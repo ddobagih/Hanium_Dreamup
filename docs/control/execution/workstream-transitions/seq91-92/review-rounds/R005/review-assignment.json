@@ -1,0 +1,275 @@
+{
+  "assigner": {
+    "id": "codex-root",
+    "task_id": "/root"
+  },
+  "authorization_binding": {
+    "byte_length": 2999,
+    "path": "docs/control/execution/workstream-transitions/seq91-92/authorization.json",
+    "sha256": "43b0dcaa38594e3f682cefcb766df332087a0118a6acd55ed53922aba9069cbd"
+  },
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "correction_reason": {
+    "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+    "failed_contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R002",
+    "failed_contract_version": "2026-08-26.1",
+    "observed_failed_test_count": 2,
+    "reason_code": "PUBLISHED_SEQ90_SYNTHETIC_REPLAY_DUPLICATED_SEQ90",
+    "remediation": "RECONSTRUCT_EXACT_SEQ89_BEFORE_SYNTHETIC_SEQ90_BOUNDARY_TEST"
+  },
+  "document_id": "WS-FP048-R002-SEQ91-92-REVIEW-ASSIGNMENT-20260826-R005",
+  "executor": {
+    "id": "codex-fp048-r002-seq91-control-executor-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl"
+  },
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "projected_transition": {
+    "completion_sequences": [
+      93,
+      94
+    ],
+    "correction_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP048-R002-CORRECTION-20260826-001",
+    "correction_sequence": 91,
+    "correction_transition": "READY_TO_READY",
+    "started_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-002",
+    "started_sequence": 92,
+    "started_transition": "READY_TO_IN_PROGRESS_AFTER_FRESH_R003_PASS"
+  },
+  "replacement_contract_binding": {
+    "canonical_contract_sha256": "e782541d53e7350da55eaef9d608d5c1a878db86bde0e7f28807527974607d9f",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R003",
+    "contract_version": "2026-08-26.2",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-003",
+    "file_sha256": "bce459dc4454b11638bc7d09320ba90671aea02c711a7b502db13e52d7b45e75",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r003.json",
+    "schema_version": "1.2"
+  },
+  "required_reviewer": {
+    "id": "codex-fp048-r002-seq91-independent-reviewer-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl/seq90_independent_review"
+  },
+  "review_scope": [
+    "exact published seq90 source CAS and seq91 adjacency",
+    "R002 root-regression failure classification and deterministic source replay",
+    "READY-to-READY status with all credit deltas zero",
+    "runtime final Git-visible managed snapshot reseal",
+    "R003 five-check private gate and conditional seq92 start",
+    "exact imported seq90 runtime dependency binding",
+    "canonical R005 review triad schema and stale R001/R002/R003/R004 result absence",
+    "pre- and post-consumer Git-visible cohort reseal",
+    "exact seq92-to-seq91 checkpoint byte reconstruction",
+    "live Git HEAD equality with the exact seq90 source mirror",
+    "seq91 event time strictly after the independent R005 review",
+    "complete direct and transitive runtime dependency source guards",
+    "runtime trust roots are the reviewed continuation checker, Goal Graph checker, FP008 hardened gate runtime/test, and seq90 correction transport",
+    "R003 adapter closure is the reviewed R002 gate/test plus seq88-89 runtime/test; refactored seq92 uses only reviewed trust roots",
+    "R003 receipt builder uses only the exact reviewed R003 contract ID, version, file SHA-256, and canonical SHA-256",
+    "seq92 precommit and postcommit gate evidence membership, 0600 mode, and canonical receipt bytes are resealed",
+    "seq92 injected checkpoint writer must execute and prove the exact commit guard",
+    "seq92 writer errors after target replacement are classified as postcommit uncertain by exact target-byte CAS",
+    "seq92 PASS receipt bytes are reconstructed in exact producer top-level and nested key order before comparison",
+    "seq92, continuation, and Goal Graph imports are limited to the final managed cohort or the exact reviewed ten-path runtime trust closure",
+    "seq92 captures the full managed and Git-visible cohort before importing Goal Graph or other reviewed runtime consumers"
+  ],
+  "reviewed_control_inputs": [
+    {
+      "byte_length": 56433,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_start_control_correction_seq91_20260826.py",
+      "sha256": "ba59ddb24c9cdbe3224514d764e36b98d052a49d5a480c8eb1233a9d89f4a09b"
+    },
+    {
+      "byte_length": 27736,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_start_control_correction_seq91_20260826.py",
+      "sha256": "dfdf0e525d2014e9806d86410c0524a65fd6872a9ce54e77fd36e30a94b6cf93"
+    },
+    {
+      "byte_length": 3882,
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r003.json",
+      "sha256": "bce459dc4454b11638bc7d09320ba90671aea02c711a7b502db13e52d7b45e75"
+    },
+    {
+      "byte_length": 20280,
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r003_20260826.py",
+      "sha256": "f6e2f65f0251107f02558cb5e3a46ad26d7ea779de14c547c728de38c5c47ed7"
+    },
+    {
+      "byte_length": 10091,
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r003_20260826.py",
+      "sha256": "9692699adbd0e7d29332087df5d5ba97bb18806922882db68431ea02919c9d0a"
+    },
+    {
+      "byte_length": 49335,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq92_20260826.py",
+      "sha256": "b40172fee085484dc397adc3471955a5ca712df751ba9e48940fc004d0bc5e21"
+    },
+    {
+      "byte_length": 34499,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq92_20260826.py",
+      "sha256": "9d004eac61458bd9ced5b4b60a088e892ce330e302d9a3c64e8b242775a4032c"
+    },
+    {
+      "byte_length": 33721,
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r002_20260826.py",
+      "sha256": "1af6109e840a2a56cb4622dccfb9eacbae6e15632f4035a329eecfe90dd5b097"
+    },
+    {
+      "byte_length": 14895,
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r002_20260826.py",
+      "sha256": "252f56aaaefa8eb55ba60a4a49cde25fd875296110efcd4060867ef425592cd1"
+    },
+    {
+      "byte_length": 61433,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+      "sha256": "4745b80ec6ab65283a9ccbb9a5082e71c1d56d8731c7ea2d04c17a30d2ca5cda"
+    },
+    {
+      "byte_length": 23832,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+      "sha256": "c1181b81f8a95425c74d7bea007d1ee098a128a42eafef8d061b977650f2f48d"
+    },
+    {
+      "byte_length": 99738,
+      "path": "scripts/apply_walksafe_fp046_goal_completed_seq54_55_20260810.py",
+      "sha256": "2f46830270ecd32cea776b40917aa0eb8e2093c25b2c24b1777fd3403d661c7d"
+    },
+    {
+      "byte_length": 77078,
+      "path": "scripts/build_walksafe_fp008_admin_review_delivery_trace_20260803.py",
+      "sha256": "c2fc02a7bf9f3ae8cd1b79e53e6c89835c8fd7b79b53f6372742f4db4576af87"
+    },
+    {
+      "byte_length": 96262,
+      "path": "scripts/build_walksafe_fp008_artifact_trace_successor_20260803.py",
+      "sha256": "b8aa2c30348100490b654064cf146dff07b1268bd231d24adc96c97419b41519"
+    },
+    {
+      "byte_length": 22398,
+      "path": "scripts/build_walksafe_fp008_gap_backlog_r024_20260803.py",
+      "sha256": "a6b0bf0bdcd6836b7436a9cc55d565bbde357ca04f000b625d620e82c438c543"
+    },
+    {
+      "byte_length": 88339,
+      "path": "scripts/build_walksafe_fp046_artifact_trace_successor_20260810.py",
+      "sha256": "53f45feaec755ef10ce38730f54740c4c3f53c22bb154e0896fd3e96bf13d9b6"
+    },
+    {
+      "byte_length": 64805,
+      "path": "scripts/build_walksafe_fp046_consent_withdrawal_deletion_trace_20260810.py",
+      "sha256": "0c91a474e406571c219e167e3c221e094e053401bef10567f6367d5e4853a21a"
+    },
+    {
+      "byte_length": 27508,
+      "path": "scripts/build_walksafe_fp046_gap_backlog_r025_20260810.py",
+      "sha256": "20c92ecaea67361912ea78085711624dfa775e777edb142577d667267e197693"
+    },
+    {
+      "byte_length": 29454,
+      "path": "scripts/build_walksafe_fp046_strict_review_gate_20260810.py",
+      "sha256": "4e97a65d4c573acbddfab3cedfcd3f80f56a81bb51217d04af237bd3bdf994cf"
+    },
+    {
+      "byte_length": 28410,
+      "path": "scripts/build_walksafe_phase1_exact257_successor_r014_20260810.py",
+      "sha256": "ae7ef87cd127bd383bd886fb6bf0ab9b3997c64e4417c9a437387bc20775ec9b"
+    },
+    {
+      "byte_length": 21323,
+      "path": "scripts/materialize_walksafe_fp048_goal_20260802.py",
+      "sha256": "0ac01107e3c40e1a4032f3364b91cefbf77dd9432d73113aca344c1793a65ec7"
+    },
+    {
+      "byte_length": 105892,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py",
+      "sha256": "f5d8ac24d05b3a0e98ece7d5d977219c37859d44d5540ba991749cbffdd63ac2"
+    },
+    {
+      "byte_length": 26198,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py",
+      "sha256": "a6d12e95e169b563f4d1642460da36c27cc43884836931ea65f81276c4fa71ad"
+    },
+    {
+      "byte_length": 169708,
+      "path": "scripts/run_walksafe_fp008_goal_start_gate_20260803.py",
+      "sha256": "0bc6f491b1a1b3fa3cbd7b1c1cc04e473c2b25258ebee9ebb0f7c9479eb24abc"
+    },
+    {
+      "byte_length": 57687,
+      "path": "tests/test_walksafe_fp008_goal_start_gate_20260803.py",
+      "sha256": "eed51cd567f25839738aa4167ce3869f24d1bb8c9c371f0035ed8fcef4716d56"
+    },
+    {
+      "byte_length": 492386,
+      "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+      "sha256": "29a58c8af883e4acb6a7f70d3174df171b369a89a05909e22be2621b81cd469c"
+    },
+    {
+      "byte_length": 247193,
+      "path": "tests/test_walksafe_project_continuation_v2_4.py",
+      "sha256": "bf69ffb92ab2e12fee45e2be7081175095ca3fe9b7b414eabea8894c582932f5"
+    },
+    {
+      "byte_length": 777949,
+      "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+      "sha256": "7373861f8f160fc59767c0b879f65136abe7c981fbda6678cbe8da937d4135a7"
+    },
+    {
+      "byte_length": 488755,
+      "path": "tests/test_walksafe_goal_graph_v2_4.py",
+      "sha256": "b20c79a936ec67a119d430fa615ab3cfd06bfeafcef71ace980e3e4d38fae9b0"
+    },
+    {
+      "byte_length": 26631,
+      "path": "scripts/run_walksafe_test_layers_current.sh",
+      "sha256": "cf630840e6f9711b123809741ef831f25eed5bd6b9ae448738738f2f3e4b6cef"
+    }
+  ],
+  "round_id": "R005",
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 2654910,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "sequence": 90,
+    "sha256": "33c691c307555a0a594356d40707ccb9862105d56cab39e7a26b49f44da778ad",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP048-R002-20260826-001",
+    "tail_event_sha256": "ba64b564f388e8598db038e8d3e20e6bf3fdada8f2ec0e5649b6b5db02fe625c"
+  },
+  "supersedes": {
+    "byte_length": 7756,
+    "disposition": "STALE_REVIEW_BLOCKED",
+    "path": "docs/control/execution/workstream-transitions/seq91-92/review-rounds/R004/review-assignment.json",
+    "reason_code": "P1_REVIEWED_RUNTIME_DEPENDENCY_CLOSURE_INCOMPLETE",
+    "reason_codes": [
+      "P1_REVIEWED_RUNTIME_DEPENDENCY_CLOSURE_INCOMPLETE",
+      "P1_R003_RECEIPT_CONTRACT_IDENTITY_NOT_SYNCHRONIZED",
+      "P0_GATE_EVIDENCE_NAMESPACE_MEMBERSHIP_NOT_RESEALED_PRE_AND_POST_PUBLICATION",
+      "P1_GATE_EVIDENCE_FILE_MODE_NOT_EXACT_0600",
+      "P1_PASS_RECEIPT_EXACT_CANONICAL_BYTES_NOT_ENFORCED",
+      "P1_INJECTED_CHECKPOINT_WRITER_COMMIT_GUARD_NOT_PROVEN",
+      "P1_SEQ92_WRITER_POSTREPLACE_ERROR_MISCLASSIFIED",
+      "P1_SEQ92_RECEIPT_KEY_ORDER_NOT_RECONSTRUCTED",
+      "P1_SEQ92_IMPORT_TRUST_RUNTIME_CLOSURE_INCOMPLETE",
+      "P1_SEQ92_RUNTIME_IMPORTED_BEFORE_COHORT_CAPTURE"
+    ],
+    "round_id": "R004",
+    "sha256": "e6cd082a9c595ef78f0d915b9ed4cfad9c922b12e1ee9ef916ce41b56835ccd7"
+  }
+}

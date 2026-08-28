@@ -1,0 +1,580 @@
+{
+  "assigner": {
+    "id": "codex-root",
+    "task_id": "/root"
+  },
+  "authorization_binding": {
+    "byte_length": 2494,
+    "path": "docs/control/execution/workstream-transitions/seq90-91/authorization.json",
+    "sha256": "65e31982d578a645d9cbfb9e72194313eac30c771c20dfdffb43d7eb2f7b13e6"
+  },
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "document_id": "WS-FP048-R002-SEQ90-91-REVIEW-ASSIGNMENT-20260826-R004",
+  "executor": {
+    "id": "codex-fp048-r002-seq90-control-executor-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl"
+  },
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "noncredit_successor_edges": {
+    "added": [
+      {
+        "path": "apps/android-gateway/test/state-encryption-maintenance.test.ts",
+        "successor": {
+          "byte_length": 17531,
+          "path": "apps/android-gateway/test/state-encryption-maintenance.test.ts",
+          "sha256": "eac9e46c24983c6df91d7b67ce8e3cbdde00797d2fc528fb54577610e27f3f52"
+        }
+      }
+    ],
+    "modified": [
+      {
+        "path": "apps/android-gateway/openapi.json",
+        "predecessor": {
+          "byte_length": 64835,
+          "path": "apps/android-gateway/openapi.json",
+          "sha256": "be9f0758f7ae80bd7e1532b0e33cafedf157f9c213628bd61b4324da84f06ae8"
+        },
+        "successor": {
+          "byte_length": 66332,
+          "path": "apps/android-gateway/openapi.json",
+          "sha256": "aa301ef0c0e567eafacaedd7cf173523461c311b5f8aa4bdc771e6cf058d0a47"
+        }
+      },
+      {
+        "path": "apps/android-gateway/src/routes.ts",
+        "predecessor": {
+          "byte_length": 38187,
+          "path": "apps/android-gateway/src/routes.ts",
+          "sha256": "804705498f65983300782fa4549b11f700ca0a964ede32a90f620a66140bc407"
+        },
+        "successor": {
+          "byte_length": 38904,
+          "path": "apps/android-gateway/src/routes.ts",
+          "sha256": "12ef104367129c14e6d2f70b68069f61bd4265ac75a9f5d8c844bb7fef0b9dd7"
+        }
+      },
+      {
+        "path": "apps/android-gateway/src/state-encryption-maintenance.ts",
+        "predecessor": {
+          "byte_length": 16946,
+          "path": "apps/android-gateway/src/state-encryption-maintenance.ts",
+          "sha256": "bcb80213d814ef348730ddd7115a54b873b70bdd5d6754bf55430e903ea4c68f"
+        },
+        "successor": {
+          "byte_length": 18311,
+          "path": "apps/android-gateway/src/state-encryption-maintenance.ts",
+          "sha256": "231a40b684a7fb3b5ab4a61b93fe2531552504b15448ed6840013f254ccb1184"
+        }
+      },
+      {
+        "path": "apps/android-gateway/test/field-long-session.test.ts",
+        "predecessor": {
+          "byte_length": 31594,
+          "path": "apps/android-gateway/test/field-long-session.test.ts",
+          "sha256": "4e3c0bd978c41595e64323c9e1b92a0ef3ffef38cdf95c973b18c170e6b7cde2"
+        },
+        "successor": {
+          "byte_length": 37515,
+          "path": "apps/android-gateway/test/field-long-session.test.ts",
+          "sha256": "748c014eb82a9c6bd38dbc56f02c6ba40fcf08b0591c117ae94435403d425d0d"
+        }
+      },
+      {
+        "path": "apps/android-gateway/test/gateway-contract.test.ts",
+        "predecessor": {
+          "byte_length": 47958,
+          "path": "apps/android-gateway/test/gateway-contract.test.ts",
+          "sha256": "b6e141da1a50fede21890dadcc6899646d92c044061975582c856338f6907fbe"
+        },
+        "successor": {
+          "byte_length": 48105,
+          "path": "apps/android-gateway/test/gateway-contract.test.ts",
+          "sha256": "2c6499fb9815611b69a6f132e59a2f317b4a2c1c5606f22529c0ec1ab620072f"
+        }
+      },
+      {
+        "path": "apps/android-gateway/test/node-adapter.test.ts",
+        "predecessor": {
+          "byte_length": 5656,
+          "path": "apps/android-gateway/test/node-adapter.test.ts",
+          "sha256": "99d5e52d3d313d21e8a191700cd3cef67c000b401dd8f60ebcaa437ea757bccb"
+        },
+        "successor": {
+          "byte_length": 6169,
+          "path": "apps/android-gateway/test/node-adapter.test.ts",
+          "sha256": "e42bfa208e0eb03a566f8bf339477924d195038e786142b3b7675d3b0e46523f"
+        }
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "predecessor": {
+          "byte_length": 929714,
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "sha256": "7cf49ad23b268ebd52809055879b734d81e7cf7215c44c94f9196b20d5b4e865"
+        },
+        "successor": {
+          "byte_length": 939879,
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "sha256": "8eff5d6a426a1e3eb54c681bb9fae4cd2231a752c92db360cdc3490388aa6ffb"
+        }
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+        "predecessor": {
+          "byte_length": 43189,
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+          "sha256": "da4188391201d2bc41ffe38dee98aef8939eba8068b522b2d14b02d3073b0fb3"
+        },
+        "successor": {
+          "byte_length": 44059,
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+          "sha256": "354ebcebcab20b7f593381ed9f94f22fe6e5d7fbfb3ea2ead6697fef2357ae67"
+        }
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+        "predecessor": {
+          "byte_length": 41210,
+          "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+          "sha256": "a9b6c144d225d05fa2f80c70f0b455088e284a301a81d78666e294af448affa5"
+        },
+        "successor": {
+          "byte_length": 45338,
+          "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+          "sha256": "db3e11d22f6b2371d0530385cfaaf7aa596662140337915731bdc97583a884b4"
+        }
+      },
+      {
+        "path": "backend/.env.example",
+        "predecessor": {
+          "byte_length": 5615,
+          "path": "backend/.env.example",
+          "sha256": "70b43d743418672fcc47de0e60bdf9237389b89eb736e8d50cf467b6006e6c19"
+        },
+        "successor": {
+          "byte_length": 6034,
+          "path": "backend/.env.example",
+          "sha256": "1bd7b6fdc333ccaf18e59cb5315746eb6c99494c8bd13615108c576f3cf6c4b0"
+        }
+      },
+      {
+        "path": "backend/app/api/health.py",
+        "predecessor": {
+          "byte_length": 19738,
+          "path": "backend/app/api/health.py",
+          "sha256": "ab477d4ea0a9ec2ce68498950eb058121fe66c8a26d28d087a335bbae4a4b9f2"
+        },
+        "successor": {
+          "byte_length": 22779,
+          "path": "backend/app/api/health.py",
+          "sha256": "443b09ada14bcb8bc5094f751489f14ced4c20025835055918e0fc0775c46269"
+        }
+      },
+      {
+        "path": "backend/app/api/reports.py",
+        "predecessor": {
+          "byte_length": 99900,
+          "path": "backend/app/api/reports.py",
+          "sha256": "ec7d2fec00676fd54ee2278ba8b77dbc393e3d13cc68df9c060374445831b922"
+        },
+        "successor": {
+          "byte_length": 104147,
+          "path": "backend/app/api/reports.py",
+          "sha256": "ba69c564ab8f2afbdef3a523a10401d225707785656d8eaf1437a2a8cebbb468"
+        }
+      },
+      {
+        "path": "backend/app/config.py",
+        "predecessor": {
+          "byte_length": 44292,
+          "path": "backend/app/config.py",
+          "sha256": "0101b5b7d1ab9c06590a270b464bb6ac48831bfa3b5cc84ceab587caab91106d"
+        },
+        "successor": {
+          "byte_length": 50757,
+          "path": "backend/app/config.py",
+          "sha256": "3ed10456cb68b9688a478dbc172630532f4ee0eaef72310e4d30ac4ff4b89125"
+        }
+      },
+      {
+        "path": "backend/app/field_test_security.py",
+        "predecessor": {
+          "byte_length": 48282,
+          "path": "backend/app/field_test_security.py",
+          "sha256": "4f181ccc655ead15d3a58ff4b5cd88b299dbe39adb6572290ac9a7b562fd16e1"
+        },
+        "successor": {
+          "byte_length": 48387,
+          "path": "backend/app/field_test_security.py",
+          "sha256": "8ead2aa6f27549aeaf1d4faba3c526abfe1c4869b2eaeee6ed59868547f0707e"
+        }
+      },
+      {
+        "path": "backend/app/main.py",
+        "predecessor": {
+          "byte_length": 6269,
+          "path": "backend/app/main.py",
+          "sha256": "16799466412e8962c9df17c96fc8dc782d9a1b63e7208d219fb6baf3c29db77c"
+        },
+        "successor": {
+          "byte_length": 8920,
+          "path": "backend/app/main.py",
+          "sha256": "becc7fd71e23b070fc311392f7fce6cd8d650739150efa7e09f4295a7662b6b6"
+        }
+      },
+      {
+        "path": "backend/app/services/privacy_lifecycle.py",
+        "predecessor": {
+          "byte_length": 61567,
+          "path": "backend/app/services/privacy_lifecycle.py",
+          "sha256": "8043cf5c548b19d5258ba2abbf55dd33a37481acdc37d7f9156835026500ca32"
+        },
+        "successor": {
+          "byte_length": 80103,
+          "path": "backend/app/services/privacy_lifecycle.py",
+          "sha256": "ad91b09edb4566355c4721af2d78d706700f2d6865e1a2bf74442f798b03fa02"
+        }
+      },
+      {
+        "path": "backend/tests/test_admin_device_proof.py",
+        "predecessor": {
+          "byte_length": 87799,
+          "path": "backend/tests/test_admin_device_proof.py",
+          "sha256": "0276194d37cefa955cca09933ec2fe7f236f6d67c5199711228adc06d6d499cb"
+        },
+        "successor": {
+          "byte_length": 87799,
+          "path": "backend/tests/test_admin_device_proof.py",
+          "sha256": "8db040ecbc266b0fc6426eb8d52bb6842be4f6f3fb1dde3cf71852fff6e23b10"
+        }
+      },
+      {
+        "path": "backend/tests/test_admin_runtime_acl_hardening.py",
+        "predecessor": {
+          "byte_length": 51596,
+          "path": "backend/tests/test_admin_runtime_acl_hardening.py",
+          "sha256": "4ba8105bb51838bcc148e669adb87fce9abdef5064430e5ea31e567397427977"
+        },
+        "successor": {
+          "byte_length": 51596,
+          "path": "backend/tests/test_admin_runtime_acl_hardening.py",
+          "sha256": "5170f7b384ac80b8c01536cec1f099cb10078bfde0d521e27790046160314479"
+        }
+      },
+      {
+        "path": "backend/tests/test_admin_security.py",
+        "predecessor": {
+          "byte_length": 189546,
+          "path": "backend/tests/test_admin_security.py",
+          "sha256": "97c08b17800d76c720a0fa615fee9025e2ad57c5278e01b2d04c901dc49f9acd"
+        },
+        "successor": {
+          "byte_length": 190607,
+          "path": "backend/tests/test_admin_security.py",
+          "sha256": "5f2a33b8728a300df5bc2fd12bb11f2acb05c54e9f68897b9b491ad8acb8f4a3"
+        }
+      },
+      {
+        "path": "backend/tests/test_field_test_security.py",
+        "predecessor": {
+          "byte_length": 48389,
+          "path": "backend/tests/test_field_test_security.py",
+          "sha256": "934f874f896430c4a76b9d4978e2fd39a1abdb177bf0df25c53f549d9f82a1b6"
+        },
+        "successor": {
+          "byte_length": 50260,
+          "path": "backend/tests/test_field_test_security.py",
+          "sha256": "18094e8ba299a30e352ccaa4c60c3b1eb7f04931266df44f2ad8c4947bf210d6"
+        }
+      },
+      {
+        "path": "backend/tests/test_fp046_postgres_integration.py",
+        "predecessor": {
+          "byte_length": 113346,
+          "path": "backend/tests/test_fp046_postgres_integration.py",
+          "sha256": "0685e211c488d7cacf2ade79c3904aaa032827c6bf30799bd40efe46be83dda3"
+        },
+        "successor": {
+          "byte_length": 117948,
+          "path": "backend/tests/test_fp046_postgres_integration.py",
+          "sha256": "362b04fd4d3b64afdaff2d491c388ef6b7ed124600bad38bdcd307dd498ff5b1"
+        }
+      },
+      {
+        "path": "backend/tests/test_health_readiness.py",
+        "predecessor": {
+          "byte_length": 25338,
+          "path": "backend/tests/test_health_readiness.py",
+          "sha256": "510a28701666a25bc6ade6e2b2adbbdfa1360b7315f9724ebca5f310394db84a"
+        },
+        "successor": {
+          "byte_length": 30523,
+          "path": "backend/tests/test_health_readiness.py",
+          "sha256": "277c756ba87752036456157d1d148a9f379c669fad88e9c041f485179f86744e"
+        }
+      },
+      {
+        "path": "backend/tests/test_reports.py",
+        "predecessor": {
+          "byte_length": 22330,
+          "path": "backend/tests/test_reports.py",
+          "sha256": "7ff10bb428fcfd5977b7c51076488c6bd6eec3152f2255f297a5b47c57e98a83"
+        },
+        "successor": {
+          "byte_length": 22330,
+          "path": "backend/tests/test_reports.py",
+          "sha256": "28df6b9856d19f89af3b152008e96fdd22db0759cf3416a7d2ff80c5efe5b71c"
+        }
+      },
+      {
+        "path": "contracts/walksafe.openapi.json",
+        "predecessor": {
+          "byte_length": 215129,
+          "path": "contracts/walksafe.openapi.json",
+          "sha256": "7b6618ed7805c8cc0d25de78b40e7b9ec15da4a7aa4c367133aa39a030aa606c"
+        },
+        "successor": {
+          "byte_length": 217412,
+          "path": "contracts/walksafe.openapi.json",
+          "sha256": "82390bdae9de6ca7b068c288dcc3aca013287a77e3983c283379f3a4af66fb7e"
+        }
+      },
+      {
+        "path": "deploy/README.md",
+        "predecessor": {
+          "byte_length": 3303,
+          "path": "deploy/README.md",
+          "sha256": "670bcfe87f15020e86104b40e9877905a14d3735f1150f63a465b133ecd6c09f"
+        },
+        "successor": {
+          "byte_length": 6141,
+          "path": "deploy/README.md",
+          "sha256": "63285f6f0e332b7f0b402a2c4e4f39f4b2da90189c17fd5b06473e8a618d5595"
+        }
+      },
+      {
+        "path": "deploy/config/walksafe-backend.env.example",
+        "predecessor": {
+          "byte_length": 4470,
+          "path": "deploy/config/walksafe-backend.env.example",
+          "sha256": "bc9e34f91402b8b2e71d759294b0f56f54ce701e25402221ca3d61586bbb9618"
+        },
+        "successor": {
+          "byte_length": 4988,
+          "path": "deploy/config/walksafe-backend.env.example",
+          "sha256": "9dd95618f37eaa1bb2660d74733180040f8c1268bf6895ee100f24df190293a7"
+        }
+      },
+      {
+        "path": "scripts/backup_walksafe_data_20260711.sh",
+        "predecessor": {
+          "byte_length": 37926,
+          "path": "scripts/backup_walksafe_data_20260711.sh",
+          "sha256": "e7f7b23667c3c5d461b4ee2fb91761c5bf451d33e20a062f3ea087fda56d5452"
+        },
+        "successor": {
+          "byte_length": 45217,
+          "path": "scripts/backup_walksafe_data_20260711.sh",
+          "sha256": "524b4c7b23771ab898391c26520a1a55ac14c1f3280234bb497aba399e54d819"
+        }
+      },
+      {
+        "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+        "predecessor": {
+          "byte_length": 59894,
+          "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+          "sha256": "6e3f9ff83d9e73e8330285940fb1cf973ce96b45ed11806430d3dfa46e61c1db"
+        },
+        "successor": {
+          "byte_length": 60949,
+          "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+          "sha256": "6886532d309af65c4d570c51283638faf77167e3962cc53c802aed7673506f75"
+        }
+      },
+      {
+        "path": "scripts/walksafe_backup_integrity.py",
+        "predecessor": {
+          "byte_length": 167511,
+          "path": "scripts/walksafe_backup_integrity.py",
+          "sha256": "54370dcf6df5ce1efdcc813d2300e6cf6ecb55889c5efdb8a67b0abc04b0188a"
+        },
+        "successor": {
+          "byte_length": 175198,
+          "path": "scripts/walksafe_backup_integrity.py",
+          "sha256": "c3c7b06990c24d92ee7b6ec9cafb13c7da0191dc4b35300405d3b9b0862646bd"
+        }
+      },
+      {
+        "path": "tests/test_report_retention_operational_safety.py",
+        "predecessor": {
+          "byte_length": 18873,
+          "path": "tests/test_report_retention_operational_safety.py",
+          "sha256": "83def3826dbf3701029f2c1c66f9c4292aee50a809220b71556d6309cd8a7369"
+        },
+        "successor": {
+          "byte_length": 22944,
+          "path": "tests/test_report_retention_operational_safety.py",
+          "sha256": "2bd74cc71327eed84db131dcb84fadb154ef6d588410182d07a7fafcb213ef61"
+        }
+      },
+      {
+        "path": "tests/test_walksafe_backup_integrity.py",
+        "predecessor": {
+          "byte_length": 92321,
+          "path": "tests/test_walksafe_backup_integrity.py",
+          "sha256": "3d0aefc9cc315ae2d316ca5c78c37e0cbc38dc8a88a853299ebad26e4bb7f730"
+        },
+        "successor": {
+          "byte_length": 100156,
+          "path": "tests/test_walksafe_backup_integrity.py",
+          "sha256": "a9fce5c60a097b9efd7e6ebbf50a6a2e7131a5e70e14db8e5e83079aa479f8b7"
+        }
+      }
+    ]
+  },
+  "noncredit_successor_edges_sha256": "c0415e6a110939d665b7f65972f014dbb84611b550c25c173d2bd518efa1d4ff",
+  "projected_transition": {
+    "reanchor_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP048-R002-20260826-001",
+    "reanchor_sequence": 90,
+    "reanchor_status_change": {},
+    "reanchor_transition": "READY_TO_READY",
+    "started_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-001",
+    "started_sequence": 91,
+    "started_transition": "READY_TO_IN_PROGRESS_AFTER_FRESH_PASS"
+  },
+  "replacement_contract_binding": {
+    "canonical_contract_sha256": "1664b922e6dbc0d7a07896b81de79cbcadbd548ce5de8646a21051fe72dce582",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R002",
+    "contract_version": "2026-08-26.1",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-002",
+    "file_sha256": "874a016a8f19b6238ea04cd17c73e06d7086cee0a4d013a66358893d59875211",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r002.json",
+    "schema_version": "1.1"
+  },
+  "required_reviewer": {
+    "id": "codex-fp048-r002-seq90-independent-reviewer-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl/seq90_independent_review"
+  },
+  "review_scope": [
+    "exact seq89 source CAS and append-only seq90 lineage",
+    "runtime final Git-visible managed cohort",
+    "exact reviewed noncredit root predecessor/successor edges",
+    "READY-to-READY status and zero-credit boundary",
+    "R002 five-check private gate and conditional seq91 start",
+    "source/review/ABA drift fail-closed behavior"
+  ],
+  "reviewed_control_inputs": [
+    {
+      "byte_length": 5833,
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r002.json",
+      "sha256": "874a016a8f19b6238ea04cd17c73e06d7086cee0a4d013a66358893d59875211"
+    },
+    {
+      "byte_length": 103971,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py",
+      "sha256": "925bdfde40c753f931f0db2f9d17991507c5106ac27e9555a786f8a7fc5f2b4f"
+    },
+    {
+      "byte_length": 24612,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py",
+      "sha256": "2263ab43dba0d0583d31450254dcfd13bcc05db8aa58370dba1ff0398a586f99"
+    },
+    {
+      "byte_length": 33721,
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r002_20260826.py",
+      "sha256": "1af6109e840a2a56cb4622dccfb9eacbae6e15632f4035a329eecfe90dd5b097"
+    },
+    {
+      "byte_length": 14895,
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r002_20260826.py",
+      "sha256": "252f56aaaefa8eb55ba60a4a49cde25fd875296110efcd4060867ef425592cd1"
+    },
+    {
+      "byte_length": 24486,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq91_20260826.py",
+      "sha256": "663ce3144a033e667cd3b85ec7dbcd121259d78b0bcfbc4013573866cad6ea82"
+    },
+    {
+      "byte_length": 13701,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq91_20260826.py",
+      "sha256": "c579ab8f1bb39ea75db5c53c069d535a95cd4388263c0e00a3d0dedde6ad1c57"
+    },
+    {
+      "byte_length": 475384,
+      "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+      "sha256": "776960bf8c708f2d3bf331a16326b295e405005519ff80af48cbbe5a06aafd04"
+    },
+    {
+      "byte_length": 240836,
+      "path": "tests/test_walksafe_project_continuation_v2_4.py",
+      "sha256": "8a123d77c7a68ea1cbcfa1c2f4e1849ddba2b58a298d7fd3a0554f2f3c632ab8"
+    },
+    {
+      "byte_length": 759711,
+      "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+      "sha256": "df7c817e6fdc8a4c506da6acd619848e8d89f32e6f2206aa0cf39b85200da5af"
+    },
+    {
+      "byte_length": 481158,
+      "path": "tests/test_walksafe_goal_graph_v2_4.py",
+      "sha256": "b707443dfd755b4299420d53568e4a70b01990f9c4c0885d0d7dbc254948594d"
+    },
+    {
+      "byte_length": 7918,
+      "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005/implementation-start-gate-receipt.json",
+      "sha256": "3bd3ba0bb29d85008f6f5697d807bce2731235362167e69e295e42dd20bff6f1"
+    },
+    {
+      "byte_length": 57807,
+      "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005/05-REPOSITORY_STATE.log",
+      "sha256": "5f379f176ab1c346786f0002a57a6ff74747677dab984f44a30ecf1c0817db16"
+    },
+    {
+      "byte_length": 8263,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/completion-receipt-r005.json",
+      "sha256": "1298a60b3fc484280c41bd1409d9d503b4fc7581fc0fe59109af7d757584d409"
+    },
+    {
+      "byte_length": 43053,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/review-rounds/R005/review-subject.json",
+      "sha256": "2aad9065c8f10ab84831f7aad0d47f8aa2b4ba3841652426b45a450faba3d6ce"
+    }
+  ],
+  "round_id": "WS-FP048-R002-SEQ90-91-REVIEW-20260826-R004",
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 2600767,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "sequence": 89,
+    "sha256": "c2ce759ff1b469d31dba266a47a91ca1e835869c011b6bed067fe6963c578e3d",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP048-R002-20260825-001",
+    "tail_event_sha256": "bb2594af4342c156df68a1b10b6c806ae91b4694edec864bb16f56236c8c53b0"
+  },
+  "supersedes": {
+    "byte_length": 7069,
+    "disposition": "REJECTED_BY_PREFLIGHT_BLOCKER",
+    "path": "docs/control/execution/workstream-transitions/seq90-91/review-rounds/R003/review-assignment.json",
+    "reason_code": "DIRECT_GATE_EVIDENCE_WAS_INCLUDED_IN_PERSISTED_MANAGED_SNAPSHOT",
+    "round_id": "WS-FP048-R002-SEQ90-91-REVIEW-20260826-R003",
+    "sha256": "66f023ae1b61542c17fe5dd2ef9155e2cd015ad197948a02e4b53bed9cf9d476"
+  }
+}

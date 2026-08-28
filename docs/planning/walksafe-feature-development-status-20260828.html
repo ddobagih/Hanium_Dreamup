@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="WalkSafe 기능 개발 우선순위와 제어 자동화 보류 결정">
+  <title>WalkSafe 기능 개발 상태와 다음 구현 순서</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17231e;
+      --muted: #5c6962;
+      --paper: #f4f1e9;
+      --card: #fffefa;
+      --line: #d7d8d1;
+      --green: #17634b;
+      --green-soft: #e5f3eb;
+      --amber: #865b0c;
+      --amber-soft: #fff2cf;
+      --red: #953f38;
+      --red-soft: #fae8e4;
+      --blue: #245c78;
+      --blue-soft: #e7f1f7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+      line-height: 1.65;
+      word-break: keep-all;
+    }
+    .page { width: min(1080px, calc(100% - 28px)); margin: 0 auto; padding: 28px 0 56px; }
+    header, section, aside {
+      margin-bottom: 16px;
+      padding: clamp(22px, 4vw, 38px);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--card);
+    }
+    header { color: #fff; background: linear-gradient(135deg, #143d31, #245c78); }
+    h1, h2 { margin: 0 0 14px; line-height: 1.25; }
+    h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+    h2 { font-size: clamp(1.35rem, 3vw, 2rem); }
+    p { margin: .65em 0; }
+    ul, ol { padding-left: 1.35em; }
+    li + li { margin-top: .42em; }
+    code { padding: .12em .35em; border-radius: 5px; background: #efeee8; color: #24372f; }
+    .meta { color: #dfece7; }
+    .decision { border-color: #e2bd66; background: var(--amber-soft); }
+    .done { border-color: #a8cfbc; background: var(--green-soft); }
+    .later { border-color: #a9c9db; background: var(--blue-soft); }
+    .danger { border-color: #ddb0aa; background: var(--red-soft); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    .card h3 { margin: 0 0 8px; }
+    .badge { display: inline-block; margin-bottom: 8px; padding: 4px 9px; border-radius: 999px; font-size: .78rem; font-weight: 800; }
+    .badge.done { color: var(--green); }
+    .badge.partial { color: var(--amber); background: var(--amber-soft); }
+    .badge.missing { color: var(--red); background: var(--red-soft); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; font-size: .92rem; }
+    th, td { padding: 12px 14px; border-top: 1px solid var(--line); vertical-align: top; text-align: left; }
+    thead th { border-top: 0; background: #f1f4f1; }
+    .small { color: var(--muted); font-size: .88rem; }
+    a { color: var(--blue); text-underline-offset: 3px; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <p>WalkSafe · 기능 개발 기준 · 2026-08-28</p>
+      <h1>기능 개발 상태와<br>다음 구현 순서</h1>
+      <p class="meta">코드·테스트·최근 작업 기록을 대조한 현재 기준입니다.</p>
+    </header>
+
+    <aside class="decision">
+      <h2>결정: 개발 중 제어 자동화는 중단</h2>
+      <p><strong>체크포인트 sequence 변경, 코드 해시 봉인, 검토 라운드, Goal 상태 전환 자동화는 더 진행하지 않는다.</strong></p>
+      <ul>
+        <li>기존 기록은 삭제하거나 덮어쓰지 않고 과거 기록으로만 보존한다.</li>
+        <li>기능 개발 중에는 일반 단위·기능·통합 테스트와 간단한 daylog만 사용한다.</li>
+        <li>모든 로컬 기능이 완성된 뒤 출시 후보를 고정할 때만 제어 자동화를 다시 검토한다.</li>
+        <li>cloud·정식시험·실운영 증거는 최종 완성 뒤 Wave 5에서 만든다.</li>
+      </ul>
+      <p class="small">이 결정은 기존 로컬 실행 계획의 seq100/101/102 제어 작업보다 우선한다.</p>
+    </aside>
+
+    <section class="done">
+      <h2>이미 로컬 구현된 기능</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>보안·서버 기능</h3>
+          <ul>
+            <li>개인정보 요청 오류 수정과 계정 삭제 API 경로 연결</li>
+            <li>서버 신고자료 실제 삭제 one-shot과 최소권한 역할</li>
+            <li>서버 용량 상태의 Backend → Gateway → Android 전달</li>
+            <li>readiness, 내부 health, 제한 telemetry, 백업·복원 실행 틀</li>
+            <li>7종 암호화 상태의 일괄 키 회전</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Android 사용자 기능</h3>
+          <ul>
+            <li>경로 이탈 감지와 사용자 선택형 재탐색</li>
+            <li>TMAP·GPS·진행방향·보폭 책임 분리</li>
+            <li>점자블록은 신뢰 가능한 TMAP 경로에서만 보조</li>
+            <li>오프라인 TTS 실패 시 안전정지</li>
+            <li>권한·장애 발생 시 접근 가능한 종료·설정·재검사 화면</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>남은 실제 기능과 구현 순서</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>순서</th><th>기능</th><th>현재 상태</th><th>남은 구현</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td><strong>위험안내 안전 계약</strong><br><code>FP-020</code></td>
+              <td>부분 구현</td>
+              <td>STOP 문구를 “멈추세요. 주변을 확인하세요.”로 고정하고 WARNING 고유 진동을 추가한다. 현재 코드와 요구사항이 직접 충돌하므로 가장 먼저 수정한다.</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td><strong>탐지·거리·카메라 품질</strong><br><code>FP-019·021</code></td>
+              <td>부분 구현</td>
+              <td>승인 모델·class allowlist 결속, 불확실 후보 무안내, 반복 실패 안전정지, 밝기·가림·흔들림·장착각·신선도와 탐지 후 거리·신뢰도 gate를 한 pipeline으로 마무리한다. 운영 임계값 승인은 실기기 시험 뒤로 둔다.</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td><strong>음성 명령·접근성 완결</strong><br><code>FP-025·026·028·030</code></td>
+              <td>부분 구현</td>
+              <td>버튼식 1회 인식에 더해 “길라잡이” 호출어와 듣기 시작·끝 신호를 구현한다. 빠진 pause/resume 및 비가역 명령 확인, 전체 화면의 읽기 순서·포커스·큰 글자·대비·터치영역을 완결한다.</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td><strong>원본자료 수집·보존·삭제</strong><br><code>EPIC-07</code></td>
+              <td>핵심 미구현</td>
+              <td>영상·음성·정확 위치·센서·경로·탐지·신고·성능의 공통 manifest/chunk, 단말 암호화 append 저장소, 서버 checksum·멱등 수신·검역, receipt 뒤 단말 삭제, 저장소별 보존·삭제를 구현한다.</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td><strong>자동신고 암호화 대기열</strong><br><code>EPIC-08</code></td>
+              <td>핵심 미구현</td>
+              <td>현재 꺼져 있는 영속 queue를 구현한다. 보행 중 전송 금지, 종료 뒤 허용한 통신망에서만 전송, 재부팅 복구, 30일·byte 상한, 멱등 재시도, 서버 receipt 뒤 단말 사본 삭제를 연결한다.</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td><strong>기기 자원·중앙 안전정지</strong><br><code>EPIC-09</code></td>
+              <td>부분 구현</td>
+              <td>저장공간·배터리·발열·카메라 신선도·추론 지연을 감시하고, 안전 핵심 장애는 전체 정지하며 자료 전송 장애만 조용히 보류하도록 통합한다.</td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td><strong>모델·앱·설정 수명주기</strong><br><code>EPIC-10·11</code></td>
+              <td>부분 구현</td>
+              <td>데이터 출처·동의·철회, 독립 평가, 승인 모델·앱·설정 묶음, 이전 정상판 복구와 단계 업데이트를 출시 후보 단위로 완성한다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="later">
+      <h2>최종 완성 뒤에만 할 작업</h2>
+      <p>다음 항목은 지금 기능 구현 목록에서 제외한다.</p>
+      <ul>
+        <li>Google/AWS 무료 cloud 환경, 운영 DB, DNS/TLS, Secret Manager/KMS</li>
+        <li>실제 backup → 격리 restore, migration, rollback, 삭제 scheduler 활성화</li>
+        <li>중앙 dashboard, alert 전달, 주·대체 on-call</li>
+        <li>실기기·현장·TalkBack 시험, 정식시험 279건, 출시 gate 5개</li>
+        <li>staging·production canary와 운영 인계</li>
+        <li>보류한 체크포인트·해시·승인 자동화 재개 여부 결정</li>
+      </ul>
+    </aside>
+
+    <aside class="danger">
+      <h2>바로 다음 한 가지</h2>
+      <p><strong>위험안내의 STOP 문구와 WARNING 진동부터 수정한다.</strong> 외부 계정이나 운영 환경이 필요 없고, 현재 코드와 확정 요구사항의 충돌이 명확해 가장 짧게 끝낼 수 있는 실제 기능 작업이다.</p>
+    </aside>
+
+    <section>
+      <h2>판정 근거</h2>
+      <ul>
+        <li><a href="walksafe-local-feature-execution-plan-20260826.html">기존 로컬 기능 실행 계획</a></li>
+        <li><a href="walksafe-security-server-operations-next-plan-20260825.html">보안·서버 Wave 3·4·5 계획</a></li>
+        <li><a href="../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/README.md">Android Navigation 현재 구현 설명</a></li>
+        <li><a href="../control/audits/walksafe-implementation-remediation-backlog-20260825-r030.json">전체 구현 backlog R030</a></li>
+        <li><a href="../../daylog/2026-08-25.md">보안·서버 Wave 1~4 구현 기록</a></li>
+        <li><a href="../../daylog/2026-08-26.md">FP-048·FP-023 구현 기록</a></li>
+      </ul>
+      <p class="small">R030은 2026-08-25 이후 구현을 반영하지 못하므로 실제 코드와 8월 25~26일 기록을 우선해 상태를 보정했다.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+{
+  "claim_boundary": {
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "goal_started": false,
+    "intended_use": "ADD_ONLY_SEQ93_BRANCH_SEMANTICS_REANCHOR_THEN_PRIVATE_GATE_AND_SEQ94_START",
+    "product_implementation_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "seq92_contract_correction_event_modified": false,
+    "start_gate_status": "NOT_RUN",
+    "test_credit_delta": 0
+  },
+  "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R005",
+  "contract_version": "2026-08-26.4",
+  "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-005",
+  "gate_purpose": "INITIAL_START",
+  "ordered_checks": [
+    {
+      "check_id": "CONTINUATION",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json"
+    },
+    {
+      "check_id": "GOAL_GRAPH",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_goal_graph_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json"
+    },
+    {
+      "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "command": "PYTHON_BIN=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python bash scripts/run_walksafe_test_layers_current.sh validate"
+    },
+    {
+      "check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_apply_walksafe_fp048_r002_goal_start_branch_semantics_reanchor_seq93_20260826.py tests/test_walksafe_fp048_r002_goal_start_gate_r005_20260826.py tests/test_apply_walksafe_fp048_r002_goal_started_seq94_20260826.py"
+    },
+    {
+      "check_id": "REPOSITORY_STATE",
+      "command": ": \"${WALKSAFE_GATE_EVENT_ID:?required}\" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json --print-gate-repository-state --gate-event-id \"${WALKSAFE_GATE_EVENT_ID}\""
+    }
+  ],
+  "schema_version": "1.2",
+  "successor_reason_code": "SEQ93_BRANCH_SEMANTICS_REANCHOR_AND_FRESH_GATE_REQUIRED",
+  "supersedes": {
+    "byte_length": 3494,
+    "canonical_sha256": "bf15183080b2ba0237109792a8c44ff2a7811c965f6155343f55523c543467b0",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R004",
+    "contract_version": "2026-08-26.3",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-004",
+    "file_sha256": "f0b4dfaa18bed37a4b33b6b3520bb19261268cdc57244de23bf0815a10062485",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r004.json",
+    "source_reanchor_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP048-R002-BRANCH-SEMANTICS-20260826-001",
+    "source_reanchor_event_sequence": 93
+  },
+  "target_goal_content_sha256": "c7632800335cd9f816b382d91ea0420a53741ae7648c04c5e9c36c3e9fc42014",
+  "target_goal_id": "WS-GOAL-EPIC-03-FP-048-R002"
+}

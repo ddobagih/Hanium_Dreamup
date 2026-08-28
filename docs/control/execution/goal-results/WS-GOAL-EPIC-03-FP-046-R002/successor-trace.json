@@ -1,0 +1,30 @@
+{
+  "completed_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_review_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "document_id": "WS-FP046-R002-SUCCESSOR-TRACE-20260825-001",
+  "future_transition": "seq88 GOAL_SUPERSEDED then seq89 GOAL_READY",
+  "next_action": "FP-048 R002에서 7종 state rotation을 all-or-nothing으로 재개한다.",
+  "ready_or_started_event_claimed": false,
+  "status": "PLANNED_NOT_ACTIVATED",
+  "successor_gap_id": "GAP-057",
+  "successor_goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "successor_work_item_id": "EPIC-03-FP048-ENCRYPTION-CONNECTION-SECURITY-INCIDENT",
+  "verification_binding": {
+    "byte_count": 1368,
+    "document_id": "WS-FP046-R002-VERIFICATION-RESULT-20260825-001",
+    "file_sha256": "567b781005b948008ebe24dec38b3a021d68880928789486eefe2b30c2480eee",
+    "mutable": false,
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/verification-result.json"
+  }
+}

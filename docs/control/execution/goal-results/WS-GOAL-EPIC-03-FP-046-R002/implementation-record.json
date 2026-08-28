@@ -1,0 +1,110 @@
+{
+  "closed_findings": [
+    "FP046-RATE-GROUP-PRIVACY-CHECK-OMISSION",
+    "FP046-NGINX-ACCOUNT-DELETION-INGRESS-OMISSION"
+  ],
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_review_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "document_id": "WS-FP046-R002-IMPLEMENTATION-RECORD-20260825-001",
+  "excluded_concurrent_noncredit_paths": [
+    {
+      "path": "backend/app/api/health.py",
+      "reason": "mixed Wave2 capacity/worker, shared runner, or generated catalog delta; present in the live snapshot but excluded from FP046 R002 credit"
+    },
+    {
+      "path": "backend/tests/test_fp046_postgres_integration.py",
+      "reason": "mixed Wave2 capacity/worker, shared runner, or generated catalog delta; present in the live snapshot but excluded from FP046 R002 credit"
+    },
+    {
+      "path": "backend/alembic/versions/202608250002_account_deletion_worker_role.py",
+      "reason": "mixed Wave2 capacity/worker, shared runner, or generated catalog delta; present in the live snapshot but excluded from FP046 R002 credit"
+    },
+    {
+      "path": "scripts/account_deletion_worker.py",
+      "reason": "mixed Wave2 capacity/worker, shared runner, or generated catalog delta; present in the live snapshot but excluded from FP046 R002 credit"
+    },
+    {
+      "path": "scripts/run_walksafe_test_layers_current.sh",
+      "reason": "mixed Wave2 capacity/worker, shared runner, or generated catalog delta; present in the live snapshot but excluded from FP046 R002 credit"
+    },
+    {
+      "path": "scripts/generate_repository_catalogs.py",
+      "reason": "mixed Wave2 capacity/worker, shared runner, or generated catalog delta; present in the live snapshot but excluded from FP046 R002 credit"
+    },
+    {
+      "path": "docs/catalogs/repository-paths.json",
+      "reason": "mixed Wave2 capacity/worker, shared runner, or generated catalog delta; present in the live snapshot but excluded from FP046 R002 credit"
+    },
+    {
+      "path": "docs/catalogs/scripts.json",
+      "reason": "mixed Wave2 capacity/worker, shared runner, or generated catalog delta; present in the live snapshot but excluded from FP046 R002 credit"
+    },
+    {
+      "path": "docs/catalogs/tests.json",
+      "reason": "mixed Wave2 capacity/worker, shared runner, or generated catalog delta; present in the live snapshot but excluded from FP046 R002 credit"
+    }
+  ],
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "implementation_files": [
+    {
+      "byte_count": 1048,
+      "path": "backend/alembic/versions/202608250001_actor_rate_limit_privacy_group.py",
+      "sha256": "d4536835e830b1abaae0f18a3ea708551623c8b1a02839a449d68c6d2096d494"
+    },
+    {
+      "byte_count": 5770,
+      "path": "backend/tests/test_actor_rate_limit_store.py",
+      "sha256": "89b4a57515cdd7bcd71d6d10c6e0af16c73132734e33978571ead1bbb12db7fc"
+    },
+    {
+      "byte_count": 3517,
+      "path": "deploy/nginx/walksafe-android-gateway.conf.example",
+      "sha256": "33bce150012f2b8003890ff66f2a6005e764e1c0c1dab89bac545d58af4aee9b"
+    },
+    {
+      "byte_count": 11390,
+      "path": "configs/walksafe_product_boundary_20260722.json",
+      "sha256": "77e0492abc807752f49e901848cf7107c091dfff3005d113dc352fd12a3d5a73"
+    },
+    {
+      "byte_count": 6450,
+      "path": "tests/test_walksafe_android_gateway_ingress_current.py",
+      "sha256": "375e3831ca15b0ff741c44f6f0191a068b99ad7e0fdf977307d0baeb2ec4ec61"
+    },
+    {
+      "byte_count": 15454,
+      "path": "tests/test_walksafe_android_product_boundary.py",
+      "sha256": "efc3a66ebf3b0526e250bfa854c3677046e1e660981fbae93f282fb759f1a8d8"
+    }
+  ],
+  "r030_bindings": [
+    {
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260825-030",
+      "file_sha256": "ae37dc814f7bbc05861f329f4c0a05e01e2362a922ac6f232a3c86846c48df66",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260825-r030.json",
+      "role": "IMPLEMENTATION_GAP"
+    },
+    {
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260825-030",
+      "file_sha256": "e60301254dcdcdc18216e2640755f1726c5127d1e37bf520b167db34dd02ac83",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260825-r030.json",
+      "role": "IMPLEMENTATION_BACKLOG"
+    }
+  ],
+  "result": "PASS_INTERNAL_STATIC_ONLY",
+  "source_event": {
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005",
+    "event_sha256": "84758c3e54d38bde48fce3250e1af4a32376698801a8d3caf6be39d016d75bd3",
+    "sequence": 85
+  }
+}

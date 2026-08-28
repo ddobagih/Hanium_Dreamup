@@ -1,0 +1,22 @@
+{
+  "assigner": "walksafe-control-publisher",
+  "document_id": "WS-FP046-R002-SEQ86-87-REVIEW-ASSIGNMENT-R001",
+  "executor": "walksafe-fp046-r002-publisher",
+  "external_independence_claimed": false,
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "required_reviewer": "walksafe-internal-transition-reviewer",
+  "review_scope": "SEQ86_87_CANONICAL_UPDATE_COMPLETION_AND_FP048_REOPEN",
+  "review_subject_binding": {
+    "byte_count": 2001,
+    "document_id": "WS-FP046-R002-REVIEW-SUBJECT-20260825-001",
+    "file_sha256": "2acc6d4b965f98dc776daaaf7772e72180e592e063c4202f3fcf628ff1ac1496",
+    "mutable": false,
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/review-subject.json"
+  },
+  "round_id": "FP046-R002-SEQ86-87-R001",
+  "schema_version": "walksafe.transition-control-review.v1",
+  "sequence_pair": [
+    86,
+    87
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "authorization_quote": "알았어 해당 단계들 계획 먼저 세세하게 세우고 진행해. 팀 꾸려서 병렬로 진행해.",
+  "authorization_scope": {
+    "authorized_actions": [
+      "SEQ91_ZERO_CREDIT_GOAL_START_CONTROL_CORRECTION",
+      "R003_PRIVATE_INITIAL_START_GATE_AFTER_SEQ91",
+      "SEQ92_GOAL_STARTED_AFTER_FRESH_R003_FIVE_CHECK_PASS"
+    ],
+    "conditions": [
+      "EXACT_PUBLISHED_SEQ90_SOURCE_CAS_REQUIRED",
+      "SEQ91_MUST_PRESERVE_READY_STATUS",
+      "R002_ROOT_REGRESSION_FAILURE_REASON_MUST_BE_EXACT",
+      "FINAL_GIT_VISIBLE_MANAGED_COHORT_MUST_BE_RESEALED",
+      "ALL_FIVE_R003_EVENT_SCOPED_GATE_CHECKS_MUST_PASS_FRESH",
+      "SEQ92_MUST_BIND_THE_EXACT_PASS_RECEIPT",
+      "ALL_CREDIT_DELTAS_REMAIN_ZERO_UNTIL_SEPARATE_SEQ93_94_COMPLETION"
+    ],
+    "excluded_actions": [
+      "RETROACTIVE_PRODUCT_IMPLEMENTATION_CREDIT",
+      "FORMAL_TEST_PASS_CLAIM",
+      "ACTUAL_DEVICE_OR_EXTERNAL_REVIEW_CREDIT",
+      "DEPLOYMENT_OR_RELEASE_APPROVAL"
+    ]
+  },
+  "authorization_status": "AUTHORIZED_FOR_CONDITIONAL_SEQ91_92_CORRECTION_CONTINUATION",
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "correction_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP048-R002-CORRECTION-20260826-001",
+  "correction_reason": {
+    "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+    "failed_contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R002",
+    "failed_contract_version": "2026-08-26.1",
+    "observed_failed_test_count": 2,
+    "reason_code": "PUBLISHED_SEQ90_SYNTHETIC_REPLAY_DUPLICATED_SEQ90",
+    "remediation": "RECONSTRUCT_EXACT_SEQ89_BEFORE_SYNTHETIC_SEQ90_BOUNDARY_TEST"
+  },
+  "document_id": "WS-FP048-R002-SEQ91-92-AUTHORIZATION-20260826-001",
+  "evidence_type": "USER_CONTINUATION_AUTHORIZATION",
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 2654910,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "sequence": 90,
+    "sha256": "33c691c307555a0a594356d40707ccb9862105d56cab39e7a26b49f44da778ad",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP048-R002-20260826-001",
+    "tail_event_sha256": "ba64b564f388e8598db038e8d3e20e6bf3fdada8f2ec0e5649b6b5db02fe625c"
+  },
+  "target_started_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-002"
+}

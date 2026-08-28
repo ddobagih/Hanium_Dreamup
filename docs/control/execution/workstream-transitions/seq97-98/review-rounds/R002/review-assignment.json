@@ -1,0 +1,181 @@
+{
+  "authorization_binding": {
+    "byte_length": 5128,
+    "path": "docs/control/execution/workstream-transitions/seq97-98/authorization.json",
+    "sha256": "0a93b127e39b8dd2f796d530387c8c30a2600e2640dc72964c51e23541200d84"
+  },
+  "candidate_status": "FINAL_REVIEW_CANDIDATE",
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "document_id": "WS-FP048-R002-SEQ97-98-REVIEW-ASSIGNMENT-20260827-R002",
+  "evidence_type": "TRANSITION_CONTROL_REVIEW_ASSIGNMENT",
+  "executor": {
+    "id": "codex-fp048-r002-seq97-snapshot-hygiene-executor-20260826",
+    "task_id": "/root/seq96_review_r002_update"
+  },
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "previous_contract_binding": {
+    "canonical_contract_sha256": "4f39f9cc18a5fff55b1369c5c0ff15a50ec080e7cced227597adea0b902afb91",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R008",
+    "contract_version": "2026-08-26.7",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-008",
+    "file_sha256": "f3106c7038287399deac3bc711d1a7624dec3aa84b9c41abeb52300d5073828d",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r008.json",
+    "schema_version": "1.2"
+  },
+  "r008_preflight_attempt_004": {
+    "authority_status": "NONAUTHORITY",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R008",
+    "contract_version": "2026-08-26.7",
+    "directory": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004",
+    "error": "retained source ancestor identity changed: docs/control",
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004",
+    "event_identity_status": "REUSABLE_UNCONSUMED",
+    "exit_code": 2,
+    "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+    "namespace_present": false,
+    "reason_code": "R008_ROOT_REGRESSION_MUTATED_RETAINED_SOURCE_ANCESTOR",
+    "receipt_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004/implementation-start-gate-receipt.json",
+    "receipt_present": false,
+    "status": "PREVIEW_FAILED_BEFORE_NAMESPACE"
+  },
+  "replacement_contract_binding": {
+    "canonical_contract_sha256": "9e82e6c2ef8a35b412efa44567025b0316e42f2f3840a4ef290f426aadbd531b",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R009",
+    "contract_version": "2026-08-26.8",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-009",
+    "file_sha256": "cd027dde66924a19e1a7942c347b4b4a0e2bea44a8e6e0752a1a42993f9d20ff",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r009.json",
+    "schema_version": "1.2"
+  },
+  "replacement_runner_binding": {
+    "byte_length": 33639,
+    "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r009_20260826.py",
+    "sha256": "f5ed6e22507e3e08413dbc089accd73e791bda02d20a88ff8b50c9914c1c1e24"
+  },
+  "required_findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0
+  },
+  "required_reviewer": {
+    "id": "codex-seq96-goalgraph-terminal-dispatch-auditor-20260826",
+    "task_id": "/root/seq96_goalgraph_terminal_dispatch_audit"
+  },
+  "reviewed_control_inputs": [
+    {
+      "byte_length": 3579,
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r009.json",
+      "sha256": "cd027dde66924a19e1a7942c347b4b4a0e2bea44a8e6e0752a1a42993f9d20ff"
+    },
+    {
+      "byte_length": 45155,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq98_20260826.py",
+      "sha256": "817dcf985b50cbdd07fc624f75bcf0bc7f0f63c137d1604571ce062ad3c38688"
+    },
+    {
+      "byte_length": 71852,
+      "path": "scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py",
+      "sha256": "324a93fd3f58c77d689a831aecb90fef2e566cefa940ee3a659a67e26d4c348a"
+    },
+    {
+      "byte_length": 940826,
+      "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+      "sha256": "c3d9f1fdeedd0b623d061efddc7a7f6e02f8a3a76d0aa72d18c00ee98cfbfba4"
+    },
+    {
+      "byte_length": 677695,
+      "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+      "sha256": "4e2c0f8d66a9e3502ce3144506dad280e4791d33274361bbcd3a1396222cbfff"
+    },
+    {
+      "byte_length": 33639,
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r009_20260826.py",
+      "sha256": "f5ed6e22507e3e08413dbc089accd73e791bda02d20a88ff8b50c9914c1c1e24"
+    },
+    {
+      "byte_length": 28432,
+      "path": "scripts/run_walksafe_test_layers_current.sh",
+      "sha256": "b4763a0fd7addee37c347f09ea6b445a7ccbe75d78f8c497af0faaccf999e480"
+    },
+    {
+      "byte_length": 21690,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq98_20260826.py",
+      "sha256": "0bf1f49613b59639ad62cebe0a5f56a33ccdc1ca13f7b3e2edc944fe59c61ea7"
+    },
+    {
+      "byte_length": 37247,
+      "path": "tests/test_apply_walksafe_fp048_r002_start_gate_contract_correction_seq96_20260826.py",
+      "sha256": "7ca08ff220e9b8151dae833ce39d8eb87f1899c4516a2b3c9529fc5f4445f15a"
+    },
+    {
+      "byte_length": 41428,
+      "path": "tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py",
+      "sha256": "8dfd0b327e4dda0cd56b5b62642ec414701640d867a2210a531f14166d7bf9a2"
+    },
+    {
+      "byte_length": 19398,
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r009_20260826.py",
+      "sha256": "76402b549ff614dd54d86264a30011b54447183e76fc71d8ec1db0810a68b322"
+    },
+    {
+      "byte_length": 9397,
+      "path": "tests/test_walksafe_fp048_r002_post_seq96_stage_regression_20260826.py",
+      "sha256": "4548221b28fc2fc0298d2edd9c38f49d7abb668ab9fc07d154de61331e042f44"
+    },
+    {
+      "byte_length": 662878,
+      "path": "tests/test_walksafe_goal_graph_v2_4.py",
+      "sha256": "d9cfe408aab905e937047d04af2b5e1ebe24baa879cbcf42ac210939355447d1"
+    },
+    {
+      "byte_length": 351805,
+      "path": "tests/test_walksafe_project_continuation_v2_4.py",
+      "sha256": "15556538d9183d6d27ade36f4c28fc49625071b8cf15d3fd2b66b356de8dd1a1"
+    }
+  ],
+  "round_id": "R002",
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 4414443,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "r008_preflight_attempt_004": {
+      "authority_status": "NONAUTHORITY",
+      "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R008",
+      "contract_version": "2026-08-26.7",
+      "directory": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004",
+      "error": "retained source ancestor identity changed: docs/control",
+      "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004",
+      "event_identity_status": "REUSABLE_UNCONSUMED",
+      "exit_code": 2,
+      "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+      "namespace_present": false,
+      "reason_code": "R008_ROOT_REGRESSION_MUTATED_RETAINED_SOURCE_ANCESTOR",
+      "receipt_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004/implementation-start-gate-receipt.json",
+      "receipt_present": false,
+      "status": "PREVIEW_FAILED_BEFORE_NAMESPACE"
+    },
+    "sequence": 96,
+    "sha256": "c64919299dea316339afd777c37a33575458a94a158acd4c04ceed8b3075d85f",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-CONTRACT-CORRECTED-FP048-R002-20260826-004",
+    "tail_event_sha256": "ff0c91a5a98df66d6e44007c5c5fd51c50793fb6b896938418104aba05798dea"
+  }
+}

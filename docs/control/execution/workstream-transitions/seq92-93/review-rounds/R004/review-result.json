@@ -1,0 +1,73 @@
+{
+  "assignment_binding": {
+    "byte_length": 10879,
+    "path": "docs/control/execution/workstream-transitions/seq92-93/review-rounds/R004/review-assignment.json",
+    "sha256": "5d03d30d14798fd3770e9adfd5482cb3fb592a06f82a0fa69e9fc2439129437d"
+  },
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "correction_reason": {
+    "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+    "failed_contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R003",
+    "failed_contract_version": "2026-08-26.2",
+    "observed_failed_test_count": 102,
+    "reason_code": "R003_PREPUBLICATION_ROOT_REGRESSION_NOT_POSTPUBLICATION_SAFE",
+    "remediation": "SUPERSEDE_R003_WITH_STAGE_AWARE_R004_BEFORE_SEQ93_START"
+  },
+  "decision": "APPROVE_INTERNAL_ZERO_CREDIT_CONTROL_ONLY",
+  "document_id": "WS-FP048-R002-SEQ92-93-REVIEW-RESULT-20260826-R004",
+  "external_independence_claimed": false,
+  "findings": [],
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "previous_contract_binding": {
+    "canonical_contract_sha256": "e782541d53e7350da55eaef9d608d5c1a878db86bde0e7f28807527974607d9f",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R003",
+    "contract_version": "2026-08-26.2",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-003",
+    "file_sha256": "bce459dc4454b11638bc7d09320ba90671aea02c711a7b502db13e52d7b45e75",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r003.json",
+    "schema_version": "1.2"
+  },
+  "projected_transition": {
+    "contract_correction_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-CONTRACT-CORRECTED-FP048-R002-20260826-001",
+    "contract_correction_sequence": 92,
+    "contract_correction_transition": "READY_TO_READY",
+    "started_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-003",
+    "started_sequence": 93,
+    "started_transition": "READY_TO_IN_PROGRESS_AFTER_FRESH_R004_PASS"
+  },
+  "replacement_contract_binding": {
+    "canonical_contract_sha256": "bf15183080b2ba0237109792a8c44ff2a7811c965f6155343f55523c543467b0",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R004",
+    "contract_version": "2026-08-26.3",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-004",
+    "file_sha256": "f0b4dfaa18bed37a4b33b6b3520bb19261268cdc57244de23bf0815a10062485",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r004.json",
+    "schema_version": "1.2"
+  },
+  "reviewed_at": "2026-08-26T12:31:20+09:00",
+  "reviewer": {
+    "id": "codex-fp048-r002-seq92-contract-independent-reviewer-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl/seq92_contract_correction_independent_review_r004"
+  },
+  "round_id": "R004",
+  "schema_version": "1.0"
+}

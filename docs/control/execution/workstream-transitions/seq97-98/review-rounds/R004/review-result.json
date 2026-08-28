@@ -1,0 +1,23 @@
+{
+  "assignment_binding": {
+    "byte_length": 8121,
+    "path": "docs/control/execution/workstream-transitions/seq97-98/review-rounds/R004/review-assignment.json",
+    "sha256": "2b13b731bf069a117b2f13cdeccc615af2e09c6ddc828a3162792424177f7bdd"
+  },
+  "decision": "APPROVED",
+  "document_id": "WS-FP048-R002-SEQ97-98-REVIEW-RESULT-20260827-R004",
+  "evidence_type": "TRANSITION_CONTROL_REVIEW_RESULT",
+  "external_independence_claimed": false,
+  "findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0
+  },
+  "reviewed_at": "2026-08-27T01:44:30+09:00",
+  "reviewer": {
+    "id": "codex-seq96-goalgraph-terminal-dispatch-auditor-20260826",
+    "task_id": "/root/seq96_goalgraph_terminal_dispatch_audit"
+  },
+  "round_id": "R004",
+  "schema_version": "1.0"
+}

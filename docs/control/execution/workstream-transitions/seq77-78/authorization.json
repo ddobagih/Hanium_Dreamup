@@ -1,0 +1,50 @@
+{
+  "authorization_quote": "계획 세워서 단계적으로 진행해 어떻게 진행해야 하는지 알지?",
+  "authorization_scope": {
+    "authorized_actions": [
+      "SEQ77_GOAL_START_CONTROL_REANCHOR",
+      "PRIVATE_INITIAL_START_GATE_EXECUTION",
+      "SEQ78_GOAL_STARTED_AFTER_GATE_PASS",
+      "LOCAL_PRODUCT_IMPLEMENTATION_AFTER_GOAL_STARTED"
+    ],
+    "conditions": [
+      "SEQ77_REANCHOR_MUST_PRESERVE_READY_STATUS",
+      "ALL_FIVE_EVENT_SCOPED_GATE_CHECKS_MUST_PASS",
+      "SEQ78_MUST_BIND_THE_EXACT_GATE_RECEIPT",
+      "PRODUCT_CHANGE_MUST_OCCUR_ONLY_AFTER_SEQ78"
+    ],
+    "excluded_actions": [
+      "FORMAL_TEST_PASS_CLAIM",
+      "ACTUAL_DEVICE_CREDIT",
+      "EXTERNAL_REVIEW_CREDIT",
+      "DEPLOYMENT",
+      "RELEASE_APPROVAL"
+    ]
+  },
+  "authorization_status": "AUTHORIZED_FOR_CONDITIONAL_SEQ77_78_CONTINUATION",
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_review_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "goal_started": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "start_gate_status": "NOT_RUN",
+    "test_credit_delta": 0
+  },
+  "document_id": "WS-FP046-R002-SEQ77-78-AUTHORIZATION-20260823-001",
+  "evidence_type": "USER_CONTINUATION_AUTHORIZATION",
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "schema_version": "1.0",
+  "supersedes": {
+    "authorization_status": "AUTHORIZED_FOR_SEQ72_76_ONLY",
+    "byte_length": 828,
+    "document_id": "WS-FP046-NPC-R002-REOPEN-AUTHORIZATION-20260815-001",
+    "file_sha256": "60c7d6220d4a6de832747d28019a9b6b55a6982d45d1571746968300394445d1",
+    "path": "docs/control/execution/workstream-transitions/seq72-76/authorization.json"
+  }
+}

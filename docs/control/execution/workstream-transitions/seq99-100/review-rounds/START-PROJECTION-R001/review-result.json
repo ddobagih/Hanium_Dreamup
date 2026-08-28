@@ -1,0 +1,23 @@
+{
+  "assignment_binding": {
+    "byte_length": 12953,
+    "path": "docs/control/execution/workstream-transitions/seq99-100/review-rounds/START-PROJECTION-R001/review-assignment.json",
+    "sha256": "659287ad5cc0287a59d8ad3ed01632b85c5c57ba5ad6d36f8d898fc93851d0ee"
+  },
+  "decision": "REJECTED",
+  "document_id": "WS-FP048-R002-SEQ100-START-PROJECTION-REVIEW-RESULT-20260828-R001",
+  "evidence_type": "TRANSITION_CONTROL_PRIMARY_REVIEW",
+  "external_independence_claimed": false,
+  "findings": {
+    "P0": 0,
+    "P1": 3,
+    "P2": 1
+  },
+  "reviewed_at": "2026-08-28T09:18:03+09:00",
+  "reviewer": {
+    "id": "codex-fp048-r002-seq100-start-projection-r001-primary-20260828",
+    "task_id": "/root/r007_preflight_perf_rootcause"
+  },
+  "round_id": "START-PROJECTION-R001",
+  "schema_version": "1.0"
+}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import importlib.util
 import hashlib
 import json
@@ -79,12 +80,8 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
             self.assertNotIn('"timestamp"', text)
         self.assertEqual(len(hashes), 1)
 
-    def test_r008_control_scripts_have_exact_current_policy(self) -> None:
+    def test_fp046_control_scripts_have_exact_current_policy(self) -> None:
         expected = {
-            "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py": (
-                "REPOSITORY_WRITE",
-                "repository-write-capability-exact",
-            ),
             "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py": (
                 "REPOSITORY_WRITE",
                 "repository-write-capability-exact",
@@ -94,6 +91,38 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
                 "repository-write-capability-exact",
             ),
             "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+            "scripts/apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+            "scripts/build_walksafe_fp046_r002_seq77_78_review_20260823.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+            "scripts/apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+            "scripts/run_walksafe_fp046_r002_goal_start_gate_20260823.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+            "scripts/apply_walksafe_fp046_r002_goal_started_seq78_20260823.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+            "scripts/build_walksafe_fp046_r002_seq78_79_recovery_review_20260824.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+            "scripts/apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+            "scripts/apply_walksafe_fp046_r002_goal_started_seq79_20260824.py": (
                 "REPOSITORY_WRITE",
                 "repository-write-capability-exact",
             ),
@@ -111,10 +140,102 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
                 path,
             )
 
+        candidate = "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py"
+        self.assertEqual(
+            catalogs.script_lifecycle(candidate),
+            ("HISTORICAL", "documented-historical-exact"),
+        )
+        self.assertEqual(
+            catalogs.script_side_effect(candidate),
+            ("REPOSITORY_WRITE", "repository-write-capability-exact"),
+            )
+
+    def test_fp048_r002_control_scripts_have_exact_current_policy(self) -> None:
+        expected = {
+            "scripts/apply_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+            "scripts/run_walksafe_fp048_r002_goal_start_gate_20260825.py",
+            "scripts/apply_walksafe_fp048_r002_goal_started_seq90_20260825.py",
+            "scripts/publish_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+        }
+        for path in expected:
+            self.assertIn(path, catalogs.KNOWN_SCRIPT_PATHS)
+            self.assertEqual(
+                catalogs.script_lifecycle(path),
+                ("CURRENT", "current-maintained-script"),
+                path,
+            )
+            self.assertEqual(
+                catalogs.script_side_effect(path),
+                ("REPOSITORY_WRITE", "repository-write-capability-exact"),
+                path,
+            )
+
+    def test_fp046_current_and_historical_test_layers_are_explicit(self) -> None:
+        historical, active_session = catalogs._runner_python_test_groups(ROOT)
+        current = {
+            "tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+            "tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+            "tests/test_build_walksafe_fp046_gap_backlog_r029_20260815.py",
+            "tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+            "tests/test_build_walksafe_fp046_r002_seq78_79_recovery_review_20260824.py",
+            "tests/test_apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py",
+            "tests/test_walksafe_android_gateway_ingress_current.py",
+        }
+        completed_transition = {
+            "tests/test_apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+            "tests/test_walksafe_fp046_r002_goal_start_gate_20260823.py",
+            "tests/test_apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+            "tests/test_apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824.py",
+            "tests/test_apply_walksafe_fp046_r002_goal_started_seq79_20260824.py",
+            "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+        }
+
+        self.assertFalse(current & historical)
+        self.assertFalse(current & active_session)
+        self.assertTrue(completed_transition <= historical)
+        for path in current:
+            self.assertEqual(
+                catalogs.test_lifecycle(path, historical, active_session),
+                ("CURRENT", "current-test"),
+                path,
+            )
+        for path in completed_transition:
+            self.assertEqual(
+                catalogs.test_lifecycle(path, historical, active_session),
+                ("HISTORICAL", "test-runner-historical-array"),
+                path,
+            )
+
+    def test_fp048_r002_control_tests_are_current(self) -> None:
+        historical, active_session = catalogs._runner_python_test_groups(ROOT)
+        current = {
+            "tests/test_apply_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+            "tests/test_walksafe_fp048_r002_goal_start_gate_20260825.py",
+            "tests/test_apply_walksafe_fp048_r002_goal_started_seq90_20260825.py",
+            "tests/test_publish_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+        }
+
+        self.assertFalse(current & historical)
+        self.assertFalse(current & active_session)
+        for path in current:
+            self.assertEqual(
+                catalogs.test_lifecycle(path, historical, active_session),
+                ("CURRENT", "current-test"),
+                path,
+            )
+
     def test_candidate_checkpoint_override_drives_repository_catalog(self) -> None:
         checkpoint = json.loads(
             (ROOT / catalogs.CHECKPOINT_PATH).read_text(encoding="utf-8")
         )
+        checkpoint["goal_execution"]["transition_history"] = [
+            event
+            for event in checkpoint["goal_execution"]["transition_history"]
+            if (
+                event.get("event_id")
+                != catalogs.FP046_R002_CONTROL_REANCHOR_EVENT_ID
+            )
+        ]
         checkpoint["working_tree_snapshot"]["managed_changed_paths"] = ["README.md"]
         checkpoint["working_tree_snapshot"]["managed_changed_path_count"] = 1
 
@@ -131,6 +252,106 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
         }
         self.assertEqual(repository["checkpoint"]["managed_path_count"], 1)
         self.assertEqual(managed, {"README.md"})
+
+    def test_seq77_catalog_requires_preserved_approved_and_active_review_evidence(self) -> None:
+        self.assertEqual(
+            catalogs.FP046_R002_PRESERVED_REVIEW_ASSIGNMENT_PATHS,
+            tuple(
+                "docs/control/execution/workstream-transitions/seq77-78/"
+                f"review-rounds/{suffix}"
+                for suffix in (
+                    "R001/review-assignment.json",
+                    "R002/review-assignment.json",
+                    "R003/review-assignment.json",
+                    "R004/review-assignment.json",
+                )
+            ),
+        )
+        self.assertEqual(
+            catalogs.FP046_R002_APPROVED_R005_REVIEW_EVIDENCE_PATHS,
+            tuple(
+                "docs/control/execution/workstream-transitions/seq77-78/"
+                f"review-rounds/R005/{name}"
+                for name in (
+                    "review-assignment.json",
+                    "review-result.json",
+                    "independent-review.json",
+                )
+            ),
+        )
+        self.assertEqual(
+            catalogs.FP046_R002_ACTIVE_R006_REVIEW_EVIDENCE_PATHS,
+            tuple(
+                "docs/control/execution/workstream-transitions/seq77-78/"
+                f"review-rounds/R006/{name}"
+                for name in (
+                    "review-assignment.json",
+                    "review-result.json",
+                    "independent-review.json",
+                )
+            ),
+        )
+        expected = (
+            catalogs.FP046_R002_PRESERVED_REVIEW_ASSIGNMENT_PATHS
+            + catalogs.FP046_R002_APPROVED_R005_REVIEW_EVIDENCE_PATHS
+            + catalogs.FP046_R002_ACTIVE_R006_REVIEW_EVIDENCE_PATHS
+        )
+        self.assertEqual(
+            catalogs.FP046_R002_MANAGED_REVIEW_EVIDENCE_PATHS,
+            expected,
+        )
+        checkpoint = json.loads(
+            (ROOT / catalogs.CHECKPOINT_PATH).read_text(encoding="utf-8")
+        )
+        checkpoint["goal_execution"]["transition_history"].append(
+            {
+                "sequence": 77,
+                "event_id": catalogs.FP046_R002_CONTROL_REANCHOR_EVENT_ID,
+            }
+        )
+        managed = checkpoint["working_tree_snapshot"][
+            "managed_changed_paths"
+        ]
+        managed.extend(catalogs.FP046_R002_MANAGED_REVIEW_EVIDENCE_PATHS)
+        checkpoint["working_tree_snapshot"]["managed_changed_paths"] = sorted(
+            set(managed)
+        )
+        checkpoint["working_tree_snapshot"]["managed_changed_path_count"] = len(
+            checkpoint["working_tree_snapshot"]["managed_changed_paths"]
+        )
+        universe = set(catalogs.discover_source_paths(ROOT)) | set(
+            catalogs.FP046_R002_MANAGED_REVIEW_EVIDENCE_PATHS
+        )
+
+        attributes = catalogs.load_checkpoint_attributes(
+            ROOT,
+            universe,
+            checkpoint_override=checkpoint,
+        )
+        self.assertTrue(
+            set(catalogs.FP046_R002_MANAGED_REVIEW_EVIDENCE_PATHS).issubset(
+                attributes["managed"]
+            )
+        )
+
+        for missing in catalogs.FP046_R002_MANAGED_REVIEW_EVIDENCE_PATHS:
+            with self.subTest(missing=missing):
+                candidate = copy.deepcopy(checkpoint)
+                candidate["working_tree_snapshot"][
+                    "managed_changed_paths"
+                ].remove(missing)
+                candidate["working_tree_snapshot"][
+                    "managed_changed_path_count"
+                ] -= 1
+                with self.assertRaisesRegex(
+                    catalogs.CatalogError,
+                    "managed review evidence closure differs",
+                ):
+                    catalogs.load_checkpoint_attributes(
+                        ROOT,
+                        universe,
+                        checkpoint_override=candidate,
+                    )
 
     def test_script_catalog_is_exhaustive_and_has_required_boundaries(self) -> None:
         source_paths = catalogs.discover_source_paths(ROOT)
@@ -267,7 +488,7 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
                 )
             )
         }
-        self.assertEqual(len(completed_one_offs), 52)
+        self.assertEqual(len(completed_one_offs), 53)
         self.assertTrue(all(entries[path]["lifecycle"] == "HISTORICAL" for path in completed_one_offs))
         for path in (
             "scripts/build_walksafe_phase1_exact257_successor_r011_20260729.py",
@@ -307,6 +528,18 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
             "scripts/build_walksafe_fp022_gap_backlog_r028_20260814.py",
             "scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py",
             "scripts/run_walksafe_fp022_goal_start_gate_20260813.py",
+            "scripts/build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+            "scripts/apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+            "scripts/run_walksafe_fp046_r002_goal_start_gate_20260823.py",
+            "scripts/apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+            "scripts/build_walksafe_fp046_r002_seq78_79_recovery_review_20260824.py",
+            "scripts/apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824.py",
+            "scripts/apply_walksafe_fp046_r002_goal_started_seq79_20260824.py",
+            "scripts/apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py",
+            "scripts/apply_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+            "scripts/run_walksafe_fp048_r002_goal_start_gate_20260825.py",
+            "scripts/apply_walksafe_fp048_r002_goal_started_seq90_20260825.py",
+            "scripts/publish_walksafe_fp048_r002_goal_seq88_89_20260825.py",
             "scripts/build_walksafe_phase1_exact257_successor_r015_20260812.py",
             "scripts/build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py",
             "scripts/apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
@@ -373,6 +606,17 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
             "tests/test_build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py",
             "tests/test_build_walksafe_phase1_exact257_successor_r015_20260812.py",
             "tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py",
+            "tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+            "tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+            "tests/test_build_walksafe_fp046_gap_backlog_r029_20260815.py",
+            "tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+            "tests/test_build_walksafe_fp046_r002_seq78_79_recovery_review_20260824.py",
+            "tests/test_apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py",
+            "tests/test_apply_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+            "tests/test_walksafe_fp048_r002_goal_start_gate_20260825.py",
+            "tests/test_apply_walksafe_fp048_r002_goal_started_seq90_20260825.py",
+            "tests/test_publish_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+            "tests/test_walksafe_android_gateway_ingress_current.py",
         ):
             self.assertEqual(entries[path]["lifecycle"], "CURRENT", path)
         for path in (
@@ -388,6 +632,12 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
             "tests/test_walksafe_fp022_goal_start_gate_20260813.py",
             "tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
             "tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py",
+            "tests/test_apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+            "tests/test_walksafe_fp046_r002_goal_start_gate_20260823.py",
+            "tests/test_apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+            "tests/test_apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824.py",
+            "tests/test_apply_walksafe_fp046_r002_goal_started_seq79_20260824.py",
+            "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
         ):
             self.assertEqual(entries[path]["lifecycle"], "HISTORICAL", path)
             self.assertEqual(

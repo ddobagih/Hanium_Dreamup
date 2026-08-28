@@ -1,0 +1,93 @@
+{
+  "schema_version": "1.1",
+  "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-FP046-R002-20260823-005",
+  "evidence_type": "IMPLEMENTATION_START_OR_RESUME_GATE",
+  "gate_purpose": "INITIAL_START",
+  "status": "PASS",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4",
+  "target_transition_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005",
+  "target_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "target_goal_content_sha256": "4627c19b421f626323778fcdfd01cc2edbc36644c48c7d65c2b4847e698ac429",
+  "static_plan_manifest_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+  "source_activation_event_sha256": "9554aaba89c0070ad2c95fa689cb6e3e083fd4bf266237c8c2c7d0cf5abb16b4",
+  "source_checkpoint_sha256": "49dd4c9946c03014de824ac3e066430e6d159ceb7f396619fc8a9c23a26dfa1f",
+  "source_ready_event_sha256": "f2a529bae5aa808fccb64191a42902d7e717d0340531410213486bdcfa279070",
+  "check_command_contract_version": "2026-08-23.1",
+  "check_command_contract_sha256": "aaf46ea8c8ab8e817ecd30ea3402265d0dcda6cbbe66b49e4fff2fffd77e203c",
+  "implementation_start_gate_contract_binding": {
+    "schema_version": "1.1",
+    "document_id": "WS-FP046-R002-INITIAL-START-GATE-CONTRACT-20260823-002",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-046-R002/initial-start-gate-contract-r002.json",
+    "file_sha256": "62311945a57cd96bbaaf10e66ce6f4114835324f74f10ca00443b49482d96a6e",
+    "contract_id": "WS-FP046-R002-INTERNAL-START-GATE-R002",
+    "contract_version": "2026-08-23.1",
+    "canonical_contract_sha256": "aaf46ea8c8ab8e817ecd30ea3402265d0dcda6cbbe66b49e4fff2fffd77e203c"
+  },
+  "runtime_bindings": [],
+  "execution_window": {
+    "started_at": "2026-08-25T03:06:39+09:00",
+    "ended_at": "2026-08-25T03:08:27+09:00"
+  },
+  "check_runs": [
+    {
+      "check_id": "CONTINUATION",
+      "command": "PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005/01-CONTINUATION.log",
+      "output_sha256": "25b5c8cf65854e11a04a9d0810dd2503585037683809c153f578c08a076ac5a7",
+      "exit_code": 0,
+      "executed_at": "2026-08-25T03:06:46.305277+09:00"
+    },
+    {
+      "check_id": "GOAL_GRAPH",
+      "command": "PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_goal_graph_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005/02-GOAL_GRAPH.log",
+      "output_sha256": "7190afa3a3f6e6852b462bfcd6663462b588efa73688b109b66799670e7f8b55",
+      "exit_code": 0,
+      "executed_at": "2026-08-25T03:06:48.082402+09:00"
+    },
+    {
+      "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "command": "PYTHON_BIN=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python bash scripts/run_walksafe_test_layers_current.sh validate",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005/03-TEST_LAYER_REGISTRY_VALIDATE.log",
+      "output_sha256": "1eef448a998bf080cbe648b330b4c9369d49ea95bbccf662ce8d077b56c96187",
+      "exit_code": 0,
+      "executed_at": "2026-08-25T03:08:10.146107+09:00"
+    },
+    {
+      "check_id": "ROOT_FP046_R002_CONTROL_REGRESSION",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py tests/test_apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py tests/test_walksafe_fp046_r002_goal_start_gate_20260823.py tests/test_apply_walksafe_fp046_r002_goal_started_seq78_20260823.py tests/test_repository_catalogs.py && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_exact_seq77_78_prefix_survives_later_suffix tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_frozen_r011_predecessor_is_byte_exact tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_later_suffix_cannot_hide_seq77_authority_tampering tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_private_gate_contract_has_exact_five_control_checks tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_review_cohort_reanchors_frozen_r011_to_current_control tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_reviewed_seq78_fixture_uses_frozen_seq76_bytes tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_seq79_replay_and_unknown_type_remain_fail_closed tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_validate_start_gate_uses_the_runner_receipt_path tests/test_walksafe_goal_graph_v2_4.py::WalkSafeFp046R002StartGraphTest",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005/04-ROOT_FP046_R002_CONTROL_REGRESSION.log",
+      "output_sha256": "95f372fa4d581c5a3ba71268ac257f272f13829361ab62382faca84c745cd43a",
+      "exit_code": 0,
+      "executed_at": "2026-08-25T03:08:10.346606+09:00"
+    },
+    {
+      "check_id": "REPOSITORY_STATE",
+      "command": ": \"${WALKSAFE_GATE_EVENT_ID:?required}\" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json --print-gate-repository-state --gate-event-id \"${WALKSAFE_GATE_EVENT_ID}\"",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005/05-REPOSITORY_STATE.log",
+      "output_sha256": "5f379f176ab1c346786f0002a57a6ff74747677dab984f44a30ecf1c0817db16",
+      "exit_code": 0,
+      "executed_at": "2026-08-25T03:08:26.407610+09:00"
+    }
+  ],
+  "repository_snapshot": {
+    "gate_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005",
+    "snapshot_scope": "AFTER_EXACT_TRANSACTION_EXCLUSIONS",
+    "head_commit": "8a146bbf9c5a7612377abb939fc4d94570d45cca",
+    "branch": "recovery/fp046-r008-wip-20260822",
+    "object_format": "sha1",
+    "git_status_raw_sha256": "47fee40eafa5cdd752977b4838694b1be67045459a8ac4c8db00d3f8f7132ca1",
+    "git_status_raw_byte_count": 8914,
+    "git_status_raw_record_count": 91,
+    "dirty_path_count": 91,
+    "path_set_sha256": "a1606cbd74aad36b98f39c6786f530072b90cbd960d8aecf18404c4648c7791e",
+    "content_set_sha256": "3c2474b48ff08b587128e436cab070a08e6e54962d433360d3ad7aa8c6241941",
+    "index_state_sha256": "83c435bb1e9c346b54d7ba02c223f43f730f252588f4ea92d307d549d0f56b01",
+    "checkpoint_base_head": "f0093863e82bfc80d9f11915cef33a51d44b8730",
+    "checkpoint_managed_path_count": 1020,
+    "checkpoint_path_set_sha256": "a880c1a392707b590630f465d2301e98440400e6a46dc5ca97d10d2e306e991a",
+    "checkpoint_content_set_sha256": "673fe4b05f8ef4117112e8a3bdb9f3e585f8da140e2c4f2179b4f9ad753374f3",
+    "gate_repository_state_output_sha256": "5f379f176ab1c346786f0002a57a6ff74747677dab984f44a30ecf1c0817db16"
+  },
+  "generated_at": "2026-08-25T03:08:29+09:00"
+}

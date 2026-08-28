@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import copy
+from contextlib import contextmanager
+from datetime import datetime, timedelta
 import gzip
 import hashlib
 import json
@@ -26,6 +28,10 @@ from scripts import (
 from scripts import (
     build_walksafe_fp022_completion_seq70_71_review_20260814
     as completion_review,
+)
+from scripts import (
+    apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826
+    as snapshot_hygiene_correction,
 )
 from scripts import check_walksafe_goal_graph_v2_4 as graph
 
@@ -6768,11 +6774,7 @@ class WalkSafeNpcSingleAdminRecoverySuccessorTest(unittest.TestCase):
     def test_seq61_62_package_uses_its_historical_snapshot_after_fp022_update(
         self,
     ) -> None:
-        checkpoint = (
-            WalkSafeFp022Seq66Seq67SuccessorTest._with_completion_suffix(
-                self.checkpoint
-            )
-        )
+        checkpoint = self._npc_checkpoint_at_sequence(71)
         backlog = next(
             row
             for row in checkpoint["canonical_bindings"]
@@ -7109,12 +7111,16 @@ class WalkSafeNpcSingleAdminRecoverySuccessorTest(unittest.TestCase):
             )
         validate_post_review.assert_called_once_with(ROOT)
 
-    def test_seq71_managed_closure_uses_frozen_start_and_current_r011_review(
+    def test_seq71_managed_closure_uses_frozen_r011_and_pre_review_delta(
         self,
     ) -> None:
+        source = copy.deepcopy(self.checkpoint)
+        source["goal_execution"]["transition_history"] = source[
+            "goal_execution"
+        ]["transition_history"][:69]
         checkpoint = (
             WalkSafeFp022Seq66Seq67SuccessorTest._with_completion_suffix(
-                self.checkpoint
+                source
             )
         )
         r003_context = mock.Mock()
@@ -7179,6 +7185,23 @@ class WalkSafeNpcSingleAdminRecoverySuccessorTest(unittest.TestCase):
                 "prepare_frozen_start_review_context",
                 return_value=frozen_start,
             ) as frozen_loader,
+            mock.patch.object(
+                graph,
+                "_fp046_r002_optional_frozen_r011_authority",
+                return_value={
+                    "context": completion_successor_context,
+                    "managed_sources_by_round": {
+                        "R002": (),
+                        "R003": (),
+                        "R004": (),
+                    },
+                },
+            ) as frozen_r011_loader,
+            mock.patch.object(
+                graph,
+                "_fp046_r002_pre_review_modified_control_cohort",
+                return_value=(),
+            ) as pre_review_loader,
             mock.patch(
                 "scripts.build_walksafe_fp022_completion_seq70_71_review_20260814."
                 "validated_control_successor_r011_context",
@@ -7202,22 +7225,34 @@ class WalkSafeNpcSingleAdminRecoverySuccessorTest(unittest.TestCase):
                 )
             )
         frozen_loader.assert_called_once_with(ROOT)
-        completion_loader.assert_called_once_with(ROOT)
-        closure_loader.assert_called_once_with(ROOT)
+        frozen_r011_loader.assert_called_once_with(ROOT)
+        pre_review_loader.assert_called_once()
+        completion_loader.assert_not_called()
+        closure_loader.assert_not_called()
 
-    def test_seq71_managed_closure_rejects_malformed_r011(self) -> None:
+    def test_seq71_managed_closure_rejects_frozen_r011_integrity_failure(
+        self,
+    ) -> None:
         checkpoint = load_json(ROOT / graph.CHECKPOINT_RELATIVE)
-        with mock.patch(
-            "scripts.build_walksafe_fp022_completion_seq70_71_review_20260814."
-            "validated_control_successor_r011_context",
-            side_effect=RuntimeError("malformed R011"),
+        for failure in (
+            ValueError("malformed frozen R011"),
+            OSError("unreadable frozen R011"),
         ):
-            self.assertFalse(
-                graph._npc_single_admin_recovery_completion_managed_closure_matches(
-                    ROOT,
-                    checkpoint,
+            with self.subTest(failure=type(failure).__name__), mock.patch.object(
+                graph,
+                "_fp046_r002_frozen_r011_authority",
+                side_effect=failure,
+            ), mock.patch.object(
+                completion_review,
+                "validated_control_successor_r011_context",
+            ) as legacy_loader:
+                self.assertFalse(
+                    graph._npc_single_admin_recovery_completion_managed_closure_matches(
+                        ROOT,
+                        checkpoint,
+                    )
                 )
-            )
+                legacy_loader.assert_not_called()
 
     def _r027_projection_fixture(self) -> tuple[Path, dict]:
         temporary = tempfile.TemporaryDirectory()
@@ -7321,15 +7356,14 @@ class WalkSafeNpcSingleAdminRecoverySuccessorTest(unittest.TestCase):
         from scripts import (
             apply_walksafe_fp046_goal_completed_seq54_55_20260810 as fp046,
         )
-        from scripts import (
-            apply_walksafe_fp022_goal_seq66_67_20260813 as fp022,
-        )
-
-        if sequence not in {60, 62}:
-            raise ValueError("NPC fixture sequence must be 60 or 62")
+        if sequence not in {60, 62, 71}:
+            raise ValueError("NPC fixture sequence must be 60, 62, or 71")
         checkpoint = copy.deepcopy(self.checkpoint)
         state = checkpoint["goal_execution"]
         history = state["transition_history"]
+        current_inventory = copy.deepcopy(state["dynamic_goal_inventory"])
+        if len(history) < sequence:
+            raise ValueError("NPC fixture source history is too short")
         for event in reversed(history[sequence:]):
             for goal_id in event.get("status_changes", {}):
                 if event["from_status"] is None:
@@ -7341,15 +7375,45 @@ class WalkSafeNpcSingleAdminRecoverySuccessorTest(unittest.TestCase):
                     event.get("subject_goal_id"), None
                 )
         del history[sequence:]
-        state["dynamic_goal_inventory"].pop(fp022.GOAL_ID, None)
-        state["materialized_child_goal_ids_by_parent"].pop(
-            fp022.PARENT_GOAL_ID, None
-        )
-        if fp022.GOAL_PATH.as_posix() in state["goal_document_paths"]:
-            state["goal_document_paths"].remove(fp022.GOAL_PATH.as_posix())
+        for state_key, event_key, default in (
+            (
+                "completion_evidence_by_goal",
+                "completion_evidence_by_goal_after",
+                {},
+            ),
+            (
+                "archived_completion_evidence_by_goal",
+                "archived_completion_evidence_by_goal_after",
+                {},
+            ),
+            ("dynamic_goal_inventory", "dynamic_goal_inventory_after", {}),
+            (
+                "materialized_child_goal_ids_by_parent",
+                "materialized_child_goal_ids_by_parent_after",
+                {},
+            ),
+        ):
+            snapshot = next(
+                (
+                    event[event_key]
+                    for event in reversed(history)
+                    if event_key in event
+                ),
+                default,
+            )
+            state[state_key] = copy.deepcopy(snapshot)
+        future_goal_paths = {
+            row["path"]
+            for goal_id, row in current_inventory.items()
+            if goal_id not in state["dynamic_goal_inventory"]
+        }
+        for relative in future_goal_paths:
+            if relative in state["goal_document_paths"]:
+                state["goal_document_paths"].remove(relative)
+            if relative in state["managed_goal_paths"]:
+                state["managed_goal_paths"].remove(relative)
+        if future_goal_paths:
             state["goal_document_count"] = len(state["goal_document_paths"])
-        if fp022.GOAL_PATH.as_posix() in state["managed_goal_paths"]:
-            state["managed_goal_paths"].remove(fp022.GOAL_PATH.as_posix())
             state["managed_goal_path_count"] = len(state["managed_goal_paths"])
             state["path_set_sha256"], state["content_set_sha256"] = (
                 graph.continuation.package_hashes(
@@ -8331,6 +8395,617 @@ class WalkSafeFp022CompletionGraphSuffixTest(unittest.TestCase):
         self.assertIn("FP022 completion seq70 ID", joined)
 
 
+class WalkSafeFp046R002CompletionGraphSuffixTest(unittest.TestCase):
+    def _completion_checkpoint(self) -> tuple[Path, dict]:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        checkpoint = load_json(ROOT / graph.V24_CHECKPOINT_RELATIVE)
+        state = checkpoint["goal_execution"]
+        history = state["transition_history"]
+        del history[85:]
+        source = history[84]
+
+        review_binding = {}
+        for role, relative in (
+            graph.FP046_R002_COMPLETION_REVIEW_PATH_BY_ROLE.items()
+        ):
+            raw = json_bytes(
+                {
+                    "document_id": (
+                        graph.FP046_R002_COMPLETION_REVIEW_DOCUMENT_ID_BY_ROLE[
+                            role
+                        ]
+                    ),
+                    "role": role,
+                }
+            )
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+            review_binding[role] = {
+                "path": relative,
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "byte_length": len(raw),
+            }
+
+        goal_review_bindings = []
+        for kind, identity in (
+            graph.FP046_R002_COMPLETION_GOAL_REVIEW_BY_KIND.items()
+        ):
+            raw = json_bytes({"kind": kind})
+            path = root / identity["path"]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+            goal_review_bindings.append(
+                {
+                    "document_id": identity["document_id"],
+                    "path": identity["path"],
+                    "file_sha256": hashlib.sha256(raw).hexdigest(),
+                    "byte_count": len(raw),
+                    "mutable": False,
+                }
+            )
+
+        changed_bindings = {}
+        for role, identity in graph.FP046_R002_R030_BINDING_IDENTITY.items():
+            digest = write_json(root, identity["path"], {"role": role})
+            changed_bindings[role] = {
+                "role": role,
+                "document_id": identity["document_id"],
+                "path": identity["path"],
+                "file_sha256": digest,
+            }
+        receipt = {
+            "document_id": graph.FP046_R002_COMPLETION_DOCUMENT_ID,
+            "goal_id": graph.FP046_R002_GOAL_ID,
+            "goal_status": "COMPLETE_AT_TARGET",
+            "source_sequence": 85,
+            "canonical_update_sequence": 86,
+            "completion_sequence": 87,
+            "evidence_bindings": goal_review_bindings,
+            "transition_control_review_binding": review_binding,
+            "successor": {
+                "goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "work_item_id": (
+                    "EPIC-03-FP048-ENCRYPTION-CONNECTION-SECURITY-INCIDENT"
+                ),
+                "status": "PLANNED_NOT_ACTIVATED",
+            },
+            "completion_boundary": copy.deepcopy(
+                graph.FP046_R002_ZERO_CREDIT_BOUNDARY
+            ),
+            "release_completion_claimed": False,
+        }
+        completion_digest = write_json(
+            root,
+            graph.FP046_R002_COMPLETION_PATH,
+            receipt,
+        )
+        completion_binding = {
+            "role": graph.FP046_R002_COMPLETION_ROLE,
+            "document_id": graph.FP046_R002_COMPLETION_DOCUMENT_ID,
+            "path": graph.FP046_R002_COMPLETION_PATH,
+            "file_sha256": completion_digest,
+        }
+        changed_bindings[graph.FP046_R002_COMPLETION_ROLE] = completion_binding
+        canonical_snapshot = copy.deepcopy(
+            history[83]["canonical_binding_snapshot_after"]
+        )
+        canonical_snapshot.update(changed_bindings)
+
+        completed = copy.deepcopy(
+            history[73]["completion_evidence_by_goal_after"]
+        )
+        completed[graph.FP046_R002_GOAL_ID] = [
+            graph.FP046_R002_COMPLETION_ROLE
+        ]
+        update_at = (
+            datetime.fromisoformat(source["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        completion_at = update_at + timedelta(seconds=1)
+        update = {
+            "sequence": 86,
+            "event_id": graph.FP046_R002_COMPLETION_UPDATE_EVENT_ID,
+            "event_type": "CANONICAL_BINDINGS_UPDATED",
+            "occurred_on": update_at.date().isoformat(),
+            "occurred_at": update_at.isoformat(),
+            "previous_focus_goal_id": graph.FP046_R002_GOAL_ID,
+            "previous_focus_content_sha256": graph.FP046_R002_GOAL_SHA256,
+            "focus_goal_id": graph.FP046_R002_GOAL_ID,
+            "focus_goal_content_sha256": graph.FP046_R002_GOAL_SHA256,
+            "from_status": "IN_PROGRESS",
+            "to_status": "IN_PROGRESS",
+            "static_plan_manifest_sha256": (
+                graph.continuation.EXPECTED_V24_MANIFEST_SHA256
+            ),
+            "status_changes": {},
+            "runtime_after": copy.deepcopy(source["runtime_after"]),
+            "blockers_after": {},
+            "blocker_resolution_ids_after": [],
+            "source_checkpoint_version": "1.25.0",
+            "evidence_refs": copy.deepcopy(
+                graph.FP046_R002_COMPLETION_CHANGED_ROLES
+            ),
+            "previous_event_sha256": source["event_sha256"],
+            "produced_by_goal_id": graph.FP046_R002_GOAL_ID,
+            "produced_binding_roles": copy.deepcopy(
+                graph.FP046_R002_COMPLETION_PRODUCED_ROLES
+            ),
+            "producer_completion_receipt_binding": completion_binding,
+            "changed_binding_roles": copy.deepcopy(
+                graph.FP046_R002_COMPLETION_CHANGED_ROLES
+            ),
+            "changed_subject_ids_by_role": {
+                "IMPLEMENTATION_BACKLOG": ["FP-046", "FP-048"],
+                "IMPLEMENTATION_GAP": [
+                    "FP-046", "FP-048", "GAP-055", "GAP-057"
+                ],
+                graph.FP046_R002_COMPLETION_ROLE: [
+                    graph.FP046_R002_GOAL_ID
+                ],
+            },
+            "producer_output_subject_ids_by_role": {
+                "IMPLEMENTATION_BACKLOG": ["FP-046", "FP-048"],
+                "IMPLEMENTATION_GAP": [
+                    "FP-046", "FP-048", "GAP-055", "GAP-057"
+                ],
+            },
+            "impact_closure_goal_ids": [
+                graph.R002_REOPEN_PARENT_GOAL_ID,
+                graph.FP048_ANDROID_REPORT_GOAL_ID,
+            ],
+            "impact_disposition_by_goal": {
+                graph.R002_REOPEN_PARENT_GOAL_ID: {
+                    "result": "REVALIDATION_REFRESH_REQUIRED",
+                    "target_status": "READY",
+                },
+                graph.FP048_ANDROID_REPORT_GOAL_ID: {
+                    "result": "REOPEN_REQUIRED",
+                    "target_status": "SUPERSEDED",
+                },
+            },
+            "reopened_completion_event_sha256_by_goal": {
+                graph.FP048_ANDROID_REPORT_GOAL_ID: (
+                    graph.FP048_ANDROID_REPORT_COMPLETION_EVENT_SHA256
+                )
+            },
+            "canonical_binding_snapshot_after": canonical_snapshot,
+            "transition_control_review_binding": review_binding,
+        }
+        update["event_sha256"] = graph.continuation.event_sha256(update)
+
+        completion_runtime = copy.deepcopy(source["runtime_after"])
+        completion_runtime.update(
+            {
+                "focus_goal_id": graph.R002_REOPEN_PARENT_GOAL_ID,
+                "focus_goal_path": graph.FP046_R002_PARENT_GOAL_PATH,
+                "focus_work_item_id": "",
+                "focus_source": "WORKSTREAM_GRAPH",
+                "ready_frontier_goal_ids": [
+                    graph.R002_REOPEN_PARENT_GOAL_ID,
+                    "WS-GOAL-EPIC-04",
+                    "WS-GOAL-EPIC-12",
+                ],
+                "artifact_work_queue_sha256": (
+                    graph.continuation.canonical_json_sha256(
+                        state["artifact_work_queue"]
+                    )
+                ),
+                "completion_boundary_sha256": (
+                    graph.continuation.canonical_json_sha256(
+                        state["completion_boundary"]
+                    )
+                ),
+            }
+        )
+        completion = {
+            "sequence": 87,
+            "event_id": graph.FP046_R002_COMPLETION_EVENT_ID,
+            "event_type": "GOAL_COMPLETED",
+            "occurred_on": completion_at.date().isoformat(),
+            "occurred_at": completion_at.isoformat(),
+            "previous_focus_goal_id": graph.FP046_R002_GOAL_ID,
+            "previous_focus_content_sha256": graph.FP046_R002_GOAL_SHA256,
+            "focus_goal_id": graph.R002_REOPEN_PARENT_GOAL_ID,
+            "focus_goal_content_sha256": graph.FP046_R002_PARENT_GOAL_SHA256,
+            "subject_goal_id": graph.FP046_R002_GOAL_ID,
+            "from_status": "IN_PROGRESS",
+            "to_status": "COMPLETE_AT_TARGET",
+            "static_plan_manifest_sha256": (
+                graph.continuation.EXPECTED_V24_MANIFEST_SHA256
+            ),
+            "status_changes": {
+                graph.FP046_R002_GOAL_ID: "COMPLETE_AT_TARGET"
+            },
+            "runtime_after": completion_runtime,
+            "blockers_after": {},
+            "blocker_resolution_ids_after": [],
+            "source_checkpoint_version": "1.25.0",
+            "evidence_refs": [graph.FP046_R002_COMPLETION_ROLE],
+            "previous_event_sha256": update["event_sha256"],
+            "canonical_update_event_sha256": update["event_sha256"],
+            "completion_receipt_binding": completion_binding,
+            "completion_evidence_bindings": {
+                graph.FP046_R002_COMPLETION_ROLE: completion_binding
+            },
+            "completion_evidence_by_goal_after": completed,
+            "canonical_binding_snapshot_after": canonical_snapshot,
+        }
+        completion["event_sha256"] = graph.continuation.event_sha256(
+            completion
+        )
+        history.extend((update, completion))
+        checkpoint["canonical_bindings"] = sorted(
+            copy.deepcopy(list(canonical_snapshot.values())),
+            key=lambda row: row["role"],
+        )
+        statuses = state["status_by_goal"]
+        statuses[graph.FP046_R002_GOAL_ID] = "COMPLETE_AT_TARGET"
+        statuses[graph.FP048_ANDROID_REPORT_GOAL_ID] = "COMPLETE_AT_TARGET"
+        statuses[graph.R002_REOPEN_PARENT_GOAL_ID] = "READY"
+        statuses.pop(graph.FP046_R002_NEXT_GOAL_ID, None)
+        state.update(
+            {
+                "focus_goal_id": graph.R002_REOPEN_PARENT_GOAL_ID,
+                "focus_goal_path": graph.FP046_R002_PARENT_GOAL_PATH,
+                "focus_work_item_id": "",
+                "focus_source": "WORKSTREAM_GRAPH",
+                "ready_frontier_goal_ids": [
+                    graph.R002_REOPEN_PARENT_GOAL_ID,
+                    "WS-GOAL-EPIC-04",
+                    "WS-GOAL-EPIC-12",
+                ],
+                "completion_evidence_by_goal": completed,
+                "pending_producer_completion_goal_id": "",
+                "transition_history_anchor_sha256": completion[
+                    "event_sha256"
+                ],
+                "validation_cutoff_at": completion["occurred_at"],
+            }
+        )
+        return root, checkpoint
+
+    @staticmethod
+    def _reseal_pair(checkpoint: dict) -> None:
+        history = checkpoint["goal_execution"]["transition_history"]
+        update, completion = history[85:87]
+        update["event_sha256"] = graph.continuation.event_sha256(update)
+        completion["previous_event_sha256"] = update["event_sha256"]
+        completion["canonical_update_event_sha256"] = update[
+            "event_sha256"
+        ]
+        completion["event_sha256"] = graph.continuation.event_sha256(
+            completion
+        )
+        if len(history) > 87:
+            history[87]["previous_event_sha256"] = completion["event_sha256"]
+            history[87]["event_sha256"] = graph.continuation.event_sha256(
+                history[87]
+            )
+
+    def test_seq85_is_dormant_and_seq86_only_fails_closed(self) -> None:
+        checkpoint = load_json(ROOT / graph.V24_CHECKPOINT_RELATIVE)
+        history = checkpoint["goal_execution"]["transition_history"]
+        del history[85:]
+        self.assertEqual(
+            graph.validate_fp046_r002_completion_seq86_87(
+                ROOT, checkpoint
+            ),
+            [],
+        )
+        history.append({})
+        self.assertEqual(
+            graph.validate_fp046_r002_completion_seq86_87(
+                ROOT, checkpoint
+            ),
+            [
+                "FP046 R002 seq86 producer transaction lacks adjacent "
+                "seq87 completion"
+            ],
+        )
+
+    def test_exact_pair_and_descendant_history_are_accepted(self) -> None:
+        root, checkpoint = self._completion_checkpoint()
+        self.assertEqual(
+            graph.validate_fp046_r002_completion_seq86_87(
+                root, checkpoint
+            ),
+            [],
+        )
+        history = checkpoint["goal_execution"]["transition_history"]
+        descendant = {
+            "sequence": 88,
+            "event_id": "WS-SYNTHETIC-FP048-R002-SEQ88",
+            "event_type": "GOAL_SUPERSEDED",
+            "previous_event_sha256": history[-1]["event_sha256"],
+        }
+        descendant["event_sha256"] = graph.continuation.event_sha256(
+            descendant
+        )
+        history.append(descendant)
+        checkpoint["goal_execution"]["focus_goal_id"] = (
+            graph.FP046_R002_NEXT_GOAL_ID
+        )
+        self.assertEqual(
+            graph.validate_fp046_r002_completion_seq86_87(
+                root, checkpoint
+            ),
+            [],
+        )
+
+    def test_seq87_projection_preserves_historical_byte_witness(self) -> None:
+        _root, checkpoint = self._completion_checkpoint()
+        order_preserving_raw = (
+            json.dumps(
+                checkpoint,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+        sort_rewritten_raw = (
+            json.dumps(
+                checkpoint,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        ).encode("utf-8")
+        self.assertEqual(
+            json.loads(order_preserving_raw),
+            json.loads(sort_rewritten_raw),
+        )
+        self.assertNotEqual(order_preserving_raw, sort_rewritten_raw)
+
+        review, correction, _started = (
+            graph._fp046_r002_recovery_control_modules()
+        )
+        original_reader = review._read_regular
+        original_safe_file = correction._safe_file
+
+        def binding_for(raw: bytes) -> dict:
+            def review_reader(root: Path, relative: Path, **kwargs: object):
+                if relative == review.CHECKPOINT_REL:
+                    return raw
+                return original_reader(root, relative, **kwargs)
+
+            def correction_file(
+                root: Path,
+                relative: Path,
+                **kwargs: object,
+            ):
+                if relative == correction.CHECKPOINT_RELATIVE:
+                    return mock.Mock(read_bytes=mock.Mock(return_value=raw))
+                return original_safe_file(root, relative, **kwargs)
+
+            with mock.patch.object(
+                review,
+                "_read_regular",
+                side_effect=review_reader,
+            ), mock.patch.object(
+                correction,
+                "_safe_file",
+                side_effect=correction_file,
+            ):
+                return review.review_source_checkpoint_binding(ROOT)
+
+        self.assertEqual(
+            binding_for(order_preserving_raw)["sha256"],
+            review.REVIEW_SOURCE_CHECKPOINT_SHA256,
+        )
+        with self.assertRaisesRegex(
+            review.ReviewError,
+            "reconstructed seq83 review source checkpoint differs",
+        ):
+            binding_for(sort_rewritten_raw)
+
+    def test_resealed_field_and_fp048_impact_tamper_fail_closed(self) -> None:
+        root, checkpoint = self._completion_checkpoint()
+        checkpoint["goal_execution"]["transition_history"][85][
+            "unexpected"
+        ] = True
+        self._reseal_pair(checkpoint)
+        errors = graph.validate_fp046_r002_completion_seq86_87(
+            root, checkpoint
+        )
+        self.assertIn(
+            "FP046 R002 completion seq86 fields differs",
+            errors,
+        )
+
+        root, checkpoint = self._completion_checkpoint()
+        checkpoint["goal_execution"]["transition_history"][85][
+            "impact_disposition_by_goal"
+        ][graph.FP048_ANDROID_REPORT_GOAL_ID] = {
+            "result": "REVALIDATION_REFRESH_REQUIRED",
+            "target_status": "READY",
+        }
+        self._reseal_pair(checkpoint)
+        errors = graph.validate_fp046_r002_completion_seq86_87(
+            root, checkpoint
+        )
+        self.assertIn(
+            "FP046 R002 completion seq86 impact disposition differs",
+            errors,
+        )
+
+        for stale_round in ("R001", "R002", "R003", "R004"):
+            with self.subTest(stale_transition_round=stale_round):
+                root, checkpoint = self._completion_checkpoint()
+                checkpoint["goal_execution"]["transition_history"][85][
+                    "transition_control_review_binding"
+                ]["assignment"]["path"] = (
+                    "docs/control/execution/workstream-transitions/seq86-87/"
+                    f"review-rounds/{stale_round}/assignment.json"
+                )
+                self._reseal_pair(checkpoint)
+                errors = graph.validate_fp046_r002_completion_seq86_87(
+                    root, checkpoint
+                )
+                self.assertIn(
+                    "FP046 R002 completion R005 transition review differs: "
+                    "assignment",
+                    errors,
+                )
+
+        root, checkpoint = self._completion_checkpoint()
+        assignment_path = (
+            graph.FP046_R002_COMPLETION_REVIEW_PATH_BY_ROLE["assignment"]
+        )
+        assignment = load_json(root / assignment_path)
+        assignment["document_id"] = (
+            "WS-FP046-R002-SEQ86-87-REVIEW-ASSIGNMENT-R002"
+        )
+        assignment_digest = write_json(root, assignment_path, assignment)
+        assignment_binding = checkpoint["goal_execution"][
+            "transition_history"
+        ][85]["transition_control_review_binding"]["assignment"]
+        assignment_binding["sha256"] = assignment_digest
+        assignment_binding["byte_length"] = (
+            root / assignment_path
+        ).stat().st_size
+        self._reseal_pair(checkpoint)
+        errors = graph.validate_fp046_r002_completion_seq86_87(
+            root, checkpoint
+        )
+        self.assertIn(
+            "FP046 R002 completion R005 transition review differs: assignment",
+            errors,
+        )
+
+    def test_resealed_completion_evidence_tamper_fails_closed(self) -> None:
+        root, checkpoint = self._completion_checkpoint()
+        completion = checkpoint["goal_execution"]["transition_history"][86]
+        completion["evidence_refs"] = []
+        self._reseal_pair(checkpoint)
+        errors = graph.validate_fp046_r002_completion_seq86_87(
+            root, checkpoint
+        )
+        self.assertIn(
+            "FP046 R002 completion seq87 evidence differs",
+            errors,
+        )
+
+    def test_r001_r002_r003_r004_goal_review_and_receipt_paths_fail_closed(
+        self,
+    ) -> None:
+        stale_goal_paths = (
+            (
+                "R001",
+                "docs/control/execution/goal-results/"
+                f"{graph.FP046_R002_GOAL_ID}/review-subject.json",
+            ),
+            (
+                "R002",
+                "docs/control/execution/goal-results/"
+                f"{graph.FP046_R002_GOAL_ID}/review-rounds/R002/"
+                "review-subject.json",
+            ),
+            (
+                "R003",
+                "docs/control/execution/goal-results/"
+                f"{graph.FP046_R002_GOAL_ID}/review-rounds/R003/"
+                "review-subject.json",
+            ),
+            (
+                "R004",
+                "docs/control/execution/goal-results/"
+                f"{graph.FP046_R002_GOAL_ID}/review-rounds/R004/"
+                "review-subject.json",
+            ),
+        )
+        for stale_round, stale_path in stale_goal_paths:
+            with self.subTest(stale_goal_round=stale_round):
+                root, checkpoint = self._completion_checkpoint()
+                receipt_path = root / graph.FP046_R002_COMPLETION_PATH
+                receipt = load_json(receipt_path)
+                receipt["evidence_bindings"][0]["path"] = stale_path
+                digest = write_json(
+                    root,
+                    graph.FP046_R002_COMPLETION_PATH,
+                    receipt,
+                )
+                history = checkpoint["goal_execution"]["transition_history"]
+                history[85]["producer_completion_receipt_binding"][
+                    "file_sha256"
+                ] = digest
+                for row in checkpoint["canonical_bindings"]:
+                    if row["role"] == graph.FP046_R002_COMPLETION_ROLE:
+                        row["file_sha256"] = digest
+                self._reseal_pair(checkpoint)
+                errors = graph.validate_fp046_r002_completion_seq86_87(
+                    root, checkpoint
+                )
+                self.assertIn(
+                    "FP046 R002 completion stale Goal review path is forbidden",
+                    errors,
+                )
+
+        stale_receipts = (
+            (
+                "R002",
+                "WS-FP046-R002-CONSENT-WITHDRAWAL-DELETION-WORK-ITEM-"
+                "COMPLETION-20260825-001",
+                "completion-receipt.json",
+            ),
+            (
+                "R003",
+                "WS-FP046-R002-CONSENT-WITHDRAWAL-DELETION-WORK-ITEM-"
+                "COMPLETION-20260825-R003",
+                "completion-receipt-r003.json",
+            ),
+            (
+                "R004",
+                "WS-FP046-R002-CONSENT-WITHDRAWAL-DELETION-WORK-ITEM-"
+                "COMPLETION-20260825-R004",
+                "completion-receipt-r004.json",
+            ),
+        )
+        for stale_round, old_document_id, filename in stale_receipts:
+            with self.subTest(stale_receipt_round=stale_round):
+                root, checkpoint = self._completion_checkpoint()
+                receipt = load_json(root / graph.FP046_R002_COMPLETION_PATH)
+                old_path = (
+                    "docs/control/execution/goal-results/"
+                    f"{graph.FP046_R002_GOAL_ID}/{filename}"
+                )
+                receipt["document_id"] = old_document_id
+                old_digest = write_json(root, old_path, receipt)
+                old_binding = {
+                    "role": graph.FP046_R002_COMPLETION_ROLE,
+                    "document_id": old_document_id,
+                    "path": old_path,
+                    "file_sha256": old_digest,
+                }
+                history = checkpoint["goal_execution"]["transition_history"]
+                history[85]["producer_completion_receipt_binding"] = old_binding
+                history[85]["canonical_binding_snapshot_after"][
+                    graph.FP046_R002_COMPLETION_ROLE
+                ] = old_binding
+                history[86]["completion_receipt_binding"] = old_binding
+                history[86]["completion_evidence_bindings"] = {
+                    graph.FP046_R002_COMPLETION_ROLE: old_binding
+                }
+                history[86]["canonical_binding_snapshot_after"][
+                    graph.FP046_R002_COMPLETION_ROLE
+                ] = old_binding
+                for index, row in enumerate(checkpoint["canonical_bindings"]):
+                    if row["role"] == graph.FP046_R002_COMPLETION_ROLE:
+                        checkpoint["canonical_bindings"][index] = old_binding
+                self._reseal_pair(checkpoint)
+                errors = graph.validate_fp046_r002_completion_seq86_87(
+                    root, checkpoint
+                )
+                self.assertIn(
+                    "FP046 R002 completion receipt binding differs",
+                    errors,
+                )
+
+
 class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
     def _review_authority_fixture(
         self,
@@ -8385,6 +9060,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         ]
         checkpoint = {
             "goal_execution": {
+                "transition_history": [],
                 "status_by_goal": {},
                 "completion_evidence_by_goal": {},
                 "archived_completion_evidence_by_goal": {},
@@ -8409,6 +9085,8 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         checkpoint: dict,
         suffix: list[dict],
         frozen_raw: dict[Path, bytes],
+        *,
+        frozen_failure: Exception | None = None,
     ) -> list[str]:
         roles = ("assignment", "review_result", "independent_review")
 
@@ -8577,7 +9255,20 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             ):
                 raise ValueError("reviewed core differs")
 
-        with mock.patch.object(
+        frozen_authority = (
+            mock.patch.object(
+                graph,
+                "_fp046_r002_optional_frozen_r011_authority",
+                side_effect=frozen_failure,
+            )
+            if frozen_failure is not None
+            else mock.patch.object(
+                graph,
+                "_fp046_r002_optional_frozen_r011_authority",
+                return_value=None,
+            )
+        )
+        with frozen_authority, mock.patch.object(
             r002_preflight,
             "load_frozen_transition_r001",
             side_effect=lambda _root: load(r001_paths),
@@ -8678,6 +9369,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             *r002_preflight.r029_candidate.CURRENT_SOURCE_PATHS,
             *r002_preflight.R007_REVIEW_PINS,
             *completion_review.CONTROL_SUCCESSOR_R011_COHORT_PATHS,
+            *completion_review.CONTROL_SUCCESSOR_R011_PATHS,
             *control_review_support_paths,
             *r002_transaction.CATALOG_RELATIVES,
             *(
@@ -8700,70 +9392,30 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         for relative in sorted(set(source_paths)):
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes((ROOT / relative).read_bytes())
-        r011_context = (
-            completion_review.prepare_control_successor_r011_context(root)
+            source = ROOT / relative
+            target.write_bytes(source.read_bytes())
+            target.chmod(source.stat().st_mode & 0o777)
+        from scripts import (
+            build_walksafe_fp046_r002_seq77_78_review_20260823 as start_review,
         )
-        r011_assignment_raw = (
-            completion_review.build_control_successor_r011_assignment(
-                r011_context,
-                assigned_at="2026-08-23T00:00:00+09:00",
-            ).encode("utf-8")
-        )
-        r011_assignment = completion_review.strict_json_bytes(
-            r011_assignment_raw,
-            completion_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL.as_posix(),
-        )
-        r011_result = {
-            "schema_version": "1.0",
-            "evidence_type": (
-                "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_REVIEW_RESULT"
-            ),
-            "goal_id": completion_review.GOAL_ID,
-            "round_id": completion_review.CONTROL_SUCCESSOR_R011_ROUND_ID,
-            "reviewed_at": r011_assignment["assigned_at"],
-            "reviewer": copy.deepcopy(r011_assignment["reviewer"]),
-            "assignment_binding": completion_review._binding(
-                completion_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL,
-                r011_assignment_raw,
-            ),
-            "review_scope": copy.deepcopy(r011_assignment["review_scope"]),
-            "decision": "APPROVED",
-            "findings": {"blocking": [], "major_open": [], "minor_open": []},
-            "finding_dispositions": [],
-            "review_boundary": copy.deepcopy(completion_review.BOUNDARY),
-        }
-        r011_result_raw = completion_review.json_text(r011_result).encode(
-            "utf-8"
-        )
-        r011_independent_raw = (
-            completion_review.build_control_successor_r011_independent_review(
-                r011_context,
-                r011_assignment,
-                r011_assignment_raw,
-                r011_result,
-                r011_result_raw,
-            ).encode("utf-8")
-        )
-        for relative, raw in (
-            (
-                completion_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL,
-                r011_assignment_raw,
-            ),
-            (
-                completion_review.CONTROL_SUCCESSOR_R011_RESULT_REL,
-                r011_result_raw,
-            ),
-            (
-                completion_review.CONTROL_SUCCESSOR_R011_INDEPENDENT_REL,
-                r011_independent_raw,
-            ),
-        ):
-            target = root / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(raw)
-        completion_review.validated_control_successor_r011_context(root)
+
+        start_review.validated_frozen_r011_context(root)
         checkpoint = load_json(root / r002_preflight.CHECKPOINT_REL)
+        history = checkpoint["goal_execution"]["transition_history"]
+        if len(history) >= 76:
+            self.assertEqual(
+                [event["sequence"] for event in history[71:76]],
+                [72, 73, 74, 75, 76],
+            )
+            plan = graph._r002_checkpoint_review_plan(
+                root,
+                checkpoint,
+                history[71:76],
+                r002_preflight,
+            )
+            self.assertIsNotNone(plan)
+            self._transaction_preflight = copy.deepcopy(plan)
+            return root, checkpoint
         historical_review_overlay = {
             Path(path): (ROOT / path).read_bytes()
             for path in (
@@ -8947,8 +9599,11 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             [],
         )
 
-    def test_seq72_76_projection_without_actual_review_fails_closed(self) -> None:
+    def test_seq72_76_projection_missing_actual_r004_review_fails_closed(
+        self,
+    ) -> None:
         root, checkpoint = self._checkpoint()
+        (root / r002_preflight.TRANSITION_R004_INDEPENDENT_REL).unlink()
 
         errors = graph.validate_fp046_npc_r002_reopen_seq72_76(
             root, checkpoint
@@ -8973,6 +9628,26 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             ),
             [],
         )
+
+    def test_direct_review_authority_rejects_frozen_r011_integrity_failure(
+        self,
+    ) -> None:
+        for failure in (
+            ValueError("frozen R011 binding differs"),
+            OSError("frozen R011 bytes unavailable"),
+        ):
+            with self.subTest(failure=type(failure).__name__):
+                root, checkpoint, suffix, frozen_raw = (
+                    self._review_authority_fixture()
+                )
+                errors = self._review_authority_errors(
+                    root,
+                    checkpoint,
+                    suffix,
+                    frozen_raw,
+                    frozen_failure=failure,
+                )
+                self.assertIn(str(failure), "\n".join(errors))
 
     def test_direct_review_authority_rejects_each_missing_review_file(
         self,
@@ -9220,7 +9895,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             ),
         )
 
-    def test_projected_seq76_replays_reviewed_core_and_completion_cascade(
+    def test_actual_projected_seq77_then_seq78_replay_reviewed_completion_cascade(
         self,
     ) -> None:
         root, checkpoint = self._checkpoint()
@@ -9233,11 +9908,27 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         }
         for relative in source_paths:
             target = root / relative
+            source = ROOT / relative
             if not target.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes((ROOT / relative).read_bytes())
+                target.write_bytes(source.read_bytes())
+            target.chmod(source.stat().st_mode & 0o777)
+        product_prefixes = {
+            "apps",
+            "backend",
+            "data_sources",
+            "datasets",
+            "model",
+            "voice",
+        }
+        product_sha256_before = {
+            relative: sha256_file(root / relative)
+            for relative in source_paths
+            if relative.parts and relative.parts[0] in product_prefixes
+        }
         git_dir, _git_state = r002_transaction._git_state(ROOT)
         os.symlink(str(git_dir), root / ".git", target_is_directory=True)
+        (root / r002_preflight.CHECKPOINT_REL).chmod(0o600)
         suffix = checkpoint["goal_execution"]["transition_history"][71:76]
         plan = graph._r002_checkpoint_review_plan(
             root,
@@ -9261,85 +9952,259 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                 )
             ),
         )
-        r011_context = (
-            completion_review.validated_control_successor_r011_context(root)
+        from scripts import (
+            build_walksafe_fp046_r002_seq77_78_review_20260823 as start_review,
         )
-        cursor = r011_context
-        while not isinstance(
-            cursor,
-            completion_review.ControlSuccessorR004Context,
-        ):
-            cursor = cursor.predecessor
-        self.assertIsInstance(
-            cursor.predecessor,
-            completion_review.ControlSuccessorR003Context,
+
+        r011_context = start_review.validated_frozen_r011_context(root)
+        managed_sources_by_round = (
+            start_review.validated_frozen_r011_managed_sources_by_round(root)
         )
         self.assertIsInstance(
-            cursor.predecessor.predecessor,
-            completion_review.ReviewContext,
+            r011_context,
+            start_review.FrozenR011Context,
+        )
+        self.assertIsInstance(
+            r011_context.current,
+            start_review.FrozenControlContext,
+        )
+        self.assertEqual(
+            r011_context.managed_sources_by_round,
+            managed_sources_by_round,
+        )
+        self.assertEqual(
+            tuple(row["path"] for row in r011_context.review_bindings),
+            tuple(path.as_posix() for path in start_review.FROZEN_R011_PATHS),
         )
         self.assertEqual(
             {
                 round_id: len(rows)
-                for round_id, rows in (
-                    completion_review.validated_control_successor_managed_closure_sources_by_round(
-                        root
-                    ).items()
-                )
+                for round_id, rows in managed_sources_by_round.items()
             },
             {"R002": 2, "R003": 2, "R004": 1},
         )
-        with mock.patch.object(
-            graph,
-            "_r002_review_authority_errors",
-            return_value=[],
-        ):
-            self.assertTrue(
-                graph._npc_single_admin_recovery_completion_managed_closure_matches(
-                    root,
-                    checkpoint,
-                )
+        if not (root / start_review.AUTHORIZATION_REL).exists():
+            start_review.write_authorization(root)
+        if not (root / start_review.CONTRACT_REL).exists():
+            start_review.write_contract(root)
+        review_context = start_review.prepare_review_context(root)
+        historical_r001 = start_review.R001_ASSIGNMENT_REL
+        self.assertTrue((root / historical_r001).is_file())
+        historical_r001_raw = (root / historical_r001).read_bytes()
+        assignment_path = root / start_review.ASSIGNMENT_REL
+        if assignment_path.exists():
+            assignment, assignment_raw = start_review.document(
+                root, start_review.ASSIGNMENT_REL
             )
-            self.assertIsNotNone(
-                graph._npc_single_admin_recovery_completion_package(
-                    root,
-                    checkpoint,
-                )
+            start_review.validate_assignment(
+                assignment,
+                assignment_raw,
+                review_context,
             )
-            self.assertIsNotNone(
-                graph._npc_single_admin_recovery_sealed_product_successor_artifacts(
-                    root,
-                    checkpoint,
-                )
+        else:
+            start_review.write_assignment(root)
+            assignment, assignment_raw = start_review.document(
+                root, start_review.ASSIGNMENT_REL
             )
-            self.assertEqual(
-                graph.validate_npc_single_admin_recovery_canonical_completion(
-                    root,
-                    checkpoint,
+
+        result_path = root / start_review.RESULT_REL
+        if result_path.exists():
+            review_result, result_raw = start_review.document(
+                root, start_review.RESULT_REL
+            )
+            start_review.validate_review_result(
+                review_result,
+                result_raw,
+                assignment,
+                assignment_raw,
+                review_context,
+            )
+        else:
+            review_result = {
+                "schema_version": "1.0",
+                "document_id": start_review.RESULT_DOCUMENT_ID,
+                "evidence_type": (
+                    "FP046_R002_SEQ77_78_REVIEWER_AUTHORED_RESULT"
                 ),
-                [],
+                "goal_id": start_review.GOAL_ID,
+                "round_id": start_review.ROUND_ID,
+                "reviewed_at": assignment["assigned_at"],
+                "reviewer": copy.deepcopy(assignment["reviewer"]),
+                "assignment_binding": start_review.binding(
+                    start_review.ASSIGNMENT_REL,
+                    assignment_raw,
+                ),
+                "review_scope": start_review.review_scope(review_context),
+                "decision": "APPROVED",
+                "findings": {
+                    "blocking": [],
+                    "major_open": [],
+                    "minor_open": [],
+                },
+                "finding_dispositions": [],
+                "review_boundary": copy.deepcopy(start_review.BOUNDARY),
+            }
+            result_raw = start_review.json_text(review_result).encode()
+            result_path.parent.mkdir(parents=True, exist_ok=True)
+            result_path.write_bytes(result_raw)
+            result_path.chmod(0o644)
+        independent_raw = start_review.build_independent_review(
+            review_context,
+            assignment,
+            assignment_raw,
+            review_result,
+            result_raw,
+        ).encode()
+        independent_path = root / start_review.INDEPENDENT_REL
+        if independent_path.exists():
+            self.assertEqual(independent_path.read_bytes(), independent_raw)
+        else:
+            independent_path.write_bytes(independent_raw)
+            independent_path.chmod(0o644)
+        start_review.validate_post_review(root)
+        self.assertEqual(
+            (root / historical_r001).read_bytes(),
+            historical_r001_raw,
+        )
+
+        from scripts import (
+            apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823
+            as reanchor,
+        )
+        from scripts import (
+            apply_walksafe_fp046_r002_goal_started_seq78_20260823 as started,
+        )
+
+        source_managed_paths = {
+            Path(path)
+            for path in checkpoint["working_tree_snapshot"][
+                "managed_changed_paths"
+            ]
+        }
+        reviewed_delta_paths = (
+            set(reanchor.REQUIRED_CONTROL_PATHS) - source_managed_paths
+        )
+        with mock.patch.object(
+            reanchor.npc,
+            "_git_visible_managed_paths",
+            return_value=reviewed_delta_paths,
+        ):
+            prepared = reanchor.prepare(
+                root,
+                allow_stale_catalogs=True,
+                event_occurred_at=(
+                    datetime.fromisoformat(review_result["reviewed_at"])
+                    + timedelta(seconds=1)
+                ).isoformat(),
             )
-            self.assertIsNotNone(
-                graph._r002_legacy_completion_overlay(root, checkpoint)
+        for relative, raw in prepared.candidate_catalogs.items():
+            (root / relative).write_bytes(raw)
+
+        seq77 = prepared.projected
+        seq77_event = seq77["goal_execution"]["transition_history"][-1]
+        self.assertEqual(len(seq77["goal_execution"]["transition_history"]), 77)
+        self.assertEqual(
+            seq77["goal_execution"]["status_by_goal"][graph.FP046_R002_GOAL_ID],
+            "READY",
+        )
+        self.assertEqual(seq77_event["from_status"], "READY")
+        self.assertEqual(seq77_event["to_status"], "READY")
+        self.assertEqual(seq77_event["status_changes"], {})
+        self.assertEqual(seq77_event["claim_boundary"], reanchor.CLAIM_BOUNDARY)
+        self.assertEqual(
+            {
+                relative: sha256_file(root / relative)
+                for relative in product_sha256_before
+            },
+            product_sha256_before,
+        )
+        self.assertEqual(
+            graph.validate_fp046_r002_seq77_78(root, seq77),
+            [],
+        )
+        repository_snapshot = copy.deepcopy(
+            seq77["goal_execution"]["transition_history"][-1][
+                "repository_context_reanchor"
+            ]["after"]
+        )
+        receipt = {
+            "document_id": started.gate._document_id(started.EVENT_ID),
+            "generated_at": "2026-08-23T00:01:00+09:00",
+            "repository_snapshot": repository_snapshot,
+        }
+        receipt_raw = json_bytes(receipt)
+        evidence = started.GateEvidence(
+            receipt=receipt,
+            receipt_bytes=receipt_raw,
+            receipt_binding={
+                "document_id": started.gate._document_id(started.EVENT_ID),
+                "path": (
+                    "docs/control/execution/goal-gates/"
+                    f"{started.EVENT_ID}/implementation-start-gate-receipt.json"
+                ),
+                "file_sha256": hashlib.sha256(receipt_raw).hexdigest(),
+            },
+            repository_payload=repository_snapshot,
+            event_occurred_at="2026-08-23T00:01:01+09:00",
+        )
+        checkpoint, started_event = started.project_seq78(
+            root,
+            prepared.projected,
+            evidence,
+            event_id=started.EVENT_ID,
+            final_sha256_by_path=prepared.final_sha256_by_path,
+        )
+        self.assertEqual(started_event["sequence"], 78)
+        self.assertEqual(
+            started_event["status_changes"],
+            {graph.FP046_R002_GOAL_ID: "IN_PROGRESS"},
+        )
+        self.assertTrue(
+            graph._npc_single_admin_recovery_completion_managed_closure_matches(
+                root,
+                checkpoint,
             )
-            self.assertEqual(
-                graph.validate_fp046_r014_successor_authority(
-                    root,
-                    checkpoint,
-                )[0],
-                [],
+        )
+        self.assertIsNotNone(
+            graph._npc_single_admin_recovery_completion_package(
+                root,
+                checkpoint,
             )
-            self.assertEqual(
-                graph.validate_fp014_canonical_completion(root, checkpoint),
-                [],
+        )
+        self.assertIsNotNone(
+            graph._npc_single_admin_recovery_sealed_product_successor_artifacts(
+                root,
+                checkpoint,
             )
-            self.assertEqual(
-                graph.validate_phase1_android_report_successor_binding(
-                    root,
-                    checkpoint,
-                )[0],
-                [],
-            )
+        )
+        self.assertEqual(
+            graph.validate_npc_single_admin_recovery_canonical_completion(
+                root,
+                checkpoint,
+            ),
+            [],
+        )
+        self.assertIsNotNone(
+            graph._r002_legacy_completion_overlay(root, checkpoint)
+        )
+        self.assertEqual(
+            graph.validate_fp046_r014_successor_authority(
+                root,
+                checkpoint,
+            )[0],
+            [],
+        )
+        self.assertEqual(
+            graph.validate_fp014_canonical_completion(root, checkpoint),
+            [],
+        )
+        self.assertEqual(
+            graph.validate_phase1_android_report_successor_binding(
+                root,
+                checkpoint,
+            )[0],
+            [],
+        )
 
     def test_transaction_built_seq77_review_plan_rewinds_seq76_bodies(
         self,
@@ -9465,83 +10330,12 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
 
     def test_seq72_76_suffix_rewinds_to_exact_seq67_state(self) -> None:
         checkpoint = load_json(ROOT / graph.CHECKPOINT_RELATIVE)
-        state = checkpoint["goal_execution"]
-        statuses = state["status_by_goal"]
-        active = state["completion_evidence_by_goal"]
-        archived = state.setdefault("archived_completion_evidence_by_goal", {})
-        future_goals = (
-            (graph.FP046_GOAL_ID, "WS-FUTURE-FP046-R002"),
-            (
-                graph.NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
-                "WS-FUTURE-NPC-R002",
-            ),
+        history = checkpoint["goal_execution"]["transition_history"]
+
+        self.assertEqual(
+            [event["sequence"] for event in history[71:76]],
+            [72, 73, 74, 75, 76],
         )
-        future_paths = (
-            "docs/control/goals/future-fp046-r002.md",
-            "docs/control/goals/future-npc-r002.md",
-        )
-        events = [
-            {
-                "sequence": 72,
-                "event_type": "CANONICAL_BINDINGS_UPDATED",
-                "subject_goal_id": graph.R002_REOPEN_PARENT_GOAL_ID,
-                "from_status": "COMPLETE_AT_TARGET",
-                "to_status": "PLANNED",
-                "status_changes": {
-                    graph.R002_REOPEN_PARENT_GOAL_ID: "PLANNED"
-                },
-            },
-            *[
-                {
-                    "sequence": sequence,
-                    "event_type": "GOAL_SUPERSEDED",
-                    "subject_goal_id": predecessor,
-                    "materialized_goal_id": successor,
-                    "materialized_goal_path": path,
-                    "from_status": "COMPLETE_AT_TARGET",
-                    "to_status": "SUPERSEDED",
-                    "status_changes": {
-                        predecessor: "SUPERSEDED",
-                        successor: "PLANNED",
-                    },
-                }
-                for sequence, (predecessor, successor), path in zip(
-                    (73, 74), future_goals, future_paths
-                )
-            ],
-            {
-                "sequence": 75,
-                "event_type": "GOAL_READY",
-                "subject_goal_id": graph.R002_REOPEN_PARENT_GOAL_ID,
-                "from_status": "PLANNED",
-                "to_status": "READY",
-                "status_changes": {
-                    graph.R002_REOPEN_PARENT_GOAL_ID: "READY"
-                },
-            },
-            {
-                "sequence": 76,
-                "event_type": "GOAL_READY",
-                "subject_goal_id": future_goals[0][1],
-                "from_status": "PLANNED",
-                "to_status": "READY",
-                "status_changes": {future_goals[0][1]: "READY"},
-            },
-        ]
-        for predecessor, successor in future_goals:
-            archived[predecessor] = active.pop(predecessor)
-            statuses[predecessor] = "SUPERSEDED"
-            statuses[successor] = "PLANNED"
-        archived[graph.R002_REOPEN_PARENT_GOAL_ID] = active.pop(
-            graph.R002_REOPEN_PARENT_GOAL_ID
-        )
-        statuses[graph.R002_REOPEN_PARENT_GOAL_ID] = "READY"
-        statuses[future_goals[0][1]] = "READY"
-        state["transition_history"].extend(events)
-        state["goal_document_paths"].extend(future_paths)
-        state["managed_goal_paths"].extend(future_paths)
-        state["goal_document_count"] += len(future_paths)
-        state["managed_goal_path_count"] += len(future_paths)
 
         self.assertTrue(
             graph._fp022_seq66_67_successor_matches(ROOT, checkpoint)
@@ -9741,6 +10535,8298 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                         root, checkpoint
                     )
                 )
+
+
+class WalkSafeFp046R002StartGraphTest(unittest.TestCase):
+    @staticmethod
+    def _checkpoint(*, sequence: int = 83) -> tuple[dict, dict]:
+        binding = {
+            "assignment": {
+                "path": "review/assignment.json",
+                "sha256": "1" * 64,
+                "byte_length": 1,
+            },
+            "review_result": {
+                "path": "review/result.json",
+                "sha256": "2" * 64,
+                "byte_length": 1,
+            },
+            "independent_review": {
+                "path": "review/independent.json",
+                "sha256": "3" * 64,
+                "byte_length": 1,
+            },
+        }
+        history = [
+            {
+                "sequence": index,
+                "event_id": f"WS-HISTORICAL-{index}",
+                "event_type": "GOAL_READY",
+            }
+            for index in range(1, 77)
+        ]
+        history.append(
+            {
+                "sequence": 77,
+                "event_id": graph.FP046_R002_CONTROL_REANCHOR_EVENT_ID,
+                "event_type": "GOAL_START_CONTROL_REANCHORED",
+                "transition_control_review_binding": copy.deepcopy(
+                    graph.continuation.FP046_R002_R006_REVIEW_BINDING
+                ),
+            }
+        )
+        if sequence >= 78:
+            history.append(
+                {
+                    "sequence": 78,
+                    "event_id": graph.FP046_R002_CONTROL_CORRECTION_EVENT_ID,
+                    "event_type": "GOAL_START_CONTROL_REANCHORED",
+                    "transition_control_review_binding": copy.deepcopy(binding),
+                }
+            )
+        if sequence >= 79:
+            history.append(
+                {
+                    "sequence": 79,
+                    "event_id": graph.FP046_R002_RECOVERY_CONTROL_REANCHOR_EVENT_ID,
+                    "event_type": "GOAL_START_CONTROL_REANCHORED",
+                    "transition_control_review_binding": copy.deepcopy(
+                        graph.continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING
+                    ),
+                }
+            )
+        if sequence >= 80:
+            history.append(
+                {
+                    "sequence": 80,
+                    "event_id": (
+                        graph.FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+                    ),
+                    "event_type": "GOAL_START_CONTROL_REANCHORED",
+                    "transition_control_review_binding": copy.deepcopy(
+                        graph.continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING
+                    ),
+                }
+            )
+        if sequence >= 81:
+            history.append(
+                {
+                    "sequence": 81,
+                    "event_id": (
+                        graph.FP046_R002_THIRD_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+                    ),
+                    "event_type": "GOAL_START_CONTROL_REANCHORED",
+                    "transition_control_review_binding": copy.deepcopy(
+                        graph.continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING
+                    ),
+                }
+            )
+        if sequence >= 82:
+            history.append(
+                {
+                    "sequence": 82,
+                    "event_id": (
+                        graph.FP046_R002_FOURTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+                    ),
+                    "event_type": "GOAL_START_CONTROL_REANCHORED",
+                    "transition_control_review_binding": copy.deepcopy(
+                        graph.continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING
+                    ),
+                }
+            )
+        if sequence >= 83:
+            history.append(
+                {
+                    "sequence": 83,
+                    "event_id": (
+                        graph.FP046_R002_FIFTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+                    ),
+                    "event_type": "GOAL_START_CONTROL_REANCHORED",
+                    "transition_control_review_binding": copy.deepcopy(
+                        graph.continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING
+                    ),
+                }
+            )
+        if sequence >= 84:
+            history.append(
+                {
+                    "sequence": 84,
+                    "event_id": (
+                        graph.FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+                    ),
+                    "event_type": "GOAL_START_CONTROL_REANCHORED",
+                    "transition_control_review_binding": copy.deepcopy(binding),
+                }
+            )
+        if sequence >= 85:
+            history.append(
+                {
+                    "sequence": 85,
+                    "event_id": graph.FP046_R002_STARTED_EVENT_ID,
+                    "event_type": "GOAL_STARTED",
+                }
+            )
+        target_managed_count = (
+            988
+            if sequence == 78
+            else graph.continuation.FP046_R002_RECOVERY_SEQ79_MANAGED_PATH_COUNT
+            if sequence == 79
+            else graph.continuation.FP046_R002_RECOVERY_HISTORICAL_MANAGED_PATH_COUNT
+            if sequence == 80
+            else graph.continuation.FP046_R002_RECOVERY_SEQ81_MANAGED_PATH_COUNT
+            if sequence == 81
+            else graph.continuation.FP046_R002_RECOVERY_SEQ82_MANAGED_PATH_COUNT
+            if sequence == 82
+            else graph.continuation.FP046_R002_RECOVERY_SEQ83_MANAGED_PATH_COUNT
+            if sequence == 83
+            else graph.continuation.FP046_R002_RECOVERY_MANAGED_PATH_COUNT
+        )
+        managed = sorted(
+            {
+                "review/assignment.json",
+                "review/result.json",
+                "review/independent.json",
+                "review/r001-assignment.json",
+                "review/r002-assignment.json",
+                "review/r003-assignment.json",
+                "review/r004-assignment.json",
+                "review/r005-assignment.json",
+                "review/r005-result.json",
+                "review/r005-independent.json",
+                "review/rejected-r001-assignment.json",
+                graph.continuation.FP046_R002_RECOVERY_REJECTED_R001_ASSIGNMENT[
+                    "path"
+                ],
+                "session/artifact-1",
+                "session/artifact-2",
+                "session/artifact-3",
+                "session/artifact-4",
+                "scripts/current-control.py",
+                *(
+                    (
+                        row["path"]
+                        for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+                    )
+                    if sequence >= 83
+                    else ()
+                ),
+                *(
+                    (
+                        graph.continuation.FP046_R002_RECOVERY_REJECTED_R013_ASSIGNMENT[
+                            "path"
+                        ],
+                    )
+                    if sequence >= 84
+                    else ()
+                ),
+                *(
+                    row["path"]
+                    for row in graph.continuation.FP046_R002_R006_REVIEW_BINDING.values()
+                ),
+                *(
+                    row["path"]
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R002_REVIEW_BINDING.values()
+                ),
+                *(
+                    row["path"]
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R003_REVIEW_BINDING.values()
+                ),
+                *(
+                    row["path"]
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R004_REVIEW_BINDING.values()
+                ),
+                *(
+                    row["path"]
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R005_REVIEW_BINDING.values()
+                ),
+                *(
+                    row["path"]
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R006_REVIEW_BINDING.values()
+                ),
+                *(
+                    (
+                        row["path"]
+                        for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values()
+                    )
+                    if sequence >= 79
+                    else ()
+                ),
+                *(
+                    (
+                        row["path"]
+                        for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+                    )
+                    if sequence >= 80
+                    else ()
+                ),
+                *(
+                    (
+                        row["path"]
+                        for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+                    )
+                    if sequence >= 81
+                    else ()
+                ),
+                *(
+                    (
+                        graph.continuation.FP046_R002_RECOVERY_REJECTED_R010_ASSIGNMENT[
+                            "path"
+                        ],
+                    )
+                    if sequence >= 82
+                    else ()
+                ),
+                *(
+                    (
+                        row["path"]
+                        for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+                    )
+                    if sequence >= 82
+                    else ()
+                ),
+            }
+        )
+        managed = sorted(
+            {
+                *managed,
+                *(
+                    f"managed/filler-{index:04d}"
+                    for index in range(
+                        target_managed_count - len(managed)
+                    )
+                ),
+            }
+        )
+        return (
+            {
+                "goal_execution": {"transition_history": history},
+                "working_tree_snapshot": {
+                    "managed_changed_paths": managed,
+                    "managed_changed_path_count": len(managed),
+                },
+            },
+            binding,
+        )
+
+    @staticmethod
+    def _authority(binding: dict) -> dict:
+        return {
+            "binding": copy.deepcopy(binding),
+            "review_paths": (
+                Path("review/assignment.json"),
+                Path("review/result.json"),
+                Path("review/independent.json"),
+            ),
+            "preserved_review_paths": (
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_R006_REVIEW_BINDING.values()
+                ),
+                Path("review/rejected-r001-assignment.json"),
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R002_REVIEW_BINDING.values()
+                ),
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R003_REVIEW_BINDING.values()
+                ),
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R004_REVIEW_BINDING.values()
+                ),
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R005_REVIEW_BINDING.values()
+                ),
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R006_REVIEW_BINDING.values()
+                ),
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values()
+                ),
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+                ),
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+                ),
+                Path(
+                    graph.continuation.FP046_R002_RECOVERY_REJECTED_R010_ASSIGNMENT[
+                        "path"
+                    ]
+                ),
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+                ),
+                *(
+                    Path(row["path"])
+                    for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+                ),
+                Path(
+                    graph.continuation.FP046_R002_RECOVERY_REJECTED_R013_ASSIGNMENT[
+                        "path"
+                    ]
+                ),
+            ),
+            "approved_r005_review_paths": (
+                Path("review/r005-assignment.json"),
+                Path("review/r005-result.json"),
+                Path("review/r005-independent.json"),
+            ),
+            "approved_r006_review_paths": (
+                Path("review/r006-assignment.json"),
+                Path("review/r006-result.json"),
+                Path("review/r006-independent.json"),
+            ),
+            "approved_r007_review_paths": tuple(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values()
+            ),
+            "approved_r008_review_paths": tuple(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+            ),
+            "approved_r009_review_paths": tuple(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+            ),
+            "approved_r011_review_bindings": tuple(
+                graph.continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+            ),
+            "approved_r012_review_bindings": tuple(
+                graph.continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+            ),
+            "rejected_r013_assignment_binding": copy.deepcopy(
+                graph.continuation.FP046_R002_RECOVERY_REJECTED_R013_ASSIGNMENT
+            ),
+            "rejected_r010_assignment_binding": copy.deepcopy(
+                graph.continuation.FP046_R002_RECOVERY_REJECTED_R010_ASSIGNMENT
+            ),
+            "session_artifact_paths": (
+                Path("session/artifact-1"),
+                Path("session/artifact-2"),
+                Path("session/artifact-3"),
+                Path("session/artifact-4"),
+            ),
+            "control_code_cohort": (
+                {
+                    "path": "scripts/current-control.py",
+                    "sha256": "4" * 64,
+                    "byte_length": 1,
+                },
+            ),
+        }
+
+    def test_current_control_authority_requires_exact_23_31_15_delta(
+        self,
+    ) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+
+        def row(relative: str, raw: bytes) -> dict:
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(raw)
+            return {
+                "path": relative,
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "byte_length": len(raw),
+            }
+
+        frozen_rows = []
+        current_rows = []
+        modified_relatives = sorted(
+            graph._FP046_R002_PRE_REVIEW_MODIFIED_CONTROL_PATHS
+        )
+        for index in range(23):
+            relative = (
+                modified_relatives[index]
+                if index < len(modified_relatives)
+                else f"controls/existing-{index:02}.py"
+            )
+            frozen_raw = f"frozen-{index}\n".encode()
+            current_raw = (
+                f"current-{index}\n".encode()
+                if index < len(modified_relatives)
+                else frozen_raw
+            )
+            frozen_rows.append(
+                {
+                    "path": relative,
+                    "sha256": hashlib.sha256(frozen_raw).hexdigest(),
+                    "byte_length": len(frozen_raw),
+                }
+            )
+            current_rows.append(row(relative, current_raw))
+        for index in range(8):
+            current_rows.append(
+                row(f"controls/added-{index:02}.py", f"added-{index}\n".encode())
+            )
+        approved_r005_relatives = tuple(
+            graph._FP046_R002_R005_REVIEW_PINS
+        )
+        approved_r005_bindings = tuple(
+            row(relative.as_posix(), (ROOT / relative).read_bytes())
+            for relative in approved_r005_relatives
+        )
+        session_artifact_relatives = tuple(
+            graph._FP046_R002_SESSION_ARTIFACT_PINS
+        )
+        session_artifact_bindings = tuple(
+            row(relative.as_posix(), (ROOT / relative).read_bytes())
+            for relative in session_artifact_relatives
+        )
+        active_review_scope = {
+            "approved_r005_review_bindings": list(
+                copy.deepcopy(approved_r005_bindings)
+            ),
+            "approved_r005_supersession_reason_code": (
+                graph._FP046_R002_R005_SUPERSESSION_REASON
+            ),
+            "session_artifact_bindings": list(
+                copy.deepcopy(session_artifact_bindings)
+            ),
+            "session_artifact_path_count": 4,
+        }
+        review_paths = graph._FP046_R002_R006_REVIEW_PATHS
+        review_binding = {}
+        for role, relative in zip(
+            ("assignment", "review_result", "independent_review"),
+            review_paths,
+            strict=True,
+        ):
+            raw = (
+                json_bytes({"review_scope": active_review_scope})
+                if role == "assignment"
+                else role.encode()
+            )
+            row(relative.as_posix(), raw)
+            review_binding[role] = {
+                "path": relative.as_posix(),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "byte_length": len(raw),
+            }
+        superseded_relatives = tuple(
+            graph._FP046_R002_PRESERVED_REVIEW_ASSIGNMENT_PINS
+        )
+        superseded_raws = tuple(
+            (ROOT / relative).read_bytes()
+            for relative in superseded_relatives
+        )
+        superseded_bindings = tuple(
+            row(relative.as_posix(), raw)
+            for relative, raw in zip(
+                superseded_relatives, superseded_raws, strict=True
+            )
+        )
+
+        frozen_context = mock.Mock()
+        frozen_context.current.control_code_cohort = tuple(frozen_rows)
+        current_context = mock.Mock(
+            spec=[
+                "current_control_cohort",
+                "control_code_successors",
+                "added_control_code_bindings",
+                "superseded_review_assignments",
+                "approved_r005_review_bindings",
+                "session_artifact_bindings",
+            ]
+        )
+        current_context.current_control_cohort = tuple(current_rows)
+        current_context.control_code_successors = tuple(
+            {"path": row["path"]} for row in current_rows[:7]
+        )
+        current_context.added_control_code_bindings = tuple(
+            {"path": row["path"]} for row in current_rows[-8:]
+        )
+        current_context.approved_r005_review_bindings = (
+            approved_r005_bindings
+        )
+        current_context.session_artifact_bindings = session_artifact_bindings
+        current_context.superseded_review_assignments = (
+            {
+                "round_id": "R001",
+                "assignment_binding": superseded_bindings[0],
+                "disposition": "SUPERSEDED_WITHOUT_APPROVAL",
+                "review_result_status": "NOT_CREATED",
+                "independent_review_status": "NOT_CREATED",
+                "supersession_reason_code": "R001_BLOCKERS_REQUIRE_R002",
+            },
+            {
+                "round_id": "R002",
+                "assignment_binding": superseded_bindings[1],
+                "disposition": "SUPERSEDED_WITHOUT_APPROVAL",
+                "review_result_status": "NOT_CREATED",
+                "independent_review_status": "NOT_CREATED",
+                "supersession_reason_code": "R002_BLOCKERS_REQUIRE_R003",
+                "confirmed_rejection_findings": [
+                    f"R002-CONFIRMED-{index}"
+                    for index in range(6)
+                ],
+            },
+            {
+                "round_id": "R003",
+                "assignment_binding": superseded_bindings[2],
+                "disposition": "SUPERSEDED_WITHOUT_APPROVAL",
+                "review_result_status": "NOT_CREATED",
+                "independent_review_status": "NOT_CREATED",
+                "supersession_reason_code": (
+                    "R003_REVIEW_INPUT_COHORT_ABA_RETAINED_DESCRIPTOR_REQUIRED"
+                ),
+                "confirmed_rejection_findings": [
+                    "REVIEW_INPUT_COHORT_ABA_CAN_PUBLISH_SELF_INVALID_EVIDENCE"
+                ],
+            },
+            {
+                "round_id": "R004",
+                "assignment_binding": superseded_bindings[3],
+                "disposition": "SUPERSEDED_WITHOUT_APPROVAL",
+                "review_result_status": "NOT_CREATED",
+                "independent_review_status": "NOT_CREATED",
+                "supersession_reason_code": (
+                    "R004_POST_PUBLICATION_REGRESSION_NOT_RERUNNABLE"
+                ),
+            },
+        )
+        review = mock.Mock(
+            spec=[
+                "validate_post_review",
+                "current_control_cohort",
+                "transition_review_binding",
+                "validated_frozen_r011_context",
+                "REVIEW_DIR",
+                "ASSIGNMENT_REL",
+                "RESULT_REL",
+                "INDEPENDENT_REL",
+                "REVIEW_PATHS",
+                "ROUND_ID",
+                "CURRENT_CONTROL_PATHS",
+                "MODIFIED_CONTROL_PATHS",
+                "ADDED_CONTROL_PATHS",
+                "PRESERVED_REVIEW_PATHS",
+                "R001_ASSIGNMENT_REL",
+                "R001_ASSIGNMENT_SHA256",
+                "R001_ASSIGNMENT_BYTE_LENGTH",
+                "R001_RESULT_REL",
+                "R001_INDEPENDENT_REL",
+                "R001_ROUND_ID",
+                "R001_SUPERSESSION_REASON_CODE",
+                "R002_ASSIGNMENT_REL",
+                "R002_ASSIGNMENT_SHA256",
+                "R002_ASSIGNMENT_BYTE_LENGTH",
+                "R002_RESULT_REL",
+                "R002_INDEPENDENT_REL",
+                "R002_ROUND_ID",
+                "R002_SUPERSESSION_REASON_CODE",
+                "R002_CONFIRMED_REJECTION_FINDINGS",
+                "R003_ASSIGNMENT_REL",
+                "R003_RESULT_REL",
+                "R003_INDEPENDENT_REL",
+                "R003_ASSIGNMENT_SHA256",
+                "R003_ASSIGNMENT_BYTE_LENGTH",
+                "R003_ROUND_ID",
+                "R003_SUPERSESSION_REASON_CODE",
+                "R003_CONFIRMED_REJECTION_FINDINGS",
+                "R004_ASSIGNMENT_REL",
+                "R004_RESULT_REL",
+                "R004_INDEPENDENT_REL",
+                "R004_ASSIGNMENT_SHA256",
+                "R004_ASSIGNMENT_BYTE_LENGTH",
+                "R004_ROUND_ID",
+                "R004_SUPERSESSION_REASON_CODE",
+                "R005_ASSIGNMENT_REL",
+                "R005_RESULT_REL",
+                "R005_INDEPENDENT_REL",
+                "R005_REVIEW_PATHS",
+                "R005_REVIEW_PINS",
+                "R005_SUPERSESSION_REASON_CODE",
+                "SESSION_ARTIFACT_PATHS",
+                "SESSION_ARTIFACT_PINS",
+            ]
+        )
+        review.validate_post_review.return_value = current_context
+        review.transition_review_binding.return_value = review_binding
+        review.validated_frozen_r011_context.return_value = frozen_context
+        review.REVIEW_DIR = graph._FP046_R002_R006_REVIEW_DIR
+        review.ASSIGNMENT_REL = review_paths[0]
+        review.RESULT_REL = review_paths[1]
+        review.INDEPENDENT_REL = review_paths[2]
+        review.REVIEW_PATHS = review_paths
+        review.ROUND_ID = graph._FP046_R002_R006_ROUND_ID
+        review.CURRENT_CONTROL_PATHS = tuple(
+            Path(row["path"]) for row in current_rows
+        )
+        review.MODIFIED_CONTROL_PATHS = {
+            Path(row["path"]) for row in current_rows[:7]
+        }
+        review.ADDED_CONTROL_PATHS = tuple(
+            Path(row["path"]) for row in current_rows[-8:]
+        )
+        review.PRESERVED_REVIEW_PATHS = superseded_relatives
+        review.R001_ASSIGNMENT_REL = superseded_relatives[0]
+        review.R001_ASSIGNMENT_SHA256 = superseded_bindings[0]["sha256"]
+        review.R001_ASSIGNMENT_BYTE_LENGTH = superseded_bindings[0][
+            "byte_length"
+        ]
+        review.R001_RESULT_REL = superseded_relatives[0].with_name(
+            "review-result.json"
+        )
+        review.R001_INDEPENDENT_REL = superseded_relatives[0].with_name(
+            "independent-review.json"
+        )
+        review.R001_ROUND_ID = "R001"
+        review.R001_SUPERSESSION_REASON_CODE = "R001_BLOCKERS_REQUIRE_R002"
+        review.R002_ASSIGNMENT_REL = superseded_relatives[1]
+        review.R002_ASSIGNMENT_SHA256 = superseded_bindings[1]["sha256"]
+        review.R002_ASSIGNMENT_BYTE_LENGTH = superseded_bindings[1][
+            "byte_length"
+        ]
+        review.R002_RESULT_REL = superseded_relatives[1].with_name(
+            "review-result.json"
+        )
+        review.R002_INDEPENDENT_REL = superseded_relatives[1].with_name(
+            "independent-review.json"
+        )
+        review.R002_ROUND_ID = "R002"
+        review.R002_SUPERSESSION_REASON_CODE = "R002_BLOCKERS_REQUIRE_R003"
+        review.R002_CONFIRMED_REJECTION_FINDINGS = tuple(
+            f"R002-CONFIRMED-{index}" for index in range(6)
+        )
+        review.R003_ASSIGNMENT_REL = superseded_relatives[2]
+        review.R003_RESULT_REL = superseded_relatives[2].with_name(
+            "review-result.json"
+        )
+        review.R003_INDEPENDENT_REL = superseded_relatives[2].with_name(
+            "independent-review.json"
+        )
+        review.R003_ASSIGNMENT_SHA256 = superseded_bindings[2]["sha256"]
+        review.R003_ASSIGNMENT_BYTE_LENGTH = superseded_bindings[2][
+            "byte_length"
+        ]
+        review.R003_ROUND_ID = "R003"
+        review.R003_SUPERSESSION_REASON_CODE = (
+            "R003_REVIEW_INPUT_COHORT_ABA_RETAINED_DESCRIPTOR_REQUIRED"
+        )
+        review.R003_CONFIRMED_REJECTION_FINDINGS = (
+            "REVIEW_INPUT_COHORT_ABA_CAN_PUBLISH_SELF_INVALID_EVIDENCE",
+        )
+        review.R004_ASSIGNMENT_REL = superseded_relatives[3]
+        review.R004_RESULT_REL = superseded_relatives[3].with_name(
+            "review-result.json"
+        )
+        review.R004_INDEPENDENT_REL = superseded_relatives[3].with_name(
+            "independent-review.json"
+        )
+        review.R004_ASSIGNMENT_SHA256 = superseded_bindings[3]["sha256"]
+        review.R004_ASSIGNMENT_BYTE_LENGTH = superseded_bindings[3][
+            "byte_length"
+        ]
+        review.R004_ROUND_ID = "R004"
+        review.R004_SUPERSESSION_REASON_CODE = (
+            "R004_POST_PUBLICATION_REGRESSION_NOT_RERUNNABLE"
+        )
+        (
+            review.R005_ASSIGNMENT_REL,
+            review.R005_RESULT_REL,
+            review.R005_INDEPENDENT_REL,
+        ) = approved_r005_relatives
+        review.R005_REVIEW_PATHS = approved_r005_relatives
+        review.R005_REVIEW_PINS = copy.deepcopy(
+            graph._FP046_R002_R005_REVIEW_PINS
+        )
+        review.R005_SUPERSESSION_REASON_CODE = (
+            graph._FP046_R002_R005_SUPERSESSION_REASON
+        )
+        review.SESSION_ARTIFACT_PATHS = session_artifact_relatives
+        review.SESSION_ARTIFACT_PINS = copy.deepcopy(
+            graph._FP046_R002_SESSION_ARTIFACT_PINS
+        )
+
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_start_review_module",
+            return_value=review,
+        ), mock.patch.object(
+            graph,
+            "_fp046_r002_frozen_r011_authority",
+            return_value={"context": frozen_context},
+        ):
+            authority = graph._fp046_r002_current_control_review_authority(
+                root
+            )
+
+        self.assertEqual(len(authority["control_code_cohort"]), 31)
+        self.assertEqual(len(authority["changed_paths"]), 7)
+        self.assertEqual(len(authority["added_paths"]), 8)
+        self.assertEqual(
+            authority["preserved_review_paths"],
+            superseded_relatives,
+        )
+        self.assertEqual(
+            authority["approved_r005_review_paths"],
+            approved_r005_relatives,
+        )
+        self.assertEqual(
+            authority["session_artifact_paths"],
+            session_artifact_relatives,
+        )
+        self.assertTrue(
+            {path.as_posix() for path in superseded_relatives}.isdisjoint(
+                row["path"] for row in authority["binding"].values()
+            )
+        )
+        self.assertTrue(
+            authority["added_paths"].isdisjoint(
+                row["path"] for row in frozen_rows
+            )
+        )
+        review.current_control_cohort.assert_not_called()
+
+        path_typed = copy.deepcopy(review_binding)
+        path_typed["assignment"]["path"] = review_paths[0]
+        float_length = copy.deepcopy(review_binding)
+        float_length["assignment"]["byte_length"] = float(
+            float_length["assignment"]["byte_length"]
+        )
+        for label, malformed_binding in (
+            ("path_type", path_typed),
+            ("byte_length_type", float_length),
+        ):
+            with self.subTest(malformed_active_binding=label):
+                review.transition_review_binding.return_value = (
+                    malformed_binding
+                )
+                try:
+                    with mock.patch.object(
+                        graph,
+                        "_fp046_r002_start_review_module",
+                        return_value=review,
+                    ), self.assertRaisesRegex(
+                        ValueError,
+                        "current review assignment binding differs",
+                    ):
+                        graph._fp046_r002_current_control_review_authority(
+                            root
+                        )
+                finally:
+                    review.transition_review_binding.return_value = (
+                        review_binding
+                    )
+
+        with mock.patch.object(
+            review,
+            "REVIEW_DIR",
+            review.REVIEW_DIR.parent / "R007",
+        ), mock.patch.object(
+            graph,
+            "_fp046_r002_start_review_module",
+            return_value=review,
+        ), self.assertRaisesRegex(
+            ValueError,
+            "active R006 review constants differ",
+        ):
+            graph._fp046_r002_current_control_review_authority(root)
+
+        for index, relative in enumerate(superseded_relatives, start=1):
+            with self.subTest(tampered_preserved_round=f"R00{index}"):
+                preserved_path = root / relative
+                preserved_raw = preserved_path.read_bytes()
+                preserved_path.write_bytes(
+                    f"tampered-r00{index}-assignment".encode()
+                )
+                try:
+                    with mock.patch.object(
+                        graph,
+                        "_fp046_r002_start_review_module",
+                        return_value=review,
+                    ), self.assertRaisesRegex(
+                        ValueError,
+                        f"superseded R00{index} assignment differs",
+                    ):
+                        graph._fp046_r002_current_control_review_authority(
+                            root
+                        )
+                finally:
+                    preserved_path.write_bytes(preserved_raw)
+
+        for index, relative in enumerate(superseded_relatives, start=1):
+            for output_name in (
+                "review-result.json",
+                "independent-review.json",
+            ):
+                with self.subTest(
+                    forbidden_rejected_output=f"R00{index}/{output_name}"
+                ):
+                    forbidden_output = root / relative.with_name(output_name)
+                    forbidden_output.write_bytes(b"must-remain-absent")
+                    try:
+                        with mock.patch.object(
+                            graph,
+                            "_fp046_r002_start_review_module",
+                            return_value=review,
+                        ), self.assertRaisesRegex(
+                            ValueError,
+                            f"superseded R00{index} assignment differs",
+                        ):
+                            graph._fp046_r002_current_control_review_authority(
+                                root
+                            )
+                    finally:
+                        forbidden_output.unlink()
+
+        for label, binding_rows in (
+            ("approved R005 review", approved_r005_bindings),
+            ("session artifact", session_artifact_bindings),
+        ):
+            for binding_row in binding_rows:
+                relative = Path(binding_row["path"])
+                with self.subTest(
+                    tampered_bound_input=f"{label}/{relative}"
+                ):
+                    bound_path = root / relative
+                    bound_raw = bound_path.read_bytes()
+                    bound_path.write_bytes(b"tampered-bound-input")
+                    try:
+                        with mock.patch.object(
+                            graph,
+                            "_fp046_r002_start_review_module",
+                            return_value=review,
+                        ), self.assertRaisesRegex(
+                            ValueError,
+                            f"{label} binding bytes differ",
+                        ):
+                            graph._fp046_r002_current_control_review_authority(
+                                root
+                            )
+                    finally:
+                        bound_path.write_bytes(bound_raw)
+
+        active_assignment_path = root / review_paths[0]
+        active_assignment_raw = active_assignment_path.read_bytes()
+        for label, scope_key, forged_value in (
+            (
+                "approved_r005_order",
+                "approved_r005_review_bindings",
+                list(reversed(approved_r005_bindings)),
+            ),
+            (
+                "approved_r005_reason",
+                "approved_r005_supersession_reason_code",
+                "R005_FORGED_SUPERSESSION_REASON",
+            ),
+            (
+                "session_artifact_inventory",
+                "session_artifact_bindings",
+                list(session_artifact_bindings[:-1]),
+            ),
+        ):
+            with self.subTest(forged_active_r006_scope=label):
+                assignment_document = json.loads(
+                    active_assignment_raw.decode("utf-8")
+                )
+                assignment_document["review_scope"][scope_key] = forged_value
+                forged_raw = json_bytes(assignment_document)
+                active_assignment_path.write_bytes(forged_raw)
+                forged_binding = copy.deepcopy(review_binding)
+                forged_binding["assignment"] = {
+                    "path": review_paths[0].as_posix(),
+                    "sha256": hashlib.sha256(forged_raw).hexdigest(),
+                    "byte_length": len(forged_raw),
+                }
+                review.transition_review_binding.return_value = forged_binding
+                try:
+                    with mock.patch.object(
+                        graph,
+                        "_fp046_r002_start_review_module",
+                        return_value=review,
+                    ), self.assertRaisesRegex(
+                        ValueError,
+                        "active R006 review scope differs",
+                    ):
+                        graph._fp046_r002_current_control_review_authority(
+                            root
+                        )
+                finally:
+                    active_assignment_path.write_bytes(active_assignment_raw)
+                    review.transition_review_binding.return_value = (
+                        review_binding
+                    )
+
+        approved_path = root / current_rows[0]["path"]
+
+        def approve_then_drift(_root: Path) -> mock.Mock:
+            approved_path.write_bytes(b"post-review-drift\n")
+            return current_context
+
+        review.validate_post_review.side_effect = approve_then_drift
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_start_review_module",
+            return_value=review,
+        ), mock.patch.object(
+            graph,
+            "_fp046_r002_frozen_r011_authority",
+            return_value={"context": frozen_context},
+        ), self.assertRaisesRegex(
+            ValueError,
+            "current control cohort bytes differ",
+        ):
+            graph._fp046_r002_current_control_review_authority(root)
+        review.current_control_cohort.assert_not_called()
+
+    def test_seq76_pre_review_overlay_is_exactly_the_modified_seven(self) -> None:
+        review = graph._fp046_r002_start_review_module()
+        frozen = graph._fp046_r002_frozen_r011_authority(ROOT)
+
+        rows = graph._fp046_r002_pre_review_modified_control_cohort(
+            ROOT,
+            frozen,
+        )
+
+        self.assertEqual(
+            {row["path"] for row in rows},
+            {path.as_posix() for path in review.MODIFIED_CONTROL_PATHS},
+        )
+        self.assertEqual(len(rows), 7)
+        self.assertTrue(
+            {row["path"] for row in rows}.isdisjoint(
+                path.as_posix() for path in review.ADDED_CONTROL_PATHS
+            )
+        )
+        for attribute, value in (
+            ("REVIEW_DIR", review.REVIEW_DIR.parent / "R007"),
+            ("PRESERVED_REVIEW_PATHS", review.PRESERVED_REVIEW_PATHS[:3]),
+            (
+                "R004_SUPERSESSION_REASON_CODE",
+                "R004_FORGED_SUPERSESSION_REASON",
+            ),
+            (
+                "R004_RESULT_REL",
+                Path("review-rounds/R004/relocated-result.json"),
+            ),
+            (
+                "R005_SUPERSESSION_REASON_CODE",
+                "R005_FORGED_SUPERSESSION_REASON",
+            ),
+            (
+                "SESSION_ARTIFACT_PATHS",
+                review.SESSION_ARTIFACT_PATHS[:3],
+            ),
+        ):
+            with self.subTest(misaligned_constant=attribute), mock.patch.object(
+                review,
+                attribute,
+                value,
+            ), self.assertRaisesRegex(
+                ValueError,
+                "active R006 review constants differ",
+            ):
+                graph._fp046_r002_pre_review_control_cohort_capability()
+        with mock.patch.object(
+            review,
+            "MODIFIED_CONTROL_PATHS",
+            {
+                *review.MODIFIED_CONTROL_PATHS,
+                Path("backend/app/main.py"),
+            },
+        ), self.assertRaisesRegex(
+            ValueError,
+            "modified control path set differs",
+        ):
+            graph._fp046_r002_pre_review_modified_control_cohort(
+                ROOT,
+                frozen,
+            )
+
+        capability_failure = (
+            graph._Fp046R002StartReviewCapabilityUnavailable(
+                "current cohort loader failed"
+            )
+        )
+        with self.assertRaisesRegex(
+            graph._Fp046R002StartReviewCapabilityUnavailable,
+            "current cohort loader failed",
+        ):
+            graph._fp046_r002_pre_review_modified_control_cohort(
+                ROOT,
+                frozen,
+                capability=(
+                    review,
+                    mock.Mock(side_effect=capability_failure),
+                ),
+            )
+
+    def test_frozen_r011_integrity_errors_are_not_legacy_fallbacks(self) -> None:
+        for failure in (
+            ValueError("frozen R011 review binding differs"),
+            OSError("frozen R011 bytes unavailable"),
+        ):
+            with self.subTest(failure=type(failure).__name__), mock.patch.object(
+                graph,
+                "_fp046_r002_frozen_r011_authority",
+                side_effect=failure,
+            ):
+                with self.assertRaises(type(failure)):
+                    graph._fp046_r002_optional_frozen_r011_authority(ROOT)
+
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_frozen_r011_capability",
+            side_effect=graph._Fp046R002StartReviewCapabilityUnavailable(
+                "legacy checkout"
+            ),
+        ):
+            self.assertIsNone(
+                graph._fp046_r002_optional_frozen_r011_authority(ROOT)
+            )
+
+        def broken_loader(_root: Path) -> None:
+            raise graph._Fp046R002StartReviewCapabilityUnavailable(
+                "loader integrity failure"
+            )
+
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_frozen_r011_capability",
+            return_value=(
+                graph._fp046_r002_start_review_module(),
+                broken_loader,
+                mock.Mock(),
+            ),
+        ), self.assertRaisesRegex(
+            graph._Fp046R002StartReviewCapabilityUnavailable,
+            "loader integrity failure",
+        ):
+            graph._fp046_r002_optional_frozen_r011_authority(ROOT)
+
+        import_failure = ModuleNotFoundError(
+            "review module body failed",
+            name=graph._FP046_R002_START_REVIEW_MODULE,
+        )
+        with mock.patch.object(
+            graph.importlib,
+            "import_module",
+            side_effect=import_failure,
+        ), mock.patch.object(
+            graph.importlib.util,
+            "find_spec",
+            return_value=mock.Mock(),
+        ), self.assertRaisesRegex(
+            ModuleNotFoundError,
+            "review module body failed",
+        ):
+            graph._fp046_r002_start_review_module()
+
+    def test_actual_seq77_review_replays_the_physical_r011_lineage(
+        self,
+    ) -> None:
+        from scripts import (
+            build_walksafe_fp046_r002_seq77_78_review_20260823 as review,
+        )
+
+        context = review.prepare_review_context(
+            ROOT,
+            require_exact_source=False,
+        )
+        frozen_r011 = context.frozen_r011_context
+        managed_sources_by_round = (
+            review.validated_frozen_r011_managed_sources_by_round(ROOT)
+        )
+        self.assertIsInstance(
+            frozen_r011,
+            review.FrozenR011Context,
+        )
+        self.assertIsInstance(
+            frozen_r011.current,
+            review.FrozenControlContext,
+        )
+        self.assertEqual(
+            frozen_r011.managed_sources_by_round,
+            managed_sources_by_round,
+        )
+        self.assertEqual(
+            frozen_r011.current.control_code_cohort,
+            context.frozen_r011_cohort,
+        )
+        self.assertEqual(
+            (
+                len(context.frozen_r011_cohort),
+                len(context.current_control_cohort),
+                len(context.control_code_successors),
+                len(context.added_control_code_bindings),
+            ),
+            (23, 31, 7, 8),
+        )
+        self.assertEqual(
+            {row["path"] for row in context.control_code_successors},
+            {path.as_posix() for path in review.MODIFIED_CONTROL_PATHS},
+        )
+        self.assertEqual(
+            tuple(row["path"] for row in context.added_control_code_bindings),
+            tuple(path.as_posix() for path in review.ADDED_CONTROL_PATHS),
+        )
+
+    def test_goal_consumer_configures_live_r014_with_rejected_r013_predecessor(
+        self,
+    ) -> None:
+        review = graph._fp046_r002_recovery_control_modules()[0]
+        expected_preserved = (
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_R006_REVIEW_BINDING.values()
+            ),
+            Path(
+                graph.continuation.FP046_R002_RECOVERY_REJECTED_R001_ASSIGNMENT[
+                    "path"
+                ]
+            ),
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R002_REVIEW_BINDING.values()
+            ),
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R003_REVIEW_BINDING.values()
+            ),
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R004_REVIEW_BINDING.values()
+            ),
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R005_REVIEW_BINDING.values()
+            ),
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R006_REVIEW_BINDING.values()
+            ),
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values()
+            ),
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+            ),
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+            ),
+            Path(
+                graph.continuation.FP046_R002_RECOVERY_REJECTED_R010_ASSIGNMENT[
+                    "path"
+                ]
+            ),
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+            ),
+            *(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+            ),
+            Path(
+                graph.continuation.FP046_R002_RECOVERY_REJECTED_R013_ASSIGNMENT[
+                    "path"
+                ]
+            ),
+        )
+
+        self.assertEqual(
+            review.REVIEW_DIR,
+            graph.continuation.FP046_R002_RECOVERY_REVIEW_DIR,
+        )
+        self.assertEqual(
+            tuple(review.REVIEW_PATHS),
+            graph.continuation.FP046_R002_RECOVERY_REVIEW_PATHS,
+        )
+        self.assertEqual(tuple(review.PRESERVED_REVIEW_PATHS), expected_preserved)
+        self.assertEqual(
+            review.REJECTED_R001_ASSIGNMENT_REL,
+            expected_preserved[3],
+        )
+        self.assertEqual(
+            review.REJECTED_R001_ASSIGNMENT_SHA256,
+            graph.continuation.FP046_R002_RECOVERY_REJECTED_R001_ASSIGNMENT[
+                "sha256"
+            ],
+        )
+        self.assertEqual(
+            review.REJECTED_R001_ASSIGNMENT_BYTE_LENGTH,
+            graph.continuation.FP046_R002_RECOVERY_REJECTED_R001_ASSIGNMENT[
+                "byte_length"
+            ],
+        )
+        self.assertFalse((ROOT / review.REJECTED_R001_RESULT_REL).exists())
+        self.assertFalse((ROOT / review.REJECTED_R001_INDEPENDENT_REL).exists())
+        self.assertEqual(
+            tuple(review.APPROVED_R002_REVIEW_PATHS),
+            tuple(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R002_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            review.APPROVED_R002_REVIEW_PINS,
+            {
+                Path(row["path"]): (row["sha256"], row["byte_length"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R002_REVIEW_BINDING.values()
+            },
+        )
+        self.assertEqual(
+            tuple(review.APPROVED_R003_REVIEW_PATHS),
+            tuple(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R003_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            review.APPROVED_R003_REVIEW_PINS,
+            {
+                Path(row["path"]): (row["sha256"], row["byte_length"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R003_REVIEW_BINDING.values()
+            },
+        )
+        self.assertEqual(
+            tuple(review.APPROVED_R004_REVIEW_PATHS),
+            tuple(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R004_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            tuple(review.APPROVED_R005_REVIEW_PATHS),
+            tuple(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R005_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            tuple(review.APPROVED_R006_REVIEW_PATHS),
+            tuple(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R006_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            tuple(review.APPROVED_R007_REVIEW_PATHS),
+            tuple(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            tuple(review.APPROVED_R008_REVIEW_PATHS),
+            tuple(
+                Path(row["path"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            review.APPROVED_R008_REVIEW_PINS,
+            {
+                Path(row["path"]): (row["sha256"], row["byte_length"])
+                for row in graph.continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+            },
+        )
+        self.assertEqual(
+            review.approved_r008_review_bindings(ROOT),
+            tuple(
+                graph.continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            review.approved_r009_review_bindings(ROOT),
+            tuple(
+                graph.continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            review.rejected_r010_assignment_binding(ROOT),
+            graph.continuation.FP046_R002_RECOVERY_REJECTED_R010_ASSIGNMENT,
+        )
+        self.assertEqual(
+            review.approved_r011_review_bindings(ROOT),
+            tuple(
+                graph.continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            review.approved_r012_review_bindings(ROOT),
+            tuple(
+                graph.continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            review.rejected_r013_assignment_binding(ROOT),
+            graph.continuation.FP046_R002_RECOVERY_REJECTED_R013_ASSIGNMENT,
+        )
+
+    def test_r014_authority_requires_the_exact_rejected_r013_loader(self) -> None:
+        review = graph._fp046_r002_recovery_control_modules()[0]
+        binding = self._checkpoint()[1]
+        context = mock.Mock(current_control_cohort=())
+        patched_loaders = {
+            "transition_review_binding": mock.Mock(return_value=binding),
+            "validated_reviewed_at": mock.Mock(
+                return_value=datetime.fromisoformat("2026-08-25T00:00:00+09:00")
+            ),
+            "validate_post_review": mock.Mock(return_value=context),
+            "rejected_r001_assignment_binding": mock.Mock(
+                return_value=graph.continuation.FP046_R002_RECOVERY_REJECTED_R001_ASSIGNMENT
+            ),
+            "rejected_r010_assignment_binding": mock.Mock(
+                return_value=graph.continuation.FP046_R002_RECOVERY_REJECTED_R010_ASSIGNMENT
+            ),
+            "approved_r011_review_bindings": mock.Mock(
+                return_value=tuple(
+                    graph.continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+                )
+            ),
+            "approved_r012_review_bindings": mock.Mock(
+                return_value=tuple(
+                    graph.continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+                )
+            ),
+            "rejected_r013_assignment_binding": mock.Mock(
+                return_value=graph.continuation.FP046_R002_RECOVERY_REJECTED_R013_ASSIGNMENT
+            ),
+        }
+        for round_id in range(2, 10):
+            constant = getattr(
+                graph.continuation,
+                f"FP046_R002_RECOVERY_APPROVED_R{round_id:03d}_REVIEW_BINDING",
+            )
+            patched_loaders[f"approved_r{round_id:03d}_review_bindings"] = (
+                mock.Mock(return_value=tuple(constant.values()))
+            )
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_control_modules",
+            return_value=(review, mock.Mock(), mock.Mock()),
+        ), mock.patch.multiple(review, **patched_loaders):
+            authority = graph._fp046_r002_recovery_review_authority(ROOT)
+        self.assertEqual(
+            authority["approved_r009_review_bindings"],
+            tuple(
+                graph.continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            authority["rejected_r010_assignment_binding"],
+            graph.continuation.FP046_R002_RECOVERY_REJECTED_R010_ASSIGNMENT,
+        )
+        self.assertEqual(
+            authority["approved_r011_review_bindings"],
+            tuple(
+                graph.continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            authority["approved_r012_review_bindings"],
+            tuple(
+                graph.continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+            ),
+        )
+        self.assertEqual(
+            authority["rejected_r013_assignment_binding"],
+            graph.continuation.FP046_R002_RECOVERY_REJECTED_R013_ASSIGNMENT,
+        )
+        for loader_name in (
+            "transition_review_binding",
+            "validated_reviewed_at",
+            "validate_post_review",
+        ):
+            patched_loaders[loader_name].assert_called_once_with(
+                ROOT, require_live_snapshot=False
+            )
+
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_control_modules",
+            return_value=(review, mock.Mock(), mock.Mock()),
+        ), mock.patch.object(
+            review,
+            "rejected_r013_assignment_binding",
+            None,
+        ), self.assertRaisesRegex(ValueError, "capability is unavailable"):
+            graph._fp046_r002_recovery_review_authority(ROOT)
+
+    def test_seq83_prefix_uses_exact_r012_without_active_r013(self) -> None:
+        checkpoint, _binding = self._checkpoint()
+        self.assertEqual(
+            graph.FP046_R002_BURNED_STARTED_EVENT_IDS,
+            frozenset(
+                {
+                    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-001",
+                    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-002",
+                    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-003",
+                    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-004",
+                }
+            ),
+        )
+        correction = mock.Mock()
+        correction.validate_seq78_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][77]
+        correction.validate_seq79_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][78]
+        correction.validate_seq80_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][79]
+        correction.validate_seq81_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][80]
+        correction.validate_seq82_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][81]
+        correction.validate_seq83_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][82]
+        correction.strict_json_equal.side_effect = lambda actual, expected: (
+            actual == expected
+        )
+        started = mock.Mock()
+        started.validate_history_suffix.return_value = []
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_control_modules",
+            return_value=(mock.Mock(), correction, started),
+        ), mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_review_authority",
+            side_effect=AssertionError("seq83 loaded active R014"),
+        ), mock.patch.object(
+            graph.continuation,
+            "validate_fp046_r002_seq77_78_boundary",
+            return_value=[],
+        ):
+            self.assertEqual(
+                graph.validate_fp046_r002_seq77_78(ROOT, checkpoint),
+                [],
+            )
+        correction.validate_seq83_history_suffix.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+        )
+        correction.validate_history_suffix.assert_not_called()
+        correction.validate_seq79_history_suffix.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+        )
+        correction.validate_seq80_history_suffix.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+        )
+        correction.validate_seq81_history_suffix.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+        )
+        correction.validate_seq82_history_suffix.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+        )
+        started.validate_history_suffix.assert_not_called()
+
+    def test_seq84_uses_active_r013_and_seq85_uses_start_validator(self) -> None:
+        checkpoint, binding = self._checkpoint(sequence=85)
+        history = checkpoint["goal_execution"]["transition_history"]
+        correction = mock.Mock()
+        for sequence in range(78, 84):
+            validator = getattr(correction, f"validate_seq{sequence}_history_suffix")
+            validator.return_value = history[sequence - 1]
+        correction.validate_history_suffix.return_value = history[83]
+        correction.strict_json_equal.side_effect = lambda actual, expected: (
+            actual == expected
+        )
+        started = mock.Mock()
+        started.validate_history_suffix.return_value = []
+        authority = self._authority(binding)
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_control_modules",
+            return_value=(mock.Mock(), correction, started),
+        ), mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_review_authority",
+            return_value=authority,
+        ), mock.patch.object(
+            graph.continuation,
+            "validate_fp046_r002_seq77_78_boundary",
+            return_value=[],
+        ):
+            self.assertEqual(
+                graph.validate_fp046_r002_seq77_78(ROOT, checkpoint),
+                [],
+            )
+        correction.validate_seq83_history_suffix.assert_called_once_with(
+            ROOT, checkpoint, require_live_snapshot=False
+        )
+        correction.validate_history_suffix.assert_called_once_with(
+            ROOT, checkpoint, require_live_snapshot=False
+        )
+        started.validate_history_suffix.assert_called_once_with(ROOT, checkpoint)
+
+    def test_seq78_recovery_requires_exact_988_managed_paths(self) -> None:
+        checkpoint, binding = self._checkpoint(sequence=78)
+        checkpoint["working_tree_snapshot"]["managed_changed_paths"].pop()
+        correction = mock.Mock()
+        correction.validate_seq78_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][77]
+        correction.validate_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][77]
+        correction.strict_json_equal.side_effect = lambda actual, expected: (
+            actual == expected
+        )
+        started = mock.Mock()
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_control_modules",
+            return_value=(mock.Mock(), correction, started),
+        ), mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_review_authority",
+            return_value=self._authority(binding),
+        ), mock.patch.object(
+            graph.continuation,
+            "validate_fp046_r002_seq77_78_boundary",
+            return_value=[],
+        ):
+            errors = graph.validate_fp046_r002_seq77_78(ROOT, checkpoint)
+
+        self.assertIn("current review managed paths differ", "\n".join(errors))
+
+    def test_seq79_through_seq85_use_exact_managed_path_counts(self) -> None:
+        for sequence in (79, 80, 81, 82, 83, 84, 85):
+            with self.subTest(sequence=sequence):
+                checkpoint, binding = self._checkpoint(sequence=sequence)
+                snapshot = checkpoint["working_tree_snapshot"]
+                snapshot["managed_changed_paths"].pop()
+                snapshot["managed_changed_path_count"] = len(
+                    snapshot["managed_changed_paths"]
+                )
+                correction = mock.Mock()
+                correction.validate_seq78_history_suffix.return_value = checkpoint[
+                    "goal_execution"
+                ]["transition_history"][77]
+                correction.validate_seq79_history_suffix.return_value = checkpoint[
+                    "goal_execution"
+                ]["transition_history"][78]
+                if sequence >= 80:
+                    correction.validate_seq80_history_suffix.return_value = checkpoint[
+                        "goal_execution"
+                    ]["transition_history"][79]
+                if sequence >= 81:
+                    correction.validate_seq81_history_suffix.return_value = checkpoint[
+                        "goal_execution"
+                    ]["transition_history"][80]
+                if sequence >= 82:
+                    correction.validate_seq82_history_suffix.return_value = checkpoint[
+                        "goal_execution"
+                    ]["transition_history"][81]
+                if sequence >= 83:
+                    correction.validate_seq83_history_suffix.return_value = checkpoint[
+                        "goal_execution"
+                    ]["transition_history"][82]
+                if sequence >= 84:
+                    correction.validate_history_suffix.return_value = checkpoint[
+                        "goal_execution"
+                    ]["transition_history"][83]
+                correction.strict_json_equal.side_effect = lambda actual, expected: (
+                    actual == expected
+                )
+                started = mock.Mock()
+                started.validate_history_suffix.return_value = []
+                with mock.patch.object(
+                    graph,
+                    "_fp046_r002_recovery_control_modules",
+                    return_value=(mock.Mock(), correction, started),
+                ), mock.patch.object(
+                    graph,
+                    "_fp046_r002_recovery_review_authority",
+                    return_value=self._authority(binding),
+                ), mock.patch.object(
+                    graph.continuation,
+                    "validate_fp046_r002_seq77_78_boundary",
+                    return_value=[],
+                ):
+                    errors = graph.validate_fp046_r002_seq77_78(
+                        ROOT, checkpoint
+                    )
+
+                self.assertIn(
+                    "current review managed paths differ", "\n".join(errors)
+                )
+
+    def test_seq77_review_binding_and_managed_cohort_fail_closed(self) -> None:
+        required_path = next(
+            iter(graph.continuation.FP046_R002_R006_REVIEW_BINDING.values())
+        )["path"]
+        for mutation in ("binding", "managed"):
+            with self.subTest(mutation=mutation):
+                checkpoint, _binding = self._checkpoint(sequence=77)
+                if mutation == "binding":
+                    checkpoint["goal_execution"]["transition_history"][76][
+                        "transition_control_review_binding"
+                    ]["assignment"]["sha256"] = "0" * 64
+                else:
+                    checkpoint["working_tree_snapshot"][
+                        "managed_changed_paths"
+                    ].remove(required_path)
+                with mock.patch.object(
+                    graph.continuation,
+                    "validate_fp046_r002_seq77_78_boundary",
+                    return_value=[],
+                ):
+                    self.assertTrue(
+                        graph.validate_fp046_r002_seq77_78(
+                            ROOT, checkpoint
+                        )
+                    )
+
+    def test_seq80_uses_historical_validator_without_live_r011(self) -> None:
+        checkpoint, _binding = self._checkpoint(sequence=80)
+        correction = mock.Mock()
+        correction.validate_seq78_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][77]
+        correction.validate_seq79_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][78]
+        correction.validate_seq80_history_suffix.return_value = checkpoint[
+            "goal_execution"
+        ]["transition_history"][79]
+        correction.strict_json_equal.side_effect = lambda actual, expected: (
+            actual == expected
+        )
+        started = mock.Mock()
+        started.validate_history_suffix.return_value = []
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_control_modules",
+            return_value=(mock.Mock(), correction, started),
+        ), mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_review_authority",
+            side_effect=AssertionError("seq80 loaded active R011"),
+        ), mock.patch.object(
+            graph.continuation,
+            "validate_fp046_r002_seq77_78_boundary",
+            return_value=[],
+        ):
+            self.assertEqual(
+                graph.validate_fp046_r002_seq77_78(ROOT, checkpoint),
+                [],
+            )
+        correction.validate_seq80_history_suffix.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+        )
+        correction.validate_history_suffix.assert_not_called()
+        started.validate_history_suffix.assert_not_called()
+
+        correction.validate_seq80_history_suffix.side_effect = ValueError(
+            "seq79 source binding differs"
+        )
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_control_modules",
+            return_value=(mock.Mock(), correction, started),
+        ), mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_review_authority",
+            side_effect=AssertionError("seq80 loaded active R011"),
+        ), mock.patch.object(
+            graph.continuation,
+            "validate_fp046_r002_seq77_78_boundary",
+            return_value=[],
+        ):
+            self.assertIn(
+                "seq79 source binding differs",
+                "\n".join(
+                    graph.validate_fp046_r002_seq77_78(ROOT, checkpoint)
+                ),
+            )
+
+    def test_historical_seq81_does_not_require_active_r012(self) -> None:
+        checkpoint = graph.continuation.load_json(
+            ROOT / "docs/control/walksafe-project-continuation-checkpoint.json"
+        )
+        history = checkpoint["goal_execution"]["transition_history"]
+        if len(history) > 81:
+            correction = graph._fp046_r002_recovery_control_modules()[1]
+            checkpoint = json.loads(
+                correction.reconstructed_seq81_checkpoint_bytes(
+                    ROOT,
+                    history[80],
+                )
+            )
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_review_authority",
+            side_effect=AssertionError("seq81 loaded active R012"),
+        ), mock.patch.object(
+            graph.continuation,
+            "validate_fp046_r002_seq77_78_boundary",
+            return_value=[],
+        ):
+            self.assertEqual(
+                graph.validate_fp046_r002_seq77_79(ROOT, checkpoint),
+                [],
+            )
+
+    def test_malformed_seq77_78_identity_is_rejected_before_import(self) -> None:
+        checkpoint, _binding = self._checkpoint()
+        checkpoint["goal_execution"]["transition_history"][76][
+            "event_id"
+        ] = "WS-FORGED-SEQ77"
+        with mock.patch.object(
+            graph,
+            "_fp046_r002_recovery_control_modules",
+            side_effect=AssertionError("malformed suffix reached imports"),
+        ):
+            self.assertEqual(
+                graph.validate_fp046_r002_seq77_78(ROOT, checkpoint),
+                [
+                    "FP046 R002 seq77/78/79/80/81/82/83/84/85 suffix is incomplete or malformed"
+                ],
+            )
+
+
+class Fp048R002RepositoryContextCallCacheTests(unittest.TestCase):
+    @staticmethod
+    def _checkpoint(marker: str) -> dict:
+        tail = {
+            "sequence": 98,
+            "event_id": f"EVENT-{marker}",
+            "event_sha256": marker * 64,
+        }
+        return {
+            "goal_execution": {
+                "transition_history": [tail],
+                "transition_history_anchor_sha256": marker * 64,
+                "goal_status": "READY",
+            },
+            "working_tree_snapshot": {
+                "path_set_sha256": marker * 64,
+                "content_set_sha256": marker * 64,
+            },
+        }
+
+    def test_one_validate_call_caches_success_and_none(self) -> None:
+        for result in ({"control.py": "1" * 64}, None):
+            with self.subTest(result=result):
+                checkpoint = self._checkpoint("1")
+
+                def validate_body(*_args, **_kwargs) -> list[str]:
+                    first = graph._fp048_r002_repository_context_live_successors(
+                        ROOT,
+                        checkpoint,
+                    )
+                    second = graph._fp048_r002_repository_context_live_successors(
+                        ROOT,
+                        checkpoint,
+                    )
+                    self.assertEqual(first, result)
+                    self.assertEqual(second, result)
+                    return []
+
+                with mock.patch.object(
+                    graph,
+                    "_validate",
+                    side_effect=validate_body,
+                ), mock.patch.object(
+                    graph,
+                    "_compute_fp048_r002_repository_context_live_successors",
+                    return_value=result,
+                ) as compute:
+                    self.assertEqual(graph.validate(ROOT), [])
+                compute.assert_called_once_with(ROOT, checkpoint)
+                self.assertIsNone(
+                    graph._FP048_R002_REPOSITORY_CONTEXT_CALL_CACHE.get()
+                )
+
+    def test_separate_validate_calls_recompute(self) -> None:
+        checkpoint = self._checkpoint("2")
+
+        def validate_body(*_args, **_kwargs) -> list[str]:
+            graph._fp048_r002_repository_context_live_successors(
+                ROOT,
+                checkpoint,
+            )
+            graph._fp048_r002_repository_context_live_successors(
+                ROOT,
+                checkpoint,
+            )
+            return []
+
+        with mock.patch.object(
+            graph,
+            "_validate",
+            side_effect=validate_body,
+        ), mock.patch.object(
+            graph,
+            "_compute_fp048_r002_repository_context_live_successors",
+            return_value={},
+        ) as compute:
+            self.assertEqual(graph.validate(ROOT), [])
+            self.assertEqual(graph.validate(ROOT), [])
+        self.assertEqual(compute.call_count, 2)
+
+    def test_call_cache_separates_checkpoint_identity_and_phase_seal(self) -> None:
+        first = self._checkpoint("3")
+        second = copy.deepcopy(first)
+
+        def validate_body(*_args, **_kwargs) -> list[str]:
+            for checkpoint in (first, first, second, second):
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                )
+            first["goal_execution"]["transition_history"][-1][
+                "event_sha256"
+            ] = "4" * 64
+            graph._fp048_r002_repository_context_live_successors(
+                ROOT,
+                first,
+            )
+            return []
+
+        with mock.patch.object(
+            graph,
+            "_validate",
+            side_effect=validate_body,
+        ), mock.patch.object(
+            graph,
+            "_compute_fp048_r002_repository_context_live_successors",
+            return_value={},
+        ) as compute:
+            self.assertEqual(graph.validate(ROOT), [])
+        self.assertEqual(compute.call_count, 3)
+
+    def test_nested_validate_restores_outer_call_cache(self) -> None:
+        checkpoint = self._checkpoint("5")
+        depth = 0
+
+        def validate_body(*_args, **_kwargs) -> list[str]:
+            nonlocal depth
+            graph._fp048_r002_repository_context_live_successors(
+                ROOT,
+                checkpoint,
+            )
+            if depth == 0:
+                depth = 1
+                try:
+                    self.assertEqual(graph.validate(ROOT), [])
+                finally:
+                    depth = 0
+            graph._fp048_r002_repository_context_live_successors(
+                ROOT,
+                checkpoint,
+            )
+            return []
+
+        with mock.patch.object(
+            graph,
+            "_validate",
+            side_effect=validate_body,
+        ), mock.patch.object(
+            graph,
+            "_compute_fp048_r002_repository_context_live_successors",
+            return_value={},
+        ) as compute:
+            self.assertEqual(graph.validate(ROOT), [])
+        self.assertEqual(compute.call_count, 2)
+        self.assertIsNone(
+            graph._FP048_R002_REPOSITORY_CONTEXT_CALL_CACHE.get()
+        )
+
+    def test_validate_exception_restores_absent_call_cache(self) -> None:
+        with mock.patch.object(
+            graph,
+            "_validate",
+            side_effect=RuntimeError("validation aborted"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "validation aborted"):
+                graph.validate(ROOT)
+        self.assertIsNone(
+            graph._FP048_R002_REPOSITORY_CONTEXT_CALL_CACHE.get()
+        )
+
+    def test_direct_calls_without_validate_context_always_recompute(self) -> None:
+        checkpoint = self._checkpoint("6")
+        with mock.patch.object(
+            graph,
+            "_compute_fp048_r002_repository_context_live_successors",
+            return_value={},
+        ) as compute:
+            graph._fp048_r002_repository_context_live_successors(
+                ROOT,
+                checkpoint,
+            )
+            graph._fp048_r002_repository_context_live_successors(
+                ROOT,
+                checkpoint,
+            )
+        self.assertEqual(compute.call_count, 2)
+
+    def test_validate_enters_and_restores_seq99_source_scope(self) -> None:
+        depth = 0
+
+        @contextmanager
+        def source_scope():
+            nonlocal depth
+            depth += 1
+            try:
+                yield
+            finally:
+                depth -= 1
+
+        authority = mock.Mock()
+        authority.seq98_source_validation_call_scope = source_scope
+
+        def validate_body(*_args, **_kwargs) -> list[str]:
+            self.assertEqual(depth, 1)
+            return []
+
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_successor_correction_authority",
+            return_value=authority,
+        ), mock.patch.object(
+            graph,
+            "_validate",
+            side_effect=validate_body,
+        ):
+            self.assertEqual(graph.validate(ROOT), [])
+        self.assertEqual(depth, 0)
+
+    def test_seq99_source_scope_enter_failure_is_fail_closed(self) -> None:
+        @contextmanager
+        def broken_source_scope():
+            raise RuntimeError("source scope unavailable")
+            yield
+
+        authority = mock.Mock()
+        authority.seq98_source_validation_call_scope = broken_source_scope
+
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_successor_correction_authority",
+            return_value=authority,
+        ), mock.patch.object(graph, "_validate") as validate:
+            with self.assertRaisesRegex(RuntimeError, "source scope unavailable"):
+                graph.validate(ROOT)
+        validate.assert_not_called()
+        self.assertIsNone(
+            graph._FP048_R002_REPOSITORY_CONTEXT_CALL_CACHE.get()
+        )
+
+
+class Fp048R002Seq91OutcomeCallCacheTests(unittest.TestCase):
+    @staticmethod
+    def _checkpoint(marker: str) -> dict:
+        checkpoint = Fp048R002RepositoryContextCallCacheTests._checkpoint(marker)
+        checkpoint["current_work"] = {"marker": marker}
+        return checkpoint
+
+    def test_aliases_compute_once_and_return_defensive_lists(self) -> None:
+        checkpoint = self._checkpoint("a")
+        aliases = (
+            graph.validate_fp048_r002_seq91_93,
+            graph.validate_fp048_r002_seq91_94,
+            graph.validate_fp048_r002_seq91_95,
+            graph.validate_fp048_r002_seq91_96,
+            graph.validate_fp048_r002_seq91_97,
+            graph.validate_fp048_r002_seq91_98,
+        )
+
+        def validate_body(*_args, **_kwargs) -> list[str]:
+            first = aliases[0](ROOT, checkpoint)
+            first.append("mutated")
+            for validator in aliases:
+                self.assertEqual(validator(ROOT, checkpoint), ["problem"])
+            return []
+
+        with mock.patch.object(
+            graph,
+            "_validate",
+            side_effect=validate_body,
+        ), mock.patch.object(
+            graph,
+            "_validate_fp048_r002_seq91_93",
+            return_value=["problem"],
+        ) as compute:
+            self.assertEqual(graph.validate(ROOT), [])
+        compute.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            historical_successor_source=False,
+        )
+
+    def test_exception_is_cached_but_keyboard_interrupt_is_not(self) -> None:
+        checkpoint = self._checkpoint("b")
+
+        def failed_validate(*_args, **_kwargs) -> list[str]:
+            for _ in range(2):
+                with self.assertRaisesRegex(ValueError, "invalid outcome"):
+                    graph.validate_fp048_r002_seq91_93(ROOT, checkpoint)
+            return []
+
+        with mock.patch.object(
+            graph,
+            "_validate",
+            side_effect=failed_validate,
+        ), mock.patch.object(
+            graph,
+            "_validate_fp048_r002_seq91_93",
+            side_effect=ValueError("invalid outcome"),
+        ) as compute:
+            self.assertEqual(graph.validate(ROOT), [])
+        self.assertEqual(compute.call_count, 1)
+
+        def interrupted_validate(*_args, **_kwargs) -> list[str]:
+            for _ in range(2):
+                with self.assertRaisesRegex(KeyboardInterrupt, "stopped"):
+                    graph.validate_fp048_r002_seq91_93(ROOT, checkpoint)
+            return []
+
+        with mock.patch.object(
+            graph,
+            "_validate",
+            side_effect=interrupted_validate,
+        ), mock.patch.object(
+            graph,
+            "_validate_fp048_r002_seq91_93",
+            side_effect=KeyboardInterrupt("stopped"),
+        ) as compute:
+            self.assertEqual(graph.validate(ROOT), [])
+        self.assertEqual(compute.call_count, 2)
+
+    def test_key_separates_identity_root_and_full_checkpoint_content(self) -> None:
+        first = self._checkpoint("c")
+        second = copy.deepcopy(first)
+
+        def validate_body(*_args, **_kwargs) -> list[str]:
+            graph.validate_fp048_r002_seq91_93(ROOT, first)
+            graph.validate_fp048_r002_seq91_93(ROOT, first)
+            graph.validate_fp048_r002_seq91_93(ROOT, second)
+            first["current_work"]["marker"] = "changed"
+            graph.validate_fp048_r002_seq91_93(ROOT, first)
+            graph.validate_fp048_r002_seq91_93(ROOT.parent, first)
+            return []
+
+        with mock.patch.object(
+            graph,
+            "_validate",
+            side_effect=validate_body,
+        ), mock.patch.object(
+            graph,
+            "_validate_fp048_r002_seq91_93",
+            return_value=[],
+        ) as compute:
+            self.assertEqual(graph.validate(ROOT), [])
+        self.assertEqual(compute.call_count, 4)
+
+    def test_direct_calls_without_validate_context_always_recompute(self) -> None:
+        checkpoint = self._checkpoint("d")
+        with mock.patch.object(
+            graph,
+            "_validate_fp048_r002_seq91_93",
+            return_value=[],
+        ) as compute:
+            graph.validate_fp048_r002_seq91_93(ROOT, checkpoint)
+            graph.validate_fp048_r002_seq91_93(ROOT, checkpoint)
+        self.assertEqual(compute.call_count, 2)
+
+    def test_private_recursive_compute_shares_one_seq97_scope(self) -> None:
+        checkpoint = self._checkpoint("scope")
+        scope_depth = 0
+
+        @contextmanager
+        def scope():
+            nonlocal scope_depth
+            scope_depth += 1
+            try:
+                yield
+            finally:
+                scope_depth -= 1
+
+        authority = mock.Mock()
+        authority.seq97_source_validation_call_scope = scope
+
+        def compute(*_args, **_kwargs) -> list[str]:
+            self.assertEqual(scope_depth, 1)
+            return []
+
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_r009_execution_correction_authority",
+            return_value=authority,
+        ), mock.patch.object(
+            graph,
+            "_validate_fp048_r002_seq91_93",
+            side_effect=compute,
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_seq91_93(ROOT, checkpoint),
+                [],
+            )
+        self.assertEqual(scope_depth, 0)
+
+
+class Fp048R002ReviewedNoncreditSuccessorTests(unittest.TestCase):
+    @staticmethod
+    def _digest(raw: bytes) -> str:
+        return hashlib.sha256(raw).hexdigest()
+
+    def _fixture(
+        self,
+    ) -> tuple[
+        tempfile.TemporaryDirectory[str],
+        Path,
+        dict,
+        dict,
+        mock.Mock,
+    ]:
+        temporary = tempfile.TemporaryDirectory()
+        root = Path(temporary.name)
+        modified_path = "product/modified.bin"
+        added_path = "product/added.bin"
+        predecessor_raw = b"reviewed predecessor\n"
+        successor_raw = b"reviewed successor\n"
+        added_raw = b"reviewed added source\n"
+        for relative, raw in (
+            (modified_path, successor_raw),
+            (added_path, added_raw),
+        ):
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+
+        review_binding: dict[str, dict] = {}
+        for role in ("assignment", "review_result", "independent_review"):
+            relative = f"review/{role}.json"
+            raw = (role + "\n").encode("utf-8")
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+            review_binding[role] = {
+                "path": relative,
+                "sha256": self._digest(raw),
+                "byte_length": len(raw),
+            }
+
+        edges = {
+            "modified": [
+                {
+                    "path": modified_path,
+                    "predecessor": {
+                        "path": modified_path,
+                        "sha256": self._digest(predecessor_raw),
+                        "byte_length": len(predecessor_raw),
+                    },
+                    "successor": {
+                        "path": modified_path,
+                        "sha256": self._digest(successor_raw),
+                        "byte_length": len(successor_raw),
+                    },
+                }
+            ],
+            "added": [
+                {
+                    "path": added_path,
+                    "successor": {
+                        "path": added_path,
+                        "sha256": self._digest(added_raw),
+                        "byte_length": len(added_raw),
+                    },
+                }
+            ],
+        }
+        history = [{} for _ in range(89)]
+        history[88] = {"event_sha256": "a" * 64}
+        event = {
+            "sequence": graph.FP048_R002_CONTROL_REANCHOR_SEQUENCE,
+            "event_id": graph.FP048_R002_CONTROL_REANCHOR_EVENT_ID,
+            "event_type": "GOAL_START_CONTROL_REANCHORED",
+            "from_status": "READY",
+            "to_status": "READY",
+            "status_changes": {},
+            "previous_event_sha256": history[88]["event_sha256"],
+            "claim_boundary": copy.deepcopy(
+                graph.FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+            ),
+            "transition_control_review_binding": review_binding,
+            "noncredit_successor_edges": copy.deepcopy(edges),
+        }
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        history.append(event)
+        checkpoint = {"goal_execution": {"transition_history": history}}
+        module = mock.Mock()
+        module.SOURCE_PRODUCT_MEMBERSHIP = {
+            modified_path: True,
+            added_path: False,
+        }
+        module.require_control_reanchored_checkpoint.return_value = None
+        module.validated_noncredit_successor_edges.return_value = copy.deepcopy(
+            edges
+        )
+        completion_edges = {
+            "modified": [
+                {
+                    "path": f"completion/modified-{index:02d}.bin",
+                    "predecessor": {
+                        "path": f"completion/modified-{index:02d}.bin",
+                        "sha256": f"{index + 1:064x}",
+                        "byte_length": index + 1,
+                    },
+                    "scope": "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+                    "successor": {
+                        "path": f"completion/modified-{index:02d}.bin",
+                        "sha256": f"{index + 101:064x}",
+                        "byte_length": index + 101,
+                    },
+                }
+                for index in range(11)
+            ],
+            "added": [
+                {
+                    "path": f"completion/added-{index:02d}.bin",
+                    "scope": "FP046_R002_DIRECT_INTERNAL_STATIC_ONLY",
+                    "successor": {
+                        "path": f"completion/added-{index:02d}.bin",
+                        "sha256": f"{index + 201:064x}",
+                        "byte_length": index + 201,
+                    },
+                }
+                for index in range(4)
+            ],
+        }
+        module.validated_seq85_to_seq87_successor_edges.return_value = (
+            completion_edges
+        )
+        return temporary, root, checkpoint, edges, module
+
+    def test_valid_reviewed_edge_composes_without_promoting_added_source(
+        self,
+    ) -> None:
+        temporary, root, checkpoint, edges, module = self._fixture()
+        self.addCleanup(temporary.cleanup)
+        relative = edges["modified"][0]["path"]
+        origin = "b" * 64
+        predecessor = edges["modified"][0]["predecessor"]["sha256"]
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_control_reanchor_module",
+            return_value=module,
+        ):
+            composed = graph._compose_fp048_r002_reviewed_noncredit_successors(
+                root,
+                checkpoint,
+                {relative: (origin, predecessor)},
+            )
+            self.assertEqual(
+                composed,
+                {
+                    relative: (
+                        origin,
+                        edges["modified"][0]["successor"]["sha256"],
+                    )
+                },
+            )
+            self.assertNotIn(edges["added"][0]["path"], composed)
+            self.assertEqual(
+                graph.validate_fp048_r002_reviewed_noncredit_successors(
+                    root,
+                    checkpoint,
+                ),
+                [],
+            )
+
+    def test_seq85_to_seq87_edge_is_composed_before_seq90(self) -> None:
+        temporary, root, checkpoint, edges, module = self._fixture()
+        self.addCleanup(temporary.cleanup)
+        row = edges["modified"][0]
+        completion_edges = copy.deepcopy(
+            module.validated_seq85_to_seq87_successor_edges.return_value
+        )
+        completion_predecessor = "d" * 64
+        completion_edges["modified"][0] = {
+            "path": row["path"],
+            "predecessor": {
+                "path": row["path"],
+                "sha256": completion_predecessor,
+                "byte_length": 7,
+            },
+            "scope": "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+            "successor": copy.deepcopy(row["predecessor"]),
+        }
+        completion_edges["modified"].sort(key=lambda value: value["path"])
+        module.validated_seq85_to_seq87_successor_edges.return_value = (
+            completion_edges
+        )
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_control_reanchor_module",
+            return_value=module,
+        ):
+            self.assertEqual(
+                graph._compose_fp048_r002_reviewed_noncredit_successors(
+                    root,
+                    checkpoint,
+                    {row["path"]: ("c" * 64, completion_predecessor)},
+                ),
+                {
+                    row["path"]: (
+                        "c" * 64,
+                        row["successor"]["sha256"],
+                    )
+                },
+            )
+
+    def test_missing_or_extra_reviewed_inventory_fails_closed(self) -> None:
+        for mutation in ("missing", "extra"):
+            with self.subTest(mutation=mutation):
+                temporary, root, checkpoint, edges, module = self._fixture()
+                self.addCleanup(temporary.cleanup)
+                forged = copy.deepcopy(edges)
+                if mutation == "missing":
+                    forged["added"] = []
+                else:
+                    forged["modified"].append(
+                        {
+                            "path": "product/unreviewed.bin",
+                            "predecessor": {
+                                "path": "product/unreviewed.bin",
+                                "sha256": "1" * 64,
+                                "byte_length": 1,
+                            },
+                            "successor": {
+                                "path": "product/unreviewed.bin",
+                                "sha256": "2" * 64,
+                                "byte_length": 2,
+                            },
+                        }
+                    )
+                    forged["modified"].sort(
+                        key=lambda value: value["path"]
+                    )
+                event = checkpoint["goal_execution"]["transition_history"][-1]
+                event["noncredit_successor_edges"] = copy.deepcopy(forged)
+                event["event_sha256"] = graph.continuation.event_sha256(event)
+                module.validated_noncredit_successor_edges.return_value = forged
+                with mock.patch.object(
+                    graph,
+                    "_fp048_r002_control_reanchor_module",
+                    return_value=module,
+                ):
+                    self.assertTrue(
+                        graph.validate_fp048_r002_reviewed_noncredit_successors(
+                            root,
+                            checkpoint,
+                        )
+                    )
+
+    def test_malformed_active_work_anchor_fails_closed(self) -> None:
+        temporary, root, checkpoint, _edges, module = self._fixture()
+        self.addCleanup(temporary.cleanup)
+        checkpoint["goal_execution"]["transition_history"].append(
+            {"sequence": 91, "event_id": "WS-FORGED-SEQ91"}
+        )
+        module.require_control_reanchored_checkpoint.side_effect = ValueError(
+            "seq91 active-work anchor differs"
+        )
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_control_reanchor_module",
+            return_value=module,
+        ):
+            self.assertTrue(
+                graph.validate_fp048_r002_reviewed_noncredit_successors(
+                    root,
+                    checkpoint,
+                )
+            )
+
+    def test_tampered_successor_and_disconnected_predecessor_fail_closed(
+        self,
+    ) -> None:
+        temporary, root, checkpoint, edges, module = self._fixture()
+        self.addCleanup(temporary.cleanup)
+        row = edges["modified"][0]
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_control_reanchor_module",
+            return_value=module,
+        ):
+            self.assertIsNone(
+                graph._compose_fp048_r002_reviewed_noncredit_successors(
+                    root,
+                    checkpoint,
+                    {row["path"]: ("b" * 64, "c" * 64)},
+                )
+            )
+            (root / row["path"]).write_bytes(b"tampered\n")
+            self.assertIsNone(
+                graph._compose_fp048_r002_reviewed_noncredit_successors(
+                    root,
+                    checkpoint,
+                    {
+                        row["path"]: (
+                            "b" * 64,
+                            row["predecessor"]["sha256"],
+                        )
+                    },
+                )
+            )
+            self.assertTrue(
+                graph.validate_fp048_r002_reviewed_noncredit_successors(
+                    root,
+                    checkpoint,
+                )
+            )
+
+    def test_unreviewed_manifest_projection_fails_closed(self) -> None:
+        temporary, root, checkpoint, edges, module = self._fixture()
+        self.addCleanup(temporary.cleanup)
+        module.validated_noncredit_successor_edges.return_value = {
+            "modified": [],
+            "added": [],
+        }
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_control_reanchor_module",
+            return_value=module,
+        ):
+            self.assertTrue(
+                graph.validate_fp048_r002_reviewed_noncredit_successors(
+                    root,
+                    checkpoint,
+                )
+            )
+            self.assertIsNone(
+                graph._compose_fp048_r002_reviewed_noncredit_successors(
+                    root,
+                    checkpoint,
+                    {
+                        edges["modified"][0]["path"]: (
+                            "b" * 64,
+                            edges["modified"][0]["predecessor"]["sha256"],
+                        )
+                    },
+                )
+            )
+
+    def test_creditful_reanchor_event_fails_before_composition(self) -> None:
+        temporary, root, checkpoint, edges, module = self._fixture()
+        self.addCleanup(temporary.cleanup)
+        event = checkpoint["goal_execution"]["transition_history"][-1]
+        event["claim_boundary"]["product_implementation_credit_delta"] = 1
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_control_reanchor_module",
+            return_value=module,
+        ):
+            self.assertTrue(
+                graph.validate_fp048_r002_reviewed_noncredit_successors(
+                    root,
+                    checkpoint,
+                )
+            )
+            self.assertIsNone(
+                graph._compose_fp048_r002_reviewed_noncredit_successors(
+                    root,
+                    checkpoint,
+                    {
+                        edges["modified"][0]["path"]: (
+                            "b" * 64,
+                            edges["modified"][0]["predecessor"]["sha256"],
+                        )
+                    },
+                )
+            )
+        module.require_control_reanchored_checkpoint.assert_not_called()
+
+    def test_phase1_bridge_keeps_its_sealed_historical_terminal(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        relative, bridge = next(
+            iter(graph.PHASE1_ANDROID_REPORT_SUCCESSOR_BRIDGES.items())
+        )
+        live_raw = b"later reviewed live bytes\n"
+        live_path = root / relative
+        live_path.parent.mkdir(parents=True, exist_ok=True)
+        live_path.write_bytes(live_raw)
+        live_sha256 = self._digest(live_raw)
+        current_bindings = {relative: live_sha256}
+
+        with mock.patch.object(
+            graph,
+            "_fp047_successful_start_snapshot_artifacts",
+            return_value={relative: bridge["predecessor_sha256"]},
+        ), mock.patch.object(
+            graph,
+            "validate_phase1_android_report_successor_binding",
+            return_value=([], current_bindings),
+        ):
+            self.assertEqual(
+                graph._phase1_android_report_successor_bridge(
+                    root,
+                    {},
+                    relative,
+                    bridge["predecessor_sha256"],
+                    current_bindings=current_bindings,
+                ),
+                (
+                    bridge["predecessor_sha256"],
+                    bridge["current_sha256"],
+                ),
+            )
+        self.assertNotEqual(bridge["current_sha256"], live_sha256)
+
+    def test_fp047_overlay_is_decomposed_only_by_exact_reviewed_edge(
+        self,
+    ) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        relative = "product/routes.ts"
+        live_raw = b"reviewed seq90 live bytes\n"
+        live_path = root / relative
+        live_path.parent.mkdir(parents=True, exist_ok=True)
+        live_path.write_bytes(live_raw)
+        live_sha256 = self._digest(live_raw)
+        fp047_before = "1" * 64
+        fp047_after = "2" * 64
+        fp046_before = "3" * 64
+        fp046_after = "4" * 64
+        common = {
+            "checkpoint": {},
+            "fp011_live_artifacts": {},
+            "fp011_transitions": {},
+            "fp013_artifacts": {},
+            "fp015_artifacts": {},
+            "fp014_artifacts": {},
+            "fp047_artifacts": {
+                relative: (fp047_before, fp047_after)
+            },
+            "fp048_artifacts": {},
+            "fp046_artifacts": {
+                relative: (fp046_before, fp046_after)
+            },
+            "npc_recovery_artifacts": {},
+        }
+
+        with mock.patch.object(
+            graph,
+            "_historical_artifact_lineage_head",
+            return_value=fp047_before,
+        ), mock.patch.object(
+            graph,
+            "_fp047_start_snapshot_successor",
+            return_value=(fp047_before, live_sha256),
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_reviewed_noncredit_edge",
+            return_value=(True, (fp046_after, live_sha256)),
+        ):
+            self.assertTrue(
+                graph._successor_lineage_reaches_live(
+                    root,
+                    {},
+                    (relative, "0" * 64),
+                    **common,
+                )
+            )
+
+        with mock.patch.object(
+            graph,
+            "_historical_artifact_lineage_head",
+            return_value=fp047_before,
+        ), mock.patch.object(
+            graph,
+            "_fp047_start_snapshot_successor",
+            return_value=(fp047_before, live_sha256),
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_reviewed_noncredit_edge",
+            return_value=(True, (fp046_after, "5" * 64)),
+        ):
+            self.assertFalse(
+                graph._successor_lineage_reaches_live(
+                    root,
+                    {},
+                    (relative, "0" * 64),
+                    **common,
+                )
+            )
+
+    def test_seq91_seq92_overlay_replays_sealed_history_without_r005(
+        self,
+    ) -> None:
+        root = ROOT
+        goal_ids = (
+            graph.FP046_GOAL_ID,
+            graph.NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+            graph.FP048_ANDROID_REPORT_GOAL_ID,
+        )
+        for sequence in (91, 92):
+            with self.subTest(sequence=sequence):
+                checkpoint, correction = (
+                    Fp048R002Seq91CorrectionTests._checkpoint()
+                )
+                if sequence == 92:
+                    Fp048R002Seq91CorrectionTests._append_seq92(
+                        checkpoint,
+                        correction,
+                    )
+                ready_validator = mock.Mock()
+                with mock.patch.object(
+                    graph,
+                    "_r002_reopen_suffix",
+                    return_value=[{}],
+                ), mock.patch.object(
+                    graph,
+                    "validate_fp046_npc_r002_reopen_seq72_76",
+                    return_value=[],
+                ), mock.patch.object(
+                    graph,
+                    "_fp048_r002_control_reanchor_module",
+                    side_effect=AssertionError(
+                        "physical seq90 R005 was reopened"
+                    ),
+                ), mock.patch(
+                    "scripts.apply_walksafe_fp048_r002_goal_seq88_89_20260825."
+                    "require_exact_ready_source",
+                    ready_validator,
+                ):
+                    overlay = graph._r002_legacy_completion_overlay(
+                        root,
+                        checkpoint,
+                    )
+
+                self.assertIsNotNone(overlay)
+                replayed = ready_validator.call_args.args[1]
+                self.assertEqual(
+                    len(replayed["goal_execution"]["transition_history"]),
+                    89,
+                )
+                self.assertEqual(
+                    replayed["goal_execution"]["status_by_goal"][
+                        graph.FP046_R002_NEXT_GOAL_ID
+                    ],
+                    "READY",
+                )
+                for goal_id in goal_ids:
+                    self.assertEqual(
+                        overlay["goal_execution"]["status_by_goal"][goal_id],
+                        "COMPLETE_AT_TARGET",
+                    )
+
+
+class Fp048R002Seq91CorrectionTests(unittest.TestCase):
+    @staticmethod
+    def _exact_seq91_checkpoint() -> dict:
+        from scripts import (
+            apply_walksafe_fp048_r002_goal_start_branch_semantics_reanchor_seq93_20260826
+            as reanchor,
+        )
+        from scripts import (
+            apply_walksafe_fp048_r002_goal_started_seq93_20260826
+            as retired_starter,
+        )
+        from scripts import (
+            apply_walksafe_fp048_r002_goal_started_seq94_20260826
+            as starter,
+        )
+        from scripts import (
+            apply_walksafe_fp048_r002_start_gate_contract_correction_seq94_20260826
+            as r006_correction,
+        )
+        from scripts import (
+            apply_walksafe_fp048_r002_start_gate_contract_correction_seq92_20260826
+            as correction,
+        )
+        from scripts import (
+            apply_walksafe_fp048_r002_start_gate_contract_correction_seq95_20260826
+            as r007_correction,
+        )
+        from scripts import (
+            apply_walksafe_fp048_r002_start_gate_contract_correction_seq96_20260826
+            as r008_correction,
+        )
+
+        checkpoint = load_json(ROOT / graph.V24_CHECKPOINT_RELATIVE)
+        history = checkpoint["goal_execution"]["transition_history"]
+        if (
+            len(history) == graph.FP048_R002_R008_STARTED_SEQUENCE
+            and history[-1].get("event_id")
+            == graph.FP048_R002_R008_STARTED_EVENT_ID
+            and history[-1].get("event_type") == "GOAL_STARTED"
+        ):
+            from scripts import (
+                apply_walksafe_fp048_r002_goal_started_seq97_20260826
+                as r008_starter,
+            )
+
+            checkpoint = r008_starter._restored_seq96_checkpoint(checkpoint)
+            history = checkpoint["goal_execution"]["transition_history"]
+        if (
+            len(history)
+            == graph.FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE
+            and history[-1].get("event_id")
+            == graph.FP048_R002_R008_CONTRACT_CORRECTION_EVENT_ID
+        ):
+            checkpoint = r008_correction._restored_seq95_checkpoint(checkpoint)
+            history = checkpoint["goal_execution"]["transition_history"]
+        if (
+            len(history)
+            == graph.FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE
+            and history[-1].get("event_id")
+            == graph.FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID
+        ):
+            checkpoint = r007_correction._restored_seq94_checkpoint(checkpoint)
+            history = checkpoint["goal_execution"]["transition_history"]
+        if (
+            len(history) == graph.FP048_R002_R006_STARTED_SEQUENCE
+            and history[-1].get("event_id")
+            == graph.FP048_R002_R006_STARTED_EVENT_ID
+        ):
+            from scripts import (
+                apply_walksafe_fp048_r002_goal_started_seq95_20260826
+                as r006_starter,
+            )
+
+            checkpoint = r006_starter._restored_seq94_checkpoint(checkpoint)
+            history = checkpoint["goal_execution"]["transition_history"]
+        if (
+            len(history)
+            == graph.FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE
+            and history[-1].get("event_id")
+            == graph.FP048_R002_R006_CONTRACT_CORRECTION_EVENT_ID
+        ):
+            checkpoint = r006_correction._restored_seq93_checkpoint(checkpoint)
+            history = checkpoint["goal_execution"]["transition_history"]
+        if (
+            len(history) == graph.FP048_R002_R005_STARTED_SEQUENCE
+            and history[-1].get("event_id")
+            == graph.FP048_R002_R005_STARTED_EVENT_ID
+        ):
+            checkpoint = starter._restored_seq93_checkpoint(checkpoint)
+            history = checkpoint["goal_execution"]["transition_history"]
+        if (
+            len(history)
+            == graph.FP048_R002_BRANCH_SEMANTICS_REANCHOR_SEQUENCE
+            and history[-1].get("event_id")
+            == graph.FP048_R002_BRANCH_SEMANTICS_REANCHOR_EVENT_ID
+        ):
+            checkpoint = reanchor._restored_seq92_checkpoint(checkpoint)
+            history = checkpoint["goal_execution"]["transition_history"]
+        elif (
+            len(history) == graph.FP048_R002_R004_STARTED_SEQUENCE
+            and history[-1].get("event_id")
+            == graph.FP048_R002_R004_STARTED_EVENT_ID
+        ):
+            checkpoint = retired_starter._restored_seq92_checkpoint(checkpoint)
+            history = checkpoint["goal_execution"]["transition_history"]
+        if (
+            len(history)
+            == graph.FP048_R002_START_GATE_CONTRACT_CORRECTION_SEQUENCE
+            and history[-1].get("event_id")
+            == graph.FP048_R002_START_GATE_CONTRACT_CORRECTION_EVENT_ID
+        ):
+            checkpoint = correction._restored_seq91_checkpoint(checkpoint)
+            history = checkpoint["goal_execution"]["transition_history"]
+        if len(history) != graph.FP048_R002_CONTROL_CORRECTION_SEQUENCE:
+            raise AssertionError("exact seq91 fixture authority is unavailable")
+        return checkpoint
+
+    @classmethod
+    def _checkpoint(cls) -> tuple[dict, dict]:
+        checkpoint = cls._exact_seq91_checkpoint()
+        checkpoint = copy.deepcopy(checkpoint)
+        snapshot = checkpoint["working_tree_snapshot"]
+        paths = sorted(
+            set(snapshot["managed_changed_paths"])
+            | set(graph.FP048_R002_STARTED_MANAGED_PATHS)
+        )
+        path_sha256, content_sha256 = graph.continuation.working_snapshot_hashes(
+            ROOT,
+            paths,
+        )
+        snapshot["managed_changed_paths"] = paths
+        snapshot["managed_changed_path_count"] = len(paths)
+        snapshot["path_set_sha256"] = path_sha256
+        snapshot["content_set_sha256"] = content_sha256
+        handoff = checkpoint["session_handoff"]
+        handoff["changed_files"] = copy.deepcopy(paths)
+        mirror = handoff["source_commit_or_snapshot"]
+        mirror["file_count"] = len(paths)
+        mirror["path_set_sha256"] = path_sha256
+        mirror["content_set_sha256"] = content_sha256
+        return checkpoint, checkpoint["goal_execution"]["transition_history"][90]
+
+    @staticmethod
+    def _append_seq92(checkpoint: dict, correction: dict) -> dict:
+        occurred_at = "2026-08-26T05:30:01+09:00"
+        state = checkpoint["goal_execution"]
+        event = {
+            field: None
+            for field in graph.continuation.V24_FIRST_START_EVENT_FIELDS
+        }
+        event.update(
+            {
+                "sequence": graph.FP048_R002_CORRECTED_STARTED_SEQUENCE,
+                "event_id": graph.FP048_R002_CORRECTED_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "occurred_on": "2026-08-26",
+                "occurred_at": occurred_at,
+                "previous_focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "previous_focus_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "focus_goal_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "static_plan_manifest_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+                ),
+                "status_changes": {
+                    graph.FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"
+                },
+                "runtime_after": copy.deepcopy(correction["runtime_after"]),
+                "repository_snapshot_before": {},
+                "implementation_start_gate_binding": {
+                    "document_id": graph.FP048_R002_STARTED_GATE_DOCUMENT_ID,
+                    "path": graph.FP048_R002_STARTED_GATE_RECEIPT_PATH,
+                    "file_sha256": "f" * 64,
+                },
+                "blockers_after": copy.deepcopy(state["blockers_by_goal"]),
+                "blocker_resolution_ids_after": [
+                    record["resolution_id"]
+                    for record in state["blocker_resolution_history"]
+                ],
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [],
+                "previous_event_sha256": correction["event_sha256"],
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = occurred_at
+        state["status_by_goal"][graph.FP046_R002_NEXT_GOAL_ID] = "IN_PROGRESS"
+        state["goal_status"] = "IN_PROGRESS"
+        current = checkpoint["current_work"]
+        current["work_item_id"] = graph.FP048_R002_WORK_ITEM_ID
+        current["status"] = "IN_PROGRESS"
+        current["current_focus"] = graph.FP048_R002_STARTED_CURRENT_FOCUS
+        current["next_action"] = graph.FP048_R002_WORK_NEXT_ACTION
+        current["release_completion_claimed"] = False
+        snapshot = checkpoint["working_tree_snapshot"]
+        snapshot["scope"] = graph.FP048_R002_STARTED_SCOPE
+        paths = snapshot["managed_changed_paths"]
+        handoff = checkpoint["session_handoff"]
+        handoff["changed_files"] = copy.deepcopy(paths)
+        handoff["current_epic"] = graph.FP048_R002_STARTED_HANDOFF_EPIC
+        handoff["last_updated_by_work_item"] = graph.FP048_R002_WORK_ITEM_ID
+        handoff["last_verification_status"] = (
+            graph.FP048_R002_STARTED_VERIFICATION_STATUS
+        )
+        handoff["next_single_action"] = graph.FP048_R002_CORRECTION_NEXT_ACTION
+        mirror = handoff["source_commit_or_snapshot"]
+        mirror["file_count"] = len(paths)
+        mirror["path_set_sha256"] = snapshot["path_set_sha256"]
+        mirror["content_set_sha256"] = snapshot["content_set_sha256"]
+        return event
+
+    def test_seq91_is_exact_ready_zero_credit_without_live_review_reads(
+        self,
+    ) -> None:
+        checkpoint, _event = self._checkpoint()
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_control_reanchor_module",
+            side_effect=AssertionError("historical review was reopened"),
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_seq91_92(ROOT, checkpoint),
+                [],
+            )
+            self.assertEqual(
+                graph.validate_fp048_r002_seq91_93(ROOT, checkpoint),
+                [],
+            )
+
+    def test_seq92_is_the_only_exact_single_goal_start(self) -> None:
+        checkpoint, correction = self._checkpoint()
+        self._append_seq92(checkpoint, correction)
+        self.assertEqual(
+            graph.validate_fp048_r002_seq91_92(ROOT, checkpoint),
+            [],
+        )
+        self.assertEqual(
+            graph.validate_fp048_r002_seq91_93(ROOT, checkpoint),
+            [],
+        )
+
+        started = checkpoint["goal_execution"]["transition_history"][91]
+        started["status_changes"]["WS-FORGED-GOAL"] = "IN_PROGRESS"
+        started["event_sha256"] = graph.continuation.event_sha256(started)
+        self.assertTrue(graph.validate_fp048_r002_seq91_92(ROOT, checkpoint))
+
+    def test_legacy_seq92_rejects_unowned_descendant(self) -> None:
+        checkpoint, correction = self._checkpoint()
+        self._append_seq92(checkpoint, correction)
+        checkpoint["goal_execution"]["transition_history"].append(
+            {"sequence": 93, "event_id": "WS-FORGED-DESCENDANT"}
+        )
+        self.assertEqual(
+            graph.validate_fp048_r002_seq91_94(ROOT, checkpoint),
+            ["FP048 R002 legacy seq92 descendant dispatch differs"],
+        )
+
+    def test_seq92_rejects_each_forged_inverse_delta_field(self) -> None:
+        mutations = (
+            "event_extra",
+            "event_focus_content",
+            "event_binding",
+            "additional_in_progress",
+            "goal_status",
+            "anchor",
+            "cutoff",
+            "work_item",
+            "work_status",
+            "work_focus",
+            "work_next_action",
+            "work_release",
+            "snapshot_scope",
+            "snapshot_count",
+            "snapshot_path_hash",
+            "snapshot_content_hash",
+            "handoff_changed_files",
+            "handoff_current_epic",
+            "handoff_last_updated",
+            "handoff_last_verification",
+            "handoff_next_action",
+            "mirror_count",
+            "mirror_path_hash",
+            "mirror_content_hash",
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                checkpoint, correction = self._checkpoint()
+                event = self._append_seq92(checkpoint, correction)
+                state = checkpoint["goal_execution"]
+                current = checkpoint["current_work"]
+                snapshot = checkpoint["working_tree_snapshot"]
+                handoff = checkpoint["session_handoff"]
+                mirror = handoff["source_commit_or_snapshot"]
+                if mutation == "event_extra":
+                    event["forged"] = True
+                elif mutation == "event_focus_content":
+                    event["focus_goal_content_sha256"] = "0" * 64
+                elif mutation == "event_binding":
+                    event["implementation_start_gate_binding"]["document_id"] = "FORGED"
+                elif mutation == "additional_in_progress":
+                    state["status_by_goal"]["WS-FORGED"] = "IN_PROGRESS"
+                elif mutation == "goal_status":
+                    state["goal_status"] = "READY"
+                elif mutation == "anchor":
+                    state["transition_history_anchor_sha256"] = "0" * 64
+                elif mutation == "cutoff":
+                    state["validation_cutoff_at"] = "2026-08-26T05:30:02+09:00"
+                elif mutation == "work_item":
+                    current["work_item_id"] = "FORGED"
+                elif mutation == "work_status":
+                    current["status"] = "READY"
+                elif mutation == "work_focus":
+                    current["current_focus"] = "FORGED"
+                elif mutation == "work_next_action":
+                    current["next_action"] = "FORGED"
+                elif mutation == "work_release":
+                    current["release_completion_claimed"] = True
+                elif mutation == "snapshot_scope":
+                    snapshot["scope"] = "FORGED"
+                elif mutation == "snapshot_count":
+                    snapshot["managed_changed_path_count"] += 1
+                elif mutation == "snapshot_path_hash":
+                    snapshot["path_set_sha256"] = "0" * 64
+                elif mutation == "snapshot_content_hash":
+                    snapshot["content_set_sha256"] = "0" * 64
+                elif mutation == "handoff_changed_files":
+                    handoff["changed_files"] = list(reversed(handoff["changed_files"]))
+                elif mutation == "handoff_current_epic":
+                    handoff["current_epic"] = "FORGED"
+                elif mutation == "handoff_last_updated":
+                    handoff["last_updated_by_work_item"] = "FORGED"
+                elif mutation == "handoff_last_verification":
+                    handoff["last_verification_status"] = "FORGED"
+                elif mutation == "handoff_next_action":
+                    handoff["next_single_action"] = "FORGED"
+                elif mutation == "mirror_count":
+                    mirror["file_count"] += 1
+                elif mutation == "mirror_path_hash":
+                    mirror["path_set_sha256"] = "0" * 64
+                else:
+                    mirror["content_set_sha256"] = "0" * 64
+                if mutation.startswith("event_"):
+                    event["event_sha256"] = graph.continuation.event_sha256(event)
+                    state["transition_history_anchor_sha256"] = event[
+                        "event_sha256"
+                    ]
+                self.assertTrue(
+                    graph.validate_fp048_r002_seq91_92(ROOT, checkpoint)
+                )
+
+    def test_seq91_credit_reason_and_frozen_edge_drift_fail_closed(self) -> None:
+        for mutation in ("credit", "reason", "edge"):
+            with self.subTest(mutation=mutation):
+                checkpoint, event = self._checkpoint()
+                if mutation == "credit":
+                    event["status_changes"] = {
+                        graph.FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"
+                    }
+                elif mutation == "reason":
+                    event["correction_reason"] = {}
+                else:
+                    event["noncredit_successor_edges"] = {
+                        "modified": [],
+                        "added": [],
+                    }
+                event["event_sha256"] = graph.continuation.event_sha256(event)
+                self.assertTrue(
+                    graph.validate_fp048_r002_seq91_92(ROOT, checkpoint)
+                )
+
+    def test_descendant_uses_frozen_seq90_edges_not_physical_review(self) -> None:
+        checkpoint, correction = self._checkpoint()
+        self._append_seq92(checkpoint, correction)
+        checkpoint["goal_execution"]["transition_history"].append(
+            {"sequence": 93, "event_id": "WS-SYNTHETIC-DESCENDANT"}
+        )
+        edges = checkpoint["goal_execution"]["transition_history"][89][
+            "noncredit_successor_edges"
+        ]
+        membership = {
+            row["path"]: kind == "modified"
+            for kind in ("modified", "added")
+            for row in edges[kind]
+        }
+        self.assertEqual(len(membership), 35)
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_control_reanchor_module",
+            side_effect=AssertionError("mutable seq90 module was imported"),
+        ):
+            self.assertEqual(
+                graph._fp048_r002_noncredit_successor_edges(ROOT, checkpoint),
+                edges,
+            )
+
+    def test_descendant_uses_frozen_seq87_edges_without_seq90_r005(self) -> None:
+        for sequence in (91, 92):
+            with self.subTest(sequence=sequence):
+                checkpoint, correction = self._checkpoint()
+                if sequence == 92:
+                    self._append_seq92(checkpoint, correction)
+                with mock.patch.object(
+                    graph,
+                    "_fp048_r002_control_reanchor_module",
+                    side_effect=AssertionError(
+                        "mutable seq90 module was imported"
+                    ),
+                ):
+                    edges = graph._fp048_r002_seq85_to_seq87_successor_edges(
+                        ROOT,
+                        checkpoint,
+                    )
+                self.assertIsNotNone(edges)
+                self.assertEqual(
+                    (len(edges["modified"]), len(edges["added"])),
+                    (11, 4),
+                )
+
+    def test_forged_local_seq87_edge_literal_fails_closed(self) -> None:
+        forged = list(graph.FP048_R002_SEQ85_TO_SEQ87_MODIFIED_BINDINGS)
+        row = list(forged[0])
+        row[4] = "f" * 64
+        forged[0] = tuple(row)
+        with mock.patch.object(
+            graph,
+            "FP048_R002_SEQ85_TO_SEQ87_MODIFIED_BINDINGS",
+            tuple(forged),
+        ), self.assertRaisesRegex(ValueError, "frozen edge set differs"):
+            graph._fp048_r002_frozen_seq85_to_seq87_successor_edges()
+
+
+class Fp048R002Seq92R004Seq93Tests(unittest.TestCase):
+    @staticmethod
+    def _canonical(checkpoint: dict) -> bytes:
+        return json.dumps(
+            checkpoint,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+    @staticmethod
+    def _sealed(path: str) -> dict:
+        return {"path": path, "sha256": "d" * 64, "byte_length": 1}
+
+    @classmethod
+    def _append_seq92(cls, checkpoint: dict) -> dict:
+        state = checkpoint["goal_execution"]
+        seq91 = state["transition_history"][90]
+        occurred_at = (
+            datetime.fromisoformat(seq91["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = copy.deepcopy(seq91)
+        event.update(
+            {
+                "sequence": graph.FP048_R002_START_GATE_CONTRACT_CORRECTION_SEQUENCE,
+                "event_id": graph.FP048_R002_START_GATE_CONTRACT_CORRECTION_EVENT_ID,
+                "event_type": "GOAL_START_GATE_CONTRACT_CORRECTED",
+                "occurred_on": occurred_at.date().isoformat(),
+                "occurred_at": occurred_at.isoformat(),
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+                "runtime_after": copy.deepcopy(seq91["runtime_after"]),
+                "claim_boundary": copy.deepcopy(
+                    graph.FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+                ),
+                "source_checkpoint_binding": {
+                    **cls._sealed(graph.V24_CHECKPOINT_RELATIVE.as_posix()),
+                    "sequence": graph.FP048_R002_CONTROL_CORRECTION_SEQUENCE,
+                    "tail_event_id": graph.FP048_R002_CONTROL_CORRECTION_EVENT_ID,
+                    "tail_event_sha256": seq91["event_sha256"],
+                },
+                "contract_supersession": {
+                    "previous_contract_binding": copy.deepcopy(
+                        seq91["contract_supersession"][
+                            "replacement_contract_binding"
+                        ]
+                    ),
+                    "reason_code": "R003_SUPERSEDED_BY_STAGE_AWARE_R004",
+                    "replacement_contract_binding": {
+                        "schema_version": "1.3",
+                        "document_id": graph.FP048_R002_R004_CONTRACT_DOCUMENT_ID,
+                        "path": graph.FP048_R002_R004_CONTRACT_PATH,
+                        "file_sha256": "e" * 64,
+                        "contract_id": graph.FP048_R002_R004_CONTRACT_ID,
+                        "contract_version": graph.FP048_R002_R004_CONTRACT_VERSION,
+                        "canonical_contract_sha256": "f" * 64,
+                    },
+                },
+                "start_gate_runner_binding": cls._sealed(
+                    graph.FP048_R002_R004_START_GATE_RUNNER_PATH
+                ),
+                "previous_event_sha256": seq91["event_sha256"],
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        return event
+
+    @staticmethod
+    def _receipt() -> dict:
+        return {
+            "document_id": "WS-FP048-R002-R004-GOAL-START-RECEIPT",
+            "path": "docs/control/execution/goal-gates/fp048-r002-r004/receipt.json",
+            "file_sha256": "a" * 64,
+        }
+
+    @classmethod
+    def _append_seq93(cls, checkpoint: dict, receipt: dict) -> dict:
+        state = checkpoint["goal_execution"]
+        correction = state["transition_history"][91]
+        occurred_at = "2026-08-26T05:30:03+09:00"
+        event = {
+            field: None
+            for field in graph.continuation.V24_FIRST_START_EVENT_FIELDS
+        }
+        event.update(
+            {
+                "sequence": graph.FP048_R002_R004_STARTED_SEQUENCE,
+                "event_id": graph.FP048_R002_R004_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "occurred_on": "2026-08-26",
+                "occurred_at": occurred_at,
+                "previous_focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "previous_focus_content_sha256": "b" * 64,
+                "focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "focus_goal_content_sha256": "b" * 64,
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "static_plan_manifest_sha256": "c" * 64,
+                "status_changes": {
+                    graph.FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"
+                },
+                "runtime_after": copy.deepcopy(correction["runtime_after"]),
+                "repository_snapshot_before": {},
+                "implementation_start_gate_binding": copy.deepcopy(receipt),
+                "blockers_after": copy.deepcopy(state["blockers_by_goal"]),
+                "blocker_resolution_ids_after": [
+                    row["resolution_id"]
+                    for row in state["blocker_resolution_history"]
+                ],
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [],
+                "previous_event_sha256": correction["event_sha256"],
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = occurred_at
+        state["status_by_goal"][graph.FP046_R002_NEXT_GOAL_ID] = "IN_PROGRESS"
+        state["goal_status"] = "IN_PROGRESS"
+        checkpoint["current_work"]["status"] = "IN_PROGRESS"
+        return event
+
+    @staticmethod
+    def _correction_authority() -> mock.Mock:
+        authority = mock.Mock()
+        authority.canonical_seq92_checkpoint_bytes.side_effect = (
+            lambda _root, value: Fp048R002Seq92R004Seq93Tests._canonical(value)
+        )
+        return authority
+
+    @classmethod
+    def _producer_seq92_projection(cls) -> tuple[object, dict, bytes]:
+        from scripts import (
+            apply_walksafe_fp048_r002_start_gate_contract_correction_seq92_20260826
+            as correction,
+        )
+
+        source = Fp048R002Seq91CorrectionTests._exact_seq91_checkpoint()
+        current, _seq91 = Fp048R002Seq91CorrectionTests._checkpoint()
+        snapshot = current["working_tree_snapshot"]
+        source_at = datetime.fromisoformat(
+            source["goal_execution"]["transition_history"][-1]["occurred_at"]
+        )
+        authorization = cls._sealed(
+            correction.AUTHORIZATION_REL.as_posix()
+        )
+        review = {
+            role: cls._sealed(relative.as_posix())
+            for role, relative in (
+                ("assignment", correction.REVIEW_ASSIGNMENT_REL),
+                ("review_result", correction.REVIEW_RESULT_REL),
+                ("independent_review", correction.INDEPENDENT_REVIEW_REL),
+            )
+        }
+        projected, _event = correction.project_seq92(
+            ROOT,
+            source,
+            managed_paths=snapshot["managed_changed_paths"],
+            path_set_sha256=snapshot["path_set_sha256"],
+            content_set_sha256=snapshot["content_set_sha256"],
+            occurred_at=(source_at + timedelta(seconds=1)).isoformat(),
+            authorization_binding_value=authorization,
+            review_binding=review,
+            replacement_contract_binding=correction.r004_contract_binding(ROOT),
+            replacement_runner_binding=correction.r004_runner_binding(ROOT),
+        )
+        return correction, projected, correction.checkpoint_json_bytes(projected)
+
+    def test_seq92_is_ready_zero_credit_r003_to_r004(self) -> None:
+        checkpoint, _seq91 = Fp048R002Seq91CorrectionTests._checkpoint()
+        event = self._append_seq92(checkpoint)
+        authority = self._correction_authority()
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r004_started_authority",
+            side_effect=AssertionError("seq93 authority loaded for exact seq92"),
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_seq91_93(ROOT, checkpoint), []
+            )
+
+        state = checkpoint["goal_execution"]
+        supersession = event["contract_supersession"]
+        self.assertEqual(state["goal_status"], "READY")
+        self.assertEqual(list(state["status_by_goal"].values()).count("IN_PROGRESS"), 0)
+        self.assertEqual(event["status_changes"], {})
+        self.assertEqual(
+            supersession["previous_contract_binding"]["contract_id"],
+            "WS-FP048-R002-INTERNAL-START-GATE-R003",
+        )
+        self.assertEqual(
+            supersession["replacement_contract_binding"]["contract_id"],
+            graph.FP048_R002_R004_CONTRACT_ID,
+        )
+        authority.require_contract_corrected_checkpoint.assert_called_once_with(
+            ROOT, checkpoint, require_live_snapshot=True
+        )
+
+    def test_r004_pass_003_cannot_publish_seq93_goal_started(self) -> None:
+        checkpoint, _seq91 = Fp048R002Seq91CorrectionTests._checkpoint()
+        self._append_seq92(checkpoint)
+        receipt = self._receipt()
+        self._append_seq93(checkpoint, receipt)
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=self._correction_authority(),
+        ):
+            errors = graph.validate_fp048_r002_seq91_93(ROOT, checkpoint)
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn(
+            "-003 PASS gate must remain PASS_UNCONSUMED",
+            errors[0],
+        )
+
+    def test_seq92_current_branch_does_not_load_retired_r004_starter(
+        self,
+    ) -> None:
+        checkpoint, _seq91 = Fp048R002Seq91CorrectionTests._checkpoint()
+        self._append_seq92(checkpoint)
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=self._correction_authority(),
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r004_started_authority",
+            side_effect=AssertionError("retired -003 starter was loaded"),
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_seq91_94(ROOT, checkpoint), []
+            )
+
+    def test_seq92_and_seq93_projection_drift_is_rejected(self) -> None:
+        for mutation in ("r004", "status", "frontier", "credit"):
+            with self.subTest(sequence=92, mutation=mutation):
+                checkpoint, _seq91 = Fp048R002Seq91CorrectionTests._checkpoint()
+                event = self._append_seq92(checkpoint)
+                state = checkpoint["goal_execution"]
+                if mutation == "r004":
+                    event["contract_supersession"]["replacement_contract_binding"][
+                        "contract_version"
+                    ] = "FORGED"
+                    event["event_sha256"] = graph.continuation.event_sha256(event)
+                    state["transition_history_anchor_sha256"] = event["event_sha256"]
+                elif mutation == "status":
+                    state["status_by_goal"][graph.FP046_R002_NEXT_GOAL_ID] = "IN_PROGRESS"
+                elif mutation == "frontier":
+                    state["ready_frontier_goal_ids"] = list(
+                        reversed(state["ready_frontier_goal_ids"])
+                    )
+                else:
+                    checkpoint["approved_state"]["formal_test_count"] += 1
+                with mock.patch.object(
+                    graph,
+                    "_fp048_r002_start_gate_contract_correction_authority",
+                    return_value=self._correction_authority(),
+                ):
+                    self.assertTrue(
+                        graph.validate_fp048_r002_seq91_93(ROOT, checkpoint)
+                    )
+
+    def test_r004_overlay_replays_current_seq92(self) -> None:
+        restored_goal_ids = (
+            graph.FP046_GOAL_ID,
+            graph.NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+            graph.FP048_ANDROID_REPORT_GOAL_ID,
+        )
+        checkpoint, _seq91 = Fp048R002Seq91CorrectionTests._checkpoint()
+        self._append_seq92(checkpoint)
+        correction = self._correction_authority()
+        ready_validator = mock.Mock()
+        original = copy.deepcopy(checkpoint)
+        with mock.patch.object(
+            graph,
+            "_r002_reopen_suffix",
+            return_value=[{}],
+        ), mock.patch.object(
+            graph,
+            "validate_fp046_npc_r002_reopen_seq72_76",
+            return_value=[],
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=correction,
+        ), mock.patch(
+            "scripts.apply_walksafe_fp048_r002_goal_seq88_89_20260825."
+            "require_exact_ready_source",
+            ready_validator,
+        ):
+            overlay = graph._r002_legacy_completion_overlay(ROOT, checkpoint)
+
+        self.assertIsNotNone(overlay)
+        replayed = ready_validator.call_args.args[1]
+        replayed_state = replayed["goal_execution"]
+        self.assertEqual(len(replayed_state["transition_history"]), 89)
+        self.assertEqual(
+            replayed_state["status_by_goal"][graph.FP046_R002_NEXT_GOAL_ID],
+            "READY",
+        )
+        self.assertEqual(replayed["current_work"]["status"], "READY")
+        self.assertEqual(checkpoint, original)
+        for goal_id in restored_goal_ids:
+            self.assertEqual(
+                overlay["goal_execution"]["status_by_goal"][goal_id],
+                "COMPLETE_AT_TARGET",
+            )
+
+    def test_r004_overlay_rejects_drift_before_seq89_replay(self) -> None:
+        checkpoint, _seq91 = Fp048R002Seq91CorrectionTests._checkpoint()
+        event = self._append_seq92(checkpoint)
+        event["contract_supersession"]["replacement_contract_binding"][
+            "contract_version"
+        ] = "FORGED"
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        checkpoint["goal_execution"]["transition_history_anchor_sha256"] = event[
+            "event_sha256"
+        ]
+        ready_validator = mock.Mock()
+        with mock.patch.object(
+            graph,
+            "_r002_reopen_suffix",
+            return_value=[{}],
+        ), mock.patch.object(
+            graph,
+            "validate_fp046_npc_r002_reopen_seq72_76",
+            return_value=[],
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=self._correction_authority(),
+        ), mock.patch(
+            "scripts.apply_walksafe_fp048_r002_goal_seq88_89_20260825."
+            "require_exact_ready_source",
+            ready_validator,
+        ):
+            self.assertIsNone(
+                graph._r002_legacy_completion_overlay(ROOT, checkpoint)
+            )
+        ready_validator.assert_not_called()
+
+    def test_producer_seq92_projection_passes_full_goal_graph_validate(self) -> None:
+        correction, projected, raw = self._producer_seq92_projection()
+        frozen = mock.Mock()
+        frozen.load_exact_seq92_source.return_value = (raw, projected)
+        with mock.patch.object(
+            graph.continuation,
+            "load_json",
+            side_effect=r008_checkpoint_loader(projected),
+        ), mock.patch.object(
+            graph.continuation,
+            "_fp048_r002_branch_semantics_reanchor_authority",
+            return_value=frozen,
+        ), mock.patch.object(
+            correction,
+            "require_contract_corrected_checkpoint",
+            return_value=None,
+        ), mock.patch.object(
+            correction,
+            "canonical_seq92_checkpoint_bytes",
+            return_value=raw,
+        ):
+            self.assertEqual(
+                graph.validate(ROOT, check_continuation=False),
+                [],
+            )
+
+
+class Fp048R002Seq93BranchSemanticsSeq94Tests(unittest.TestCase):
+    @staticmethod
+    def _canonical(checkpoint: dict) -> bytes:
+        return json.dumps(
+            checkpoint,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+    @staticmethod
+    def _passed_attempt() -> dict:
+        root = (
+            "docs/control/execution/goal-gates/"
+            f"{graph.FP048_R002_R004_STARTED_EVENT_ID}"
+        )
+        return {
+            "event_id": graph.FP048_R002_R004_STARTED_EVENT_ID,
+            "directory": root,
+            "directory_mode": "0700",
+            "status": "PASS_UNCONSUMED",
+            "files": [
+                {
+                    "path": f"{root}/{index:02d}.log",
+                    "sha256": f"{index:x}" * 64,
+                    "byte_length": index,
+                }
+                for index in range(1, 7)
+            ],
+        }
+
+    @staticmethod
+    def _r005_contract() -> dict:
+        return {
+            "schema_version": "1.2",
+            "document_id": graph.FP048_R002_R005_CONTRACT_DOCUMENT_ID,
+            "path": graph.FP048_R002_R005_CONTRACT_PATH,
+            "file_sha256": "5" * 64,
+            "contract_id": graph.FP048_R002_R005_CONTRACT_ID,
+            "contract_version": graph.FP048_R002_R005_CONTRACT_VERSION,
+            "canonical_contract_sha256": "6" * 64,
+        }
+
+    @classmethod
+    def _append_seq93(
+        cls,
+        checkpoint: dict,
+        passed_attempt: dict,
+        r005_contract: dict,
+    ) -> dict:
+        state = checkpoint["goal_execution"]
+        seq92 = state["transition_history"][91]
+        occurred_at = (
+            datetime.fromisoformat(seq92["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = copy.deepcopy(seq92)
+        event.update(
+            {
+                "sequence": graph.FP048_R002_BRANCH_SEMANTICS_REANCHOR_SEQUENCE,
+                "event_id": graph.FP048_R002_BRANCH_SEMANTICS_REANCHOR_EVENT_ID,
+                "event_type": "GOAL_START_CONTROL_REANCHORED",
+                "occurred_at": occurred_at.isoformat(),
+                "occurred_on": occurred_at.date().isoformat(),
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+                "runtime_after": copy.deepcopy(seq92["runtime_after"]),
+                "source_checkpoint_binding": {
+                    **cls._sealed_checkpoint_source(seq92),
+                    "passed_gate_attempt_003": copy.deepcopy(passed_attempt),
+                },
+                "contract_supersession": {
+                    "previous_contract_binding": copy.deepcopy(
+                        seq92["contract_supersession"][
+                            "replacement_contract_binding"
+                        ]
+                    ),
+                    "reason_code": (
+                        "SEQ93_BRANCH_SEMANTICS_REANCHOR_AND_FRESH_GATE_REQUIRED"
+                    ),
+                    "replacement_contract_binding": copy.deepcopy(
+                        r005_contract
+                    ),
+                },
+                "start_gate_runner_binding": {
+                    "path": graph.FP048_R002_R005_START_GATE_RUNNER_PATH,
+                    "sha256": "7" * 64,
+                    "byte_length": 1,
+                },
+                "repository_context_reanchor": {
+                    "before": {},
+                    "after": {
+                        "base_commit": "8" * 40,
+                        "branch": "current",
+                        "logical_branch": "current",
+                        "logical_branch_semantics": "WORKSTREAM_LABEL",
+                        "physical_git_branch": (
+                            "recovery/fp046-r008-wip-20260822"
+                        ),
+                        "branch_mismatch_reason_code": (
+                            "LOGICAL_CURRENT_LABEL_IS_NOT_PHYSICAL_GIT_BRANCH"
+                        ),
+                        "current_head": "9" * 40,
+                        "managed_changed_path_count": 1,
+                        "path_set_sha256": "a" * 64,
+                        "content_set_sha256": "b" * 64,
+                    },
+                },
+                "correction_reason": {
+                    "branch_mismatch_reason_code": (
+                        "LOGICAL_CURRENT_LABEL_IS_NOT_PHYSICAL_GIT_BRANCH"
+                    ),
+                    "logical_branch": "current",
+                    "logical_branch_semantics": "WORKSTREAM_LABEL",
+                    "observed_gate_event_id": (
+                        graph.FP048_R002_R004_STARTED_EVENT_ID
+                    ),
+                    "observed_physical_git_branch": (
+                        "recovery/fp046-r008-wip-20260822"
+                    ),
+                    "reason_code": "R004_PASS_BRANCH_SEMANTICS_AMBIGUOUS",
+                    "remediation": (
+                        "SEAL_R004_PASS_AS_UNCONSUMED_AND_RUN_BRANCH_AWARE_"
+                        "R005_GATE"
+                    ),
+                },
+                "claim_boundary": copy.deepcopy(
+                    graph.FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+                ),
+                "previous_event_sha256": seq92["event_sha256"],
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        return event
+
+    @staticmethod
+    def _sealed_checkpoint_source(seq92: dict) -> dict:
+        return {
+            "path": graph.V24_CHECKPOINT_RELATIVE.as_posix(),
+            "sha256": "c" * 64,
+            "byte_length": 1,
+            "sequence": graph.FP048_R002_START_GATE_CONTRACT_CORRECTION_SEQUENCE,
+            "tail_event_id": graph.FP048_R002_START_GATE_CONTRACT_CORRECTION_EVENT_ID,
+            "tail_event_sha256": seq92["event_sha256"],
+        }
+
+    @staticmethod
+    def _receipt() -> dict:
+        return {
+            "document_id": graph.FP048_R002_R005_STARTED_GATE_DOCUMENT_ID,
+            "path": graph.FP048_R002_R005_STARTED_GATE_RECEIPT_PATH,
+            "file_sha256": "d" * 64,
+        }
+
+    @classmethod
+    def _append_seq94(cls, checkpoint: dict, receipt: dict) -> dict:
+        state = checkpoint["goal_execution"]
+        control = state["transition_history"][92]
+        occurred_at = (
+            datetime.fromisoformat(control["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = {
+            field: None
+            for field in graph.continuation.V24_FIRST_START_EVENT_FIELDS
+        }
+        event.update(
+            {
+                "sequence": graph.FP048_R002_R005_STARTED_SEQUENCE,
+                "event_id": graph.FP048_R002_R005_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "occurred_on": occurred_at.date().isoformat(),
+                "occurred_at": occurred_at.isoformat(),
+                "previous_focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "previous_focus_content_sha256": "e" * 64,
+                "focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "focus_goal_content_sha256": "e" * 64,
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "static_plan_manifest_sha256": "f" * 64,
+                "status_changes": {
+                    graph.FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"
+                },
+                "runtime_after": copy.deepcopy(control["runtime_after"]),
+                "repository_snapshot_before": {},
+                "implementation_start_gate_binding": copy.deepcopy(receipt),
+                "blockers_after": copy.deepcopy(state["blockers_by_goal"]),
+                "blocker_resolution_ids_after": [
+                    row["resolution_id"]
+                    for row in state["blocker_resolution_history"]
+                ],
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [],
+                "previous_event_sha256": control["event_sha256"],
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        state["status_by_goal"][graph.FP046_R002_NEXT_GOAL_ID] = (
+            "IN_PROGRESS"
+        )
+        state["goal_status"] = "IN_PROGRESS"
+        checkpoint["current_work"]["status"] = "IN_PROGRESS"
+        return event
+
+    @staticmethod
+    def _reanchor_authority(
+        event: dict,
+        passed_attempt: dict,
+        r005_contract: dict,
+        seq92_raw: bytes,
+        seq93_raw: bytes,
+    ) -> mock.Mock:
+        authority = mock.Mock()
+        authority.EVENT_FIELDS = frozenset(event)
+        authority.CLAIM_BOUNDARY = copy.deepcopy(event["claim_boundary"])
+        authority.CORRECTION_REASON = copy.deepcopy(event["correction_reason"])
+        authority.LOGICAL_BRANCH = "current"
+        authority.LOGICAL_BRANCH_SEMANTICS = "WORKSTREAM_LABEL"
+        authority.PHYSICAL_GIT_BRANCH = "recovery/fp046-r008-wip-20260822"
+        authority.BRANCH_MISMATCH_REASON_CODE = (
+            "LOGICAL_CURRENT_LABEL_IS_NOT_PHYSICAL_GIT_BRANCH"
+        )
+        authority.R005_SUCCESSOR_REASON_CODE = (
+            "SEQ93_BRANCH_SEMANTICS_REANCHOR_AND_FRESH_GATE_REQUIRED"
+        )
+        authority.passed_gate_attempt_003_binding.return_value = (
+            copy.deepcopy(passed_attempt)
+        )
+        authority.r005_contract_binding.return_value = copy.deepcopy(
+            r005_contract
+        )
+        authority.checkpoint_json_bytes.side_effect = (
+            Fp048R002Seq93BranchSemanticsSeq94Tests._canonical
+        )
+        authority.canonical_seq93_checkpoint_bytes.return_value = seq93_raw
+        authority.reconstructed_seq93_checkpoint_bytes.return_value = seq93_raw
+        authority.reconstructed_seq92_checkpoint_bytes.return_value = seq92_raw
+        authority.require_exact_seq92_source.return_value = None
+        authority.require_branch_semantics_reanchored_checkpoint.return_value = (
+            None
+        )
+        return authority
+
+    @classmethod
+    def _successor_correction_authority(
+        cls,
+        seq93_raw: bytes,
+    ) -> mock.Mock:
+        authority = mock.Mock()
+        authority.reconstructed_seq93_checkpoint_bytes.return_value = (
+            seq93_raw
+        )
+
+        def require_exact_seq93_source(
+            raw: bytes,
+            checkpoint: dict,
+            _root: Path,
+        ) -> None:
+            if raw != seq93_raw or cls._canonical(checkpoint) != seq93_raw:
+                raise RuntimeError("seq93 frozen source differs")
+
+        authority.require_exact_seq93_source.side_effect = (
+            require_exact_seq93_source
+        )
+        return authority
+
+    def _seq93_fixture(
+        self,
+    ) -> tuple[dict, bytes, bytes, mock.Mock, mock.Mock, dict]:
+        checkpoint, _seq91 = Fp048R002Seq91CorrectionTests._checkpoint()
+        Fp048R002Seq92R004Seq93Tests._append_seq92(checkpoint)
+        seq92_raw = self._canonical(checkpoint)
+        passed_attempt = self._passed_attempt()
+        r005_contract = self._r005_contract()
+        event = self._append_seq93(
+            checkpoint,
+            passed_attempt,
+            r005_contract,
+        )
+        seq93_raw = self._canonical(checkpoint)
+        correction = (
+            Fp048R002Seq92R004Seq93Tests._correction_authority()
+        )
+        correction.canonical_seq92_checkpoint_bytes.return_value = seq92_raw
+        reanchor = self._reanchor_authority(
+            event,
+            passed_attempt,
+            r005_contract,
+            seq92_raw,
+            seq93_raw,
+        )
+        return checkpoint, seq92_raw, seq93_raw, correction, reanchor, event
+
+    def test_seq93_physical_branch_differs_from_logical_current_and_both_validators_pass(
+        self,
+    ) -> None:
+        checkpoint, _seq92_raw, seq93_raw, correction, reanchor, event = (
+            self._seq93_fixture()
+        )
+        successor = self._successor_correction_authority(seq93_raw)
+        history = checkpoint["goal_execution"]["transition_history"]
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=correction,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_branch_semantics_reanchor_authority",
+            return_value=reanchor,
+        ), mock.patch.object(
+            graph.continuation,
+            "_fp048_r002_branch_semantics_reanchor_authority",
+            return_value=reanchor,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r006_contract_correction_authority",
+            return_value=successor,
+        ), mock.patch.object(
+            graph.continuation,
+            "_fp048_r002_r006_contract_correction_authority",
+            return_value=successor,
+        ):
+            continuation_errors = (
+                graph.continuation._validate_fp048_r002_branch_semantics_reanchor_seq93(
+                    ROOT,
+                    event=event,
+                    checkpoint=checkpoint,
+                    history=history,
+                )
+            )
+            graph_errors = graph.validate_fp048_r002_seq91_94(
+                ROOT,
+                checkpoint,
+            )
+
+        self.assertEqual(continuation_errors, [])
+        self.assertEqual(graph_errors, [])
+        after = event["repository_context_reanchor"]["after"]
+        self.assertEqual(checkpoint["session_handoff"]["branch"], "current")
+        self.assertEqual(after["logical_branch"], "current")
+        self.assertNotEqual(
+            after["physical_git_branch"],
+            after["logical_branch"],
+        )
+        reanchor.require_branch_semantics_reanchored_checkpoint.assert_not_called()
+        self.assertEqual(
+            event["source_checkpoint_binding"]["passed_gate_attempt_003"][
+                "status"
+            ],
+            "PASS_UNCONSUMED",
+        )
+
+    def test_seq93_frozen_successor_rejects_forgery_and_absent_successor_uses_legacy(
+        self,
+    ) -> None:
+        with self.subTest("present successor rejects forged state"):
+            checkpoint, _a, seq93_raw, correction, reanchor, _event = (
+                self._seq93_fixture()
+            )
+            checkpoint["current_work"]["status"] = "IN_PROGRESS"
+            successor = self._successor_correction_authority(seq93_raw)
+            with mock.patch.object(
+                graph,
+                "_fp048_r002_start_gate_contract_correction_authority",
+                return_value=correction,
+            ), mock.patch.object(
+                graph,
+                "_fp048_r002_branch_semantics_reanchor_authority",
+                return_value=reanchor,
+            ), mock.patch.object(
+                graph,
+                "_fp048_r002_r006_contract_correction_authority",
+                return_value=successor,
+            ):
+                self.assertEqual(
+                    graph.validate_fp048_r002_seq91_94(ROOT, checkpoint),
+                    [
+                        "FP048 R002 seq93 branch-semantics authority differs: "
+                        "seq93 frozen source differs"
+                    ],
+                )
+            reanchor.require_branch_semantics_reanchored_checkpoint.assert_not_called()
+
+        with self.subTest("absent successor retains standalone validator"):
+            checkpoint, _a, _b, correction, reanchor, _event = (
+                self._seq93_fixture()
+            )
+            missing = ModuleNotFoundError(
+                "successor correction module is absent",
+                name=graph.FP048_R002_R006_CONTRACT_CORRECTION_MODULE,
+            )
+            load_error = RuntimeError(
+                "FP048 R002 seq94 R006 contract-correction authority "
+                "cannot be loaded"
+            )
+            load_error.__cause__ = missing
+            with mock.patch.object(
+                graph,
+                "_fp048_r002_start_gate_contract_correction_authority",
+                return_value=correction,
+            ), mock.patch.object(
+                graph,
+                "_fp048_r002_branch_semantics_reanchor_authority",
+                return_value=reanchor,
+            ), mock.patch.object(
+                graph,
+                "_fp048_r002_r006_contract_correction_authority",
+                side_effect=load_error,
+            ):
+                self.assertEqual(
+                    graph.validate_fp048_r002_seq91_94(ROOT, checkpoint),
+                    [],
+                )
+            reanchor.require_branch_semantics_reanchored_checkpoint.assert_called_once()
+
+    def test_legacy_r005_direct_seq94_start_is_rejected_without_consume(
+        self,
+    ) -> None:
+        checkpoint, _seq92_raw, seq93_raw, correction, reanchor, _event = (
+            self._seq93_fixture()
+        )
+        receipt = self._receipt()
+        started = self._append_seq94(checkpoint, receipt)
+        starter = mock.Mock()
+        starter.EVENT_FIELDS = frozenset(started)
+        starter.goal_start_gate_receipt_binding.return_value = receipt
+        starter.reconstructed_seq93_checkpoint_bytes.return_value = seq93_raw
+        starter.require_exact_seq94_projection.return_value = None
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=correction,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_branch_semantics_reanchor_authority",
+            return_value=reanchor,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r005_started_authority",
+            return_value=starter,
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_seq91_94(ROOT, checkpoint),
+                [
+                    "FP048 R002 legacy R005 direct seq94 GOAL_STARTED "
+                    "is forbidden"
+                ],
+            )
+
+        state = checkpoint["goal_execution"]
+        self.assertEqual(
+            started["implementation_start_gate_binding"],
+            receipt,
+        )
+        self.assertEqual(
+            list(state["status_by_goal"].values()).count("IN_PROGRESS"),
+            1,
+        )
+        self.assertFalse(
+            any(
+                event.get("event_id")
+                == graph.FP048_R002_R004_STARTED_EVENT_ID
+                for event in state["transition_history"]
+            )
+        )
+        starter.require_exact_seq94_projection.assert_not_called()
+
+    def test_seq93_rejects_consumed_003_and_collapsed_branch_semantics(
+        self,
+    ) -> None:
+        for mutation in ("consumed_003", "same_physical_branch"):
+            with self.subTest(mutation=mutation):
+                checkpoint, _a, _b, correction, reanchor, event = (
+                    self._seq93_fixture()
+                )
+                if mutation == "consumed_003":
+                    event["source_checkpoint_binding"][
+                        "passed_gate_attempt_003"
+                    ]["status"] = "PASS_CONSUMED"
+                else:
+                    event["repository_context_reanchor"]["after"][
+                        "physical_git_branch"
+                    ] = "current"
+                event["event_sha256"] = graph.continuation.event_sha256(
+                    event
+                )
+                checkpoint["goal_execution"][
+                    "transition_history_anchor_sha256"
+                ] = event["event_sha256"]
+                with mock.patch.object(
+                    graph,
+                    "_fp048_r002_start_gate_contract_correction_authority",
+                    return_value=correction,
+                ), mock.patch.object(
+                    graph,
+                    "_fp048_r002_branch_semantics_reanchor_authority",
+                    return_value=reanchor,
+                ):
+                    self.assertTrue(
+                        graph.validate_fp048_r002_seq91_94(
+                            ROOT,
+                            checkpoint,
+                        )
+                    )
+
+
+class Fp048R002Seq94CorrectionSeq95Tests(unittest.TestCase):
+    @staticmethod
+    def _r006_contract() -> dict:
+        return graph._fp048_r002_r006_contract_binding()
+
+    @staticmethod
+    def _r006_runner() -> dict:
+        return {
+            "path": graph.FP048_R002_R006_START_GATE_RUNNER_PATH,
+            "sha256": graph.FP048_R002_R006_START_GATE_RUNNER_SHA256,
+            "byte_length": (
+                graph.FP048_R002_R006_START_GATE_RUNNER_BYTE_LENGTH
+            ),
+        }
+
+    @classmethod
+    def _append_seq94(cls, checkpoint: dict) -> dict:
+        state = checkpoint["goal_execution"]
+        control = state["transition_history"][92]
+        occurred_at = (
+            datetime.fromisoformat(control["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = copy.deepcopy(control)
+        event.update(
+            {
+                "sequence": graph.FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE,
+                "event_id": graph.FP048_R002_R006_CONTRACT_CORRECTION_EVENT_ID,
+                "event_type": "GOAL_START_GATE_CONTRACT_CORRECTED",
+                "occurred_on": occurred_at.date().isoformat(),
+                "occurred_at": occurred_at.isoformat(),
+                "previous_focus_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "focus_goal_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "static_plan_manifest_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+                ),
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+                "runtime_after": copy.deepcopy(control["runtime_after"]),
+                "blockers_after": copy.deepcopy(control["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    control["blocker_resolution_ids_after"]
+                ),
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [
+                    "FP048-R002_EXACT_SEQ93_BRANCH_SEMANTICS_SOURCE",
+                    "FP048-R002_SEQ93_R003_FROZEN_REVIEW_AUTHORITY",
+                    "FP048-R002_R004_PASS_003_REMAINS_PASS_UNCONSUMED",
+                    "FP048-R002_R005_PREFLIGHT_004_NO_NAMESPACE_NONAUTHORITY",
+                    "FP048-R002_R006_STAGE_AWARE_GATE_CONTRACT",
+                    "FP048-R002_SEQ94_95_TRANSITION_CONTROL_REVIEW",
+                ],
+                "source_checkpoint_binding": {
+                    "path": graph.V24_CHECKPOINT_RELATIVE.as_posix(),
+                    "sha256": "1" * 64,
+                    "byte_length": 1,
+                    "sequence": (
+                        graph.FP048_R002_BRANCH_SEMANTICS_REANCHOR_SEQUENCE
+                    ),
+                    "tail_event_id": (
+                        graph.FP048_R002_BRANCH_SEMANTICS_REANCHOR_EVENT_ID
+                    ),
+                    "tail_event_sha256": control["event_sha256"],
+                    "passed_gate_attempt_003": copy.deepcopy(
+                        control["source_checkpoint_binding"]
+                        ["passed_gate_attempt_003"]
+                    ),
+                    "preflight_attempt_004": copy.deepcopy(
+                        graph.FP048_R002_R005_PREFLIGHT_ATTEMPT
+                    ),
+                },
+                "source_ready_event_binding": copy.deepcopy(
+                    control["source_ready_event_binding"]
+                ),
+                "contract_supersession": {
+                    "previous_contract_binding": copy.deepcopy(
+                        control["contract_supersession"]
+                        ["replacement_contract_binding"]
+                    ),
+                    "reason_code": (
+                        graph.FP048_R002_R006_SUCCESSOR_REASON_CODE
+                    ),
+                    "replacement_contract_binding": cls._r006_contract(),
+                },
+                "start_gate_runner_binding": cls._r006_runner(),
+                "noncredit_successor_edges": copy.deepcopy(
+                    control["noncredit_successor_edges"]
+                ),
+                "claim_boundary": copy.deepcopy(
+                    graph.FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+                ),
+                "canonical_binding_snapshot_after": copy.deepcopy(
+                    control["canonical_binding_snapshot_after"]
+                ),
+                "correction_reason": copy.deepcopy(
+                    graph.FP048_R002_R006_CORRECTION_REASON
+                ),
+                "previous_event_sha256": control["event_sha256"],
+            }
+        )
+        if set(event) != graph.FP048_R002_ZERO_CREDIT_CONTROL_EVENT_FIELDS:
+            raise AssertionError("seq94 fixture field set differs")
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        return event
+
+    @staticmethod
+    def _correction_authority(seq93_raw: bytes, seq94_raw: bytes) -> mock.Mock:
+        authority = mock.Mock()
+        authority.require_contract_corrected_checkpoint.return_value = None
+        authority.canonical_seq94_checkpoint_bytes.return_value = seq94_raw
+        authority.reconstructed_seq93_checkpoint_bytes.return_value = seq93_raw
+
+        def require_exact_seq93_source(
+            raw: bytes,
+            _source: dict,
+            _root: Path,
+        ) -> None:
+            if raw != seq93_raw:
+                raise RuntimeError("seq93 frozen source differs")
+
+        authority.require_exact_seq93_source.side_effect = (
+            require_exact_seq93_source
+        )
+        return authority
+
+    @staticmethod
+    def _receipt_binding() -> dict:
+        return {
+            "document_id": graph.FP048_R002_R006_STARTED_GATE_DOCUMENT_ID,
+            "path": graph.FP048_R002_R006_STARTED_GATE_RECEIPT_PATH,
+            "file_sha256": "d" * 64,
+        }
+
+    @classmethod
+    def _append_seq95(
+        cls,
+        checkpoint: dict,
+        receipt_binding: dict,
+        repository_snapshot: dict,
+    ) -> dict:
+        state = checkpoint["goal_execution"]
+        correction = state["transition_history"][93]
+        occurred_at = (
+            datetime.fromisoformat(correction["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = {
+            field: None
+            for field in graph.continuation.V24_FIRST_START_EVENT_FIELDS
+        }
+        event.update(
+            {
+                "sequence": graph.FP048_R002_R006_STARTED_SEQUENCE,
+                "event_id": graph.FP048_R002_R006_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "occurred_on": occurred_at.date().isoformat(),
+                "occurred_at": occurred_at.isoformat(),
+                "previous_focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "previous_focus_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "focus_goal_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "static_plan_manifest_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+                ),
+                "status_changes": {
+                    graph.FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"
+                },
+                "runtime_after": copy.deepcopy(correction["runtime_after"]),
+                "repository_snapshot_before": copy.deepcopy(
+                    repository_snapshot
+                ),
+                "implementation_start_gate_binding": copy.deepcopy(
+                    receipt_binding
+                ),
+                "blockers_after": copy.deepcopy(correction["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    correction["blocker_resolution_ids_after"]
+                ),
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [],
+                "previous_event_sha256": correction["event_sha256"],
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        state["status_by_goal"][graph.FP046_R002_NEXT_GOAL_ID] = (
+            "IN_PROGRESS"
+        )
+        state["goal_status"] = "IN_PROGRESS"
+        checkpoint["current_work"]["status"] = "IN_PROGRESS"
+        return event
+
+    @staticmethod
+    def _started_authority(seq94_raw: bytes) -> mock.Mock:
+        authority = mock.Mock()
+        authority.require_started_checkpoint.return_value = None
+        authority.reconstructed_seq94_checkpoint_bytes.return_value = seq94_raw
+        return authority
+
+    def _seq94_fixture(
+        self,
+    ) -> tuple[dict, bytes, bytes, mock.Mock, mock.Mock, mock.Mock, dict]:
+        checkpoint, _seq92_raw, seq93_raw, old_correction, reanchor, _event = (
+            Fp048R002Seq93BranchSemanticsSeq94Tests()._seq93_fixture()
+        )
+        event = self._append_seq94(checkpoint)
+        seq94_raw = Fp048R002Seq93BranchSemanticsSeq94Tests._canonical(
+            checkpoint
+        )
+        authority = self._correction_authority(seq93_raw, seq94_raw)
+        return (
+            checkpoint,
+            seq93_raw,
+            seq94_raw,
+            old_correction,
+            reanchor,
+            authority,
+            event,
+        )
+
+    def test_seq94_exact_correction_reconstructs_seq93_and_stays_ready(
+        self,
+    ) -> None:
+        checkpoint, _a, _b, old_correction, reanchor, authority, _event = (
+            self._seq94_fixture()
+        )
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=old_correction,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_branch_semantics_reanchor_authority",
+            return_value=reanchor,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r006_contract_correction_authority",
+            return_value=authority,
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_seq91_95(ROOT, checkpoint),
+                [],
+            )
+
+        state = checkpoint["goal_execution"]
+        self.assertEqual(state["goal_status"], "READY")
+        self.assertEqual(
+            list(state["status_by_goal"].values()).count("IN_PROGRESS"),
+            0,
+        )
+        authority.reconstructed_seq93_checkpoint_bytes.assert_called_once()
+
+    def test_seq94_tamper_fails_even_when_producer_only_accepts(self) -> None:
+        for mutation in ("extra_field", "preflight_authority", "status"):
+            with self.subTest(mutation=mutation):
+                checkpoint, _a, _b, old_correction, reanchor, authority, event = (
+                    self._seq94_fixture()
+                )
+                if mutation == "extra_field":
+                    event["forged"] = True
+                elif mutation == "preflight_authority":
+                    event["source_checkpoint_binding"][
+                        "preflight_attempt_004"
+                    ]["authority_status"] = "AUTHORITY"
+                else:
+                    event["to_status"] = "IN_PROGRESS"
+                event["event_sha256"] = graph.continuation.event_sha256(event)
+                checkpoint["goal_execution"][
+                    "transition_history_anchor_sha256"
+                ] = event["event_sha256"]
+                with mock.patch.object(
+                    graph,
+                    "_fp048_r002_start_gate_contract_correction_authority",
+                    return_value=old_correction,
+                ), mock.patch.object(
+                    graph,
+                    "_fp048_r002_branch_semantics_reanchor_authority",
+                    return_value=reanchor,
+                ), mock.patch.object(
+                    graph,
+                    "_fp048_r002_r006_contract_correction_authority",
+                    return_value=authority,
+                ):
+                    self.assertEqual(
+                        graph.validate_fp048_r002_seq91_95(ROOT, checkpoint),
+                        [
+                            "FP048 R002 seq94 R006 contract-correction "
+                            "event differs"
+                        ],
+                    )
+                authority.require_contract_corrected_checkpoint.assert_not_called()
+
+    def test_seq94_rejects_nonexact_seq93_inverse(self) -> None:
+        checkpoint, _a, _b, old_correction, reanchor, authority, _event = (
+            self._seq94_fixture()
+        )
+        authority.reconstructed_seq93_checkpoint_bytes.return_value = b"{}"
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=old_correction,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_branch_semantics_reanchor_authority",
+            return_value=reanchor,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r006_contract_correction_authority",
+            return_value=authority,
+        ):
+            errors = graph.validate_fp048_r002_seq91_95(ROOT, checkpoint)
+        self.assertTrue(errors)
+        self.assertIn("seq94 R006 correction authority differs", errors[0])
+
+    def test_r006_receipt_requires_exact_five_check_pass_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            receipt_path = (
+                root / graph.FP048_R002_R006_STARTED_GATE_RECEIPT_PATH
+            )
+            receipt_path.parent.mkdir(parents=True)
+            source_raw = b"exact seq94 source\n"
+            correction = {
+                "event_sha256": "a" * 64,
+                "source_ready_event_binding": {"event_sha256": "b" * 64},
+            }
+            repository_snapshot = {"head_commit": "c" * 40}
+            runs = [
+                {
+                    "check_id": check_id,
+                    "command": f"command-{index}",
+                    "executed_at": f"2026-08-26T15:40:0{index}+09:00",
+                    "exit_code": 0,
+                    "output_path": (
+                        "docs/control/execution/goal-gates/"
+                        f"{graph.FP048_R002_R006_STARTED_EVENT_ID}/"
+                        f"{index:02d}-{check_id}.log"
+                    ),
+                    "output_sha256": f"{index:x}" * 64,
+                }
+                for index, check_id in enumerate(
+                    graph.FP048_R002_R006_EXPECTED_CHECK_IDS,
+                    start=1,
+                )
+            ]
+            receipt = {
+                "schema_version": "1.1",
+                "document_id": (
+                    graph.FP048_R002_R006_STARTED_GATE_DOCUMENT_ID
+                ),
+                "evidence_type": "IMPLEMENTATION_START_OR_RESUME_GATE",
+                "gate_purpose": "INITIAL_START",
+                "status": "PASS",
+                "package_id": "walksafe-completion-graph-v2-4",
+                "target_transition_event_id": (
+                    graph.FP048_R002_R006_STARTED_EVENT_ID
+                ),
+                "target_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "target_goal_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "static_plan_manifest_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+                ),
+                "source_activation_event_sha256": correction[
+                    "event_sha256"
+                ],
+                "source_checkpoint_sha256": (
+                    graph.continuation.sha256_bytes(source_raw)
+                ),
+                "source_ready_event_sha256": "b" * 64,
+                "check_command_contract_version": (
+                    graph.FP048_R002_R006_CONTRACT_VERSION
+                ),
+                "check_command_contract_sha256": (
+                    graph.FP048_R002_R006_CONTRACT_CANONICAL_SHA256
+                ),
+                "implementation_start_gate_contract_binding": (
+                    self._r006_contract()
+                ),
+                "runtime_bindings": [],
+                "execution_window": {
+                    "started_at": "2026-08-26T15:40:00+09:00",
+                    "ended_at": "2026-08-26T15:40:06+09:00",
+                },
+                "check_runs": runs,
+                "repository_snapshot": repository_snapshot,
+                "generated_at": "2026-08-26T15:40:07+09:00",
+            }
+
+            def publish() -> dict:
+                raw = (json.dumps(receipt, ensure_ascii=False, indent=2) + "\n").encode()
+                receipt_path.write_bytes(raw)
+                return {
+                    "document_id": (
+                        graph.FP048_R002_R006_STARTED_GATE_DOCUMENT_ID
+                    ),
+                    "path": graph.FP048_R002_R006_STARTED_GATE_RECEIPT_PATH,
+                    "file_sha256": graph.continuation.sha256_bytes(raw),
+                }
+
+            binding = publish()
+            started = {
+                "implementation_start_gate_binding": binding,
+                "repository_snapshot_before": repository_snapshot,
+            }
+            self.assertIsNotNone(
+                graph._fp048_r002_r006_receipt_authority(
+                    root,
+                    correction,
+                    started,
+                    source_raw,
+                )
+            )
+
+            receipt["check_runs"][0]["check_id"] = "FORGED"
+            started["implementation_start_gate_binding"] = publish()
+            self.assertIsNone(
+                graph._fp048_r002_r006_receipt_authority(
+                    root,
+                    correction,
+                    started,
+                    source_raw,
+                )
+            )
+
+    def test_legacy_direct_seq95_started_is_rejected_without_loader(self) -> None:
+        checkpoint, _a, seq94_raw, old_correction, reanchor, correction, _event = (
+            self._seq94_fixture()
+        )
+        receipt_binding = self._receipt_binding()
+        receipt = {"repository_snapshot": {"head_commit": "a" * 40}}
+        started = self._append_seq95(
+            checkpoint,
+            receipt_binding,
+            receipt["repository_snapshot"],
+        )
+        starter = self._started_authority(seq94_raw)
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=old_correction,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_branch_semantics_reanchor_authority",
+            return_value=reanchor,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r006_contract_correction_authority",
+            return_value=correction,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r006_started_authority",
+            return_value=starter,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r006_receipt_authority",
+            return_value=(receipt_binding, receipt),
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_seq91_95(ROOT, checkpoint),
+                [
+                    "FP048 R002 legacy R006 direct seq95 GOAL_STARTED "
+                    "is forbidden"
+                ],
+            )
+
+        self.assertEqual(started["previous_event_sha256"], _event["event_sha256"])
+        self.assertEqual(
+            list(
+                checkpoint["goal_execution"]["status_by_goal"].values()
+            ).count("IN_PROGRESS"),
+            1,
+        )
+        starter.require_started_checkpoint.assert_not_called()
+
+    def test_legacy_direct_seq95_bypass_remains_rejected_after_tamper(
+        self,
+    ) -> None:
+        for mutation in ("adjacency", "binding", "status", "frontier"):
+            with self.subTest(mutation=mutation):
+                (
+                    checkpoint,
+                    _a,
+                    seq94_raw,
+                    old_correction,
+                    reanchor,
+                    correction,
+                    _event,
+                ) = self._seq94_fixture()
+                receipt_binding = self._receipt_binding()
+                receipt = {"repository_snapshot": {"head_commit": "a" * 40}}
+                started = self._append_seq95(
+                    checkpoint,
+                    receipt_binding,
+                    receipt["repository_snapshot"],
+                )
+                if mutation == "adjacency":
+                    started["previous_event_sha256"] = "0" * 64
+                    started["event_sha256"] = graph.continuation.event_sha256(
+                        started
+                    )
+                    checkpoint["goal_execution"][
+                        "transition_history_anchor_sha256"
+                    ] = started["event_sha256"]
+                elif mutation == "binding":
+                    started["implementation_start_gate_binding"][
+                        "document_id"
+                    ] = "FORGED"
+                    started["event_sha256"] = graph.continuation.event_sha256(
+                        started
+                    )
+                    checkpoint["goal_execution"][
+                        "transition_history_anchor_sha256"
+                    ] = started["event_sha256"]
+                elif mutation == "status":
+                    checkpoint["goal_execution"]["status_by_goal"][
+                        "WS-FORGED"
+                    ] = "IN_PROGRESS"
+                else:
+                    checkpoint["goal_execution"][
+                        "ready_frontier_goal_ids"
+                    ] = ["WS-FORGED"]
+                starter = self._started_authority(seq94_raw)
+                with mock.patch.object(
+                    graph,
+                    "_fp048_r002_start_gate_contract_correction_authority",
+                    return_value=old_correction,
+                ), mock.patch.object(
+                    graph,
+                    "_fp048_r002_branch_semantics_reanchor_authority",
+                    return_value=reanchor,
+                ), mock.patch.object(
+                    graph,
+                    "_fp048_r002_r006_contract_correction_authority",
+                    return_value=correction,
+                ), mock.patch.object(
+                    graph,
+                    "_fp048_r002_r006_started_authority",
+                    return_value=starter,
+                ), mock.patch.object(
+                    graph,
+                    "_fp048_r002_r006_receipt_authority",
+                    return_value=(receipt_binding, receipt),
+                ):
+                    errors = graph.validate_fp048_r002_seq91_95(
+                        ROOT,
+                        checkpoint,
+                    )
+                self.assertEqual(
+                    errors,
+                    [
+                        "FP048 R002 legacy R006 direct seq95 "
+                        "GOAL_STARTED is forbidden"
+                    ],
+                )
+                starter.require_started_checkpoint.assert_not_called()
+
+
+class Fp048R002Seq95CorrectionSeq96Tests(
+    Fp048R002Seq94CorrectionSeq95Tests
+):
+    @staticmethod
+    def _r007_contract() -> dict:
+        return graph._fp048_r002_r007_contract_binding()
+
+    @staticmethod
+    def _r007_runner() -> dict:
+        return {
+            "path": graph.FP048_R002_R007_START_GATE_RUNNER_PATH,
+            "sha256": graph.FP048_R002_R007_START_GATE_RUNNER_SHA256,
+            "byte_length": (
+                graph.FP048_R002_R007_START_GATE_RUNNER_BYTE_LENGTH
+            ),
+        }
+
+    @classmethod
+    def _append_seq95_correction(cls, checkpoint: dict) -> dict:
+        state = checkpoint["goal_execution"]
+        control = state["transition_history"][93]
+        occurred_at = (
+            datetime.fromisoformat(control["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = copy.deepcopy(control)
+        event.update(
+            {
+                "sequence": (
+                    graph.FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE
+                ),
+                "event_id": (
+                    graph.FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID
+                ),
+                "event_type": "GOAL_START_GATE_CONTRACT_CORRECTED",
+                "occurred_on": occurred_at.date().isoformat(),
+                "occurred_at": occurred_at.isoformat(),
+                "previous_focus_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "focus_goal_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "static_plan_manifest_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+                ),
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+                "runtime_after": copy.deepcopy(control["runtime_after"]),
+                "blockers_after": copy.deepcopy(control["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    control["blocker_resolution_ids_after"]
+                ),
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [
+                    "FP048-R002_EXACT_PUBLISHED_SEQ94_SOURCE",
+                    "FP048-R002_SEQ94_R002_FROZEN_REVIEW_AUTHORITY",
+                    "FP048-R002_R004_PASS_003_REMAINS_PASS_UNCONSUMED",
+                    "FP048-R002_R005_PREFLIGHT_004_HISTORICAL_NONAUTHORITY",
+                    "FP048-R002_R006_PREFLIGHT_004_NO_NAMESPACE_NONAUTHORITY",
+                    "FP048-R002_R007_STAGE_AWARE_GATE_CONTRACT",
+                    "FP048-R002_SEQ95_96_TRANSITION_CONTROL_REVIEW",
+                ],
+                "source_checkpoint_binding": {
+                    "path": graph.V24_CHECKPOINT_RELATIVE.as_posix(),
+                    "sha256": "2" * 64,
+                    "byte_length": 2,
+                    "sequence": (
+                        graph.FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE
+                    ),
+                    "tail_event_id": (
+                        graph.FP048_R002_R006_CONTRACT_CORRECTION_EVENT_ID
+                    ),
+                    "tail_event_sha256": control["event_sha256"],
+                    "passed_gate_attempt_003": copy.deepcopy(
+                        control["source_checkpoint_binding"]
+                        ["passed_gate_attempt_003"]
+                    ),
+                    "preflight_attempt_004": copy.deepcopy(
+                        control["source_checkpoint_binding"]
+                        ["preflight_attempt_004"]
+                    ),
+                    "r006_preflight_attempt_004": copy.deepcopy(
+                        graph.FP048_R002_R006_PREFLIGHT_ATTEMPT
+                    ),
+                },
+                "source_ready_event_binding": copy.deepcopy(
+                    control["source_ready_event_binding"]
+                ),
+                "contract_supersession": {
+                    "previous_contract_binding": (
+                        graph._fp048_r002_r006_contract_binding()
+                    ),
+                    "reason_code": (
+                        graph.FP048_R002_R007_SUCCESSOR_REASON_CODE
+                    ),
+                    "replacement_contract_binding": cls._r007_contract(),
+                },
+                "start_gate_runner_binding": cls._r007_runner(),
+                "noncredit_successor_edges": copy.deepcopy(
+                    control["noncredit_successor_edges"]
+                ),
+                "claim_boundary": copy.deepcopy(
+                    graph.FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+                ),
+                "canonical_binding_snapshot_after": copy.deepcopy(
+                    control["canonical_binding_snapshot_after"]
+                ),
+                "correction_reason": copy.deepcopy(
+                    graph.FP048_R002_R007_CORRECTION_REASON
+                ),
+                "previous_event_sha256": control["event_sha256"],
+            }
+        )
+        if set(event) != graph.FP048_R002_ZERO_CREDIT_CONTROL_EVENT_FIELDS:
+            raise AssertionError("seq95 correction fixture field set differs")
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        return event
+
+    @staticmethod
+    def _seq95_authority(seq94_raw: bytes, seq95_raw: bytes) -> mock.Mock:
+        authority = mock.Mock()
+        authority.require_contract_corrected_checkpoint.return_value = None
+        authority.canonical_frozen_seq94_checkpoint_bytes.return_value = seq94_raw
+        authority.canonical_seq95_checkpoint_bytes.return_value = seq95_raw
+        authority.reconstructed_seq94_checkpoint_bytes.return_value = seq94_raw
+        return authority
+
+    @staticmethod
+    def _seq96_authority(
+        seq95_raw: bytes,
+        receipt_binding: dict,
+    ) -> mock.Mock:
+        authority = mock.Mock()
+        authority.require_exact_seq96_projection.return_value = None
+        authority.reconstructed_seq95_checkpoint_bytes.return_value = seq95_raw
+        authority.goal_start_gate_receipt_binding.return_value = copy.deepcopy(
+            receipt_binding
+        )
+        return authority
+
+    @classmethod
+    def _append_seq96(
+        cls,
+        checkpoint: dict,
+        receipt_binding: dict,
+        repository_snapshot: dict,
+    ) -> dict:
+        state = checkpoint["goal_execution"]
+        correction = state["transition_history"][94]
+        occurred_at = (
+            datetime.fromisoformat(correction["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = {
+            field: None
+            for field in graph.continuation.V24_FIRST_START_EVENT_FIELDS
+        }
+        event.update(
+            {
+                "sequence": graph.FP048_R002_R007_STARTED_SEQUENCE,
+                "event_id": graph.FP048_R002_R007_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "occurred_on": occurred_at.date().isoformat(),
+                "occurred_at": occurred_at.isoformat(),
+                "previous_focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "previous_focus_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "focus_goal_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "static_plan_manifest_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+                ),
+                "status_changes": {
+                    graph.FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"
+                },
+                "runtime_after": copy.deepcopy(correction["runtime_after"]),
+                "repository_snapshot_before": copy.deepcopy(
+                    repository_snapshot
+                ),
+                "implementation_start_gate_binding": copy.deepcopy(
+                    receipt_binding
+                ),
+                "blockers_after": copy.deepcopy(correction["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    correction["blocker_resolution_ids_after"]
+                ),
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [],
+                "previous_event_sha256": correction["event_sha256"],
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        state["status_by_goal"][graph.FP046_R002_NEXT_GOAL_ID] = (
+            "IN_PROGRESS"
+        )
+        state["goal_status"] = "IN_PROGRESS"
+        checkpoint["current_work"]["status"] = "IN_PROGRESS"
+        return event
+
+    def _seq95_fixture(
+        self,
+    ) -> tuple[
+        dict,
+        bytes,
+        bytes,
+        mock.Mock,
+        mock.Mock,
+        mock.Mock,
+        mock.Mock,
+        dict,
+    ]:
+        (
+            checkpoint,
+            _seq93_raw,
+            seq94_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            _seq94_event,
+        ) = super()._seq94_fixture()
+        event = self._append_seq95_correction(checkpoint)
+        seq95_raw = Fp048R002Seq93BranchSemanticsSeq94Tests._canonical(
+            checkpoint
+        )
+        r007_authority = self._seq95_authority(seq94_raw, seq95_raw)
+        return (
+            checkpoint,
+            seq94_raw,
+            seq95_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            event,
+        )
+
+    @staticmethod
+    def _validate(
+        checkpoint: dict,
+        old_correction: mock.Mock,
+        reanchor: mock.Mock,
+        r006_authority: mock.Mock,
+        r007_authority: mock.Mock,
+        *,
+        starter: mock.Mock | None = None,
+        receipt_authority: tuple[dict, dict] | None = None,
+    ) -> list[str]:
+        if starter is None:
+            starter = mock.Mock()
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=old_correction,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_branch_semantics_reanchor_authority",
+            return_value=reanchor,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r006_contract_correction_authority",
+            return_value=r006_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r007_contract_correction_authority",
+            return_value=r007_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r007_started_authority",
+            return_value=starter,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r007_receipt_authority",
+            return_value=receipt_authority,
+        ):
+            return graph.validate_fp048_r002_seq91_96(ROOT, checkpoint)
+
+    def test_seq95_exact_correction_reconstructs_frozen_seq94_and_stays_ready(
+        self,
+    ) -> None:
+        (
+            checkpoint,
+            _seq94_raw,
+            _seq95_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            _event,
+        ) = self._seq95_fixture()
+        self.assertEqual(
+            self._validate(
+                checkpoint,
+                old_correction,
+                reanchor,
+                r006_authority,
+                r007_authority,
+            ),
+            [],
+        )
+        state = checkpoint["goal_execution"]
+        self.assertEqual(state["goal_status"], "READY")
+        self.assertEqual(list(state["status_by_goal"].values()).count("IN_PROGRESS"), 0)
+        r007_authority.reconstructed_seq94_checkpoint_bytes.assert_called_once()
+        r007_authority.canonical_frozen_seq94_checkpoint_bytes.assert_called_once()
+        r006_authority.require_contract_corrected_checkpoint.assert_not_called()
+        r006_authority.canonical_seq94_checkpoint_bytes.assert_not_called()
+
+    def test_seq95_inverse_never_replays_dynamic_r006_review(self) -> None:
+        (
+            checkpoint,
+            _seq94_raw,
+            _seq95_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            _event,
+        ) = self._seq95_fixture()
+        r006_authority.require_contract_corrected_checkpoint.side_effect = (
+            AssertionError("dynamic R006 review replay is forbidden")
+        )
+        r006_authority.canonical_seq94_checkpoint_bytes.side_effect = (
+            AssertionError("dynamic R006 canonical replay is forbidden")
+        )
+        self.assertEqual(
+            self._validate(
+                checkpoint,
+                old_correction,
+                reanchor,
+                r006_authority,
+                r007_authority,
+            ),
+            [],
+        )
+        r007_authority.canonical_frozen_seq94_checkpoint_bytes.assert_called_once()
+
+    def test_seq95_tamper_fails_before_producer_only_acceptance(self) -> None:
+        for mutation in (
+            "extra_field",
+            "receipt_path",
+            "previous_contract",
+            "status",
+        ):
+            with self.subTest(mutation=mutation):
+                (
+                    checkpoint,
+                    _seq94_raw,
+                    _seq95_raw,
+                    old_correction,
+                    reanchor,
+                    r006_authority,
+                    r007_authority,
+                    event,
+                ) = self._seq95_fixture()
+                if mutation == "extra_field":
+                    event["forged"] = True
+                elif mutation == "receipt_path":
+                    event["source_checkpoint_binding"][
+                        "r006_preflight_attempt_004"
+                    ]["receipt_path"] = "receipt.json"
+                elif mutation == "previous_contract":
+                    event["contract_supersession"][
+                        "previous_contract_binding"
+                    ]["contract_id"] = "FORGED"
+                else:
+                    event["to_status"] = "IN_PROGRESS"
+                event["event_sha256"] = graph.continuation.event_sha256(event)
+                checkpoint["goal_execution"][
+                    "transition_history_anchor_sha256"
+                ] = event["event_sha256"]
+                self.assertEqual(
+                    self._validate(
+                        checkpoint,
+                        old_correction,
+                        reanchor,
+                        r006_authority,
+                        r007_authority,
+                    ),
+                    [
+                        "FP048 R002 seq95 R007 contract-correction event "
+                        "differs"
+                    ],
+                )
+                r007_authority.require_contract_corrected_checkpoint.assert_not_called()
+
+    def test_seq95_rejects_nonexact_frozen_seq94_inverse(self) -> None:
+        (
+            checkpoint,
+            _seq94_raw,
+            _seq95_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            _event,
+        ) = self._seq95_fixture()
+        r007_authority.reconstructed_seq94_checkpoint_bytes.return_value = b"{}"
+        errors = self._validate(
+            checkpoint,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+        )
+        self.assertTrue(errors)
+        self.assertIn("seq95 R007 correction authority differs", errors[0])
+
+    def test_seq95_frontier_tamper_fails_after_producer_acceptance(self) -> None:
+        (
+            checkpoint,
+            _seq94_raw,
+            _seq95_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            _event,
+        ) = self._seq95_fixture()
+        checkpoint["goal_execution"]["ready_frontier_goal_ids"] = [
+            "WS-FORGED"
+        ]
+        self.assertEqual(
+            self._validate(
+                checkpoint,
+                old_correction,
+                reanchor,
+                r006_authority,
+                r007_authority,
+            ),
+            ["FP048 R002 seq95 READY zero-credit projection differs"],
+        )
+        r007_authority.require_contract_corrected_checkpoint.assert_called_once()
+
+    def test_r007_receipt_requires_private_canonical_five_check_pass(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            contract_path = root / graph.FP048_R002_R007_CONTRACT_PATH
+            contract_path.parent.mkdir(parents=True)
+            shutil.copyfile(
+                ROOT / graph.FP048_R002_R007_CONTRACT_PATH,
+                contract_path,
+            )
+            contract = json.loads(contract_path.read_text(encoding="utf-8"))
+            commands = {
+                row["check_id"]: row["command"]
+                for row in contract["ordered_checks"]
+            }
+            receipt_path = (
+                root / graph.FP048_R002_R007_STARTED_GATE_RECEIPT_PATH
+            )
+            receipt_path.parent.mkdir(parents=True)
+            source_raw = b"exact seq95 source\n"
+            correction = {
+                "event_sha256": "a" * 64,
+                "source_ready_event_binding": {"event_sha256": "b" * 64},
+            }
+            repository_snapshot = {"head_commit": "c" * 40}
+            runs = [
+                {
+                    "check_id": check_id,
+                    "command": commands[check_id],
+                    "executed_at": f"2026-08-26T17:40:0{index}+09:00",
+                    "exit_code": 0,
+                    "output_path": (
+                        "docs/control/execution/goal-gates/"
+                        f"{graph.FP048_R002_R007_STARTED_EVENT_ID}/"
+                        f"{index:02d}-{check_id}.log"
+                    ),
+                    "output_sha256": f"{index:x}" * 64,
+                }
+                for index, check_id in enumerate(
+                    graph.FP048_R002_R007_EXPECTED_CHECK_IDS,
+                    start=1,
+                )
+            ]
+            receipt = {
+                "schema_version": "1.1",
+                "document_id": graph.FP048_R002_R007_STARTED_GATE_DOCUMENT_ID,
+                "evidence_type": "IMPLEMENTATION_START_OR_RESUME_GATE",
+                "gate_purpose": "INITIAL_START",
+                "status": "PASS",
+                "package_id": graph.V24_PACKAGE_ID,
+                "target_transition_event_id": (
+                    graph.FP048_R002_R007_STARTED_EVENT_ID
+                ),
+                "target_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "target_goal_content_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+                ),
+                "static_plan_manifest_sha256": (
+                    graph.FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+                ),
+                "source_activation_event_sha256": correction["event_sha256"],
+                "source_checkpoint_sha256": (
+                    graph.continuation.sha256_bytes(source_raw)
+                ),
+                "source_ready_event_sha256": "b" * 64,
+                "check_command_contract_version": (
+                    graph.FP048_R002_R007_CONTRACT_VERSION
+                ),
+                "check_command_contract_sha256": (
+                    graph.FP048_R002_R007_CONTRACT_CANONICAL_SHA256
+                ),
+                "implementation_start_gate_contract_binding": (
+                    self._r007_contract()
+                ),
+                "runtime_bindings": [],
+                "execution_window": {
+                    "started_at": "2026-08-26T17:40:00+09:00",
+                    "ended_at": "2026-08-26T17:40:06+09:00",
+                },
+                "check_runs": runs,
+                "repository_snapshot": repository_snapshot,
+                "generated_at": "2026-08-26T17:40:07+09:00",
+            }
+
+            def publish(*, canonical: bool = True, mode: int = 0o600) -> dict:
+                if canonical:
+                    raw = (
+                        json.dumps(receipt, ensure_ascii=False, indent=2) + "\n"
+                    ).encode()
+                else:
+                    raw = json.dumps(receipt, ensure_ascii=False).encode()
+                receipt_path.write_bytes(raw)
+                receipt_path.chmod(mode)
+                return {
+                    "document_id": (
+                        graph.FP048_R002_R007_STARTED_GATE_DOCUMENT_ID
+                    ),
+                    "path": graph.FP048_R002_R007_STARTED_GATE_RECEIPT_PATH,
+                    "file_sha256": graph.continuation.sha256_bytes(raw),
+                }
+
+            started = {
+                "implementation_start_gate_binding": publish(),
+                "repository_snapshot_before": repository_snapshot,
+            }
+            self.assertIsNotNone(
+                graph._fp048_r002_r007_receipt_authority(
+                    root,
+                    correction,
+                    started,
+                    source_raw,
+                )
+            )
+            for mutation in ("mode", "canonical", "check_id"):
+                with self.subTest(mutation=mutation):
+                    receipt["check_runs"][0]["check_id"] = (
+                        "FORGED" if mutation == "check_id" else "CONTINUATION"
+                    )
+                    started["implementation_start_gate_binding"] = publish(
+                        canonical=mutation != "canonical",
+                        mode=0o644 if mutation == "mode" else 0o600,
+                    )
+                    self.assertIsNone(
+                        graph._fp048_r002_r007_receipt_authority(
+                            root,
+                            correction,
+                            started,
+                            source_raw,
+                        )
+                    )
+
+    def test_legacy_direct_seq96_r007_start_bypass_is_rejected(self) -> None:
+        (
+            checkpoint,
+            _seq94_raw,
+            seq95_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            _correction,
+        ) = self._seq95_fixture()
+        receipt_binding = {
+            "document_id": graph.FP048_R002_R007_STARTED_GATE_DOCUMENT_ID,
+            "path": graph.FP048_R002_R007_STARTED_GATE_RECEIPT_PATH,
+            "file_sha256": "e" * 64,
+        }
+        receipt = {"repository_snapshot": {"head_commit": "a" * 40}}
+        self._append_seq96(
+            checkpoint,
+            receipt_binding,
+            receipt["repository_snapshot"],
+        )
+        starter = self._seq96_authority(seq95_raw, receipt_binding)
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_r008_contract_correction_authority",
+            side_effect=AssertionError("R008 correction authority loaded"),
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r008_started_authority",
+            side_effect=AssertionError("R008 starter authority loaded"),
+        ):
+            errors = self._validate(
+                checkpoint,
+                old_correction,
+                reanchor,
+                r006_authority,
+                r007_authority,
+                starter=starter,
+                receipt_authority=(receipt_binding, receipt),
+            )
+        self.assertEqual(
+            errors,
+            ["FP048 R002 legacy R007 direct seq96 GOAL_STARTED is forbidden"],
+        )
+        starter.require_exact_seq96_projection.assert_not_called()
+
+
+class Fp048R002Seq96CorrectionSeq97Tests(
+    Fp048R002Seq95CorrectionSeq96Tests
+):
+    REANCHOR_TEST_PATH = (
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/"
+        "MainActivity.kt"
+    )
+
+    @classmethod
+    def _seal_repository_context(cls, checkpoint: dict) -> str:
+        authority = graph._fp048_r002_r008_contract_correction_authority()
+        paths = sorted(
+            path.as_posix()
+            for path in authority.NONCREDIT_FP023_PRODUCT_PATHS
+        )
+        path_set_sha256, content_set_sha256 = (
+            graph.continuation.working_snapshot_hashes(ROOT, paths)
+        )
+        digest = graph.continuation.sha256_file(
+            ROOT / cls.REANCHOR_TEST_PATH
+        )
+        snapshot = checkpoint["working_tree_snapshot"]
+        snapshot.update(
+            {
+                "managed_changed_paths": paths,
+                "managed_changed_path_count": len(paths),
+                "path_set_sha256": path_set_sha256,
+                "content_set_sha256": content_set_sha256,
+            }
+        )
+        handoff = checkpoint["session_handoff"]
+        handoff["changed_files"] = paths
+        mirror = handoff["source_commit_or_snapshot"]
+        mirror.update(
+            {
+                "file_count": len(paths),
+                "path_set_sha256": path_set_sha256,
+                "content_set_sha256": content_set_sha256,
+            }
+        )
+        correction = checkpoint["goal_execution"]["transition_history"][95]
+        prior_after = correction["repository_context_reanchor"]["after"]
+        correction["repository_context_reanchor"]["after"] = {
+            "base_commit": snapshot["base_head"],
+            "branch": prior_after["logical_branch"],
+            "logical_branch": prior_after["logical_branch"],
+            "logical_branch_semantics": prior_after[
+                "logical_branch_semantics"
+            ],
+            "physical_git_branch": prior_after["physical_git_branch"],
+            "branch_mismatch_reason_code": prior_after[
+                "branch_mismatch_reason_code"
+            ],
+            "current_head": mirror["current_head"],
+            "managed_changed_path_count": len(paths),
+            "path_set_sha256": path_set_sha256,
+            "content_set_sha256": content_set_sha256,
+        }
+        correction["event_sha256"] = graph.continuation.event_sha256(
+            correction
+        )
+        state = checkpoint["goal_execution"]
+        state["transition_history_anchor_sha256"] = correction[
+            "event_sha256"
+        ]
+        return digest
+
+    @classmethod
+    def _repository_context_correction_authority(cls) -> mock.Mock:
+        source = graph._fp048_r002_r008_contract_correction_authority()
+        authority = mock.Mock()
+        authority.NONCREDIT_FP023_PRODUCT_PATHS = (
+            source.NONCREDIT_FP023_PRODUCT_PATHS
+        )
+        authority.noncredit_fp023_product_successor_bindings.return_value = {
+            "authority_label": "NONCREDIT_REPOSITORY_CONTEXT_ONLY",
+            "bindings": [
+                {
+                    "path": path.as_posix(),
+                    "sha256": graph.continuation.sha256_file(ROOT / path),
+                    "byte_length": (ROOT / path).stat().st_size,
+                }
+                for path in source.NONCREDIT_FP023_PRODUCT_PATHS
+            ],
+            "credit_boundary": {
+                "actual_device_test_credit_delta": 0,
+                "deployment_credit_delta": 0,
+                "external_review_credit_delta": 0,
+                "formal_test_credit_delta": 0,
+                "implementation_completion_credit_delta": 0,
+                "release_credit_delta": 0,
+            },
+        }
+        return authority
+
+    @staticmethod
+    def _r008_contract() -> dict:
+        return graph._fp048_r002_r008_contract_binding()
+
+    @staticmethod
+    def _r008_runner() -> dict:
+        return {
+            "path": graph.FP048_R002_R008_START_GATE_RUNNER_PATH,
+            "sha256": graph.FP048_R002_R008_START_GATE_RUNNER_SHA256,
+            "byte_length": graph.FP048_R002_R008_START_GATE_RUNNER_BYTE_LENGTH,
+        }
+
+    @classmethod
+    def _append_seq96_correction(cls, checkpoint: dict) -> dict:
+        state = checkpoint["goal_execution"]
+        source_event = state["transition_history"][94]
+        source = source_event["source_checkpoint_binding"]
+        occurred_at = (
+            datetime.fromisoformat(source_event["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = copy.deepcopy(source_event)
+        event.update(
+            {
+                "sequence": graph.FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE,
+                "event_id": graph.FP048_R002_R008_CONTRACT_CORRECTION_EVENT_ID,
+                "event_type": "GOAL_START_GATE_CONTRACT_CORRECTED",
+                "occurred_on": occurred_at.date().isoformat(),
+                "occurred_at": occurred_at.isoformat(),
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+                "runtime_after": copy.deepcopy(source_event["runtime_after"]),
+                "blockers_after": copy.deepcopy(source_event["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    source_event["blocker_resolution_ids_after"]
+                ),
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [
+                    "FP048-R002_EXACT_PUBLISHED_SEQ95_SOURCE",
+                    "FP048-R002_SEQ95_R002_FROZEN_REVIEW_AUTHORITY",
+                    "FP048-R002_R007_ROOT_REGRESSION_PREVIEW_NONAUTHORITY",
+                    "FP048-R002_R008_STAGE_AWARE_GATE_CONTRACT",
+                    "FP048-R002_SEQ96_97_TRANSITION_CONTROL_REVIEW",
+                ],
+                "source_checkpoint_binding": {
+                    "path": graph.V24_CHECKPOINT_RELATIVE.as_posix(),
+                    "sha256": "3" * 64,
+                    "byte_length": 3,
+                    "sequence": graph.FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE,
+                    "tail_event_id": graph.FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID,
+                    "tail_event_sha256": source_event["event_sha256"],
+                    "passed_gate_attempt_003": copy.deepcopy(
+                        source["passed_gate_attempt_003"]
+                    ),
+                    "preflight_attempt_004": copy.deepcopy(
+                        source["preflight_attempt_004"]
+                    ),
+                    "r006_preflight_attempt_004": copy.deepcopy(
+                        source["r006_preflight_attempt_004"]
+                    ),
+                    "r007_preflight_attempt_004": copy.deepcopy(
+                        graph.FP048_R002_R007_PREFLIGHT_ATTEMPT
+                    ),
+                },
+                "source_ready_event_binding": copy.deepcopy(
+                    source_event["source_ready_event_binding"]
+                ),
+                "contract_supersession": {
+                    "previous_contract_binding": graph._fp048_r002_r007_contract_binding(),
+                    "reason_code": graph.FP048_R002_R008_SUCCESSOR_REASON_CODE,
+                    "replacement_contract_binding": cls._r008_contract(),
+                },
+                "start_gate_runner_binding": cls._r008_runner(),
+                "noncredit_successor_edges": copy.deepcopy(
+                    source_event["noncredit_successor_edges"]
+                ),
+                "claim_boundary": copy.deepcopy(
+                    graph.FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+                ),
+                "canonical_binding_snapshot_after": copy.deepcopy(
+                    source_event["canonical_binding_snapshot_after"]
+                ),
+                "correction_reason": copy.deepcopy(
+                    graph.FP048_R002_R008_CORRECTION_REASON
+                ),
+                "previous_event_sha256": source_event["event_sha256"],
+            }
+        )
+        if set(event) != graph.FP048_R002_ZERO_CREDIT_CONTROL_EVENT_FIELDS:
+            raise AssertionError("seq96 correction fixture field set differs")
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        return event
+
+    @classmethod
+    def _append_seq97(
+        cls,
+        checkpoint: dict,
+        receipt_binding: dict,
+    ) -> dict:
+        state = checkpoint["goal_execution"]
+        correction = state["transition_history"][95]
+        occurred_at = (
+            datetime.fromisoformat(correction["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = {
+            field: None
+            for field in graph.continuation.V24_FIRST_START_EVENT_FIELDS
+        }
+        event.update(
+            {
+                "sequence": graph.FP048_R002_R008_STARTED_SEQUENCE,
+                "event_id": graph.FP048_R002_R008_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "occurred_on": occurred_at.date().isoformat(),
+                "occurred_at": occurred_at.isoformat(),
+                "previous_focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "previous_focus_content_sha256": graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256,
+                "focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "focus_goal_content_sha256": graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256,
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "static_plan_manifest_sha256": graph.FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256,
+                "status_changes": {
+                    graph.FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"
+                },
+                "runtime_after": copy.deepcopy(correction["runtime_after"]),
+                "repository_snapshot_before": {"head_commit": "a" * 40},
+                "implementation_start_gate_binding": copy.deepcopy(
+                    receipt_binding
+                ),
+                "blockers_after": copy.deepcopy(correction["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    correction["blocker_resolution_ids_after"]
+                ),
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [],
+                "previous_event_sha256": correction["event_sha256"],
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        state["status_by_goal"][graph.FP046_R002_NEXT_GOAL_ID] = "IN_PROGRESS"
+        state["goal_status"] = "IN_PROGRESS"
+        checkpoint["current_work"]["status"] = "IN_PROGRESS"
+        return event
+
+    @classmethod
+    def _r008_correction_authority(
+        cls,
+        seq95_raw: bytes,
+        seq96_raw: bytes,
+    ) -> mock.Mock:
+        authority = mock.Mock()
+        authority.require_contract_corrected_checkpoint.return_value = None
+        authority.canonical_frozen_seq95_checkpoint_bytes.return_value = seq95_raw
+        authority.canonical_seq96_checkpoint_bytes.return_value = seq96_raw
+        authority.reconstructed_seq95_checkpoint_bytes.return_value = seq95_raw
+        authority.reconstructed_seq96_checkpoint_bytes.return_value = seq96_raw
+        authority.r007_contract_binding.return_value = cls._r007_contract()
+        authority.r008_contract_binding.return_value = cls._r008_contract()
+        authority.r008_runner_binding.return_value = cls._r008_runner()
+        return authority
+
+    @classmethod
+    def _seq97_authority(
+        cls,
+        seq96_raw: bytes,
+        receipt_binding: dict | None,
+    ) -> mock.Mock:
+        authority = mock.Mock()
+        authority.require_exact_seq97_projection.return_value = None
+        authority.reconstructed_seq96_checkpoint_bytes.return_value = seq96_raw
+        authority.goal_start_gate_receipt_binding.return_value = copy.deepcopy(
+            receipt_binding
+        )
+        authority.require_published_r008_gate_for_seq96.return_value = (
+            copy.deepcopy(receipt_binding)
+        )
+        return authority
+
+    @classmethod
+    def _gate_authority(cls) -> mock.Mock:
+        authority = mock.Mock()
+        authority.expected_r008_binding.return_value = cls._r008_contract()
+        authority.expected_preflight_attempt_004_binding.return_value = (
+            copy.deepcopy(graph.FP048_R002_R007_PREFLIGHT_ATTEMPT)
+        )
+        bound = mock.Mock(contract_binding=cls._r008_contract())
+        authority.bind_contract_corrected_source.return_value = bound
+        authority.bind_published_contract_corrected_source.return_value = bound
+        return authority
+
+    def _seq96_fixture(self) -> tuple:
+        (
+            checkpoint,
+            _seq94_raw,
+            seq95_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            _event,
+        ) = super()._seq95_fixture()
+        event = self._append_seq96_correction(checkpoint)
+        seq96_raw = Fp048R002Seq93BranchSemanticsSeq94Tests._canonical(
+            checkpoint
+        )
+        return (
+            checkpoint,
+            seq95_raw,
+            seq96_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            self._r008_correction_authority(seq95_raw, seq96_raw),
+            event,
+        )
+
+    @staticmethod
+    def _validate_r008(
+        checkpoint: dict,
+        old_correction: mock.Mock,
+        reanchor: mock.Mock,
+        r006_authority: mock.Mock,
+        r007_authority: mock.Mock,
+        r008_authority: mock.Mock,
+        starter: mock.Mock,
+        gate_authority: mock.Mock,
+        *,
+        gate_namespace_present: bool = False,
+    ) -> list[str]:
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_start_gate_contract_correction_authority",
+            return_value=old_correction,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_branch_semantics_reanchor_authority",
+            return_value=reanchor,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r006_contract_correction_authority",
+            return_value=r006_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r007_contract_correction_authority",
+            return_value=r007_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r008_contract_correction_authority",
+            return_value=r008_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r008_started_authority",
+            return_value=starter,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r008_gate_authority",
+            return_value=gate_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r008_gate_namespace_present",
+            return_value=gate_namespace_present,
+        ):
+            return graph.validate_fp048_r002_seq91_97(ROOT, checkpoint)
+
+    def test_seq96_exact_r007_to_r008_correction_stays_ready(self) -> None:
+        (
+            checkpoint,
+            seq95_raw,
+            _seq96_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            r008_authority,
+            _event,
+        ) = self._seq96_fixture()
+        starter = self._seq97_authority(b"", None)
+        gate_authority = self._gate_authority()
+        self.assertEqual(
+            self._validate_r008(
+                checkpoint,
+                old_correction,
+                reanchor,
+                r006_authority,
+                r007_authority,
+                r008_authority,
+                starter,
+                gate_authority,
+            ),
+            [],
+        )
+        state = checkpoint["goal_execution"]
+        self.assertEqual(state["goal_status"], "READY")
+        self.assertNotIn("IN_PROGRESS", state["status_by_goal"].values())
+        r008_authority.canonical_frozen_seq95_checkpoint_bytes.assert_called_once()
+        self.assertEqual(
+            r008_authority.reconstructed_seq95_checkpoint_bytes.return_value,
+            seq95_raw,
+        )
+        gate_authority.bind_contract_corrected_source.assert_called_once()
+        starter.require_published_r008_gate_for_seq96.assert_not_called()
+        r007_authority.require_contract_corrected_checkpoint.assert_not_called()
+
+    def test_seq96_uses_exact_repository_context_and_legacy_seq97_does_not(
+        self,
+    ) -> None:
+        checkpoint = self._seq96_fixture()[0]
+        digest = self._seal_repository_context(checkpoint)
+        correction_authority = (
+            self._repository_context_correction_authority()
+        )
+        expected_live = {
+            binding["path"]: binding["sha256"]
+            for binding in (
+                correction_authority
+                .noncredit_fp023_product_successor_bindings.return_value[
+                    "bindings"
+                ]
+            )
+        }
+        started_authority = mock.Mock()
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_r008_contract_correction_authority",
+            return_value=correction_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r008_started_authority",
+            return_value=started_authority,
+        ):
+            self.assertEqual(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                ),
+                expected_live,
+            )
+            self.assertEqual(
+                graph._compose_fp048_r002_reviewed_noncredit_successors(
+                    ROOT,
+                    checkpoint,
+                    {
+                        self.REANCHOR_TEST_PATH: (
+                            "0" * 64,
+                            "7cf49ad23b268ebd52809055879b734d81e7cf7215c44c94f9196b20d5b4e865",
+                        )
+                    },
+                ),
+                {self.REANCHOR_TEST_PATH: ("0" * 64, digest)},
+            )
+
+            self._append_seq97(
+                checkpoint,
+                {
+                    "document_id": graph.FP048_R002_R008_STARTED_GATE_DOCUMENT_ID,
+                    "path": graph.FP048_R002_R008_STARTED_GATE_RECEIPT_PATH,
+                    "file_sha256": "e" * 64,
+                },
+            )
+            self.assertIsNone(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+        self.assertEqual(
+            correction_authority.require_contract_corrected_checkpoint.call_count,
+            2,
+        )
+        self.assertTrue(
+            all(
+                call.args[0] == ROOT
+                and call.kwargs
+                == {
+                    "require_live_snapshot": False,
+                    "run_external_validators": False,
+                }
+                for call in (
+                    correction_authority
+                    .require_contract_corrected_checkpoint.call_args_list
+                )
+            )
+        )
+        started_authority.require_started_checkpoint.assert_not_called()
+
+    def test_repository_context_preserves_historical_successor_composition(
+        self,
+    ) -> None:
+        checkpoint = self._seq96_fixture()[0]
+        self._seal_repository_context(checkpoint)
+        correction_authority = (
+            self._repository_context_correction_authority()
+        )
+        product_paths = {
+            path.as_posix()
+            for path in correction_authority.NONCREDIT_FP023_PRODUCT_PATHS
+        }
+        edge_sets = (
+            graph._fp048_r002_seq85_to_seq87_successor_edges(
+                ROOT,
+                checkpoint,
+            ),
+            graph._fp048_r002_noncredit_successor_edges(ROOT, checkpoint),
+        )
+        chains: dict[str, list[str]] = {}
+        for edge_set in edge_sets:
+            self.assertIsNotNone(edge_set)
+            for row in edge_set["modified"]:
+                relative = row["path"]
+                if relative in product_paths:
+                    continue
+                before = row["predecessor"]["sha256"]
+                after = row["successor"]["sha256"]
+                chain = chains.setdefault(relative, [before, before])
+                if chain[1] == before:
+                    chain[1] = after
+        relative, (before, after) = next(
+            (relative, chain)
+            for relative, chain in chains.items()
+            if chain[0] != chain[1]
+        )
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_r008_contract_correction_authority",
+            return_value=correction_authority,
+        ):
+            self.assertEqual(
+                graph._compose_fp048_r002_reviewed_noncredit_successors(
+                    ROOT,
+                    checkpoint,
+                    {relative: ("0" * 64, before)},
+                ),
+                {relative: ("0" * 64, after)},
+            )
+
+    def test_repository_context_live_successor_tamper_fails_closed(self) -> None:
+        for mutation in (
+            "event",
+            "event_hash",
+            "state",
+            "snapshot",
+            "content_set",
+            "reviewed_product",
+            "stage",
+        ):
+            with self.subTest(mutation=mutation):
+                checkpoint = self._seq96_fixture()[0]
+                self._seal_repository_context(checkpoint)
+                state = checkpoint["goal_execution"]
+                correction = state["transition_history"][95]
+                if mutation == "event":
+                    correction["event_id"] = "FORGED"
+                    correction["event_sha256"] = (
+                        graph.continuation.event_sha256(correction)
+                    )
+                    state["transition_history_anchor_sha256"] = correction[
+                        "event_sha256"
+                    ]
+                elif mutation == "event_hash":
+                    correction["event_sha256"] = "0" * 64
+                    state["transition_history_anchor_sha256"] = "0" * 64
+                elif mutation == "state":
+                    state["goal_status"] = "IN_PROGRESS"
+                elif mutation == "snapshot":
+                    checkpoint["session_handoff"]["changed_files"] = []
+                elif mutation == "content_set":
+                    checkpoint["working_tree_snapshot"][
+                        "content_set_sha256"
+                    ] = "f" * 64
+                    checkpoint["session_handoff"][
+                        "source_commit_or_snapshot"
+                    ]["content_set_sha256"] = "f" * 64
+                    correction["repository_context_reanchor"]["after"][
+                        "content_set_sha256"
+                    ] = "f" * 64
+                    correction["event_sha256"] = (
+                        graph.continuation.event_sha256(correction)
+                    )
+                    state["transition_history_anchor_sha256"] = correction[
+                        "event_sha256"
+                    ]
+                elif mutation == "reviewed_product":
+                    pass
+                else:
+                    state["transition_history"].append(copy.deepcopy(correction))
+                authority = self._repository_context_correction_authority()
+                if mutation == "reviewed_product":
+                    authority.noncredit_fp023_product_successor_bindings.return_value[
+                        "bindings"
+                    ][0]["sha256"] = "0" * 64
+                with mock.patch.object(
+                    graph,
+                    "_fp048_r002_r008_contract_correction_authority",
+                    return_value=authority,
+                ):
+                    self.assertIsNone(
+                        graph._fp048_r002_repository_context_live_successors(
+                            ROOT,
+                            checkpoint,
+                        )
+                    )
+
+    def test_repository_context_requires_full_physical_stage_authority(
+        self,
+    ) -> None:
+        for failure in (
+            "physical review triad deleted",
+            "physical review self-resealed",
+            "seq95 inverse CAS differs",
+        ):
+            with self.subTest(failure=failure):
+                checkpoint = self._seq96_fixture()[0]
+                self._seal_repository_context(checkpoint)
+                authority = self._repository_context_correction_authority()
+                authority.require_contract_corrected_checkpoint.side_effect = (
+                    RuntimeError(failure)
+                )
+                with mock.patch.object(
+                    graph,
+                    "_fp048_r002_r008_contract_correction_authority",
+                    return_value=authority,
+                ):
+                    self.assertIsNone(
+                        graph._fp048_r002_repository_context_live_successors(
+                            ROOT,
+                            checkpoint,
+                        )
+                    )
+
+        checkpoint = self._seq96_fixture()[0]
+        self._seal_repository_context(checkpoint)
+        self._append_seq97(
+            checkpoint,
+            {
+                "document_id": graph.FP048_R002_R008_STARTED_GATE_DOCUMENT_ID,
+                "path": graph.FP048_R002_R008_STARTED_GATE_RECEIPT_PATH,
+                "file_sha256": "e" * 64,
+            },
+        )
+        authority = mock.Mock()
+        authority.require_started_checkpoint.side_effect = RuntimeError(
+            "seq97 receipt differs"
+        )
+        correction_authority = (
+            self._repository_context_correction_authority()
+        )
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_r008_started_authority",
+            return_value=authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r008_contract_correction_authority",
+            return_value=correction_authority,
+        ):
+            self.assertIsNone(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+
+        authority.require_started_checkpoint.assert_not_called()
+
+    def test_repository_context_warm_cache_rechecks_reviewed_product_size(
+        self,
+    ) -> None:
+        checkpoint = self._seq96_fixture()[0]
+        self._seal_repository_context(checkpoint)
+        authority = self._repository_context_correction_authority()
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_r008_contract_correction_authority",
+            return_value=authority,
+        ):
+            self.assertIsNotNone(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+            reviewed = (
+                authority
+                .noncredit_fp023_product_successor_bindings.return_value
+            )
+            reviewed["bindings"][0]["byte_length"] += 1
+            self.assertIsNone(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+        self.assertEqual(
+            authority.require_contract_corrected_checkpoint.call_count,
+            2,
+        )
+
+    def test_legacy_direct_seq96_has_no_repository_context_authority(
+        self,
+    ) -> None:
+        checkpoint, *_rest = super()._seq95_fixture()
+        self._append_seq96(
+            checkpoint,
+            {
+                "document_id": graph.FP048_R002_R007_STARTED_GATE_DOCUMENT_ID,
+                "path": graph.FP048_R002_R007_STARTED_GATE_RECEIPT_PATH,
+                "file_sha256": "e" * 64,
+            },
+            {"head_commit": "a" * 40},
+        )
+        self.assertIsNone(
+            graph._fp048_r002_repository_context_live_successors(
+                ROOT,
+                checkpoint,
+            )
+        )
+
+    def test_seq96_projected_checkpoint_does_not_read_live_seq95(self) -> None:
+        (
+            checkpoint,
+            _seq95_raw,
+            _seq96_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            r008_authority,
+            _event,
+        ) = self._seq96_fixture()
+        starter = self._seq97_authority(b"", None)
+        starter.require_published_r008_gate_for_seq96.side_effect = (
+            AssertionError("projected seq96 must not read the live checkpoint")
+        )
+        gate_authority = self._gate_authority()
+
+        self.assertEqual(
+            self._validate_r008(
+                checkpoint,
+                old_correction,
+                reanchor,
+                r006_authority,
+                r007_authority,
+                r008_authority,
+                starter,
+                gate_authority,
+            ),
+            [],
+        )
+        gate_authority.bind_contract_corrected_source.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_gate_namespace_absent=True,
+        )
+        gate_authority.bind_published_contract_corrected_source.assert_not_called()
+        starter.require_published_r008_gate_for_seq96.assert_not_called()
+
+    def test_seq96_published_namespace_uses_only_live_cas_helper(self) -> None:
+        (
+            checkpoint,
+            _seq95_raw,
+            _seq96_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            r008_authority,
+            _event,
+        ) = self._seq96_fixture()
+        receipt_binding = {
+            "document_id": graph.FP048_R002_R008_STARTED_GATE_DOCUMENT_ID,
+            "path": graph.FP048_R002_R008_STARTED_GATE_RECEIPT_PATH,
+            "file_sha256": "e" * 64,
+        }
+        starter = self._seq97_authority(b"", receipt_binding)
+        gate_authority = self._gate_authority()
+
+        self.assertEqual(
+            self._validate_r008(
+                checkpoint,
+                old_correction,
+                reanchor,
+                r006_authority,
+                r007_authority,
+                r008_authority,
+                starter,
+                gate_authority,
+                gate_namespace_present=True,
+            ),
+            [],
+        )
+        starter.require_published_r008_gate_for_seq96.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+        gate_authority.bind_published_contract_corrected_source.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+        gate_authority.bind_contract_corrected_source.assert_not_called()
+        r008_authority.require_contract_corrected_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+            run_external_validators=False,
+        )
+
+    def test_seq96_correction_uses_sealed_product_successor_composition(
+        self,
+    ) -> None:
+        checkpoint = self._seq96_fixture()[0]
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_reviewed_noncredit_edge",
+            side_effect=AssertionError(
+                "READY correction reopened current product successors"
+            ),
+        ):
+            transitions = graph._fp022_completion_start_to_final_transitions(
+                ROOT,
+                checkpoint,
+                require_completion_review=False,
+            )
+
+        self.assertIsInstance(transitions, dict)
+        self.assertEqual(len(transitions), 9)
+
+        checkpoint = self._seq96_fixture()[0]
+        self._append_seq97(
+            checkpoint,
+            {
+                "document_id": graph.FP048_R002_R008_STARTED_GATE_DOCUMENT_ID,
+                "path": graph.FP048_R002_R008_STARTED_GATE_RECEIPT_PATH,
+                "file_sha256": "e" * 64,
+            },
+        )
+        self.assertIsNone(
+            graph._fp048_r002_repository_context_live_successors(
+                ROOT,
+                checkpoint,
+            )
+        )
+
+        checkpoint = self._seq96_fixture()[0]
+        correction = checkpoint["goal_execution"]["transition_history"][-1]
+        correction["to_status"] = "IN_PROGRESS"
+        correction["event_sha256"] = graph.continuation.event_sha256(
+            correction
+        )
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_reviewed_noncredit_edge",
+            side_effect=AssertionError("non-correction must compose live"),
+        ), self.assertRaisesRegex(AssertionError, "must compose live"):
+            graph._fp022_completion_start_to_final_transitions(
+                ROOT,
+                checkpoint,
+                require_completion_review=False,
+            )
+
+    def test_seq96_static_tamper_fails_before_r008_producer_acceptance(self) -> None:
+        for mutation in ("sequence_type", "preflight_type", "runner", "status", "extra"):
+            with self.subTest(mutation=mutation):
+                (
+                    checkpoint,
+                    _seq95_raw,
+                    _seq96_raw,
+                    old_correction,
+                    reanchor,
+                    r006_authority,
+                    r007_authority,
+                    r008_authority,
+                    event,
+                ) = self._seq96_fixture()
+                if mutation == "sequence_type":
+                    event["sequence"] = 96.0
+                elif mutation == "preflight_type":
+                    event["source_checkpoint_binding"][
+                        "r007_preflight_attempt_004"
+                    ]["exit_code"] = 1.0
+                elif mutation == "runner":
+                    event["start_gate_runner_binding"]["sha256"] = "0" * 64
+                elif mutation == "status":
+                    event["to_status"] = "IN_PROGRESS"
+                else:
+                    event["forged"] = True
+                event["event_sha256"] = graph.continuation.event_sha256(event)
+                checkpoint["goal_execution"][
+                    "transition_history_anchor_sha256"
+                ] = event["event_sha256"]
+                errors = self._validate_r008(
+                    checkpoint,
+                    old_correction,
+                    reanchor,
+                    r006_authority,
+                    r007_authority,
+                    r008_authority,
+                    self._seq97_authority(b"", None),
+                    self._gate_authority(),
+                )
+                self.assertTrue(errors)
+                r008_authority.require_contract_corrected_checkpoint.assert_not_called()
+
+    def test_seq96_rejects_nonexact_frozen_seq95_inverse(self) -> None:
+        (
+            checkpoint,
+            _seq95_raw,
+            _seq96_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            r008_authority,
+            _event,
+        ) = self._seq96_fixture()
+        r008_authority.reconstructed_seq95_checkpoint_bytes.return_value = b"{}"
+        errors = self._validate_r008(
+            checkpoint,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            r008_authority,
+            self._seq97_authority(b"", None),
+            self._gate_authority(),
+        )
+        self.assertTrue(errors)
+        self.assertIn("seq96 R008 correction authority differs", errors[0])
+
+    def test_legacy_direct_seq97_r008_start_is_rejected(self) -> None:
+        (
+            checkpoint,
+            _seq95_raw,
+            seq96_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            r008_authority,
+            correction,
+        ) = self._seq96_fixture()
+        receipt_binding = {
+            "document_id": graph.FP048_R002_R008_STARTED_GATE_DOCUMENT_ID,
+            "path": graph.FP048_R002_R008_STARTED_GATE_RECEIPT_PATH,
+            "file_sha256": "e" * 64,
+        }
+        started = self._append_seq97(checkpoint, receipt_binding)
+        starter = self._seq97_authority(seq96_raw, receipt_binding)
+        gate_authority = self._gate_authority()
+        self.assertEqual(
+            self._validate_r008(
+                checkpoint,
+                old_correction,
+                reanchor,
+                r006_authority,
+                r007_authority,
+                r008_authority,
+                starter,
+                gate_authority,
+            ),
+            ["FP048 R002 legacy R008 direct seq97 GOAL_STARTED is forbidden"],
+        )
+        self.assertEqual(
+            started["previous_event_sha256"],
+            correction["event_sha256"],
+        )
+        self.assertEqual(
+            list(
+                checkpoint["goal_execution"]["status_by_goal"].values()
+            ).count("IN_PROGRESS"),
+            1,
+        )
+        starter.require_exact_seq97_projection.assert_not_called()
+        gate_authority.bind_published_contract_corrected_source.assert_not_called()
+        r007_authority.require_contract_corrected_checkpoint.assert_not_called()
+
+    def test_seq97_tamper_and_receipt_disagreement_fail_closed(self) -> None:
+        for mutation in ("adjacency", "status", "frontier", "receipt"):
+            with self.subTest(mutation=mutation):
+                (
+                    checkpoint,
+                    _seq95_raw,
+                    seq96_raw,
+                    old_correction,
+                    reanchor,
+                    r006_authority,
+                    r007_authority,
+                    r008_authority,
+                    _correction,
+                ) = self._seq96_fixture()
+                receipt_binding = {
+                    "document_id": graph.FP048_R002_R008_STARTED_GATE_DOCUMENT_ID,
+                    "path": graph.FP048_R002_R008_STARTED_GATE_RECEIPT_PATH,
+                    "file_sha256": "e" * 64,
+                }
+                started = self._append_seq97(checkpoint, receipt_binding)
+                starter = self._seq97_authority(seq96_raw, receipt_binding)
+                if mutation == "adjacency":
+                    started["previous_event_sha256"] = "0" * 64
+                    started["event_sha256"] = graph.continuation.event_sha256(
+                        started
+                    )
+                    checkpoint["goal_execution"][
+                        "transition_history_anchor_sha256"
+                    ] = started["event_sha256"]
+                elif mutation == "status":
+                    checkpoint["goal_execution"]["status_by_goal"][
+                        "WS-FORGED"
+                    ] = "IN_PROGRESS"
+                elif mutation == "frontier":
+                    checkpoint["goal_execution"][
+                        "ready_frontier_goal_ids"
+                    ] = ["WS-FORGED"]
+                else:
+                    starter.require_published_r008_gate_for_seq96.return_value = {
+                        **receipt_binding,
+                        "file_sha256": "f" * 64,
+                    }
+                errors = self._validate_r008(
+                    checkpoint,
+                    old_correction,
+                    reanchor,
+                    r006_authority,
+                    r007_authority,
+                    r008_authority,
+                    starter,
+                    self._gate_authority(),
+                )
+                self.assertTrue(errors)
+                self.assertEqual(
+                    errors,
+                    [
+                        "FP048 R002 legacy R008 direct seq97 GOAL_STARTED "
+                        "is forbidden"
+                    ],
+                )
+
+    def test_r008_authority_loaders_require_public_apis(self) -> None:
+        for loader, label in (
+            (
+                graph._fp048_r002_r008_contract_correction_authority,
+                "contract-correction",
+            ),
+            (graph._fp048_r002_r008_started_authority, "started"),
+            (graph._fp048_r002_r008_gate_authority, "gate"),
+        ):
+            with self.subTest(label=label), mock.patch.object(
+                graph.importlib,
+                "import_module",
+                return_value=object(),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "API is missing"):
+                    loader()
+
+
+class Fp048R002Seq97CorrectionSeq98Tests(unittest.TestCase):
+    HYGIENE_TEST_REL = Path(
+        "tests/test_apply_walksafe_fp048_r002_start_gate_contract_correction_"
+        "seq96_20260826.py"
+    )
+
+    @staticmethod
+    def _canonical(checkpoint: dict) -> bytes:
+        return (
+            json.dumps(checkpoint, ensure_ascii=False, indent=2) + "\n"
+        ).encode("utf-8")
+
+    @classmethod
+    def _append_seq97_correction(cls, checkpoint: dict) -> dict:
+        state = checkpoint["goal_execution"]
+        source = state["transition_history"][95]
+        occurred_at = (
+            datetime.fromisoformat(source["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = copy.deepcopy(source)
+        source_binding = {
+            "path": graph.V24_CHECKPOINT_RELATIVE.as_posix(),
+            "sha256": "4" * 64,
+            "byte_length": 4,
+            "sequence": graph.FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE,
+            "tail_event_id": graph.FP048_R002_R008_CONTRACT_CORRECTION_EVENT_ID,
+            "tail_event_sha256": source["event_sha256"],
+            "r008_preflight_attempt_004": {"exit_code": 2},
+        }
+        event.update(
+            {
+                "sequence": graph.FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE,
+                "event_id": graph.FP048_R002_R009_CONTRACT_CORRECTION_EVENT_ID,
+                "event_type": "GOAL_START_GATE_CONTRACT_CORRECTED",
+                "occurred_on": occurred_at.date().isoformat(),
+                "occurred_at": occurred_at.isoformat(),
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+                "runtime_after": copy.deepcopy(source["runtime_after"]),
+                "blockers_after": copy.deepcopy(source["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    source["blocker_resolution_ids_after"]
+                ),
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [
+                    "FP048-R002_EXACT_PUBLISHED_SEQ96_SOURCE",
+                    "FP048-R002_R008_SNAPSHOT_ANCESTOR_PREVIEW_NONAUTHORITY",
+                    "FP048-R002_R009_SNAPSHOT_SAFE_GATE_CONTRACT",
+                    "FP048-R002_SEQ97_98_TRANSITION_CONTROL_REVIEW",
+                ],
+                "source_checkpoint_binding": source_binding,
+                "authorization_binding": {
+                    "path": "docs/control/execution/workstream-transitions/"
+                    "seq97-98/authorization.json",
+                    "sha256": "a" * 64,
+                    "byte_length": 1,
+                },
+                "contract_supersession": {
+                    "previous_contract_binding": copy.deepcopy(
+                        source["contract_supersession"][
+                            "replacement_contract_binding"
+                        ]
+                    ),
+                    "reason_code": "R008_RETAINED_ANCESTOR_IDENTITY_CHANGED",
+                    "replacement_contract_binding": {
+                        "schema_version": "1.2",
+                        "document_id": "WS-FP048-R002-INITIAL-START-GATE-"
+                        "CONTRACT-20260826-009",
+                        "path": "docs/control/execution/goal-contracts/"
+                        "WS-GOAL-EPIC-03-FP-048-R002/"
+                        "initial-start-gate-contract-r009.json",
+                        "file_sha256": "b" * 64,
+                        "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R009",
+                        "contract_version": "2026-08-26.8",
+                        "canonical_contract_sha256": "c" * 64,
+                    },
+                },
+                "start_gate_runner_binding": {
+                    "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_"
+                    "r009_20260826.py",
+                    "sha256": "d" * 64,
+                    "byte_length": 1,
+                },
+                "transition_control_review_binding": {
+                    role: {
+                        "path": "docs/control/execution/workstream-transitions/"
+                        f"seq97-98/review-rounds/R001/{name}.json",
+                        "sha256": digest * 64,
+                        "byte_length": 1,
+                    }
+                    for role, name, digest in (
+                        ("assignment", "review-assignment", "e"),
+                        ("review_result", "review-result", "f"),
+                        ("independent_review", "independent-review", "1"),
+                    )
+                },
+                "repository_context_reanchor": {
+                    "before": {
+                        **copy.deepcopy(source_binding),
+                        "current_work": copy.deepcopy(checkpoint["current_work"]),
+                        "working_tree_snapshot": copy.deepcopy(
+                            checkpoint["working_tree_snapshot"]
+                        ),
+                        "session_handoff": copy.deepcopy(
+                            checkpoint["session_handoff"]
+                        ),
+                    },
+                    "after": copy.deepcopy(
+                        source["repository_context_reanchor"]["after"]
+                    ),
+                },
+                "claim_boundary": copy.deepcopy(
+                    graph.FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+                ),
+                "correction_reason": {
+                    "r008_preflight_attempt_004": {"exit_code": 2}
+                },
+                "previous_event_sha256": source["event_sha256"],
+            }
+        )
+        if set(event) != graph.FP048_R002_ZERO_CREDIT_CONTROL_EVENT_FIELDS:
+            raise AssertionError("seq97 correction fixture field set differs")
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        return event
+
+    @classmethod
+    def _append_seq98_started(
+        cls,
+        checkpoint: dict,
+        receipt_binding: dict,
+    ) -> dict:
+        state = checkpoint["goal_execution"]
+        correction = state["transition_history"][96]
+        occurred_at = (
+            datetime.fromisoformat(correction["occurred_at"])
+            + timedelta(seconds=1)
+        )
+        event = {
+            field: None
+            for field in graph.continuation.V24_FIRST_START_EVENT_FIELDS
+        }
+        event.update(
+            {
+                "sequence": graph.FP048_R002_R009_STARTED_SEQUENCE,
+                "event_id": graph.FP048_R002_R009_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "occurred_on": occurred_at.date().isoformat(),
+                "occurred_at": occurred_at.isoformat(),
+                "previous_focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "previous_focus_content_sha256": graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256,
+                "focus_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "focus_goal_content_sha256": graph.FP048_R002_CORRECTED_STARTED_GOAL_SHA256,
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "static_plan_manifest_sha256": graph.FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256,
+                "status_changes": {
+                    graph.FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"
+                },
+                "runtime_after": copy.deepcopy(correction["runtime_after"]),
+                "repository_snapshot_before": {"head_commit": "a" * 40},
+                "implementation_start_gate_binding": copy.deepcopy(
+                    receipt_binding
+                ),
+                "blockers_after": copy.deepcopy(correction["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    correction["blocker_resolution_ids_after"]
+                ),
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [],
+                "previous_event_sha256": correction["event_sha256"],
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        state["status_by_goal"][graph.FP046_R002_NEXT_GOAL_ID] = "IN_PROGRESS"
+        state["goal_status"] = "IN_PROGRESS"
+        checkpoint["current_work"]["status"] = "IN_PROGRESS"
+        return event
+
+    @classmethod
+    def _correction_authority(
+        cls,
+        seq96_raw: bytes,
+        seq97_raw: bytes,
+    ) -> mock.Mock:
+        authority = mock.Mock()
+        authority.CORRECTED_SEQ96_TEST_REL = cls.HYGIENE_TEST_REL
+        authority.REVIEWED_CONTROL_PATHS = (
+            snapshot_hygiene_correction.REVIEWED_CONTROL_PATHS
+        )
+        authority.require_snapshot_hygiene_corrected_checkpoint.return_value = None
+        authority.reconstructed_seq96_checkpoint_bytes.return_value = seq96_raw
+        authority.canonical_seq97_checkpoint_bytes.return_value = seq97_raw
+        authority.noncredit_snapshot_hygiene_successor_binding.return_value = {
+            "authority_label": "NONCREDIT_SNAPSHOT_HYGIENE_CONTROL_ONLY",
+            "binding": {
+                "path": cls.HYGIENE_TEST_REL.as_posix(),
+                "sha256": graph.continuation.sha256_file(
+                    ROOT / cls.HYGIENE_TEST_REL
+                ),
+                "byte_length": (ROOT / cls.HYGIENE_TEST_REL).stat().st_size,
+            },
+            "credit_boundary": {
+                "actual_device_test_credit_delta": 0,
+                "deployment_credit_delta": 0,
+                "external_review_credit_delta": 0,
+                "formal_test_credit_delta": 0,
+                "implementation_completion_credit_delta": 0,
+                "release_credit_delta": 0,
+            },
+        }
+        authority.noncredit_reviewed_control_successor_bindings.return_value = {
+            "authority_label": "NONCREDIT_REVIEWED_CONTROL_CONTEXT_ONLY",
+            "bindings": [
+                {
+                    "path": relative.as_posix(),
+                    "sha256": graph.continuation.sha256_file(ROOT / relative),
+                    "byte_length": (ROOT / relative).stat().st_size,
+                }
+                for relative in authority.REVIEWED_CONTROL_PATHS
+            ],
+            "credit_boundary": {
+                "actual_device_test_credit_delta": 0,
+                "deployment_credit_delta": 0,
+                "external_review_credit_delta": 0,
+                "formal_test_credit_delta": 0,
+                "implementation_completion_credit_delta": 0,
+                "release_credit_delta": 0,
+            },
+        }
+        return authority
+
+    @staticmethod
+    def _started_authority(
+        seq97_raw: bytes,
+        receipt_binding: dict,
+    ) -> mock.Mock:
+        authority = mock.Mock()
+        authority.require_started_checkpoint.return_value = None
+        authority.reconstructed_seq97_checkpoint_bytes.return_value = seq97_raw
+        authority.goal_start_gate_receipt_binding.return_value = copy.deepcopy(
+            receipt_binding
+        )
+        authority.require_published_r009_gate_for_seq97.return_value = mock.Mock(
+            receipt_binding=copy.deepcopy(receipt_binding)
+        )
+        return authority
+
+    def _fixture(self) -> tuple:
+        harness = Fp048R002Seq96CorrectionSeq97Tests(methodName="runTest")
+        (
+            checkpoint,
+            _seq95_raw,
+            seq96_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            r008_authority,
+            _r008_event,
+        ) = harness._seq96_fixture()
+        self._append_seq97_correction(checkpoint)
+        seq97_raw = self._canonical(checkpoint)
+        return (
+            checkpoint,
+            seq96_raw,
+            seq97_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            r008_authority,
+            self._correction_authority(seq96_raw, seq97_raw),
+            harness,
+        )
+
+    @staticmethod
+    def _validate(
+        fixture: tuple,
+        starter: mock.Mock | None = None,
+    ) -> list[str]:
+        (
+            checkpoint,
+            _seq96_raw,
+            _seq97_raw,
+            old_correction,
+            reanchor,
+            r006_authority,
+            r007_authority,
+            r008_authority,
+            r009_authority,
+            harness,
+        ) = fixture
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_r009_contract_correction_authority",
+            return_value=r009_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r009_started_authority",
+            return_value=starter or mock.Mock(),
+        ):
+            return harness._validate_r008(
+                checkpoint,
+                old_correction,
+                reanchor,
+                r006_authority,
+                r007_authority,
+                r008_authority,
+                harness._seq97_authority(b"", None),
+                harness._gate_authority(),
+            )
+
+    def _seal_context(self, fixture: tuple) -> dict[str, str]:
+        checkpoint, *_rest, r009_authority, _harness = fixture
+        r008_authority = (
+            Fp048R002Seq96CorrectionSeq97Tests
+            ._repository_context_correction_authority()
+        )
+        paths = sorted(
+            {
+                *(path.as_posix() for path in r008_authority.NONCREDIT_FP023_PRODUCT_PATHS),
+                *(
+                    path.as_posix()
+                    for path in r009_authority.REVIEWED_CONTROL_PATHS
+                ),
+            }
+        )
+        path_set, content_set = graph.continuation.working_snapshot_hashes(
+            ROOT,
+            paths,
+        )
+        snapshot = checkpoint["working_tree_snapshot"]
+        snapshot.update(
+            {
+                "managed_changed_paths": paths,
+                "managed_changed_path_count": len(paths),
+                "path_set_sha256": path_set,
+                "content_set_sha256": content_set,
+            }
+        )
+        handoff = checkpoint["session_handoff"]
+        handoff["changed_files"] = paths
+        mirror = handoff["source_commit_or_snapshot"]
+        mirror.update(
+            {
+                "file_count": len(paths),
+                "path_set_sha256": path_set,
+                "content_set_sha256": content_set,
+            }
+        )
+        event = checkpoint["goal_execution"]["transition_history"][96]
+        after = event["repository_context_reanchor"]["after"]
+        after.update(
+            {
+                "base_commit": snapshot["base_head"],
+                "branch": after["logical_branch"],
+                "current_head": mirror["current_head"],
+                "managed_changed_path_count": len(paths),
+                "path_set_sha256": path_set,
+                "content_set_sha256": content_set,
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state = checkpoint["goal_execution"]
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        expected = {
+            binding["path"]: binding["sha256"]
+            for binding in r008_authority
+            .noncredit_fp023_product_successor_bindings.return_value["bindings"]
+        }
+        hygiene = r009_authority
+        hygiene_binding = (
+            hygiene.noncredit_snapshot_hygiene_successor_binding.return_value[
+                "binding"
+            ]
+        )
+        controls = (
+            hygiene.noncredit_reviewed_control_successor_bindings.return_value[
+                "bindings"
+            ]
+        )
+        expected.update(
+            {binding["path"]: binding["sha256"] for binding in controls}
+        )
+        self.assertEqual(expected[hygiene_binding["path"]], hygiene_binding["sha256"])
+        return expected
+
+    def test_exact_seq97_correction_stays_ready_and_reconstructs_seq96(self) -> None:
+        fixture = self._fixture()
+        checkpoint, seq96_raw, *_rest, r009_authority, _harness = fixture
+        self.assertEqual(self._validate(fixture), [])
+        self.assertEqual(checkpoint["goal_execution"]["goal_status"], "READY")
+        self.assertNotIn(
+            "IN_PROGRESS",
+            checkpoint["goal_execution"]["status_by_goal"].values(),
+        )
+        r009_authority.require_snapshot_hygiene_corrected_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=True,
+            run_external_validators=False,
+        )
+        self.assertEqual(
+            r009_authority.reconstructed_seq96_checkpoint_bytes.return_value,
+            seq96_raw,
+        )
+
+    def test_seq97_event_state_and_inverse_tamper_fail_closed(self) -> None:
+        for mutation in ("event", "state", "inverse", "review_authority"):
+            with self.subTest(mutation=mutation):
+                fixture = self._fixture()
+                checkpoint, seq96_raw, *_rest, r009_authority, _harness = fixture
+                event = checkpoint["goal_execution"]["transition_history"][96]
+                if mutation == "event":
+                    event["sequence"] = 97.0
+                elif mutation == "state":
+                    checkpoint["goal_execution"]["goal_status"] = "IN_PROGRESS"
+                elif mutation == "inverse":
+                    r009_authority.reconstructed_seq96_checkpoint_bytes.return_value = (
+                        seq96_raw + b" "
+                    )
+                else:
+                    r009_authority.require_snapshot_hygiene_corrected_checkpoint.side_effect = RuntimeError(
+                        "R009 failure observation or independent review differs"
+                    )
+                if mutation == "event":
+                    event["event_sha256"] = graph.continuation.event_sha256(event)
+                    checkpoint["goal_execution"][
+                        "transition_history_anchor_sha256"
+                    ] = event["event_sha256"]
+                self.assertTrue(self._validate(fixture))
+
+    def test_seq97_self_resealed_snapshot_hash_tamper_fails_closed(self) -> None:
+        fixture = self._fixture()
+        checkpoint, *_rest, r009_authority, _harness = fixture
+        self._seal_context(fixture)
+        snapshot = checkpoint["working_tree_snapshot"]
+        snapshot["content_set_sha256"] = "0" * 64
+        checkpoint["session_handoff"]["source_commit_or_snapshot"][
+            "content_set_sha256"
+        ] = "0" * 64
+        event = checkpoint["goal_execution"]["transition_history"][96]
+        event["repository_context_reanchor"]["after"][
+            "content_set_sha256"
+        ] = "0" * 64
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state = checkpoint["goal_execution"]
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        r008_authority = (
+            Fp048R002Seq96CorrectionSeq97Tests
+            ._repository_context_correction_authority()
+        )
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_r008_contract_correction_authority",
+            return_value=r008_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r009_contract_correction_authority",
+            return_value=r009_authority,
+        ):
+            self.assertIsNone(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+
+    def test_exact_seq98_consumes_only_fresh_r009_receipt(self) -> None:
+        fixture = self._fixture()
+        checkpoint, _seq96_raw, seq97_raw, *_rest = fixture
+        receipt_binding = {
+            "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-"
+            "FP048-R002-20260826-004",
+            "path": "docs/control/execution/goal-gates/"
+            f"{graph.FP048_R002_R009_STARTED_EVENT_ID}/"
+            "implementation-start-gate-receipt.json",
+            "file_sha256": "9" * 64,
+        }
+        self._append_seq98_started(checkpoint, receipt_binding)
+        starter = self._started_authority(seq97_raw, receipt_binding)
+        self.assertEqual(self._validate(fixture, starter), [])
+        starter.require_started_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=True,
+            run_external_validators=False,
+        )
+        self.assertEqual(
+            checkpoint["approved_state"]["release_status"],
+            "NOT_ELIGIBLE",
+        )
+
+    def test_seq98_receipt_inverse_and_credit_tamper_fail_closed(self) -> None:
+        for mutation in ("receipt", "inverse", "credit"):
+            with self.subTest(mutation=mutation):
+                fixture = self._fixture()
+                checkpoint, _seq96_raw, seq97_raw, *_rest = fixture
+                receipt_binding = {
+                    "document_id": "R009",
+                    "path": "r009/implementation-start-gate-receipt.json",
+                    "file_sha256": "9" * 64,
+                }
+                self._append_seq98_started(checkpoint, receipt_binding)
+                starter = self._started_authority(seq97_raw, receipt_binding)
+                if mutation == "receipt":
+                    starter.require_published_r009_gate_for_seq97.return_value = (
+                        mock.Mock(
+                            receipt_binding={
+                                **receipt_binding,
+                                "file_sha256": "0" * 64,
+                            }
+                        )
+                    )
+                elif mutation == "inverse":
+                    starter.reconstructed_seq97_checkpoint_bytes.return_value = (
+                        seq97_raw + b" "
+                    )
+                else:
+                    checkpoint["approved_state"]["release_status"] = "ELIGIBLE"
+                self.assertTrue(self._validate(fixture, starter))
+
+    def test_seq97_and_seq98_terminal_overlay_is_exact_reviewed_zero_credit(
+        self,
+    ) -> None:
+        fixture = self._fixture()
+        checkpoint, _seq96_raw, seq97_raw, *_rest, r009_authority, _harness = fixture
+        expected = self._seal_context(fixture)
+        r008_authority = (
+            Fp048R002Seq96CorrectionSeq97Tests
+            ._repository_context_correction_authority()
+        )
+        starter = self._started_authority(seq97_raw, {"path": "r009"})
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_r008_contract_correction_authority",
+            return_value=r008_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r009_contract_correction_authority",
+            return_value=r009_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r009_started_authority",
+            return_value=starter,
+        ):
+            self.assertEqual(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                ),
+                expected,
+            )
+            self.assertEqual(len(expected), 29)
+            self._append_seq98_started(checkpoint, {"path": "r009"})
+            self.assertEqual(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                ),
+                expected,
+            )
+            controls = (
+                r009_authority
+                .noncredit_reviewed_control_successor_bindings.return_value[
+                    "bindings"
+                ]
+            )
+            controls[0]["byte_length"] += 1
+            self.assertIsNone(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+            controls[0]["byte_length"] -= 1
+            hygiene = (
+                r009_authority
+                .noncredit_snapshot_hygiene_successor_binding.return_value
+            )
+            hygiene["binding"]["byte_length"] += 1
+            self.assertIsNone(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+
+    def test_r009_authority_loaders_require_public_apis(self) -> None:
+        for loader in (
+            graph._fp048_r002_r009_contract_correction_authority,
+            graph._fp048_r002_r009_started_authority,
+        ):
+            with self.subTest(loader=loader.__name__), mock.patch.object(
+                graph.importlib,
+                "import_module",
+                return_value=object(),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "API is missing"):
+                    loader()
+
+
+class Fp048R002CompletionSeq99Seq100Tests(unittest.TestCase):
+    @staticmethod
+    def _checkpoint_bytes(value: dict) -> bytes:
+        return (
+            json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+        ).encode("utf-8")
+
+    def _fixture(self) -> tuple:
+        harness = Fp048R002Seq97CorrectionSeq98Tests(methodName="runTest")
+        start_fixture = harness._fixture()
+        checkpoint = start_fixture[0]
+        harness._seal_context(start_fixture)
+        receipt_binding = {
+            "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-"
+            "FP048-R002-20260826-004",
+            "path": "docs/control/execution/goal-gates/"
+            f"{graph.FP048_R002_R009_STARTED_EVENT_ID}/"
+            "implementation-start-gate-receipt.json",
+            "file_sha256": "e" * 64,
+        }
+        harness._append_seq98_started(checkpoint, receipt_binding)
+        source = copy.deepcopy(checkpoint)
+        source_raw = self._checkpoint_bytes(source)
+        source_tail = source["goal_execution"]["transition_history"][-1]
+        update_at = datetime.fromisoformat(source_tail["occurred_at"]) + timedelta(
+            seconds=1
+        )
+        update = {
+            "sequence": graph.FP048_R002_COMPLETION_EVIDENCE_SEQUENCE,
+            "event_id": graph.FP048_R002_COMPLETION_EVIDENCE_EVENT_ID,
+            "event_type": "CANONICAL_BINDINGS_UPDATED",
+            "occurred_on": update_at.date().isoformat(),
+            "occurred_at": update_at.isoformat(),
+            "previous_event_sha256": source_tail["event_sha256"],
+            "source_checkpoint_binding": {
+                "path": graph.V24_CHECKPOINT_RELATIVE.as_posix(),
+                "sha256": hashlib.sha256(source_raw).hexdigest(),
+                "byte_length": len(source_raw),
+            },
+        }
+        update["event_sha256"] = graph.continuation.event_sha256(update)
+        completion_at = update_at + timedelta(seconds=1)
+        completion = {
+            "sequence": graph.FP048_R002_COMPLETION_SEQUENCE,
+            "event_id": graph.FP048_R002_COMPLETION_EVENT_ID,
+            "event_type": "GOAL_COMPLETED",
+            "occurred_on": completion_at.date().isoformat(),
+            "occurred_at": completion_at.isoformat(),
+            "previous_event_sha256": update["event_sha256"],
+            "canonical_update_event_sha256": update["event_sha256"],
+        }
+        completion["event_sha256"] = graph.continuation.event_sha256(completion)
+        state = checkpoint["goal_execution"]
+        state["transition_history"].extend((update, completion))
+        state["transition_history_anchor_sha256"] = completion["event_sha256"]
+        state["validation_cutoff_at"] = completion["occurred_at"]
+        review_source_binding = copy.deepcopy(update["source_checkpoint_binding"])
+        authority = mock.Mock()
+        authority.CHECKPOINT_REL = graph.V24_CHECKPOINT_RELATIVE
+        authority.started_authority = mock.Mock()
+        authority.reconstructed_seq98_checkpoint_bytes.return_value = source_raw
+        authority.strict_json.side_effect = lambda raw, _label: json.loads(raw)
+        authority.checkpoint_bytes.side_effect = self._checkpoint_bytes
+        authority.sha256_bytes.side_effect = lambda raw: hashlib.sha256(raw).hexdigest()
+        return (
+            checkpoint,
+            source,
+            source_raw,
+            review_source_binding,
+            authority,
+            start_fixture,
+        )
+
+    @staticmethod
+    def _validate(
+        checkpoint: dict,
+        authority: mock.Mock,
+        review_source_binding: dict,
+    ) -> list[str]:
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_completion_authority",
+            return_value=authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r009_started_authority",
+            return_value=authority.started_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_completion_evidence_authority",
+            return_value=(mock.sentinel.evidence, review_source_binding),
+        ):
+            return graph.validate_fp048_r002_completion_seq99_100(ROOT, checkpoint)
+
+    def test_seq99_without_adjacent_seq100_is_rejected(self) -> None:
+        checkpoint, *_rest = self._fixture()
+        state = checkpoint["goal_execution"]
+        state["transition_history"].pop()
+
+        self.assertEqual(
+            graph.validate_fp048_r002_completion_seq99_100(ROOT, checkpoint),
+            [
+                "FP048 R002 seq99 evidence transaction lacks adjacent "
+                "seq100 completion"
+            ],
+        )
+
+    def test_nonexact_seq101_descendant_is_rejected(self) -> None:
+        checkpoint, *_rest = self._fixture()
+        checkpoint["goal_execution"]["transition_history"].append(
+            {"sequence": 101, "event_id": "FORGED"}
+        )
+        self.assertEqual(
+            graph.validate_fp048_r002_completion_seq99_100(ROOT, checkpoint),
+            ["FP048 R002 seq99/100 descendant dispatch differs"],
+        )
+
+    def test_exact_seq100_uses_public_inverse_and_projection_authority(self) -> None:
+        (
+            checkpoint,
+            source,
+            source_raw,
+            review_source_binding,
+            authority,
+            _start_fixture,
+        ) = self._fixture()
+
+        self.assertEqual(
+            self._validate(checkpoint, authority, review_source_binding),
+            [],
+        )
+        authority.reconstructed_seq98_checkpoint_bytes.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+        authority.started_authority.require_started_checkpoint.assert_called_once_with(
+            ROOT,
+            source,
+            require_live_snapshot=False,
+            run_external_validators=False,
+        )
+        authority.validate_projection.assert_called_once_with(
+            ROOT,
+            source,
+            checkpoint,
+            mock.sentinel.evidence,
+        )
+        self.assertEqual(authority.checkpoint_bytes(source), source_raw)
+
+    def test_seq98_source_cas_and_review_tail_tamper_fail_closed(self) -> None:
+        for mutation in ("event_sha256", "event_length", "review_sha256", "review_length"):
+            with self.subTest(mutation=mutation):
+                (
+                    checkpoint,
+                    _source,
+                    _source_raw,
+                    review_source_binding,
+                    authority,
+                    *_rest,
+                ) = self._fixture()
+                update, completion = checkpoint["goal_execution"][
+                    "transition_history"
+                ][-2:]
+                if mutation == "event_sha256":
+                    update["source_checkpoint_binding"]["sha256"] = "0" * 64
+                elif mutation == "event_length":
+                    update["source_checkpoint_binding"]["byte_length"] += 1
+                elif mutation == "review_sha256":
+                    review_source_binding["sha256"] = "0" * 64
+                else:
+                    review_source_binding["byte_length"] += 1
+                if mutation.startswith("event_"):
+                    update["event_sha256"] = graph.continuation.event_sha256(update)
+                    completion["previous_event_sha256"] = update["event_sha256"]
+                    completion["canonical_update_event_sha256"] = update[
+                        "event_sha256"
+                    ]
+                    completion["event_sha256"] = graph.continuation.event_sha256(
+                        completion
+                    )
+
+                errors = self._validate(
+                    checkpoint,
+                    authority,
+                    review_source_binding,
+                )
+
+                self.assertTrue(errors)
+                self.assertIn("source CAS differs", errors[0])
+                authority.validate_projection.assert_not_called()
+
+    def test_exact_seq100_terminal_reconstructs_exact_seq98_authority(self) -> None:
+        (
+            checkpoint,
+            _source,
+            source_raw,
+            _review_source_binding,
+            authority,
+            start_fixture,
+        ) = self._fixture()
+        r009_authority = start_fixture[8]
+        r008_authority = (
+            Fp048R002Seq96CorrectionSeq97Tests
+            ._repository_context_correction_authority()
+        )
+        expected = {
+            binding["path"]: binding["sha256"]
+            for binding in r008_authority
+            .noncredit_fp023_product_successor_bindings.return_value["bindings"]
+        }
+        hygiene = (
+            r009_authority
+            .noncredit_snapshot_hygiene_successor_binding.return_value[
+                "binding"
+            ]
+        )
+        controls = (
+            r009_authority
+            .noncredit_reviewed_control_successor_bindings.return_value[
+                "bindings"
+            ]
+        )
+        expected.update(
+            {binding["path"]: binding["sha256"] for binding in controls}
+        )
+        self.assertEqual(expected[hygiene["path"]], hygiene["sha256"])
+        with mock.patch.object(
+            graph,
+            "validate_fp048_r002_completion_seq99_100",
+            return_value=[],
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_completion_authority",
+            return_value=authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r008_contract_correction_authority",
+            return_value=r008_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r009_contract_correction_authority",
+            return_value=r009_authority,
+        ), mock.patch.object(
+            graph,
+            "_fp048_r002_r009_started_authority",
+            return_value=authority.started_authority,
+        ):
+            self.assertEqual(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                ),
+                expected,
+            )
+            authority.reconstructed_seq98_checkpoint_bytes.return_value = (
+                source_raw + b" "
+            )
+            self.assertIsNone(
+                graph._fp048_r002_repository_context_live_successors(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+
+
+class Fp048R002Seq98CorrectionSeq99Tests(unittest.TestCase):
+    CORRECTION_TYPE = "GOAL_START_GATE_EXECUTION_CORRECTED"
+
+    def test_runtime_mapping_guard_is_imported(self) -> None:
+        self.assertTrue(isinstance({}, graph.Mapping))
+
+    def test_seq98_live_phase_is_private_and_direct_drift_fails(self) -> None:
+        authority = mock.Mock()
+        graph._require_fp048_r002_seq98_execution_correction(
+            ROOT,
+            {},
+            authority,
+            historical_successor_source=True,
+        )
+        graph._require_fp048_r002_seq98_execution_correction(
+            ROOT,
+            {},
+            authority,
+            historical_successor_source=False,
+        )
+        self.assertEqual(
+            [
+                call.kwargs["require_live_snapshot"]
+                for call in authority
+                .require_start_gate_execution_corrected_checkpoint.call_args_list
+            ],
+            [False, True],
+        )
+        authority.require_start_gate_execution_corrected_checkpoint.side_effect = (
+            RuntimeError("direct seq98 live drift")
+        )
+        with self.assertRaisesRegex(RuntimeError, "direct seq98 live drift"):
+            graph._require_fp048_r002_seq98_execution_correction(
+                ROOT,
+                {},
+                authority,
+                historical_successor_source=False,
+            )
+
+    def test_reviewed_control_phase_overlay_keeps_active_digest(self) -> None:
+        path = Path("control/shared.py")
+        zero_credit = {
+            "actual_device_test_credit_delta": 0,
+            "deployment_credit_delta": 0,
+            "external_review_credit_delta": 0,
+            "formal_test_credit_delta": 0,
+            "implementation_completion_credit_delta": 0,
+            "release_credit_delta": 0,
+        }
+
+        def authority(digest: str) -> mock.Mock:
+            value = mock.Mock()
+            value.REVIEWED_CONTROL_PATHS = (path,)
+            value.noncredit_reviewed_control_successor_bindings.return_value = {
+                "authority_label": "NONCREDIT_REVIEWED_CONTROL_CONTEXT_ONLY",
+                "bindings": [
+                    {
+                        "path": path.as_posix(),
+                        "sha256": digest,
+                        "byte_length": 3,
+                    }
+                ],
+                "credit_boundary": copy.deepcopy(zero_credit),
+            }
+            return value
+
+        historical = authority("1" * 64)
+        active = authority("2" * 64)
+        old_rows, active_rows = graph._fp048_r002_reviewed_control_phase_overlays(
+            ROOT,
+            historical,
+            {"phase": "seq98"},
+            active,
+            {"phase": "seq99"},
+            active_require_live_snapshot=True,
+        )
+        bindings: list[dict] = []
+        for owner, rows in ((historical, old_rows), (active, active_rows)):
+            overlaid = graph._fp048_r002_overlay_reviewed_control_successors(
+                bindings,
+                owner,
+                rows,
+            )
+            self.assertIsNotNone(overlaid)
+            bindings = overlaid[0]
+        self.assertEqual(bindings[0]["sha256"], "2" * 64)
+        self.assertFalse(
+            historical.noncredit_reviewed_control_successor_bindings
+            .call_args.kwargs["require_live_snapshot"]
+        )
+        self.assertTrue(
+            active.noncredit_reviewed_control_successor_bindings
+            .call_args.kwargs["require_live_snapshot"]
+        )
+
+    def test_reviewed_control_phase_overlay_marks_projection_nonlive(self) -> None:
+        active = mock.Mock()
+        active.noncredit_reviewed_control_successor_bindings.return_value = {}
+
+        _historical_rows, active_rows = (
+            graph._fp048_r002_reviewed_control_phase_overlays(
+                ROOT,
+                None,
+                {"phase": "seq98"},
+                active,
+                {"phase": "seq99-projected"},
+                active_require_live_snapshot=False,
+            )
+        )
+
+        self.assertEqual(active_rows, {})
+        self.assertFalse(
+            active.noncredit_reviewed_control_successor_bindings
+            .call_args.kwargs["require_live_snapshot"]
+        )
+
+    def test_required_repository_aggregate_failure_propagates(self) -> None:
+        active = {
+            "goal_execution": {
+                "transition_history": [
+                    {"sequence": sequence}
+                    for sequence in range(
+                        1,
+                        graph.FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE
+                        + 1,
+                    )
+                ]
+            }
+        }
+        predecessor = {"control/shared.py": ("1" * 64, "1" * 64)}
+        empty_edges = {"modified": []}
+        with (
+            mock.patch.object(
+                graph,
+                "_fp048_r002_seq85_to_seq87_successor_edges",
+                return_value=empty_edges,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_noncredit_successor_edges",
+                return_value=empty_edges,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_repository_context_live_successors",
+                return_value=None,
+            ),
+        ):
+            self.assertIsNone(
+                graph._compose_fp048_r002_reviewed_noncredit_successors(
+                    ROOT,
+                    active,
+                    predecessor,
+                )
+            )
+            with mock.patch.object(
+                graph,
+                "_fp048_r002_control_reanchor_is_declared",
+                return_value=True,
+            ):
+                self.assertEqual(
+                    graph.validate_fp048_r002_reviewed_noncredit_successors(
+                        ROOT,
+                        active,
+                    ),
+                    [
+                        "FP048 R002 reviewed noncredit successor authority differs"
+                    ],
+                )
+
+        historical = copy.deepcopy(active)
+        historical["goal_execution"]["transition_history"] = historical[
+            "goal_execution"
+        ]["transition_history"][:95]
+        with (
+            mock.patch.object(
+                graph,
+                "_fp048_r002_seq85_to_seq87_successor_edges",
+                return_value=empty_edges,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_noncredit_successor_edges",
+                return_value=empty_edges,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_repository_context_live_successors",
+                return_value=None,
+            ),
+        ):
+            self.assertEqual(
+                graph._compose_fp048_r002_reviewed_noncredit_successors(
+                    ROOT,
+                    historical,
+                    predecessor,
+                ),
+                predecessor,
+            )
+
+    @classmethod
+    def _seq98(cls) -> tuple[dict, mock.Mock]:
+        history = [
+            {
+                "sequence": sequence,
+                "event_id": f"SYNTHETIC-{sequence}",
+                "event_type": "SYNTHETIC",
+                "event_sha256": f"{sequence % 10}" * 64,
+            }
+            for sequence in range(1, 98)
+        ]
+        source = history[-1]
+        event = {
+            "sequence": graph.FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE,
+            "event_id": graph.FP048_R002_R009_EXECUTION_CORRECTION_EVENT_ID,
+            "event_type": cls.CORRECTION_TYPE,
+            "from_status": "READY",
+            "to_status": "READY",
+            "status_changes": {},
+            "previous_event_sha256": source["event_sha256"],
+        }
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        history.append(event)
+        authority = mock.Mock()
+        authority.CORRECTION_EVENT_TYPE = cls.CORRECTION_TYPE
+        return {"goal_execution": {"transition_history": history}}, authority
+
+    @staticmethod
+    def _append_seq99(checkpoint: dict, receipt: dict) -> dict:
+        history = checkpoint["goal_execution"]["transition_history"]
+        correction = history[-1]
+        event = {
+            field: None for field in graph.continuation.V24_FIRST_START_EVENT_FIELDS
+        }
+        event.update(
+            {
+                "sequence": graph.FP048_R002_R010_STARTED_SEQUENCE,
+                "event_id": graph.FP048_R002_R010_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "status_changes": {
+                    graph.FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"
+                },
+                "implementation_start_gate_binding": copy.deepcopy(receipt),
+                "previous_event_sha256": correction["event_sha256"],
+            }
+        )
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        history.append(event)
+        return event
+
+    def test_exact_seq98_correction_and_seq99_start_dispatch(self) -> None:
+        checkpoint, authority = self._seq98()
+        correction = graph._fp048_r002_seq98_r010_dispatch_event(
+            checkpoint,
+            authority,
+        )
+        self.assertEqual(
+            correction["event_id"],
+            graph.FP048_R002_R009_EXECUTION_CORRECTION_EVENT_ID,
+        )
+        receipt = {"path": "r010/implementation-start-gate-receipt.json"}
+        started = self._append_seq99(checkpoint, receipt)
+        self.assertIs(
+            graph._fp048_r002_seq99_r010_started_event(checkpoint, receipt),
+            started,
+        )
+
+    def test_legacy_seq98_and_resealed_tamper_fail_closed(self) -> None:
+        checkpoint, authority = self._seq98()
+        checkpoint["goal_execution"]["transition_history"][-1] = {
+            "sequence": graph.FP048_R002_R009_STARTED_SEQUENCE,
+            "event_id": graph.FP048_R002_R009_STARTED_EVENT_ID,
+            "event_type": "GOAL_STARTED",
+        }
+        with self.assertRaisesRegex(RuntimeError, "legacy direct seq98 R009"):
+            graph._fp048_r002_seq98_r010_dispatch_event(checkpoint, authority)
+
+        checkpoint, authority = self._seq98()
+        event = checkpoint["goal_execution"]["transition_history"][-1]
+        event["sequence"] = 98.0
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        with self.assertRaisesRegex(RuntimeError, "execution-correction"):
+            graph._fp048_r002_seq98_r010_dispatch_event(checkpoint, authority)
+
+    def test_new_authority_loaders_require_complete_public_surfaces(self) -> None:
+        for loader in (
+            graph._fp048_r002_r009_execution_correction_authority,
+            graph._fp048_r002_r010_started_authority,
+        ):
+            with self.subTest(loader=loader.__name__), mock.patch.object(
+                graph.importlib,
+                "import_module",
+                return_value=object(),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "API is missing"):
+                    loader()
+
+    def test_reviewed_control_overlay_is_exact_and_zero_credit(self) -> None:
+        authority = mock.Mock()
+        authority.REVIEWED_CONTROL_PATHS = (
+            Path("control/shared.py"),
+            Path("control/successor.py"),
+        )
+        predecessor = [
+            {
+                "path": "control/shared.py",
+                "sha256": "1" * 64,
+                "byte_length": 1,
+            },
+            {
+                "path": "product/kept.py",
+                "sha256": "2" * 64,
+                "byte_length": 2,
+            },
+        ]
+        reviewed = {
+            "authority_label": "NONCREDIT_REVIEWED_CONTROL_CONTEXT_ONLY",
+            "bindings": [
+                {
+                    "path": "control/shared.py",
+                    "sha256": "3" * 64,
+                    "byte_length": 3,
+                },
+                {
+                    "path": "control/successor.py",
+                    "sha256": "4" * 64,
+                    "byte_length": 4,
+                },
+            ],
+            "credit_boundary": {
+                "actual_device_test_credit_delta": 0,
+                "deployment_credit_delta": 0,
+                "external_review_credit_delta": 0,
+                "formal_test_credit_delta": 0,
+                "implementation_completion_credit_delta": 0,
+                "release_credit_delta": 0,
+            },
+        }
+        expected = [predecessor[1], *reviewed["bindings"]]
+        self.assertEqual(
+            graph._fp048_r002_overlay_reviewed_control_successors(
+                predecessor,
+                authority,
+                reviewed,
+            ),
+            (expected, authority.REVIEWED_CONTROL_PATHS),
+        )
+        for mutation in ("credit", "path", "size"):
+            with self.subTest(mutation=mutation):
+                tampered = copy.deepcopy(reviewed)
+                if mutation == "credit":
+                    tampered["credit_boundary"]["release_credit_delta"] = True
+                elif mutation == "path":
+                    tampered["bindings"][0]["path"] = "control/forged.py"
+                else:
+                    tampered["bindings"][0]["byte_length"] = True
+                self.assertIsNone(
+                    graph._fp048_r002_overlay_reviewed_control_successors(
+                        predecessor,
+                        authority,
+                        tampered,
+                    )
+                )
+
+
+class Fp048R002SuccessorSeq99Seq102Tests(unittest.TestCase):
+    @classmethod
+    def _checkpoint(cls, length: int) -> dict[str, object]:
+        history: list[dict[str, object]] = [
+            {"sequence": sequence, "event_id": f"SYNTHETIC-{sequence}"}
+            for sequence in range(1, length + 1)
+        ]
+        history[97] = {
+            "sequence": 98,
+            "event_id": graph.FP048_R002_R009_EXECUTION_CORRECTION_EVENT_ID,
+            "event_type": "GOAL_START_GATE_EXECUTION_CORRECTED",
+            "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+            "from_status": "READY",
+            "to_status": "READY",
+            "status_changes": {},
+        }
+        if length >= 99:
+            history[98] = {
+                "sequence": 99,
+                "event_id": graph.FP048_R002_SUCCESSOR_CORRECTION_EVENT_ID,
+                "event_type": "GOAL_START_GATE_EXECUTION_CORRECTED",
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+            }
+        if length >= 100:
+            history[99] = {
+                "sequence": 100,
+                "event_id": graph.FP048_R002_SUCCESSOR_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "status_changes": {
+                    graph.FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"
+                },
+            }
+        if length >= 101:
+            history[100] = {
+                "sequence": 101,
+                "event_id": graph.FP048_R002_SUCCESSOR_EVIDENCE_EVENT_ID,
+                "event_type": "CANONICAL_BINDINGS_UPDATED",
+                "produced_by_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "IN_PROGRESS",
+                "to_status": "IN_PROGRESS",
+                "status_changes": {},
+            }
+        if length >= 102:
+            history[101] = {
+                "sequence": 102,
+                "event_id": graph.FP048_R002_SUCCESSOR_COMPLETION_EVENT_ID,
+                "event_type": "GOAL_COMPLETED",
+                "subject_goal_id": graph.FP046_R002_NEXT_GOAL_ID,
+                "from_status": "IN_PROGRESS",
+                "to_status": "COMPLETE_AT_TARGET",
+                "status_changes": {
+                    graph.FP046_R002_NEXT_GOAL_ID: "COMPLETE_AT_TARGET"
+                },
+            }
+        return {"goal_execution": {"transition_history": history}}
+
+    @staticmethod
+    def _raw(checkpoint: dict[str, object]) -> bytes:
+        return (
+            json.dumps(checkpoint, ensure_ascii=False, indent=2) + "\n"
+        ).encode("utf-8")
+
+    def _authorities(self) -> tuple[mock.Mock, mock.Mock, mock.Mock]:
+        correction = mock.Mock()
+        correction.reconstructed_seq98_checkpoint_bytes.return_value = self._raw(
+            self._checkpoint(98)
+        )
+        starter = mock.Mock()
+        starter.reconstructed_seq99_checkpoint_bytes.return_value = self._raw(
+            self._checkpoint(99)
+        )
+        completion = mock.Mock()
+        completion.reconstructed_seq100_checkpoint_bytes.return_value = self._raw(
+            self._checkpoint(100)
+        )
+        return correction, starter, completion
+
+    def test_seq99_seq100_and_adjacent_seq102_are_dispatched(self) -> None:
+        for length in (99, 100, 102):
+            with self.subTest(length=length):
+                correction, starter, completion = self._authorities()
+                with (
+                    mock.patch.object(
+                        graph,
+                        "_fp048_r002_successor_correction_authority",
+                        return_value=correction,
+                    ),
+                    mock.patch.object(
+                        graph,
+                        "_fp048_r002_successor_started_authority",
+                        return_value=starter,
+                    ),
+                    mock.patch.object(
+                        graph,
+                        "_fp048_r002_successor_completion_authority",
+                        return_value=completion,
+                    ),
+                ):
+                    self.assertEqual(
+                        graph.validate_fp048_r002_successor_seq99_102(
+                            ROOT,
+                            self._checkpoint(length),
+                            require_live_snapshot=True,
+                        ),
+                        [],
+                    )
+                self.assertEqual(
+                    correction.require_start_gate_execution_corrected_checkpoint.call_count,
+                    int(length == 99),
+                )
+                if length == 99:
+                    self.assertTrue(
+                        correction.require_start_gate_execution_corrected_checkpoint
+                        .call_args.kwargs["require_live_snapshot"]
+                    )
+                self.assertEqual(
+                    starter.require_started_checkpoint.call_count,
+                    int(length >= 100),
+                )
+                if length >= 100:
+                    self.assertEqual(
+                        starter.require_started_checkpoint.call_args.kwargs[
+                            "require_live_snapshot"
+                        ],
+                        length == 100,
+                    )
+                self.assertEqual(
+                    completion.require_completed_checkpoint.call_count,
+                    int(length == 102),
+                )
+                if length == 102:
+                    self.assertTrue(
+                        completion.require_completed_checkpoint.call_args.kwargs[
+                            "require_live_snapshot"
+                        ]
+                    )
+
+    def test_projected_seq102_uses_nonlive_chain_and_live_drift_fails(self) -> None:
+        correction, starter, completion = self._authorities()
+        checkpoint = self._checkpoint(102)
+        with (
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_correction_authority",
+                return_value=correction,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_started_authority",
+                return_value=starter,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_completion_authority",
+                return_value=completion,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_is_live_checkpoint",
+                return_value=False,
+            ),
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_successor_seq99_102(
+                    ROOT,
+                    checkpoint,
+                ),
+                [],
+            )
+        correction.require_start_gate_execution_corrected_checkpoint.assert_not_called()
+        for validator in (
+            starter.require_started_checkpoint,
+            completion.require_completed_checkpoint,
+        ):
+            self.assertFalse(
+                validator.call_args.kwargs["require_live_snapshot"]
+            )
+
+        completion.require_completed_checkpoint.side_effect = RuntimeError(
+            "live checkpoint drift"
+        )
+        with (
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_correction_authority",
+                return_value=correction,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_started_authority",
+                return_value=starter,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_completion_authority",
+                return_value=completion,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_is_live_checkpoint",
+                return_value=True,
+            ),
+        ):
+            errors = graph.validate_fp048_r002_successor_seq99_102(
+                ROOT,
+                checkpoint,
+            )
+        self.assertTrue(any("live checkpoint drift" in error for error in errors))
+
+    def test_projected_seq99_uses_inverse_validation_without_precheck(self) -> None:
+        correction, starter, completion = self._authorities()
+        with (
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_correction_authority",
+                return_value=correction,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_started_authority",
+                return_value=starter,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_completion_authority",
+                return_value=completion,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_is_live_checkpoint",
+                return_value=False,
+            ),
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_successor_seq99_102(
+                    ROOT,
+                    self._checkpoint(99),
+                    require_live_snapshot=False,
+                ),
+                [],
+            )
+        correction.require_start_gate_execution_corrected_checkpoint.assert_not_called()
+        correction.reconstructed_seq98_checkpoint_bytes.assert_called_once()
+
+    def test_explicit_false_cannot_downgrade_live_and_io_fails_closed(self) -> None:
+        checkpoint = self._checkpoint(99)
+        correction, starter, completion = self._authorities()
+        with (
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_correction_authority",
+                return_value=correction,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_started_authority",
+                return_value=starter,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_completion_authority",
+                return_value=completion,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_is_live_checkpoint",
+                return_value=True,
+            ),
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_successor_seq99_102(
+                    ROOT,
+                    checkpoint,
+                    require_live_snapshot=False,
+                ),
+                [],
+            )
+        self.assertTrue(
+            correction.require_start_gate_execution_corrected_checkpoint
+            .call_args.kwargs["require_live_snapshot"]
+        )
+
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_successor_is_live_checkpoint",
+            side_effect=ValueError("live checkpoint cannot be read"),
+        ), mock.patch.object(
+            graph.importlib,
+            "import_module",
+            side_effect=AssertionError("authority load must remain fail-closed"),
+        ):
+            errors = graph.validate_fp048_r002_successor_seq99_102(
+                ROOT,
+                checkpoint,
+                require_live_snapshot=False,
+            )
+        self.assertTrue(
+            any("live checkpoint cannot be read" in error for error in errors)
+        )
+
+    def test_noncanonical_successor_inverse_is_rejected(self) -> None:
+        correction, starter, completion = self._authorities()
+        correction.reconstructed_seq98_checkpoint_bytes.return_value += b" "
+        with (
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_correction_authority",
+                return_value=correction,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_started_authority",
+                return_value=starter,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_successor_completion_authority",
+                return_value=completion,
+            ),
+        ):
+            errors = graph.validate_fp048_r002_successor_seq99_102(
+                ROOT,
+                self._checkpoint(99),
+                require_live_snapshot=False,
+            )
+        self.assertTrue(any("noncanonical" in error for error in errors))
+
+    def test_seq101_without_adjacent_seq102_is_rejected_before_import(self) -> None:
+        with mock.patch.object(
+            graph.importlib,
+            "import_module",
+            side_effect=AssertionError("successor authority must stay lazy"),
+        ):
+            errors = graph.validate_fp048_r002_successor_seq99_102(
+                ROOT,
+                self._checkpoint(101),
+            )
+        self.assertTrue(any("lacks adjacent seq102" in error for error in errors))
+
+    def test_bool_sequence_and_wrong_identity_are_rejected(self) -> None:
+        mutations = {
+            "bool sequence": {"sequence": True},
+            "wrong event ID": {"event_id": "FORGED-SEQ99"},
+            "wrong event type": {"event_type": "GOAL_STARTED"},
+        }
+        for label, mutation in mutations.items():
+            with self.subTest(label=label):
+                checkpoint = self._checkpoint(99)
+                checkpoint["goal_execution"]["transition_history"][-1].update(
+                    mutation
+                )
+                errors = graph.validate_fp048_r002_successor_seq99_102(
+                    ROOT,
+                    checkpoint,
+                )
+                self.assertTrue(errors)
+                self.assertIn("identity or status differs", errors[0])
+
+    def test_failed_r010_direct_seq99_is_rejected(self) -> None:
+        checkpoint = self._checkpoint(99)
+        checkpoint["goal_execution"]["transition_history"][-1].update(
+            {
+                "event_id": graph.FP048_R002_R010_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+            }
+        )
+        errors = graph.validate_fp048_r002_successor_seq99_102(ROOT, checkpoint)
+        self.assertTrue(any("legacy failed R010" in error for error in errors))
+
+    def test_historical_seq98_does_not_import_successor_modules(self) -> None:
+        with mock.patch.object(
+            graph.importlib,
+            "import_module",
+            side_effect=AssertionError("historical seq98 must remain isolated"),
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_successor_seq99_102(
+                    ROOT,
+                    self._checkpoint(98),
+                ),
+                [],
+            )
+
+    def test_authority_loaders_import_only_the_exact_successor_modules(self) -> None:
+        modules = {
+            graph.FP048_R002_SUCCESSOR_CORRECTION_MODULE: mock.Mock(),
+            graph.FP048_R002_SUCCESSOR_STARTED_MODULE: mock.Mock(),
+            graph.FP048_R002_SUCCESSOR_COMPLETION_MODULE: mock.Mock(),
+        }
+        with mock.patch.object(
+            graph.importlib,
+            "import_module",
+            side_effect=modules.__getitem__,
+        ) as importer:
+            self.assertIs(
+                graph._fp048_r002_successor_correction_authority(),
+                modules[graph.FP048_R002_SUCCESSOR_CORRECTION_MODULE],
+            )
+            self.assertIs(
+                graph._fp048_r002_successor_started_authority(),
+                modules[graph.FP048_R002_SUCCESSOR_STARTED_MODULE],
+            )
+            self.assertIs(
+                graph._fp048_r002_successor_completion_authority(),
+                modules[graph.FP048_R002_SUCCESSOR_COMPLETION_MODULE],
+            )
+        self.assertEqual(
+            importer.call_args_list,
+            [
+                mock.call(graph.FP048_R002_SUCCESSOR_CORRECTION_MODULE),
+                mock.call(graph.FP048_R002_SUCCESSOR_STARTED_MODULE),
+                mock.call(graph.FP048_R002_SUCCESSOR_COMPLETION_MODULE),
+            ],
+        )
+
+    def test_completion_producer_hook_uses_the_successor_dispatch(self) -> None:
+        checkpoint = self._checkpoint(102)
+        with mock.patch.object(
+            graph,
+            "validate_fp048_r002_successor_seq99_102",
+            return_value=["sentinel"],
+        ) as validator:
+            self.assertEqual(
+                graph.validate_fp048_r002_completion_seq101_102(
+                    ROOT,
+                    checkpoint,
+                ),
+                ["sentinel"],
+            )
+        validator.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+        )
+
+
+class Fp048R002CompletionSeq100Seq101Tests(unittest.TestCase):
+    @staticmethod
+    def _checkpoint(length: int) -> dict:
+        history = [
+            {"sequence": sequence, "event_id": f"SYNTHETIC-{sequence}"}
+            for sequence in range(1, length + 1)
+        ]
+        if length >= 99:
+            source = {
+                "sequence": 99,
+                "event_id": graph.FP048_R002_R010_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+            }
+            source["event_sha256"] = graph.continuation.event_sha256(source)
+            history[98] = source
+        if length >= 100:
+            update = {
+                "sequence": 100,
+                "event_id": graph.FP048_R002_COMPLETION_EVIDENCE_EVENT_ID,
+                "event_type": "CANONICAL_BINDINGS_UPDATED",
+                "occurred_at": "2026-08-27T02:00:00+09:00",
+                "previous_event_sha256": history[98]["event_sha256"],
+                "source_checkpoint_binding": {"path": "checkpoint"},
+            }
+            update["event_sha256"] = graph.continuation.event_sha256(update)
+            history[99] = update
+        if length >= 101:
+            completion = {
+                "sequence": 101,
+                "event_id": graph.FP048_R002_COMPLETION_EVENT_ID,
+                "event_type": "GOAL_COMPLETED",
+                "occurred_at": "2026-08-27T02:00:01+09:00",
+                "previous_event_sha256": history[99]["event_sha256"],
+                "canonical_update_event_sha256": history[99]["event_sha256"],
+            }
+            completion["event_sha256"] = graph.continuation.event_sha256(
+                completion
+            )
+            history[100] = completion
+        return {"goal_execution": {"transition_history": history}}
+
+    def test_seq100_requires_adjacent_seq101(self) -> None:
+        self.assertEqual(
+            graph.validate_fp048_r002_completion_seq100_101(
+                ROOT,
+                self._checkpoint(100),
+            ),
+            [
+                "FP048 R002 seq100 evidence transaction lacks adjacent "
+                "seq101 completion"
+            ],
+        )
+
+    def test_completion_evidence_loader_matches_sealed_assignment_cas_subset(
+        self,
+    ) -> None:
+        authority = mock.Mock()
+        authority.COMPLETION_RECEIPT_REL = Path("reviews/completion-receipt.json")
+        authority.COMPLETION_ROLE = "FP048_COMPLETION"
+        authority.COMPLETION_DOCUMENT_ID = "FP048-COMPLETION-RECEIPT"
+        authority.GOAL_ID = graph.FP046_R002_NEXT_GOAL_ID
+        authority.ZERO_CREDIT_BOUNDARY = {"release_credit_delta": 0}
+        authority.REVIEW_ASSIGNMENT_REL = Path("reviews/assignment.json")
+        authority.REVIEW_RESULT_REL = Path("reviews/result.json")
+        authority.INDEPENDENT_REVIEW_REL = Path("reviews/independent.json")
+        authority.CHECKPOINT_REL = graph.V24_CHECKPOINT_RELATIVE
+        authority.sha256_bytes.side_effect = (
+            lambda raw: hashlib.sha256(raw).hexdigest()
+        )
+        authority.json_bytes.side_effect = (
+            lambda value: (json.dumps(value, sort_keys=True) + "\n").encode()
+        )
+        authority.CompletionEvidence.side_effect = lambda **values: values
+
+        restored_raw = b'{"source":"seq99"}\n'
+        common_cas = {
+            "path": authority.CHECKPOINT_REL.as_posix(),
+            "sha256": hashlib.sha256(restored_raw).hexdigest(),
+            "byte_length": len(restored_raw),
+        }
+        assignment = {
+            "source_checkpoint_binding": {
+                **common_cas,
+                "sequence": graph.FP048_R002_COMPLETION_SOURCE_SEQUENCE,
+                "tail_event_id": graph.FP048_R002_R010_STARTED_EVENT_ID,
+                "tail_event_sha256": "a" * 64,
+            }
+        }
+        authority.expected_review_assignment.return_value = assignment
+        receipt = {
+            "document_id": authority.COMPLETION_DOCUMENT_ID,
+            "goal_id": authority.GOAL_ID,
+            "completion_boundary": authority.ZERO_CREDIT_BOUNDARY,
+            "verification_evidence": {
+                "execution_window": {
+                    "ended_at": "2026-08-27T03:00:00+09:00"
+                }
+            },
+        }
+        result = {"decision": "APPROVED"}
+        independent = {"decision": "CONCUR"}
+        documents = {
+            authority.COMPLETION_RECEIPT_REL: receipt,
+            authority.REVIEW_ASSIGNMENT_REL: assignment,
+            authority.REVIEW_RESULT_REL: result,
+            authority.INDEPENDENT_REVIEW_REL: independent,
+        }
+        raws = {
+            path: authority.json_bytes(value)
+            for path, value in documents.items()
+        }
+        review_binding = {
+            role: {
+                "path": path.as_posix(),
+                "sha256": hashlib.sha256(raws[path]).hexdigest(),
+                "byte_length": len(raws[path]),
+            }
+            for role, path in {
+                "assignment": authority.REVIEW_ASSIGNMENT_REL,
+                "review_result": authority.REVIEW_RESULT_REL,
+                "independent_review": authority.INDEPENDENT_REVIEW_REL,
+            }.items()
+        }
+        reviewed = mock.Mock(
+            binding=copy.deepcopy(review_binding),
+            latest_review_at="2026-08-27T03:01:00+09:00",
+        )
+        authority.validate_review_authority.return_value = reviewed
+        receipt_binding = {
+            "role": authority.COMPLETION_ROLE,
+            "document_id": authority.COMPLETION_DOCUMENT_ID,
+            "path": authority.COMPLETION_RECEIPT_REL.as_posix(),
+            "file_sha256": hashlib.sha256(
+                raws[authority.COMPLETION_RECEIPT_REL]
+            ).hexdigest(),
+        }
+        update = {
+            "producer_completion_receipt_binding": receipt_binding,
+            "transition_control_review_binding": review_binding,
+        }
+        completion = {
+            "completion_receipt_binding": receipt_binding,
+            "completion_evidence_bindings": {
+                authority.COMPLETION_ROLE: receipt_binding
+            },
+        }
+
+        def load_document(
+            _root: Path,
+            relative: Path,
+            _authority: object,
+            _label: str,
+        ) -> tuple[bytes, dict]:
+            return raws[relative], copy.deepcopy(documents[relative])
+
+        with mock.patch.object(
+            graph,
+            "_fp048_r002_completion_private_json",
+            side_effect=load_document,
+        ):
+            _evidence, source_cas = (
+                graph._fp048_r002_completion_evidence_authority(
+                    ROOT,
+                    {},
+                    authority,
+                    update,
+                    completion,
+                    restored_raw,
+                    {},
+                )
+            )
+            self.assertEqual(source_cas, common_cas)
+
+            assignment["source_checkpoint_binding"]["sha256"] = "0" * 64
+            authority.expected_review_assignment.return_value = assignment
+            raws[authority.REVIEW_ASSIGNMENT_REL] = authority.json_bytes(
+                assignment
+            )
+            update["transition_control_review_binding"]["assignment"] = {
+                "path": authority.REVIEW_ASSIGNMENT_REL.as_posix(),
+                "sha256": hashlib.sha256(
+                    raws[authority.REVIEW_ASSIGNMENT_REL]
+                ).hexdigest(),
+                "byte_length": len(raws[authority.REVIEW_ASSIGNMENT_REL]),
+            }
+            authority.validate_review_authority.return_value.binding = copy.deepcopy(
+                update["transition_control_review_binding"]
+            )
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "completion independent review authority differs",
+            ):
+                graph._fp048_r002_completion_evidence_authority(
+                    ROOT,
+                    {},
+                    authority,
+                    update,
+                    completion,
+                    restored_raw,
+                    {},
+                )
+
+    def test_completion_loader_pins_receipt_and_review_paths(self) -> None:
+        authority = mock.Mock()
+        authority.SOURCE_SEQUENCE = graph.FP048_R002_COMPLETION_SOURCE_SEQUENCE
+        authority.EVIDENCE_SEQUENCE = graph.FP048_R002_COMPLETION_EVIDENCE_SEQUENCE
+        authority.COMPLETION_SEQUENCE = graph.FP048_R002_COMPLETION_SEQUENCE
+        authority.EVIDENCE_EVENT_ID = graph.FP048_R002_COMPLETION_EVIDENCE_EVENT_ID
+        authority.COMPLETION_EVENT_ID = graph.FP048_R002_COMPLETION_EVENT_ID
+        authority.COMPLETION_RECEIPT_REL = graph.FP048_R002_COMPLETION_RECEIPT_REL
+        authority.REVIEW_ROOT = graph.FP048_R002_COMPLETION_REVIEW_ROOT
+        with mock.patch.object(
+            graph.importlib,
+            "import_module",
+            return_value=authority,
+        ):
+            self.assertIs(graph._fp048_r002_completion_authority(), authority)
+            authority.REVIEW_ROOT = Path("forged-review-root")
+            with self.assertRaisesRegex(RuntimeError, "constant differs"):
+                graph._fp048_r002_completion_authority()
+
+    def test_exact_seq101_uses_seq99_inverse_and_projection(self) -> None:
+        checkpoint = self._checkpoint(101)
+        source = self._checkpoint(99)
+        raw = (json.dumps(source, sort_keys=True) + "\n").encode()
+        binding = {
+            "path": graph.V24_CHECKPOINT_RELATIVE.as_posix(),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "byte_length": len(raw),
+        }
+        checkpoint["goal_execution"]["transition_history"][99][
+            "source_checkpoint_binding"
+        ] = copy.deepcopy(binding)
+        checkpoint["goal_execution"]["transition_history"][99][
+            "event_sha256"
+        ] = graph.continuation.event_sha256(
+            checkpoint["goal_execution"]["transition_history"][99]
+        )
+        update = checkpoint["goal_execution"]["transition_history"][99]
+        completion = checkpoint["goal_execution"]["transition_history"][100]
+        completion["previous_event_sha256"] = update["event_sha256"]
+        completion["canonical_update_event_sha256"] = update["event_sha256"]
+        completion["event_sha256"] = graph.continuation.event_sha256(completion)
+        authority = mock.Mock()
+        authority.CHECKPOINT_REL = graph.V24_CHECKPOINT_RELATIVE
+        authority.reconstructed_seq99_checkpoint_bytes.return_value = raw
+        authority.checkpoint_bytes.side_effect = (
+            lambda value: (json.dumps(value, sort_keys=True) + "\n").encode()
+        )
+        authority.sha256_bytes.side_effect = (
+            lambda value: hashlib.sha256(value).hexdigest()
+        )
+        starter = mock.Mock()
+        with (
+            mock.patch.object(
+                graph,
+                "_fp048_r002_completion_authority",
+                return_value=authority,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_r010_started_authority",
+                return_value=starter,
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_completion_evidence_authority",
+                return_value=(mock.sentinel.evidence, binding),
+            ),
+            mock.patch.object(
+                graph,
+                "_fp048_r002_zero_credit_boundary_matches",
+                return_value=True,
+            ),
+        ):
+            self.assertEqual(
+                graph.validate_fp048_r002_completion_seq100_101(
+                    ROOT,
+                    checkpoint,
+                ),
+                [],
+            )
+        authority.validate_projection.assert_called_once_with(
+            ROOT,
+            source,
+            checkpoint,
+            mock.sentinel.evidence,
+        )
+
+    def test_seq101_projection_tamper_fails_closed(self) -> None:
+        checkpoint = self._checkpoint(101)
+        checkpoint["goal_execution"]["transition_history"][-1][
+            "canonical_update_event_sha256"
+        ] = "0" * 64
+        errors = graph.validate_fp048_r002_completion_seq100_101(
+            ROOT,
+            checkpoint,
+        )
+        self.assertTrue(errors)
+        self.assertIn("identity or adjacency differs", errors[0])
 
 
 if __name__ == "__main__":

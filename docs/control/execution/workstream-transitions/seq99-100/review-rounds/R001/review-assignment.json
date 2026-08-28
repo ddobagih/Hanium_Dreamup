@@ -1,0 +1,362 @@
+{
+  "authorization_binding": {
+    "byte_length": 11522,
+    "path": "docs/control/execution/workstream-transitions/seq99-100/authorization.json",
+    "sha256": "60496500b9f40cd68992eeb16881ce80e6545b22663414f91c2a73177d89ed01"
+  },
+  "candidate_status": "FINAL_REVIEW_CANDIDATE",
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "document_id": "WS-FP048-R002-SEQ99-100-REVIEW-ASSIGNMENT-20260827-R001",
+  "evidence_type": "TRANSITION_CONTROL_REVIEW_ASSIGNMENT",
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "previous_contract_binding": {
+    "canonical_contract_sha256": "0428342409bb1210563a579d153ed025ff6ce1ca636a874c1532bb2423fedf1e",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R010",
+    "contract_version": "2026-08-27.1",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260827-010",
+    "file_sha256": "6bbb426e5b00f7f886e376587d06b42a97b1a5b04683d685f701e2ca0a04120e",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r010.json",
+    "schema_version": "1.2"
+  },
+  "producer": {
+    "id": "codex-fp048-r002-seq99-r010-correction-producer-20260827",
+    "task_id": "/root/seq99_correction_impl"
+  },
+  "r010_execution_failure": {
+    "all_checks_exit_code": 0,
+    "authority_status": "NONAUTHORITY",
+    "contract_binding": {
+      "canonical_contract_sha256": "0428342409bb1210563a579d153ed025ff6ce1ca636a874c1532bb2423fedf1e",
+      "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R010",
+      "contract_version": "2026-08-27.1",
+      "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260827-010",
+      "file_sha256": "6bbb426e5b00f7f886e376587d06b42a97b1a5b04683d685f701e2ca0a04120e",
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r010.json",
+      "schema_version": "1.2"
+    },
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R010",
+    "contract_version": "2026-08-27.1",
+    "directory": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005",
+    "directory_authority": {
+      "mode": "0700",
+      "nlink": 2,
+      "owner_uid": 1000
+    },
+    "error": "R010 start namespace unexpectedly exists",
+    "error_type": "GateError",
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005",
+    "event_identity_status": "CONSUMED_FAILED_NO_RECEIPT",
+    "failure_phase": "POST_CHECK_CONTEXT_REVALIDATION",
+    "logs": [
+      {
+        "byte_length": 39,
+        "check_id": "CONTINUATION",
+        "exit_code": 0,
+        "mode": "0600",
+        "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/01-CONTINUATION.log",
+        "sha256": "25b5c8cf65854e11a04a9d0810dd2503585037683809c153f578c08a076ac5a7"
+      },
+      {
+        "byte_length": 108,
+        "check_id": "GOAL_GRAPH",
+        "exit_code": 0,
+        "mode": "0600",
+        "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/02-GOAL_GRAPH.log",
+        "sha256": "f880c51e169f2a6f03875ab90156c15b9c5ce260ed0761b0048556b08d089516"
+      },
+      {
+        "byte_length": 35,
+        "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+        "exit_code": 0,
+        "mode": "0600",
+        "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/03-TEST_LAYER_REGISTRY_VALIDATE.log",
+        "sha256": "1eef448a998bf080cbe648b330b4c9369d49ea95bbccf662ce8d077b56c96187"
+      },
+      {
+        "byte_length": 111,
+        "check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+        "exit_code": 0,
+        "mode": "0600",
+        "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/04-ROOT_FP048_R002_CONTROL_REGRESSION.log",
+        "sha256": "85e8a0864f4bd46be2f7b2f2dccbce80c712a9d300fa88c1f41a5fbdd6bb923a"
+      },
+      {
+        "byte_length": 259587,
+        "check_id": "REPOSITORY_STATE",
+        "exit_code": 0,
+        "mode": "0600",
+        "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/05-REPOSITORY_STATE.log",
+        "sha256": "e3ef5e355c085633c057640739c7d94914065ea6e527a08faf19e742911a2853"
+      }
+    ],
+    "namespace_present": true,
+    "reason_code": "R010_POST_CHECK_CONTEXT_REVALIDATION_REJECTED_OWN_EVENT_NAMESPACE",
+    "receipt_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/implementation-start-gate-receipt.json",
+    "receipt_present": false,
+    "receipt_stage_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/.implementation-start-gate-receipt.json.staging",
+    "receipt_stage_present": false,
+    "replacement_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-006",
+    "runner_binding": {
+      "byte_length": 39666,
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r010_20260827.py",
+      "sha256": "10c60b71893a84f28466331b26efde212af3d13c8a996c6e350b3ec5faacd6e5"
+    },
+    "runner_exit_code": 2,
+    "status": "FAILED_AFTER_ALL_CHECKS_BEFORE_RECEIPT"
+  },
+  "replacement_contract_binding": {
+    "canonical_contract_sha256": "0cfd22fef38acac7c61e8102ebc7b2c1c4f46c371e3b2a1c8c8a00afc449d43e",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R011",
+    "contract_version": "2026-08-27.2",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260827-011",
+    "file_sha256": "05e771dcbdcca9c48c1fd2b6af77f50b5c6b7112aa712ff41e9a3326131b86df",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r011.json",
+    "schema_version": "1.2"
+  },
+  "replacement_runner_binding": {
+    "byte_length": 38068,
+    "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r011_20260827.py",
+    "sha256": "b93434471cb578a6806bd7dddb94c4f95dc74d853b3d63647b27f47fb3cb3e0d"
+  },
+  "required_findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0
+  },
+  "required_independent_reviewer": {
+    "id": "codex-fp048-r002-seq99-correction-independent-reviewer-20260827",
+    "task_id": "/root/seq99_correction_independent_review"
+  },
+  "required_primary_reviewer": {
+    "id": "codex-fp048-r002-seq99-correction-primary-reviewer-20260827",
+    "task_id": "/root/seq99_correction_primary_review"
+  },
+  "reviewed_control_inputs": [
+    {
+      "byte_length": 4485,
+      "path": ".gitignore",
+      "sha256": "2870d3d01da10787855b5af666788f9f0f697c233b53394104eef831deb2c3e1"
+    },
+    {
+      "byte_length": 1777,
+      "path": "configs/walksafe_node_toolchain_lock_20260715.json",
+      "sha256": "3b71481dee20943c6a7039315068809c6858c720bfc9df9133d43048b7b7b1a3"
+    },
+    {
+      "byte_length": 3447,
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r011.json",
+      "sha256": "05e771dcbdcca9c48c1fd2b6af77f50b5c6b7112aa712ff41e9a3326131b86df"
+    },
+    {
+      "byte_length": 73137,
+      "path": "scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py",
+      "sha256": "6b1038129a8783ad1c7c11f6066d1c1758705b358c8c0a6034553fcda4d17f7c"
+    },
+    {
+      "byte_length": 105892,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py",
+      "sha256": "f5d8ac24d05b3a0e98ece7d5d977219c37859d44d5540ba991749cbffdd63ac2"
+    },
+    {
+      "byte_length": 48004,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq100_20260827.py",
+      "sha256": "eff19f646f9e63eec4276a5c77709557f8d9076e2c15af26e50ca221e6401c34"
+    },
+    {
+      "byte_length": 71950,
+      "path": "scripts/apply_walksafe_fp048_r002_start_gate_execution_correction_seq99_20260827.py",
+      "sha256": "9875c60c93f64832e1042fd99a3ec4d4da566b33e0a9bb71b0a8b8fea3d806eb"
+    },
+    {
+      "byte_length": 968566,
+      "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+      "sha256": "09b025876d7063be9f8c6a1186c11a19e2bb03551e79eb48c76c941600ad61cd"
+    },
+    {
+      "byte_length": 26757,
+      "path": "scripts/check_walksafe_node_toolchain_20260715.py",
+      "sha256": "dd88cd342addda35bc486440091e39e3b16d064c89e0f79d62fc3c03d21cdcfe"
+    },
+    {
+      "byte_length": 705178,
+      "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+      "sha256": "ad8f99cdac2adf5e53160f920da9ea27e85db83ac2cd6caf0ec6b65fe4602cec"
+    },
+    {
+      "byte_length": 169971,
+      "path": "scripts/run_walksafe_fp008_goal_start_gate_20260803.py",
+      "sha256": "bf37db58a84e09f2adcee0318385a8b980504b19dec2edc5c75d75a68e89d3d7"
+    },
+    {
+      "byte_length": 38068,
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r011_20260827.py",
+      "sha256": "b93434471cb578a6806bd7dddb94c4f95dc74d853b3d63647b27f47fb3cb3e0d"
+    },
+    {
+      "byte_length": 29183,
+      "path": "scripts/run_walksafe_test_layers_current.sh",
+      "sha256": "b21e4df076604cd0626f8a3b331e5e1e72b160ab49985f6915ced8bb7b78fa76"
+    },
+    {
+      "byte_length": 26198,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py",
+      "sha256": "a6d12e95e169b563f4d1642460da36c27cc43884836931ea65f81276c4fa71ad"
+    },
+    {
+      "byte_length": 17617,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq100_20260827.py",
+      "sha256": "57e578ec97ac380439c2a289ae540ceb7305f72b5ab75151c8b9b2953f8a4d02"
+    },
+    {
+      "byte_length": 17177,
+      "path": "tests/test_apply_walksafe_fp048_r002_start_gate_execution_correction_seq99_20260827.py",
+      "sha256": "57bd3f6c82ba8b8a7d392d31294505b7948ac8e1e8d158d6b2c0dd253f6fe909"
+    },
+    {
+      "byte_length": 51335,
+      "path": "tests/test_repository_catalogs.py",
+      "sha256": "8f08d1fadbc7a4ddb4a55de02d70af6e27b9a39fc07f38b91e008b70733ab118"
+    },
+    {
+      "byte_length": 59246,
+      "path": "tests/test_walksafe_fp008_goal_start_gate_20260803.py",
+      "sha256": "dff83f9566f541934d8aab87b1e4cf073fed212236818b56ba0c24565f9ddf6d"
+    },
+    {
+      "byte_length": 41222,
+      "path": "tests/test_walksafe_fp048_goal_completed_seq43_44_20260802.py",
+      "sha256": "6004935a29f7c7727bfcf65dba1fea5ebef73b0a26f6494af9338cf732ede589"
+    },
+    {
+      "byte_length": 30868,
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r011_20260827.py",
+      "sha256": "78169a0dee6be655d4ba8c826cff906c669e906ca12c4c46aac0fba8909c5eb0"
+    },
+    {
+      "byte_length": 2915,
+      "path": "tests/test_walksafe_fp048_r002_post_seq99_stage_regression_20260827.py",
+      "sha256": "701f4f1d5bd0c072e715da2e7eb2af89d76a6452f5f65c833629f676b5a6db1f"
+    },
+    {
+      "byte_length": 694585,
+      "path": "tests/test_walksafe_goal_graph_v2_4.py",
+      "sha256": "384cf4a3a6e988f0a9def3dd9917e5564f6b7be07ba0ac707c87232c09d75e15"
+    },
+    {
+      "byte_length": 375452,
+      "path": "tests/test_walksafe_project_continuation_v2_4.py",
+      "sha256": "5af1b0472b74b0235099d2bd056f1df9ae2647c2304baaff4f0e5725d80aef8e"
+    }
+  ],
+  "round_id": "R001",
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 5076973,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "r010_execution_failure": {
+      "all_checks_exit_code": 0,
+      "authority_status": "NONAUTHORITY",
+      "contract_binding": {
+        "canonical_contract_sha256": "0428342409bb1210563a579d153ed025ff6ce1ca636a874c1532bb2423fedf1e",
+        "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R010",
+        "contract_version": "2026-08-27.1",
+        "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260827-010",
+        "file_sha256": "6bbb426e5b00f7f886e376587d06b42a97b1a5b04683d685f701e2ca0a04120e",
+        "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r010.json",
+        "schema_version": "1.2"
+      },
+      "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R010",
+      "contract_version": "2026-08-27.1",
+      "directory": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005",
+      "directory_authority": {
+        "mode": "0700",
+        "nlink": 2,
+        "owner_uid": 1000
+      },
+      "error": "R010 start namespace unexpectedly exists",
+      "error_type": "GateError",
+      "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005",
+      "event_identity_status": "CONSUMED_FAILED_NO_RECEIPT",
+      "failure_phase": "POST_CHECK_CONTEXT_REVALIDATION",
+      "logs": [
+        {
+          "byte_length": 39,
+          "check_id": "CONTINUATION",
+          "exit_code": 0,
+          "mode": "0600",
+          "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/01-CONTINUATION.log",
+          "sha256": "25b5c8cf65854e11a04a9d0810dd2503585037683809c153f578c08a076ac5a7"
+        },
+        {
+          "byte_length": 108,
+          "check_id": "GOAL_GRAPH",
+          "exit_code": 0,
+          "mode": "0600",
+          "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/02-GOAL_GRAPH.log",
+          "sha256": "f880c51e169f2a6f03875ab90156c15b9c5ce260ed0761b0048556b08d089516"
+        },
+        {
+          "byte_length": 35,
+          "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+          "exit_code": 0,
+          "mode": "0600",
+          "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/03-TEST_LAYER_REGISTRY_VALIDATE.log",
+          "sha256": "1eef448a998bf080cbe648b330b4c9369d49ea95bbccf662ce8d077b56c96187"
+        },
+        {
+          "byte_length": 111,
+          "check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+          "exit_code": 0,
+          "mode": "0600",
+          "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/04-ROOT_FP048_R002_CONTROL_REGRESSION.log",
+          "sha256": "85e8a0864f4bd46be2f7b2f2dccbce80c712a9d300fa88c1f41a5fbdd6bb923a"
+        },
+        {
+          "byte_length": 259587,
+          "check_id": "REPOSITORY_STATE",
+          "exit_code": 0,
+          "mode": "0600",
+          "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/05-REPOSITORY_STATE.log",
+          "sha256": "e3ef5e355c085633c057640739c7d94914065ea6e527a08faf19e742911a2853"
+        }
+      ],
+      "namespace_present": true,
+      "reason_code": "R010_POST_CHECK_CONTEXT_REVALIDATION_REJECTED_OWN_EVENT_NAMESPACE",
+      "receipt_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/implementation-start-gate-receipt.json",
+      "receipt_present": false,
+      "receipt_stage_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005/.implementation-start-gate-receipt.json.staging",
+      "receipt_stage_present": false,
+      "replacement_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-006",
+      "runner_binding": {
+        "byte_length": 39666,
+        "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r010_20260827.py",
+        "sha256": "10c60b71893a84f28466331b26efde212af3d13c8a996c6e350b3ec5faacd6e5"
+      },
+      "runner_exit_code": 2,
+      "status": "FAILED_AFTER_ALL_CHECKS_BEFORE_RECEIPT"
+    },
+    "sequence": 98,
+    "sha256": "79c194f1293205b81c8d56920a9c610af5ba8d308a30c273c72eb4a05fec41f5",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-EXECUTION-CORRECTED-FP048-R002-20260827-006",
+    "tail_event_sha256": "13c1de237df551d943027aa5b944d84dcae24ce06132c80febbb69bf45220bbd"
+  }
+}

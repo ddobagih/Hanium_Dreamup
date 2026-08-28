@@ -1,0 +1,522 @@
+.....FF............F.......FFFFFFFF.FFFFFF.............................. [ 90%]
+........                                                                 [100%]
+=================================== FAILURES ===================================
+___________ test_public_sequences_source_cas_and_reviewer_are_exact ____________
+
+    def test_public_sequences_source_cas_and_reviewer_are_exact() -> None:
+>       raw, source = _source()
+                      ^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:146: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+________ test_stale_rounds_are_exact_unapproved_and_distinct_from_r004 _________
+
+    def test_stale_rounds_are_exact_unapproved_and_distinct_from_r004() -> None:
+        correction._require_immutable_review_lineage(ROOT)
+        assert correction._observed_binding(
+            ROOT, correction.AUTHORIZATION_REL
+        ) == correction.AUTHORIZATION_BINDING
+        assert correction._observed_binding(
+            ROOT, correction.R001_REVIEW_ASSIGNMENT_REL
+        ) == correction.R001_REVIEW_ASSIGNMENT_BINDING
+        assert not os.path.lexists(ROOT / correction.R001_REVIEW_RESULT_REL)
+        assert not os.path.lexists(ROOT / correction.R001_INDEPENDENT_REVIEW_REL)
+        assert correction._observed_binding(
+            ROOT, correction.R002_REVIEW_ASSIGNMENT_REL
+        ) == correction.R002_REVIEW_ASSIGNMENT_BINDING
+        assert not os.path.lexists(ROOT / correction.R002_REVIEW_RESULT_REL)
+        assert not os.path.lexists(ROOT / correction.R002_INDEPENDENT_REVIEW_REL)
+        assert correction._observed_binding(
+            ROOT, correction.R003_REVIEW_ASSIGNMENT_REL
+        ) == correction.R003_REVIEW_ASSIGNMENT_BINDING
+        assert not os.path.lexists(ROOT / correction.R003_REVIEW_RESULT_REL)
+        assert not os.path.lexists(ROOT / correction.R003_INDEPENDENT_REVIEW_REL)
+        assert correction.R001_REVIEW_ROOT != correction.REVIEW_ROOT
+        assert correction.R002_REVIEW_ROOT != correction.REVIEW_ROOT
+        assert correction.R003_REVIEW_ROOT != correction.REVIEW_ROOT
+>       _source_raw, source = correction.load_exact_seq96_source(ROOT)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:187: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+_________ test_r008_failure_observation_is_exact_and_namespace_absent __________
+
+    def test_r008_failure_observation_is_exact_and_namespace_absent() -> None:
+>       observed = correction.r008_preflight_attempt_004_observation(ROOT)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:260: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:611: in r008_preflight_attempt_004_observation
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'R008 preflight changed the seq96 checkpoint'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: R008 preflight changed the seq96 checkpoint
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+____ test_public_reviewed_control_successor_historical_and_live_boundaries _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77ef1baa6480>
+
+    def test_public_reviewed_control_successor_historical_and_live_boundaries(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       projected, assignment_raw, rows = _public_review_fixture()
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:403: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:95: in _public_review_fixture
+    projected, event = _projected()
+                       ^^^^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:120: in _projected
+    _raw, source = _source()
+                   ^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+___ test_public_reviewed_control_successor_rejects_unpublished_and_tampered ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77ef1b2b0c20>
+
+    def test_public_reviewed_control_successor_rejects_unpublished_and_tampered(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       projected, assignment_raw, _rows = _public_review_fixture()
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:471: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:95: in _public_review_fixture
+    projected, event = _projected()
+                       ^^^^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:120: in _projected
+    _raw, source = _source()
+                   ^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+______ test_public_reviewed_control_successor_accepts_only_seq97_or_seq98 ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77ef1bdd4560>
+
+    def test_public_reviewed_control_successor_accepts_only_seq97_or_seq98(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       projected, assignment_raw, rows = _public_review_fixture()
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:531: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:95: in _public_review_fixture
+    projected, event = _projected()
+                       ^^^^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:120: in _projected
+    _raw, source = _source()
+                   ^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+__________ test_review_manifest_is_deterministic_and_side_effect_free __________
+
+    def test_review_manifest_is_deterministic_and_side_effect_free() -> None:
+        candidate_paths = (correction.AUTHORIZATION_REL, *correction.REVIEW_PATHS)
+        before = {
+            path: (ROOT / path).read_bytes() if (ROOT / path).is_file() else None
+            for path in candidate_paths
+        }
+>       first = correction.prepare_review_manifest(ROOT)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:615: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:1082: in prepare_review_manifest
+    _raw, source = load_exact_seq96_source(root)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+__________ test_starter_mutation_changes_candidate_assignment_binding __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77ef1ba33c50>
+
+    def test_starter_mutation_changes_candidate_assignment_binding(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       _raw, source = _source()
+                       ^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:651: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+_________ test_project_seq97_is_ready_to_ready_and_strict_zero_credit __________
+
+    def test_project_seq97_is_ready_to_ready_and_strict_zero_credit() -> None:
+>       projected, event = _projected()
+                           ^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:672: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:120: in _projected
+    _raw, source = _source()
+                   ^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+______ test_projection_rejects_bool_sequence_and_changed_r008_observation ______
+
+    def test_projection_rejects_bool_sequence_and_changed_r008_observation() -> None:
+>       _raw, source = _source()
+                       ^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:708: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+_____ test_historical_inverse_restores_exact_seq96_without_live_pin_replay _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77ef1b9fcf20>
+
+    def test_historical_inverse_restores_exact_seq96_without_live_pin_replay(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       projected, event = _projected()
+                           ^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:743: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:120: in _projected
+    _raw, source = _source()
+                   ^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+___________ test_historical_validator_rejects_resealed_bool_sequence ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77ef1ba0e1e0>
+
+    def test_historical_validator_rejects_resealed_bool_sequence(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       projected, event = _projected()
+                           ^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:830: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:120: in _projected
+    _raw, source = _source()
+                   ^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+_______ test_physical_authorization_and_review_are_schema_and_mode_exact _______
+
+tmp_path = PosixPath('/tmp/walksafe-fp008-authority-n5cdavo5/runtime/tmp/pytest-of-ddobagi/pytest-0/test_physical_authorization_an0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77ef1c1bd580>
+
+    def test_physical_authorization_and_review_are_schema_and_mode_exact(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       _raw, source = _source()
+                       ^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:871: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+__________ test_write_uses_commit_guard_and_checks_terminal_authority __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77ef1ba0e7b0>
+
+    def test_write_uses_commit_guard_and_checks_terminal_authority(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       projected, event = _projected()
+                           ^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:1068: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:120: in _projected
+    _raw, source = _source()
+                   ^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+__________________ test_write_reports_postcommit_uncertainty ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77ef1ba39910>
+
+    def test_write_reports_postcommit_uncertainty(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+>       projected, event = _projected()
+                           ^^^^^^^^^^^^
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:1111: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:120: in _projected
+    _raw, source = _source()
+                   ^^^^^^^^^
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:37: in _source
+    return correction.load_exact_seq96_source(ROOT)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:588: in load_exact_seq96_source
+    require_exact_seq96_source(observed.raw, source, root)
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:564: in require_exact_seq96_source
+    require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'exact published seq96 source differs'
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise SnapshotHygieneCorrectionError(message)
+E           scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.SnapshotHygieneCorrectionError: exact published seq96 source differs
+
+scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:42: SnapshotHygieneCorrectionError
+____________________ test_cli_review_preview_writes_nothing ____________________
+
+capsys = <_pytest.capture.CaptureFixture object at 0x77ef1c1a0710>
+
+    def test_cli_review_preview_writes_nothing(
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        candidate_paths = (correction.AUTHORIZATION_REL, *correction.REVIEW_PATHS)
+        before = {
+            path: (ROOT / path).read_bytes() if (ROOT / path).is_file() else None
+            for path in candidate_paths
+        }
+>       assert correction.main(["--prepare-review"]) == 0
+E       AssertionError: assert 2 == 0
+E        +  where 2 = <function main at 0x77ef1c0a6b60>(['--prepare-review'])
+E        +    where <function main at 0x77ef1c0a6b60> = correction.main
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:1146: AssertionError
+----------------------------- Captured stderr call -----------------------------
+FP048-R002 seq97 snapshot-hygiene correction: FAIL: exact published seq96 source differs
+______________ test_cli_authorization_outputs_canonical_document _______________
+
+capsysbinary = <_pytest.capture.CaptureFixture object at 0x77ef1bdd4d40>
+
+    def test_cli_authorization_outputs_canonical_document(
+        capsysbinary: pytest.CaptureFixture[bytes],
+    ) -> None:
+>       assert correction.main(["--prepare-authorization"]) == 0
+E       AssertionError: assert 2 == 0
+E        +  where 2 = <function main at 0x77ef1c0a6b60>(['--prepare-authorization'])
+E        +    where <function main at 0x77ef1c0a6b60> = correction.main
+
+tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py:1159: AssertionError
+----------------------------- Captured stderr call -----------------------------
+FP048-R002 seq97 snapshot-hygiene correction: FAIL: exact published seq96 source differs
+=========================== short test summary info ============================
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_public_sequences_source_cas_and_reviewer_are_exact
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_stale_rounds_are_exact_unapproved_and_distinct_from_r004
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_r008_failure_observation_is_exact_and_namespace_absent
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_public_reviewed_control_successor_historical_and_live_boundaries
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_public_reviewed_control_successor_rejects_unpublished_and_tampered
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_public_reviewed_control_successor_accepts_only_seq97_or_seq98
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_review_manifest_is_deterministic_and_side_effect_free
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_starter_mutation_changes_candidate_assignment_binding
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_project_seq97_is_ready_to_ready_and_strict_zero_credit
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_projection_rejects_bool_sequence_and_changed_r008_observation
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_historical_inverse_restores_exact_seq96_without_live_pin_replay
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_historical_validator_rejects_resealed_bool_sequence
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_physical_authorization_and_review_are_schema_and_mode_exact
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_write_uses_commit_guard_and_checks_terminal_authority
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_write_reports_postcommit_uncertainty
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_cli_review_preview_writes_nothing
+FAILED tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py::test_cli_authorization_outputs_canonical_document
+17 failed, 63 passed in 8.04s

@@ -1,0 +1,31 @@
+{
+  "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R001",
+  "contract_version": "2026-08-25.1",
+  "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260825-001",
+  "gate_purpose": "INITIAL_START",
+  "ordered_checks": [
+    {
+      "check_id": "CONTINUATION",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json"
+    },
+    {
+      "check_id": "GOAL_GRAPH",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_goal_graph_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json"
+    },
+    {
+      "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "command": "PYTHON_BIN=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python bash scripts/run_walksafe_test_layers_current.sh validate"
+    },
+    {
+      "check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_apply_walksafe_fp048_r002_goal_seq88_89_20260825.py tests/test_walksafe_fp048_r002_goal_start_gate_20260825.py tests/test_apply_walksafe_fp048_r002_goal_started_seq90_20260825.py"
+    },
+    {
+      "check_id": "REPOSITORY_STATE",
+      "command": ": \"${WALKSAFE_GATE_EVENT_ID:?required}\" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json --print-gate-repository-state --gate-event-id \"${WALKSAFE_GATE_EVENT_ID}\""
+    }
+  ],
+  "schema_version": "1.0",
+  "target_goal_content_sha256": "c7632800335cd9f816b382d91ea0420a53741ae7648c04c5e9c36c3e9fc42014",
+  "target_goal_id": "WS-GOAL-EPIC-03-FP-048-R002"
+}

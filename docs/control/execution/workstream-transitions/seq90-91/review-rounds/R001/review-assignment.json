@@ -1,0 +1,162 @@
+{
+  "assigner": {
+    "id": "codex-root",
+    "task_id": "/root"
+  },
+  "authorization_binding": {
+    "byte_length": 2497,
+    "path": "docs/control/execution/workstream-transitions/seq90-91/authorization.json",
+    "sha256": "4a9071d1ea76355d8b13891120838bf703e751d4e46c65edec5b3d1285c96d92"
+  },
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "document_id": "WS-FP048-R002-SEQ90-91-REVIEW-ASSIGNMENT-20260826-R001",
+  "executor": {
+    "id": "codex-fp048-r002-seq90-control-executor-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl"
+  },
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "noncredit_successor_edges": {
+    "added": [
+      {
+        "path": "apps/android-gateway/test/state-encryption-maintenance.test.ts",
+        "successor": {
+          "byte_length": 17531,
+          "path": "apps/android-gateway/test/state-encryption-maintenance.test.ts",
+          "sha256": "eac9e46c24983c6df91d7b67ce8e3cbdde00797d2fc528fb54577610e27f3f52"
+        }
+      }
+    ],
+    "modified": [
+      {
+        "path": "apps/android-gateway/src/state-encryption-maintenance.ts",
+        "predecessor": {
+          "byte_length": 16946,
+          "path": "apps/android-gateway/src/state-encryption-maintenance.ts",
+          "sha256": "bcb80213d814ef348730ddd7115a54b873b70bdd5d6754bf55430e903ea4c68f"
+        },
+        "successor": {
+          "byte_length": 18311,
+          "path": "apps/android-gateway/src/state-encryption-maintenance.ts",
+          "sha256": "231a40b684a7fb3b5ab4a61b93fe2531552504b15448ed6840013f254ccb1184"
+        }
+      }
+    ]
+  },
+  "noncredit_successor_edges_sha256": "ea4c8560bcd2b1b17a33a37898cb17f979465f7884f853149a31efc527013d62",
+  "projected_transition": {
+    "reanchor_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP048-R002-20260826-001",
+    "reanchor_sequence": 90,
+    "reanchor_status_change": {},
+    "reanchor_transition": "READY_TO_READY",
+    "started_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-001",
+    "started_sequence": 91,
+    "started_transition": "READY_TO_IN_PROGRESS_AFTER_FRESH_PASS"
+  },
+  "replacement_contract_binding": {
+    "canonical_contract_sha256": "acce118275edf5ec5b808069e7be3c2a6bef35ddddb239233a5249899d19e776",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R002",
+    "contract_version": "2026-08-26.1",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-002",
+    "file_sha256": "35d346b8c87dc3c9bdbbbb2ba450177873c8a71d36df927ad0123c3d9524fdce",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r002.json",
+    "schema_version": "1.1"
+  },
+  "required_reviewer": {
+    "id": "codex-fp048-r002-seq90-independent-reviewer-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl/seq90_independent_review"
+  },
+  "review_scope": [
+    "exact seq89 source CAS and append-only seq90 lineage",
+    "runtime final Git-visible managed cohort",
+    "exact noncredit FP048 product predecessor/successor edges",
+    "READY-to-READY status and zero-credit boundary",
+    "R002 five-check private gate and conditional seq91 start",
+    "source/review/ABA drift fail-closed behavior"
+  ],
+  "reviewed_control_inputs": [
+    {
+      "byte_length": 3752,
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r002.json",
+      "sha256": "35d346b8c87dc3c9bdbbbb2ba450177873c8a71d36df927ad0123c3d9524fdce"
+    },
+    {
+      "byte_length": 70447,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py",
+      "sha256": "046ae80c55a2d48922bf1be4f36fb127c9cb1b3385dd70d4b290ee65c2cb4b7c"
+    },
+    {
+      "byte_length": 4795,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py",
+      "sha256": "a1d9253f1bc70a43812c54a403f70b9c6999d2cbd9181fd15e29ec75ee1d49fc"
+    },
+    {
+      "byte_length": 33721,
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r002_20260826.py",
+      "sha256": "1af6109e840a2a56cb4622dccfb9eacbae6e15632f4035a329eecfe90dd5b097"
+    },
+    {
+      "byte_length": 14895,
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r002_20260826.py",
+      "sha256": "252f56aaaefa8eb55ba60a4a49cde25fd875296110efcd4060867ef425592cd1"
+    },
+    {
+      "byte_length": 23620,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq91_20260826.py",
+      "sha256": "ac3d624024ccd19f75c1b1746252527e90e3b20265635540cf0418d9f4c311c6"
+    },
+    {
+      "byte_length": 11803,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq91_20260826.py",
+      "sha256": "1b43c892f91a5d5656c9079c7a6b62de8277e20de49d5129282f46e5681be108"
+    },
+    {
+      "byte_length": 475384,
+      "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+      "sha256": "776960bf8c708f2d3bf331a16326b295e405005519ff80af48cbbe5a06aafd04"
+    },
+    {
+      "byte_length": 240836,
+      "path": "tests/test_walksafe_project_continuation_v2_4.py",
+      "sha256": "8a123d77c7a68ea1cbcfa1c2f4e1849ddba2b58a298d7fd3a0554f2f3c632ab8"
+    },
+    {
+      "byte_length": 741100,
+      "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+      "sha256": "d2424b9524e6d300f2ce92c09f7ae31de941d62f984bde7c0afcbed85be37af3"
+    },
+    {
+      "byte_length": 468676,
+      "path": "tests/test_walksafe_goal_graph_v2_4.py",
+      "sha256": "4e9b8d480ed1ec36b16108741603840af4cf92944b2f7e6ea1f3c206aa099307"
+    }
+  ],
+  "round_id": "WS-FP048-R002-SEQ90-91-REVIEW-20260826-R001",
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 2600767,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "sequence": 89,
+    "sha256": "c2ce759ff1b469d31dba266a47a91ca1e835869c011b6bed067fe6963c578e3d",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP048-R002-20260825-001",
+    "tail_event_sha256": "bb2594af4342c156df68a1b10b6c806ae91b4694edec864bb16f56236c8c53b0"
+  }
+}

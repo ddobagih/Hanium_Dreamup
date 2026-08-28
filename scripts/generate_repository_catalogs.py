@@ -22,6 +22,41 @@ OUTPUT_PATHS = (
     "docs/catalogs/tests.json",
 )
 CHECKPOINT_PATH = "docs/control/walksafe-project-continuation-checkpoint.json"
+FP046_R002_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP046-R002-20260823-001"
+)
+FP046_R002_PRESERVED_REVIEW_ASSIGNMENT_PATHS = (
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R001/review-assignment.json",
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R002/review-assignment.json",
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R003/review-assignment.json",
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R004/review-assignment.json",
+)
+FP046_R002_APPROVED_R005_REVIEW_EVIDENCE_PATHS = (
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R005/review-assignment.json",
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R005/review-result.json",
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R005/independent-review.json",
+)
+FP046_R002_ACTIVE_R006_REVIEW_EVIDENCE_PATHS = (
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R006/review-assignment.json",
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R006/review-result.json",
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R006/independent-review.json",
+)
+FP046_R002_MANAGED_REVIEW_EVIDENCE_PATHS = (
+    FP046_R002_PRESERVED_REVIEW_ASSIGNMENT_PATHS
+    + FP046_R002_APPROVED_R005_REVIEW_EVIDENCE_PATHS
+    + FP046_R002_ACTIVE_R006_REVIEW_EVIDENCE_PATHS
+)
 CURRENT_TEST_RUNNER_PATH = "scripts/run_walksafe_test_layers_current.sh"
 EXPECTED_ACTIVE_SESSION_TESTS = frozenset(
     {"tests/test_walksafe_project_continuation_v2_4.py"}
@@ -43,6 +78,7 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'data_sources/scripts/build_walksafe_v1.py',
         'data_sources/scripts/inspect_aihub513_validation.py',
         'data_sources/scripts/prepare_tactile_damage_area_review_decisions.py',
+        'scripts/account_deletion_worker.py',
         'scripts/aihub_label_first_download_20260602.sh',
         'scripts/apply_walksafe_fp008_goal_completed_seq49_50_20260809.py',
         'scripts/apply_walksafe_fp008_goal_seq45_46_20260803.py',
@@ -53,8 +89,39 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'scripts/apply_walksafe_fp046_goal_started_seq53_20260809.py',
         'scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py',
         'scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py',
+        'scripts/apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py',
+        'scripts/apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824.py',
+        'scripts/apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py',
+        'scripts/apply_walksafe_fp046_r002_goal_started_seq78_20260823.py',
+        'scripts/apply_walksafe_fp046_r002_goal_started_seq79_20260824.py',
         'scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py',
         'scripts/apply_walksafe_fp048_goal_started_seq42_20260802.py',
+        'scripts/apply_walksafe_fp048_r002_goal_completed_seq98_99_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_completed_seq99_100_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_completed_seq100_101_20260827.py',
+        'scripts/apply_walksafe_fp048_r002_goal_completed_seq101_102_20260827.py',
+        'scripts/apply_walksafe_fp048_r002_goal_seq88_89_20260825.py',
+        'scripts/apply_walksafe_fp048_r002_goal_start_control_correction_seq91_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq90_20260825.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq91_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq92_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq93_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_start_branch_semantics_reanchor_seq93_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq94_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq95_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq96_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq97_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq98_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq99_20260827.py',
+        'scripts/apply_walksafe_fp048_r002_goal_started_seq100_20260827.py',
+        'scripts/apply_walksafe_fp048_r002_start_gate_contract_correction_seq92_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_start_gate_contract_correction_seq94_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_start_gate_contract_correction_seq95_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_start_gate_contract_correction_seq96_20260826.py',
+        'scripts/apply_walksafe_fp048_r002_start_gate_execution_correction_seq98_20260827.py',
+        'scripts/apply_walksafe_fp048_r002_start_gate_execution_correction_seq99_20260827.py',
+        'scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py',
         'scripts/apply_walksafe_fp022_goal_seq66_67_20260813.py',
         'scripts/apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py',
         'scripts/apply_walksafe_fp022_goal_started_seq69_20260814.py',
@@ -71,6 +138,16 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'scripts/apply_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py',
         'scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py',
         'scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_r002_20260826.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_r003_20260826.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_r004_20260826.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_r005_20260826.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_r006_20260826.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_r007_20260826.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_r008_20260826.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_r009_20260826.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_r010_20260827.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_r011_20260827.py',
         'scripts/audit_project_classification_20260708.py',
         'scripts/audit_submission_visual_privacy_20260711.py',
         'scripts/audit_walksafe_test_report_contamination_20260711.py',
@@ -135,6 +212,8 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'scripts/build_walksafe_fp046_gap_backlog_r025_20260810.py',
         'scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py',
         'scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py',
+        'scripts/build_walksafe_fp046_r002_seq77_78_review_20260823.py',
+        'scripts/build_walksafe_fp046_r002_seq78_79_recovery_review_20260824.py',
         'scripts/build_walksafe_fp046_strict_review_gate_20260810.py',
         'scripts/build_walksafe_fp047_user_admin_login_authorization_separation_trace_20260726.py',
         'scripts/build_walksafe_fp048_artifact_trace_successor_20260802.py',
@@ -258,6 +337,7 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'scripts/prepare_android_field_device_20260710.sh',
         'scripts/promote_submission_final_20260713.py',
         'scripts/provision_walksafe_admin_device_key.py',
+        'scripts/publish_walksafe_fp048_r002_goal_seq88_89_20260825.py',
         'scripts/prune_walksafe_backups_20260711.py',
         'scripts/pull_android_field_sessions_20260710.py',
         'scripts/reconcile_walksafe_fp008_isolated_snapshot_fix_seq47a_20260809.py',
@@ -269,10 +349,13 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'scripts/restore_walksafe_private_evidence_modes.py',
         'scripts/resume_walksafe_tactile3_yolo26s_20260522.sh',
         'scripts/run_cloudflare_field_test_services_20260711.sh',
+        'scripts/run_walksafe_backup_oneshot_20260825.sh',
         'scripts/run_walksafe_fp008_goal_start_gate_20260803.py',
         'scripts/run_walksafe_fp008_session_resume_gate_20260809.py',
         'scripts/run_walksafe_fp046_goal_start_gate_20260809.py',
+        'scripts/run_walksafe_fp046_r002_goal_start_gate_20260823.py',
         'scripts/run_walksafe_fp048_goal_start_gate_20260802.py',
+        'scripts/run_walksafe_fp048_r002_goal_start_gate_20260825.py',
         'scripts/run_walksafe_npc_single_admin_recovery_goal_start_gate_20260812.py',
         'scripts/run_walksafe_fp022_goal_start_gate_20260813.py',
         'scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py',
@@ -491,6 +574,7 @@ HISTORICAL_SCRIPT_EXACT = frozenset(
         "scripts/build_walksafe_fp046_artifact_trace_successor_20260810.py",
         "scripts/build_walksafe_fp046_consent_withdrawal_deletion_trace_20260810.py",
         "scripts/build_walksafe_fp046_gap_backlog_r025_20260810.py",
+        "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
         "scripts/build_walksafe_fp046_strict_review_gate_20260810.py",
         "scripts/build_walksafe_fp047_user_admin_login_authorization_separation_trace_20260726.py",
         "scripts/build_walksafe_fp048_artifact_trace_successor_20260802.py",
@@ -542,6 +626,7 @@ EXTERNAL_SCRIPT_EXACT = frozenset(
 )
 DB_DEVICE_SCRIPT_EXACT = frozenset(
     {
+        "scripts/account_deletion_worker.py",
         "scripts/audit_walksafe_test_report_contamination_20260711.py",
         "scripts/backup_walksafe_data_20260711.sh",
         "scripts/bind_walksafe_admin_credential_issuer_key.py",
@@ -556,6 +641,7 @@ DB_DEVICE_SCRIPT_EXACT = frozenset(
         "scripts/prune_walksafe_backups_20260711.py",
         "scripts/pull_android_field_sessions_20260710.py",
         "scripts/restore_walksafe_backup_drill_20260711.sh",
+        "scripts/run_walksafe_backup_oneshot_20260825.sh",
         "scripts/run_walksafe_log_retention_20260711.sh",
         "scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py",
         "scripts/run_walksafe_report_retention_20260717.sh",
@@ -584,14 +670,26 @@ REPOSITORY_WRITE_SCRIPT_EXACT = frozenset(
         "scripts/build_walksafe_historical_git_witness_20260812.py",
         "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
         "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+        "scripts/apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py",
+        "scripts/apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824.py",
+        "scripts/apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+        "scripts/apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+        "scripts/apply_walksafe_fp046_r002_goal_started_seq79_20260824.py",
+        "scripts/apply_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+        "scripts/apply_walksafe_fp048_r002_goal_started_seq90_20260825.py",
         "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py",
         "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+        "scripts/build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+        "scripts/build_walksafe_fp046_r002_seq78_79_recovery_review_20260824.py",
         "scripts/apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
         "scripts/apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
         "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py",
         "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py",
         "scripts/run_walksafe_npc_single_admin_recovery_goal_start_gate_20260812.py",
         "scripts/run_walksafe_fp022_goal_start_gate_20260813.py",
+        "scripts/run_walksafe_fp046_r002_goal_start_gate_20260823.py",
+        "scripts/run_walksafe_fp048_r002_goal_start_gate_20260825.py",
+        "scripts/publish_walksafe_fp048_r002_goal_seq88_89_20260825.py",
         "scripts/restore_walksafe_private_evidence_modes.py",
         "scripts/manage_local_model_registry.py",
         "scripts/run_walksafe_submission_python_20260714.py",
@@ -802,6 +900,17 @@ def load_checkpoint_attributes(
     managed = set(managed_values)
     if managed_count != len(managed_values) or len(managed) != len(managed_values):
         raise CatalogError("checkpoint managed path count or uniqueness mismatch")
+    history = goal.get("transition_history") if isinstance(goal, Mapping) else None
+    if (
+        isinstance(history, list)
+        and len(history) >= 77
+        and isinstance(history[76], Mapping)
+        and history[76].get("event_id") == FP046_R002_CONTROL_REANCHOR_EVENT_ID
+        and not set(FP046_R002_MANAGED_REVIEW_EVIDENCE_PATHS).issubset(managed)
+    ):
+        raise CatalogError(
+            "FP046 R002 seq77 managed review evidence closure differs"
+        )
     if not isinstance(binding_values, list):
         raise CatalogError("checkpoint canonical_bindings must be a list")
     canonical_by_path: dict[str, list[dict[str, Any]]] = {}

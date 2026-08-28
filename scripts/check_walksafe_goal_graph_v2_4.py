@@ -14,13 +14,16 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
 import zlib
-from datetime import datetime
+from contextlib import nullcontext
+from contextvars import ContextVar
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -964,6 +967,8 @@ def validate_phase1_android_report_successor_binding(
 
     current_bindings: dict[str, str] = {}
     expected_live_by_path: dict[str, str] = {}
+    pre_reviewed_artifacts: dict[str, tuple[str, str]] = {}
+    validated_live_rows: dict[str, tuple[Path, int, int, str]] = {}
     for row in all_rows:
         relative = row.get("exact_path")
         digest = row.get("sha256")
@@ -1015,11 +1020,36 @@ def validate_phase1_android_report_successor_binding(
                 )
                 continue
             expected_live_digest = completion_transition[1]
+        pre_reviewed_artifacts[relative] = (digest, expected_live_digest)
+        validated_live_rows[relative] = (
+            path,
+            actual_size,
+            byte_length,
+            digest,
+        )
+
+    reviewed_artifacts = (
+        _compose_fp048_r002_reviewed_noncredit_successors(
+            root,
+            checkpoint,
+            pre_reviewed_artifacts,
+        )
+        if isinstance(checkpoint, dict)
+        else pre_reviewed_artifacts
+    )
+    if reviewed_artifacts is None:
+        errors.append(
+            "phase1 Android report reviewed successor lineage differs"
+        )
+        reviewed_artifacts = pre_reviewed_artifacts
+    for relative, (path, actual_size, byte_length, digest) in (
+        validated_live_rows.items()
+    ):
+        expected_live_digest = reviewed_artifacts[relative][1]
         expected_live_by_path[relative] = expected_live_digest
         if (
             (
-                relative not in fp048_bindings
-                and relative not in fp046_transitions
+                expected_live_digest == digest
                 and actual_size != byte_length
             )
             or continuation.sha256_file(path) != expected_live_digest
@@ -1099,7 +1129,11 @@ def _phase1_android_report_successor_bridge(
         or continuation.sha256_file(live) != current_sha256
     ):
         return None
-    return predecessor_sha256, current_sha256
+    # The validator above proves the complete reviewed chain through the live
+    # file.  This helper represents only the sealed phase-1 edge; returning the
+    # live terminal here would collapse later FP048/FP046/NPC/reanchor edges and
+    # make their ordered authority impossible to verify independently.
+    return predecessor_sha256, bridge["current_sha256"]
 
 
 def validate_phone_mounting_current_state_successor_binding(
@@ -2668,6 +2702,913 @@ R002_REOPEN_EVENT_TYPES = (
     "GOAL_READY",
     "GOAL_READY",
 )
+FP046_R002_GOAL_ID = "WS-GOAL-EPIC-03-FP-046-R002"
+FP046_R002_CONTROL_REANCHOR_SEQUENCE = 77
+FP046_R002_CONTROL_CORRECTION_SEQUENCE = 78
+FP046_R002_RECOVERY_CONTROL_REANCHOR_SEQUENCE = 79
+FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_SEQUENCE = 80
+FP046_R002_THIRD_RECOVERY_CONTROL_REANCHOR_SEQUENCE = 81
+FP046_R002_FOURTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE = 82
+FP046_R002_FIFTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE = 83
+FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE = 84
+FP046_R002_STARTED_SEQUENCE = 85
+FP046_R002_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP046-R002-20260823-001"
+)
+FP046_R002_CONTROL_REANCHOR_EVENT_SHA256 = (
+    "0d80244b6d1c1f7a91bcdce78f7861086f16b39c66874e21e5cb6ba8b2c88fd1"
+)
+FP046_R002_CONTROL_CORRECTION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP046-R002-CORRECTION-20260824-001"
+)
+FP046_R002_RECOVERY_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP046-R002-CORRECTION-20260824-002"
+)
+FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP046-R002-CORRECTION-20260824-003"
+)
+FP046_R002_THIRD_RECOVERY_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP046-R002-CORRECTION-20260824-004"
+)
+FP046_R002_FOURTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP046-R002-CORRECTION-20260824-005"
+)
+FP046_R002_FIFTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP046-R002-CORRECTION-20260824-006"
+)
+FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP046-R002-CORRECTION-20260824-007"
+)
+FP046_R002_STARTED_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005"
+)
+FP046_R002_STARTED_EVENT_SHA256 = (
+    "84758c3e54d38bde48fce3250e1af4a32376698801a8d3caf6be39d016d75bd3"
+)
+FP048_R002_CONTROL_REANCHOR_SEQUENCE = 90
+FP048_R002_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP048-R002-20260826-001"
+)
+FP048_R002_CONTROL_REANCHOR_EVENT_SHA256 = (
+    "ba64b564f388e8598db038e8d3e20e6bf3fdada8f2ec0e5649b6b5db02fe625c"
+)
+FP048_R002_NONCREDIT_EDGE_SET_SHA256 = (
+    "bebe6ecf211f92fb1aaf934a72989b2930b15d2d164e1829e68478b360514c21"
+)
+FP048_R002_SEQ87_REVIEWED_CREDIT_PATHS = frozenset(
+    {
+        "backend/alembic/versions/202608250001_actor_rate_limit_privacy_group.py",
+        "backend/tests/test_actor_rate_limit_store.py",
+        "configs/walksafe_product_boundary_20260722.json",
+        "deploy/nginx/walksafe-android-gateway.conf.example",
+        "tests/test_walksafe_android_gateway_ingress_current.py",
+        "tests/test_walksafe_android_product_boundary.py",
+    }
+)
+FP048_R002_SEQ87_REVIEWED_NONCREDIT_PATHS = frozenset(
+    {
+        "backend/alembic/versions/202608250002_account_deletion_worker_role.py",
+        "backend/app/api/health.py",
+        "backend/tests/test_fp046_postgres_integration.py",
+        "docs/catalogs/repository-paths.json",
+        "docs/catalogs/scripts.json",
+        "docs/catalogs/tests.json",
+        "scripts/account_deletion_worker.py",
+        "scripts/generate_repository_catalogs.py",
+        "scripts/run_walksafe_test_layers_current.sh",
+    }
+)
+FP048_R002_SEQ87_REVIEWED_ADDED_PATHS = frozenset(
+    {
+        "backend/alembic/versions/202608250001_actor_rate_limit_privacy_group.py",
+        "backend/alembic/versions/202608250002_account_deletion_worker_role.py",
+        "scripts/account_deletion_worker.py",
+        "tests/test_walksafe_android_gateway_ingress_current.py",
+    }
+)
+FP048_R002_SEQ85_TO_SEQ87_EDGE_SET_SHA256 = (
+    "2a5abff7617a7afa6a10e531690a09abe8238ff176ae08973731a27a2ef50022"
+)
+FP048_R002_SEQ85_TO_SEQ87_MODIFIED_BINDINGS = (
+    (
+        "backend/app/api/health.py",
+        "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+        "5d4f29aae15af069dff62a466b4dbebc88a886f3322ee5de5aa0529639be3401",
+        19_738,
+        "ab477d4ea0a9ec2ce68498950eb058121fe66c8a26d28d087a335bbae4a4b9f2",
+        19_738,
+    ),
+    (
+        "backend/tests/test_actor_rate_limit_store.py",
+        "FP046_R002_DIRECT_INTERNAL_STATIC_ONLY",
+        "3b95c546b6b7c8e3e14b7714ef21c257a121dc37848a5771a60ef6280cd4db91",
+        3_098,
+        "89b4a57515cdd7bcd71d6d10c6e0af16c73132734e33978571ead1bbb12db7fc",
+        5_770,
+    ),
+    (
+        "backend/tests/test_fp046_postgres_integration.py",
+        "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+        "fba65428ac42eb506b6952f18319fd7b33e00695cd26b7278c2edda9699061e2",
+        89_608,
+        "0685e211c488d7cacf2ade79c3904aaa032827c6bf30799bd40efe46be83dda3",
+        113_346,
+    ),
+    (
+        "configs/walksafe_product_boundary_20260722.json",
+        "FP046_R002_DIRECT_INTERNAL_STATIC_ONLY",
+        "976547476d61d789c7a453b16c361a40c8fc25719d57215d9d4c10f0e99537a0",
+        11_227,
+        "77e0492abc807752f49e901848cf7107c091dfff3005d113dc352fd12a3d5a73",
+        11_390,
+    ),
+    (
+        "deploy/nginx/walksafe-android-gateway.conf.example",
+        "FP046_R002_DIRECT_INTERNAL_STATIC_ONLY",
+        "a75eecac17b67eda8b05987c44e192765567552b95f90ba00194eb1393ae5fc4",
+        3_053,
+        "33bce150012f2b8003890ff66f2a6005e764e1c0c1dab89bac545d58af4aee9b",
+        3_517,
+    ),
+    (
+        "docs/catalogs/repository-paths.json",
+        "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+        "a904270d0a684c37a3093d579dd35e28655a640e97ff34409dda31fac2e8ecda",
+        2_965_810,
+        "8e701f07a1a72bd29e6e7c0d5373811358d387973439ee16004b41233c419ab0",
+        2_980_762,
+    ),
+    (
+        "docs/catalogs/scripts.json",
+        "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+        "2925b721922306a3c025b348e357ab9a471f1deb6eb285271d85abe79a37ec64",
+        96_300,
+        "29b0d624ee3db8370473206a0e2efcee06213b298a37298b76e44410dc8e06f4",
+        96_625,
+    ),
+    (
+        "docs/catalogs/tests.json",
+        "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+        "0c5241d231f8a2cfa682dd5a21a6ddaac17484e0692e318c78abf1ebe5890236",
+        92_925,
+        "de493557a64d9b1b2aff12baae13e9c56fe48770d6b73f60b788c12fba057b8a",
+        94_272,
+    ),
+    (
+        "scripts/generate_repository_catalogs.py",
+        "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+        "1ca6a4471ba7ce96409f947ca239d021a7c07b5a0d3c5da3db2ee57e4d886d95",
+        69_548,
+        "6ee052ac5c50c65322c7749abb5cc884048e559de9e0e8edd6b6606651530655",
+        70_463,
+    ),
+    (
+        "scripts/run_walksafe_test_layers_current.sh",
+        "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+        "30b630bfa7d7d60029bf7fa6fa975ade00c038aa3233f299a81133c134643385",
+        25_530,
+        "5bceabcbee1b91667e5d9bfef5e43e2c92f248f5c7c7c77baa56fd3a0d118802",
+        25_755,
+    ),
+    (
+        "tests/test_walksafe_android_product_boundary.py",
+        "FP046_R002_DIRECT_INTERNAL_STATIC_ONLY",
+        "545f27b4302abecbb3b270ec54d9ce3c3c9ef638a8a2960d91ba960e84e143f5",
+        15_267,
+        "efc3a66ebf3b0526e250bfa854c3677046e1e660981fbae93f282fb759f1a8d8",
+        15_454,
+    ),
+)
+FP048_R002_SEQ85_TO_SEQ87_ADDED_BINDINGS = (
+    (
+        "backend/alembic/versions/202608250001_actor_rate_limit_privacy_group.py",
+        "FP046_R002_DIRECT_INTERNAL_STATIC_ONLY",
+        "d4536835e830b1abaae0f18a3ea708551623c8b1a02839a449d68c6d2096d494",
+        1_048,
+    ),
+    (
+        "backend/alembic/versions/202608250002_account_deletion_worker_role.py",
+        "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+        "76836f2aa3219bf9921e99ed3984f41f8c12bd0a1905d7cebc2a957672f3cb4f",
+        4_773,
+    ),
+    (
+        "scripts/account_deletion_worker.py",
+        "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+        "d5ad6b02f7888d01df1783999e92889a9f0f0ee4192ddde8c471ef29c2f07650",
+        27_593,
+    ),
+    (
+        "tests/test_walksafe_android_gateway_ingress_current.py",
+        "FP046_R002_DIRECT_INTERNAL_STATIC_ONLY",
+        "375e3831ca15b0ff741c44f6f0191a068b99ad7e0fdf977307d0baeb2ec4ec61",
+        6_450,
+    ),
+)
+FP048_R002_CONTROL_REANCHOR_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_start_control_reanchor_"
+    "seq90_20260826"
+)
+FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY = {
+    "implementation_start_authorized": False,
+    "goal_status_change_count": 0,
+    "product_implementation_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "test_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "actual_device_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "signing_credit_delta": 0,
+    "release_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": False,
+    "release_status": "NOT_ELIGIBLE",
+}
+FP048_R002_CONTROL_CORRECTION_SEQUENCE = 91
+FP048_R002_CONTROL_CORRECTION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP048-R002-CORRECTION-20260826-001"
+)
+FP048_R002_CORRECTED_STARTED_SEQUENCE = 92
+FP048_R002_CORRECTED_STARTED_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-002"
+)
+FP048_R002_START_GATE_CONTRACT_CORRECTION_SEQUENCE = 92
+FP048_R002_START_GATE_CONTRACT_CORRECTION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-CONTRACT-CORRECTED-"
+    "FP048-R002-20260826-001"
+)
+FP048_R002_START_GATE_CONTRACT_CORRECTION_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_start_gate_contract_correction_"
+    "seq92_20260826"
+)
+FP048_R002_R004_CONTRACT_ID = "WS-FP048-R002-INTERNAL-START-GATE-R004"
+FP048_R002_R004_CONTRACT_VERSION = "2026-08-26.3"
+FP048_R002_R004_CONTRACT_DOCUMENT_ID = (
+    "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-004"
+)
+FP048_R002_R004_CONTRACT_PATH = (
+    "docs/control/execution/goal-contracts/"
+    "WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r004.json"
+)
+FP048_R002_R004_START_GATE_RUNNER_PATH = (
+    "scripts/run_walksafe_fp048_r002_goal_start_gate_r004_20260826.py"
+)
+FP048_R002_R004_STARTED_SEQUENCE = 93
+FP048_R002_R004_STARTED_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-003"
+)
+FP048_R002_R004_STARTED_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_started_seq93_20260826"
+)
+FP048_R002_BRANCH_SEMANTICS_REANCHOR_SEQUENCE = 93
+FP048_R002_BRANCH_SEMANTICS_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP048-R002-BRANCH-SEMANTICS-20260826-001"
+)
+FP048_R002_BRANCH_SEMANTICS_REANCHOR_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_start_branch_semantics_reanchor_"
+    "seq93_20260826"
+)
+FP048_R002_R005_CONTRACT_ID = "WS-FP048-R002-INTERNAL-START-GATE-R005"
+FP048_R002_R005_CONTRACT_VERSION = "2026-08-26.4"
+FP048_R002_R005_CONTRACT_DOCUMENT_ID = (
+    "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-005"
+)
+FP048_R002_R005_CONTRACT_PATH = (
+    "docs/control/execution/goal-contracts/"
+    "WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r005.json"
+)
+FP048_R002_R005_START_GATE_RUNNER_PATH = (
+    "scripts/run_walksafe_fp048_r002_goal_start_gate_r005_20260826.py"
+)
+FP048_R002_R005_STARTED_SEQUENCE = 94
+FP048_R002_R005_STARTED_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004"
+)
+FP048_R002_R005_STARTED_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_started_seq94_20260826"
+)
+FP048_R002_R005_STARTED_GATE_DOCUMENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-"
+    "FP048-R002-20260826-004"
+)
+FP048_R002_R005_STARTED_GATE_RECEIPT_PATH = (
+    "docs/control/execution/goal-gates/"
+    f"{FP048_R002_R005_STARTED_EVENT_ID}/"
+    "implementation-start-gate-receipt.json"
+)
+FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE = 94
+FP048_R002_R006_CONTRACT_CORRECTION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-CONTRACT-CORRECTED-"
+    "FP048-R002-20260826-002"
+)
+FP048_R002_R006_CONTRACT_CORRECTION_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_start_gate_contract_correction_"
+    "seq94_20260826"
+)
+FP048_R002_R006_STARTED_SEQUENCE = 95
+FP048_R002_R006_STARTED_EVENT_ID = FP048_R002_R005_STARTED_EVENT_ID
+FP048_R002_R006_STARTED_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_started_seq95_20260826"
+)
+FP048_R002_R006_CONTRACT_ID = "WS-FP048-R002-INTERNAL-START-GATE-R006"
+FP048_R002_R006_CONTRACT_VERSION = "2026-08-26.5"
+FP048_R002_R006_CONTRACT_DOCUMENT_ID = (
+    "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-006"
+)
+FP048_R002_R006_CONTRACT_PATH = (
+    "docs/control/execution/goal-contracts/"
+    "WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r006.json"
+)
+FP048_R002_R006_CONTRACT_SHA256 = (
+    "ec2d0a34a9622d2fcb144602e0b53f388dfaf43c021d4ca8b8a815e5b7ec7509"
+)
+FP048_R002_R006_CONTRACT_CANONICAL_SHA256 = (
+    "da78b752d95efc8631b3a650b3ee2305dd3c357b3ad5aec8546eb2ff492c4253"
+)
+FP048_R002_R006_START_GATE_RUNNER_PATH = (
+    "scripts/run_walksafe_fp048_r002_goal_start_gate_r006_20260826.py"
+)
+FP048_R002_R006_START_GATE_RUNNER_SHA256 = (
+    "de7755cda818e2c60ac23af0c1b6dc5a3def4b71f2b64e41d7fa7a38c1044e75"
+)
+FP048_R002_R006_START_GATE_RUNNER_BYTE_LENGTH = 26_746
+FP048_R002_R006_SUCCESSOR_REASON_CODE = (
+    "R005_PREDECESSOR_LIVE_SOURCE_REGRESSION_NOT_POSTPUBLICATION_SAFE"
+)
+FP048_R002_R005_PREFLIGHT_ATTEMPT = {
+    "event_id": FP048_R002_R006_STARTED_EVENT_ID,
+    "directory": (
+        "docs/control/execution/goal-gates/"
+        f"{FP048_R002_R006_STARTED_EVENT_ID}"
+    ),
+    "receipt_path": (
+        "docs/control/execution/goal-gates/"
+        f"{FP048_R002_R006_STARTED_EVENT_ID}/"
+        "implementation-start-gate-receipt.json"
+    ),
+    "status": "PREFLIGHT_FAILED_NO_GATE_NAMESPACE_CREATED",
+    "authority_status": "NONAUTHORITY",
+    "event_identity_status": "REUSABLE_UNCONSUMED",
+    "namespace_present": False,
+    "receipt_present": False,
+    "reason_code": "R005_PREVIEW_FAILED_NO_NAMESPACE_NONAUTHORITY",
+}
+FP048_R002_R006_CORRECTION_REASON = {
+    "failed_contract_id": FP048_R002_R005_CONTRACT_ID,
+    "failed_contract_version": FP048_R002_R005_CONTRACT_VERSION,
+    "preflight_attempt_004": FP048_R002_R005_PREFLIGHT_ATTEMPT,
+    "reason_code": FP048_R002_R006_SUCCESSOR_REASON_CODE,
+    "remediation": "SUPERSEDE_R005_WITH_STAGE_AWARE_R006_BEFORE_SEQ95_START",
+}
+FP048_R002_R006_STARTED_GATE_DOCUMENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-"
+    "FP048-R002-20260826-004"
+)
+FP048_R002_R006_STARTED_GATE_RECEIPT_PATH = (
+    "docs/control/execution/goal-gates/"
+    f"{FP048_R002_R006_STARTED_EVENT_ID}/"
+    "implementation-start-gate-receipt.json"
+)
+FP048_R002_R006_EXPECTED_CHECK_IDS = (
+    "CONTINUATION",
+    "GOAL_GRAPH",
+    "TEST_LAYER_REGISTRY_VALIDATE",
+    "ROOT_FP048_R002_CONTROL_REGRESSION",
+    "REPOSITORY_STATE",
+)
+FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE = 95
+FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-CONTRACT-CORRECTED-"
+    "FP048-R002-20260826-003"
+)
+FP048_R002_R007_CONTRACT_CORRECTION_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_start_gate_contract_correction_"
+    "seq95_20260826"
+)
+FP048_R002_R007_STARTED_SEQUENCE = 96
+FP048_R002_R007_STARTED_EVENT_ID = FP048_R002_R006_STARTED_EVENT_ID
+FP048_R002_R007_STARTED_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_started_seq96_20260826"
+)
+FP048_R002_R007_CONTRACT_ID = "WS-FP048-R002-INTERNAL-START-GATE-R007"
+FP048_R002_R007_CONTRACT_VERSION = "2026-08-26.6"
+FP048_R002_R007_CONTRACT_DOCUMENT_ID = (
+    "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-007"
+)
+FP048_R002_R007_CONTRACT_PATH = (
+    "docs/control/execution/goal-contracts/"
+    "WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r007.json"
+)
+FP048_R002_R007_CONTRACT_SHA256 = (
+    "ba18500d312c447b0f2107d63e1165d80bb2fc232afaba4a98310620b50fed1e"
+)
+FP048_R002_R007_CONTRACT_CANONICAL_SHA256 = (
+    "9fbb5c244c538641dcde2035d4903faa0ff09692dedacb99e63d05261ecf7581"
+)
+FP048_R002_R007_START_GATE_RUNNER_PATH = (
+    "scripts/run_walksafe_fp048_r002_goal_start_gate_r007_20260826.py"
+)
+FP048_R002_R007_START_GATE_RUNNER_SHA256 = (
+    "6c4bbbad097e783d10951b212d5ef285c7c8cc51fe6fbe0212528bb0c5cdd9e8"
+)
+FP048_R002_R007_START_GATE_RUNNER_BYTE_LENGTH = 32_322
+FP048_R002_R007_SUCCESSOR_REASON_CODE = (
+    "R006_CHECKPOINT_NONAUTHORITY_RECEIPT_PATH_NOT_STAGE_AWARE"
+)
+FP048_R002_R006_PREFLIGHT_ATTEMPT = {
+    "event_id": FP048_R002_R007_STARTED_EVENT_ID,
+    "contract_id": FP048_R002_R006_CONTRACT_ID,
+    "contract_version": FP048_R002_R006_CONTRACT_VERSION,
+    "directory": (
+        "docs/control/execution/goal-gates/"
+        f"{FP048_R002_R007_STARTED_EVENT_ID}"
+    ),
+    "receipt_path": (
+        "docs/control/execution/goal-gates/"
+        f"{FP048_R002_R007_STARTED_EVENT_ID}/"
+        "implementation-start-gate-receipt.json"
+    ),
+    "status": "PREVIEW_FAILED_BEFORE_NAMESPACE",
+    "authority_status": "NONAUTHORITY",
+    "event_identity_status": "REUSABLE_UNCONSUMED",
+    "namespace_present": False,
+    "receipt_present": False,
+    "error": "checkpoint gate evidence reference is malformed",
+    "reason_code": FP048_R002_R007_SUCCESSOR_REASON_CODE,
+}
+FP048_R002_R007_CORRECTION_REASON = {
+    "failed_contract_id": FP048_R002_R006_CONTRACT_ID,
+    "failed_contract_version": FP048_R002_R006_CONTRACT_VERSION,
+    "r006_preflight_attempt_004": FP048_R002_R006_PREFLIGHT_ATTEMPT,
+    "reason_code": FP048_R002_R007_SUCCESSOR_REASON_CODE,
+    "remediation": "SUPERSEDE_R006_WITH_STAGE_AWARE_R007_BEFORE_SEQ96_START",
+}
+FP048_R002_R007_STARTED_GATE_DOCUMENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-"
+    "FP048-R002-20260826-004"
+)
+FP048_R002_R007_STARTED_GATE_RECEIPT_PATH = (
+    "docs/control/execution/goal-gates/"
+    f"{FP048_R002_R007_STARTED_EVENT_ID}/"
+    "implementation-start-gate-receipt.json"
+)
+FP048_R002_R007_EXPECTED_CHECK_IDS = FP048_R002_R006_EXPECTED_CHECK_IDS
+FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE = 96
+FP048_R002_R008_CONTRACT_CORRECTION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-CONTRACT-CORRECTED-"
+    "FP048-R002-20260826-004"
+)
+FP048_R002_R008_CONTRACT_CORRECTION_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_start_gate_contract_correction_"
+    "seq96_20260826"
+)
+FP048_R002_R008_STARTED_SEQUENCE = 97
+FP048_R002_R008_STARTED_EVENT_ID = FP048_R002_R007_STARTED_EVENT_ID
+FP048_R002_R008_STARTED_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_started_seq97_20260826"
+)
+FP048_R002_R008_GATE_MODULE = (
+    "scripts.run_walksafe_fp048_r002_goal_start_gate_r008_20260826"
+)
+FP048_R002_R008_CONTRACT_ID = "WS-FP048-R002-INTERNAL-START-GATE-R008"
+FP048_R002_R008_CONTRACT_VERSION = "2026-08-26.7"
+FP048_R002_R008_CONTRACT_DOCUMENT_ID = (
+    "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-008"
+)
+FP048_R002_R008_CONTRACT_PATH = (
+    "docs/control/execution/goal-contracts/"
+    "WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r008.json"
+)
+FP048_R002_R008_CONTRACT_SHA256 = (
+    "f3106c7038287399deac3bc711d1a7624dec3aa84b9c41abeb52300d5073828d"
+)
+FP048_R002_R008_CONTRACT_CANONICAL_SHA256 = (
+    "4f39f9cc18a5fff55b1369c5c0ff15a50ec080e7cced227597adea0b902afb91"
+)
+FP048_R002_R008_CONTRACT_BYTE_LENGTH = 3_571
+FP048_R002_R008_START_GATE_RUNNER_PATH = (
+    "scripts/run_walksafe_fp048_r002_goal_start_gate_r008_20260826.py"
+)
+FP048_R002_R008_START_GATE_RUNNER_SHA256 = (
+    "9893913d951754cbdbb1991eea7eda76b30b2a878f1fc2d9e4a792ff515c9f7e"
+)
+FP048_R002_R008_START_GATE_RUNNER_BYTE_LENGTH = 33_898
+FP048_R002_R008_SUCCESSOR_REASON_CODE = (
+    "R007_ROOT_REGRESSION_INCLUDED_PREPUBLICATION_ONLY_SEQ95_TESTS"
+)
+FP048_R002_R007_PREFLIGHT_ATTEMPT = {
+    "event_id": FP048_R002_R008_STARTED_EVENT_ID,
+    "contract_id": FP048_R002_R007_CONTRACT_ID,
+    "contract_version": FP048_R002_R007_CONTRACT_VERSION,
+    "directory": (
+        "docs/control/execution/goal-gates/"
+        f"{FP048_R002_R008_STARTED_EVENT_ID}"
+    ),
+    "receipt_path": (
+        "docs/control/execution/goal-gates/"
+        f"{FP048_R002_R008_STARTED_EVENT_ID}/"
+        "implementation-start-gate-receipt.json"
+    ),
+    "status": "PREVIEW_FAILED_BEFORE_NAMESPACE",
+    "authority_status": "NONAUTHORITY",
+    "event_identity_status": "REUSABLE_UNCONSUMED",
+    "namespace_present": False,
+    "receipt_present": False,
+    "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+    "exit_code": 1,
+    "error": (
+        "ROOT_FP048_R002_CONTROL_REGRESSION failed with exit code 1; "
+        "see PREVIEW_ONLY"
+    ),
+    "reason_code": FP048_R002_R008_SUCCESSOR_REASON_CODE,
+}
+FP048_R002_R008_CORRECTION_REASON = {
+    "failed_contract_id": FP048_R002_R007_CONTRACT_ID,
+    "failed_contract_version": FP048_R002_R007_CONTRACT_VERSION,
+    "r007_preflight_attempt_004": FP048_R002_R007_PREFLIGHT_ATTEMPT,
+    "reason_code": FP048_R002_R008_SUCCESSOR_REASON_CODE,
+    "remediation": "SUPERSEDE_R007_WITH_STAGE_AWARE_R008_BEFORE_SEQ97_START",
+}
+FP048_R002_R008_STARTED_GATE_DOCUMENT_ID = (
+    FP048_R002_R007_STARTED_GATE_DOCUMENT_ID
+)
+FP048_R002_R008_STARTED_GATE_RECEIPT_PATH = (
+    FP048_R002_R007_STARTED_GATE_RECEIPT_PATH
+)
+FP048_R002_R008_EXPECTED_CHECK_IDS = FP048_R002_R007_EXPECTED_CHECK_IDS
+FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE = 97
+FP048_R002_R009_CONTRACT_CORRECTION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-CONTRACT-CORRECTED-"
+    "FP048-R002-20260826-005"
+)
+FP048_R002_R009_CONTRACT_CORRECTION_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_"
+    "correction_seq97_20260826"
+)
+FP048_R002_R009_STARTED_SEQUENCE = 98
+FP048_R002_R009_STARTED_EVENT_ID = FP048_R002_R008_STARTED_EVENT_ID
+FP048_R002_R009_STARTED_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_started_seq98_20260826"
+)
+FP048_R002_R009_GATE_MODULE = (
+    "scripts.run_walksafe_fp048_r002_goal_start_gate_r009_20260826"
+)
+FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE = 98
+FP048_R002_R009_EXECUTION_CORRECTION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-EXECUTION-CORRECTED-"
+    "FP048-R002-20260827-006"
+)
+FP048_R002_R009_EXECUTION_CORRECTION_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_start_gate_execution_"
+    "correction_seq98_20260827"
+)
+FP048_R002_R010_STARTED_SEQUENCE = 99
+FP048_R002_R010_STARTED_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-005"
+)
+FP048_R002_R010_STARTED_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_started_seq99_20260827"
+)
+FP048_R002_SUCCESSOR_CORRECTION_SEQUENCE = 99
+FP048_R002_SUCCESSOR_CORRECTION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-EXECUTION-CORRECTED-"
+    "FP048-R002-20260827-007"
+)
+FP048_R002_SUCCESSOR_CORRECTION_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_start_gate_execution_"
+    "correction_seq99_20260827"
+)
+FP048_R002_SUCCESSOR_STARTED_SEQUENCE = 100
+FP048_R002_SUCCESSOR_STARTED_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260827-006"
+)
+FP048_R002_SUCCESSOR_STARTED_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_started_seq100_20260827"
+)
+FP048_R002_SUCCESSOR_EVIDENCE_SEQUENCE = 101
+FP048_R002_SUCCESSOR_COMPLETION_SEQUENCE = 102
+FP048_R002_SUCCESSOR_EVIDENCE_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-"
+    "FP048-R002-20260827-004"
+)
+FP048_R002_SUCCESSOR_COMPLETION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-COMPLETED-FP048-R002-20260827-004"
+)
+FP048_R002_SUCCESSOR_COMPLETION_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_completed_seq101_102_20260827"
+)
+FP048_R002_COMPLETION_MODULE = (
+    "scripts.apply_walksafe_fp048_r002_goal_completed_seq100_101_20260827"
+)
+FP048_R002_COMPLETION_SOURCE_SEQUENCE = 99
+FP048_R002_COMPLETION_EVIDENCE_SEQUENCE = 100
+FP048_R002_COMPLETION_SEQUENCE = 101
+FP048_R002_COMPLETION_EVIDENCE_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-"
+    "FP048-R002-20260827-003"
+)
+FP048_R002_COMPLETION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-COMPLETED-FP048-R002-20260827-003"
+)
+FP048_R002_COMPLETION_RECEIPT_REL = Path(
+    "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R002/"
+    "completion-receipt-20260827-003.json"
+)
+FP048_R002_COMPLETION_REVIEW_ROOT = Path(
+    "docs/control/execution/workstream-transitions/seq100-101/"
+    "review-rounds/R001"
+)
+FP048_R002_ZERO_CREDIT_CONTROL_EVENT_FIELDS = frozenset(
+    {
+        "sequence",
+        "event_id",
+        "event_type",
+        "occurred_on",
+        "occurred_at",
+        "previous_focus_goal_id",
+        "previous_focus_content_sha256",
+        "focus_goal_id",
+        "focus_goal_content_sha256",
+        "subject_goal_id",
+        "from_status",
+        "to_status",
+        "static_plan_manifest_sha256",
+        "status_changes",
+        "runtime_after",
+        "blockers_after",
+        "blocker_resolution_ids_after",
+        "source_checkpoint_version",
+        "evidence_refs",
+        "source_checkpoint_binding",
+        "source_ready_event_binding",
+        "authorization_binding",
+        "contract_supersession",
+        "start_gate_runner_binding",
+        "transition_control_review_binding",
+        "repository_context_reanchor",
+        "noncredit_successor_edges",
+        "claim_boundary",
+        "unchanged_control_projection",
+        "canonical_binding_snapshot_after",
+        "correction_reason",
+        "previous_event_sha256",
+        "event_sha256",
+    }
+)
+FP048_R002_R006_RECEIPT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "document_id",
+        "evidence_type",
+        "gate_purpose",
+        "status",
+        "package_id",
+        "target_transition_event_id",
+        "target_goal_id",
+        "target_goal_content_sha256",
+        "static_plan_manifest_sha256",
+        "source_activation_event_sha256",
+        "source_checkpoint_sha256",
+        "source_ready_event_sha256",
+        "check_command_contract_version",
+        "check_command_contract_sha256",
+        "implementation_start_gate_contract_binding",
+        "runtime_bindings",
+        "execution_window",
+        "check_runs",
+        "repository_snapshot",
+        "generated_at",
+    }
+)
+FP048_R002_CORRECTED_STARTED_GOAL_SHA256 = (
+    "c7632800335cd9f816b382d91ea0420a53741ae7648c04c5e9c36c3e9fc42014"
+)
+FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256 = (
+    "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07"
+)
+FP048_R002_WORK_ITEM_ID = "EPIC-03-FP048-ENCRYPTION-CONNECTION-SECURITY-INCIDENT"
+FP048_R002_STARTED_CURRENT_FOCUS = (
+    "FP-048 R002/GAP-057 GOAL_STARTED/IN_PROGRESS; repository-internal "
+    "seven-state encryption rotation all-or-nothing fail-fast work authorized"
+)
+FP048_R002_WORK_NEXT_ACTION = (
+    "FP-048 R002에서 7종 state rotation을 all-or-nothing으로 재개한다."
+)
+FP048_R002_STARTED_SCOPE = (
+    "Graph v2.4 through FP048-R002/GAP-057 GOAL_STARTED seq92 after exact "
+    "seq91 zero-credit control correction and fresh R003 five-check internal "
+    "PASS gate; no product completion, artifact completion, formal-test, "
+    "device, external, deployment, approval, or release credit."
+)
+FP048_R002_STARTED_HANDOFF_EPIC = "EPIC-03 / FP-048 R002/GAP-057 IN_PROGRESS"
+FP048_R002_STARTED_VERIFICATION_STATUS = (
+    "PASS_WITH_FP048-R002_IN_PROGRESS_FORMAL_EXTERNAL_DEVICE_RELEASE_NOT_RUN"
+)
+FP048_R002_CORRECTION_NEXT_ACTION = (
+    "R003 event-scoped five-check start gate를 fresh event ID로 실행한다."
+)
+FP048_R002_STARTED_GATE_DOCUMENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-"
+    "FP048-R002-20260826-002"
+)
+FP048_R002_STARTED_GATE_RECEIPT_PATH = (
+    "docs/control/execution/goal-gates/"
+    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-002/"
+    "implementation-start-gate-receipt.json"
+)
+FP048_R002_STARTED_MANAGED_PATHS = (
+    "scripts/apply_walksafe_fp048_r002_goal_started_seq92_20260826.py",
+    "tests/test_apply_walksafe_fp048_r002_goal_started_seq92_20260826.py",
+)
+FP048_R002_CONTROL_CORRECTION_REASON = {
+    "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+    "failed_contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R002",
+    "failed_contract_version": "2026-08-26.1",
+    "observed_failed_test_count": 2,
+    "reason_code": "PUBLISHED_SEQ90_SYNTHETIC_REPLAY_DUPLICATED_SEQ90",
+    "remediation": (
+        "RECONSTRUCT_EXACT_SEQ89_BEFORE_SYNTHETIC_SEQ90_BOUNDARY_TEST"
+    ),
+}
+FP046_R002_BURNED_STARTED_EVENT_IDS = frozenset(
+    {
+        "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-001",
+        "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-002",
+        "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-003",
+        "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-004",
+    }
+)
+FP046_R002_COMPLETION_UPDATE_SEQUENCE = 86
+FP046_R002_COMPLETION_SEQUENCE = 87
+FP046_R002_COMPLETION_UPDATE_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-"
+    "FP046-R002-20260825-001"
+)
+FP046_R002_COMPLETION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-COMPLETED-FP046-R002-20260825-001"
+)
+FP046_R002_COMPLETION_ROLE = f"WORK_ITEM_COMPLETION::{FP046_R002_GOAL_ID}"
+FP046_R002_COMPLETION_DOCUMENT_ID = (
+    "WS-FP046-R002-CONSENT-WITHDRAWAL-DELETION-WORK-ITEM-COMPLETION-"
+    "20260825-R005"
+)
+FP046_R002_COMPLETION_PATH = (
+    "docs/control/execution/goal-results/"
+    f"{FP046_R002_GOAL_ID}/completion-receipt-r005.json"
+)
+FP046_R002_GOAL_PATH = (
+    "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/"
+    "epic-03-fp046-consent-withdrawal-deletion-r002.md"
+)
+FP046_R002_GOAL_SHA256 = (
+    "4627c19b421f626323778fcdfd01cc2edbc36644c48c7d65c2b4847e698ac429"
+)
+FP046_R002_PARENT_GOAL_PATH = (
+    "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/"
+    "epic-03-account-admin-security.md"
+)
+FP046_R002_PARENT_GOAL_SHA256 = (
+    "7d2dfb7fe89bd30fc1f6113acb0b533a9fd91a6106cc2ab4798091763beae832"
+)
+FP046_R002_NEXT_GOAL_ID = "WS-GOAL-EPIC-03-FP-048-R002"
+FP046_R002_R030_BINDING_IDENTITY = {
+    "IMPLEMENTATION_BACKLOG": {
+        "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260825-030",
+        "path": (
+            "docs/control/audits/"
+            "walksafe-implementation-remediation-backlog-20260825-r030.json"
+        ),
+    },
+    "IMPLEMENTATION_GAP": {
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260825-030",
+        "path": (
+            "docs/control/audits/"
+            "walksafe-implementation-gap-analysis-20260825-r030.json"
+        ),
+    },
+}
+FP046_R002_COMPLETION_CHANGED_ROLES = [
+    "IMPLEMENTATION_BACKLOG",
+    "IMPLEMENTATION_GAP",
+    FP046_R002_COMPLETION_ROLE,
+]
+FP046_R002_COMPLETION_PRODUCED_ROLES = [
+    "IMPLEMENTATION_BACKLOG",
+    "IMPLEMENTATION_GAP",
+]
+FP046_R002_COMPLETION_UPDATE_FIELDS = frozenset(
+    {
+        "sequence", "event_id", "event_type", "occurred_on", "occurred_at",
+        "previous_focus_goal_id", "previous_focus_content_sha256",
+        "focus_goal_id", "focus_goal_content_sha256", "from_status",
+        "to_status", "static_plan_manifest_sha256", "status_changes",
+        "runtime_after", "blockers_after", "blocker_resolution_ids_after",
+        "source_checkpoint_version", "evidence_refs", "previous_event_sha256",
+        "produced_by_goal_id", "produced_binding_roles",
+        "producer_completion_receipt_binding", "changed_binding_roles",
+        "changed_subject_ids_by_role", "producer_output_subject_ids_by_role",
+        "impact_closure_goal_ids", "impact_disposition_by_goal",
+        "reopened_completion_event_sha256_by_goal",
+        "canonical_binding_snapshot_after", "event_sha256",
+        "transition_control_review_binding",
+    }
+)
+FP046_R002_COMPLETION_EVENT_FIELDS = frozenset(
+    {
+        "sequence", "event_id", "event_type", "occurred_on", "occurred_at",
+        "previous_focus_goal_id", "previous_focus_content_sha256",
+        "focus_goal_id", "focus_goal_content_sha256", "subject_goal_id",
+        "from_status", "to_status", "static_plan_manifest_sha256",
+        "status_changes", "runtime_after", "blockers_after",
+        "blocker_resolution_ids_after", "source_checkpoint_version",
+        "evidence_refs", "previous_event_sha256",
+        "canonical_update_event_sha256", "completion_receipt_binding",
+        "completion_evidence_bindings", "completion_evidence_by_goal_after",
+        "canonical_binding_snapshot_after", "event_sha256",
+    }
+)
+FP046_R002_COMPLETION_RUNTIME_FIELDS = frozenset(
+    {
+        "focus_goal_id", "focus_goal_path", "focus_work_item_id",
+        "focus_source", "ready_frontier_goal_ids", "blocked_goal_ids",
+        "pending_questions", "open_question_count",
+        "artifact_work_queue_sha256", "completion_boundary_sha256",
+        "activation_status", "package_status",
+    }
+)
+FP046_R002_COMPLETION_REVIEW_PATH_BY_ROLE = {
+    "assignment": (
+        "docs/control/execution/workstream-transitions/seq86-87/"
+        "review-rounds/R005/assignment.json"
+    ),
+    "review_result": (
+        "docs/control/execution/workstream-transitions/seq86-87/"
+        "review-rounds/R005/review-result.json"
+    ),
+    "independent_review": (
+        "docs/control/execution/workstream-transitions/seq86-87/"
+        "review-rounds/R005/independent-review.json"
+    ),
+}
+FP046_R002_COMPLETION_REVIEW_DOCUMENT_ID_BY_ROLE = {
+    "assignment": (
+        "WS-FP046-R002-SEQ86-87-THIRD-RECOVERY-REVIEW-ASSIGNMENT-R005"
+    ),
+    "review_result": (
+        "WS-FP046-R002-SEQ86-87-THIRD-RECOVERY-REVIEW-RESULT-R005"
+    ),
+    "independent_review": (
+        "WS-FP046-R002-SEQ86-87-THIRD-RECOVERY-INDEPENDENT-REVIEW-R005"
+    ),
+}
+FP046_R002_COMPLETION_GOAL_REVIEW_BY_KIND = {
+    "review_subject": {
+        "document_id": (
+            "WS-FP046-R002-THIRD-RECOVERY-REVIEW-SUBJECT-20260825-R005"
+        ),
+        "path": (
+            "docs/control/execution/goal-results/"
+            f"{FP046_R002_GOAL_ID}/review-rounds/R005/review-subject.json"
+        ),
+    },
+    "independent_review": {
+        "document_id": (
+            "WS-FP046-R002-THIRD-RECOVERY-INDEPENDENT-REVIEW-20260825-R005"
+        ),
+        "path": (
+            "docs/control/execution/goal-results/"
+            f"{FP046_R002_GOAL_ID}/review-rounds/R005/independent-review.json"
+        ),
+    },
+}
+FP046_R002_ZERO_CREDIT_BOUNDARY = {
+    "formal_test_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "external_review_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "formal_test_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "release_credit_delta": 0,
+}
 R002_REOPEN_CANONICAL_BINDING_UPDATES = {
     "IMPLEMENTATION_GAP": {
         "role": "IMPLEMENTATION_GAP",
@@ -5582,6 +6523,10 @@ def _fp048_android_report_successor_bindings(
     require_live_after: bool = True,
 ) -> dict[str, str] | None:
     """Prove the exact five packet hashes superseded by sealed FP048."""
+    proof_checkpoint = _r002_legacy_completion_overlay(root, checkpoint)
+    if proof_checkpoint is None:
+        return None
+    checkpoint = proof_checkpoint
     expected = FP048_ANDROID_REPORT_SUCCESSOR_BY_PATH
     if (
         not isinstance(checkpoint, dict)
@@ -6515,25 +7460,85 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             if fp022_start_suffix
             else None
         )
-        fp022_control_successor_context = (
-            fp022_completion_review.validated_control_successor_r011_context(
-                root
+        fp046_pre_review_modified_controls: tuple[dict[str, Any], ...] = ()
+        fp046_start_review_authority = None
+        frozen_r011 = None
+        if fp022_completion_suffix:
+            fp046_start_suffix = _fp046_r002_seq77_78_suffix(checkpoint)
+            if fp046_start_suffix is None:
+                return False
+            frozen_r011 = _fp046_r002_optional_frozen_r011_authority(root)
+            if frozen_r011 is None:
+                if fp046_start_suffix != []:
+                    return False
+                fp022_control_successor_context = (
+                    fp022_completion_review.validated_control_successor_r011_context(
+                        root
+                    )
+                )
+                fp022_managed_sources_by_round = (
+                    fp022_completion_review.validated_control_successor_managed_closure_sources_by_round(
+                        root
+                    )
+                )
+            else:
+                if len(fp046_start_suffix) <= 1:
+                    try:
+                        pre_review_capability = (
+                            _fp046_r002_pre_review_control_cohort_capability()
+                        )
+                    except _Fp046R002StartReviewCapabilityUnavailable:
+                        pass
+                    else:
+                        fp046_pre_review_modified_controls = (
+                            _fp046_r002_pre_review_modified_control_cohort(
+                                root,
+                                frozen_r011,
+                                capability=pre_review_capability,
+                            )
+                        )
+                else:
+                    if len(fp046_start_suffix) >= 6:
+                        fp046_start_review_authority = (
+                            _fp046_r002_recovery_review_authority(
+                                root,
+                                checkpoint,
+                            )
+                        )
+                fp022_control_successor_context = frozen_r011["context"]
+                fp022_managed_sources_by_round = frozen_r011[
+                    "managed_sources_by_round"
+                ]
+        else:
+            fp022_control_successor_context = None
+            fp022_managed_sources_by_round = None
+        if frozen_r011 is not None:
+            fp022_completion_context = (
+                _fp046_r002_frozen_completion_review_context(
+                    root,
+                    fp022_completion_review,
+                )
             )
-            if fp022_completion_suffix
-            else None
-        )
-        fp022_completion_context = (
-            fp022_control_successor_context.current
-            if fp022_control_successor_context is not None
-            else None
-        )
-        fp022_managed_sources_by_round = (
-            fp022_completion_review.validated_control_successor_managed_closure_sources_by_round(
-                root
+            fp022_completion_context["control_code_cohort"] = tuple(
+                copy.deepcopy(
+                    frozen_r011["context"].current.control_code_cohort
+                )
             )
-            if fp022_control_successor_context is not None
-            else None
-        )
+        elif fp022_control_successor_context is not None:
+            legacy_completion_context = fp022_control_successor_context.current
+            fp022_completion_context = {
+                "control_code_cohort": tuple(
+                    legacy_completion_context.control_code_cohort
+                ),
+                "completion_evidence_bindings": tuple(
+                    legacy_completion_context.completion_evidence_bindings
+                ),
+                "superseded_assignment_bindings": tuple(
+                    legacy_completion_context.superseded_assignment_bindings
+                ),
+            }
+        else:
+            fp022_completion_context = None
         if fp022_completion_context is not None:
             expected_completion_review_binding = {
                 role: fp022_completion_review._binding(
@@ -6618,13 +7623,15 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
                 path.as_posix()
                 for path in fp022_completion_review.UNMANAGED_EVIDENCE_PATHS
             }
-            for row in fp022_completion_context.control_code_cohort:
+            for row in fp022_completion_context["control_code_cohort"]:
                 path = row.get("path")
                 digest = row.get("sha256")
                 if not isinstance(path, str) or not isinstance(digest, str):
                     return False
                 mandatory[path] = digest
-            for row in fp022_completion_context.completion_evidence_bindings:
+            for row in fp022_completion_context[
+                "completion_evidence_bindings"
+            ]:
                 path = row.get("path")
                 digest = row.get("sha256")
                 if not isinstance(path, str) or not isinstance(digest, str):
@@ -6735,7 +7742,9 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
                             root, Path(row["path"])
                         )
                         for row in (
-                            fp022_completion_context.superseded_assignment_bindings
+                            fp022_completion_context[
+                                "superseded_assignment_bindings"
+                            ]
                         )
                     },
                     fp022_completion_review.ASSIGNMENT_REL: _npc_exact_live_bytes(
@@ -6747,6 +7756,18 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
                     fp022_completion_review.INDEPENDENT_REL: _npc_exact_live_bytes(
                         root, fp022_completion_review.INDEPENDENT_REL
                     ),
+                }
+            )
+        if fp046_start_review_authority is not None:
+            dynamic_raw.update(
+                {
+                    relative: _npc_exact_live_bytes(root, relative)
+                    for relative in (
+                        *fp046_start_review_authority["review_paths"],
+                        *fp046_start_review_authority[
+                            "preserved_review_paths"
+                        ],
+                    )
                 }
             )
         expected_dynamic_paths = {
@@ -6791,12 +7812,23 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
                     *(
                         Path(row["path"])
                         for row in (
-                            fp022_completion_context.superseded_assignment_bindings
+                            fp022_completion_context[
+                                "superseded_assignment_bindings"
+                            ]
                         )
                     ),
                     fp022_completion_review.ASSIGNMENT_REL,
                     fp022_completion_review.RESULT_REL,
                     fp022_completion_review.INDEPENDENT_REL,
+                }
+            )
+        if fp046_start_review_authority is not None:
+            expected_dynamic_paths.update(
+                {
+                    *fp046_start_review_authority["review_paths"],
+                    *fp046_start_review_authority[
+                        "preserved_review_paths"
+                    ],
                 }
             )
         if (
@@ -6853,6 +7885,17 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             if overlaid_mandatory is None:
                 return False
             mandatory = overlaid_mandatory
+
+        for row in fp046_pre_review_modified_controls:
+            if row["path"] not in mandatory:
+                return False
+            mandatory[row["path"]] = row["sha256"]
+
+        if fp046_start_review_authority is not None:
+            for row in fp046_start_review_authority[
+                "control_code_cohort"
+            ]:
+                mandatory[row["path"]] = row["sha256"]
 
         snapshot = checkpoint.get("working_tree_snapshot")
         handoff = checkpoint.get("session_handoff")
@@ -6923,6 +7966,8 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
 def _npc_single_admin_recovery_completion_package(
     root: Path,
     checkpoint: dict[str, Any],
+    *,
+    require_current_managed_closure: bool = True,
 ) -> dict[str, Any] | None:
     """Validate the add-only NPC result/review package bound by seq61/62."""
 
@@ -7162,9 +8207,12 @@ def _npc_single_admin_recovery_completion_package(
     implementation = _npc_single_admin_recovery_v2_completion_evidence(root)
     if (
         implementation is None
-        or not _npc_single_admin_recovery_completion_managed_closure_matches(
-            root,
-            checkpoint,
+        or (
+            require_current_managed_closure
+            and not _npc_single_admin_recovery_completion_managed_closure_matches(
+                root,
+                checkpoint,
+            )
         )
     ):
         return None
@@ -7332,6 +8380,86 @@ def _fp022_completion_start_to_final_transitions(
 
     state = checkpoint.get("goal_execution")
     history = state.get("transition_history") if isinstance(state, dict) else None
+    terminal_event: dict[str, Any] | None = None
+    if isinstance(history, list):
+        if len(history) == FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE:
+            candidate = _fp048_r002_seq96_r008_contract_correction_event(
+                checkpoint
+            )
+            if isinstance(candidate, dict) and (
+                _fp048_r002_seq92_ready_projection_matches(
+                    checkpoint,
+                    candidate,
+                )
+            ):
+                terminal_event = candidate
+        elif len(history) == FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE:
+            candidate = _fp048_r002_seq97_r009_contract_correction_event(
+                checkpoint
+            )
+            if isinstance(candidate, dict) and (
+                _fp048_r002_seq92_ready_projection_matches(
+                    checkpoint,
+                    candidate,
+                )
+            ):
+                terminal_event = candidate
+        elif len(history) == FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE:
+            authority = _fp048_r002_r009_execution_correction_authority()
+            candidate = _fp048_r002_seq98_r009_execution_correction_event(
+                checkpoint,
+                authority,
+            )
+            if isinstance(candidate, dict) and (
+                _fp048_r002_seq92_ready_projection_matches(
+                    checkpoint,
+                    candidate,
+                )
+            ):
+                terminal_event = candidate
+        elif (
+            len(history) > FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE
+            and isinstance(history[98], Mapping)
+            and history[98].get("event_id")
+            == FP048_R002_SUCCESSOR_CORRECTION_EVENT_ID
+        ):
+            try:
+                source = _fp048_r002_successor_seq98_source(
+                    root,
+                    checkpoint,
+                    require_live_snapshot=_fp048_r002_successor_is_live_checkpoint(
+                        root,
+                        checkpoint,
+                    ),
+                )
+            except Exception:
+                source = None
+            if source is not None:
+                terminal_event = history[-1]
+        elif len(history) == FP048_R002_R010_STARTED_SEQUENCE:
+            candidate = history[-1]
+            binding = (
+                candidate.get("implementation_start_gate_binding")
+                if isinstance(candidate, dict)
+                else None
+            )
+            started = (
+                _fp048_r002_seq99_r010_started_event(checkpoint, binding)
+                if isinstance(binding, dict)
+                else None
+            )
+            if isinstance(started, dict) and (
+                _fp048_r002_seq93_in_progress_projection_matches(
+                    checkpoint,
+                    started,
+                )
+            ):
+                terminal_event = started
+        elif len(history) == FP048_R002_COMPLETION_SEQUENCE and not (
+            validate_fp048_r002_completion_seq100_101(root, checkpoint)
+        ):
+            terminal_event = history[-1]
+    use_sealed_successors = terminal_event is not None
     if (
         not require_completion_review
         and isinstance(history, list)
@@ -7343,9 +8471,16 @@ def _fp022_completion_start_to_final_transitions(
         and not _fp022_completion_suffix_is_declared(checkpoint)
     ):
         return {}
+    sealed_completion = _fp022_completion_suffix_is_declared(checkpoint)
     if (
-        require_completion_review
-        and continuation.validate_fp022_completion_seq70_71(root, checkpoint)
+        isinstance(history, list)
+        and len(history) >= 71
+        and not sealed_completion
+    ):
+        return None
+    if sealed_completion and continuation.validate_fp022_completion_seq70_71(
+        root,
+        checkpoint,
     ):
         return None
     try:
@@ -7358,9 +8493,7 @@ def _fp022_completion_start_to_final_transitions(
             as fp022_evidence,
         )
 
-        if require_completion_review:
-            completion_review.validate_post_review(root)
-        else:
+        if not sealed_completion:
             completion_review._validate_product_chain(root)
         implementation = _load_exact_json(
             root, fp022_evidence.IMPLEMENTATION_REL.as_posix()
@@ -7372,7 +8505,17 @@ def _fp022_completion_start_to_final_transitions(
         )
         if not isinstance(manifest, dict):
             return None
-        fp022_evidence.validate_final_content_manifest(manifest, root=root)
+        if sealed_completion:
+            fp022_evidence.verify_seal(
+                manifest,
+                "manifest_content_sha256",
+                "FP-022 final-content manifest",
+            )
+        else:
+            fp022_evidence.validate_final_content_manifest(
+                manifest,
+                root=root,
+            )
 
         minimum_history = 71 if require_completion_review else 69
         if not isinstance(history, list) or len(history) < minimum_history:
@@ -7500,12 +8643,27 @@ def _fp022_completion_start_to_final_transitions(
             before_sha256 = continuation.sha256_bytes(blob.stdout)
             after_sha256 = row.get("sha256")
             live = _exact_repo_file(root, relative)
-            if (
-                live is None
-                or live.stat().st_size != row.get("byte_length")
-                or continuation.sha256_file(live) != after_sha256
-            ):
+            if live is None:
                 return None
+            live_sha256 = continuation.sha256_file(live)
+            if not use_sealed_successors and (
+                live.stat().st_size != row.get("byte_length")
+                or live_sha256 != after_sha256
+            ):
+                reviewed_valid, reviewed_successor = (
+                    _fp048_r002_reviewed_noncredit_edge(
+                        root,
+                        checkpoint,
+                        relative,
+                        after_sha256,
+                    )
+                )
+                if (
+                    not reviewed_valid
+                    or reviewed_successor is None
+                    or reviewed_successor[1] != live_sha256
+                ):
+                    return None
             if before_sha256 == after_sha256:
                 unchanged.add(relative)
             else:
@@ -7527,8 +8685,5109 @@ def _fp022_completion_start_to_final_transitions(
         ValueError,
         subprocess.SubprocessError,
         npc_recovery.BuildError,
+        fp022_evidence.BuildError,
+        completion_review.ReviewError,
     ):
         return None
+
+
+def _fp048_r002_control_reanchor_event(
+    checkpoint: dict[str, Any],
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list):
+        return None
+    matches = [
+        (index, event)
+        for index, event in enumerate(history)
+        if isinstance(event, dict)
+        and (
+            event.get("sequence") == FP048_R002_CONTROL_REANCHOR_SEQUENCE
+            or event.get("event_id") == FP048_R002_CONTROL_REANCHOR_EVENT_ID
+        )
+    ]
+    if len(matches) != 1 or matches[0][0] != FP048_R002_CONTROL_REANCHOR_SEQUENCE - 1:
+        return None
+    event = matches[0][1]
+    predecessor = history[FP048_R002_CONTROL_REANCHOR_SEQUENCE - 2]
+    if (
+        not isinstance(predecessor, dict)
+        or event.get("sequence") != FP048_R002_CONTROL_REANCHOR_SEQUENCE
+        or event.get("event_id") != FP048_R002_CONTROL_REANCHOR_EVENT_ID
+        or event.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+        or event.get("from_status") != "READY"
+        or event.get("to_status") != "READY"
+        or event.get("status_changes") != {}
+        or event.get("previous_event_sha256") != predecessor.get("event_sha256")
+        or event.get("event_sha256") != continuation.event_sha256(event)
+        or event.get("claim_boundary")
+        != FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+    ):
+        return None
+    return event
+
+
+def _fp048_r002_control_reanchor_is_declared(
+    checkpoint: dict[str, Any],
+) -> bool:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    return bool(
+        isinstance(history, list)
+        and any(
+            isinstance(event, dict)
+            and (
+                event.get("sequence") == FP048_R002_CONTROL_REANCHOR_SEQUENCE
+                or event.get("event_id") == FP048_R002_CONTROL_REANCHOR_EVENT_ID
+            )
+            for event in history
+        )
+    )
+
+
+def _fp048_r002_binding_is_sealed(value: Any) -> bool:
+    return bool(
+        isinstance(value, dict)
+        and set(value) == {"path", "sha256", "byte_length"}
+        and isinstance(value.get("path"), str)
+        and value["path"]
+        and isinstance(value.get("sha256"), str)
+        and continuation.SHA256_RE.fullmatch(value["sha256"]) is not None
+        and isinstance(value.get("byte_length"), int)
+        and not isinstance(value.get("byte_length"), bool)
+        and value["byte_length"] >= 0
+    )
+
+
+def _fp048_r002_control_correction_event(
+    checkpoint: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return the exact frozen seq91 event without reopening live evidence."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 91:
+        return None
+    reanchor = history[89]
+    correction = history[90]
+    if not isinstance(reanchor, dict) or not isinstance(correction, dict):
+        return None
+    source = correction.get("source_checkpoint_binding")
+    supersession = correction.get("contract_supersession")
+    replacement = (
+        supersession.get("replacement_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    review = correction.get("transition_control_review_binding")
+    if (
+        _fp048_r002_control_reanchor_event(checkpoint) is None
+        or reanchor.get("event_sha256")
+        != FP048_R002_CONTROL_REANCHOR_EVENT_SHA256
+        or set(correction) != set(reanchor) | {"correction_reason"}
+        or correction.get("sequence")
+        != FP048_R002_CONTROL_CORRECTION_SEQUENCE
+        or correction.get("event_id")
+        != FP048_R002_CONTROL_CORRECTION_EVENT_ID
+        or correction.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+        or correction.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or correction.get("previous_focus_goal_id")
+        != FP046_R002_NEXT_GOAL_ID
+        or correction.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or correction.get("from_status") != "READY"
+        or correction.get("to_status") != "READY"
+        or correction.get("status_changes") != {}
+        or correction.get("previous_event_sha256")
+        != reanchor.get("event_sha256")
+        or correction.get("event_sha256")
+        != continuation.event_sha256(correction)
+        or correction.get("claim_boundary")
+        != FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+        or correction.get("correction_reason")
+        != FP048_R002_CONTROL_CORRECTION_REASON
+        or correction.get("noncredit_successor_edges")
+        != reanchor.get("noncredit_successor_edges")
+        or correction.get("runtime_after") != reanchor.get("runtime_after")
+        or correction.get("blockers_after") != reanchor.get("blockers_after")
+        or correction.get("blocker_resolution_ids_after")
+        != reanchor.get("blocker_resolution_ids_after")
+        or correction.get("canonical_binding_snapshot_after")
+        != reanchor.get("canonical_binding_snapshot_after")
+        or correction.get("source_ready_event_binding")
+        != reanchor.get("source_ready_event_binding")
+        or not isinstance(source, dict)
+        or source.get("sequence") != FP048_R002_CONTROL_REANCHOR_SEQUENCE
+        or source.get("tail_event_id") != FP048_R002_CONTROL_REANCHOR_EVENT_ID
+        or source.get("tail_event_sha256") != reanchor.get("event_sha256")
+        or not isinstance(supersession, dict)
+        or set(supersession)
+        != {
+            "previous_contract_binding",
+            "reason_code",
+            "replacement_contract_binding",
+        }
+        or supersession.get("previous_contract_binding")
+        != reanchor.get("contract_supersession", {}).get(
+            "replacement_contract_binding"
+        )
+        or supersession.get("reason_code")
+        != FP048_R002_CONTROL_CORRECTION_REASON["reason_code"]
+        or not isinstance(replacement, dict)
+        or replacement.get("path")
+        != (
+            "docs/control/execution/goal-contracts/"
+            "WS-GOAL-EPIC-03-FP-048-R002/"
+            "initial-start-gate-contract-r003.json"
+        )
+        or replacement.get("contract_id")
+        != "WS-FP048-R002-INTERNAL-START-GATE-R003"
+        or replacement.get("contract_version") != "2026-08-26.2"
+        or not _fp048_r002_binding_is_sealed(
+            correction.get("authorization_binding")
+        )
+        or correction["authorization_binding"]["path"]
+        != (
+            "docs/control/execution/workstream-transitions/seq91-92/"
+            "authorization.json"
+        )
+        or not _fp048_r002_binding_is_sealed(
+            correction.get("start_gate_runner_binding")
+        )
+        or correction["start_gate_runner_binding"]["path"]
+        != "scripts/run_walksafe_fp048_r002_goal_start_gate_r003_20260826.py"
+        or not isinstance(review, dict)
+        or set(review) != {"assignment", "review_result", "independent_review"}
+        or not all(_fp048_r002_binding_is_sealed(row) for row in review.values())
+    ):
+        return None
+    return correction
+
+
+def _fp048_r002_seq91_92_suffix(
+    checkpoint: dict[str, Any],
+) -> list[dict[str, Any]] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list):
+        return None
+    if len(history) < FP048_R002_CONTROL_CORRECTION_SEQUENCE:
+        return []
+    correction = _fp048_r002_control_correction_event(checkpoint)
+    if correction is None:
+        return None
+    if len(history) < FP048_R002_CORRECTED_STARTED_SEQUENCE:
+        return [correction]
+    started = history[FP048_R002_CORRECTED_STARTED_SEQUENCE - 1]
+    if (
+        not isinstance(started, dict)
+        or set(started) != continuation.V24_FIRST_START_EVENT_FIELDS
+        or started.get("sequence") != FP048_R002_CORRECTED_STARTED_SEQUENCE
+        or started.get("event_id") != FP048_R002_CORRECTED_STARTED_EVENT_ID
+        or started.get("event_type") != "GOAL_STARTED"
+        or started.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("from_status") != "READY"
+        or started.get("to_status") != "IN_PROGRESS"
+        or started.get("status_changes")
+        != {FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"}
+        or started.get("previous_event_sha256")
+        != correction.get("event_sha256")
+        or started.get("event_sha256") != continuation.event_sha256(started)
+    ):
+        return None
+    return [correction, started]
+
+
+def _fp048_r002_exact_seq92_projection(
+    root: Path,
+    checkpoint: dict[str, Any],
+    state: dict[str, Any],
+    started: dict[str, Any],
+) -> bool:
+    try:
+        history = state.get("transition_history")
+        if not isinstance(history, list) or len(history) != 92:
+            return False
+        control = history[90]
+        occurred_at = datetime.fromisoformat(started.get("occurred_at"))
+        binding = started.get("implementation_start_gate_binding")
+        resolutions = state.get("blocker_resolution_history")
+        if (
+            occurred_at.utcoffset() is None
+            or occurred_at.microsecond != 0
+            or set(started) != continuation.V24_FIRST_START_EVENT_FIELDS
+            or started.get("occurred_on") != occurred_at.date().isoformat()
+            or started.get("previous_focus_content_sha256")
+            != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+            or started.get("focus_goal_content_sha256")
+            != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+            or started.get("static_plan_manifest_sha256")
+            != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+            or started.get("runtime_after") != control.get("runtime_after")
+            or started.get("blockers_after") != state.get("blockers_by_goal")
+            or not isinstance(resolutions, list)
+            or not all(
+                isinstance(record, dict) and "resolution_id" in record
+                for record in resolutions
+            )
+            or started.get("blocker_resolution_ids_after")
+            != [record["resolution_id"] for record in resolutions]
+            or started.get("source_checkpoint_version")
+            != checkpoint.get("schema_version")
+            or started.get("evidence_refs") != []
+            or not isinstance(started.get("repository_snapshot_before"), dict)
+            or not isinstance(binding, dict)
+            or set(binding) != {"document_id", "path", "file_sha256"}
+            or binding.get("document_id") != FP048_R002_STARTED_GATE_DOCUMENT_ID
+            or binding.get("path") != FP048_R002_STARTED_GATE_RECEIPT_PATH
+            or not isinstance(binding.get("file_sha256"), str)
+            or continuation.SHA256_RE.fullmatch(binding["file_sha256"]) is None
+        ):
+            return False
+        statuses = state.get("status_by_goal")
+        current = checkpoint.get("current_work")
+        snapshot = checkpoint.get("working_tree_snapshot")
+        handoff = checkpoint.get("session_handoff")
+        if (
+            not isinstance(statuses, dict)
+            or statuses.get(FP046_R002_NEXT_GOAL_ID) != "IN_PROGRESS"
+            or list(statuses.values()).count("IN_PROGRESS") != 1
+            or state.get("goal_status") != "IN_PROGRESS"
+            or state.get("transition_history_anchor_sha256")
+            != started.get("event_sha256")
+            or state.get("validation_cutoff_at") != started.get("occurred_at")
+            or not isinstance(current, dict)
+            or current.get("work_item_id") != FP048_R002_WORK_ITEM_ID
+            or current.get("status") != "IN_PROGRESS"
+            or current.get("current_focus") != FP048_R002_STARTED_CURRENT_FOCUS
+            or current.get("next_action") != FP048_R002_WORK_NEXT_ACTION
+            or current.get("release_completion_claimed") is not False
+            or not isinstance(snapshot, dict)
+        ):
+            return False
+        paths = snapshot.get("managed_changed_paths")
+        if (
+            not isinstance(paths, list)
+            or not all(isinstance(path, str) and path for path in paths)
+            or paths != sorted(set(paths))
+            or not set(FP048_R002_STARTED_MANAGED_PATHS).issubset(paths)
+            or snapshot.get("scope") != FP048_R002_STARTED_SCOPE
+            or type(snapshot.get("managed_changed_path_count")) is not int
+            or snapshot.get("managed_changed_path_count") != len(paths)
+        ):
+            return False
+        path_sha256, content_sha256 = continuation.working_snapshot_hashes(
+            root, paths
+        )
+        mirror = handoff.get("source_commit_or_snapshot") if isinstance(handoff, dict) else None
+        return bool(
+            snapshot.get("path_set_sha256") == path_sha256
+            and snapshot.get("content_set_sha256") == content_sha256
+            and isinstance(handoff, dict)
+            and handoff.get("changed_files") == paths
+            and handoff.get("current_epic") == FP048_R002_STARTED_HANDOFF_EPIC
+            and handoff.get("last_updated_by_work_item") == FP048_R002_WORK_ITEM_ID
+            and handoff.get("last_verification_status")
+            == FP048_R002_STARTED_VERIFICATION_STATUS
+            and handoff.get("next_single_action")
+            == FP048_R002_CORRECTION_NEXT_ACTION
+            and isinstance(mirror, dict)
+            and type(mirror.get("file_count")) is int
+            and mirror.get("file_count") == len(paths)
+            and mirror.get("path_set_sha256") == path_sha256
+            and mirror.get("content_set_sha256") == content_sha256
+        )
+    except (KeyError, OSError, TypeError, ValueError):
+        return False
+
+
+def validate_fp048_r002_seq91_92(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Validate the append-only zero-credit correction and exact start."""
+
+    suffix = _fp048_r002_seq91_92_suffix(checkpoint)
+    if suffix == []:
+        return []
+    if suffix is None:
+        return ["FP048 R002 seq91/92 correction/start suffix differs"]
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    statuses = state.get("status_by_goal") if isinstance(state, dict) else None
+    current = checkpoint.get("current_work")
+    if not isinstance(history, list) or not isinstance(statuses, dict):
+        return ["FP048 R002 seq91/92 state projection differs"]
+    expected = "READY" if len(history) == 91 else "IN_PROGRESS"
+    if len(history) in {91, 92} and (
+        statuses.get(FP046_R002_NEXT_GOAL_ID) != expected
+        or state.get("goal_status") != expected
+        or not isinstance(current, dict)
+        or current.get("status") != expected
+    ):
+        return ["FP048 R002 seq91/92 state projection differs"]
+    if len(history) == 92 and not _fp048_r002_exact_seq92_projection(
+        root,
+        checkpoint,
+        state,
+        history[91],
+    ):
+        return ["FP048 R002 seq92 exact projection differs"]
+    return []
+
+
+def _fp048_r002_start_gate_contract_correction_authority() -> Any:
+    """Load the seq92 R004 contract-correction owner only for that branch."""
+
+    try:
+        authority = importlib.import_module(
+            FP048_R002_START_GATE_CONTRACT_CORRECTION_MODULE
+        )
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq92 contract-correction authority cannot be loaded"
+        ) from exc
+    for name in (
+        "canonical_seq92_checkpoint_bytes",
+        "require_contract_corrected_checkpoint",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                "FP048 R002 seq92 contract-correction authority API is "
+                f"missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r004_started_authority() -> Any:
+    """Load the seq93 R004-receipt start owner only for that branch."""
+
+    try:
+        authority = importlib.import_module(FP048_R002_R004_STARTED_MODULE)
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq93 started authority cannot be loaded"
+        ) from exc
+    for name in (
+        "require_exact_seq93_projection",
+        "reconstructed_seq92_checkpoint_bytes",
+        "goal_start_gate_receipt_binding",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 seq93 started authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_branch_semantics_reanchor_authority() -> Any:
+    """Load the seq93 READY reanchor owner for the current R005 branch."""
+
+    try:
+        authority = importlib.import_module(
+            FP048_R002_BRANCH_SEMANTICS_REANCHOR_MODULE
+        )
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq93 branch-semantics authority cannot be loaded"
+        ) from exc
+    for name in (
+        "canonical_seq93_checkpoint_bytes",
+        "checkpoint_json_bytes",
+        "frozen_seq92_r004_review_binding",
+        "passed_gate_attempt_003_binding",
+        "r005_contract_binding",
+        "require_exact_seq92_source",
+        "require_branch_semantics_reanchored_checkpoint",
+        "reconstructed_seq92_checkpoint_bytes",
+        "reconstructed_seq93_checkpoint_bytes",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                "FP048 R002 seq93 branch-semantics authority API is "
+                f"missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r005_started_authority() -> Any:
+    """Load the seq94 R005-receipt start owner for the current branch."""
+
+    try:
+        authority = importlib.import_module(FP048_R002_R005_STARTED_MODULE)
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq94 started authority cannot be loaded"
+        ) from exc
+    for name in (
+        "require_exact_seq94_projection",
+        "reconstructed_seq93_checkpoint_bytes",
+        "goal_start_gate_receipt_binding",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 seq94 started authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r006_contract_correction_authority() -> Any:
+    """Load the seq94 R005-to-R006 correction owner for the new branch."""
+
+    try:
+        authority = importlib.import_module(
+            FP048_R002_R006_CONTRACT_CORRECTION_MODULE
+        )
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq94 R006 contract-correction authority cannot be loaded"
+        ) from exc
+    for name in (
+        "canonical_seq94_checkpoint_bytes",
+        "require_contract_corrected_checkpoint",
+        "require_exact_seq93_source",
+        "reconstructed_seq93_checkpoint_bytes",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                "FP048 R002 seq94 R006 contract-correction authority API is "
+                f"missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r006_started_authority() -> Any:
+    """Load the seq95 R006-receipt start owner only for the new branch."""
+
+    try:
+        authority = importlib.import_module(FP048_R002_R006_STARTED_MODULE)
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq95 R006 started authority cannot be loaded"
+        ) from exc
+    for name in (
+        "require_started_checkpoint",
+        "reconstructed_seq94_checkpoint_bytes",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 seq95 R006 started authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r007_contract_correction_authority() -> Any:
+    """Load the seq95 R006-to-R007 correction owner."""
+
+    try:
+        authority = importlib.import_module(
+            FP048_R002_R007_CONTRACT_CORRECTION_MODULE
+        )
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq95 R007 contract-correction authority cannot be loaded"
+        ) from exc
+    for name in (
+        "canonical_frozen_seq94_checkpoint_bytes",
+        "canonical_seq95_checkpoint_bytes",
+        "require_contract_corrected_checkpoint",
+        "reconstructed_seq94_checkpoint_bytes",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                "FP048 R002 seq95 R007 contract-correction authority API is "
+                f"missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r007_started_authority() -> Any:
+    """Load the seq96 exact R007-receipt start owner."""
+
+    try:
+        authority = importlib.import_module(FP048_R002_R007_STARTED_MODULE)
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq96 R007 started authority cannot be loaded"
+        ) from exc
+    for name in (
+        "goal_start_gate_receipt_binding",
+        "reconstructed_seq95_checkpoint_bytes",
+        "require_exact_seq96_projection",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 seq96 R007 started authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r008_contract_correction_authority() -> Any:
+    """Load the exact seq96 R007-to-R008 correction owner."""
+
+    try:
+        authority = importlib.import_module(
+            FP048_R002_R008_CONTRACT_CORRECTION_MODULE
+        )
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq96 R008 contract-correction authority cannot be loaded"
+        ) from exc
+    for name in (
+        "canonical_frozen_seq95_checkpoint_bytes",
+        "canonical_seq96_checkpoint_bytes",
+        "noncredit_fp023_product_successor_bindings",
+        "require_contract_corrected_checkpoint",
+        "reconstructed_seq95_checkpoint_bytes",
+        "reconstructed_seq96_checkpoint_bytes",
+        "r007_contract_binding",
+        "r008_contract_binding",
+        "r008_runner_binding",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                "FP048 R002 seq96 R008 contract-correction authority API is "
+                f"missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r008_started_authority() -> Any:
+    """Load the exact seq97 fresh R008 PASS-to-start owner."""
+
+    try:
+        authority = importlib.import_module(FP048_R002_R008_STARTED_MODULE)
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq97 R008 started authority cannot be loaded"
+        ) from exc
+    for name in (
+        "goal_start_gate_receipt_binding",
+        "reconstructed_seq96_checkpoint_bytes",
+        "require_exact_seq97_projection",
+        "require_published_r008_gate_for_seq96",
+        "require_started_checkpoint",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 seq97 R008 started authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r008_gate_authority() -> Any:
+    """Load only the public R008 gate authority surface."""
+
+    try:
+        authority = importlib.import_module(FP048_R002_R008_GATE_MODULE)
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 R008 gate authority cannot be loaded"
+        ) from exc
+    for name in (
+        "bind_contract_corrected_source",
+        "bind_published_contract_corrected_source",
+        "expected_r008_binding",
+        "expected_preflight_attempt_004_binding",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 R008 gate authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r009_contract_correction_authority() -> Any:
+    """Load the exact seq97 R008-failure-to-R009 correction owner."""
+
+    try:
+        authority = importlib.import_module(
+            FP048_R002_R009_CONTRACT_CORRECTION_MODULE
+        )
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq97 R009 contract-correction authority cannot be loaded"
+        ) from exc
+    for name in (
+        "canonical_seq97_checkpoint_bytes",
+        "noncredit_snapshot_hygiene_successor_binding",
+        "noncredit_reviewed_control_successor_bindings",
+        "project_seq97",
+        "reconstructed_seq96_checkpoint_bytes",
+        "require_snapshot_hygiene_corrected_checkpoint",
+        "r009_contract_binding",
+        "r009_runner_binding",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                "FP048 R002 seq97 R009 contract-correction authority API is "
+                f"missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r009_started_authority() -> Any:
+    """Load the exact seq98 fresh R009 PASS-to-start owner."""
+
+    try:
+        authority = importlib.import_module(FP048_R002_R009_STARTED_MODULE)
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq98 R009 started authority cannot be loaded"
+        ) from exc
+    for name in (
+        "goal_start_gate_receipt_binding",
+        "reconstructed_seq97_checkpoint_bytes",
+        "require_published_r009_gate_for_seq97",
+        "require_started_checkpoint",
+        "validate_gate_evidence",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 seq98 R009 started authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r009_execution_correction_authority() -> Any:
+    """Load the exact failed-R009-to-R010 seq98 correction owner."""
+
+    try:
+        authority = importlib.import_module(
+            FP048_R002_R009_EXECUTION_CORRECTION_MODULE
+        )
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq98 R009 execution-correction authority cannot be loaded"
+        ) from exc
+    for name in (
+        "canonical_seq98_checkpoint_bytes",
+        "noncredit_reviewed_control_successor_bindings",
+        "r009_execution_failure_binding",
+        "r010_contract_binding",
+        "r010_runner_binding",
+        "reconstructed_seq97_checkpoint_bytes",
+        "require_start_gate_execution_corrected_checkpoint",
+        "seq97_source_validation_call_scope",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                "FP048 R002 seq98 R009 execution-correction authority API is "
+                f"missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r010_started_authority() -> Any:
+    """Load the exact seq99 fresh R010 PASS-to-start owner."""
+
+    try:
+        authority = importlib.import_module(FP048_R002_R010_STARTED_MODULE)
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq99 R010 started authority cannot be loaded"
+        ) from exc
+    for name in (
+        "canonical_seq99_checkpoint_bytes",
+        "goal_start_gate_receipt_binding",
+        "reconstructed_seq98_checkpoint_bytes",
+        "require_started_checkpoint",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 seq99 R010 started authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_successor_correction_authority() -> Any:
+    """Load only the public seq99 successor-correction surface."""
+
+    authority = importlib.import_module(FP048_R002_SUCCESSOR_CORRECTION_MODULE)
+    for name in (
+        "noncredit_reviewed_control_successor_bindings",
+        "reconstructed_seq98_checkpoint_bytes",
+        "require_start_gate_execution_corrected_checkpoint",
+        "seq98_source_validation_call_scope",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 successor seq99 authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_successor_started_authority() -> Any:
+    """Load only the public seq100 starter surface."""
+
+    authority = importlib.import_module(FP048_R002_SUCCESSOR_STARTED_MODULE)
+    for name in (
+        "reconstructed_seq99_checkpoint_bytes",
+        "require_started_checkpoint",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 successor seq100 authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_successor_completion_authority() -> Any:
+    """Load only the public adjacent seq101/102 completion surface."""
+
+    authority = importlib.import_module(FP048_R002_SUCCESSOR_COMPLETION_MODULE)
+    for name in (
+        "reconstructed_seq100_checkpoint_bytes",
+        "require_completed_checkpoint",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 successor seq101/102 authority API is missing: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_successor_history(
+    checkpoint: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, Mapping) else None
+    if not isinstance(history, list) or not all(
+        isinstance(event, Mapping) for event in history
+    ):
+        raise ValueError("successor transition history is malformed")
+    return history
+
+
+def _require_fp048_r002_successor_identity(
+    history: list[Mapping[str, Any]],
+) -> None:
+    """Check only public successor dispatch identity; producers own semantics."""
+
+    length = len(history)
+    if length <= FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE:
+        return
+    if length == FP048_R002_SUCCESSOR_EVIDENCE_SEQUENCE:
+        raise ValueError(
+            "seq101 evidence transaction lacks adjacent seq102 completion"
+        )
+    if length not in {
+        FP048_R002_SUCCESSOR_CORRECTION_SEQUENCE,
+        FP048_R002_SUCCESSOR_STARTED_SEQUENCE,
+        FP048_R002_SUCCESSOR_COMPLETION_SEQUENCE,
+    }:
+        raise ValueError("successor history must end at seq99, seq100, or seq102")
+
+    legacy = history[98]
+    if (
+        type(legacy.get("sequence")) is int
+        and legacy.get("sequence") == FP048_R002_R010_STARTED_SEQUENCE
+        and legacy.get("event_id") == FP048_R002_R010_STARTED_EVENT_ID
+        and legacy.get("event_type") == "GOAL_STARTED"
+    ):
+        raise ValueError("legacy failed R010 direct seq99 GOAL_STARTED is forbidden")
+
+    specifications: tuple[tuple[int, str, str, str | None, str, str, dict[str, str]], ...] = (
+        (
+            FP048_R002_SUCCESSOR_CORRECTION_SEQUENCE,
+            FP048_R002_SUCCESSOR_CORRECTION_EVENT_ID,
+            "GOAL_START_GATE_EXECUTION_CORRECTED",
+            FP046_R002_NEXT_GOAL_ID,
+            "READY",
+            "READY",
+            {},
+        ),
+        (
+            FP048_R002_SUCCESSOR_STARTED_SEQUENCE,
+            FP048_R002_SUCCESSOR_STARTED_EVENT_ID,
+            "GOAL_STARTED",
+            FP046_R002_NEXT_GOAL_ID,
+            "READY",
+            "IN_PROGRESS",
+            {FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"},
+        ),
+        (
+            FP048_R002_SUCCESSOR_EVIDENCE_SEQUENCE,
+            FP048_R002_SUCCESSOR_EVIDENCE_EVENT_ID,
+            "CANONICAL_BINDINGS_UPDATED",
+            None,
+            "IN_PROGRESS",
+            "IN_PROGRESS",
+            {},
+        ),
+        (
+            FP048_R002_SUCCESSOR_COMPLETION_SEQUENCE,
+            FP048_R002_SUCCESSOR_COMPLETION_EVENT_ID,
+            "GOAL_COMPLETED",
+            FP046_R002_NEXT_GOAL_ID,
+            "IN_PROGRESS",
+            "COMPLETE_AT_TARGET",
+            {FP046_R002_NEXT_GOAL_ID: "COMPLETE_AT_TARGET"},
+        ),
+    )
+    for sequence, event_id, event_type, subject, before, after, changes in specifications:
+        if sequence > length:
+            break
+        event = history[sequence - 1]
+        if (
+            type(event.get("sequence")) is not int
+            or event.get("sequence") != sequence
+            or event.get("event_id") != event_id
+            or event.get("event_type") != event_type
+            or event.get("from_status") != before
+            or event.get("to_status") != after
+            or event.get("status_changes") != changes
+            or (
+                subject is not None
+                and event.get("subject_goal_id") != subject
+            )
+            or (
+                sequence == FP048_R002_SUCCESSOR_EVIDENCE_SEQUENCE
+                and event.get("produced_by_goal_id") != FP046_R002_NEXT_GOAL_ID
+            )
+        ):
+            raise ValueError(f"seq{sequence} successor identity or status differs")
+
+
+def _fp048_r002_successor_inverse(
+    raw: Any,
+    *,
+    expected_sequence: int,
+) -> dict[str, Any]:
+    if not isinstance(raw, bytes) or not raw:
+        raise ValueError(f"seq{expected_sequence} inverse authority returned non-bytes")
+    try:
+        checkpoint = json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(f"seq{expected_sequence} inverse checkpoint is malformed") from exc
+    if not isinstance(checkpoint, dict):
+        raise ValueError(f"seq{expected_sequence} inverse checkpoint is malformed")
+    expected_raw = (
+        json.dumps(checkpoint, ensure_ascii=False, indent=2, sort_keys=False)
+        + "\n"
+    ).encode("utf-8")
+    if raw != expected_raw:
+        raise ValueError(f"seq{expected_sequence} inverse checkpoint is noncanonical")
+    history = _fp048_r002_successor_history(checkpoint)
+    if len(history) != expected_sequence:
+        raise ValueError(f"seq{expected_sequence} inverse history differs")
+    _require_fp048_r002_successor_identity(history)
+    return checkpoint
+
+
+def _fp048_r002_successor_seq98_source(
+    root: Path,
+    checkpoint: Mapping[str, Any],
+    *,
+    require_live_snapshot: bool,
+) -> dict[str, Any] | None:
+    """Validate the new branch and recover its exact existing seq98 source."""
+
+    history = _fp048_r002_successor_history(checkpoint)
+    if len(history) <= FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE:
+        return None
+    _require_fp048_r002_successor_identity(history)
+    candidate: Mapping[str, Any] = checkpoint
+    active_sequence = len(history)
+
+    if active_sequence == FP048_R002_SUCCESSOR_COMPLETION_SEQUENCE:
+        completion = _fp048_r002_successor_completion_authority()
+        completion.require_completed_checkpoint(
+            root,
+            candidate,
+            require_live_snapshot=require_live_snapshot,
+            run_external_validators=False,
+        )
+        candidate = _fp048_r002_successor_inverse(
+            completion.reconstructed_seq100_checkpoint_bytes(root, candidate),
+            expected_sequence=FP048_R002_SUCCESSOR_STARTED_SEQUENCE,
+        )
+
+    candidate_history = _fp048_r002_successor_history(candidate)
+    if len(candidate_history) == FP048_R002_SUCCESSOR_STARTED_SEQUENCE:
+        starter = _fp048_r002_successor_started_authority()
+        starter.require_started_checkpoint(
+            root,
+            candidate,
+            require_live_snapshot=(
+                require_live_snapshot
+                and active_sequence == FP048_R002_SUCCESSOR_STARTED_SEQUENCE
+            ),
+            run_external_validators=False,
+        )
+        candidate = _fp048_r002_successor_inverse(
+            starter.reconstructed_seq99_checkpoint_bytes(root, candidate),
+            expected_sequence=FP048_R002_SUCCESSOR_CORRECTION_SEQUENCE,
+        )
+
+    candidate_history = _fp048_r002_successor_history(candidate)
+    if len(candidate_history) != FP048_R002_SUCCESSOR_CORRECTION_SEQUENCE:
+        raise ValueError("successor inverse did not recover seq99")
+    correction = _fp048_r002_successor_correction_authority()
+    correction_is_live = (
+        require_live_snapshot
+        and active_sequence == FP048_R002_SUCCESSOR_CORRECTION_SEQUENCE
+    )
+    if correction_is_live:
+        correction.require_start_gate_execution_corrected_checkpoint(
+            root,
+            candidate,
+            require_live_snapshot=True,
+            run_external_validators=False,
+        )
+    source = _fp048_r002_successor_inverse(
+        correction.reconstructed_seq98_checkpoint_bytes(root, candidate),
+        expected_sequence=FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE,
+    )
+    tail = _fp048_r002_successor_history(source)[-1]
+    if (
+        type(tail.get("sequence")) is not int
+        or tail.get("sequence") != FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE
+        or tail.get("event_id") != FP048_R002_R009_EXECUTION_CORRECTION_EVENT_ID
+        or tail.get("event_type") != "GOAL_START_GATE_EXECUTION_CORRECTED"
+        or tail.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or tail.get("from_status") != "READY"
+        or tail.get("to_status") != "READY"
+        or tail.get("status_changes") != {}
+    ):
+        raise ValueError("successor inverse exact seq98 correction differs")
+    return source
+
+
+def _fp048_r002_successor_is_live_checkpoint(
+    root: Path,
+    checkpoint: Mapping[str, Any],
+) -> bool:
+    live = _exact_repo_file(root, V24_CHECKPOINT_RELATIVE.as_posix())
+    if live is None:
+        raise ValueError("FP048 R002 live checkpoint is missing or unsafe")
+    try:
+        return continuation.canonical_json_bytes(
+            continuation.load_json(live)
+        ) == continuation.canonical_json_bytes(checkpoint)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError("FP048 R002 live checkpoint cannot be read") from exc
+
+
+def validate_fp048_r002_successor_seq99_102(
+    root: Path,
+    checkpoint: dict[str, Any],
+    *,
+    require_live_snapshot: bool | None = None,
+) -> list[str]:
+    """Validate only the exact seq98->99->100->101+102 successor branch."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, Mapping) else None
+    if (
+        not isinstance(history, list)
+        or len(history) <= FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE
+    ):
+        return []
+    if require_live_snapshot is not None and type(require_live_snapshot) is not bool:
+        return ["FP048 R002 successor live-snapshot flag differs"]
+    try:
+        observed_live_snapshot = _fp048_r002_successor_is_live_checkpoint(
+            root,
+            checkpoint,
+        )
+        _fp048_r002_successor_seq98_source(
+            root,
+            checkpoint,
+            require_live_snapshot=(
+                observed_live_snapshot or require_live_snapshot is True
+            ),
+        )
+    except Exception as exc:
+        return [f"FP048 R002 successor seq99-102 authority differs: {exc}"]
+    return []
+
+
+def validate_fp048_r002_completion_seq101_102(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Public completion-producer hook for the adjacent seq101/102 pair."""
+
+    return validate_fp048_r002_successor_seq99_102(
+        root,
+        checkpoint,
+        require_live_snapshot=False,
+    )
+
+
+def _fp048_r002_completion_authority() -> Any:
+    """Load only the public seq100/101 completion producer surface."""
+
+    try:
+        authority = importlib.import_module(FP048_R002_COMPLETION_MODULE)
+    except ImportError as exc:
+        raise RuntimeError(
+            "FP048 R002 seq100/101 completion authority cannot be loaded"
+        ) from exc
+    for name in (
+        "CompletionEvidence",
+        "checkpoint_bytes",
+        "expected_review_assignment",
+        "json_bytes",
+        "reconstructed_seq99_checkpoint_bytes",
+        "sha256_bytes",
+        "validate_projection",
+        "validate_review_authority",
+    ):
+        if not callable(getattr(authority, name, None)):
+            raise RuntimeError(
+                f"FP048 R002 seq100/101 completion authority API is missing: {name}"
+            )
+    for name, expected in (
+        ("SOURCE_SEQUENCE", FP048_R002_COMPLETION_SOURCE_SEQUENCE),
+        ("EVIDENCE_SEQUENCE", FP048_R002_COMPLETION_EVIDENCE_SEQUENCE),
+        ("COMPLETION_SEQUENCE", FP048_R002_COMPLETION_SEQUENCE),
+        ("EVIDENCE_EVENT_ID", FP048_R002_COMPLETION_EVIDENCE_EVENT_ID),
+        ("COMPLETION_EVENT_ID", FP048_R002_COMPLETION_EVENT_ID),
+        ("COMPLETION_RECEIPT_REL", FP048_R002_COMPLETION_RECEIPT_REL),
+        ("REVIEW_ROOT", FP048_R002_COMPLETION_REVIEW_ROOT),
+    ):
+        if getattr(authority, name, None) != expected:
+            raise RuntimeError(
+                f"FP048 R002 seq100/101 completion authority constant differs: {name}"
+            )
+    return authority
+
+
+def _fp048_r002_r008_gate_namespace_present(root: Path) -> bool:
+    """Distinguish a projected seq96 source from a published R008 gate."""
+
+    receipt = root / FP048_R002_R008_STARTED_GATE_RECEIPT_PATH
+    return os.path.lexists(receipt.parent) or os.path.lexists(receipt)
+
+
+def _fp048_r002_zero_credit_boundary_matches(
+    checkpoint: dict[str, Any],
+) -> bool:
+    approved = checkpoint.get("approved_state")
+    verification = checkpoint.get("verification_boundary")
+    current = checkpoint.get("current_work")
+    return bool(
+        isinstance(approved, dict)
+        and approved.get("formal_test_count") == 279
+        and approved.get("formal_test_not_run_count") == 279
+        and approved.get("remaining_gate_count") == 5
+        and approved.get("remaining_gates_waived") is False
+        and approved.get("release_status") == "NOT_ELIGIBLE"
+        and isinstance(verification, dict)
+        and verification.get("formal_test_total") == 279
+        and verification.get("formal_test_not_run_count") == 279
+        and verification.get("actual_device_test_status") == "NOT_RUN"
+        and verification.get("all_remaining_gate_status") == "NOT_RUN"
+        and verification.get("formal_test_pass_claimed") is False
+        and verification.get("implementation_conformance_claimed") is False
+        and verification.get("release_eligible") is False
+        and isinstance(current, dict)
+        and current.get("release_completion_claimed") is False
+    )
+
+
+def _fp048_r002_exact_frontier_matches(
+    state: dict[str, Any],
+    event: dict[str, Any],
+) -> bool:
+    runtime = event.get("runtime_after")
+    expected = (
+        runtime.get("ready_frontier_goal_ids")
+        if isinstance(runtime, dict)
+        else None
+    )
+    return bool(
+        isinstance(expected, list)
+        and expected
+        and expected[0] == FP046_R002_NEXT_GOAL_ID
+        and all(isinstance(goal_id, str) and goal_id for goal_id in expected)
+        and len(expected) == len(set(expected))
+        and state.get("ready_frontier_goal_ids") == expected
+        and state.get("focus_goal_id") == FP046_R002_NEXT_GOAL_ID
+        and runtime.get("focus_goal_id") == FP046_R002_NEXT_GOAL_ID
+    )
+
+
+def _fp048_r002_seq92_contract_correction_event(
+    checkpoint: dict[str, Any],
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 92:
+        return None
+    seq91 = _fp048_r002_control_correction_event(checkpoint)
+    event = history[91]
+    if not isinstance(seq91, dict) or not isinstance(event, dict):
+        return None
+    source = event.get("source_checkpoint_binding")
+    supersession = event.get("contract_supersession")
+    previous = (
+        supersession.get("previous_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    replacement = (
+        supersession.get("replacement_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    seq91_replacement = seq91.get("contract_supersession", {}).get(
+        "replacement_contract_binding"
+    )
+    runner = event.get("start_gate_runner_binding")
+    if (
+        event.get("sequence")
+        != FP048_R002_START_GATE_CONTRACT_CORRECTION_SEQUENCE
+        or event.get("event_id")
+        != FP048_R002_START_GATE_CONTRACT_CORRECTION_EVENT_ID
+        or event.get("event_type") != "GOAL_START_GATE_CONTRACT_CORRECTED"
+        or event.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("from_status") != "READY"
+        or event.get("to_status") != "READY"
+        or event.get("status_changes") != {}
+        or event.get("runtime_after") != seq91.get("runtime_after")
+        or event.get("claim_boundary")
+        != FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+        or event.get("previous_event_sha256") != seq91.get("event_sha256")
+        or event.get("event_sha256") != continuation.event_sha256(event)
+        or not isinstance(source, dict)
+        or source.get("sequence") != FP048_R002_CONTROL_CORRECTION_SEQUENCE
+        or source.get("tail_event_id") != FP048_R002_CONTROL_CORRECTION_EVENT_ID
+        or source.get("tail_event_sha256") != seq91.get("event_sha256")
+        or not isinstance(supersession, dict)
+        or previous != seq91_replacement
+        or not isinstance(replacement, dict)
+        or replacement.get("document_id")
+        != FP048_R002_R004_CONTRACT_DOCUMENT_ID
+        or replacement.get("contract_id") != FP048_R002_R004_CONTRACT_ID
+        or replacement.get("contract_version")
+        != FP048_R002_R004_CONTRACT_VERSION
+        or replacement.get("path") != FP048_R002_R004_CONTRACT_PATH
+        or not _fp048_r002_binding_is_sealed(runner)
+        or runner.get("path") != FP048_R002_R004_START_GATE_RUNNER_PATH
+    ):
+        return None
+    return event
+
+
+def _fp048_r002_seq92_ready_projection_matches(
+    checkpoint: dict[str, Any],
+    event: dict[str, Any],
+) -> bool:
+    state = checkpoint.get("goal_execution")
+    current = checkpoint.get("current_work")
+    statuses = state.get("status_by_goal") if isinstance(state, dict) else None
+    return bool(
+        isinstance(state, dict)
+        and isinstance(statuses, dict)
+        and statuses.get(FP046_R002_NEXT_GOAL_ID) == "READY"
+        and list(statuses.values()).count("IN_PROGRESS") == 0
+        and state.get("goal_status") == "READY"
+        and state.get("transition_history_anchor_sha256")
+        == event.get("event_sha256")
+        and state.get("validation_cutoff_at") == event.get("occurred_at")
+        and isinstance(current, dict)
+        and current.get("status") == "READY"
+        and _fp048_r002_exact_frontier_matches(state, event)
+        and _fp048_r002_zero_credit_boundary_matches(checkpoint)
+    )
+
+
+def _fp048_r002_seq93_started_event(
+    checkpoint: dict[str, Any],
+    receipt_binding: dict[str, Any],
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 93:
+        return None
+    correction = history[91]
+    started = history[92]
+    target_starts = [
+        event
+        for event in history
+        if isinstance(event, dict)
+        and event.get("event_type") == "GOAL_STARTED"
+        and event.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+    ]
+    if (
+        not isinstance(correction, dict)
+        or not isinstance(started, dict)
+        or len(target_starts) != 1
+        or target_starts[0] is not started
+        or set(started) != continuation.V24_FIRST_START_EVENT_FIELDS
+        or started.get("sequence") != FP048_R002_R004_STARTED_SEQUENCE
+        or started.get("event_id") != FP048_R002_R004_STARTED_EVENT_ID
+        or started.get("event_type") != "GOAL_STARTED"
+        or started.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("from_status") != "READY"
+        or started.get("to_status") != "IN_PROGRESS"
+        or started.get("status_changes")
+        != {FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"}
+        or started.get("runtime_after") != correction.get("runtime_after")
+        or started.get("implementation_start_gate_binding") != receipt_binding
+        or started.get("previous_event_sha256") != correction.get("event_sha256")
+        or started.get("event_sha256") != continuation.event_sha256(started)
+    ):
+        return None
+    return started
+
+
+def _fp048_r002_seq93_in_progress_projection_matches(
+    checkpoint: dict[str, Any],
+    started: dict[str, Any],
+) -> bool:
+    state = checkpoint.get("goal_execution")
+    current = checkpoint.get("current_work")
+    statuses = state.get("status_by_goal") if isinstance(state, dict) else None
+    return bool(
+        isinstance(state, dict)
+        and isinstance(statuses, dict)
+        and statuses.get(FP046_R002_NEXT_GOAL_ID) == "IN_PROGRESS"
+        and list(statuses.values()).count("IN_PROGRESS") == 1
+        and state.get("goal_status") == "IN_PROGRESS"
+        and state.get("transition_history_anchor_sha256")
+        == started.get("event_sha256")
+        and state.get("validation_cutoff_at") == started.get("occurred_at")
+        and isinstance(current, dict)
+        and current.get("status") == "IN_PROGRESS"
+        and _fp048_r002_exact_frontier_matches(state, started)
+        and _fp048_r002_zero_credit_boundary_matches(checkpoint)
+    )
+
+
+def _fp048_r002_seq93_branch_semantics_event(
+    root: Path,
+    checkpoint: dict[str, Any],
+    authority: Any,
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 93:
+        return None
+    correction = history[91]
+    event = history[92]
+    if not isinstance(correction, dict) or not isinstance(event, dict):
+        return None
+    source = event.get("source_checkpoint_binding")
+    supersession = event.get("contract_supersession")
+    replacement = (
+        supersession.get("replacement_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    previous = (
+        supersession.get("previous_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    runner = event.get("start_gate_runner_binding")
+    reason = event.get("correction_reason")
+    context = event.get("repository_context_reanchor")
+    after = context.get("after") if isinstance(context, dict) else None
+    try:
+        event_fields = frozenset(authority.EVENT_FIELDS)
+        passed_attempt = authority.passed_gate_attempt_003_binding(root)
+        r005_contract = authority.r005_contract_binding(root)
+        attempt_raw = json.dumps(
+            passed_attempt,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (AttributeError, OSError, TypeError, ValueError):
+        return None
+    if (
+        set(event) != event_fields
+        or event.get("sequence")
+        != FP048_R002_BRANCH_SEMANTICS_REANCHOR_SEQUENCE
+        or event.get("event_id")
+        != FP048_R002_BRANCH_SEMANTICS_REANCHOR_EVENT_ID
+        or event.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+        or event.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("from_status") != "READY"
+        or event.get("to_status") != "READY"
+        or event.get("status_changes") != {}
+        or event.get("runtime_after") != correction.get("runtime_after")
+        or event.get("claim_boundary")
+        != FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+        or event.get("previous_event_sha256") != correction.get("event_sha256")
+        or event.get("event_sha256") != continuation.event_sha256(event)
+        or not isinstance(source, dict)
+        or source.get("sequence")
+        != FP048_R002_START_GATE_CONTRACT_CORRECTION_SEQUENCE
+        or source.get("tail_event_id")
+        != FP048_R002_START_GATE_CONTRACT_CORRECTION_EVENT_ID
+        or source.get("tail_event_sha256") != correction.get("event_sha256")
+        or source.get("passed_gate_attempt_003") != passed_attempt
+        or FP048_R002_R004_STARTED_EVENT_ID not in attempt_raw
+        or "PASS_UNCONSUMED" not in attempt_raw
+        or not isinstance(supersession, dict)
+        or previous
+        != correction.get("contract_supersession", {}).get(
+            "replacement_contract_binding"
+        )
+        or replacement != r005_contract
+        or not isinstance(replacement, dict)
+        or replacement.get("document_id")
+        != FP048_R002_R005_CONTRACT_DOCUMENT_ID
+        or replacement.get("contract_id") != FP048_R002_R005_CONTRACT_ID
+        or replacement.get("contract_version")
+        != FP048_R002_R005_CONTRACT_VERSION
+        or replacement.get("path") != FP048_R002_R005_CONTRACT_PATH
+        or not _fp048_r002_binding_is_sealed(runner)
+        or runner.get("path") != FP048_R002_R005_START_GATE_RUNNER_PATH
+        or reason != authority.CORRECTION_REASON
+        or not isinstance(after, dict)
+        or after.get("branch") != authority.LOGICAL_BRANCH
+        or after.get("logical_branch") != authority.LOGICAL_BRANCH
+        or after.get("logical_branch_semantics")
+        != authority.LOGICAL_BRANCH_SEMANTICS
+        or after.get("physical_git_branch") != authority.PHYSICAL_GIT_BRANCH
+        or after.get("physical_git_branch") == after.get("logical_branch")
+        or after.get("branch_mismatch_reason_code")
+        != authority.BRANCH_MISMATCH_REASON_CODE
+    ):
+        return None
+    return event
+
+
+def _fp048_r002_seq94_started_event(
+    checkpoint: dict[str, Any],
+    receipt_binding: dict[str, Any],
+    authority: Any,
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 94:
+        return None
+    control = history[92]
+    started = history[93]
+    target_starts = [
+        event
+        for event in history
+        if isinstance(event, dict)
+        and event.get("event_type") == "GOAL_STARTED"
+        and event.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+    ]
+    try:
+        event_fields = frozenset(authority.EVENT_FIELDS)
+    except (AttributeError, TypeError):
+        return None
+    if (
+        not isinstance(control, dict)
+        or not isinstance(started, dict)
+        or len(target_starts) != 1
+        or target_starts[0] is not started
+        or any(
+            isinstance(event, dict)
+            and event.get("event_id") == FP048_R002_R004_STARTED_EVENT_ID
+            for event in history
+        )
+        or set(started) != event_fields
+        or started.get("sequence") != FP048_R002_R005_STARTED_SEQUENCE
+        or started.get("event_id") != FP048_R002_R005_STARTED_EVENT_ID
+        or started.get("event_type") != "GOAL_STARTED"
+        or started.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("from_status") != "READY"
+        or started.get("to_status") != "IN_PROGRESS"
+        or started.get("status_changes")
+        != {FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"}
+        or started.get("runtime_after") != control.get("runtime_after")
+        or started.get("implementation_start_gate_binding") != receipt_binding
+        or receipt_binding.get("document_id")
+        != FP048_R002_R005_STARTED_GATE_DOCUMENT_ID
+        or receipt_binding.get("path")
+        != FP048_R002_R005_STARTED_GATE_RECEIPT_PATH
+        or started.get("previous_event_sha256") != control.get("event_sha256")
+        or started.get("event_sha256") != continuation.event_sha256(started)
+    ):
+        return None
+    return started
+
+
+def _fp048_r002_r006_contract_binding() -> dict[str, Any]:
+    return {
+        "schema_version": "1.2",
+        "document_id": FP048_R002_R006_CONTRACT_DOCUMENT_ID,
+        "path": FP048_R002_R006_CONTRACT_PATH,
+        "file_sha256": FP048_R002_R006_CONTRACT_SHA256,
+        "contract_id": FP048_R002_R006_CONTRACT_ID,
+        "contract_version": FP048_R002_R006_CONTRACT_VERSION,
+        "canonical_contract_sha256": (
+            FP048_R002_R006_CONTRACT_CANONICAL_SHA256
+        ),
+    }
+
+
+def _fp048_r002_seq94_r006_contract_correction_event(
+    checkpoint: dict[str, Any],
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 94:
+        return None
+    control = history[92]
+    event = history[93]
+    if not isinstance(control, dict) or not isinstance(event, dict):
+        return None
+    source = event.get("source_checkpoint_binding")
+    control_source = control.get("source_checkpoint_binding")
+    supersession = event.get("contract_supersession")
+    previous = (
+        supersession.get("previous_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    replacement = (
+        supersession.get("replacement_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    runner = event.get("start_gate_runner_binding")
+    correction_reason = event.get("correction_reason")
+    preflight_attempt = (
+        source.get("preflight_attempt_004")
+        if isinstance(source, dict)
+        else None
+    )
+    target_starts = [
+        row
+        for row in history[:FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE]
+        if isinstance(row, dict)
+        and row.get("event_type") == "GOAL_STARTED"
+        and row.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+    ]
+    if (
+        target_starts
+        or set(event) != FP048_R002_ZERO_CREDIT_CONTROL_EVENT_FIELDS
+        or event.get("sequence")
+        != FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE
+        or event.get("event_id")
+        != FP048_R002_R006_CONTRACT_CORRECTION_EVENT_ID
+        or event.get("event_type") != "GOAL_START_GATE_CONTRACT_CORRECTED"
+        or event.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("previous_focus_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or event.get("focus_goal_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or event.get("static_plan_manifest_sha256")
+        != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+        or event.get("from_status") != "READY"
+        or event.get("to_status") != "READY"
+        or event.get("status_changes") != {}
+        or event.get("runtime_after") != control.get("runtime_after")
+        or event.get("blockers_after") != control.get("blockers_after")
+        or event.get("blocker_resolution_ids_after")
+        != control.get("blocker_resolution_ids_after")
+        or event.get("source_checkpoint_version")
+        != checkpoint.get("schema_version")
+        or event.get("evidence_refs")
+        != [
+            "FP048-R002_EXACT_SEQ93_BRANCH_SEMANTICS_SOURCE",
+            "FP048-R002_SEQ93_R003_FROZEN_REVIEW_AUTHORITY",
+            "FP048-R002_R004_PASS_003_REMAINS_PASS_UNCONSUMED",
+            "FP048-R002_R005_PREFLIGHT_004_NO_NAMESPACE_NONAUTHORITY",
+            "FP048-R002_R006_STAGE_AWARE_GATE_CONTRACT",
+            "FP048-R002_SEQ94_95_TRANSITION_CONTROL_REVIEW",
+        ]
+        or not isinstance(source, dict)
+        or source.get("sequence")
+        != FP048_R002_BRANCH_SEMANTICS_REANCHOR_SEQUENCE
+        or source.get("tail_event_id")
+        != FP048_R002_BRANCH_SEMANTICS_REANCHOR_EVENT_ID
+        or source.get("tail_event_sha256") != control.get("event_sha256")
+        or not isinstance(control_source, dict)
+        or source.get("passed_gate_attempt_003")
+        != control_source.get("passed_gate_attempt_003")
+        or preflight_attempt != FP048_R002_R005_PREFLIGHT_ATTEMPT
+        or event.get("source_ready_event_binding")
+        != control.get("source_ready_event_binding")
+        or not isinstance(supersession, dict)
+        or previous
+        != control.get("contract_supersession", {}).get(
+            "replacement_contract_binding"
+        )
+        or replacement != _fp048_r002_r006_contract_binding()
+        or supersession.get("reason_code")
+        != FP048_R002_R006_SUCCESSOR_REASON_CODE
+        or runner
+        != {
+            "path": FP048_R002_R006_START_GATE_RUNNER_PATH,
+            "sha256": FP048_R002_R006_START_GATE_RUNNER_SHA256,
+            "byte_length": FP048_R002_R006_START_GATE_RUNNER_BYTE_LENGTH,
+        }
+        or correction_reason != FP048_R002_R006_CORRECTION_REASON
+        or event.get("noncredit_successor_edges")
+        != control.get("noncredit_successor_edges")
+        or event.get("claim_boundary")
+        != FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+        or event.get("canonical_binding_snapshot_after")
+        != control.get("canonical_binding_snapshot_after")
+        or event.get("previous_event_sha256") != control.get("event_sha256")
+        or event.get("event_sha256") != continuation.event_sha256(event)
+    ):
+        return None
+    return event
+
+
+def _fp048_r002_r006_receipt_authority(
+    root: Path,
+    correction: dict[str, Any],
+    started: dict[str, Any],
+    source_raw: bytes,
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    binding = started.get("implementation_start_gate_binding")
+    if (
+        not isinstance(binding, dict)
+        or set(binding) != {"document_id", "path", "file_sha256"}
+        or binding.get("document_id")
+        != FP048_R002_R006_STARTED_GATE_DOCUMENT_ID
+        or binding.get("path") != FP048_R002_R006_STARTED_GATE_RECEIPT_PATH
+        or not isinstance(binding.get("file_sha256"), str)
+        or continuation.SHA256_RE.fullmatch(binding["file_sha256"]) is None
+    ):
+        return None
+    receipt_path = _exact_repo_file(root, binding["path"])
+    if (
+        receipt_path is None
+        or continuation.sha256_file(receipt_path) != binding["file_sha256"]
+    ):
+        return None
+    receipt = _load_exact_json(root, binding["path"])
+    if not isinstance(receipt, dict):
+        return None
+    contract_binding = receipt.get("implementation_start_gate_contract_binding")
+    runs = receipt.get("check_runs")
+    window = receipt.get("execution_window")
+    source_ready = correction.get("source_ready_event_binding")
+    expected_root = (
+        "docs/control/execution/goal-gates/"
+        f"{FP048_R002_R006_STARTED_EVENT_ID}"
+    )
+    if (
+        set(receipt) != FP048_R002_R006_RECEIPT_FIELDS
+        or receipt.get("schema_version") != "1.1"
+        or receipt.get("document_id")
+        != FP048_R002_R006_STARTED_GATE_DOCUMENT_ID
+        or receipt.get("evidence_type")
+        != "IMPLEMENTATION_START_OR_RESUME_GATE"
+        or receipt.get("gate_purpose") != "INITIAL_START"
+        or receipt.get("status") != "PASS"
+        or not isinstance(receipt.get("package_id"), str)
+        or not receipt["package_id"]
+        or receipt.get("target_transition_event_id")
+        != FP048_R002_R006_STARTED_EVENT_ID
+        or receipt.get("target_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or receipt.get("target_goal_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or receipt.get("static_plan_manifest_sha256")
+        != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+        or receipt.get("source_activation_event_sha256")
+        != correction.get("event_sha256")
+        or receipt.get("source_checkpoint_sha256")
+        != continuation.sha256_bytes(source_raw)
+        or not isinstance(source_ready, dict)
+        or receipt.get("source_ready_event_sha256")
+        != source_ready.get("event_sha256")
+        or receipt.get("check_command_contract_version")
+        != FP048_R002_R006_CONTRACT_VERSION
+        or receipt.get("check_command_contract_sha256")
+        != FP048_R002_R006_CONTRACT_CANONICAL_SHA256
+        or contract_binding != _fp048_r002_r006_contract_binding()
+        or receipt.get("runtime_bindings") != []
+        or not isinstance(window, dict)
+        or set(window) != {"started_at", "ended_at"}
+        or not all(isinstance(window.get(key), str) for key in window)
+        or not isinstance(receipt.get("generated_at"), str)
+        or not isinstance(receipt.get("repository_snapshot"), dict)
+        or receipt.get("repository_snapshot")
+        != started.get("repository_snapshot_before")
+        or not isinstance(runs, list)
+        or len(runs) != len(FP048_R002_R006_EXPECTED_CHECK_IDS)
+    ):
+        return None
+    for index, (check_id, run) in enumerate(
+        zip(FP048_R002_R006_EXPECTED_CHECK_IDS, runs, strict=True),
+        start=1,
+    ):
+        if (
+            not isinstance(run, dict)
+            or set(run)
+            != {
+                "check_id",
+                "command",
+                "executed_at",
+                "exit_code",
+                "output_path",
+                "output_sha256",
+            }
+            or run.get("check_id") != check_id
+            or not isinstance(run.get("command"), str)
+            or not run["command"]
+            or not isinstance(run.get("executed_at"), str)
+            or type(run.get("exit_code")) is not int
+            or run.get("exit_code") != 0
+            or run.get("output_path")
+            != f"{expected_root}/{index:02d}-{check_id}.log"
+            or not isinstance(run.get("output_sha256"), str)
+            or continuation.SHA256_RE.fullmatch(run["output_sha256"]) is None
+        ):
+            return None
+    return copy.deepcopy(binding), receipt
+
+
+def _fp048_r002_seq95_r006_started_event(
+    checkpoint: dict[str, Any],
+    receipt_binding: dict[str, Any],
+    receipt: dict[str, Any],
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 95:
+        return None
+    correction = history[93]
+    started = history[94]
+    target_starts = [
+        event
+        for event in history[:FP048_R002_R006_STARTED_SEQUENCE]
+        if isinstance(event, dict)
+        and event.get("event_type") == "GOAL_STARTED"
+        and event.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+    ]
+    if (
+        not isinstance(correction, dict)
+        or not isinstance(started, dict)
+        or len(target_starts) != 1
+        or target_starts[0] is not started
+        or set(started) != continuation.V24_FIRST_START_EVENT_FIELDS
+        or started.get("sequence") != FP048_R002_R006_STARTED_SEQUENCE
+        or started.get("event_id") != FP048_R002_R006_STARTED_EVENT_ID
+        or started.get("event_type") != "GOAL_STARTED"
+        or started.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("previous_focus_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or started.get("focus_goal_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or started.get("from_status") != "READY"
+        or started.get("to_status") != "IN_PROGRESS"
+        or started.get("static_plan_manifest_sha256")
+        != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+        or started.get("status_changes")
+        != {FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"}
+        or started.get("runtime_after") != correction.get("runtime_after")
+        or started.get("repository_snapshot_before")
+        != receipt.get("repository_snapshot")
+        or started.get("implementation_start_gate_binding") != receipt_binding
+        or started.get("blockers_after") != correction.get("blockers_after")
+        or started.get("blocker_resolution_ids_after")
+        != correction.get("blocker_resolution_ids_after")
+        or started.get("source_checkpoint_version")
+        != checkpoint.get("schema_version")
+        or started.get("evidence_refs") != []
+        or started.get("previous_event_sha256")
+        != correction.get("event_sha256")
+        or started.get("event_sha256") != continuation.event_sha256(started)
+    ):
+        return None
+    return started
+
+
+def _fp048_r002_r007_contract_binding() -> dict[str, Any]:
+    return {
+        "schema_version": "1.2",
+        "document_id": FP048_R002_R007_CONTRACT_DOCUMENT_ID,
+        "path": FP048_R002_R007_CONTRACT_PATH,
+        "file_sha256": FP048_R002_R007_CONTRACT_SHA256,
+        "contract_id": FP048_R002_R007_CONTRACT_ID,
+        "contract_version": FP048_R002_R007_CONTRACT_VERSION,
+        "canonical_contract_sha256": (
+            FP048_R002_R007_CONTRACT_CANONICAL_SHA256
+        ),
+    }
+
+
+def _fp048_r002_seq95_r007_contract_correction_event(
+    checkpoint: dict[str, Any],
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 95:
+        return None
+    control = history[93]
+    event = history[94]
+    if not isinstance(control, dict) or not isinstance(event, dict):
+        return None
+    source = event.get("source_checkpoint_binding")
+    control_source = control.get("source_checkpoint_binding")
+    supersession = event.get("contract_supersession")
+    previous = (
+        supersession.get("previous_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    replacement = (
+        supersession.get("replacement_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    target_starts = [
+        row
+        for row in history[:FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE]
+        if isinstance(row, dict)
+        and row.get("event_type") == "GOAL_STARTED"
+        and row.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+    ]
+    if (
+        target_starts
+        or set(event) != FP048_R002_ZERO_CREDIT_CONTROL_EVENT_FIELDS
+        or event.get("sequence")
+        != FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE
+        or event.get("event_id")
+        != FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID
+        or event.get("event_type") != "GOAL_START_GATE_CONTRACT_CORRECTED"
+        or event.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("previous_focus_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or event.get("focus_goal_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or event.get("static_plan_manifest_sha256")
+        != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+        or event.get("from_status") != "READY"
+        or event.get("to_status") != "READY"
+        or event.get("status_changes") != {}
+        or event.get("runtime_after") != control.get("runtime_after")
+        or event.get("blockers_after") != control.get("blockers_after")
+        or event.get("blocker_resolution_ids_after")
+        != control.get("blocker_resolution_ids_after")
+        or event.get("source_checkpoint_version")
+        != checkpoint.get("schema_version")
+        or event.get("evidence_refs")
+        != [
+            "FP048-R002_EXACT_PUBLISHED_SEQ94_SOURCE",
+            "FP048-R002_SEQ94_R002_FROZEN_REVIEW_AUTHORITY",
+            "FP048-R002_R004_PASS_003_REMAINS_PASS_UNCONSUMED",
+            "FP048-R002_R005_PREFLIGHT_004_HISTORICAL_NONAUTHORITY",
+            "FP048-R002_R006_PREFLIGHT_004_NO_NAMESPACE_NONAUTHORITY",
+            "FP048-R002_R007_STAGE_AWARE_GATE_CONTRACT",
+            "FP048-R002_SEQ95_96_TRANSITION_CONTROL_REVIEW",
+        ]
+        or not isinstance(source, dict)
+        or source.get("sequence")
+        != FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE
+        or source.get("tail_event_id")
+        != FP048_R002_R006_CONTRACT_CORRECTION_EVENT_ID
+        or source.get("tail_event_sha256") != control.get("event_sha256")
+        or not isinstance(control_source, dict)
+        or source.get("passed_gate_attempt_003")
+        != control_source.get("passed_gate_attempt_003")
+        or source.get("preflight_attempt_004")
+        != control_source.get("preflight_attempt_004")
+        or source.get("r006_preflight_attempt_004")
+        != FP048_R002_R006_PREFLIGHT_ATTEMPT
+        or event.get("source_ready_event_binding")
+        != control.get("source_ready_event_binding")
+        or not isinstance(supersession, dict)
+        or previous != _fp048_r002_r006_contract_binding()
+        or previous
+        != control.get("contract_supersession", {}).get(
+            "replacement_contract_binding"
+        )
+        or replacement != _fp048_r002_r007_contract_binding()
+        or supersession.get("reason_code")
+        != FP048_R002_R007_SUCCESSOR_REASON_CODE
+        or event.get("start_gate_runner_binding")
+        != {
+            "path": FP048_R002_R007_START_GATE_RUNNER_PATH,
+            "sha256": FP048_R002_R007_START_GATE_RUNNER_SHA256,
+            "byte_length": FP048_R002_R007_START_GATE_RUNNER_BYTE_LENGTH,
+        }
+        or event.get("correction_reason")
+        != FP048_R002_R007_CORRECTION_REASON
+        or event.get("noncredit_successor_edges")
+        != control.get("noncredit_successor_edges")
+        or event.get("claim_boundary")
+        != FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+        or event.get("canonical_binding_snapshot_after")
+        != control.get("canonical_binding_snapshot_after")
+        or event.get("previous_event_sha256") != control.get("event_sha256")
+        or event.get("event_sha256") != continuation.event_sha256(event)
+    ):
+        return None
+    return event
+
+
+def _fp048_r002_r007_receipt_authority(
+    root: Path,
+    correction: dict[str, Any],
+    started: dict[str, Any],
+    source_raw: bytes,
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    binding = started.get("implementation_start_gate_binding")
+    if (
+        not isinstance(binding, dict)
+        or set(binding) != {"document_id", "path", "file_sha256"}
+        or binding.get("document_id")
+        != FP048_R002_R007_STARTED_GATE_DOCUMENT_ID
+        or binding.get("path") != FP048_R002_R007_STARTED_GATE_RECEIPT_PATH
+        or not isinstance(binding.get("file_sha256"), str)
+        or continuation.SHA256_RE.fullmatch(binding["file_sha256"]) is None
+    ):
+        return None
+    receipt_path = _exact_repo_file(root, binding["path"])
+    if receipt_path is None:
+        return None
+    try:
+        receipt_raw = receipt_path.read_bytes()
+    except OSError:
+        return None
+    if (
+        receipt_path.stat().st_mode & 0o777 != 0o600
+        or continuation.sha256_bytes(receipt_raw) != binding["file_sha256"]
+    ):
+        return None
+    receipt = _load_exact_json(root, binding["path"])
+    if (
+        not isinstance(receipt, dict)
+        or receipt_raw
+        != (json.dumps(receipt, ensure_ascii=False, indent=2) + "\n").encode(
+            "utf-8"
+        )
+    ):
+        return None
+    contract_path = _exact_repo_file(root, FP048_R002_R007_CONTRACT_PATH)
+    contract = _load_exact_json(root, FP048_R002_R007_CONTRACT_PATH)
+    if contract_path is None or not isinstance(contract, dict):
+        return None
+    try:
+        contract_raw = contract_path.read_bytes()
+    except OSError:
+        return None
+    ordered_checks = contract.get("ordered_checks")
+    if (
+        continuation.sha256_bytes(contract_raw)
+        != FP048_R002_R007_CONTRACT_SHA256
+        or continuation.canonical_json_sha256(contract)
+        != FP048_R002_R007_CONTRACT_CANONICAL_SHA256
+        or not isinstance(ordered_checks, list)
+        or [
+            row.get("check_id") if isinstance(row, dict) else None
+            for row in ordered_checks
+        ]
+        != list(FP048_R002_R007_EXPECTED_CHECK_IDS)
+        or any(
+            not isinstance(row, dict)
+            or set(row) != {"check_id", "command"}
+            or not isinstance(row.get("command"), str)
+            or not row["command"]
+            for row in ordered_checks
+        )
+    ):
+        return None
+    expected_commands = {
+        row["check_id"]: row["command"] for row in ordered_checks
+    }
+    contract_binding = receipt.get("implementation_start_gate_contract_binding")
+    runs = receipt.get("check_runs")
+    window = receipt.get("execution_window")
+    source_ready = correction.get("source_ready_event_binding")
+    expected_root = (
+        "docs/control/execution/goal-gates/"
+        f"{FP048_R002_R007_STARTED_EVENT_ID}"
+    )
+    if (
+        set(receipt) != FP048_R002_R006_RECEIPT_FIELDS
+        or receipt.get("schema_version") != "1.1"
+        or receipt.get("document_id")
+        != FP048_R002_R007_STARTED_GATE_DOCUMENT_ID
+        or receipt.get("evidence_type")
+        != "IMPLEMENTATION_START_OR_RESUME_GATE"
+        or receipt.get("gate_purpose") != "INITIAL_START"
+        or receipt.get("status") != "PASS"
+        or receipt.get("package_id") != V24_PACKAGE_ID
+        or receipt.get("target_transition_event_id")
+        != FP048_R002_R007_STARTED_EVENT_ID
+        or receipt.get("target_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or receipt.get("target_goal_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or receipt.get("static_plan_manifest_sha256")
+        != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+        or receipt.get("source_activation_event_sha256")
+        != correction.get("event_sha256")
+        or receipt.get("source_checkpoint_sha256")
+        != continuation.sha256_bytes(source_raw)
+        or not isinstance(source_ready, dict)
+        or receipt.get("source_ready_event_sha256")
+        != source_ready.get("event_sha256")
+        or receipt.get("check_command_contract_version")
+        != FP048_R002_R007_CONTRACT_VERSION
+        or receipt.get("check_command_contract_sha256")
+        != FP048_R002_R007_CONTRACT_CANONICAL_SHA256
+        or contract_binding != _fp048_r002_r007_contract_binding()
+        or receipt.get("runtime_bindings") != []
+        or not isinstance(window, dict)
+        or set(window) != {"started_at", "ended_at"}
+        or not all(isinstance(window.get(key), str) for key in window)
+        or not isinstance(receipt.get("generated_at"), str)
+        or not isinstance(receipt.get("repository_snapshot"), dict)
+        or receipt.get("repository_snapshot")
+        != started.get("repository_snapshot_before")
+        or not isinstance(runs, list)
+        or len(runs) != len(FP048_R002_R007_EXPECTED_CHECK_IDS)
+    ):
+        return None
+    for index, (check_id, run) in enumerate(
+        zip(FP048_R002_R007_EXPECTED_CHECK_IDS, runs, strict=True),
+        start=1,
+    ):
+        if (
+            not isinstance(run, dict)
+            or set(run)
+            != {
+                "check_id",
+                "command",
+                "executed_at",
+                "exit_code",
+                "output_path",
+                "output_sha256",
+            }
+            or run.get("check_id") != check_id
+            or run.get("command") != expected_commands[check_id]
+            or not isinstance(run.get("executed_at"), str)
+            or type(run.get("exit_code")) is not int
+            or run.get("exit_code") != 0
+            or run.get("output_path")
+            != f"{expected_root}/{index:02d}-{check_id}.log"
+            or not isinstance(run.get("output_sha256"), str)
+            or continuation.SHA256_RE.fullmatch(run["output_sha256"]) is None
+        ):
+            return None
+    return copy.deepcopy(binding), receipt
+
+
+def _fp048_r002_seq96_r007_started_event(
+    checkpoint: dict[str, Any],
+    receipt_binding: dict[str, Any],
+    receipt: dict[str, Any],
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 96:
+        return None
+    correction = history[94]
+    started = history[95]
+    target_starts = [
+        event
+        for event in history[:FP048_R002_R007_STARTED_SEQUENCE]
+        if isinstance(event, dict)
+        and event.get("event_type") == "GOAL_STARTED"
+        and event.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+    ]
+    if (
+        not isinstance(correction, dict)
+        or not isinstance(started, dict)
+        or len(target_starts) != 1
+        or target_starts[0] is not started
+        or set(started) != continuation.V24_FIRST_START_EVENT_FIELDS
+        or started.get("sequence") != FP048_R002_R007_STARTED_SEQUENCE
+        or started.get("event_id") != FP048_R002_R007_STARTED_EVENT_ID
+        or started.get("event_type") != "GOAL_STARTED"
+        or started.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("previous_focus_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or started.get("focus_goal_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or started.get("from_status") != "READY"
+        or started.get("to_status") != "IN_PROGRESS"
+        or started.get("static_plan_manifest_sha256")
+        != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+        or started.get("status_changes")
+        != {FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"}
+        or started.get("runtime_after") != correction.get("runtime_after")
+        or started.get("repository_snapshot_before")
+        != receipt.get("repository_snapshot")
+        or started.get("implementation_start_gate_binding") != receipt_binding
+        or started.get("blockers_after") != correction.get("blockers_after")
+        or started.get("blocker_resolution_ids_after")
+        != correction.get("blocker_resolution_ids_after")
+        or started.get("source_checkpoint_version")
+        != checkpoint.get("schema_version")
+        or started.get("evidence_refs") != []
+        or started.get("previous_event_sha256")
+        != correction.get("event_sha256")
+        or started.get("event_sha256") != continuation.event_sha256(started)
+    ):
+        return None
+    return started
+
+
+def _fp048_r002_r008_contract_binding() -> dict[str, Any]:
+    return {
+        "schema_version": "1.2",
+        "document_id": FP048_R002_R008_CONTRACT_DOCUMENT_ID,
+        "path": FP048_R002_R008_CONTRACT_PATH,
+        "file_sha256": FP048_R002_R008_CONTRACT_SHA256,
+        "contract_id": FP048_R002_R008_CONTRACT_ID,
+        "contract_version": FP048_R002_R008_CONTRACT_VERSION,
+        "canonical_contract_sha256": (
+            FP048_R002_R008_CONTRACT_CANONICAL_SHA256
+        ),
+    }
+
+
+def _fp048_r002_seq96_r008_contract_correction_event(
+    checkpoint: dict[str, Any],
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 96:
+        return None
+    source_event = history[94]
+    event = history[95]
+    if not isinstance(source_event, dict) or not isinstance(event, dict):
+        return None
+    source = event.get("source_checkpoint_binding")
+    source_source = source_event.get("source_checkpoint_binding")
+    supersession = event.get("contract_supersession")
+    previous = (
+        supersession.get("previous_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    replacement = (
+        supersession.get("replacement_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    preflight = (
+        source.get("r007_preflight_attempt_004")
+        if isinstance(source, dict)
+        else None
+    )
+    target_starts = [
+        row
+        for row in history[:FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE]
+        if isinstance(row, dict)
+        and row.get("event_type") == "GOAL_STARTED"
+        and row.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+    ]
+    if (
+        target_starts
+        or set(event) != FP048_R002_ZERO_CREDIT_CONTROL_EVENT_FIELDS
+        or type(source_event.get("sequence")) is not int
+        or source_event.get("sequence")
+        != FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE
+        or source_event.get("event_id")
+        != FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID
+        or source_event.get("event_type")
+        != "GOAL_START_GATE_CONTRACT_CORRECTED"
+        or source_event.get("from_status") != "READY"
+        or source_event.get("to_status") != "READY"
+        or source_event.get("status_changes") != {}
+        or source_event.get("event_sha256")
+        != continuation.event_sha256(source_event)
+        or type(event.get("sequence")) is not int
+        or event.get("sequence")
+        != FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE
+        or event.get("event_id")
+        != FP048_R002_R008_CONTRACT_CORRECTION_EVENT_ID
+        or event.get("event_type") != "GOAL_START_GATE_CONTRACT_CORRECTED"
+        or event.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("previous_focus_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or event.get("focus_goal_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or event.get("static_plan_manifest_sha256")
+        != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+        or event.get("from_status") != "READY"
+        or event.get("to_status") != "READY"
+        or event.get("status_changes") != {}
+        or event.get("runtime_after") != source_event.get("runtime_after")
+        or event.get("blockers_after") != source_event.get("blockers_after")
+        or event.get("blocker_resolution_ids_after")
+        != source_event.get("blocker_resolution_ids_after")
+        or event.get("source_checkpoint_version")
+        != checkpoint.get("schema_version")
+        or event.get("evidence_refs")
+        != [
+            "FP048-R002_EXACT_PUBLISHED_SEQ95_SOURCE",
+            "FP048-R002_SEQ95_R002_FROZEN_REVIEW_AUTHORITY",
+            "FP048-R002_R007_ROOT_REGRESSION_PREVIEW_NONAUTHORITY",
+            "FP048-R002_R008_STAGE_AWARE_GATE_CONTRACT",
+            "FP048-R002_SEQ96_97_TRANSITION_CONTROL_REVIEW",
+        ]
+        or not isinstance(source, dict)
+        or source.get("sequence")
+        != FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE
+        or source.get("tail_event_id")
+        != FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID
+        or source.get("tail_event_sha256")
+        != source_event.get("event_sha256")
+        or not isinstance(source_source, dict)
+        or source.get("passed_gate_attempt_003")
+        != source_source.get("passed_gate_attempt_003")
+        or source.get("preflight_attempt_004")
+        != source_source.get("preflight_attempt_004")
+        or source.get("r006_preflight_attempt_004")
+        != source_source.get("r006_preflight_attempt_004")
+        or continuation.canonical_json_bytes(preflight)
+        != continuation.canonical_json_bytes(FP048_R002_R007_PREFLIGHT_ATTEMPT)
+        or not isinstance(preflight, dict)
+        or type(preflight.get("exit_code")) is not int
+        or event.get("source_ready_event_binding")
+        != source_event.get("source_ready_event_binding")
+        or not isinstance(supersession, dict)
+        or previous != _fp048_r002_r007_contract_binding()
+        or previous
+        != source_event.get("contract_supersession", {}).get(
+            "replacement_contract_binding"
+        )
+        or replacement != _fp048_r002_r008_contract_binding()
+        or supersession.get("reason_code")
+        != FP048_R002_R008_SUCCESSOR_REASON_CODE
+        or event.get("start_gate_runner_binding")
+        != {
+            "path": FP048_R002_R008_START_GATE_RUNNER_PATH,
+            "sha256": FP048_R002_R008_START_GATE_RUNNER_SHA256,
+            "byte_length": FP048_R002_R008_START_GATE_RUNNER_BYTE_LENGTH,
+        }
+        or continuation.canonical_json_bytes(event.get("correction_reason"))
+        != continuation.canonical_json_bytes(FP048_R002_R008_CORRECTION_REASON)
+        or event.get("noncredit_successor_edges")
+        != source_event.get("noncredit_successor_edges")
+        or event.get("claim_boundary")
+        != FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+        or event.get("canonical_binding_snapshot_after")
+        != source_event.get("canonical_binding_snapshot_after")
+        or event.get("previous_event_sha256")
+        != source_event.get("event_sha256")
+        or event.get("event_sha256") != continuation.event_sha256(event)
+    ):
+        return None
+    return event
+
+
+def _fp048_r002_seq97_r008_started_event(
+    checkpoint: dict[str, Any],
+    receipt_binding: dict[str, Any],
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 97:
+        return None
+    correction = history[95]
+    started = history[96]
+    target_starts = [
+        event
+        for event in history[:FP048_R002_R008_STARTED_SEQUENCE]
+        if isinstance(event, dict)
+        and event.get("event_type") == "GOAL_STARTED"
+        and event.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+    ]
+    if (
+        not isinstance(correction, dict)
+        or not isinstance(started, dict)
+        or len(target_starts) != 1
+        or target_starts[0] is not started
+        or set(started) != continuation.V24_FIRST_START_EVENT_FIELDS
+        or type(started.get("sequence")) is not int
+        or started.get("sequence") != FP048_R002_R008_STARTED_SEQUENCE
+        or started.get("event_id") != FP048_R002_R008_STARTED_EVENT_ID
+        or started.get("event_type") != "GOAL_STARTED"
+        or started.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("previous_focus_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or started.get("focus_goal_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or started.get("from_status") != "READY"
+        or started.get("to_status") != "IN_PROGRESS"
+        or started.get("static_plan_manifest_sha256")
+        != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+        or started.get("status_changes")
+        != {FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"}
+        or started.get("runtime_after") != correction.get("runtime_after")
+        or not isinstance(started.get("repository_snapshot_before"), dict)
+        or started.get("implementation_start_gate_binding") != receipt_binding
+        or started.get("blockers_after") != correction.get("blockers_after")
+        or started.get("blocker_resolution_ids_after")
+        != correction.get("blocker_resolution_ids_after")
+        or started.get("source_checkpoint_version")
+        != checkpoint.get("schema_version")
+        or started.get("evidence_refs") != []
+        or started.get("previous_event_sha256")
+        != correction.get("event_sha256")
+        or started.get("event_sha256") != continuation.event_sha256(started)
+    ):
+        return None
+    return started
+
+
+def _fp048_r002_seq97_r009_contract_correction_event(
+    checkpoint: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return only the exact zero-credit seq97 READY-to-READY correction."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 97:
+        return None
+    source = history[95]
+    event = history[96]
+    source_binding = (
+        event.get("source_checkpoint_binding")
+        if isinstance(event, dict)
+        else None
+    )
+    target_starts = [
+        row
+        for row in history[:FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE]
+        if isinstance(row, dict)
+        and row.get("event_type") == "GOAL_STARTED"
+        and row.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+    ]
+    if (
+        target_starts
+        or not isinstance(source, dict)
+        or not isinstance(event, dict)
+        or _fp048_r002_seq96_r008_contract_correction_event(checkpoint) is None
+        or set(event) != FP048_R002_ZERO_CREDIT_CONTROL_EVENT_FIELDS
+        or type(event.get("sequence")) is not int
+        or event.get("sequence")
+        != FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE
+        or event.get("event_id")
+        != FP048_R002_R009_CONTRACT_CORRECTION_EVENT_ID
+        or event.get("event_type") != "GOAL_START_GATE_CONTRACT_CORRECTED"
+        or event.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or event.get("previous_focus_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or event.get("focus_goal_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or event.get("static_plan_manifest_sha256")
+        != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+        or event.get("from_status") != "READY"
+        or event.get("to_status") != "READY"
+        or event.get("status_changes") != {}
+        or event.get("runtime_after") != source.get("runtime_after")
+        or event.get("blockers_after") != source.get("blockers_after")
+        or event.get("blocker_resolution_ids_after")
+        != source.get("blocker_resolution_ids_after")
+        or event.get("source_checkpoint_version")
+        != checkpoint.get("schema_version")
+        or not isinstance(event.get("evidence_refs"), list)
+        or not event["evidence_refs"]
+        or not isinstance(source_binding, dict)
+        or type(source_binding.get("sequence")) is not int
+        or source_binding.get("sequence")
+        != FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE
+        or source_binding.get("tail_event_id")
+        != FP048_R002_R008_CONTRACT_CORRECTION_EVENT_ID
+        or source_binding.get("tail_event_sha256") != source.get("event_sha256")
+        or event.get("claim_boundary")
+        != FP048_R002_CONTROL_REANCHOR_CLAIM_BOUNDARY
+        or event.get("previous_event_sha256") != source.get("event_sha256")
+        or event.get("event_sha256") != continuation.event_sha256(event)
+    ):
+        return None
+    return event
+
+
+def _fp048_r002_seq98_r009_started_event(
+    checkpoint: dict[str, Any],
+    receipt_binding: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return only the fresh R009-receipt seq98 GOAL_STARTED event."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 98:
+        return None
+    correction = history[96]
+    started = history[97]
+    target_starts = [
+        event
+        for event in history[:FP048_R002_R009_STARTED_SEQUENCE]
+        if isinstance(event, dict)
+        and event.get("event_type") == "GOAL_STARTED"
+        and event.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+    ]
+    if (
+        not isinstance(correction, dict)
+        or not isinstance(started, dict)
+        or len(target_starts) != 1
+        or target_starts[0] is not started
+        or set(started) != continuation.V24_FIRST_START_EVENT_FIELDS
+        or type(started.get("sequence")) is not int
+        or started.get("sequence") != FP048_R002_R009_STARTED_SEQUENCE
+        or started.get("event_id") != FP048_R002_R009_STARTED_EVENT_ID
+        or started.get("event_type") != "GOAL_STARTED"
+        or started.get("previous_focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("focus_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("subject_goal_id") != FP046_R002_NEXT_GOAL_ID
+        or started.get("previous_focus_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or started.get("focus_goal_content_sha256")
+        != FP048_R002_CORRECTED_STARTED_GOAL_SHA256
+        or started.get("from_status") != "READY"
+        or started.get("to_status") != "IN_PROGRESS"
+        or started.get("static_plan_manifest_sha256")
+        != FP048_R002_CORRECTED_STARTED_MANIFEST_SHA256
+        or started.get("status_changes")
+        != {FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"}
+        or started.get("runtime_after") != correction.get("runtime_after")
+        or not isinstance(started.get("repository_snapshot_before"), dict)
+        or started.get("implementation_start_gate_binding") != receipt_binding
+        or started.get("blockers_after") != correction.get("blockers_after")
+        or started.get("blocker_resolution_ids_after")
+        != correction.get("blocker_resolution_ids_after")
+        or started.get("source_checkpoint_version")
+        != checkpoint.get("schema_version")
+        or started.get("evidence_refs") != []
+        or started.get("previous_event_sha256")
+        != correction.get("event_sha256")
+        or started.get("event_sha256") != continuation.event_sha256(started)
+    ):
+        return None
+    return started
+
+
+def _fp048_r002_seq98_r009_execution_correction_event(
+    checkpoint: dict[str, Any],
+    authority: Any,
+) -> dict[str, Any] | None:
+    """Return only the exact failed-R009-to-R010 seq98 correction event."""
+
+    history = checkpoint.get("goal_execution", {}).get("transition_history")
+    if not isinstance(history, list) or len(history) < 98:
+        return None
+    source, event = history[96:98]
+    expected_type = getattr(authority, "CORRECTION_EVENT_TYPE", None)
+    if not (
+        isinstance(source, dict)
+        and isinstance(event, dict)
+        and isinstance(expected_type, str)
+        and expected_type
+        and type(event.get("sequence")) is int
+        and event.get("sequence")
+        == FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE
+        and event.get("event_id")
+        == FP048_R002_R009_EXECUTION_CORRECTION_EVENT_ID
+        and event.get("event_type") == expected_type
+        and event.get("from_status") == event.get("to_status") == "READY"
+        and event.get("status_changes") == {}
+        and event.get("previous_event_sha256") == source.get("event_sha256")
+        and event.get("event_sha256") == continuation.event_sha256(event)
+    ):
+        return None
+    return event
+
+
+def _fp048_r002_seq99_r010_started_event(
+    checkpoint: dict[str, Any],
+    receipt_binding: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return only the fresh R010-receipt seq99 GOAL_STARTED event."""
+
+    history = checkpoint.get("goal_execution", {}).get("transition_history")
+    if not isinstance(history, list) or len(history) < 99:
+        return None
+    correction, started = history[97:99]
+    if not (
+        isinstance(correction, dict)
+        and isinstance(started, dict)
+        and set(started) == continuation.V24_FIRST_START_EVENT_FIELDS
+        and type(started.get("sequence")) is int
+        and started.get("sequence") == FP048_R002_R010_STARTED_SEQUENCE
+        and started.get("event_id") == FP048_R002_R010_STARTED_EVENT_ID
+        and started.get("event_type") == "GOAL_STARTED"
+        and started.get("subject_goal_id") == FP046_R002_NEXT_GOAL_ID
+        and started.get("from_status") == "READY"
+        and started.get("to_status") == "IN_PROGRESS"
+        and started.get("status_changes")
+        == {FP046_R002_NEXT_GOAL_ID: "IN_PROGRESS"}
+        and started.get("implementation_start_gate_binding") == receipt_binding
+        and started.get("previous_event_sha256")
+        == correction.get("event_sha256")
+        and started.get("event_sha256")
+        == continuation.event_sha256(started)
+    ):
+        return None
+    return started
+
+
+def _fp048_r002_seq98_r010_dispatch_event(
+    checkpoint: dict[str, Any],
+    authority: Any,
+) -> dict[str, Any]:
+    """Dispatch only the correction successor; reject the retired R009 start."""
+
+    history = checkpoint.get("goal_execution", {}).get("transition_history")
+    if not isinstance(history, list) or len(history) < 98:
+        raise RuntimeError("seq98 successor history differs")
+    event = history[97]
+    if (
+        isinstance(event, dict)
+        and type(event.get("sequence")) is int
+        and event.get("sequence") == FP048_R002_R009_STARTED_SEQUENCE
+        and event.get("event_id") == FP048_R002_R009_STARTED_EVENT_ID
+        and event.get("event_type") == "GOAL_STARTED"
+    ):
+        raise RuntimeError("legacy direct seq98 R009 GOAL_STARTED is forbidden")
+    correction = _fp048_r002_seq98_r009_execution_correction_event(
+        checkpoint,
+        authority,
+    )
+    if correction is None:
+        raise RuntimeError("seq98 R009 execution-correction event differs")
+    return correction
+
+
+def _require_fp048_r002_seq98_execution_correction(
+    root: Path,
+    checkpoint: Mapping[str, Any],
+    authority: Any,
+    *,
+    historical_successor_source: bool,
+) -> None:
+    authority.require_start_gate_execution_corrected_checkpoint(
+        root,
+        checkpoint,
+        require_live_snapshot=not historical_successor_source,
+        run_external_validators=False,
+    )
+
+
+def _validate_fp048_r002_seq91_93(
+    root: Path,
+    checkpoint: dict[str, Any],
+    *,
+    historical_successor_source: bool,
+) -> list[str]:
+    """Dispatch the frozen prefix and exact append-only FP048 R002 successor."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list):
+        return ["FP048 R002 seq91/92/93/94 history is malformed"]
+    if len(history) > FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE:
+        try:
+            source = _fp048_r002_successor_seq98_source(
+                root,
+                checkpoint,
+                require_live_snapshot=_fp048_r002_successor_is_live_checkpoint(
+                    root,
+                    checkpoint,
+                ),
+            )
+        except Exception as exc:
+            return [f"FP048 R002 successor seq99-102 authority differs: {exc}"]
+        if source is None:
+            return ["FP048 R002 successor inverse seq98 is missing"]
+        return _validate_fp048_r002_seq91_93(
+            root,
+            source,
+            historical_successor_source=True,
+        )
+    if len(history) < FP048_R002_START_GATE_CONTRACT_CORRECTION_SEQUENCE:
+        return validate_fp048_r002_seq91_92(root, checkpoint)
+    seq92 = history[91]
+    if (
+        isinstance(seq92, dict)
+        and seq92.get("event_id") == FP048_R002_CORRECTED_STARTED_EVENT_ID
+        and seq92.get("event_type") == "GOAL_STARTED"
+    ):
+        if len(history) != FP048_R002_CORRECTED_STARTED_SEQUENCE:
+            return ["FP048 R002 legacy seq92 descendant dispatch differs"]
+        return validate_fp048_r002_seq91_92(root, checkpoint)
+    if (
+        not isinstance(seq92, dict)
+        or seq92.get("event_id")
+        != FP048_R002_START_GATE_CONTRACT_CORRECTION_EVENT_ID
+        or seq92.get("event_type") != "GOAL_START_GATE_CONTRACT_CORRECTED"
+    ):
+        return ["FP048 R002 seq92 descendant dispatch differs"]
+
+    try:
+        correction_authority = (
+            _fp048_r002_start_gate_contract_correction_authority()
+        )
+        if len(history) == 92:
+            try:
+                correction_authority.require_contract_corrected_checkpoint(
+                    root,
+                    checkpoint,
+                    require_live_snapshot=True,
+                )
+                expected_seq92 = (
+                    correction_authority.canonical_seq92_checkpoint_bytes(
+                        root,
+                        checkpoint,
+                    )
+                )
+            except Exception as physical_review_error:
+                frozen = _fp048_r002_branch_semantics_reanchor_authority()
+                expected_seq92 = frozen.checkpoint_json_bytes(checkpoint)
+                try:
+                    frozen.require_exact_seq92_source(
+                        expected_seq92,
+                        checkpoint,
+                        root,
+                    )
+                except Exception as frozen_error:
+                    raise RuntimeError(
+                        "seq92 physical and frozen review authorities differ: "
+                        f"{physical_review_error}; {frozen_error}"
+                    ) from frozen_error
+        else:
+            expected_seq92 = None
+        if (
+            expected_seq92 is not None
+            and (
+                not isinstance(expected_seq92, bytes)
+                or not expected_seq92
+            )
+        ):
+            raise RuntimeError("seq92 canonical checkpoint authority differs")
+    except Exception as exc:
+        return [f"FP048 R002 seq92 contract-correction authority differs: {exc}"]
+
+    correction = _fp048_r002_seq92_contract_correction_event(
+        checkpoint,
+    )
+    if correction is None:
+        return ["FP048 R002 seq92 contract-correction event differs"]
+    if len(history) == 92:
+        return (
+            []
+            if _fp048_r002_seq92_ready_projection_matches(
+                checkpoint,
+                correction,
+            )
+            else ["FP048 R002 seq92 READY zero-credit projection differs"]
+        )
+
+    seq93 = history[92]
+    if (
+        isinstance(seq93, dict)
+        and seq93.get("event_id") == FP048_R002_R004_STARTED_EVENT_ID
+        and seq93.get("event_type") == "GOAL_STARTED"
+    ):
+        return [
+            "FP048 R002 -003 PASS gate must remain PASS_UNCONSUMED; "
+            "seq93 GOAL_STARTED is forbidden"
+        ]
+    if (
+        not isinstance(seq93, dict)
+        or seq93.get("event_id")
+        != FP048_R002_BRANCH_SEMANTICS_REANCHOR_EVENT_ID
+        or seq93.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+    ):
+        return ["FP048 R002 seq93 branch-semantics dispatch differs"]
+
+    try:
+        reanchor_authority = (
+            _fp048_r002_branch_semantics_reanchor_authority()
+        )
+        reanchor = _fp048_r002_seq93_branch_semantics_event(
+            root,
+            checkpoint,
+            reanchor_authority,
+        )
+        if reanchor is None:
+            raise RuntimeError("seq93 branch-semantics event differs")
+        if len(history) == 93:
+            try:
+                successor_authority = (
+                    _fp048_r002_r006_contract_correction_authority()
+                )
+            except RuntimeError as load_error:
+                missing = load_error.__cause__
+                if not (
+                    isinstance(missing, ModuleNotFoundError)
+                    and missing.name
+                    == FP048_R002_R006_CONTRACT_CORRECTION_MODULE
+                ):
+                    raise
+                successor_authority = None
+            if successor_authority is not None:
+                reconstructed_seq93 = (
+                    successor_authority.reconstructed_seq93_checkpoint_bytes(
+                        root,
+                        checkpoint,
+                    )
+                )
+                if not isinstance(reconstructed_seq93, bytes):
+                    raise RuntimeError(
+                        "seq93 frozen authority returned non-bytes"
+                    )
+                successor_authority.require_exact_seq93_source(
+                    reconstructed_seq93,
+                    checkpoint,
+                    root,
+                )
+            else:
+                reanchor_authority.require_branch_semantics_reanchored_checkpoint(
+                    root,
+                    checkpoint,
+                    run_external_validators=False,
+                    require_live_snapshot=True,
+                )
+                canonical_seq93 = (
+                    reanchor_authority.canonical_seq93_checkpoint_bytes(
+                        root,
+                        checkpoint,
+                    )
+                )
+                reconstructed_seq93 = (
+                    reanchor_authority.reconstructed_seq93_checkpoint_bytes(
+                        root,
+                        checkpoint,
+                    )
+                )
+                inverse_seq92 = (
+                    reanchor_authority.reconstructed_seq92_checkpoint_bytes(
+                        root,
+                        checkpoint,
+                    )
+                )
+                restored_seq92 = json.loads(inverse_seq92)
+                if not isinstance(restored_seq92, dict):
+                    raise RuntimeError("seq93 inverse seq92 checkpoint differs")
+                canonical_seq92 = reanchor_authority.checkpoint_json_bytes(
+                    restored_seq92
+                )
+                reanchor_authority.require_exact_seq92_source(
+                    canonical_seq92,
+                    restored_seq92,
+                    root,
+                )
+                if (
+                    not isinstance(canonical_seq93, bytes)
+                    or not canonical_seq93
+                    or canonical_seq93 != reconstructed_seq93
+                    or not isinstance(inverse_seq92, bytes)
+                    or inverse_seq92 != canonical_seq92
+                ):
+                    raise RuntimeError("seq93 inverse authority differs")
+    except Exception as exc:
+        return [f"FP048 R002 seq93 branch-semantics authority differs: {exc}"]
+
+    if len(history) == 93:
+        return (
+            []
+            if _fp048_r002_seq92_ready_projection_matches(
+                checkpoint,
+                reanchor,
+            )
+            else ["FP048 R002 seq93 READY zero-credit projection differs"]
+        )
+    seq94 = history[93]
+    if (
+        isinstance(seq94, dict)
+        and seq94.get("event_id") == FP048_R002_R005_STARTED_EVENT_ID
+        and seq94.get("event_type") == "GOAL_STARTED"
+    ):
+        return [
+            "FP048 R002 legacy R005 direct seq94 GOAL_STARTED is forbidden"
+        ]
+    if (
+        not isinstance(seq94, dict)
+        or seq94.get("event_id")
+        != FP048_R002_R006_CONTRACT_CORRECTION_EVENT_ID
+        or seq94.get("event_type") != "GOAL_START_GATE_CONTRACT_CORRECTED"
+    ):
+        return ["FP048 R002 seq94 R006 correction dispatch differs"]
+    correction = _fp048_r002_seq94_r006_contract_correction_event(checkpoint)
+    if correction is None:
+        return ["FP048 R002 seq94 R006 contract-correction event differs"]
+
+    try:
+        correction_authority = (
+            _fp048_r002_r006_contract_correction_authority()
+        )
+        if len(history) == FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE:
+            correction_authority.require_contract_corrected_checkpoint(
+                root,
+                checkpoint,
+                require_live_snapshot=True,
+                run_external_validators=False,
+            )
+            canonical_seq94 = (
+                correction_authority.canonical_seq94_checkpoint_bytes(
+                    root,
+                    checkpoint,
+                )
+            )
+            inverse_seq93 = (
+                correction_authority.reconstructed_seq93_checkpoint_bytes(
+                    root,
+                    checkpoint,
+                )
+            )
+            restored_seq93 = json.loads(inverse_seq93)
+            if not isinstance(restored_seq93, dict):
+                raise RuntimeError("seq94 inverse seq93 checkpoint differs")
+            correction_authority.require_exact_seq93_source(
+                inverse_seq93,
+                restored_seq93,
+                root,
+            )
+            if (
+                not isinstance(canonical_seq94, bytes)
+                or not canonical_seq94
+                or not isinstance(inverse_seq93, bytes)
+                or not inverse_seq93
+            ):
+                raise RuntimeError("seq94 inverse seq93 authority differs")
+    except Exception as exc:
+        return [f"FP048 R002 seq94 R006 correction authority differs: {exc}"]
+
+    if len(history) == FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE:
+        return (
+            []
+            if _fp048_r002_seq92_ready_projection_matches(
+                checkpoint,
+                correction,
+            )
+            else ["FP048 R002 seq94 READY zero-credit projection differs"]
+        )
+    seq95 = history[94]
+    if (
+        isinstance(seq95, dict)
+        and seq95.get("sequence") == FP048_R002_R006_STARTED_SEQUENCE
+        and seq95.get("event_id") == FP048_R002_R006_STARTED_EVENT_ID
+        and seq95.get("event_type") == "GOAL_STARTED"
+    ):
+        return [
+            "FP048 R002 legacy R006 direct seq95 GOAL_STARTED is forbidden"
+        ]
+    if (
+        not isinstance(seq95, dict)
+        or seq95.get("sequence")
+        != FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE
+        or seq95.get("event_id")
+        != FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID
+        or seq95.get("event_type") != "GOAL_START_GATE_CONTRACT_CORRECTED"
+    ):
+        return ["FP048 R002 seq95 R007 correction dispatch differs"]
+    successor_correction = _fp048_r002_seq95_r007_contract_correction_event(
+        checkpoint
+    )
+    if successor_correction is None:
+        return ["FP048 R002 seq95 R007 contract-correction event differs"]
+
+    try:
+        successor_authority = (
+            _fp048_r002_r007_contract_correction_authority()
+        )
+        if len(history) == FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE:
+            successor_authority.require_contract_corrected_checkpoint(
+                root,
+                checkpoint,
+                run_external_validators=False,
+                require_live_snapshot=True,
+            )
+            canonical_seq95 = (
+                successor_authority.canonical_seq95_checkpoint_bytes(
+                    root,
+                    checkpoint,
+                )
+            )
+            inverse_seq94 = (
+                successor_authority.reconstructed_seq94_checkpoint_bytes(
+                    root,
+                    checkpoint,
+                )
+            )
+            restored_seq94 = json.loads(inverse_seq94)
+            if not isinstance(restored_seq94, dict):
+                raise RuntimeError("seq95 inverse seq94 checkpoint differs")
+            expected_seq94 = (
+                successor_authority.canonical_frozen_seq94_checkpoint_bytes(
+                    root,
+                    restored_seq94,
+                )
+            )
+            restored_correction = (
+                _fp048_r002_seq94_r006_contract_correction_event(
+                    restored_seq94
+                )
+            )
+            if (
+                not isinstance(canonical_seq95, bytes)
+                or not canonical_seq95
+                or not isinstance(inverse_seq94, bytes)
+                or not inverse_seq94
+                or inverse_seq94 != expected_seq94
+                or restored_correction is None
+                or not _fp048_r002_seq92_ready_projection_matches(
+                    restored_seq94,
+                    restored_correction,
+                )
+            ):
+                raise RuntimeError("seq95 inverse seq94 authority differs")
+    except Exception as exc:
+        return [f"FP048 R002 seq95 R007 correction authority differs: {exc}"]
+
+    if len(history) == FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE:
+        return (
+            []
+            if _fp048_r002_seq92_ready_projection_matches(
+                checkpoint,
+                successor_correction,
+            )
+            else ["FP048 R002 seq95 READY zero-credit projection differs"]
+        )
+    seq96 = history[95]
+    if (
+        isinstance(seq96, dict)
+        and type(seq96.get("sequence")) is int
+        and seq96.get("sequence") == FP048_R002_R007_STARTED_SEQUENCE
+        and seq96.get("event_id") == FP048_R002_R007_STARTED_EVENT_ID
+        and seq96.get("event_type") == "GOAL_STARTED"
+    ):
+        return [
+            "FP048 R002 legacy R007 direct seq96 GOAL_STARTED is forbidden"
+        ]
+    if (
+        not isinstance(seq96, dict)
+        or type(seq96.get("sequence")) is not int
+        or seq96.get("sequence")
+        != FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE
+        or seq96.get("event_id")
+        != FP048_R002_R008_CONTRACT_CORRECTION_EVENT_ID
+        or seq96.get("event_type") != "GOAL_START_GATE_CONTRACT_CORRECTED"
+    ):
+        return ["FP048 R002 seq96 R008 correction dispatch differs"]
+    r008_correction = _fp048_r002_seq96_r008_contract_correction_event(
+        checkpoint
+    )
+    if r008_correction is None:
+        return ["FP048 R002 seq96 R008 contract-correction event differs"]
+
+    try:
+        r008_authority = _fp048_r002_r008_contract_correction_authority()
+        r008_starter = _fp048_r002_r008_started_authority()
+        r008_gate = _fp048_r002_r008_gate_authority()
+        if len(history) == FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE:
+            gate_namespace_present = (
+                _fp048_r002_r008_gate_namespace_present(root)
+            )
+            if gate_namespace_present:
+                published_receipt_binding = (
+                    r008_starter.require_published_r008_gate_for_seq96(
+                        root,
+                        checkpoint,
+                    )
+                )
+                if not isinstance(published_receipt_binding, dict):
+                    raise RuntimeError(
+                        "seq96 R008 published receipt binding differs"
+                    )
+            else:
+                published_receipt_binding = None
+            require_live_snapshot = not gate_namespace_present
+            r008_authority.require_contract_corrected_checkpoint(
+                root,
+                checkpoint,
+                require_live_snapshot=require_live_snapshot,
+                run_external_validators=False,
+            )
+            canonical_seq96 = r008_authority.canonical_seq96_checkpoint_bytes(
+                root,
+                checkpoint,
+            )
+            inverse_seq95 = r008_authority.reconstructed_seq95_checkpoint_bytes(
+                root,
+                checkpoint,
+            )
+            restored_seq95 = json.loads(inverse_seq95)
+            if not isinstance(restored_seq95, dict):
+                raise RuntimeError("seq96 inverse seq95 checkpoint differs")
+            expected_seq95 = (
+                r008_authority.canonical_frozen_seq95_checkpoint_bytes(
+                    root,
+                    restored_seq95,
+                )
+            )
+            restored_r007_correction = (
+                _fp048_r002_seq95_r007_contract_correction_event(
+                    restored_seq95
+                )
+            )
+            gate_binding = r008_gate.expected_r008_binding()
+            gate_preflight = r008_gate.expected_preflight_attempt_004_binding()
+            bound = (
+                r008_gate.bind_published_contract_corrected_source(
+                    root,
+                    checkpoint,
+                )
+                if gate_namespace_present
+                else r008_gate.bind_contract_corrected_source(
+                    root,
+                    checkpoint,
+                    require_gate_namespace_absent=True,
+                )
+            )
+            if (
+                not isinstance(canonical_seq96, bytes)
+                or not canonical_seq96
+                or not isinstance(inverse_seq95, bytes)
+                or not inverse_seq95
+                or inverse_seq95 != expected_seq95
+                or restored_r007_correction is None
+                or not _fp048_r002_seq92_ready_projection_matches(
+                    restored_seq95,
+                    restored_r007_correction,
+                )
+                or continuation.canonical_json_bytes(gate_binding)
+                != continuation.canonical_json_bytes(
+                    _fp048_r002_r008_contract_binding()
+                )
+                or continuation.canonical_json_bytes(gate_preflight)
+                != continuation.canonical_json_bytes(
+                    FP048_R002_R007_PREFLIGHT_ATTEMPT
+                )
+                or continuation.canonical_json_bytes(
+                    getattr(bound, "contract_binding", None)
+                )
+                != continuation.canonical_json_bytes(gate_binding)
+            ):
+                raise RuntimeError("seq96 frozen R008 authority differs")
+    except Exception as exc:
+        return [f"FP048 R002 seq96 R008 correction authority differs: {exc}"]
+
+    if len(history) == FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE:
+        return (
+            []
+            if _fp048_r002_seq92_ready_projection_matches(
+                checkpoint,
+                r008_correction,
+            )
+            else ["FP048 R002 seq96 READY zero-credit projection differs"]
+        )
+    if len(history) < FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE:
+        return ["FP048 R002 seq97 descendant dispatch differs"]
+    seq97 = history[96]
+    if (
+        isinstance(seq97, dict)
+        and type(seq97.get("sequence")) is int
+        and seq97.get("sequence") == FP048_R002_R008_STARTED_SEQUENCE
+        and seq97.get("event_id") == FP048_R002_R008_STARTED_EVENT_ID
+        and seq97.get("event_type") == "GOAL_STARTED"
+    ):
+        return ["FP048 R002 legacy R008 direct seq97 GOAL_STARTED is forbidden"]
+    if (
+        not isinstance(seq97, dict)
+        or type(seq97.get("sequence")) is not int
+        or seq97.get("sequence")
+        != FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE
+        or seq97.get("event_id")
+        != FP048_R002_R009_CONTRACT_CORRECTION_EVENT_ID
+        or seq97.get("event_type") != "GOAL_START_GATE_CONTRACT_CORRECTED"
+    ):
+        return ["FP048 R002 seq97 R009 correction dispatch differs"]
+    r009_correction = _fp048_r002_seq97_r009_contract_correction_event(
+        checkpoint
+    )
+    if r009_correction is None:
+        return ["FP048 R002 seq97 R009 contract-correction event differs"]
+
+    try:
+        r009_authority = _fp048_r002_r009_contract_correction_authority()
+        execution_authority = (
+            _fp048_r002_r009_execution_correction_authority()
+        )
+        failure_binding = execution_authority.r009_execution_failure_binding(root)
+        if not isinstance(failure_binding, Mapping) or not failure_binding:
+            raise RuntimeError("R009 failed execution binding differs")
+        if len(history) == FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE:
+            r009_authority.require_snapshot_hygiene_corrected_checkpoint(
+                root,
+                checkpoint,
+                require_live_snapshot=False,
+                run_external_validators=False,
+            )
+            canonical_seq97 = r009_authority.canonical_seq97_checkpoint_bytes(
+                root,
+                checkpoint,
+            )
+            inverse_seq96 = r009_authority.reconstructed_seq96_checkpoint_bytes(
+                root,
+                checkpoint,
+            )
+            restored_seq96 = json.loads(inverse_seq96)
+            if not isinstance(restored_seq96, dict):
+                raise RuntimeError("seq97 inverse seq96 checkpoint differs")
+            r008_authority.require_contract_corrected_checkpoint(
+                root,
+                restored_seq96,
+                require_live_snapshot=False,
+                run_external_validators=False,
+            )
+            expected_seq96 = r008_authority.canonical_seq96_checkpoint_bytes(
+                root,
+                restored_seq96,
+            )
+            if (
+                not isinstance(canonical_seq97, bytes)
+                or not canonical_seq97
+                or inverse_seq96 != expected_seq96
+            ):
+                raise RuntimeError("seq97 frozen seq96 inverse authority differs")
+    except Exception as exc:
+        return [f"FP048 R002 seq97 R009 correction authority differs: {exc}"]
+
+    if len(history) == FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE:
+        return (
+            []
+            if _fp048_r002_seq92_ready_projection_matches(
+                checkpoint,
+                r009_correction,
+            )
+            else ["FP048 R002 seq97 READY zero-credit projection differs"]
+        )
+    try:
+        execution_correction = _fp048_r002_seq98_r010_dispatch_event(
+            checkpoint,
+            execution_authority,
+        )
+    except Exception as exc:
+        return [f"FP048 R002 seq98 successor dispatch differs: {exc}"]
+    try:
+        if len(history) == FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE:
+            _require_fp048_r002_seq98_execution_correction(
+                root,
+                checkpoint,
+                execution_authority,
+                historical_successor_source=historical_successor_source,
+            )
+            inverse_seq97 = execution_authority.reconstructed_seq97_checkpoint_bytes(
+                root,
+                checkpoint,
+            )
+            restored_seq97 = json.loads(inverse_seq97)
+            if (
+                inverse_seq97
+                != r009_authority.canonical_seq97_checkpoint_bytes(
+                    root,
+                    restored_seq97,
+                )
+            ):
+                raise RuntimeError("seq98 inverse seq97 authority is noncanonical")
+            r009_authority.require_snapshot_hygiene_corrected_checkpoint(
+                root,
+                restored_seq97,
+                require_live_snapshot=False,
+                run_external_validators=False,
+            )
+    except Exception as exc:
+        return [f"FP048 R002 seq98 R009 execution correction differs: {exc}"]
+    if len(history) == FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE:
+        return (
+            []
+            if _fp048_r002_seq92_ready_projection_matches(
+                checkpoint,
+                execution_correction,
+            )
+            else ["FP048 R002 seq98 READY zero-credit projection differs"]
+        )
+    if len(history) > FP048_R002_R010_STARTED_SEQUENCE:
+        return []
+    if len(history) != FP048_R002_R010_STARTED_SEQUENCE:
+        return ["FP048 R002 seq99 descendant dispatch differs"]
+
+    try:
+        starter = _fp048_r002_r010_started_authority()
+        starter.require_started_checkpoint(
+            root,
+            checkpoint,
+            require_live_snapshot=True,
+            run_external_validators=False,
+        )
+        receipt_binding = starter.goal_start_gate_receipt_binding(root, checkpoint)
+        inverse_seq98 = starter.reconstructed_seq98_checkpoint_bytes(
+            root,
+            checkpoint,
+        )
+        restored_seq98 = json.loads(inverse_seq98)
+        if (
+            inverse_seq98
+            != execution_authority.canonical_seq98_checkpoint_bytes(
+                root,
+                restored_seq98,
+            )
+        ):
+            raise RuntimeError("seq99 inverse seq98 authority is noncanonical")
+        execution_authority.require_start_gate_execution_corrected_checkpoint(
+            root,
+            restored_seq98,
+            require_live_snapshot=False,
+            run_external_validators=False,
+        )
+    except Exception as exc:
+        return [f"FP048 R002 seq99 R010 started authority differs: {exc}"]
+    started = _fp048_r002_seq99_r010_started_event(checkpoint, receipt_binding)
+    if started is None:
+        return ["FP048 R002 seq99 GOAL_STARTED event differs"]
+    if not _fp048_r002_seq93_in_progress_projection_matches(checkpoint, started):
+        return ["FP048 R002 seq99 one-IN_PROGRESS projection differs"]
+    return []
+
+
+def validate_fp048_r002_seq91_93(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Dispatch the frozen prefix and exact append-only FP048 R002 successor."""
+
+    cache = _FP048_R002_REPOSITORY_CONTEXT_CALL_CACHE.get()
+    if cache is None:
+        authority = _fp048_r002_r009_execution_correction_authority()
+        with authority.seq97_source_validation_call_scope():
+            return _validate_fp048_r002_seq91_93(
+                root,
+                checkpoint,
+                historical_successor_source=False,
+            )
+    key = (
+        "seq91-98-validation-outcome",
+        *_fp048_r002_repository_context_call_cache_key(root, checkpoint),
+        continuation.canonical_json_sha256(checkpoint),
+    )
+    cached = cache.get(key, _FP048_R002_REPOSITORY_CONTEXT_CACHE_MISS)
+    if cached is not _FP048_R002_REPOSITORY_CONTEXT_CACHE_MISS:
+        cached_checkpoint, cached_payload = cached
+        if cached_checkpoint is checkpoint:
+            kind, payload = cached_payload
+            if kind == "error":
+                raise payload
+            return list(payload)
+    try:
+        authority = _fp048_r002_r009_execution_correction_authority()
+        with authority.seq97_source_validation_call_scope():
+            result = _validate_fp048_r002_seq91_93(
+                root,
+                checkpoint,
+                historical_successor_source=False,
+            )
+    except Exception as exc:
+        cache[key] = (checkpoint, ("error", exc))
+        raise
+    cache[key] = (checkpoint, ("value", tuple(result)))
+    return list(result)
+
+
+def validate_fp048_r002_seq91_94(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Compatibility name for the current seq91-through-seq97 validator."""
+
+    return validate_fp048_r002_seq91_93(root, checkpoint)
+
+
+def validate_fp048_r002_seq91_95(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Compatibility name for the current seq91-through-seq97 validator."""
+
+    return validate_fp048_r002_seq91_93(root, checkpoint)
+
+
+def validate_fp048_r002_seq91_96(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Compatibility name for the current seq91-through-seq97 validator."""
+
+    return validate_fp048_r002_seq91_93(root, checkpoint)
+
+
+def validate_fp048_r002_seq91_97(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Compatibility name for the current seq91-through-seq98 validator."""
+
+    return validate_fp048_r002_seq91_93(root, checkpoint)
+
+
+def validate_fp048_r002_seq91_98(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Explicit name for the append-only seq91-through-seq98 validator."""
+
+    return validate_fp048_r002_seq91_93(root, checkpoint)
+
+
+def _fp048_r002_completion_private_json(
+    root: Path,
+    relative: Path,
+    authority: Any,
+    label: str,
+) -> tuple[bytes, dict[str, Any]]:
+    path = _exact_repo_file(root, relative.as_posix())
+    if (
+        path is None
+        or _contains_symlink(root, relative.as_posix())
+        or path.stat().st_nlink != 1
+        or path.stat().st_mode & 0o777 != 0o600
+    ):
+        raise RuntimeError(f"{label} mode or file authority differs")
+    raw = path.read_bytes()
+    try:
+        value = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"{label} is malformed") from exc
+    if not isinstance(value, dict):
+        raise RuntimeError(f"{label} root differs")
+    if raw != authority.json_bytes(value):
+        raise RuntimeError(f"{label} is not canonical")
+    return raw, value
+
+
+def _fp048_r002_completion_bound_file(
+    root: Path,
+    row: Any,
+    relative: Path,
+    authority: Any,
+) -> bool:
+    path = _exact_repo_file(root, relative.as_posix())
+    return bool(
+        isinstance(row, dict)
+        and set(row) == {"path", "sha256", "byte_length"}
+        and row.get("path") == relative.as_posix()
+        and path is not None
+        and not _contains_symlink(root, relative.as_posix())
+        and type(row.get("byte_length")) is int
+        and row["byte_length"] == path.stat().st_size
+        and row.get("sha256") == continuation.sha256_file(path)
+    )
+
+
+def _fp048_r002_completion_binding_rows_match(
+    root: Path,
+    rows: Any,
+    relatives: tuple[Path, ...],
+    authority: Any,
+) -> bool:
+    return bool(
+        isinstance(rows, list)
+        and len(rows) == len(relatives)
+        and all(
+            _fp048_r002_completion_bound_file(root, row, relative, authority)
+            for row, relative in zip(rows, relatives, strict=True)
+        )
+    )
+
+
+def _fp048_r002_completion_time(value: Any, label: str) -> datetime:
+    if not isinstance(value, str):
+        raise RuntimeError(f"{label} differs")
+    parsed = datetime.fromisoformat(value)
+    if parsed.utcoffset() is None:
+        raise RuntimeError(f"{label} lacks timezone authority")
+    return parsed
+
+
+def _fp048_r002_completion_evidence_authority_legacy_seq98_99(
+    root: Path,
+    checkpoint: dict[str, Any],
+    authority: Any,
+    update: dict[str, Any],
+    completion: dict[str, Any],
+    restored_raw: bytes,
+    restored: dict[str, Any],
+) -> tuple[Any, dict[str, Any]]:
+    receipt_relative = Path(authority.COMPLETION_RECEIPT_REL)
+    receipt_raw, receipt = _fp048_r002_completion_private_json(
+        root,
+        receipt_relative,
+        authority,
+        "FP048 R002 completion receipt",
+    )
+    receipt_binding = {
+        "role": authority.COMPLETION_ROLE,
+        "document_id": authority.COMPLETION_DOCUMENT_ID,
+        "path": receipt_relative.as_posix(),
+        "file_sha256": authority.sha256_bytes(receipt_raw),
+    }
+    if (
+        update.get("producer_completion_receipt_binding") != receipt_binding
+        or completion.get("completion_receipt_binding") != receipt_binding
+        or completion.get("completion_evidence_bindings")
+        != {authority.COMPLETION_ROLE: receipt_binding}
+        or receipt.get("document_id") != authority.COMPLETION_DOCUMENT_ID
+        or receipt.get("goal_id") != authority.GOAL_ID
+        or receipt.get("completion_boundary") != authority.ZERO_CREDIT_BOUNDARY
+    ):
+        raise RuntimeError("completion receipt binding differs")
+
+    review_roles = ("assignment", "review_result", "independent_review")
+    review_relatives = tuple(Path(path) for path in authority.REVIEW_PATHS)
+    review_binding = update.get("transition_control_review_binding")
+    if (
+        not isinstance(review_binding, dict)
+        or set(review_binding) != set(review_roles)
+    ):
+        raise RuntimeError("completion review binding differs")
+    review_documents: dict[str, dict[str, Any]] = {}
+    review_raw: dict[str, bytes] = {}
+    for role, relative in zip(review_roles, review_relatives, strict=True):
+        raw, document = _fp048_r002_completion_private_json(
+            root,
+            relative,
+            authority,
+            f"FP048 R002 completion {role}",
+        )
+        expected = {
+            "path": relative.as_posix(),
+            "sha256": authority.sha256_bytes(raw),
+            "byte_length": len(raw),
+        }
+        if review_binding.get(role) != expected:
+            raise RuntimeError(f"completion review binding differs: {role}")
+        review_documents[role] = document
+        review_raw[role] = raw
+
+    assignment = review_documents["assignment"]
+    result = review_documents["review_result"]
+    independent = review_documents["independent_review"]
+    source_binding = assignment.get("source_checkpoint_binding")
+    source = checkpoint["goal_execution"][
+        "transition_history"
+    ][FP048_R002_COMPLETION_SOURCE_SEQUENCE - 1]
+    receipt_file_binding = {
+        "path": receipt_relative.as_posix(),
+        "sha256": authority.sha256_bytes(receipt_raw),
+        "byte_length": len(receipt_raw),
+    }
+    expected_assignment = authority.expected_review_assignment(
+        root,
+        restored_raw,
+        restored,
+        receipt_raw,
+    )
+    if (
+        review_raw["assignment"] != authority.json_bytes(expected_assignment)
+        or assignment != expected_assignment
+        or set(assignment)
+        != {
+            "schema_version",
+            "document_id",
+            "goal_id",
+            "round_id",
+            "source_checkpoint_binding",
+            "completion_receipt_binding",
+            "producer_bindings",
+            "consumer_bindings",
+            "product_bindings",
+            "projected_transition",
+            "review_scope",
+            "required_decision",
+            "claim_boundary",
+        }
+        or assignment.get("schema_version") != "1.0"
+        or assignment.get("document_id")
+        != "WS-FP048-R002-SEQ99-100-REVIEW-ASSIGNMENT-20260826-R001"
+        or assignment.get("goal_id") != authority.GOAL_ID
+        or assignment.get("round_id") != "R001"
+        or not isinstance(source_binding, dict)
+        or set(source_binding)
+        != {
+            "path",
+            "sha256",
+            "byte_length",
+            "sequence",
+            "tail_event_id",
+            "tail_event_sha256",
+        }
+        or source_binding.get("path") != authority.CHECKPOINT_REL.as_posix()
+        or type(source_binding.get("byte_length")) is not int
+        or source_binding["byte_length"] <= 0
+        or not isinstance(source_binding.get("sha256"), str)
+        or continuation.SHA256_RE.fullmatch(source_binding["sha256"]) is None
+        or source_binding.get("sequence")
+        != FP048_R002_COMPLETION_SOURCE_SEQUENCE
+        or source_binding.get("tail_event_id") != source.get("event_id")
+        or source_binding.get("tail_event_sha256") != source.get("event_sha256")
+        or assignment.get("completion_receipt_binding") != receipt_file_binding
+        or assignment.get("projected_transition")
+        != {
+            "evidence_sequence": FP048_R002_COMPLETION_EVIDENCE_SEQUENCE,
+            "evidence_event_id": FP048_R002_COMPLETION_EVIDENCE_EVENT_ID,
+            "completion_sequence": FP048_R002_COMPLETION_SEQUENCE,
+            "completion_event_id": FP048_R002_COMPLETION_EVENT_ID,
+            "status_change": {
+                authority.GOAL_ID: "IN_PROGRESS_TO_COMPLETE_AT_TARGET"
+            },
+        }
+        or assignment.get("required_decision")
+        != "APPROVE_INTERNAL_ZERO_CREDIT_COMPLETION_ONLY"
+        or assignment.get("claim_boundary") != authority.ZERO_CREDIT_BOUNDARY
+    ):
+        raise RuntimeError("completion review assignment differs")
+
+    producer_paths = (Path(authority.SCRIPT_REL), Path(authority.TEST_REL))
+    consumer_paths = tuple(Path(path) for path in authority.CONSUMER_PATHS)
+    product_paths = tuple(Path(path) for path in authority.PRODUCT_PINS)
+    if (
+        not _fp048_r002_completion_binding_rows_match(
+            root, assignment.get("producer_bindings"), producer_paths, authority
+        )
+        or not _fp048_r002_completion_binding_rows_match(
+            root, assignment.get("consumer_bindings"), consumer_paths, authority
+        )
+        or not _fp048_r002_completion_binding_rows_match(
+            root, assignment.get("product_bindings"), product_paths, authority
+        )
+        or any(
+            (continuation.sha256_file(root / relative), (root / relative).stat().st_size)
+            != tuple(authority.PRODUCT_PINS[relative])
+            for relative in product_paths
+        )
+    ):
+        raise RuntimeError("completion reviewed file cohort differs")
+
+    assignment_row = review_binding["assignment"]
+    result_row = review_binding["review_result"]
+    result_reviewer = result.get("reviewer")
+    independent_reviewer = independent.get("reviewer")
+    if (
+        set(result)
+        != {
+            "schema_version",
+            "document_id",
+            "goal_id",
+            "round_id",
+            "assignment_binding",
+            "reviewer",
+            "reviewed_at",
+            "decision",
+            "findings",
+            "external_independence_claimed",
+            "claim_boundary",
+        }
+        or result.get("schema_version") != "1.0"
+        or result.get("document_id")
+        != "WS-FP048-R002-SEQ99-100-REVIEW-RESULT-20260826-R001"
+        or result.get("goal_id") != authority.GOAL_ID
+        or result.get("round_id") != "R001"
+        or result.get("assignment_binding") != assignment_row
+        or result.get("decision")
+        != "APPROVE_INTERNAL_ZERO_CREDIT_COMPLETION_ONLY"
+        or result.get("findings") != []
+        or result.get("external_independence_claimed") is not False
+        or result.get("claim_boundary") != authority.ZERO_CREDIT_BOUNDARY
+        or not isinstance(result_reviewer, dict)
+        or set(result_reviewer) != {"id", "task_id"}
+        or not all(
+            isinstance(result_reviewer.get(key), str) and result_reviewer[key]
+            for key in ("id", "task_id")
+        )
+    ):
+        raise RuntimeError("completion review result differs")
+    if (
+        set(independent)
+        != {
+            "schema_version",
+            "document_id",
+            "goal_id",
+            "round_id",
+            "assignment_binding",
+            "review_result_binding",
+            "reviewer",
+            "reviewed_at",
+            "decision",
+            "findings",
+            "external_independence_claimed",
+            "claim_boundary",
+        }
+        or independent.get("schema_version") != "1.0"
+        or independent.get("document_id")
+        != "WS-FP048-R002-SEQ99-100-INDEPENDENT-REVIEW-20260826-R001"
+        or independent.get("goal_id") != authority.GOAL_ID
+        or independent.get("round_id") != "R001"
+        or independent.get("assignment_binding") != assignment_row
+        or independent.get("review_result_binding") != result_row
+        or independent.get("decision")
+        != "CONCUR_INTERNAL_ZERO_CREDIT_COMPLETION_ONLY"
+        or independent.get("findings") != []
+        or independent.get("external_independence_claimed") is not False
+        or independent.get("claim_boundary") != authority.ZERO_CREDIT_BOUNDARY
+        or not isinstance(independent_reviewer, dict)
+        or set(independent_reviewer) != {"id", "task_id"}
+        or not all(
+            isinstance(independent_reviewer.get(key), str)
+            and independent_reviewer[key]
+            for key in ("id", "task_id")
+        )
+        or independent_reviewer["id"] == result_reviewer["id"]
+        or independent_reviewer["task_id"] == result_reviewer["task_id"]
+    ):
+        raise RuntimeError("completion independent review differs")
+
+    verification = receipt.get("verification_evidence")
+    window = verification.get("execution_window") if isinstance(verification, dict) else None
+    verification_end = (
+        _fp048_r002_completion_time(window.get("ended_at"), "verification ended_at")
+        if isinstance(window, dict)
+        else None
+    )
+    result_at = _fp048_r002_completion_time(
+        result.get("reviewed_at"), "review result reviewed_at"
+    )
+    independent_at = _fp048_r002_completion_time(
+        independent.get("reviewed_at"), "independent review reviewed_at"
+    )
+    if (
+        verification_end is None
+        or not verification_end <= result_at <= independent_at
+    ):
+        raise RuntimeError("completion review chronology differs")
+    evidence = authority.CompletionEvidence(
+        verification=verification,
+        receipt=receipt,
+        receipt_bytes=receipt_raw,
+        receipt_binding=receipt_binding,
+        review_binding=copy.deepcopy(review_binding),
+        latest_authority_at=independent["reviewed_at"],
+    )
+    return evidence, copy.deepcopy(source_binding)
+
+
+def _fp048_r002_completion_evidence_authority(
+    root: Path,
+    checkpoint: dict[str, Any],
+    authority: Any,
+    update: dict[str, Any],
+    completion: dict[str, Any],
+    restored_raw: bytes,
+    restored: dict[str, Any],
+) -> tuple[Any, dict[str, Any]]:
+    """Load the exact shifted seq100/101 receipt and independent review."""
+
+    receipt_relative = Path(authority.COMPLETION_RECEIPT_REL)
+    receipt_raw, receipt = _fp048_r002_completion_private_json(
+        root,
+        receipt_relative,
+        authority,
+        "FP048 R002 completion receipt",
+    )
+    receipt_binding = {
+        "role": authority.COMPLETION_ROLE,
+        "document_id": authority.COMPLETION_DOCUMENT_ID,
+        "path": receipt_relative.as_posix(),
+        "file_sha256": authority.sha256_bytes(receipt_raw),
+    }
+    if (
+        update.get("producer_completion_receipt_binding") != receipt_binding
+        or completion.get("completion_receipt_binding") != receipt_binding
+        or completion.get("completion_evidence_bindings")
+        != {authority.COMPLETION_ROLE: receipt_binding}
+        or receipt.get("document_id") != authority.COMPLETION_DOCUMENT_ID
+        or receipt.get("goal_id") != authority.GOAL_ID
+        or receipt.get("completion_boundary") != authority.ZERO_CREDIT_BOUNDARY
+    ):
+        raise RuntimeError("completion receipt binding differs")
+
+    role_paths = {
+        "assignment": getattr(authority, "REVIEW_ASSIGNMENT_REL", None),
+        "review_result": getattr(authority, "REVIEW_RESULT_REL", None),
+        "independent_review": getattr(authority, "INDEPENDENT_REVIEW_REL", None),
+    }
+    if any(not isinstance(relative, Path) for relative in role_paths.values()):
+        raise RuntimeError("completion review path authority differs")
+    review_raw: dict[str, bytes] = {}
+    review_documents: dict[str, dict[str, Any]] = {}
+    expected_review_binding: dict[str, dict[str, Any]] = {}
+    for role, relative in role_paths.items():
+        raw, document = _fp048_r002_completion_private_json(
+            root,
+            relative,
+            authority,
+            f"FP048 R002 completion {role}",
+        )
+        review_raw[role] = raw
+        review_documents[role] = document
+        expected_review_binding[role] = {
+            "path": relative.as_posix(),
+            "sha256": authority.sha256_bytes(raw),
+            "byte_length": len(raw),
+        }
+    if update.get("transition_control_review_binding") != expected_review_binding:
+        raise RuntimeError("completion review binding differs")
+
+    expected_assignment = authority.expected_review_assignment(
+        root,
+        restored_raw,
+        restored,
+        receipt_raw,
+    )
+    assignment = review_documents["assignment"]
+    verification = receipt.get("verification_evidence")
+    window = (
+        verification.get("execution_window")
+        if isinstance(verification, dict)
+        else None
+    )
+    verification_end = (
+        _fp048_r002_completion_time(
+            window.get("ended_at"),
+            "verification ended_at",
+        )
+        if isinstance(window, dict)
+        else None
+    )
+    if (
+        verification_end is None
+        or assignment != expected_assignment
+        or review_raw["assignment"] != authority.json_bytes(expected_assignment)
+    ):
+        raise RuntimeError("completion review assignment differs")
+    reviewed = authority.validate_review_authority(
+        expected_assignment,
+        review_raw["assignment"],
+        review_documents["review_result"],
+        review_raw["review_result"],
+        review_documents["independent_review"],
+        review_raw["independent_review"],
+        verification_ended_at=verification_end,
+    )
+    reviewed_binding = getattr(reviewed, "binding", None)
+    latest_review_at = getattr(reviewed, "latest_review_at", None)
+    source_binding = assignment.get("source_checkpoint_binding")
+    expected_source_binding = {
+        "path": authority.CHECKPOINT_REL.as_posix(),
+        "sha256": authority.sha256_bytes(restored_raw),
+        "byte_length": len(restored_raw),
+    }
+    if (
+        reviewed_binding != expected_review_binding
+        or not isinstance(latest_review_at, str)
+        or not isinstance(source_binding, dict)
+        or {
+            key: source_binding.get(key)
+            for key in expected_source_binding
+        }
+        != expected_source_binding
+    ):
+        raise RuntimeError("completion independent review authority differs")
+    evidence = authority.CompletionEvidence(
+        verification=verification,
+        receipt=receipt,
+        receipt_bytes=receipt_raw,
+        receipt_binding=receipt_binding,
+        review_binding=copy.deepcopy(expected_review_binding),
+        latest_authority_at=latest_review_at,
+    )
+    return evidence, copy.deepcopy(expected_source_binding)
+
+
+def validate_fp048_r002_completion_seq100_101(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Validate the adjacent internal-only FP048 R002 seq100/101 completion."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list):
+        return ["FP048 R002 seq100/101 completion history is malformed"]
+    if (
+        len(history) > FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE
+        and isinstance(history[98], Mapping)
+        and history[98].get("event_id")
+        == FP048_R002_SUCCESSOR_CORRECTION_EVENT_ID
+    ):
+        return validate_fp048_r002_successor_seq99_102(root, checkpoint)
+    if len(history) < FP048_R002_COMPLETION_EVIDENCE_SEQUENCE:
+        return []
+    if len(history) == FP048_R002_COMPLETION_EVIDENCE_SEQUENCE:
+        return ["FP048 R002 seq100 evidence transaction lacks adjacent seq101 completion"]
+    if len(history) != FP048_R002_COMPLETION_SEQUENCE:
+        return ["FP048 R002 seq100/101 descendant dispatch differs"]
+    source, update, completion = history[98:101]
+    if not all(isinstance(event, dict) for event in (source, update, completion)):
+        return ["FP048 R002 seq99/100/101 completion events are malformed"]
+    if (
+        type(source.get("sequence")) is not int
+        or source.get("sequence") != FP048_R002_COMPLETION_SOURCE_SEQUENCE
+        or source.get("event_id") != FP048_R002_R010_STARTED_EVENT_ID
+        or source.get("event_type") != "GOAL_STARTED"
+        or type(update.get("sequence")) is not int
+        or update.get("sequence") != FP048_R002_COMPLETION_EVIDENCE_SEQUENCE
+        or update.get("event_id") != FP048_R002_COMPLETION_EVIDENCE_EVENT_ID
+        or update.get("event_type") != "CANONICAL_BINDINGS_UPDATED"
+        or type(completion.get("sequence")) is not int
+        or completion.get("sequence") != FP048_R002_COMPLETION_SEQUENCE
+        or completion.get("event_id") != FP048_R002_COMPLETION_EVENT_ID
+        or completion.get("event_type") != "GOAL_COMPLETED"
+        or update.get("previous_event_sha256") != source.get("event_sha256")
+        or completion.get("previous_event_sha256") != update.get("event_sha256")
+        or completion.get("canonical_update_event_sha256")
+        != update.get("event_sha256")
+        or source.get("event_sha256") != continuation.event_sha256(source)
+        or update.get("event_sha256") != continuation.event_sha256(update)
+        or completion.get("event_sha256")
+        != continuation.event_sha256(completion)
+    ):
+        return ["FP048 R002 seq99/100/101 identity or adjacency differs"]
+    try:
+        update_at = _fp048_r002_completion_time(
+            update.get("occurred_at"), "seq100 occurred_at"
+        )
+        completion_at = _fp048_r002_completion_time(
+            completion.get("occurred_at"), "seq101 occurred_at"
+        )
+        if completion_at != update_at + timedelta(seconds=1):
+            raise RuntimeError("seq100/101 chronology differs")
+        authority = _fp048_r002_completion_authority()
+        restored_raw = authority.reconstructed_seq99_checkpoint_bytes(
+            root,
+            checkpoint,
+        )
+        if not isinstance(restored_raw, bytes) or not restored_raw:
+            raise RuntimeError("seq99 public inverse bytes differ")
+        restored = json.loads(restored_raw)
+        if restored_raw != authority.checkpoint_bytes(restored):
+            raise RuntimeError("seq99 public inverse is not canonical")
+        restored_history = restored.get("goal_execution", {}).get(
+            "transition_history"
+        )
+        if (
+            not isinstance(restored_history, list)
+            or len(restored_history) != FP048_R002_COMPLETION_SOURCE_SEQUENCE
+            or not isinstance(restored_history[-1], dict)
+        ):
+            raise RuntimeError("seq99 public inverse history differs")
+        event_source_binding = {
+            "path": authority.CHECKPOINT_REL.as_posix(),
+            "sha256": authority.sha256_bytes(restored_raw),
+            "byte_length": len(restored_raw),
+        }
+        review_source_binding = copy.deepcopy(event_source_binding)
+        if update.get("source_checkpoint_binding") != event_source_binding:
+            raise RuntimeError("seq99 source CAS differs")
+        started_authority = _fp048_r002_r010_started_authority()
+        started_authority.require_started_checkpoint(
+            root,
+            restored,
+            require_live_snapshot=False,
+            run_external_validators=False,
+        )
+        evidence, source_binding = _fp048_r002_completion_evidence_authority(
+            root,
+            checkpoint,
+            authority,
+            update,
+            completion,
+            restored_raw,
+            restored,
+        )
+        if source_binding != review_source_binding:
+            raise RuntimeError("seq99 review source CAS differs")
+        authority.validate_projection(
+            root,
+            restored,
+            checkpoint,
+            evidence,
+        )
+        if not _fp048_r002_zero_credit_boundary_matches(checkpoint):
+            raise RuntimeError("completion release boundary differs")
+    except Exception as exc:
+        return [f"FP048 R002 seq100/101 completion authority differs: {exc}"]
+    return []
+
+
+def validate_fp048_r002_completion_seq99_100(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Compatibility alias; only the shifted seq100/101 pair is authoritative."""
+
+    return validate_fp048_r002_completion_seq100_101(root, checkpoint)
+
+
+def validate_fp048_r002_completion_seq98_99(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Legacy alias retained without authorizing the retired completion path."""
+
+    return validate_fp048_r002_completion_seq100_101(root, checkpoint)
+
+
+def _fp048_r002_noncredit_successor_edges(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> dict[str, list[dict[str, Any]]] | None:
+    """Load only the exact reviewed seq90 zero-credit byte successors."""
+
+    if not _fp048_r002_control_reanchor_is_declared(checkpoint):
+        return {"modified": [], "added": []}
+    event = _fp048_r002_control_reanchor_event(checkpoint)
+    if event is None:
+        return None
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list):
+        return None
+    require_live_successor = (
+        len(history) == FP048_R002_CONTROL_REANCHOR_SEQUENCE
+    )
+    try:
+        if len(history) >= FP048_R002_CONTROL_CORRECTION_SEQUENCE:
+            correction = _fp048_r002_control_correction_event(checkpoint)
+            if correction is None:
+                return None
+            edges = copy.deepcopy(event.get("noncredit_successor_edges"))
+            if (
+                not isinstance(edges, dict)
+                or continuation.canonical_json_sha256(edges)
+                != FP048_R002_NONCREDIT_EDGE_SET_SHA256
+                or len(edges.get("modified", [])) != 32
+                or len(edges.get("added", [])) != 3
+            ):
+                return None
+            source_membership = {
+                row.get("path"): kind == "modified"
+                for kind in ("modified", "added")
+                for row in edges[kind]
+                if isinstance(row, dict)
+            }
+        else:
+            module = _fp048_r002_control_reanchor_module()
+            source_membership = getattr(
+                module,
+                "SOURCE_PRODUCT_MEMBERSHIP",
+                None,
+            )
+            require_checkpoint = getattr(
+                module,
+                "require_control_reanchored_checkpoint",
+                None,
+            )
+            load_edges = getattr(
+                module,
+                "validated_noncredit_successor_edges",
+                None,
+            )
+            if not callable(require_checkpoint) or not callable(load_edges):
+                return None
+            require_checkpoint(root, checkpoint)
+            edges = load_edges(root, checkpoint)
+    except Exception:
+        return None
+    if (
+        not isinstance(edges, dict)
+        or set(edges) != {"modified", "added"}
+        or not isinstance(edges.get("modified"), list)
+        or not isinstance(edges.get("added"), list)
+        or event.get("noncredit_successor_edges") != edges
+        or not isinstance(source_membership, dict)
+        or not source_membership
+        or any(
+            not isinstance(relative, str) or type(is_member) is not bool
+            for relative, is_member in source_membership.items()
+        )
+    ):
+        return None
+
+    if require_live_successor:
+        review_binding = event.get("transition_control_review_binding")
+        if (
+            not isinstance(review_binding, dict)
+            or set(review_binding)
+            != {"assignment", "review_result", "independent_review"}
+        ):
+            return None
+        for role, row in review_binding.items():
+            relative = row.get("path") if isinstance(row, dict) else None
+            path = _exact_repo_file(root, relative)
+            if (
+                not isinstance(row, dict)
+                or set(row) != {"path", "sha256", "byte_length"}
+                or not isinstance(relative, str)
+                or path is None
+                or _contains_symlink(root, relative)
+                or row.get("sha256") != continuation.sha256_file(path)
+                or row.get("byte_length") != path.stat().st_size
+                or not isinstance(role, str)
+            ):
+                return None
+
+    seen: set[str] = set()
+    observed_membership: dict[str, bool] = {}
+    for kind in ("modified", "added"):
+        rows = edges[kind]
+        paths = [row.get("path") for row in rows if isinstance(row, dict)]
+        if (
+            len(paths) != len(rows)
+            or any(not isinstance(relative, str) for relative in paths)
+            or paths != sorted(paths)
+            or len(set(paths)) != len(paths)
+            or seen.intersection(paths)
+        ):
+            return None
+        seen.update(paths)
+        observed_membership.update(
+            {relative: kind == "modified" for relative in paths}
+        )
+        for row in rows:
+            expected_fields = (
+                {"path", "predecessor", "successor"}
+                if kind == "modified"
+                else {"path", "successor"}
+            )
+            if set(row) != expected_fields:
+                return None
+            relative = row["path"]
+            bindings = [row["successor"]]
+            if kind == "modified":
+                bindings.insert(0, row["predecessor"])
+            if any(
+                not isinstance(binding, dict)
+                or set(binding) != {"path", "sha256", "byte_length"}
+                or binding.get("path") != relative
+                or not isinstance(binding.get("sha256"), str)
+                or continuation.SHA256_RE.fullmatch(binding["sha256"]) is None
+                or not isinstance(binding.get("byte_length"), int)
+                or isinstance(binding.get("byte_length"), bool)
+                or binding["byte_length"] < 0
+                for binding in bindings
+            ):
+                return None
+            if kind == "modified" and (
+                row["predecessor"]["sha256"] == row["successor"]["sha256"]
+                and row["predecessor"]["byte_length"]
+                == row["successor"]["byte_length"]
+            ):
+                return None
+            if require_live_successor:
+                live = _exact_repo_file(root, relative)
+                if (
+                    live is None
+                    or _contains_symlink(root, relative)
+                    or live.stat().st_size
+                    != row["successor"]["byte_length"]
+                    or continuation.sha256_file(live)
+                    != row["successor"]["sha256"]
+                ):
+                    return None
+    if observed_membership != source_membership:
+        return None
+    return copy.deepcopy(edges)
+
+
+def _fp048_r002_control_reanchor_module() -> Any:
+    return importlib.import_module(FP048_R002_CONTROL_REANCHOR_MODULE)
+
+
+def _fp048_r002_frozen_seq85_to_seq87_successor_edges(
+) -> dict[str, list[dict[str, Any]]]:
+    """Return the Goal-Graph-local sealed pre-seq90 edge set."""
+
+    modified = [
+        {
+            "path": path,
+            "predecessor": {
+                "path": path,
+                "sha256": predecessor_sha256,
+                "byte_length": predecessor_length,
+            },
+            "scope": scope,
+            "successor": {
+                "path": path,
+                "sha256": successor_sha256,
+                "byte_length": successor_length,
+            },
+        }
+        for (
+            path,
+            scope,
+            predecessor_sha256,
+            predecessor_length,
+            successor_sha256,
+            successor_length,
+        ) in FP048_R002_SEQ85_TO_SEQ87_MODIFIED_BINDINGS
+    ]
+    added = [
+        {
+            "path": path,
+            "scope": scope,
+            "successor": {
+                "path": path,
+                "sha256": successor_sha256,
+                "byte_length": successor_length,
+            },
+        }
+        for (
+            path,
+            scope,
+            successor_sha256,
+            successor_length,
+        ) in FP048_R002_SEQ85_TO_SEQ87_ADDED_BINDINGS
+    ]
+    edges = {"modified": modified, "added": added}
+    observed_credit = {
+        row["path"]
+        for rows in edges.values()
+        for row in rows
+        if row["scope"] == "FP046_R002_DIRECT_INTERNAL_STATIC_ONLY"
+    }
+    observed_noncredit = {
+        row["path"]
+        for rows in edges.values()
+        for row in rows
+        if row["scope"] == "CONCURRENT_LIVE_MANAGED_NONCREDIT"
+    }
+    observed_added = {row["path"] for row in added}
+    if (
+        observed_credit != FP048_R002_SEQ87_REVIEWED_CREDIT_PATHS
+        or observed_noncredit != FP048_R002_SEQ87_REVIEWED_NONCREDIT_PATHS
+        or observed_added != FP048_R002_SEQ87_REVIEWED_ADDED_PATHS
+        or len(modified) != 11
+        or len(added) != 4
+        or [row["path"] for row in modified]
+        != sorted(row["path"] for row in modified)
+        or [row["path"] for row in added]
+        != sorted(row["path"] for row in added)
+        or continuation.canonical_json_sha256(edges)
+        != FP048_R002_SEQ85_TO_SEQ87_EDGE_SET_SHA256
+    ):
+        raise ValueError("seq85-to-seq87 frozen edge set differs")
+    return edges
+
+
+def _fp048_r002_seq85_to_seq87_successor_edges(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> dict[str, list[dict[str, Any]]] | None:
+    """Load the exact reviewed seq85-to-seq87 completion successors."""
+
+    if not _fp048_r002_control_reanchor_is_declared(checkpoint):
+        return {"modified": [], "added": []}
+    try:
+        state = checkpoint.get("goal_execution")
+        history = (
+            state.get("transition_history")
+            if isinstance(state, dict)
+            else None
+        )
+        if not isinstance(history, list):
+            return None
+        if len(history) >= FP048_R002_CONTROL_CORRECTION_SEQUENCE:
+            if _fp048_r002_control_correction_event(checkpoint) is None:
+                return None
+            edges = _fp048_r002_frozen_seq85_to_seq87_successor_edges()
+        else:
+            module = _fp048_r002_control_reanchor_module()
+            load_edges = getattr(
+                module,
+                "validated_seq85_to_seq87_successor_edges",
+                None,
+            )
+            if not callable(load_edges):
+                return None
+            edges = load_edges(root, checkpoint)
+    except Exception:
+        return None
+    if (
+        not isinstance(edges, dict)
+        or set(edges) != {"modified", "added"}
+        or not isinstance(edges.get("modified"), list)
+        or not isinstance(edges.get("added"), list)
+        or len(edges["modified"]) != 11
+        or len(edges["added"]) != 4
+    ):
+        return None
+    seen: set[str] = set()
+    for kind in ("modified", "added"):
+        rows = edges[kind]
+        paths = [row.get("path") for row in rows if isinstance(row, dict)]
+        if (
+            len(paths) != len(rows)
+            or any(not isinstance(relative, str) for relative in paths)
+            or paths != sorted(paths)
+            or len(set(paths)) != len(paths)
+            or seen.intersection(paths)
+        ):
+            return None
+        seen.update(paths)
+        for row in rows:
+            expected_fields = (
+                {"path", "predecessor", "scope", "successor"}
+                if kind == "modified"
+                else {"path", "scope", "successor"}
+            )
+            if set(row) != expected_fields or row.get("scope") not in {
+                "CONCURRENT_LIVE_MANAGED_NONCREDIT",
+                "FP046_R002_DIRECT_INTERNAL_STATIC_ONLY",
+            }:
+                return None
+            relative = row["path"]
+            bindings = [row["successor"]]
+            if kind == "modified":
+                bindings.insert(0, row["predecessor"])
+            if any(
+                not isinstance(binding, dict)
+                or set(binding) != {"path", "sha256", "byte_length"}
+                or binding.get("path") != relative
+                or not isinstance(binding.get("sha256"), str)
+                or continuation.SHA256_RE.fullmatch(binding["sha256"])
+                is None
+                or not isinstance(binding.get("byte_length"), int)
+                or isinstance(binding.get("byte_length"), bool)
+                or binding["byte_length"] < 0
+                for binding in bindings
+            ):
+                return None
+            if kind == "modified" and row["predecessor"] == row["successor"]:
+                return None
+    return copy.deepcopy(edges)
+
+
+_FP048_R002_REPOSITORY_CONTEXT_CALL_CACHE: ContextVar[
+    dict[
+        tuple[Any, ...],
+        tuple[dict[str, Any], Any],
+    ]
+    | None
+] = ContextVar(
+    "_FP048_R002_REPOSITORY_CONTEXT_CALL_CACHE",
+    default=None,
+)
+_FP048_R002_REPOSITORY_CONTEXT_CACHE_MISS = object()
+
+
+def _fp048_r002_overlay_reviewed_control_successors(
+    reviewed_bindings: list[dict[str, Any]],
+    authority: Any,
+    reviewed_control: Any,
+) -> tuple[list[dict[str, Any]], tuple[Path, ...]] | None:
+    """Overlay one exact, zero-credit reviewed control cohort."""
+
+    control_paths = getattr(authority, "REVIEWED_CONTROL_PATHS", ())
+    bindings = (
+        reviewed_control.get("bindings")
+        if isinstance(reviewed_control, dict)
+        else None
+    )
+    credit = (
+        reviewed_control.get("credit_boundary")
+        if isinstance(reviewed_control, dict)
+        else None
+    )
+    if (
+        not isinstance(reviewed_control, dict)
+        or set(reviewed_control)
+        != {"authority_label", "bindings", "credit_boundary"}
+        or reviewed_control.get("authority_label")
+        != "NONCREDIT_REVIEWED_CONTROL_CONTEXT_ONLY"
+        or not isinstance(control_paths, tuple)
+        or not control_paths
+        or len(set(control_paths)) != len(control_paths)
+        or any(not isinstance(path, Path) for path in control_paths)
+        or not isinstance(bindings, list)
+        or len(bindings) != len(control_paths)
+        or not isinstance(credit, dict)
+        or set(credit)
+        != {
+            "actual_device_test_credit_delta",
+            "deployment_credit_delta",
+            "external_review_credit_delta",
+            "formal_test_credit_delta",
+            "implementation_completion_credit_delta",
+            "release_credit_delta",
+        }
+        or any(type(value) is not int or value != 0 for value in credit.values())
+    ):
+        return None
+    expected_paths = [path.as_posix() for path in control_paths]
+    if [binding.get("path") for binding in bindings if isinstance(binding, dict)] != expected_paths:
+        return None
+    by_path = {
+        binding.get("path"): binding
+        for binding in bindings
+        if isinstance(binding, dict)
+        and set(binding) == {"path", "sha256", "byte_length"}
+        and isinstance(binding.get("sha256"), str)
+        and continuation.SHA256_RE.fullmatch(binding["sha256"]) is not None
+        and type(binding.get("byte_length")) is int
+        and binding["byte_length"] >= 0
+    }
+    if len(by_path) != len(control_paths):
+        return None
+    overlaid = [
+        binding
+        for binding in reviewed_bindings
+        if binding.get("path") not in by_path
+    ]
+    overlaid.extend(copy.deepcopy(bindings))
+    return overlaid, control_paths
+
+
+def _fp048_r002_reviewed_control_phase_overlays(
+    root: Path,
+    historical_authority: Any | None,
+    historical_checkpoint: Mapping[str, Any],
+    active_authority: Any | None,
+    active_checkpoint: Mapping[str, Any] | None,
+    *,
+    active_require_live_snapshot: bool,
+) -> tuple[Any | None, Any | None]:
+    """Read predecessor rows historically and only the active rows live."""
+
+    historical = (
+        historical_authority.noncredit_reviewed_control_successor_bindings(
+            root,
+            historical_checkpoint,
+            require_live_snapshot=active_checkpoint is None,
+        )
+        if historical_authority is not None
+        else None
+    )
+    active = (
+        active_authority.noncredit_reviewed_control_successor_bindings(
+            root,
+            active_checkpoint,
+            require_live_snapshot=active_require_live_snapshot,
+        )
+        if active_authority is not None and active_checkpoint is not None
+        else None
+    )
+    return historical, active
+
+
+def _compute_fp048_r002_repository_context_live_successors(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> dict[str, str] | None:
+    """Return the exact stage-owned aggregate-resealed live content set.
+
+    The seq96 R008 correction reseals the complete managed/Git-visible set as
+    one zero-credit repository-context aggregate.  Seq97 then reseals the
+    snapshot-hygiene successor. Seq98 seals the failed R009 execution, then
+    seq99 corrects the failed R010 dispatch before seq100 start and adjacent
+    seq101/102 completion. Only exact physical stages supply authority.
+    """
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    repository_checkpoint = checkpoint
+    repository_history = history
+    active_successor_checkpoint: dict[str, Any] | None = None
+    active_successor_authority: Any | None = None
+    active_successor_require_live_snapshot = True
+    if (
+        isinstance(history, list)
+        and len(history) > FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE
+        and isinstance(history[98], Mapping)
+        and history[98].get("event_id")
+        == FP048_R002_SUCCESSOR_CORRECTION_EVENT_ID
+    ):
+        try:
+            top_level_successor_is_live_checkpoint = (
+                _fp048_r002_successor_is_live_checkpoint(root, checkpoint)
+            )
+            source = _fp048_r002_successor_seq98_source(
+                root,
+                checkpoint,
+                require_live_snapshot=top_level_successor_is_live_checkpoint,
+            )
+            if source is None:
+                return None
+            active_successor_authority = (
+                _fp048_r002_successor_correction_authority()
+            )
+            active_successor_checkpoint = checkpoint
+            active_successor_require_live_snapshot = (
+                top_level_successor_is_live_checkpoint
+            )
+            if len(history) == FP048_R002_SUCCESSOR_COMPLETION_SEQUENCE:
+                completion_authority = (
+                    _fp048_r002_successor_completion_authority()
+                )
+                active_successor_checkpoint = _fp048_r002_successor_inverse(
+                    completion_authority.reconstructed_seq100_checkpoint_bytes(
+                        root,
+                        checkpoint,
+                    ),
+                    expected_sequence=FP048_R002_SUCCESSOR_STARTED_SEQUENCE,
+                )
+                active_successor_require_live_snapshot = False
+        except Exception:
+            return None
+        checkpoint = source
+        state = checkpoint.get("goal_execution")
+        history = (
+            state.get("transition_history")
+            if isinstance(state, dict)
+            else None
+        )
+    if (
+        isinstance(history, list)
+        and len(history) == FP048_R002_COMPLETION_SEQUENCE
+    ):
+        try:
+            if validate_fp048_r002_completion_seq100_101(root, checkpoint):
+                return None
+            completion_authority = _fp048_r002_completion_authority()
+            source_raw = (
+                completion_authority.reconstructed_seq99_checkpoint_bytes(
+                    root,
+                    checkpoint,
+                )
+            )
+            source = json.loads(source_raw)
+            if (
+                not isinstance(source_raw, bytes)
+                or not source_raw
+                or not isinstance(source, dict)
+                or source_raw != completion_authority.checkpoint_bytes(source)
+                or not _fp048_r002_zero_credit_boundary_matches(checkpoint)
+            ):
+                return None
+        except Exception:
+            return None
+        return _fp048_r002_repository_context_live_successors(root, source)
+    if not isinstance(history, list) or len(history) not in {
+        FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE,
+        FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE,
+        FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE,
+        FP048_R002_R010_STARTED_SEQUENCE,
+    }:
+        return None
+    r008_correction = _fp048_r002_seq96_r008_contract_correction_event(
+        checkpoint
+    )
+    if r008_correction is None:
+        return None
+    if len(history) == FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE:
+        correction = r008_correction
+        if not _fp048_r002_seq92_ready_projection_matches(
+            checkpoint,
+            correction,
+        ):
+            return None
+    elif len(history) == FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE:
+        correction = _fp048_r002_seq97_r009_contract_correction_event(
+            checkpoint
+        )
+        if correction is None:
+            return None
+        if not _fp048_r002_seq92_ready_projection_matches(
+            checkpoint,
+            correction,
+        ):
+            return None
+    else:
+        execution_authority = (
+            _fp048_r002_r009_execution_correction_authority()
+        )
+        correction = _fp048_r002_seq98_r009_execution_correction_event(
+            checkpoint,
+            execution_authority,
+        )
+        if correction is None:
+            return None
+        if len(history) == FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE:
+            if not _fp048_r002_seq92_ready_projection_matches(
+                checkpoint,
+                correction,
+            ):
+                return None
+        else:
+            receipt_binding = history[-1].get(
+                "implementation_start_gate_binding"
+            )
+            started = (
+                _fp048_r002_seq99_r010_started_event(
+                    checkpoint,
+                    receipt_binding,
+                )
+                if isinstance(receipt_binding, dict)
+                else None
+            )
+            if (
+                started is None
+                or not _fp048_r002_seq93_in_progress_projection_matches(
+                    checkpoint,
+                    started,
+                )
+            ):
+                return None
+
+    repository_correction = correction
+    if active_successor_checkpoint is not None:
+        if (
+            not isinstance(repository_history, list)
+            or len(repository_history)
+            < FP048_R002_SUCCESSOR_CORRECTION_SEQUENCE
+            or not isinstance(repository_history[98], dict)
+        ):
+            return None
+        repository_correction = repository_history[98]
+    context = repository_correction.get("repository_context_reanchor")
+    before = context.get("before") if isinstance(context, dict) else None
+    after = context.get("after") if isinstance(context, dict) else None
+    snapshot = repository_checkpoint.get("working_tree_snapshot")
+    handoff = repository_checkpoint.get("session_handoff")
+    mirror = (
+        handoff.get("source_commit_or_snapshot")
+        if isinstance(handoff, dict)
+        else None
+    )
+    paths = (
+        snapshot.get("managed_changed_paths")
+        if isinstance(snapshot, dict)
+        else None
+    )
+    if (
+        not isinstance(context, dict)
+        or set(context) != {"before", "after"}
+        or not isinstance(before, dict)
+        or not isinstance(after, dict)
+        or set(after)
+        != {
+            "base_commit",
+            "branch",
+            "logical_branch",
+            "logical_branch_semantics",
+            "physical_git_branch",
+            "branch_mismatch_reason_code",
+            "current_head",
+            "managed_changed_path_count",
+            "path_set_sha256",
+            "content_set_sha256",
+        }
+        or not isinstance(snapshot, dict)
+        or not isinstance(mirror, dict)
+        or not isinstance(paths, list)
+        or paths != sorted(set(paths))
+        or any(
+            not isinstance(relative, str)
+            or not relative
+            or Path(relative).is_absolute()
+            or ".." in Path(relative).parts
+            for relative in paths
+        )
+    ):
+        return None
+    path_set_sha256 = hashlib.sha256(
+        ("\n".join(paths) + "\n").encode("utf-8")
+    ).hexdigest()
+    count = len(paths)
+    content_set_sha256 = snapshot.get("content_set_sha256")
+    if (
+        snapshot.get("managed_changed_path_count") != count
+        or snapshot.get("path_set_sha256") != path_set_sha256
+        or not isinstance(content_set_sha256, str)
+        or continuation.SHA256_RE.fullmatch(content_set_sha256) is None
+        or after.get("managed_changed_path_count") != count
+        or after.get("path_set_sha256") != path_set_sha256
+        or after.get("content_set_sha256") != content_set_sha256
+        or after.get("base_commit") != snapshot.get("base_head")
+        or after.get("branch") != after.get("logical_branch")
+        or after.get("physical_git_branch") == after.get("logical_branch")
+        or mirror.get("file_count") != count
+        or mirror.get("path_set_sha256") != path_set_sha256
+        or mirror.get("content_set_sha256") != content_set_sha256
+        or mirror.get("current_head") != after.get("current_head")
+        or mirror.get("base_commit") != after.get("base_commit")
+        or handoff.get("changed_files") != paths
+    ):
+        return None
+
+    resolved: list[tuple[str, Path]] = []
+    observed_size_by_path: dict[str, int] = {}
+    for relative in paths:
+        path = _exact_repo_file(root, relative)
+        if path is None:
+            continue
+        if _contains_symlink(root, relative):
+            return None
+        try:
+            observed = path.stat()
+        except OSError:
+            return None
+        resolved.append((relative, path))
+        observed_size_by_path[relative] = observed.st_size
+    authority_paths: list[str] = []
+    for binding in (
+        repository_correction.get("authorization_binding"),
+        *(
+            repository_correction.get(
+                "transition_control_review_binding", {}
+            ).values()
+            if isinstance(
+                repository_correction.get("transition_control_review_binding"),
+                dict,
+            )
+            else ()
+        ),
+        repository_history[-1].get("implementation_start_gate_binding")
+        if isinstance(repository_history, list)
+        and len(repository_history)
+        in {
+            FP048_R002_R010_STARTED_SEQUENCE,
+            FP048_R002_SUCCESSOR_STARTED_SEQUENCE,
+        }
+        and isinstance(repository_history[-1], dict)
+        else None,
+    ):
+        relative = binding.get("path") if isinstance(binding, dict) else None
+        if isinstance(relative, str):
+            authority_paths.append(relative)
+    for relative in sorted(set(authority_paths)):
+        path = _exact_repo_file(root, relative)
+        if path is None:
+            continue
+        try:
+            path.stat()
+        except OSError:
+            return None
+    active_successor_reviewed_control: Any | None = None
+    try:
+        r008_correction_authority = (
+            _fp048_r002_r008_contract_correction_authority()
+        )
+        if len(history) == FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE:
+            r008_correction_authority.require_contract_corrected_checkpoint(
+                root,
+                checkpoint,
+                require_live_snapshot=False,
+                run_external_validators=False,
+            )
+            snapshot_hygiene = None
+            reviewed_control = None
+            successor_reviewed_control = None
+            successor_control_authority = None
+        elif len(history) == FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE:
+            r009_correction_authority = (
+                _fp048_r002_r009_contract_correction_authority()
+            )
+            r009_correction_authority.require_snapshot_hygiene_corrected_checkpoint(
+                root,
+                checkpoint,
+                require_live_snapshot=False,
+                run_external_validators=False,
+            )
+            snapshot_hygiene = (
+                r009_correction_authority
+                .noncredit_snapshot_hygiene_successor_binding(root)
+            )
+            reviewed_control = (
+                r009_correction_authority
+                .noncredit_reviewed_control_successor_bindings(
+                    root,
+                    checkpoint,
+                    require_live_snapshot=True,
+                )
+            )
+            successor_reviewed_control = None
+            successor_control_authority = None
+        else:
+            r009_correction_authority = (
+                _fp048_r002_r009_contract_correction_authority()
+            )
+            successor_control_authority = (
+                _fp048_r002_r009_execution_correction_authority()
+            )
+            seq98_checkpoint = checkpoint
+            if len(history) == FP048_R002_R010_STARTED_SEQUENCE:
+                r010_started_authority = _fp048_r002_r010_started_authority()
+                r010_started_authority.require_started_checkpoint(
+                    root,
+                    checkpoint,
+                    require_live_snapshot=False,
+                    run_external_validators=False,
+                )
+                seq98_raw = r010_started_authority.reconstructed_seq98_checkpoint_bytes(
+                    root,
+                    checkpoint,
+                )
+                seq98_checkpoint = json.loads(seq98_raw)
+                if seq98_raw != successor_control_authority.canonical_seq98_checkpoint_bytes(
+                    root,
+                    seq98_checkpoint,
+                ):
+                    return None
+            successor_control_authority.require_start_gate_execution_corrected_checkpoint(
+                root,
+                seq98_checkpoint,
+                require_live_snapshot=False,
+                run_external_validators=False,
+            )
+            seq97_raw = successor_control_authority.reconstructed_seq97_checkpoint_bytes(
+                root,
+                seq98_checkpoint,
+            )
+            seq97_checkpoint = json.loads(seq97_raw)
+            if seq97_raw != r009_correction_authority.canonical_seq97_checkpoint_bytes(
+                root,
+                seq97_checkpoint,
+            ):
+                return None
+            snapshot_hygiene = (
+                r009_correction_authority
+                .noncredit_snapshot_hygiene_successor_binding(root)
+            )
+            reviewed_control = (
+                r009_correction_authority
+                .noncredit_reviewed_control_successor_bindings(
+                    root,
+                    seq97_checkpoint,
+                    require_live_snapshot=False,
+                )
+            )
+            successor_reviewed_control = None
+        (
+            successor_reviewed_control,
+            active_successor_reviewed_control,
+        ) = _fp048_r002_reviewed_control_phase_overlays(
+            root,
+            successor_control_authority,
+            checkpoint,
+            active_successor_authority,
+            active_successor_checkpoint,
+            active_require_live_snapshot=active_successor_require_live_snapshot,
+        )
+        reviewed_product = (
+            r008_correction_authority.noncredit_fp023_product_successor_bindings(
+                root
+            )
+        )
+    except Exception:
+        return None
+
+    expected_product_paths = getattr(
+        r008_correction_authority,
+        "NONCREDIT_FP023_PRODUCT_PATHS",
+        None,
+    )
+    reviewed_bindings = (
+        reviewed_product.get("bindings")
+        if isinstance(reviewed_product, dict)
+        else None
+    )
+    credit_boundary = (
+        reviewed_product.get("credit_boundary")
+        if isinstance(reviewed_product, dict)
+        else None
+    )
+    if (
+        not isinstance(expected_product_paths, tuple)
+        or len(expected_product_paths) != 15
+        or len(set(expected_product_paths)) != 15
+        or any(not isinstance(path, Path) for path in expected_product_paths)
+        or not isinstance(reviewed_product, dict)
+        or set(reviewed_product)
+        != {"authority_label", "bindings", "credit_boundary"}
+        or reviewed_product.get("authority_label")
+        != "NONCREDIT_REPOSITORY_CONTEXT_ONLY"
+        or not isinstance(reviewed_bindings, list)
+        or len(reviewed_bindings) != 15
+        or not isinstance(credit_boundary, dict)
+        or set(credit_boundary)
+        != {
+            "actual_device_test_credit_delta",
+            "deployment_credit_delta",
+            "external_review_credit_delta",
+            "formal_test_credit_delta",
+            "implementation_completion_credit_delta",
+            "release_credit_delta",
+        }
+        or any(
+            type(value) is not int or value != 0
+            for value in credit_boundary.values()
+        )
+    ):
+        return None
+    if snapshot_hygiene is not None:
+        hygiene_binding = (
+            snapshot_hygiene.get("binding")
+            if isinstance(snapshot_hygiene, dict)
+            else None
+        )
+        hygiene_credit = (
+            snapshot_hygiene.get("credit_boundary")
+            if isinstance(snapshot_hygiene, dict)
+            else None
+        )
+        hygiene_relative = getattr(
+            r009_correction_authority,
+            "CORRECTED_SEQ96_TEST_REL",
+            None,
+        )
+        if (
+            not isinstance(snapshot_hygiene, dict)
+            or set(snapshot_hygiene)
+            != {"authority_label", "binding", "credit_boundary"}
+            or snapshot_hygiene.get("authority_label")
+            != "NONCREDIT_SNAPSHOT_HYGIENE_CONTROL_ONLY"
+            or not isinstance(hygiene_relative, Path)
+            or not isinstance(hygiene_binding, dict)
+            or set(hygiene_binding) != {"path", "sha256", "byte_length"}
+            or hygiene_binding.get("path") != hygiene_relative.as_posix()
+            or not isinstance(hygiene_binding.get("sha256"), str)
+            or continuation.SHA256_RE.fullmatch(hygiene_binding["sha256"])
+            is None
+            or type(hygiene_binding.get("byte_length")) is not int
+            or not isinstance(hygiene_credit, dict)
+            or set(hygiene_credit)
+            != {
+                "actual_device_test_credit_delta",
+                "deployment_credit_delta",
+                "external_review_credit_delta",
+                "formal_test_credit_delta",
+                "implementation_completion_credit_delta",
+                "release_credit_delta",
+            }
+            or any(
+                type(value) is not int or value != 0
+                for value in hygiene_credit.values()
+            )
+        ):
+            return None
+        control_bindings = (
+            reviewed_control.get("bindings")
+            if isinstance(reviewed_control, dict)
+            else None
+        )
+        control_credit = (
+            reviewed_control.get("credit_boundary")
+            if isinstance(reviewed_control, dict)
+            else None
+        )
+        control_paths = getattr(
+            r009_correction_authority,
+            "REVIEWED_CONTROL_PATHS",
+            None,
+        )
+        if (
+            not isinstance(reviewed_control, dict)
+            or set(reviewed_control)
+            != {"authority_label", "bindings", "credit_boundary"}
+            or reviewed_control.get("authority_label")
+            != "NONCREDIT_REVIEWED_CONTROL_CONTEXT_ONLY"
+            or not isinstance(control_paths, tuple)
+            or len(control_paths) != 14
+            or len(set(control_paths)) != 14
+            or any(not isinstance(path, Path) for path in control_paths)
+            or not isinstance(control_bindings, list)
+            or len(control_bindings) != len(control_paths)
+            or [
+                binding.get("path")
+                for binding in control_bindings
+                if isinstance(binding, dict)
+            ]
+            != [path.as_posix() for path in control_paths]
+            or not isinstance(control_credit, dict)
+            or set(control_credit)
+            != {
+                "actual_device_test_credit_delta",
+                "deployment_credit_delta",
+                "external_review_credit_delta",
+                "formal_test_credit_delta",
+                "implementation_completion_credit_delta",
+                "release_credit_delta",
+            }
+            or any(
+                type(value) is not int or value != 0
+                for value in control_credit.values()
+            )
+        ):
+            return None
+        control_by_path = {
+            binding.get("path"): binding
+            for binding in control_bindings
+            if isinstance(binding, dict)
+            and set(binding) == {"path", "sha256", "byte_length"}
+        }
+        if (
+            len(control_by_path) != len(control_paths)
+            or control_by_path.get(hygiene_relative.as_posix())
+            != hygiene_binding
+        ):
+            return None
+        reviewed_bindings = [*reviewed_bindings, *control_bindings]
+    successor_control_paths: set[Path] = set()
+    for overlay_authority, overlay_control in (
+        (successor_control_authority, successor_reviewed_control),
+        (active_successor_authority, active_successor_reviewed_control),
+    ):
+        if overlay_control is None:
+            continue
+        if overlay_authority is None:
+            return None
+        successor_overlay = _fp048_r002_overlay_reviewed_control_successors(
+            reviewed_bindings,
+            overlay_authority,
+            overlay_control,
+        )
+        if successor_overlay is None:
+            return None
+        reviewed_bindings, overlaid_paths = successor_overlay
+        successor_control_paths.update(overlaid_paths)
+    expected_reviewed_paths = {
+        path.as_posix() for path in expected_product_paths
+    }
+    if snapshot_hygiene is not None:
+        expected_reviewed_paths.update(
+            path.as_posix() for path in control_paths
+        )
+    expected_reviewed_paths.update(
+        path.as_posix() for path in successor_control_paths
+    )
+    reviewed_by_path = {
+        binding.get("path"): binding
+        for binding in reviewed_bindings
+        if isinstance(binding, dict)
+        and set(binding) == {"path", "sha256", "byte_length"}
+    }
+    if set(reviewed_by_path) != expected_reviewed_paths or any(
+        not isinstance(binding.get("sha256"), str)
+        or continuation.SHA256_RE.fullmatch(binding["sha256"]) is None
+        or type(binding.get("byte_length")) is not int
+        or observed_size_by_path.get(relative) != binding["byte_length"]
+        for relative, binding in reviewed_by_path.items()
+    ):
+        return None
+    reviewed_live = {
+        relative: binding["sha256"]
+        for relative, binding in reviewed_by_path.items()
+    }
+
+    try:
+        observed_snapshot_hashes = continuation.working_snapshot_hashes(
+            root,
+            paths,
+        )
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return None
+    if observed_snapshot_hashes != (path_set_sha256, content_set_sha256):
+        return None
+
+    live: dict[str, str] = {}
+    for relative, path in resolved:
+        digest = continuation.sha256_file(path)
+        binding = reviewed_by_path.get(relative)
+        if binding is None:
+            continue
+        if (
+            binding.get("sha256") != digest
+            or type(binding.get("byte_length")) is not int
+            or binding["byte_length"] != path.stat().st_size
+        ):
+            return None
+        live[relative] = digest
+    if set(live) != set(reviewed_by_path):
+        return None
+    if live != reviewed_live:
+        return None
+    return live
+
+
+def _fp048_r002_repository_context_cache_scalar(value: Any) -> Any:
+    if value is None or type(value) in {bool, int, float, str}:
+        return type(value).__name__, value
+    return type(value).__name__, id(value)
+
+
+def _fp048_r002_repository_context_call_cache_key(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> tuple[Any, ...]:
+    """Bind one call-local result to an exact object and cheap phase seal."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    tail = history[-1] if isinstance(history, list) and history else None
+    snapshot = checkpoint.get("working_tree_snapshot")
+    return (
+        root.resolve().as_posix(),
+        id(checkpoint),
+        id(state),
+        id(history),
+        len(history) if isinstance(history, list) else None,
+        id(tail),
+        _fp048_r002_repository_context_cache_scalar(
+            tail.get("sequence") if isinstance(tail, dict) else None
+        ),
+        _fp048_r002_repository_context_cache_scalar(
+            tail.get("event_id") if isinstance(tail, dict) else None
+        ),
+        _fp048_r002_repository_context_cache_scalar(
+            tail.get("event_sha256") if isinstance(tail, dict) else None
+        ),
+        _fp048_r002_repository_context_cache_scalar(
+            state.get("transition_history_anchor_sha256")
+            if isinstance(state, dict)
+            else None
+        ),
+        _fp048_r002_repository_context_cache_scalar(
+            state.get("goal_status") if isinstance(state, dict) else None
+        ),
+        _fp048_r002_repository_context_cache_scalar(
+            snapshot.get("path_set_sha256")
+            if isinstance(snapshot, dict)
+            else None
+        ),
+        _fp048_r002_repository_context_cache_scalar(
+            snapshot.get("content_set_sha256")
+            if isinstance(snapshot, dict)
+            else None
+        ),
+    )
+
+
+def _fp048_r002_repository_context_live_successors(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> dict[str, str] | None:
+    """Compute once per exact checkpoint phase during one top-level validate."""
+
+    cache = _FP048_R002_REPOSITORY_CONTEXT_CALL_CACHE.get()
+    if cache is None:
+        return _compute_fp048_r002_repository_context_live_successors(
+            root,
+            checkpoint,
+        )
+    key = _fp048_r002_repository_context_call_cache_key(root, checkpoint)
+    cached = cache.get(
+        key,
+        _FP048_R002_REPOSITORY_CONTEXT_CACHE_MISS,
+    )
+    if cached is not _FP048_R002_REPOSITORY_CONTEXT_CACHE_MISS:
+        cached_checkpoint, cached_result = cached
+        if cached_checkpoint is checkpoint:
+            return None if cached_result is None else dict(cached_result)
+    result = _compute_fp048_r002_repository_context_live_successors(
+        root,
+        checkpoint,
+    )
+    cache[key] = (
+        checkpoint,
+        None if result is None else dict(result),
+    )
+    return None if result is None else dict(result)
+
+
+def _compose_fp048_r002_reviewed_noncredit_successors(
+    root: Path,
+    checkpoint: dict[str, Any],
+    predecessor_artifacts: dict[str, tuple[str, str]],
+) -> dict[str, tuple[str, str]] | None:
+    """Compose reviewed zero-credit edges through the exact live aggregate."""
+
+    completion_edges = _fp048_r002_seq85_to_seq87_successor_edges(
+        root,
+        checkpoint,
+    )
+    edges = _fp048_r002_noncredit_successor_edges(root, checkpoint)
+    if completion_edges is None or edges is None:
+        return None
+    result = dict(predecessor_artifacts)
+    aggregate = _fp048_r002_repository_context_live_successors(
+        root,
+        checkpoint,
+    )
+    history = checkpoint.get("goal_execution", {}).get("transition_history")
+    aggregate_required = (
+        isinstance(history, list)
+        and len(history) >= FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE
+    )
+    if aggregate_required and aggregate is None:
+        return None
+    for successor_edges in (completion_edges, edges):
+        for row in successor_edges["modified"]:
+            relative = row["path"]
+            predecessor = result.get(relative)
+            if predecessor is None:
+                continue
+            before = row["predecessor"]["sha256"]
+            after = row["successor"]["sha256"]
+            if predecessor[1] != before:
+                return None
+            result[relative] = predecessor[0], after
+    if aggregate is not None:
+        for relative, predecessor in result.items():
+            terminal = aggregate.get(relative)
+            if terminal is not None:
+                result[relative] = predecessor[0], terminal
+    return result
+
+
+def _fp048_r002_reviewed_noncredit_edge(
+    root: Path,
+    checkpoint: dict[str, Any],
+    relative: str,
+    predecessor_sha256: str,
+) -> tuple[bool, tuple[str, str] | None]:
+    base = {relative: (predecessor_sha256, predecessor_sha256)}
+    composed = _compose_fp048_r002_reviewed_noncredit_successors(
+        root,
+        checkpoint,
+        base,
+    )
+    if composed is None:
+        return False, None
+    edge = composed[relative]
+    return True, edge if edge != base[relative] else None
+
+
+def validate_fp048_r002_reviewed_noncredit_successors(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    if not _fp048_r002_control_reanchor_is_declared(checkpoint):
+        return []
+    edges = _fp048_r002_noncredit_successor_edges(root, checkpoint)
+    history = checkpoint.get("goal_execution", {}).get("transition_history")
+    aggregate_required = (
+        isinstance(history, list)
+        and len(history) >= FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE
+    )
+    aggregate = (
+        _fp048_r002_repository_context_live_successors(root, checkpoint)
+        if aggregate_required
+        else {}
+    )
+    return (
+        []
+        if edges is not None and aggregate is not None
+        else ["FP048 R002 reviewed noncredit successor authority differs"]
+    )
 
 
 def _compose_completion_product_successors(
@@ -7557,6 +13816,7 @@ def _npc_single_admin_recovery_sealed_product_successor_artifacts(
     implementation = _npc_single_admin_recovery_completion_package(
         root,
         checkpoint,
+        require_current_managed_closure=False,
     )
     if implementation is None:
         return None
@@ -7632,7 +13892,10 @@ def _npc_single_admin_recovery_live_compatibility_artifacts(
         npc_artifacts, fp022_artifacts
     )
     current_security_artifacts = (
-        _current_security_database_compatibility_artifacts(root)
+        _current_security_database_compatibility_artifacts(
+            root,
+            checkpoint,
+        )
     )
     if composed is None or current_security_artifacts is None:
         return None
@@ -7644,6 +13907,7 @@ def _npc_single_admin_recovery_live_compatibility_artifacts(
 
 def _current_security_database_compatibility_artifacts(
     root: Path,
+    checkpoint: dict[str, Any] | None = None,
 ) -> dict[str, tuple[str, str]] | None:
     """Bind immutable completion bytes to exact current DB/security successors."""
 
@@ -7769,22 +14033,49 @@ def _current_security_database_compatibility_artifacts(
             or continuation.sha256_file(live_path) != source["sha256"]
         ):
             return None
-    artifacts: dict[str, tuple[str, str]] = {}
+    artifacts = {
+        relative: (
+            amendment["predecessor_sha256"],
+            amendment["successor_sha256"],
+        )
+        for relative, amendment in (
+            CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS.items()
+        )
+    }
+    reviewed_artifacts = (
+        _compose_fp048_r002_reviewed_noncredit_successors(
+            root,
+            checkpoint,
+            artifacts,
+        )
+        if checkpoint is not None
+        else artifacts
+    )
+    if reviewed_artifacts is None:
+        return None
     for relative, amendment in (
         CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS.items()
     ):
         live_path = _exact_repo_file(root, relative)
+        live_sha256 = (
+            continuation.sha256_file(live_path)
+            if live_path is not None
+            else None
+        )
         if (
             live_path is None
-            or live_path.stat().st_size != amendment["successor_byte_length"]
-            or continuation.sha256_file(live_path)
-            != amendment["successor_sha256"]
+            or live_sha256 is None
         ):
             return None
-        artifacts[relative] = (
-            amendment["predecessor_sha256"],
-            amendment["successor_sha256"],
-        )
+        expected_live_sha256 = reviewed_artifacts[relative][1]
+        if live_sha256 != expected_live_sha256:
+            return None
+        if (
+            expected_live_sha256 == amendment["successor_sha256"]
+            and live_path.stat().st_size
+            != amendment["successor_byte_length"]
+        ):
+            return None
     return artifacts
 
 
@@ -8279,6 +14570,30 @@ def validate_fp046_r014_successor_authority(
         and isinstance(row["worktree"].get("sha256"), str)
         and continuation.SHA256_RE.fullmatch(row["worktree"]["sha256"])
     }
+    reviewed_predecessors: dict[str, tuple[str, str]] = {}
+    for row in rows:
+        relative = row["path"]
+        amendment = FP046_FINAL_SOURCE_BINDING_AMENDMENTS.get(relative)
+        final_sha256 = (
+            amendment["current_sha256"]
+            if amendment is not None
+            else row["sha256"]
+        )
+        successor = successor_artifacts.get(relative)
+        if successor is not None and successor[0] != final_sha256:
+            return [f"FP046 final source binding differs: {relative}"], {}, {}
+        reviewed_predecessors[relative] = (
+            final_sha256,
+            successor[1] if successor is not None else final_sha256,
+        )
+    reviewed_successors = _compose_fp048_r002_reviewed_noncredit_successors(
+        root,
+        checkpoint,
+        reviewed_predecessors,
+    )
+    if reviewed_successors is None:
+        return ["FP048 R002 reviewed successor composition differs"], {}, {}
+
     final_bindings: dict[str, str] = {}
     transitions: dict[str, tuple[str, str]] = {}
     missing = unchanged = 0
@@ -8301,6 +14616,10 @@ def validate_fp046_r014_successor_authority(
         actual_sha256 = (
             continuation.sha256_file(path) if path is not None else None
         )
+        expected_before_review = (
+            successor[1] if successor is not None else final_sha256
+        )
+        expected_live_sha256 = reviewed_successors[relative][1]
         if (
             path is None
             or (
@@ -8310,19 +14629,11 @@ def validate_fp046_r014_successor_authority(
                     or row["sha256"] != amendment["sealed_sha256"]
                 )
             )
+            or actual_sha256 != expected_live_sha256
             or (
                 successor is None
-                and (
-                    actual_size != final_byte_length
-                    or actual_sha256 != final_sha256
-                )
-            )
-            or (
-                successor is not None
-                and (
-                    successor[0] != final_sha256
-                    or actual_sha256 != successor[1]
-                )
+                and expected_live_sha256 == expected_before_review
+                and actual_size != final_byte_length
             )
         ):
             return [f"FP046 final source binding differs: {relative}"], {}, {}
@@ -12865,6 +19176,7 @@ def _fp012_successor_product_artifacts(
             else None
         )
         controlled_successor = None
+        reviewed_successor = None
         if (
             isinstance(relative, str)
             and isinstance(after_sha256, str)
@@ -12890,6 +19202,23 @@ def _fp012_successor_product_artifacts(
                 )
             )
         if (
+            isinstance(relative, str)
+            and isinstance(after_sha256, str)
+            and live_sha256 != after_sha256
+            and snapshot_successor is None
+            and controlled_successor is None
+            and declared_successor is None
+        ):
+            reviewed = _compose_fp048_r002_reviewed_noncredit_successors(
+                root,
+                checkpoint,
+                {relative: (after_sha256, after_sha256)},
+            )
+            if reviewed is not None:
+                terminal = reviewed[relative][1]
+                if terminal != after_sha256 and terminal == live_sha256:
+                    reviewed_successor = after_sha256, terminal
+        if (
             path is None
             or not isinstance(after_sha256, str)
             or not continuation.SHA256_RE.fullmatch(after_sha256)
@@ -12898,6 +19227,7 @@ def _fp012_successor_product_artifacts(
                 and snapshot_successor is None
                 and controlled_successor is None
                 and declared_successor is None
+                and reviewed_successor is None
             )
             or change_kind not in {"ADDED", "MODIFIED"}
         ):
@@ -14168,12 +20498,35 @@ def _successor_lineage_reaches_live(
         and fp046 is not None
         and fp047[1] != fp046[0]
     ):
-        snapshot_overlay = _fp047_start_snapshot_successor(
+        current_snapshot_overlay = _fp047_start_snapshot_successor(
             root,
             checkpoint,
             relative,
             fp047[0],
         )
+        snapshot_overlay = current_snapshot_overlay
+        if current_snapshot_overlay != (fp047[0], fp046[1]):
+            reviewed_valid, reviewed_successor = (
+                _fp048_r002_reviewed_noncredit_edge(
+                    root,
+                    checkpoint,
+                    relative,
+                    fp046[1],
+                )
+            )
+            if (
+                not reviewed_valid
+                or reviewed_successor is None
+                or current_snapshot_overlay
+                != (fp047[0], reviewed_successor[1])
+                or reviewed_successor[0] != fp046[1]
+            ):
+                return False
+            # The exact reviewed edge proves that the old live terminal of the
+            # FP047 snapshot overlay was FP046's sealed final digest.  Retain
+            # that historical terminal so the reanchor edge is applied once,
+            # below, instead of accepting an aggregate snapshot-to-live jump.
+            snapshot_overlay = fp047[0], fp046[1]
         if (
             lineage_head != fp047[0]
             or snapshot_overlay != (fp047[0], fp046[1])
@@ -14204,6 +20557,18 @@ def _successor_lineage_reaches_live(
         if npc_successor[0] != lineage_head:
             return False
         lineage_head = npc_successor[1]
+    reviewed_valid, reviewed_successor = (
+        _fp048_r002_reviewed_noncredit_edge(
+            root,
+            checkpoint,
+            relative,
+            lineage_head,
+        )
+    )
+    if not reviewed_valid:
+        return False
+    if reviewed_successor is not None:
+        lineage_head = reviewed_successor[1]
     if live_sha256 == lineage_head:
         return True
     # Preserve the pre-existing exact FP047 start-snapshot overlay for paths
@@ -15684,6 +22049,1732 @@ def validate_fp022_completion_seq70_71(
     return errors
 
 
+def validate_fp046_r002_completion_seq86_87(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Validate the fixed FP-046 R002 producer/completion publication pair."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 86:
+        return []
+    if len(history) == 86:
+        return ["FP046 R002 seq86 producer transaction lacks adjacent seq87 completion"]
+    source, update, completion = history[84:87]
+    if not all(isinstance(event, dict) for event in (source, update, completion)):
+        return ["FP046 R002 seq85/86/87 completion events are malformed"]
+
+    errors: list[str] = []
+    parent_goal_id = R002_REOPEN_PARENT_GOAL_ID
+    fp048_goal_id = FP048_ANDROID_REPORT_GOAL_ID
+    changed_subjects = {
+        "IMPLEMENTATION_BACKLOG": ["FP-046", "FP-048"],
+        "IMPLEMENTATION_GAP": ["FP-046", "FP-048", "GAP-055", "GAP-057"],
+        FP046_R002_COMPLETION_ROLE: [FP046_R002_GOAL_ID],
+    }
+    produced_subjects = {
+        role: changed_subjects[role]
+        for role in FP046_R002_COMPLETION_PRODUCED_ROLES
+    }
+    impact = {
+        parent_goal_id: {
+            "result": "REVALIDATION_REFRESH_REQUIRED",
+            "target_status": "READY",
+        },
+        fp048_goal_id: {
+            "result": "REOPEN_REQUIRED",
+            "target_status": "SUPERSEDED",
+        },
+    }
+    comparisons = (
+        ("seq86 fields", set(update), FP046_R002_COMPLETION_UPDATE_FIELDS),
+        ("seq87 fields", set(completion), FP046_R002_COMPLETION_EVENT_FIELDS),
+        ("seq85 sequence", source.get("sequence"), FP046_R002_STARTED_SEQUENCE),
+        ("seq85 ID", source.get("event_id"), FP046_R002_STARTED_EVENT_ID),
+        ("seq85 type", source.get("event_type"), "GOAL_STARTED"),
+        ("seq85 subject", source.get("subject_goal_id"), FP046_R002_GOAL_ID),
+        ("seq86 sequence", update.get("sequence"), 86),
+        ("seq87 sequence", completion.get("sequence"), 87),
+        ("seq86 ID", update.get("event_id"), FP046_R002_COMPLETION_UPDATE_EVENT_ID),
+        ("seq87 ID", completion.get("event_id"), FP046_R002_COMPLETION_EVENT_ID),
+        ("seq86 type", update.get("event_type"), "CANONICAL_BINDINGS_UPDATED"),
+        ("seq87 type", completion.get("event_type"), "GOAL_COMPLETED"),
+        ("seq86 previous", update.get("previous_event_sha256"), source.get("event_sha256")),
+        ("seq87 previous", completion.get("previous_event_sha256"), update.get("event_sha256")),
+        ("seq87 update", completion.get("canonical_update_event_sha256"), update.get("event_sha256")),
+        ("seq86 previous focus", update.get("previous_focus_goal_id"), FP046_R002_GOAL_ID),
+        ("seq86 focus", update.get("focus_goal_id"), FP046_R002_GOAL_ID),
+        ("seq86 previous focus content", update.get("previous_focus_content_sha256"), FP046_R002_GOAL_SHA256),
+        ("seq86 focus content", update.get("focus_goal_content_sha256"), FP046_R002_GOAL_SHA256),
+        ("seq86 from status", update.get("from_status"), "IN_PROGRESS"),
+        ("seq86 to status", update.get("to_status"), "IN_PROGRESS"),
+        ("seq86 status changes", update.get("status_changes"), {}),
+        ("seq86 producer", update.get("produced_by_goal_id"), FP046_R002_GOAL_ID),
+        ("seq86 evidence", update.get("evidence_refs"), FP046_R002_COMPLETION_CHANGED_ROLES),
+        ("seq86 changed roles", update.get("changed_binding_roles"), FP046_R002_COMPLETION_CHANGED_ROLES),
+        ("seq86 produced roles", update.get("produced_binding_roles"), FP046_R002_COMPLETION_PRODUCED_ROLES),
+        ("seq86 changed subjects", update.get("changed_subject_ids_by_role"), changed_subjects),
+        ("seq86 produced subjects", update.get("producer_output_subject_ids_by_role"), produced_subjects),
+        ("seq86 impact Goals", update.get("impact_closure_goal_ids"), [parent_goal_id, fp048_goal_id]),
+        ("seq86 impact disposition", update.get("impact_disposition_by_goal"), impact),
+        (
+            "seq86 reopened completion",
+            update.get("reopened_completion_event_sha256_by_goal"),
+            {fp048_goal_id: FP048_ANDROID_REPORT_COMPLETION_EVENT_SHA256},
+        ),
+        ("seq87 previous focus", completion.get("previous_focus_goal_id"), FP046_R002_GOAL_ID),
+        ("seq87 previous focus content", completion.get("previous_focus_content_sha256"), FP046_R002_GOAL_SHA256),
+        ("seq87 subject", completion.get("subject_goal_id"), FP046_R002_GOAL_ID),
+        ("seq87 focus", completion.get("focus_goal_id"), parent_goal_id),
+        ("seq87 focus content", completion.get("focus_goal_content_sha256"), FP046_R002_PARENT_GOAL_SHA256),
+        ("seq87 from status", completion.get("from_status"), "IN_PROGRESS"),
+        ("seq87 to status", completion.get("to_status"), "COMPLETE_AT_TARGET"),
+        ("seq87 status changes", completion.get("status_changes"), {FP046_R002_GOAL_ID: "COMPLETE_AT_TARGET"}),
+        ("seq87 evidence", completion.get("evidence_refs"), [FP046_R002_COMPLETION_ROLE]),
+        ("seq86 manifest", update.get("static_plan_manifest_sha256"), continuation.EXPECTED_V24_MANIFEST_SHA256),
+        ("seq87 manifest", completion.get("static_plan_manifest_sha256"), continuation.EXPECTED_V24_MANIFEST_SHA256),
+        ("seq86 source version", update.get("source_checkpoint_version"), "1.25.0"),
+        ("seq87 source version", completion.get("source_checkpoint_version"), "1.25.0"),
+        ("seq86 blockers", update.get("blockers_after"), {}),
+        ("seq87 blockers", completion.get("blockers_after"), {}),
+        ("seq86 resolutions", update.get("blocker_resolution_ids_after"), []),
+        ("seq87 resolutions", completion.get("blocker_resolution_ids_after"), []),
+    )
+    for label, actual, expected in comparisons:
+        _require_equal(errors, f"FP046 R002 completion {label}", actual, expected)
+
+    if (
+        source.get("event_sha256") != FP046_R002_STARTED_EVENT_SHA256
+        or continuation.event_sha256(source) != FP046_R002_STARTED_EVENT_SHA256
+    ):
+        errors.append("FP046 R002 completion seq85 source seal differs")
+    if update.get("event_sha256") != continuation.event_sha256(update):
+        errors.append("FP046 R002 completion seq86 event seal differs")
+    if completion.get("event_sha256") != continuation.event_sha256(completion):
+        errors.append("FP046 R002 completion seq87 event seal differs")
+
+    try:
+        source_at = datetime.fromisoformat(str(source.get("occurred_at")))
+        update_at = datetime.fromisoformat(str(update.get("occurred_at")))
+        completion_at = datetime.fromisoformat(str(completion.get("occurred_at")))
+        if any(value.utcoffset() is None for value in (source_at, update_at, completion_at)):
+            raise ValueError("timezone is missing")
+    except (TypeError, ValueError):
+        errors.append("FP046 R002 completion occurred_at sequence differs")
+    else:
+        for label, actual, expected in (
+            ("seq86 occurred_at", update_at, source_at + timedelta(seconds=1)),
+            ("seq87 occurred_at", completion_at, update_at + timedelta(seconds=1)),
+            ("seq86 occurred_on", update.get("occurred_on"), update_at.date().isoformat()),
+            ("seq87 occurred_on", completion.get("occurred_on"), completion_at.date().isoformat()),
+        ):
+            _require_equal(errors, f"FP046 R002 completion {label}", actual, expected)
+
+    fp048_completion = history[43] if len(history) > 43 else None
+    if (
+        not isinstance(fp048_completion, dict)
+        or fp048_completion.get("sequence") != 44
+        or fp048_completion.get("event_id") != FP048_ANDROID_REPORT_COMPLETION_EVENT_ID
+        or fp048_completion.get("event_type") != "GOAL_COMPLETED"
+        or fp048_completion.get("subject_goal_id") != fp048_goal_id
+        or fp048_completion.get("event_sha256")
+        != FP048_ANDROID_REPORT_COMPLETION_EVENT_SHA256
+        or continuation.event_sha256(fp048_completion)
+        != FP048_ANDROID_REPORT_COMPLETION_EVENT_SHA256
+    ):
+        errors.append("FP046 R002 completion FP048 R001 frozen completion seal differs")
+
+    completion_binding = update.get("producer_completion_receipt_binding")
+    binding_identity = {
+        "role": FP046_R002_COMPLETION_ROLE,
+        "document_id": FP046_R002_COMPLETION_DOCUMENT_ID,
+        "path": FP046_R002_COMPLETION_PATH,
+    }
+    binding_valid = bool(
+        isinstance(completion_binding, dict)
+        and set(completion_binding) == {*binding_identity, "file_sha256"}
+        and all(
+            completion_binding.get(key) == value
+            for key, value in binding_identity.items()
+        )
+        and _sha256_binding_matches(
+            root,
+            completion_binding,
+            expected_path=FP046_R002_COMPLETION_PATH,
+        )
+    )
+    if not binding_valid:
+        errors.append("FP046 R002 completion receipt binding differs")
+    if (
+        completion.get("completion_receipt_binding") != completion_binding
+        or completion.get("completion_evidence_bindings")
+        != {FP046_R002_COMPLETION_ROLE: completion_binding}
+    ):
+        errors.append("FP046 R002 completion seq87 evidence binding differs")
+
+    review_binding = update.get("transition_control_review_binding")
+    if (
+        not isinstance(review_binding, dict)
+        or set(review_binding) != set(FP046_R002_COMPLETION_REVIEW_PATH_BY_ROLE)
+    ):
+        errors.append("FP046 R002 completion transition review binding differs")
+    else:
+        for role, relative in FP046_R002_COMPLETION_REVIEW_PATH_BY_ROLE.items():
+            row = review_binding.get(role)
+            path = _exact_repo_file(root, relative)
+            review_document = _load_exact_json(root, relative)
+            if (
+                not isinstance(row, dict)
+                or set(row) != {"path", "sha256", "byte_length"}
+                or row.get("path") != relative
+                or path is None
+                or not isinstance(review_document, dict)
+                or review_document.get("document_id")
+                != FP046_R002_COMPLETION_REVIEW_DOCUMENT_ID_BY_ROLE[role]
+                or row.get("sha256") != continuation.sha256_file(path)
+                or row.get("byte_length") != path.stat().st_size
+            ):
+                errors.append(
+                    f"FP046 R002 completion R005 transition review differs: {role}"
+                )
+
+    update_snapshot = update.get("canonical_binding_snapshot_after")
+    completion_snapshot = completion.get("canonical_binding_snapshot_after")
+    source_snapshot_event = history[83] if len(history) > 83 else None
+    source_snapshot = (
+        source_snapshot_event.get("canonical_binding_snapshot_after")
+        if isinstance(source_snapshot_event, dict)
+        else None
+    )
+    if (
+        not isinstance(source_snapshot, dict)
+        or len(source_snapshot) != 43
+        or FP046_R002_COMPLETION_ROLE in source_snapshot
+        or not isinstance(update_snapshot, dict)
+        or update_snapshot != completion_snapshot
+    ):
+        errors.append("FP046 R002 completion historical canonical snapshots differ")
+    else:
+        actual_changed_roles = sorted(
+            role
+            for role in set(source_snapshot) | set(update_snapshot)
+            if source_snapshot.get(role) != update_snapshot.get(role)
+        )
+        if actual_changed_roles != sorted(FP046_R002_COMPLETION_CHANGED_ROLES):
+            errors.append("FP046 R002 completion historical canonical delta differs")
+        if update_snapshot.get(FP046_R002_COMPLETION_ROLE) != completion_binding:
+            errors.append("FP046 R002 completion receipt snapshot differs")
+        for role, document_id, relative in (
+            (
+                "IMPLEMENTATION_BACKLOG",
+                "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260825-030",
+                "docs/control/audits/walksafe-implementation-remediation-backlog-20260825-r030.json",
+            ),
+            (
+                "IMPLEMENTATION_GAP",
+                "WS-IMPLEMENTATION-GAP-ANALYSIS-20260825-030",
+                "docs/control/audits/walksafe-implementation-gap-analysis-20260825-r030.json",
+            ),
+        ):
+            row = update_snapshot.get(role)
+            if (
+                not isinstance(row, dict)
+                or row.get("role") != role
+                or row.get("document_id") != document_id
+                or row.get("path") != relative
+                or not isinstance(row.get("file_sha256"), str)
+                or continuation.SHA256_RE.fullmatch(row["file_sha256"]) is None
+            ):
+                errors.append(f"FP046 R002 completion canonical binding differs: {role}")
+
+    completion_map_source = history[73] if len(history) > 73 else None
+    completion_map_before = (
+        completion_map_source.get("completion_evidence_by_goal_after")
+        if isinstance(completion_map_source, dict)
+        else None
+    )
+    expected_completion_map = None
+    if isinstance(completion_map_before, dict):
+        expected_completion_map = copy.deepcopy(completion_map_before)
+        expected_completion_map[FP046_R002_GOAL_ID] = [
+            FP046_R002_COMPLETION_ROLE
+        ]
+        if completion.get("completion_evidence_by_goal_after") != expected_completion_map:
+            errors.append("FP046 R002 completion seq87 evidence role map differs")
+    else:
+        errors.append("FP046 R002 completion seq74 evidence preimage differs")
+
+    update_runtime = update.get("runtime_after")
+    completion_runtime = completion.get("runtime_after")
+    if (
+        not isinstance(update_runtime, dict)
+        or set(update_runtime) != FP046_R002_COMPLETION_RUNTIME_FIELDS
+        or update_runtime != source.get("runtime_after")
+    ):
+        errors.append("FP046 R002 completion seq86 runtime differs")
+    expected_completion_runtime = {
+        "focus_goal_id": parent_goal_id,
+        "focus_goal_path": FP046_R002_PARENT_GOAL_PATH,
+        "focus_work_item_id": "",
+        "focus_source": "WORKSTREAM_GRAPH",
+        "ready_frontier_goal_ids": [
+            parent_goal_id,
+            "WS-GOAL-EPIC-04",
+            "WS-GOAL-EPIC-12",
+        ],
+        "blocked_goal_ids": [],
+        "pending_questions": [],
+        "open_question_count": 0,
+        "activation_status": "ACTIVE",
+        "package_status": "ACTIVE",
+    }
+    if (
+        not isinstance(completion_runtime, dict)
+        or set(completion_runtime) != FP046_R002_COMPLETION_RUNTIME_FIELDS
+        or any(
+            completion_runtime.get(key) != value
+            for key, value in expected_completion_runtime.items()
+        )
+        or any(
+            not isinstance(completion_runtime.get(key), str)
+            or continuation.SHA256_RE.fullmatch(completion_runtime[key]) is None
+            for key in (
+                "artifact_work_queue_sha256",
+                "completion_boundary_sha256",
+            )
+        )
+    ):
+        errors.append("FP046 R002 completion seq87 focus/frontier runtime differs")
+
+    receipt = _load_exact_json(root, FP046_R002_COMPLETION_PATH)
+    if not binding_valid or not isinstance(receipt, dict):
+        errors.append("FP046 R002 completion receipt is missing or malformed")
+    else:
+        receipt_expectations = {
+            "document_id": FP046_R002_COMPLETION_DOCUMENT_ID,
+            "goal_id": FP046_R002_GOAL_ID,
+            "goal_status": "COMPLETE_AT_TARGET",
+            "source_sequence": 85,
+            "canonical_update_sequence": 86,
+            "completion_sequence": 87,
+            "transition_control_review_binding": review_binding,
+            "completion_boundary": FP046_R002_ZERO_CREDIT_BOUNDARY,
+            "release_completion_claimed": False,
+            "successor": {
+                "goal_id": FP046_R002_NEXT_GOAL_ID,
+                "work_item_id": (
+                    "EPIC-03-FP048-ENCRYPTION-CONNECTION-SECURITY-INCIDENT"
+                ),
+                "status": "PLANNED_NOT_ACTIVATED",
+            },
+        }
+        if any(
+            receipt.get(key) != expected
+            for key, expected in receipt_expectations.items()
+        ):
+            errors.append("FP046 R002 completion receipt semantics differ")
+        evidence_bindings = receipt.get("evidence_bindings")
+        goal_review_paths = {
+            row["path"]
+            for row in FP046_R002_COMPLETION_GOAL_REVIEW_BY_KIND.values()
+        }
+        if not isinstance(evidence_bindings, list) or any(
+            not isinstance(row, dict) for row in evidence_bindings
+        ):
+            errors.append("FP046 R002 completion R005 Goal review bindings differ")
+        else:
+            review_rows = [
+                row
+                for row in evidence_bindings
+                if row.get("path") in goal_review_paths
+            ]
+            if len(review_rows) != 2:
+                errors.append("FP046 R002 completion R005 Goal review bindings differ")
+            for kind, identity in FP046_R002_COMPLETION_GOAL_REVIEW_BY_KIND.items():
+                matches = [
+                    row
+                    for row in review_rows
+                    if row.get("path") == identity["path"]
+                ]
+                row = matches[0] if len(matches) == 1 else None
+                path = _exact_repo_file(root, identity["path"])
+                if (
+                    not isinstance(row, dict)
+                    or set(row)
+                    != {
+                        "document_id",
+                        "path",
+                        "file_sha256",
+                        "byte_count",
+                        "mutable",
+                    }
+                    or row.get("document_id") != identity["document_id"]
+                    or row.get("mutable") is not False
+                    or path is None
+                    or row.get("file_sha256") != continuation.sha256_file(path)
+                    or row.get("byte_count") != path.stat().st_size
+                ):
+                    errors.append(
+                        f"FP046 R002 completion R005 Goal review differs: {kind}"
+                    )
+            if any(
+                isinstance(row.get("path"), str)
+                and row["path"].endswith(
+                    ("/review-subject.json", "/independent-review.json")
+                )
+                and row["path"] not in goal_review_paths
+                for row in evidence_bindings
+            ):
+                errors.append(
+                    "FP046 R002 completion stale Goal review path is forbidden"
+                )
+
+    if len(history) == 87 and isinstance(state, dict):
+        statuses = state.get("status_by_goal")
+        if not (
+            isinstance(statuses, dict)
+            and statuses.get(FP046_R002_GOAL_ID) == "COMPLETE_AT_TARGET"
+            and statuses.get(fp048_goal_id) == "COMPLETE_AT_TARGET"
+            and FP046_R002_NEXT_GOAL_ID not in statuses
+            and state.get("focus_goal_id") == parent_goal_id
+            and state.get("focus_goal_path") == FP046_R002_PARENT_GOAL_PATH
+            and state.get("focus_work_item_id") == ""
+            and state.get("focus_source") == "WORKSTREAM_GRAPH"
+            and state.get("ready_frontier_goal_ids")
+            == [parent_goal_id, "WS-GOAL-EPIC-04", "WS-GOAL-EPIC-12"]
+            and state.get("completion_evidence_by_goal") == expected_completion_map
+            and state.get("pending_producer_completion_goal_id") in {None, ""}
+            and state.get("transition_history_anchor_sha256")
+            == completion.get("event_sha256")
+            and state.get("validation_cutoff_at") == completion.get("occurred_at")
+            and continuation.canonical_binding_snapshot(checkpoint)
+            == completion_snapshot
+        ):
+            errors.append("FP046 R002 completion final status/focus/frontier differs")
+        queue = state.get("artifact_work_queue")
+        boundary = state.get("completion_boundary")
+        if (
+            not isinstance(completion_runtime, dict)
+            or completion_runtime.get("artifact_work_queue_sha256")
+            != continuation.canonical_json_sha256(queue)
+            or completion_runtime.get("completion_boundary_sha256")
+            != continuation.canonical_json_sha256(boundary)
+        ):
+            errors.append("FP046 R002 completion final runtime seal differs")
+        approved = checkpoint.get("approved_state")
+        verification = checkpoint.get("verification_boundary")
+        if (
+            not isinstance(approved, dict)
+            or approved.get("formal_test_count") != 279
+            or approved.get("formal_test_not_run_count") != 279
+            or approved.get("release_status") != "NOT_ELIGIBLE"
+            or not isinstance(verification, dict)
+            or verification.get("actual_device_test_status") != "NOT_RUN"
+            or verification.get("all_remaining_gate_status") != "NOT_RUN"
+            or verification.get("formal_test_pass_claimed") is not False
+            or verification.get("release_eligible") is not False
+        ):
+            errors.append("FP046 R002 completion final zero-credit boundary differs")
+    elif len(history) > 87:
+        descendant = history[87]
+        if (
+            not isinstance(descendant, dict)
+            or descendant.get("previous_event_sha256")
+            != completion.get("event_sha256")
+            or descendant.get("event_sha256")
+            != continuation.event_sha256(descendant)
+        ):
+            errors.append("FP046 R002 completion descendant history adjacency differs")
+    return errors
+
+
+_FP046_R002_START_REVIEW_MODULE = (
+    "scripts.build_walksafe_fp046_r002_seq77_78_review_20260823"
+)
+_FP046_R002_RECOVERY_REVIEW_MODULE = (
+    "scripts.build_walksafe_fp046_r002_seq78_79_recovery_review_20260824"
+)
+_FP046_R002_R003_REVIEW_ASSIGNMENT_SHA256 = (
+    "fb3bf40e349c4edf6cabdd7a8afde5c491802f3d943f8b2b4beda5b84d54658c"
+)
+_FP046_R002_R003_REVIEW_ASSIGNMENT_BYTE_LENGTH = 24_009
+_FP046_R002_R003_CONFIRMED_FINDING = (
+    "REVIEW_INPUT_COHORT_ABA_CAN_PUBLISH_SELF_INVALID_EVIDENCE"
+)
+_FP046_R002_R003_SUPERSESSION_REASON = (
+    "R003_REVIEW_INPUT_COHORT_ABA_RETAINED_DESCRIPTOR_REQUIRED"
+)
+_FP046_R002_R004_REVIEW_ASSIGNMENT_SHA256 = (
+    "810013bf9aab371a7cdd899e617afdfa9c3fda9979a387f20784277174e56ee7"
+)
+_FP046_R002_R004_REVIEW_ASSIGNMENT_BYTE_LENGTH = 27_865
+_FP046_R002_R004_SUPERSESSION_REASON = (
+    "R004_POST_PUBLICATION_REGRESSION_NOT_RERUNNABLE"
+)
+_FP046_R002_PRESERVED_REVIEW_ASSIGNMENT_PINS = {
+    Path(
+        "docs/control/execution/workstream-transitions/seq77-78/"
+        "review-rounds/R001/review-assignment.json"
+    ): (
+        "e1b3807d7de0d3473d271e8aa36cd73d0b2e5bde3ecc00f0c8652642efc376dd",
+        22_114,
+    ),
+    Path(
+        "docs/control/execution/workstream-transitions/seq77-78/"
+        "review-rounds/R002/review-assignment.json"
+    ): (
+        "1fbb07eb4fe16e943a5ca13f9d78ad10f51952d01dbbc1ca6d698b91ed0c5885",
+        22_838,
+    ),
+    Path(
+        "docs/control/execution/workstream-transitions/seq77-78/"
+        "review-rounds/R003/review-assignment.json"
+    ): (
+        _FP046_R002_R003_REVIEW_ASSIGNMENT_SHA256,
+        _FP046_R002_R003_REVIEW_ASSIGNMENT_BYTE_LENGTH,
+    ),
+    Path(
+        "docs/control/execution/workstream-transitions/seq77-78/"
+        "review-rounds/R004/review-assignment.json"
+    ): (
+        _FP046_R002_R004_REVIEW_ASSIGNMENT_SHA256,
+        _FP046_R002_R004_REVIEW_ASSIGNMENT_BYTE_LENGTH,
+    ),
+}
+_FP046_R002_R005_REVIEW_DIR = Path(
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R005"
+)
+_FP046_R002_R005_REVIEW_PATHS = (
+    _FP046_R002_R005_REVIEW_DIR / "review-assignment.json",
+    _FP046_R002_R005_REVIEW_DIR / "review-result.json",
+    _FP046_R002_R005_REVIEW_DIR / "independent-review.json",
+)
+_FP046_R002_R005_REVIEW_PINS = {
+    _FP046_R002_R005_REVIEW_PATHS[0]: (
+        "5c9927f92934b5ee6586a0b966a180824cae722cc389d38e031bf04eb6650d37",
+        28_536,
+    ),
+    _FP046_R002_R005_REVIEW_PATHS[1]: (
+        "f7bd94cb53e521c37f442982c7fb1f29df6a9f17bc3342f51fc7593748dc015c",
+        28_548,
+    ),
+    _FP046_R002_R005_REVIEW_PATHS[2]: (
+        "9ed52ee716b8101e82938b909a2b1ba046a2f240f15b584d9577d09932a768ee",
+        28_831,
+    ),
+}
+_FP046_R002_R005_SUPERSESSION_REASON = (
+    "R005_POST_APPROVAL_SESSION_ARTIFACT_INVENTORY_GROWTH_REQUIRES_R006_RESEAL"
+)
+_FP046_R002_SESSION_ARTIFACT_PINS = {
+    Path("daylog/2026-08-23.md"): (
+        "96885bff8f5486493e04ae089d9ebb80ea1d5c677aa37e3b36fe4a2bd6707432",
+        5_982,
+    ),
+    Path("daylog/2026-08-24.md"): (
+        "6bccb6222b2292446f20f48d54171850873f86c515547a74aefadab3fc89667f",
+        13_479,
+    ),
+    Path("docs/planning/walksafe-fp046-r002-resumption-plan-20260824.html"): (
+        "1bc7662049d938c821f769278713af3dadb84e4c250450becb78dbb7edaaa742",
+        37_293,
+    ),
+    Path(
+        "docs/planning/"
+        "walksafe-security-server-operations-feature-first-plan-20260824.html"
+    ): (
+        "1a0baf026f86bd1b6624b70e2cda54c9c5547edacb7ec4459a45d3d64e193d14",
+        53_718,
+    ),
+}
+_FP046_R002_R006_REVIEW_DIR = Path(
+    "docs/control/execution/workstream-transitions/seq77-78/"
+    "review-rounds/R006"
+)
+_FP046_R002_R006_REVIEW_PATHS = (
+    _FP046_R002_R006_REVIEW_DIR / "review-assignment.json",
+    _FP046_R002_R006_REVIEW_DIR / "review-result.json",
+    _FP046_R002_R006_REVIEW_DIR / "independent-review.json",
+)
+_FP046_R002_R006_ROUND_ID = (
+    "WS-FP046-R002-SEQ77-78-REVIEW-20260823-R006"
+)
+_FP046_R002_PRE_REVIEW_MODIFIED_CONTROL_PATHS = frozenset(
+    {
+        "scripts/check_walksafe_goal_graph_v2_4.py",
+        "scripts/check_walksafe_project_continuation_v2_4.py",
+        "scripts/generate_repository_catalogs.py",
+        "scripts/run_walksafe_test_layers_current.sh",
+        "tests/test_repository_catalogs.py",
+        "tests/test_walksafe_goal_graph_v2_4.py",
+        "tests/test_walksafe_project_continuation_v2_4.py",
+    }
+)
+
+
+class _Fp046R002StartReviewCapabilityUnavailable(RuntimeError):
+    """Signal only exact legacy compatibility, never integrity failure."""
+
+
+def _fp046_r002_start_review_module() -> Any:
+    try:
+        return importlib.import_module(_FP046_R002_START_REVIEW_MODULE)
+    except ModuleNotFoundError as exc:
+        if exc.name != _FP046_R002_START_REVIEW_MODULE:
+            raise
+        try:
+            module_spec = importlib.util.find_spec(
+                _FP046_R002_START_REVIEW_MODULE
+            )
+        except ModuleNotFoundError:
+            module_spec = None
+        if module_spec is not None:
+            raise
+        raise _Fp046R002StartReviewCapabilityUnavailable(
+            "FP046 R002 seq77/78 review module is unavailable"
+        ) from exc
+
+
+def _fp046_r002_start_control_modules() -> tuple[Any, Any, Any]:
+    review = _fp046_r002_start_review_module()
+    reanchor = importlib.import_module(
+        "scripts.apply_walksafe_fp046_r002_goal_start_control_reanchor_"
+        "seq77_20260823"
+    )
+    started = importlib.import_module(
+        "scripts.apply_walksafe_fp046_r002_goal_started_seq78_20260823"
+    )
+    return review, reanchor, started
+
+
+def _fp046_r002_recovery_control_modules() -> tuple[Any, Any, Any]:
+    review = importlib.import_module(_FP046_R002_RECOVERY_REVIEW_MODULE)
+    correction = importlib.import_module(
+        "scripts.apply_walksafe_fp046_r002_goal_start_control_correction_"
+        "seq78_20260824"
+    )
+    started = importlib.import_module(
+        "scripts.apply_walksafe_fp046_r002_goal_started_seq79_20260824"
+    )
+    return review, correction, started
+
+
+def _fp046_r002_frozen_r014_event_review(
+    root: Path,
+    checkpoint: dict[str, Any],
+    review: Any,
+) -> tuple[dict[str, dict[str, Any]], datetime, tuple[dict[str, Any], ...]]:
+    """Replay the exact seq84-bound R014 scope without rebuilding live bytes."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 84:
+        raise ValueError("FP046 R002 frozen R014 event is missing")
+    event = history[83]
+    previous = history[82]
+    binding = (
+        event.get("transition_control_review_binding")
+        if isinstance(event, dict)
+        else None
+    )
+    if (
+        not isinstance(previous, dict)
+        or not isinstance(event, dict)
+        or event.get("sequence") != 84
+        or event.get("event_id")
+        != FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+        or event.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+        or event.get("previous_event_sha256") != previous.get("event_sha256")
+        or event.get("event_sha256") != continuation.event_sha256(event)
+        or not isinstance(binding, dict)
+        or set(binding)
+        != {"assignment", "review_result", "independent_review"}
+    ):
+        raise ValueError("FP046 R002 frozen R014 event authority differs")
+
+    roles = ("assignment", "review_result", "independent_review")
+    review_paths = tuple(Path(binding[role]["path"]) for role in roles)
+    if review_paths != tuple(Path(path) for path in review.REVIEW_PATHS):
+        raise ValueError("FP046 R002 frozen R014 review paths differ")
+    documents: dict[str, dict[str, Any]] = {}
+    for role, relative in zip(roles, review_paths, strict=True):
+        row = binding[role]
+        path = _exact_repo_file(root, relative.as_posix())
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"path", "sha256", "byte_length"}
+            or path is None
+            or _contains_symlink(root, relative.as_posix())
+            or path.stat().st_size != row["byte_length"]
+            or continuation.sha256_file(path) != row["sha256"]
+        ):
+            raise ValueError("FP046 R002 frozen R014 review binding differs")
+        document = _load_exact_json(root, relative.as_posix())
+        if not isinstance(document, dict):
+            raise ValueError("FP046 R002 frozen R014 review document differs")
+        documents[role] = document
+
+    assignment = documents["assignment"]
+    result = documents["review_result"]
+    independent = documents["independent_review"]
+    scope = assignment.get("review_scope")
+    zero_findings = {"blocking": [], "major_open": [], "minor_open": []}
+    zero_boundary = {
+        "external_independence_claimed": False,
+        "formal_test_credit_added": 0,
+        "product_implementation_credit_added": 0,
+        "release_status": "NOT_ELIGIBLE",
+    }
+    try:
+        reviewed_at = datetime.fromisoformat(result["reviewed_at"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("FP046 R002 frozen R014 review time differs") from exc
+    if (
+        assignment.get("round_id") != review.ROUND_ID
+        or assignment.get("goal_id") != FP046_R002_GOAL_ID
+        or assignment.get("review_boundary") != zero_boundary
+        or not isinstance(scope, dict)
+        or result.get("round_id") != review.ROUND_ID
+        or result.get("goal_id") != FP046_R002_GOAL_ID
+        or result.get("decision") != "APPROVED"
+        or result.get("findings") != zero_findings
+        or result.get("assignment_binding") != binding["assignment"]
+        or result.get("review_scope") != scope
+        or independent.get("round_id") != review.ROUND_ID
+        or independent.get("goal_id") != FP046_R002_GOAL_ID
+        or independent.get("decision") != "APPROVED"
+        or independent.get("status") != "PASS"
+        or independent.get("findings") != zero_findings
+        or independent.get("assignment_provenance") != binding["assignment"]
+        or independent.get("review_result_provenance")
+        != binding["review_result"]
+        or independent.get("review_scope") != scope
+        or independent.get("reviewed_at") != result.get("reviewed_at")
+        or reviewed_at.tzinfo is None
+        or reviewed_at.utcoffset() is None
+    ):
+        raise ValueError("FP046 R002 frozen R014 review envelope differs")
+    cohort = scope.get("current_control_cohort")
+    if (
+        not isinstance(cohort, list)
+        or len(cohort) != 37
+        or scope.get("current_control_path_count") != 37
+        or len({row.get("path") for row in cohort if isinstance(row, dict)})
+        != 37
+        or any(
+            not isinstance(row, dict)
+            or set(row) != {"path", "sha256", "byte_length"}
+            or not isinstance(row.get("path"), str)
+            or continuation.SHA256_RE.fullmatch(str(row.get("sha256", "")))
+            is None
+            or not isinstance(row.get("byte_length"), int)
+            or isinstance(row.get("byte_length"), bool)
+            or row["byte_length"] < 0
+            for row in cohort
+        )
+    ):
+        raise ValueError("FP046 R002 frozen R014 control cohort differs")
+    return copy.deepcopy(binding), reviewed_at, tuple(copy.deepcopy(cohort))
+
+
+def _fp046_r002_recovery_review_authority(
+    root: Path,
+    checkpoint: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Validate the active R014 recovery review and exact predecessors."""
+
+    review, _correction, _started = _fp046_r002_recovery_control_modules()
+    binding_loader = getattr(review, "transition_review_binding", None)
+    reviewed_at_loader = getattr(review, "validated_reviewed_at", None)
+    post_review_loader = getattr(review, "validate_post_review", None)
+    rejected_r001_loader = getattr(review, "rejected_r001_assignment_binding", None)
+    approved_r002_loader = getattr(review, "approved_r002_review_bindings", None)
+    approved_r003_loader = getattr(review, "approved_r003_review_bindings", None)
+    approved_r004_loader = getattr(review, "approved_r004_review_bindings", None)
+    approved_r005_loader = getattr(review, "approved_r005_review_bindings", None)
+    approved_r006_loader = getattr(review, "approved_r006_review_bindings", None)
+    approved_r007_loader = getattr(review, "approved_r007_review_bindings", None)
+    approved_r008_loader = getattr(review, "approved_r008_review_bindings", None)
+    approved_r009_loader = getattr(review, "approved_r009_review_bindings", None)
+    rejected_r010_loader = getattr(review, "rejected_r010_assignment_binding", None)
+    approved_r011_loader = getattr(review, "approved_r011_review_bindings", None)
+    approved_r012_loader = getattr(review, "approved_r012_review_bindings", None)
+    rejected_r013_loader = getattr(review, "rejected_r013_assignment_binding", None)
+    if not all(
+        callable(loader)
+        for loader in (
+            binding_loader,
+            reviewed_at_loader,
+            post_review_loader,
+            rejected_r001_loader,
+            approved_r002_loader,
+            approved_r003_loader,
+            approved_r004_loader,
+            approved_r005_loader,
+            approved_r006_loader,
+            approved_r007_loader,
+            approved_r008_loader,
+            approved_r009_loader,
+            rejected_r010_loader,
+            approved_r011_loader,
+            approved_r012_loader,
+            rejected_r013_loader,
+        )
+    ):
+        raise ValueError("FP046 R002 recovery review capability is unavailable")
+    try:
+        binding = binding_loader(root, require_live_snapshot=False)
+        reviewed_at = reviewed_at_loader(root, require_live_snapshot=False)
+        context = post_review_loader(root, require_live_snapshot=False)
+        control_code_cohort = tuple(context.current_control_cohort)
+    except Exception:
+        if checkpoint is None:
+            raise
+        binding, reviewed_at, control_code_cohort = (
+            _fp046_r002_frozen_r014_event_review(
+                root,
+                checkpoint,
+                review,
+            )
+        )
+    rejected_r001_binding = rejected_r001_loader(root)
+    approved_r002_bindings = approved_r002_loader(root)
+    approved_r003_bindings = approved_r003_loader(root)
+    approved_r004_bindings = approved_r004_loader(root)
+    approved_r005_bindings = approved_r005_loader(root)
+    approved_r006_bindings = approved_r006_loader(root)
+    approved_r007_bindings = approved_r007_loader(root)
+    approved_r008_bindings = approved_r008_loader(root)
+    approved_r009_bindings = approved_r009_loader(root)
+    rejected_r010_binding = rejected_r010_loader(root)
+    approved_r011_bindings = approved_r011_loader(root)
+    approved_r012_bindings = approved_r012_loader(root)
+    rejected_r013_binding = rejected_r013_loader(root)
+    review_dir = getattr(review, "REVIEW_DIR", None)
+    review_paths = tuple(Path(path) for path in getattr(review, "REVIEW_PATHS", ()))
+    preserved_paths = tuple(
+        Path(path) for path in getattr(review, "PRESERVED_REVIEW_PATHS", ())
+    )
+    session_paths = tuple(
+        Path(path) for path in getattr(review, "SESSION_ARTIFACT_PATHS", ())
+    )
+    expected_preserved_paths = (
+        *(Path(row["path"]) for row in continuation.FP046_R002_R006_REVIEW_BINDING.values()),
+        Path(continuation.FP046_R002_RECOVERY_REJECTED_R001_ASSIGNMENT["path"]),
+        *(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R002_REVIEW_BINDING.values()
+        ),
+        *(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R003_REVIEW_BINDING.values()
+        ),
+        *(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R004_REVIEW_BINDING.values()
+        ),
+        *(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R005_REVIEW_BINDING.values()
+        ),
+        *(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R006_REVIEW_BINDING.values()
+        ),
+        *(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values()
+        ),
+        *(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+        ),
+        *(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+        ),
+        Path(continuation.FP046_R002_RECOVERY_REJECTED_R010_ASSIGNMENT["path"]),
+        *(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+        ),
+        *(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+        ),
+        Path(continuation.FP046_R002_RECOVERY_REJECTED_R013_ASSIGNMENT["path"]),
+    )
+    if (
+        not isinstance(review_dir, Path)
+        or review_dir != continuation.FP046_R002_RECOVERY_REVIEW_DIR
+        or review_paths != continuation.FP046_R002_RECOVERY_REVIEW_PATHS
+        or type(binding) is not dict
+        or set(binding) != {"assignment", "review_result", "independent_review"}
+        or not isinstance(reviewed_at, datetime)
+        or reviewed_at.tzinfo is None
+        or tuple(getattr(review, "SESSION_ARTIFACT_PATHS", ())) != ()
+        or {
+            path: (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_R006_REVIEW_BINDING.values()
+            for path in (Path(row["path"]),)
+        }
+        != getattr(review, "PRESERVED_REVIEW_PINS", None)
+        or preserved_paths != expected_preserved_paths
+        or rejected_r001_binding
+        != continuation.FP046_R002_RECOVERY_REJECTED_R001_ASSIGNMENT
+        or tuple(getattr(review, "APPROVED_R002_REVIEW_PATHS", ()))
+        != tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R002_REVIEW_BINDING.values()
+        )
+        or getattr(review, "APPROVED_R002_REVIEW_PINS", None)
+        != {
+            Path(row["path"]): (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R002_REVIEW_BINDING.values()
+        }
+        or approved_r002_bindings
+        != tuple(
+            continuation.FP046_R002_RECOVERY_APPROVED_R002_REVIEW_BINDING.values()
+        )
+        or tuple(getattr(review, "APPROVED_R003_REVIEW_PATHS", ()))
+        != tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R003_REVIEW_BINDING.values()
+        )
+        or getattr(review, "APPROVED_R003_REVIEW_PINS", None)
+        != {
+            Path(row["path"]): (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R003_REVIEW_BINDING.values()
+        }
+        or approved_r003_bindings
+        != tuple(
+            continuation.FP046_R002_RECOVERY_APPROVED_R003_REVIEW_BINDING.values()
+        )
+        or tuple(getattr(review, "APPROVED_R004_REVIEW_PATHS", ()))
+        != tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R004_REVIEW_BINDING.values()
+        )
+        or getattr(review, "APPROVED_R004_REVIEW_PINS", None)
+        != {
+            Path(row["path"]): (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R004_REVIEW_BINDING.values()
+        }
+        or approved_r004_bindings
+        != tuple(
+            continuation.FP046_R002_RECOVERY_APPROVED_R004_REVIEW_BINDING.values()
+        )
+        or tuple(getattr(review, "APPROVED_R005_REVIEW_PATHS", ()))
+        != tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R005_REVIEW_BINDING.values()
+        )
+        or getattr(review, "APPROVED_R005_REVIEW_PINS", None)
+        != {
+            Path(row["path"]): (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R005_REVIEW_BINDING.values()
+        }
+        or approved_r005_bindings
+        != tuple(
+            continuation.FP046_R002_RECOVERY_APPROVED_R005_REVIEW_BINDING.values()
+        )
+        or tuple(getattr(review, "APPROVED_R006_REVIEW_PATHS", ()))
+        != tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R006_REVIEW_BINDING.values()
+        )
+        or getattr(review, "APPROVED_R006_REVIEW_PINS", None)
+        != {
+            Path(row["path"]): (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R006_REVIEW_BINDING.values()
+        }
+        or approved_r006_bindings
+        != tuple(
+            continuation.FP046_R002_RECOVERY_APPROVED_R006_REVIEW_BINDING.values()
+        )
+        or tuple(getattr(review, "APPROVED_R007_REVIEW_PATHS", ()))
+        != tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values()
+        )
+        or getattr(review, "APPROVED_R007_REVIEW_PINS", None)
+        != {
+            Path(row["path"]): (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values()
+        }
+        or approved_r007_bindings
+        != tuple(
+            continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values()
+        )
+        or tuple(getattr(review, "APPROVED_R008_REVIEW_PATHS", ()))
+        != tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+        )
+        or getattr(review, "APPROVED_R008_REVIEW_PINS", None)
+        != {
+            Path(row["path"]): (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+        }
+        or approved_r008_bindings
+        != tuple(
+            continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+        )
+        or tuple(getattr(review, "APPROVED_R009_REVIEW_PATHS", ()))
+        != tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+        )
+        or getattr(review, "APPROVED_R009_REVIEW_PINS", None)
+        != {
+            Path(row["path"]): (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+        }
+        or approved_r009_bindings
+        != tuple(
+            continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+        )
+        or rejected_r010_binding
+        != continuation.FP046_R002_RECOVERY_REJECTED_R010_ASSIGNMENT
+        or tuple(getattr(review, "APPROVED_R011_REVIEW_PATHS", ()))
+        != tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+        )
+        or getattr(review, "APPROVED_R011_REVIEW_PINS", None)
+        != {
+            Path(row["path"]): (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+        }
+        or approved_r011_bindings
+        != tuple(
+            continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+        )
+        or tuple(getattr(review, "APPROVED_R012_REVIEW_PATHS", ()))
+        != tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+        )
+        or getattr(review, "APPROVED_R012_REVIEW_PINS", None)
+        != {
+            Path(row["path"]): (row["sha256"], row["byte_length"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+        }
+        or approved_r012_bindings
+        != tuple(
+            continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+        )
+        or rejected_r013_binding
+        != continuation.FP046_R002_RECOVERY_REJECTED_R013_ASSIGNMENT
+        or set(review_paths) & set(preserved_paths)
+        or any(path.is_absolute() or ".." in path.parts for path in (*review_paths, *preserved_paths, *session_paths))
+    ):
+        raise ValueError("FP046 R002 recovery review authority differs")
+    return {
+        "binding": binding,
+        "reviewed_at": reviewed_at,
+        "review_paths": review_paths,
+        "preserved_review_paths": preserved_paths,
+        "rejected_r001_assignment_binding": rejected_r001_binding,
+        "approved_r002_review_bindings": approved_r002_bindings,
+        "approved_r003_review_bindings": approved_r003_bindings,
+        "approved_r004_review_bindings": approved_r004_bindings,
+        "approved_r005_review_bindings": approved_r005_bindings,
+        "approved_r005_review_paths": tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R005_REVIEW_BINDING.values()
+        ),
+        "approved_r006_review_bindings": approved_r006_bindings,
+        "approved_r006_review_paths": tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R006_REVIEW_BINDING.values()
+        ),
+        "approved_r007_review_bindings": approved_r007_bindings,
+        "approved_r007_review_paths": tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values()
+        ),
+        "approved_r008_review_bindings": approved_r008_bindings,
+        "approved_r008_review_paths": tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+        ),
+        "approved_r009_review_bindings": approved_r009_bindings,
+        "approved_r011_review_bindings": approved_r011_bindings,
+        "approved_r012_review_bindings": approved_r012_bindings,
+        "rejected_r013_assignment_binding": rejected_r013_binding,
+        "approved_r009_review_paths": tuple(
+            Path(row["path"])
+            for row in continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+        ),
+        "rejected_r010_assignment_binding": rejected_r010_binding,
+        "session_artifact_paths": session_paths,
+        "control_code_cohort": control_code_cohort,
+    }
+
+
+def _fp046_r002_require_r006_review_constants(review: Any) -> None:
+    preserved_paths = tuple(
+        _FP046_R002_PRESERVED_REVIEW_ASSIGNMENT_PINS
+    )
+    if (
+        getattr(review, "REVIEW_DIR", None) != _FP046_R002_R006_REVIEW_DIR
+        or getattr(review, "ASSIGNMENT_REL", None)
+        != _FP046_R002_R006_REVIEW_PATHS[0]
+        or getattr(review, "RESULT_REL", None)
+        != _FP046_R002_R006_REVIEW_PATHS[1]
+        or getattr(review, "INDEPENDENT_REL", None)
+        != _FP046_R002_R006_REVIEW_PATHS[2]
+        or tuple(getattr(review, "REVIEW_PATHS", ()))
+        != _FP046_R002_R006_REVIEW_PATHS
+        or getattr(review, "ROUND_ID", None) != _FP046_R002_R006_ROUND_ID
+        or tuple(getattr(review, "PRESERVED_REVIEW_PATHS", ()))
+        != preserved_paths
+        or {
+            getattr(review, "R001_ASSIGNMENT_REL", None): (
+                getattr(review, "R001_ASSIGNMENT_SHA256", None),
+                getattr(review, "R001_ASSIGNMENT_BYTE_LENGTH", None),
+            ),
+            getattr(review, "R002_ASSIGNMENT_REL", None): (
+                getattr(review, "R002_ASSIGNMENT_SHA256", None),
+                getattr(review, "R002_ASSIGNMENT_BYTE_LENGTH", None),
+            ),
+            getattr(review, "R003_ASSIGNMENT_REL", None): (
+                getattr(review, "R003_ASSIGNMENT_SHA256", None),
+                getattr(review, "R003_ASSIGNMENT_BYTE_LENGTH", None),
+            ),
+            getattr(review, "R004_ASSIGNMENT_REL", None): (
+                getattr(review, "R004_ASSIGNMENT_SHA256", None),
+                getattr(review, "R004_ASSIGNMENT_BYTE_LENGTH", None),
+            ),
+        }
+        != _FP046_R002_PRESERVED_REVIEW_ASSIGNMENT_PINS
+        or tuple(
+            getattr(review, name, None)
+            for name in (
+                "R001_RESULT_REL",
+                "R002_RESULT_REL",
+                "R003_RESULT_REL",
+                "R004_RESULT_REL",
+            )
+        )
+        != tuple(
+            path.with_name("review-result.json")
+            for path in preserved_paths
+        )
+        or tuple(
+            getattr(review, name, None)
+            for name in (
+                "R001_INDEPENDENT_REL",
+                "R002_INDEPENDENT_REL",
+                "R003_INDEPENDENT_REL",
+                "R004_INDEPENDENT_REL",
+            )
+        )
+        != tuple(
+            path.with_name("independent-review.json")
+            for path in preserved_paths
+        )
+        or getattr(review, "R003_SUPERSESSION_REASON_CODE", None)
+        != _FP046_R002_R003_SUPERSESSION_REASON
+        or tuple(
+            getattr(review, "R003_CONFIRMED_REJECTION_FINDINGS", ())
+        )
+        != (_FP046_R002_R003_CONFIRMED_FINDING,)
+        or getattr(review, "R004_SUPERSESSION_REASON_CODE", None)
+        != _FP046_R002_R004_SUPERSESSION_REASON
+        or tuple(getattr(review, "R005_REVIEW_PATHS", ()))
+        != _FP046_R002_R005_REVIEW_PATHS
+        or tuple(
+            getattr(review, name, None)
+            for name in (
+                "R005_ASSIGNMENT_REL",
+                "R005_RESULT_REL",
+                "R005_INDEPENDENT_REL",
+            )
+        )
+        != _FP046_R002_R005_REVIEW_PATHS
+        or getattr(review, "R005_REVIEW_PINS", None)
+        != _FP046_R002_R005_REVIEW_PINS
+        or getattr(review, "R005_SUPERSESSION_REASON_CODE", None)
+        != _FP046_R002_R005_SUPERSESSION_REASON
+        or tuple(getattr(review, "SESSION_ARTIFACT_PATHS", ()))
+        != tuple(_FP046_R002_SESSION_ARTIFACT_PINS)
+        or getattr(review, "SESSION_ARTIFACT_PINS", None)
+        != _FP046_R002_SESSION_ARTIFACT_PINS
+    ):
+        raise ValueError("FP046 R002 active R006 review constants differ")
+
+
+def _fp046_r002_frozen_r011_capability() -> tuple[Any, Any, Any]:
+    review = _fp046_r002_start_review_module()
+    frozen_loader = getattr(review, "validated_frozen_r011_context", None)
+    managed_loader = getattr(
+        review,
+        "validated_frozen_r011_managed_sources_by_round",
+        None,
+    )
+    if not callable(frozen_loader) or not callable(managed_loader):
+        raise _Fp046R002StartReviewCapabilityUnavailable(
+            "FP046 R002 frozen R011 interface is unavailable"
+        )
+    return review, frozen_loader, managed_loader
+
+
+def _fp046_r002_frozen_r011_authority(
+    root: Path,
+    *,
+    capability: tuple[Any, Any, Any] | None = None,
+) -> dict[str, Any]:
+    """Replay the exact R011 predecessor without rebuilding its live cohort."""
+
+    if capability is None:
+        capability = _fp046_r002_frozen_r011_capability()
+    review, frozen_loader, managed_loader = capability
+    context = frozen_loader(root)
+    managed_sources_by_round = managed_loader(root)
+    paths = tuple(Path(path) for path in review.FROZEN_R011_PATHS)
+    raw_by_path: dict[Path, bytes] = {}
+    for relative in paths:
+        raw = _npc_exact_live_bytes(root, relative)
+        if raw is None:
+            raise ValueError(f"frozen R011 review file is missing: {relative}")
+        raw_by_path[relative] = raw
+    binding = _r002_exact_review_binding(root, paths, raw_by_path)
+    if binding is None:
+        raise ValueError("frozen R011 review binding differs")
+    expected_review_bindings = tuple(
+        binding[role]
+        for role in ("assignment", "review_result", "independent_review")
+    )
+    if (
+        not isinstance(context, review.FrozenR011Context)
+        or not isinstance(context.current, review.FrozenControlContext)
+        or tuple(context.review_bindings) != expected_review_bindings
+        or managed_sources_by_round != context.managed_sources_by_round
+        or set(managed_sources_by_round) != {"R002", "R003", "R004"}
+        or any(
+            not isinstance(rows, tuple)
+            for rows in managed_sources_by_round.values()
+        )
+    ):
+        raise ValueError("frozen R011 local interface differs")
+    return {
+        "context": context,
+        "binding": binding,
+        "raw_by_path": raw_by_path,
+        "managed_sources_by_round": copy.deepcopy(managed_sources_by_round),
+    }
+
+
+def _fp046_r002_optional_frozen_r011_authority(
+    root: Path,
+) -> dict[str, Any] | None:
+    """Return None only when the successor module/capability does not exist."""
+
+    try:
+        capability = _fp046_r002_frozen_r011_capability()
+    except _Fp046R002StartReviewCapabilityUnavailable:
+        return None
+    return _fp046_r002_frozen_r011_authority(
+        root,
+        capability=capability,
+    )
+
+
+def _fp046_r002_frozen_completion_review_context(
+    root: Path,
+    completion_review: Any,
+) -> dict[str, tuple[dict[str, Any], ...]]:
+    """Read the seq70/71 completion scope without executing historic builders."""
+
+    assignment = _load_exact_json(
+        root,
+        completion_review.ASSIGNMENT_REL.as_posix(),
+    )
+    scope = assignment.get("review_scope") if isinstance(assignment, dict) else None
+    if (
+        not isinstance(scope, dict)
+        or assignment.get("round_id") != completion_review.ROUND_ID
+        or assignment.get("goal_id") != completion_review.GOAL_ID
+    ):
+        raise ValueError("frozen completion review identity differs")
+
+    specifications = (
+        (
+            "control_code_cohort",
+            "reviewed_control_code_cohort",
+            frozenset({"path", "sha256", "byte_length"}),
+            15,
+        ),
+        (
+            "completion_evidence_bindings",
+            "completion_evidence_bindings",
+            frozenset({"path", "sha256", "byte_length"}),
+            14,
+        ),
+        (
+            "superseded_assignment_bindings",
+            "superseded_review_assignments",
+            frozenset(
+                {"path", "sha256", "byte_length", "reason", "status"}
+            ),
+            13,
+        ),
+    )
+    result: dict[str, tuple[dict[str, Any], ...]] = {}
+    for result_key, scope_key, keys, expected_count in specifications:
+        value = scope.get(scope_key)
+        if not isinstance(value, list) or len(value) != expected_count:
+            raise ValueError(f"frozen completion {scope_key} differs")
+        paths: set[str] = set()
+        for row in value:
+            relative = row.get("path") if isinstance(row, dict) else None
+            path = Path(relative) if isinstance(relative, str) else Path()
+            if (
+                not isinstance(row, dict)
+                or set(row) != keys
+                or not isinstance(relative, str)
+                or not relative
+                or path.is_absolute()
+                or ".." in path.parts
+                or relative in paths
+                or not isinstance(row.get("sha256"), str)
+                or continuation.SHA256_RE.fullmatch(row["sha256"]) is None
+                or not isinstance(row.get("byte_length"), int)
+                or isinstance(row.get("byte_length"), bool)
+                or row["byte_length"] < 0
+            ):
+                raise ValueError(f"frozen completion {scope_key} row differs")
+            paths.add(relative)
+        result[result_key] = tuple(copy.deepcopy(value))
+    if scope.get("reviewed_control_code_cohort_sha256") != (
+        continuation.canonical_json_sha256(list(result["control_code_cohort"]))
+    ):
+        raise ValueError("frozen completion control cohort aggregate differs")
+    return result
+
+
+def _fp046_r002_validated_control_cohort_delta(
+    root: Path,
+    review: Any,
+    cohort_source: Any,
+    frozen_context: Any,
+    *,
+    reviewed_context: Any | None = None,
+) -> dict[str, Any]:
+    if not isinstance(cohort_source, tuple):
+        raise ValueError("FP046 R002 control cohort differs")
+    cohort = tuple(copy.deepcopy(cohort_source))
+    cohort_by_path: dict[str, dict[str, Any]] = {}
+    for row in cohort:
+        if not isinstance(row, dict) or set(row) != {
+            "path",
+            "sha256",
+            "byte_length",
+        }:
+            raise ValueError("FP046 R002 current control cohort row differs")
+        relative = row.get("path")
+        path = Path(relative) if isinstance(relative, str) else Path()
+        raw = _npc_exact_live_bytes(root, path)
+        if (
+            not isinstance(relative, str)
+            or not relative
+            or path.is_absolute()
+            or ".." in path.parts
+            or relative in cohort_by_path
+            or raw is None
+            or len(raw) != row.get("byte_length")
+            or continuation.sha256_bytes(raw) != row.get("sha256")
+        ):
+            raise ValueError("FP046 R002 current control cohort bytes differ")
+        cohort_by_path[relative] = row
+    if not cohort_by_path:
+        raise ValueError("FP046 R002 current control cohort is empty")
+
+    frozen_rows = tuple(frozen_context.current.control_code_cohort)
+    frozen_by_path = {
+        row.get("path"): row
+        for row in frozen_rows
+        if isinstance(row, dict) and isinstance(row.get("path"), str)
+    }
+    if len(frozen_rows) != 23 or len(frozen_by_path) != 23:
+        raise ValueError("FP046 R002 frozen R011 cohort differs")
+
+    current_paths = set(cohort_by_path)
+    frozen_paths = set(frozen_by_path)
+    added_paths = current_paths - frozen_paths
+    changed_paths = {
+        relative
+        for relative in current_paths & frozen_paths
+        if cohort_by_path[relative] != frozen_by_path[relative]
+    }
+    expected_current_paths = {
+        Path(path).as_posix() for path in review.CURRENT_CONTROL_PATHS
+    }
+    expected_changed_paths = {
+        Path(path).as_posix() for path in review.MODIFIED_CONTROL_PATHS
+    }
+    expected_added_paths = {
+        Path(path).as_posix() for path in review.ADDED_CONTROL_PATHS
+    }
+    if (
+        expected_changed_paths
+        != _FP046_R002_PRE_REVIEW_MODIFIED_CONTROL_PATHS
+    ):
+        raise ValueError("FP046 R002 modified control path set differs")
+    if (
+        len(cohort_by_path) != 31
+        or not frozen_paths.issubset(current_paths)
+        or current_paths != expected_current_paths
+        or changed_paths != expected_changed_paths
+        or added_paths != expected_added_paths
+        or len(changed_paths) != 7
+        or len(added_paths) != 8
+        or len(changed_paths | added_paths) != 15
+    ):
+        raise ValueError("FP046 R002 reviewed control successor delta differs")
+    if reviewed_context is not None:
+        successor_paths = {
+            row.get("path")
+            for row in reviewed_context.control_code_successors
+            if isinstance(row, dict)
+        }
+        if successor_paths != changed_paths:
+            raise ValueError("FP046 R002 reviewed modified path set differs")
+        reviewed_added_paths = {
+            row.get("path")
+            for row in reviewed_context.added_control_code_bindings
+            if isinstance(row, dict)
+        }
+        if reviewed_added_paths != added_paths:
+            raise ValueError("FP046 R002 reviewed added path set differs")
+    return {
+        "control_code_cohort": tuple(cohort_by_path.values()),
+        "changed_paths": frozenset(changed_paths),
+        "added_paths": frozenset(added_paths),
+    }
+
+
+def _fp046_r002_pre_review_control_cohort_capability() -> tuple[Any, Any]:
+    review = _fp046_r002_start_review_module()
+    cohort_loader = getattr(review, "current_control_cohort", None)
+    required_constants = (
+        "CURRENT_CONTROL_PATHS",
+        "MODIFIED_CONTROL_PATHS",
+        "ADDED_CONTROL_PATHS",
+    )
+    if not callable(cohort_loader) or any(
+        not hasattr(review, name) for name in required_constants
+    ):
+        raise _Fp046R002StartReviewCapabilityUnavailable(
+            "FP046 R002 current control cohort capability is unavailable"
+        )
+    _fp046_r002_require_r006_review_constants(review)
+    return review, cohort_loader
+
+
+def _fp046_r002_pre_review_modified_control_cohort(
+    root: Path,
+    frozen_authority: dict[str, Any],
+    *,
+    capability: tuple[Any, Any] | None = None,
+) -> tuple[dict[str, Any], ...]:
+    """Bind only the seven existing WIP controls before seq77 authority."""
+
+    if capability is None:
+        capability = _fp046_r002_pre_review_control_cohort_capability()
+    review, cohort_loader = capability
+    frozen_context = frozen_authority.get("context")
+    if frozen_context is None:
+        raise ValueError("FP046 R002 frozen R011 context is missing")
+    delta = _fp046_r002_validated_control_cohort_delta(
+        root,
+        review,
+        cohort_loader(root),
+        frozen_context,
+    )
+    return tuple(
+        row
+        for row in delta["control_code_cohort"]
+        if row["path"] in delta["changed_paths"]
+    )
+
+
+def _fp046_r002_current_control_review_authority(
+    root: Path,
+) -> dict[str, Any]:
+    """Validate the actor-separated seq77/78 review and its live cohort."""
+
+    review = _fp046_r002_start_review_module()
+    post_review_loader = getattr(review, "validate_post_review", None)
+    binding_loader = getattr(review, "transition_review_binding", None)
+    if not callable(post_review_loader) or not callable(binding_loader):
+        raise _Fp046R002StartReviewCapabilityUnavailable(
+            "FP046 R002 approved review capability is unavailable"
+        )
+    _fp046_r002_require_r006_review_constants(review)
+    context = post_review_loader(root)
+    binding = binding_loader(root)
+    if type(binding) is not dict or set(binding) != {
+        "assignment",
+        "review_result",
+        "independent_review",
+    }:
+        raise ValueError("FP046 R002 current review role set differs")
+    review_paths: list[Path] = []
+    review_raw_by_role: dict[str, bytes] = {}
+    for role in ("assignment", "review_result", "independent_review"):
+        row = binding.get(role)
+        if (
+            type(row) is not dict
+            or set(row) != {"path", "sha256", "byte_length"}
+            or type(row.get("path")) is not str
+            or not row["path"]
+            or type(row.get("sha256")) is not str
+            or continuation.SHA256_RE.fullmatch(row["sha256"]) is None
+            or type(row.get("byte_length")) is not int
+            or row["byte_length"] < 0
+        ):
+            raise ValueError(f"FP046 R002 current review {role} binding differs")
+        relative = Path(row["path"])
+        raw = _npc_exact_live_bytes(root, relative)
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or raw is None
+            or len(raw) != row.get("byte_length")
+            or continuation.sha256_bytes(raw) != row.get("sha256")
+        ):
+            raise ValueError(f"FP046 R002 current review {role} bytes differ")
+        review_paths.append(relative)
+        review_raw_by_role[role] = raw
+    if tuple(review_paths) != _FP046_R002_R006_REVIEW_PATHS:
+        raise ValueError("FP046 R002 active R006 review paths differ")
+
+    superseded = getattr(context, "superseded_review_assignments", None)
+    preserved_paths = tuple(
+        Path(path) for path in getattr(review, "PRESERVED_REVIEW_PATHS", ())
+    )
+    expected_preserved_paths = (
+        review.R001_ASSIGNMENT_REL,
+        review.R002_ASSIGNMENT_REL,
+        review.R003_ASSIGNMENT_REL,
+        review.R004_ASSIGNMENT_REL,
+    )
+    pinned_preserved_paths = tuple(
+        _FP046_R002_PRESERVED_REVIEW_ASSIGNMENT_PINS
+    )
+    if (
+        type(superseded) is not tuple
+        or len(superseded) != 4
+        or preserved_paths != pinned_preserved_paths
+        or expected_preserved_paths != pinned_preserved_paths
+        or set(preserved_paths) & set(review_paths)
+        or review.R003_ASSIGNMENT_SHA256
+        != _FP046_R002_R003_REVIEW_ASSIGNMENT_SHA256
+        or review.R003_ASSIGNMENT_BYTE_LENGTH
+        != _FP046_R002_R003_REVIEW_ASSIGNMENT_BYTE_LENGTH
+        or tuple(review.R003_CONFIRMED_REJECTION_FINDINGS)
+        != (_FP046_R002_R003_CONFIRMED_FINDING,)
+        or review.R003_SUPERSESSION_REASON_CODE
+        != _FP046_R002_R003_SUPERSESSION_REASON
+        or review.R004_ASSIGNMENT_SHA256
+        != _FP046_R002_R004_REVIEW_ASSIGNMENT_SHA256
+        or review.R004_ASSIGNMENT_BYTE_LENGTH
+        != _FP046_R002_R004_REVIEW_ASSIGNMENT_BYTE_LENGTH
+        or review.R004_SUPERSESSION_REASON_CODE
+        != _FP046_R002_R004_SUPERSESSION_REASON
+    ):
+        raise ValueError("FP046 R002 superseded review inventory differs")
+    round_specs = (
+        (
+            review.R001_ROUND_ID,
+            review.R001_SUPERSESSION_REASON_CODE,
+            None,
+            review.R001_RESULT_REL,
+            review.R001_INDEPENDENT_REL,
+        ),
+        (
+            review.R002_ROUND_ID,
+            review.R002_SUPERSESSION_REASON_CODE,
+            tuple(review.R002_CONFIRMED_REJECTION_FINDINGS),
+            review.R002_RESULT_REL,
+            review.R002_INDEPENDENT_REL,
+        ),
+        (
+            review.R003_ROUND_ID,
+            review.R003_SUPERSESSION_REASON_CODE,
+            tuple(review.R003_CONFIRMED_REJECTION_FINDINGS),
+            review.R003_RESULT_REL,
+            review.R003_INDEPENDENT_REL,
+        ),
+        (
+            review.R004_ROUND_ID,
+            review.R004_SUPERSESSION_REASON_CODE,
+            None,
+            review.R004_RESULT_REL,
+            review.R004_INDEPENDENT_REL,
+        ),
+    )
+    base_fields = {
+        "round_id",
+        "assignment_binding",
+        "disposition",
+        "review_result_status",
+        "independent_review_status",
+        "supersession_reason_code",
+    }
+    for index, (record, relative, specification) in enumerate(
+        zip(superseded, preserved_paths, round_specs, strict=True),
+        start=1,
+    ):
+        (
+            round_id,
+            reason_code,
+            confirmed_findings,
+            result_relative,
+            independent_relative,
+        ) = specification
+        expected_sha256, expected_byte_length = (
+            _FP046_R002_PRESERVED_REVIEW_ASSIGNMENT_PINS[relative]
+        )
+        expected_result_relative = relative.with_name("review-result.json")
+        expected_independent_relative = relative.with_name(
+            "independent-review.json"
+        )
+        expected_fields = set(base_fields)
+        if confirmed_findings is not None:
+            expected_fields.add("confirmed_rejection_findings")
+        binding_row = (
+            record.get("assignment_binding")
+            if type(record) is dict
+            else None
+        )
+        raw = _npc_exact_live_bytes(root, relative)
+        if (
+            type(record) is not dict
+            or set(record) != expected_fields
+            or record.get("round_id") != round_id
+            or record.get("disposition") != "SUPERSEDED_WITHOUT_APPROVAL"
+            or record.get("review_result_status") != "NOT_CREATED"
+            or record.get("independent_review_status") != "NOT_CREATED"
+            or record.get("supersession_reason_code") != reason_code
+            or (
+                confirmed_findings is not None
+                and record.get("confirmed_rejection_findings")
+                != list(confirmed_findings)
+            )
+            or type(binding_row) is not dict
+            or set(binding_row) != {"path", "sha256", "byte_length"}
+            or binding_row.get("path") != relative.as_posix()
+            or type(binding_row.get("sha256")) is not str
+            or (
+                continuation.SHA256_RE.fullmatch(binding_row["sha256"])
+                is None
+            )
+            or type(binding_row.get("byte_length")) is not int
+            or relative.is_absolute()
+            or ".." in relative.parts
+            or raw is None
+            or len(raw) != binding_row.get("byte_length")
+            or continuation.sha256_bytes(raw) != binding_row.get("sha256")
+            or len(raw) != expected_byte_length
+            or continuation.sha256_bytes(raw) != expected_sha256
+            or result_relative != expected_result_relative
+            or independent_relative != expected_independent_relative
+            or any(
+                (root / output).exists() or (root / output).is_symlink()
+                for output in (
+                    expected_result_relative,
+                    expected_independent_relative,
+                )
+            )
+        ):
+            raise ValueError(
+                f"FP046 R002 superseded R00{index} assignment differs"
+            )
+
+    approved_r005 = getattr(context, "approved_r005_review_bindings", None)
+    session_artifacts = getattr(context, "session_artifact_bindings", None)
+    expected_approved_r005 = tuple(
+        {
+            "path": relative.as_posix(),
+            "sha256": pin[0],
+            "byte_length": pin[1],
+        }
+        for relative, pin in _FP046_R002_R005_REVIEW_PINS.items()
+    )
+    expected_session_artifacts = tuple(
+        {
+            "path": relative.as_posix(),
+            "sha256": pin[0],
+            "byte_length": pin[1],
+        }
+        for relative, pin in _FP046_R002_SESSION_ARTIFACT_PINS.items()
+    )
+    for label, actual, expected in (
+        ("approved R005 review", approved_r005, expected_approved_r005),
+        ("session artifact", session_artifacts, expected_session_artifacts),
+    ):
+        if type(actual) is not tuple or actual != expected:
+            raise ValueError(f"FP046 R002 {label} binding inventory differs")
+        for row in actual:
+            relative = Path(row["path"])
+            raw = _npc_exact_live_bytes(root, relative)
+            if (
+                raw is None
+                or len(raw) != row["byte_length"]
+                or continuation.sha256_bytes(raw) != row["sha256"]
+            ):
+                raise ValueError(f"FP046 R002 {label} binding bytes differ")
+
+    try:
+        active_assignment = json.loads(
+            review_raw_by_role["assignment"].decode("utf-8")
+        )
+    except (KeyError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("FP046 R002 active R006 assignment differs") from exc
+    active_scope = (
+        active_assignment.get("review_scope")
+        if type(active_assignment) is dict
+        else None
+    )
+    if (
+        type(active_scope) is not dict
+        or active_scope.get("approved_r005_review_bindings")
+        != list(expected_approved_r005)
+        or active_scope.get("approved_r005_supersession_reason_code")
+        != _FP046_R002_R005_SUPERSESSION_REASON
+        or active_scope.get("session_artifact_bindings")
+        != list(expected_session_artifacts)
+        or active_scope.get("session_artifact_path_count") != 4
+    ):
+        raise ValueError("FP046 R002 active R006 review scope differs")
+
+    frozen_authority = _fp046_r002_frozen_r011_authority(root)
+    delta = _fp046_r002_validated_control_cohort_delta(
+        root,
+        review,
+        getattr(context, "current_control_cohort", None),
+        frozen_authority["context"],
+        reviewed_context=context,
+    )
+    return {
+        "context": context,
+        "binding": binding,
+        "review_paths": tuple(review_paths),
+        "preserved_review_paths": preserved_paths,
+        "approved_r005_review_paths": _FP046_R002_R005_REVIEW_PATHS,
+        "session_artifact_paths": tuple(
+            _FP046_R002_SESSION_ARTIFACT_PINS
+        ),
+        **delta,
+    }
+
+
 def _r002_reopen_suffix(
     checkpoint: dict[str, Any],
 ) -> list[dict[str, Any]] | None:
@@ -16214,19 +24305,81 @@ def _r002_review_authority_errors(
         )
         if plan is None:
             raise ValueError("reviewed checkpoint plan is malformed")
+        start_suffix = _fp046_r002_seq77_78_suffix(checkpoint)
+        if start_suffix is None:
+            raise ValueError("FP046 R002 start suffix is malformed")
+        frozen_r011 = _fp046_r002_optional_frozen_r011_authority(root)
+        if frozen_r011 is None and start_suffix != []:
+            raise ValueError(
+                "FP046 R002 start review capability is unavailable"
+            )
         r001_binding, r001_raw = review.load_frozen_transition_r001(root)
         r002_binding, r002_raw = review.load_frozen_transition_r002(root)
         r003_binding, r003_raw = review.load_frozen_transition_r003(root)
-        r004_binding, r004_raw = review.load_validated_transition_r004(root)
+        if frozen_r011 is not None:
+            r004_raw = {
+                relative: review._safe_regular_bytes(
+                    root,
+                    relative,
+                    "frozen transition R004 review",
+                )
+                for relative in review.TRANSITION_R004_PATHS
+            }
+            r004_assignment_raw = r004_raw[
+                review.TRANSITION_R004_ASSIGNMENT_REL
+            ]
+            r004_result_raw = r004_raw[review.TRANSITION_R004_RESULT_REL]
+            r004_assignment = review.strict_json_bytes(
+                r004_assignment_raw,
+                "frozen transition R004 assignment",
+            )
+            r004_result = review.strict_json_bytes(
+                r004_result_raw,
+                "frozen transition R004 review result",
+            )
+            review._validate_transition_assignment_envelope(
+                r004_assignment,
+                r004_assignment_raw,
+            )
+            review._validate_transition_result_document(
+                r004_result,
+                r004_result_raw,
+                r004_assignment,
+                r004_assignment_raw,
+            )
+            if r004_raw[review.TRANSITION_R004_INDEPENDENT_REL] != (
+                review.build_transition_independent_review(
+                    r004_assignment,
+                    r004_assignment_raw,
+                    r004_result,
+                    r004_result_raw,
+                ).encode("utf-8")
+            ):
+                raise ValueError("frozen transition R004 review differs")
+            r004_binding = review._review_binding_by_role(
+                review.TRANSITION_R004_PATHS,
+                r004_raw,
+            )
+        else:
+            r004_binding, r004_raw = review.load_validated_transition_r004(
+                root
+            )
         r009_binding, r009_raw = review.load_frozen_control_successor_r009(
             root
         )
         r010_binding, r010_raw = review.load_frozen_control_successor_r010(
             root
         )
-        r011_binding, r011_raw = review.load_validated_control_successor_r011(
-            root
-        )
+        if frozen_r011 is not None:
+            r011_binding = frozen_r011["binding"]
+            r011_raw = frozen_r011["raw_by_path"]
+        else:
+            r011_binding, r011_raw = (
+                review.load_validated_control_successor_r011(root)
+            )
+        if start_suffix not in ([], None):
+            if len(start_suffix) >= 6:
+                _fp046_r002_recovery_review_authority(root, checkpoint)
         path_groups = (
             (tuple(Path(path) for path in review.TRANSITION_R001_PATHS), r001_raw),
             (tuple(Path(path) for path in review.TRANSITION_R002_PATHS), r002_raw),
@@ -16841,6 +24994,409 @@ def validate_fp046_npc_r002_reopen_seq72_76(
     return errors
 
 
+def _fp046_r002_seq77_79_suffix(
+    checkpoint: dict[str, Any],
+) -> list[dict[str, Any]] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list):
+        return None
+    if len(history) < FP046_R002_CONTROL_REANCHOR_SEQUENCE:
+        return []
+    reanchor = history[FP046_R002_CONTROL_REANCHOR_SEQUENCE - 1]
+    if (
+        not isinstance(reanchor, dict)
+        or reanchor.get("sequence") != FP046_R002_CONTROL_REANCHOR_SEQUENCE
+        or reanchor.get("event_id") != FP046_R002_CONTROL_REANCHOR_EVENT_ID
+        or reanchor.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+    ):
+        return None
+    if len(history) < FP046_R002_CONTROL_CORRECTION_SEQUENCE:
+        return [reanchor]
+    correction = history[FP046_R002_CONTROL_CORRECTION_SEQUENCE - 1]
+    if (
+        not isinstance(correction, dict)
+        or correction.get("sequence") != FP046_R002_CONTROL_CORRECTION_SEQUENCE
+        or correction.get("event_id") != FP046_R002_CONTROL_CORRECTION_EVENT_ID
+        or correction.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+    ):
+        return None
+    if len(history) < FP046_R002_RECOVERY_CONTROL_REANCHOR_SEQUENCE:
+        return [reanchor, correction]
+    recovery = history[FP046_R002_RECOVERY_CONTROL_REANCHOR_SEQUENCE - 1]
+    if (
+        not isinstance(recovery, dict)
+        or recovery.get("sequence") != FP046_R002_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+        or recovery.get("event_id") != FP046_R002_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+        or recovery.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+    ):
+        return None
+    if len(history) < FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_SEQUENCE:
+        return [reanchor, correction, recovery]
+    second_recovery = history[
+        FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_SEQUENCE - 1
+    ]
+    if (
+        not isinstance(second_recovery, dict)
+        or second_recovery.get("sequence")
+        != FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+        or second_recovery.get("event_id")
+        != FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+        or second_recovery.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+    ):
+        return None
+    if len(history) < FP046_R002_THIRD_RECOVERY_CONTROL_REANCHOR_SEQUENCE:
+        return [reanchor, correction, recovery, second_recovery]
+    third_recovery = history[
+        FP046_R002_THIRD_RECOVERY_CONTROL_REANCHOR_SEQUENCE - 1
+    ]
+    if (
+        not isinstance(third_recovery, dict)
+        or third_recovery.get("sequence")
+        != FP046_R002_THIRD_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+        or third_recovery.get("event_id")
+        != FP046_R002_THIRD_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+        or third_recovery.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+    ):
+        return None
+    if len(history) < FP046_R002_FOURTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE:
+        return [
+            reanchor,
+            correction,
+            recovery,
+            second_recovery,
+            third_recovery,
+        ]
+    fourth_recovery = history[
+        FP046_R002_FOURTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE - 1
+    ]
+    if (
+        not isinstance(fourth_recovery, dict)
+        or fourth_recovery.get("sequence")
+        != FP046_R002_FOURTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+        or fourth_recovery.get("event_id")
+        != FP046_R002_FOURTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+        or fourth_recovery.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+    ):
+        return None
+    if len(history) < FP046_R002_FIFTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE:
+        return [
+            reanchor,
+            correction,
+            recovery,
+            second_recovery,
+            third_recovery,
+            fourth_recovery,
+        ]
+    fifth_recovery = history[
+        FP046_R002_FIFTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE - 1
+    ]
+    if (
+        not isinstance(fifth_recovery, dict)
+        or fifth_recovery.get("sequence")
+        != FP046_R002_FIFTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+        or fifth_recovery.get("event_id")
+        != FP046_R002_FIFTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+        or fifth_recovery.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+    ):
+        return None
+    if len(history) < FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE:
+        return [
+            reanchor,
+            correction,
+            recovery,
+            second_recovery,
+            third_recovery,
+            fourth_recovery,
+            fifth_recovery,
+        ]
+    sixth_recovery = history[
+        FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE - 1
+    ]
+    if (
+        not isinstance(sixth_recovery, dict)
+        or sixth_recovery.get("sequence")
+        != FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+        or sixth_recovery.get("event_id")
+        != FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+        or sixth_recovery.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+    ):
+        return None
+    if len(history) < FP046_R002_STARTED_SEQUENCE:
+        return [
+            reanchor,
+            correction,
+            recovery,
+            second_recovery,
+            third_recovery,
+            fourth_recovery,
+            fifth_recovery,
+            sixth_recovery,
+        ]
+    started = history[FP046_R002_STARTED_SEQUENCE - 1]
+    if (
+        not isinstance(started, dict)
+        or started.get("sequence") != FP046_R002_STARTED_SEQUENCE
+        or started.get("event_id") != FP046_R002_STARTED_EVENT_ID
+        or started.get("event_id") in FP046_R002_BURNED_STARTED_EVENT_IDS
+        or started.get("event_type") != "GOAL_STARTED"
+    ):
+        return None
+    return [
+        reanchor,
+        correction,
+        recovery,
+        second_recovery,
+        third_recovery,
+        fourth_recovery,
+        fifth_recovery,
+        sixth_recovery,
+        started,
+    ]
+
+
+def _fp046_r002_seq77_78_suffix(
+    checkpoint: dict[str, Any],
+) -> list[dict[str, Any]] | None:
+    """Compatibility alias for callers that predate the recovery suffix."""
+
+    return _fp046_r002_seq77_79_suffix(checkpoint)
+
+
+def validate_fp046_r002_seq77_79(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Validate the FP046 R002 seq77 through seq85 recovery/start suffix."""
+
+    suffix = _fp046_r002_seq77_79_suffix(checkpoint)
+    if suffix == []:
+        return []
+    if suffix is None:
+        return [
+            "FP046 R002 seq77/78/79/80/81/82/83/84/85 suffix is incomplete or malformed"
+        ]
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list):
+        return ["FP046 R002 seq77/78/79/80/81/82/83/84/85 state is malformed"]
+    errors = [
+        f"FP046 R002 seq77/78/79/80/81/82/83/84/85: {error}"
+        for error in continuation.validate_fp046_r002_seq77_78_boundary(
+            root,
+            checkpoint,
+        )
+    ]
+    try:
+        required_managed = {
+            row["path"]
+            for row in continuation.FP046_R002_R006_REVIEW_BINDING.values()
+        }
+        if suffix[0].get("transition_control_review_binding") != (
+            continuation.FP046_R002_R006_REVIEW_BINDING
+        ):
+            errors.append("FP046 R002 seq77 historical R006 binding differs")
+
+        if len(suffix) >= 2:
+            _review, correction, started = _fp046_r002_recovery_control_modules()
+            corrected = correction.validate_seq78_history_suffix(
+                root,
+                checkpoint,
+                require_live_snapshot=False,
+            )
+            if not correction.strict_json_equal(corrected, suffix[1]):
+                raise ValueError("seq78 correction validator result differs")
+
+        if len(suffix) >= 3:
+            historical_review_bindings = (
+                continuation.FP046_R002_RECOVERY_REJECTED_R001_ASSIGNMENT,
+                *continuation.FP046_R002_RECOVERY_APPROVED_R002_REVIEW_BINDING.values(),
+                *continuation.FP046_R002_RECOVERY_APPROVED_R003_REVIEW_BINDING.values(),
+                *continuation.FP046_R002_RECOVERY_APPROVED_R004_REVIEW_BINDING.values(),
+                *continuation.FP046_R002_RECOVERY_APPROVED_R005_REVIEW_BINDING.values(),
+                *continuation.FP046_R002_RECOVERY_APPROVED_R006_REVIEW_BINDING.values(),
+                *continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING.values(),
+            )
+            required_managed.update(
+                row["path"] for row in historical_review_bindings
+            )
+            corrected = correction.validate_seq79_history_suffix(
+                root,
+                checkpoint,
+                require_live_snapshot=False,
+            )
+            if not correction.strict_json_equal(corrected, suffix[2]):
+                raise ValueError("seq79 correction validator result differs")
+            if not correction.strict_json_equal(
+                suffix[2].get("transition_control_review_binding"),
+                continuation.FP046_R002_RECOVERY_APPROVED_R007_REVIEW_BINDING,
+            ):
+                errors.append("FP046 R002 seq79 recovery review binding differs")
+
+        if len(suffix) >= 4:
+            required_managed.update(
+                row["path"]
+                for row in continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING.values()
+            )
+            corrected = correction.validate_seq80_history_suffix(
+                root,
+                checkpoint,
+                require_live_snapshot=False,
+            )
+            if not correction.strict_json_equal(corrected, suffix[3]):
+                raise ValueError("seq80 correction validator result differs")
+            if not correction.strict_json_equal(
+                suffix[3].get("transition_control_review_binding"),
+                continuation.FP046_R002_RECOVERY_APPROVED_R008_REVIEW_BINDING,
+            ):
+                errors.append("FP046 R002 seq80 recovery review binding differs")
+
+        if len(suffix) >= 5:
+            required_managed.update(
+                row["path"]
+                for row in continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING.values()
+            )
+            corrected = correction.validate_seq81_history_suffix(
+                root,
+                checkpoint,
+                require_live_snapshot=False,
+            )
+            if not correction.strict_json_equal(corrected, suffix[4]):
+                raise ValueError("seq81 correction validator result differs")
+            if not correction.strict_json_equal(
+                suffix[4].get("transition_control_review_binding"),
+                continuation.FP046_R002_RECOVERY_APPROVED_R009_REVIEW_BINDING,
+            ):
+                errors.append("FP046 R002 seq81 recovery review binding differs")
+
+        if len(suffix) >= 6:
+            required_managed.update(
+                row["path"]
+                for row in continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING.values()
+            )
+            corrected = correction.validate_seq82_history_suffix(
+                root,
+                checkpoint,
+                require_live_snapshot=False,
+            )
+            if not correction.strict_json_equal(corrected, suffix[5]):
+                raise ValueError("seq82 correction validator result differs")
+            if not correction.strict_json_equal(
+                suffix[5].get("transition_control_review_binding"),
+                continuation.FP046_R002_RECOVERY_APPROVED_R011_REVIEW_BINDING,
+            ):
+                errors.append("FP046 R002 seq82 recovery review binding differs")
+
+        if len(suffix) >= 7:
+            required_managed.update(
+                row["path"]
+                for row in continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING.values()
+            )
+            corrected = correction.validate_seq83_history_suffix(
+                root,
+                checkpoint,
+                require_live_snapshot=False,
+            )
+            if not correction.strict_json_equal(corrected, suffix[6]):
+                raise ValueError("seq83 correction validator result differs")
+            if not correction.strict_json_equal(
+                suffix[6].get("transition_control_review_binding"),
+                continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING,
+            ):
+                errors.append("FP046 R002 seq83 recovery review binding differs")
+
+        if len(suffix) >= 8:
+            authority = _fp046_r002_recovery_review_authority(
+                root,
+                checkpoint,
+            )
+            required_managed.update(
+                path.as_posix()
+                for key in (
+                    "review_paths",
+                    "preserved_review_paths",
+                    "session_artifact_paths",
+                )
+                for path in authority[key]
+            )
+            corrected = correction.validate_history_suffix(
+                root,
+                checkpoint,
+                require_live_snapshot=False,
+            )
+            if not correction.strict_json_equal(corrected, suffix[7]):
+                raise ValueError("seq84 correction validator result differs")
+            if not correction.strict_json_equal(
+                suffix[7].get("transition_control_review_binding"),
+                authority["binding"],
+            ):
+                errors.append("FP046 R002 seq84 recovery review binding differs")
+
+        if len(suffix) == 9:
+            started_errors = started.validate_history_suffix(root, checkpoint)
+            if not isinstance(started_errors, list):
+                raise ValueError("seq85 history validator result differs")
+            errors.extend(
+                f"FP046 R002 seq77/78/79/80/81/82/83/84/85: {error}"
+                for error in started_errors
+            )
+
+        snapshot = checkpoint.get("working_tree_snapshot")
+        managed = (
+            snapshot.get("managed_changed_paths")
+            if isinstance(snapshot, dict)
+            else None
+        )
+        expected_managed_count = (
+            988
+            if len(suffix) == 2
+            else continuation.FP046_R002_RECOVERY_SEQ79_MANAGED_PATH_COUNT
+            if len(suffix) == 3
+            else continuation.FP046_R002_RECOVERY_HISTORICAL_MANAGED_PATH_COUNT
+            if len(suffix) == 4
+            else continuation.FP046_R002_RECOVERY_SEQ81_MANAGED_PATH_COUNT
+            if len(suffix) == 5
+            else continuation.FP046_R002_RECOVERY_SEQ82_MANAGED_PATH_COUNT
+            if len(suffix) == 6
+            else continuation.FP046_R002_RECOVERY_SEQ83_MANAGED_PATH_COUNT
+            if len(suffix) == 7
+            else continuation.FP046_R002_RECOVERY_MANAGED_PATH_COUNT
+        )
+        if (
+            not isinstance(managed, list)
+            or managed != sorted(set(managed))
+            or not required_managed.issubset(managed)
+            or (
+                len(suffix) >= 2
+                and len(history) <= FP046_R002_STARTED_SEQUENCE
+                and (
+                    len(managed) != expected_managed_count
+                    or not isinstance(snapshot, dict)
+                    or snapshot.get("managed_changed_path_count")
+                    != expected_managed_count
+                    or continuation.FP046_R002_RECOVERY_FAILED_GATE_LOG
+                    in managed
+                )
+            )
+        ):
+            errors.append("FP046 R002 seq77 current review managed paths differ")
+
+    except Exception as exc:
+        errors.append(
+            f"FP046 R002 seq77/78/79/80/81/82/83/84/85 authority differs: {exc}"
+        )
+    return errors
+
+
+def validate_fp046_r002_seq77_78(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Compatibility alias for the recovery-aware validator."""
+
+    return validate_fp046_r002_seq77_79(root, checkpoint)
+
+
 def _r002_legacy_completion_overlay(
     root: Path,
     checkpoint: dict[str, Any],
@@ -16862,7 +25418,70 @@ def _r002_legacy_completion_overlay(
         archived, dict
     ):
         return None
-    for goal_id in (FP046_GOAL_ID, NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID):
+    restored_goal_ids = [FP046_GOAL_ID, NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID]
+    history = state.get("transition_history")
+    if (
+        isinstance(history, list)
+        and len(history) >= 89
+        and isinstance(history[87], dict)
+        and isinstance(history[88], dict)
+        and history[87].get("event_id")
+        == "WS-GOAL-GRAPH-V2-4-GOAL-SUPERSEDED-FP048-R002-20260825-001"
+        and history[88].get("event_id")
+        == "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP048-R002-20260825-001"
+    ):
+        try:
+            from scripts import (
+                apply_walksafe_fp048_r002_goal_seq88_89_20260825
+                as fp048_r002_seq88_89,
+            )
+
+            ready_source = checkpoint
+            started_after_ready = False
+            if len(history) >= 91:
+                seq92 = history[91] if len(history) >= 92 else None
+                r004_correction_declared = isinstance(seq92, dict) and (
+                    seq92.get("event_id")
+                    == FP048_R002_START_GATE_CONTRACT_CORRECTION_EVENT_ID
+                    or seq92.get("event_type")
+                    == "GOAL_START_GATE_CONTRACT_CORRECTED"
+                )
+                if r004_correction_declared:
+                    if validate_fp048_r002_seq91_97(root, checkpoint):
+                        return None
+                    started_after_ready = len(history) >= 94
+                else:
+                    correction_suffix = _fp048_r002_seq91_92_suffix(checkpoint)
+                    if correction_suffix is None:
+                        return None
+                    started_after_ready = len(correction_suffix) >= 2
+            ready_projection = copy.deepcopy(ready_source)
+            ready_state = ready_projection["goal_execution"]
+            if started_after_ready:
+                ready_state["status_by_goal"][FP046_R002_NEXT_GOAL_ID] = (
+                    "READY"
+                )
+                ready_state["goal_status"] = "READY"
+                current = ready_projection.get("current_work")
+                if not isinstance(current, dict):
+                    return None
+                current["status"] = "READY"
+            ready_history = ready_state["transition_history"]
+            ready_state["transition_history"] = ready_history[:89]
+            ready_state["transition_history_anchor_sha256"] = ready_history[
+                88
+            ]["event_sha256"]
+            ready_state["validation_cutoff_at"] = ready_history[88][
+                "occurred_at"
+            ]
+            fp048_r002_seq88_89.require_exact_ready_source(
+                root,
+                ready_projection,
+            )
+        except (KeyError, OSError, RuntimeError, TypeError, ValueError):
+            return None
+        restored_goal_ids.append(FP048_ANDROID_REPORT_GOAL_ID)
+    for goal_id in restored_goal_ids:
         roles = archived.get(goal_id)
         if not isinstance(roles, list):
             return None
@@ -16871,7 +25490,7 @@ def _r002_legacy_completion_overlay(
     return projection
 
 
-def validate(
+def _validate(
     root: Path = ROOT,
     checkpoint_path: Path = V24_CHECKPOINT_RELATIVE,
     archive_path: Path = V23_ARCHIVE_RELATIVE,
@@ -16910,6 +25529,13 @@ def validate(
         return errors + [f"v2.4 input cannot be loaded: {exc}"]
     errors.extend(validate_fp022_completion_seq70_71(root, checkpoint))
     errors.extend(validate_fp046_npc_r002_reopen_seq72_76(root, checkpoint))
+    errors.extend(validate_fp046_r002_seq77_79(root, checkpoint))
+    errors.extend(validate_fp046_r002_completion_seq86_87(root, checkpoint))
+    errors.extend(
+        validate_fp048_r002_reviewed_noncredit_successors(root, checkpoint)
+    )
+    errors.extend(validate_fp048_r002_seq91_98(root, checkpoint))
+    errors.extend(validate_fp048_r002_completion_seq100_101(root, checkpoint))
     preimage_errors, canonical_preimages = (
         validate_canonical_preimage_archive(root)
     )
@@ -17011,6 +25637,39 @@ def validate(
             )
         )
     return errors
+
+
+def validate(
+    root: Path = ROOT,
+    checkpoint_path: Path = V24_CHECKPOINT_RELATIVE,
+    archive_path: Path = V23_ARCHIVE_RELATIVE,
+    manifest_path: Path = V24_MANIFEST_RELATIVE,
+    *,
+    check_continuation: bool = True,
+    current_work_session_id: str | None = None,
+    run_frozen_semantics: bool = True,
+) -> list[str]:
+    """Validate with an aggregate cache confined to this exact call."""
+
+    token = _FP048_R002_REPOSITORY_CONTEXT_CALL_CACHE.set({})
+    try:
+        try:
+            correction = _fp048_r002_successor_correction_authority()
+            source_scope = correction.seq98_source_validation_call_scope()
+        except (AttributeError, ImportError, RuntimeError):
+            source_scope = nullcontext()
+        with source_scope:
+            return _validate(
+                root,
+                checkpoint_path,
+                archive_path,
+                manifest_path,
+                check_continuation=check_continuation,
+                current_work_session_id=current_work_session_id,
+                run_frozen_semantics=run_frozen_semantics,
+            )
+    finally:
+        _FP048_R002_REPOSITORY_CONTEXT_CALL_CACHE.reset(token)
 
 
 def main() -> int:

@@ -1,0 +1,99 @@
+{
+  "authorization_quote": "이제 진행해",
+  "authorization_scope": {
+    "authorized_actions": [
+      "SEQ84_ZERO_CREDIT_GOAL_START_CONTROL_CORRECTION",
+      "PRESERVE_UNCONSUMED_PRIVATE_GATE_PASS_004",
+      "FIX_PROJECTED_START_ACTIVATION_PREDECESSOR_VALIDATOR",
+      "PRIVATE_INITIAL_START_GATE_RETRY_WITH_UNUSED_EVENT_ID_005",
+      "SEQ85_GOAL_STARTED_AFTER_GATE_PASS",
+      "LOCAL_PRODUCT_IMPLEMENTATION_AFTER_GOAL_STARTED"
+    ],
+    "conditions": [
+      "SEQ84_CORRECTION_MUST_PRESERVE_READY_STATUS",
+      "SEQ84_MUST_BIND_THE_EXACT_SEQ83_CORRECTION_R012_REVIEW_AND_UNCONSUMED_GATE_PASS_004",
+      "PROJECTED_START_VALIDATION_MUST_USE_THE_IMMEDIATELY_PRECEDING_CORRECTION_EVENT",
+      "GOAL_STARTED_EVENT_ID_004_REMAINS_UNUSED_BY_ANY_CHECKPOINT_EVENT",
+      "GOAL_STARTED_EVENT_ID_005_MUST_REMAIN_UNUSED_UNTIL_THE_REAL_GATE_RUN",
+      "ALL_FIVE_EVENT_SCOPED_GATE_CHECKS_MUST_PASS",
+      "SEQ85_MUST_BIND_THE_EXACT_GATE_RECEIPT",
+      "PRODUCT_CHANGE_MUST_OCCUR_ONLY_AFTER_SEQ85",
+      "AUTHORITY_SCOPE_IS_NOT_EXPANDED_BEYOND_THE_EXISTING_RECOVERY_CONTINUATION"
+    ],
+    "excluded_actions": [
+      "FORMAL_TEST_PASS_CLAIM",
+      "ACTUAL_DEVICE_CREDIT",
+      "EXTERNAL_REVIEW_CREDIT",
+      "DEPLOYMENT",
+      "RELEASE_APPROVAL"
+    ]
+  },
+  "authorization_status": "AUTHORIZED_FOR_CONDITIONAL_SEQ84_85_RECOVERY_CONTINUATION",
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_review_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "goal_started": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "sequence_83_status": "PUBLISHED_ZERO_CREDIT",
+    "sequence_84_status": "NOT_PUBLISHED",
+    "sequence_85_status": "NOT_PUBLISHED",
+    "start_gate_004_status": "PASS_UNCONSUMED",
+    "start_gate_005_status": "NOT_RUN",
+    "test_credit_delta": 0
+  },
+  "document_id": "WS-FP046-R002-SEQ84-85-RECOVERY-AUTHORIZATION-20260825-001",
+  "evidence_type": "USER_CONTINUATION_AUTHORIZATION",
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "predecessor_review": {
+    "records": [
+      {
+        "byte_length": 38480,
+        "path": "docs/control/execution/workstream-transitions/seq78-79/review-rounds/R012/review-assignment.json",
+        "sha256": "287e64d716cc23d138ec8bf87690342df8e9136d220f0b227f212c29341886d7"
+      },
+      {
+        "byte_length": 38272,
+        "path": "docs/control/execution/workstream-transitions/seq78-79/review-rounds/R012/review-result.json",
+        "sha256": "9f71b7717d60746e59c8b476acc6679bb3f8aedaa15bf7135a554e1d3b709237"
+      },
+      {
+        "byte_length": 38555,
+        "path": "docs/control/execution/workstream-transitions/seq78-79/review-rounds/R012/independent-review.json",
+        "sha256": "2729e096da3596b939e6260444b7b8eb4b329fba11bdf27f5391c40b0c707330"
+      }
+    ],
+    "round_id": "WS-FP046-R002-SEQ83-84-RECOVERY-REVIEW-20260825-R012"
+  },
+  "reason_code": "SEQ84_PROJECTED_START_ACTIVATION_PREDECESSOR_VALIDATOR_CORRECTED",
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 2425953,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "sequence": 83,
+    "sha256": "234b190dbed90d2f7f3cb1a1a5a616b7b25f79577d3b88bad5cfc9571b1f9bb1",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP046-R002-CORRECTION-20260824-006",
+    "tail_event_sha256": "488f8b87f4d6a3ef605e2360b10d1df7b932096f3baf775e68189fb3683f1f0b"
+  },
+  "supersedes": {
+    "authorization_status": "AUTHORIZED_FOR_CONDITIONAL_SEQ83_84_RECOVERY_CONTINUATION",
+    "byte_length": 4132,
+    "document_id": "WS-FP046-R002-SEQ83-84-RECOVERY-AUTHORIZATION-20260825-001",
+    "file_sha256": "9f199ed6f03901b4d703b73c9b040b64bcf7454ca4ad09c79de8aa2d1f82e144",
+    "path": "docs/control/execution/workstream-transitions/seq83-84/authorization.json"
+  },
+  "unconsumed_gate_pass_binding": {
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-004",
+    "receipt": {
+      "byte_length": 7918,
+      "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-004/implementation-start-gate-receipt.json",
+      "sha256": "2499d7d2e8833c51d6715f5bde408e9a927e35f7962c966aff21af8d2cf11cb6"
+    },
+    "status": "PASS_UNCONSUMED"
+  }
+}

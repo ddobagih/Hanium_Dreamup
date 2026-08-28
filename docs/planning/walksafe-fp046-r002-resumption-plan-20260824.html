@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="WalkSafe FP046 R002 seq76 복구 WIP를 R004 review 통제부터 안전하게 재개하기 위한 비정본 실행 계획">
+  <title>WalkSafe FP046 R002 재개 실행 계획</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5b6578;
+      --line: #d9dfeb;
+      --surface: #ffffff;
+      --soft: #f4f7fb;
+      --navy: #173b68;
+      --blue: #1f67a8;
+      --teal: #087f74;
+      --amber: #9a5b00;
+      --red: #a32929;
+      --green: #096250;
+      --blue-soft: #eaf2fb;
+      --green-soft: #e8f7f2;
+      --amber-soft: #fff4d8;
+      --red-soft: #fdecec;
+      --shadow: 0 12px 30px rgba(30, 55, 90, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--soft);
+      color: var(--ink);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+      line-height: 1.65;
+    }
+
+    a { color: var(--blue); text-underline-offset: 0.18em; }
+    a:hover { color: var(--navy); }
+    a:focus-visible,
+    summary:focus-visible {
+      outline: 3px solid #f5b942;
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: fixed;
+      z-index: 20;
+      top: 8px;
+      left: 8px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--navy);
+      font-weight: 800;
+      transform: translateY(-150%);
+    }
+    .skip-link:focus { transform: translateY(0); }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 30px 0 72px;
+    }
+
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: 42px;
+      border-radius: 22px;
+      color: #fff;
+      background: linear-gradient(135deg, #102b4b 0%, #164f7a 58%, #087f74 100%);
+      box-shadow: var(--shadow);
+    }
+    header::after {
+      content: "";
+      position: absolute;
+      right: -92px;
+      bottom: -132px;
+      width: 330px;
+      height: 330px;
+      border: 54px solid rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+    }
+    .eyebrow {
+      margin: 0 0 8px;
+      font-size: 0.82rem;
+      font-weight: 850;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.84;
+    }
+    h1 {
+      position: relative;
+      z-index: 1;
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 3.35rem);
+      line-height: 1.18;
+      letter-spacing: -0.045em;
+    }
+    header .lead {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+      margin: 18px 0 0;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 1.04rem;
+    }
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 24px;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 0.88rem;
+    }
+
+    nav {
+      position: sticky;
+      z-index: 5;
+      top: 10px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      margin: 18px 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 8px 24px rgba(30, 55, 90, 0.08);
+      backdrop-filter: blur(10px);
+    }
+    nav a {
+      flex: 0 0 auto;
+      padding: 7px 12px;
+      border-radius: 9px;
+      color: var(--navy);
+      font-size: 0.88rem;
+      font-weight: 780;
+      text-decoration: none;
+    }
+    nav a:hover,
+    nav a:focus-visible { background: var(--blue-soft); }
+
+    main { display: grid; gap: 18px; min-width: 0; }
+    section,
+    .notice {
+      min-width: 0;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    section[id] { scroll-margin-top: 88px; }
+    .notice {
+      border-left: 5px solid var(--amber);
+      background: var(--amber-soft);
+      box-shadow: none;
+    }
+    .notice.danger {
+      border-left-color: var(--red);
+      background: var(--red-soft);
+    }
+    .notice strong { color: #744300; }
+    .notice.danger strong { color: var(--red); }
+
+    h2 {
+      margin: 0 0 16px;
+      color: var(--navy);
+      font-size: clamp(1.45rem, 3vw, 2rem);
+      line-height: 1.3;
+      letter-spacing: -0.025em;
+    }
+    h3 {
+      margin: 24px 0 10px;
+      color: var(--navy);
+      font-size: 1.15rem;
+    }
+    p { margin: 0.65em 0; }
+    ul, ol { padding-left: 1.35rem; }
+    li + li { margin-top: 0.38rem; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .card {
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--soft);
+    }
+    .card .value {
+      display: block;
+      overflow-wrap: anywhere;
+      color: var(--navy);
+      font-size: 1.35rem;
+      font-weight: 850;
+      letter-spacing: -0.03em;
+    }
+    .card .label { color: var(--muted); font-size: 0.87rem; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 850;
+      letter-spacing: 0.015em;
+      white-space: nowrap;
+    }
+    .badge.ready { color: var(--green); background: var(--green-soft); }
+    .badge.wip { color: #785000; background: var(--amber-soft); }
+    .badge.stop { color: var(--red); background: var(--red-soft); }
+    .badge.info { color: var(--navy); background: var(--blue-soft); }
+
+    .table-wrap {
+      max-width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.91rem;
+    }
+    th,
+    td {
+      padding: 12px 13px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--navy);
+      background: #edf3fa;
+      font-size: 0.81rem;
+      letter-spacing: 0.015em;
+    }
+    tr:last-child td { border-bottom: 0; }
+
+    code {
+      padding: 0.12em 0.34em;
+      border-radius: 5px;
+      background: #edf1f6;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.88em;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      max-width: 100%;
+      margin: 12px 0;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid #d5dce8;
+      border-radius: 10px;
+      background: #edf1f6;
+      white-space: pre;
+    }
+    pre code { padding: 0; background: transparent; overflow-wrap: normal; }
+
+    .flow {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .flow .node {
+      display: grid;
+      flex: 0 0 138px;
+      min-height: 82px;
+      place-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--blue-soft);
+      color: var(--navy);
+      text-align: center;
+      font-weight: 850;
+    }
+    .flow .node.current { border-color: #d49827; background: var(--amber-soft); }
+    .flow .node.product { border-color: #69a899; background: var(--green-soft); }
+    .flow .arrow {
+      display: grid;
+      flex: 0 0 22px;
+      place-items: center;
+      color: var(--blue);
+      font-size: 1.3rem;
+      font-weight: 900;
+    }
+
+    .phase-list {
+      counter-reset: phase;
+      display: grid;
+      gap: 14px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .phase-list > li {
+      counter-increment: phase;
+      position: relative;
+      margin: 0;
+      padding: 18px 18px 18px 66px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+    }
+    .phase-list > li::before {
+      content: "P" counter(phase);
+      position: absolute;
+      top: 18px;
+      left: 16px;
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border-radius: 11px;
+      color: #fff;
+      background: var(--navy);
+      font-size: 0.82rem;
+      font-weight: 850;
+    }
+    .phase-list h3 { margin: 0 0 7px; }
+    .acceptance {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-left: 4px solid var(--teal);
+      border-radius: 0 9px 9px 0;
+      background: var(--green-soft);
+    }
+
+    details {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--soft);
+    }
+    summary {
+      padding: 11px 14px;
+      color: var(--navy);
+      cursor: pointer;
+      font-weight: 800;
+    }
+    details > div { padding: 0 14px 14px; }
+
+    .checklist { padding: 0; list-style: none; }
+    .checklist li { position: relative; padding-left: 1.55rem; }
+    .checklist li::before {
+      content: "□";
+      position: absolute;
+      left: 0;
+      color: var(--teal);
+      font-weight: 900;
+    }
+    .small { color: var(--muted); font-size: 0.85rem; }
+    .mono { font-family: "SFMono-Regular", Consolas, monospace; }
+    .nowrap { white-space: nowrap; }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    footer {
+      padding: 24px 6px 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-align: center;
+    }
+
+    @media (max-width: 900px) {
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .flow { flex-direction: column; overflow: visible; }
+      .flow .node { flex-basis: auto; min-height: 64px; }
+      .flow .arrow { flex-basis: 24px; transform: rotate(90deg); }
+    }
+    @media (max-width: 620px) {
+      .page { width: min(calc(100% - 18px), 1180px); padding-top: 10px; }
+      header, section, .notice { padding: 21px; border-radius: 14px; }
+      nav { top: 4px; }
+      .cards { grid-template-columns: 1fr; }
+      .phase-list > li { padding: 60px 15px 16px; }
+      .phase-list > li::before { top: 14px; left: 14px; }
+      th, td { padding: 10px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+    @media print {
+      @page { margin: 13mm; }
+      body { background: #fff; font-size: 10pt; }
+      .page { width: 100%; padding: 0; }
+      header { color: #000; background: #fff; border: 2px solid var(--navy); box-shadow: none; }
+      header .lead, .meta { color: #26364d; }
+      nav, .skip-link { display: none; }
+      main { display: block; }
+      section, .notice, .phase-list > li { break-inside: avoid; margin-top: 12px; box-shadow: none; }
+      details > div { display: block; }
+      a { color: inherit; text-decoration: none; }
+      .table-wrap, .flow { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">본문으로 건너뛰기</a>
+  <div class="page">
+    <header>
+      <p class="eyebrow">Hanium Dreamup · WalkSafe · FP046</p>
+      <h1>R002 재개 실행 계획</h1>
+      <p class="lead">
+        seq76 READY에서 중단된 복구 WIP를 보존하고, R004 review 입력 cohort의
+        ABA 방어를 먼저 완성한 뒤 seq77·private five-check gate·seq78을 거쳐
+        제품의 privacy 503과 계정 삭제 404 수정으로 이동하는 절차입니다.
+      </p>
+      <div class="meta">
+        <span>기준일: 2026-08-24 KST</span>
+        <span>브랜치: recovery/fp046-r008-wip-20260822</span>
+        <span>HEAD: 8a146bbf9c5a</span>
+        <span>문서 성격: 비정본 재개 안내</span>
+      </div>
+    </header>
+
+    <nav aria-label="문서 바로가기">
+      <a href="#baseline">현재 기준선</a>
+      <a href="#why">중단 원인</a>
+      <a href="#guardrails">보존 규칙</a>
+      <a href="#phases">재개 단계</a>
+      <a href="#tests">검증 사다리</a>
+      <a href="#product">제품 수정</a>
+      <a href="#stop">중단 조건</a>
+      <a href="#done">완료 기준</a>
+      <a href="#sources">근거</a>
+    </nav>
+
+    <main id="content">
+      <aside class="notice" aria-label="문서 효력 주의">
+        <strong>이 문서는 실행 순서를 설명하는 비정본 계획서입니다.</strong>
+        승인, review 결과, checkpoint, Goal event 또는 제품 완료 증거가 아닙니다.
+        이 파일 추가로 Git-visible 경로가 하나 늘어나므로 R004 triad가 완성된 뒤
+        catalog와 managed path를 다시 계산할 때 포함 여부를 실제 규칙으로 판정해야 합니다.
+      </aside>
+
+      <aside class="notice danger" aria-label="현재 진행 판정">
+        <strong>현재 판정은 NO-GO입니다.</strong>
+        review builder와 자체 test는 active R003을 요구하지만 seq77·gate·seq78·continuation·Goal·catalog
+        consumer는 active R004를 요구합니다. 따라서 root regression과 private five-check gate는 현재 정의상
+        함께 PASS할 수 없습니다. P2~P4 정렬이 끝나기 전에는 seq77 write, gate 실행, seq78, 제품 수정을 시작하지 않습니다.
+      </aside>
+
+      <section id="baseline">
+        <h2>1. 재개 기준선</h2>
+        <div class="cards" aria-label="현재 상태 요약">
+          <div class="card"><span class="value">seq76</span><span class="label">checkpoint tail</span></div>
+          <div class="card"><span class="value">READY</span><span class="label">FP046 R002 상태</span></div>
+          <div class="card"><span class="value">R003</span><span class="label">현재 builder active round</span></div>
+          <div class="card"><span class="value">0건</span><span class="label">이번 WIP의 제품 코드 수정</span></div>
+        </div>
+
+        <h3>고정해야 할 값</h3>
+        <div class="table-wrap" tabindex="0" aria-label="재개 기준선 표">
+          <table>
+            <caption class="visually-hidden">FP046 R002 재개 시 고정해야 할 값</caption>
+            <thead>
+              <tr><th scope="col">항목</th><th scope="col">현재 exact 값</th><th scope="col">재개 판정</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>브랜치 / HEAD</td><td><code>recovery/fp046-r008-wip-20260822</code><br><code>8a146bbf9c5a7612377abb939fc4d94570d45cca</code></td><td>다르면 작업을 시작하지 않고 원인을 확인</td></tr>
+              <tr><td>checkpoint</td><td><code>bf0f44f0ed2a777c2a3d62b81fa995d26e3b725e398a37034b7d70fa1d3a1a36</code><br>2,217,805 bytes · mode 0600 · nlink 1</td><td>seq76 READY 그대로여야 함</td></tr>
+              <tr><td>tail event</td><td><code>WS-GOAL-GRAPH-V2-4-GOAL-READY-FP046-R002-20260815-001</code><br><code>f2a529bae5aa808fccb64191a42902d7e717d0340531410213486bdcfa279070</code></td><td>seq77을 아직 기록하지 않은 상태</td></tr>
+              <tr><td>checkpoint 내부 source 계약</td><td><code>branch=current</code><br><code>current_head=ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c</code><br><code>base=f0093863e82bfc80d9f11915cef33a51d44b8730</code></td><td>실제 Git branch/HEAD와 미리 맞추지 않음</td></tr>
+              <tr><td>현재 focus</td><td><code>WS-GOAL-EPIC-03-FP-046-R002</code> · <code>GAP-055</code></td><td>제품 수정 전 시작 통제 복구가 우선</td></tr>
+              <tr><td>provisional path set</td><td>963 paths · <code>ea6f65a9a38ae2b6bc5b3e320c9b0ad7c1b26c3a1085dc49df0a4535fab64352</code></td><td>참고값일 뿐이며 R004 완성 후 재계산</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>보존된 review assignment</h3>
+        <div class="table-wrap" tabindex="0" aria-label="보존된 review assignment 표">
+          <table>
+            <caption class="visually-hidden">보존된 R001부터 R003까지의 review assignment</caption>
+            <thead>
+              <tr><th scope="col">Round</th><th scope="col">SHA-256 / bytes</th><th scope="col">출력 상태</th><th scope="col">의미</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>R001</td><td><code>e1b3807d7de0d3473d271e8aa36cd73d0b2e5bde3ecc00f0c8652642efc376dd</code><br>22,114</td><td>result 없음<br>independent 없음</td><td>assignment만 불변 보존</td></tr>
+              <tr><td>R002</td><td><code>1fbb07eb4fe16e943a5ca13f9d78ad10f51952d01dbbc1ca6d698b91ed0c5885</code><br>22,838</td><td>result 없음<br>independent 없음</td><td>6개 control finding으로 REJECT</td></tr>
+              <tr><td>R003</td><td><code>fb3bf40e349c4edf6cabdd7a8afde5c491802f3d943f8b2b4beda5b84d54658c</code><br>24,009</td><td>result 없음<br>independent 없음</td><td>입력 cohort ABA finding으로 REJECT</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small">
+          종료 직전 <code>git diff --check</code>는 PASS였습니다. R003 완료본에서 기록된
+          180/160/73/60/31 PASS는 마지막 정상 지점의 역사 결과이며, 현재 부분 전환 WIP 전체가
+          PASS한다는 뜻은 아닙니다.
+        </p>
+      </section>
+
+      <section id="why">
+        <h2>2. 왜 R004부터 다시 시작하는가</h2>
+        <p>
+          R003 검수에서 <code>write_assignment</code>와 <code>write_independent</code>가 최초 입력 파일
+          descriptor를 게시 완료까지 유지하지 않는 문제가 확인됐습니다. 입력이 A→B→A로 순간 교체되면
+          최종 경로 검사만 통과하면서 스스로 무효인 evidence가 게시될 수 있습니다.
+        </p>
+        <div class="flow" role="img" aria-label="seq76에서 R004 통제, 검토, seq77, five-check gate, seq78, 제품 수정으로 이어지는 순서">
+          <div class="node current">seq76 READY<br><span class="small">현재</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node">R004 builder<br><span class="small">retained cohort</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node">R004 triad<br><span class="small">분리 검토</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node">seq77<br><span class="small">zero-credit</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node">5-check gate</div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node">seq78<br><span class="small">GOAL_STARTED</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node product">제품 수정<br><span class="small">503 · 404</span></div>
+        </div>
+        <p>
+          현재 builder와 builder test는 active R003이지만 continuation, Goal, catalog, gate와 seq77/78 test 일부는
+          fail-first R004 기대값으로 넘어가 있습니다. 이 불일치를 먼저 닫아야 이후 검토와 event가 같은 입력을 보게 됩니다.
+        </p>
+      </section>
+
+      <section id="guardrails">
+        <h2>3. 작업 중 보존 규칙</h2>
+        <div class="table-wrap" tabindex="0" aria-label="작업 중 보존 규칙 표">
+          <table>
+            <caption class="visually-hidden">반드시 유지할 항목과 현재 금지된 작업</caption>
+            <thead><tr><th scope="col">반드시 유지</th><th scope="col">지금 금지</th></tr></thead>
+            <tbody>
+              <tr><td>checkpoint는 seq76 READY 유지</td><td>seq77 <code>--write</code> 선실행</td></tr>
+              <tr><td>checkpoint의 logical <code>current</code>/<code>ca0898…</code> source 계약 유지</td><td>실제 Git branch/HEAD로 미리 reconcile</td></tr>
+              <tr><td>R001·R002·R003 assignment exact bytes 유지</td><td>기존 assignment 수정·교체·삭제</td></tr>
+              <tr><td>각 rejected round의 result/independent 부재 유지</td><td>R004 안정화 전에 evidence 생성</td></tr>
+              <tr><td>catalog JSON은 현재 파생 WIP로 보존</td><td>R004 triad 전 catalog 재생성</td></tr>
+              <tr><td>제품 영역은 control 종료 후 변경</td><td>DB migration·Nginx 수정 선행</td></tr>
+              <tr><td>모든 event는 add-only·exact predecessor 결속</td><td><code>git clean</code>, reset, 강제 checkout</td></tr>
+              <tr><td>seq78 전 미커밋 WIP 보존</td><td>조기 commit·push 또는 완료 주장</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="phases">
+        <h2>4. 재개 단계</h2>
+        <ol class="phase-list">
+          <li>
+            <h3>재개 fingerprint 확인</h3>
+            <p>HEAD, checkpoint, 세 assignment, output 부재와 dirty tree를 읽기 전용으로 다시 확인합니다.</p>
+            <details>
+              <summary>권장 확인 명령</summary>
+              <div><pre><code>git status --short --branch --untracked-files=all
+git rev-parse HEAD
+sha256sum docs/control/walksafe-project-continuation-checkpoint.json \
+  docs/control/execution/workstream-transitions/seq77-78/review-rounds/R00{1,2,3}/review-assignment.json
+rg --files -uu docs/control/execution/workstream-transitions/seq77-78/review-rounds | sort
+git diff --check</code></pre></div>
+            </details>
+            <div class="acceptance"><strong>수용 기준:</strong> 위 기준선과 exact 일치하고 R001~R003의 result/independent가 없어야 합니다.</div>
+          </li>
+
+          <li>
+            <h3>review builder와 test를 active R004로 완성</h3>
+            <ul>
+              <li>R003 assignment를 세 번째 preserved input으로 exact pin하고 R003 output 부재를 검사합니다.</li>
+              <li>supersession reason은 <code>R003_REVIEW_INPUT_COHORT_ABA_RETAINED_DESCRIPTOR_REQUIRED</code>를 사용합니다.</li>
+              <li>confirmed finding은 <code>REVIEW_INPUT_COHORT_ABA_CAN_PUBLISH_SELF_INVALID_EVIDENCE</code>로 결속합니다.</li>
+              <li>assignment와 independent가 참조하는 전체 입력 cohort를 최초 open부터 게시 직전·직후 검증까지 retained descriptor로 유지합니다.</li>
+              <li>A→B→A 교체, inode·size·owner·mode·nlink 변화, close/fsync/rename 실패와 postcommit uncertainty를 fail-first로 고정합니다.</li>
+            </ul>
+            <div class="acceptance"><strong>수용 기준:</strong> builder 단독 회귀가 PASS하고 실제 review output은 한 건도 생성되지 않습니다.</div>
+          </li>
+
+          <li>
+            <h3>consumer·gate·catalog 계약을 R004에 맞춤</h3>
+            <p>
+              continuation, Goal checker, repository catalog generator/test, private gate, seq77/seq78 apply와 각 test가
+              같은 active R004 triad와 R001~R003 preserved assignment를 보도록 맞춥니다.
+            </p>
+            <ul>
+              <li>현재 review 경로 기대값은 preserved assignment 3개 + active R004 triad 3개, 총 6개입니다.</li>
+              <li>active R003 참조는 rejected history 검증에만 남기고 현재 authority로 사용하지 않습니다.</li>
+              <li>gate의 exact pytest selector와 후속 event가 생겨도 seq77·78 authority가 유지되는 suffix 검증을 유지합니다.</li>
+              <li>managed cohort는 게시 전후 같은 집합·내용인지 검증하고 임시 provisional digest를 고정값으로 쓰지 않습니다.</li>
+            </ul>
+            <div class="acceptance"><strong>수용 기준:</strong> 네 control 모듈, 두 checker와 catalog 계약이 모두 같은 R004 상수를 사용합니다.</div>
+          </li>
+
+          <li>
+            <h3>evidence 생성 전 control 회귀 실행</h3>
+            <p>locked CPython으로 builder, seq77, gate, seq78, catalog test와 post-seq77 selector를 실행합니다.</p>
+            <details>
+              <summary>첫 targeted 회귀 명령</summary>
+              <div><pre><code>WALKSAFE_TEST_PYTHON=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. "$WALKSAFE_TEST_PYTHON" -B -m pytest \
+  -p no:cacheprovider -q \
+  tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py \
+  tests/test_apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py \
+  tests/test_walksafe_fp046_r002_goal_start_gate_20260823.py \
+  tests/test_apply_walksafe_fp046_r002_goal_started_seq78_20260823.py \
+  tests/test_repository_catalogs.py</code></pre></div>
+            </details>
+            <p>
+              이어서 exact contract selector, post-seq77 selector, Goal graph 전체, continuation 전체와
+              test-layer registry <code>validate</code>를 실행합니다.
+            </p>
+            <div class="acceptance"><strong>수용 기준:</strong> assertion 완화·skip·실패 무시 없이 위 검증 전체와 <code>git diff --check</code>가 PASS합니다.</div>
+          </li>
+
+          <li>
+            <h3>add-only R004 분리 검토 수행</h3>
+            <p>
+              코드가 안정된 뒤에만 R004 assignment를 생성합니다. executor와 reviewer를 분리하고, review result와
+              independent review가 assignment·authorization·contract·source hashes를 exact하게 결속하도록 합니다.
+            </p>
+            <ul>
+              <li>새 finding이 있으면 R004 assignment를 보존하고 result를 억지로 만들지 않은 채 R005 successor로 이동합니다.</li>
+              <li>승인된 경우에만 R004 assignment/result/independent triad가 모두 존재하도록 합니다.</li>
+              <li>파일은 add-only, regular file, 허용 mode, nlink 1과 게시 후 descriptor 재검증을 만족해야 합니다.</li>
+            </ul>
+            <div class="acceptance"><strong>수용 기준:</strong> R004 triad의 identity·time order·hash·역할 분리가 post-review 검사에서 PASS합니다.</div>
+          </li>
+
+          <li>
+            <h3>catalog 3개를 한 번만 재생성</h3>
+            <p>
+              R004 triad가 완성된 뒤 <code>repository-paths.json</code>, <code>scripts.json</code>, <code>tests.json</code>을
+              결정론적으로 재생성합니다. 이 HTML과 당일 daylog를 포함한 실제 path universe를 기준으로 managed path 수와
+              path/content digest를 다시 계산합니다.
+            </p>
+            <details>
+              <summary>생성·검사 명령</summary>
+              <div><pre><code>python3 -B scripts/generate_repository_catalogs.py --root .
+python3 -B scripts/generate_repository_catalogs.py --root . --check
+WALKSAFE_TEST_PYTHON=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. "$WALKSAFE_TEST_PYTHON" -B -m pytest \
+  -p no:cacheprovider -q tests/test_repository_catalogs.py</code></pre></div>
+            </details>
+            <div class="acceptance"><strong>수용 기준:</strong> catalog <code>--check</code>와 test가 PASS하고 provisional 963 값을 실제 계산값으로 교체할 준비가 됩니다.</div>
+          </li>
+
+          <li>
+            <h3>seq77 → five-check gate → seq78</h3>
+            <ol>
+              <li>seq77 preflight와 zero-credit reanchor를 CAS 방식으로 게시합니다.</li>
+              <li>새 event ID에 결속해 private five-check gate를 한 번 실행하고 add-only receipt를 검증합니다.</li>
+              <li>같은 event ID와 receipt를 사용해 seq78 preflight 후 <code>GOAL_STARTED</code>를 게시합니다.</li>
+            </ol>
+            <p class="small">
+              seq78은 focus Goal을 <code>IN_PROGRESS</code>로 전환하고 실제 event hash를 history anchor로 기록한다.
+              별도 seq79는 제품 수정 허용 조건이 아니며, 현재 세션의 latest-event 검사를 깨뜨릴 수 있어 생성하지 않는다.
+            </p>
+            <div class="acceptance"><strong>수용 기준:</strong> history는 76→77→78로 단조롭게 이어지고, latest event와 current work session이 같은 seq78을 가리키며 제품·정식시험·배포·승인 credit은 모두 0입니다.</div>
+          </li>
+
+          <li>
+            <h3>제품 수정 lane으로 전환</h3>
+            <p>위 통제가 모두 닫힌 뒤에만 503과 404를 각각 재현하는 실패 테스트를 만들고 최소 제품 수정을 시작합니다.</p>
+            <div class="acceptance"><strong>수용 기준:</strong> focus Goal이 적법하게 IN_PROGRESS이고 event-scoped gate receipt가 현재 source와 일치합니다.</div>
+          </li>
+        </ol>
+      </section>
+
+      <section id="tests">
+        <h2>5. 검증 사다리</h2>
+        <div class="table-wrap" tabindex="0" aria-label="검증 사다리 표">
+          <table>
+            <caption class="visually-hidden">FP046 R002 재개 검증 순서와 판정 기준</caption>
+            <thead><tr><th scope="col">순서</th><th scope="col">검증</th><th scope="col">언제</th><th scope="col">판정</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>builder 단독 test</td><td>R004 retained cohort 구현 중</td><td>ABA와 파일교체가 반드시 FAIL</td></tr>
+              <tr><td>2</td><td>seq77 + gate + seq78 + catalog targeted suite</td><td>evidence 생성 전</td><td>현재 R004 계약에 exact PASS</td></tr>
+              <tr><td>3</td><td>post-seq77 exact selector + Goal graph class</td><td>consumer 정렬 후</td><td>후속 suffix 호환성과 변조 거부 유지</td></tr>
+              <tr><td>4</td><td>test-layer registry <code>validate</code></td><td>새 test 추가 후</td><td>모든 Python test가 정확히 한 layer</td></tr>
+              <tr><td>5</td><td>continuation + Goal graph 전체</td><td>catalog·checkpoint 후보 확정 후</td><td>새 실패 0, exact current state PASS</td></tr>
+              <tr><td>6</td><td>private five-check gate</td><td>seq77 게시 후</td><td>다섯 check와 repository-state 모두 PASS</td></tr>
+              <tr><td>7</td><td>제품 회귀</td><td>503·404 수정 후</td><td>재현 test와 관련 backend/Gateway/Nginx test PASS</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>private gate의 exact 다섯 check</h3>
+        <ol>
+          <li><code>CONTINUATION</code></li>
+          <li><code>GOAL_GRAPH</code></li>
+          <li><code>TEST_LAYER_REGISTRY_VALIDATE</code></li>
+          <li><code>ROOT_FP046_R002_CONTROL_REGRESSION</code></li>
+          <li><code>REPOSITORY_STATE</code></li>
+        </ol>
+        <p class="small">이 gate에는 Web, 실제 기기, 외부 검토, 배포, 정식시험, release 검사를 섞지 않습니다.</p>
+      </section>
+
+      <section id="product">
+        <h2>6. 통제 종료 뒤 제품 수정</h2>
+        <div class="table-wrap" tabindex="0" aria-label="제품 수정 계획 표">
+          <table>
+            <caption class="visually-hidden">통제 종료 뒤 privacy 503과 계정 삭제 404 수정 계획</caption>
+            <thead><tr><th scope="col">증상</th><th scope="col">확인된 원인</th><th scope="col">최소 변경</th><th scope="col">검증</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>privacy HTTP 503</strong></td>
+                <td>runtime은 <code>rate_group='privacy'</code>를 쓰지만 PostgreSQL CHECK는 기존 5개 값만 허용해 첫 INSERT가 SQLSTATE 23514로 실패</td>
+                <td>새 Alembic successor migration, expected-head, migration/runtime tests와 관련 문서 갱신</td>
+                <td>실패 재현 → upgrade/downgrade·fresh DB → privacy 요청 정상·기존 group 회귀 PASS</td>
+              </tr>
+              <tr>
+                <td><strong>계정 삭제 404</strong></td>
+                <td>Gateway/OpenAPI/client에는 3개 account-deletion route가 있으나 Nginx allowlist가 catch-all 404로 차단</td>
+                <td>Nginx exact location/안전한 request-id regex 3개, product boundary 5→8, 관련 tests/docs 갱신</td>
+                <td>허용 8개만 전달, 유사·변형·미허용 경로 404, query/logging 경계와 OpenAPI 일치</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small">
+          두 수정은 같은 Goal 안에서도 별도 fail-first 재현과 검증 묶음으로 다룹니다. migration 또는 Nginx를 먼저 고친 뒤
+          테스트를 맞추는 방식으로 진행하지 않습니다.
+        </p>
+      </section>
+
+      <section id="stop">
+        <h2>7. 즉시 중단 조건</h2>
+        <aside class="notice danger" aria-label="즉시 중단 조건">
+          <strong>아래 중 하나라도 발생하면 write·review·event 진행을 멈춥니다.</strong>
+          <ul>
+            <li>HEAD, checkpoint 또는 R001~R003 assignment의 exact hash·bytes·mode·nlink가 다름</li>
+            <li>rejected round의 result 또는 independent 파일이 새로 존재함</li>
+            <li>builder·consumer가 서로 다른 active review round를 가리킴</li>
+            <li>retained descriptor cohort를 닫기 전에 게시 성공으로 처리함</li>
+            <li>postcommit 상태가 확정되지 않았는데 일반 실패로 분류함</li>
+            <li>catalog 생성 전후 source universe가 바뀌거나 provisional digest를 final로 사용함</li>
+            <li>seq77/78 event 시각·predecessor·receipt·repository-state가 어긋남</li>
+            <li>통제가 끝나기 전에 제품 파일이 수정됨</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section id="done">
+        <h2>8. 이 재개 작업의 완료 기준</h2>
+        <h3>Control 완료</h3>
+        <ul class="checklist">
+          <li>R004 retained descriptor cohort와 ABA 회귀가 PASS한다.</li>
+          <li>R001~R003 assignment는 불변이고 output은 계속 없다.</li>
+          <li>R004 triad가 add-only로 생성되고 분리 검토를 통과한다.</li>
+          <li>catalog 3개와 실제 managed path/hash가 결정론적으로 일치한다.</li>
+          <li>seq77, five-check receipt, seq78이 exact chain으로 검증되고 seq78이 current work session으로 결속된다.</li>
+        </ul>
+        <h3>Product 완료</h3>
+        <ul class="checklist">
+          <li>privacy 503과 계정 삭제 404를 각각 재현하는 test가 수정 전 실패하고 수정 후 통과한다.</li>
+          <li>migration·Gateway/OpenAPI/client·Nginx boundary와 관련 문서가 같은 계약을 가리킨다.</li>
+          <li>continuation, Goal graph, test-layer, targeted·관련 제품 회귀와 <code>git diff --check</code>가 통과한다.</li>
+          <li>정식 시험 279개, 실제 기기, 외부 검토, 배포와 release gate는 실행 근거 없이는 계속 NOT_RUN입니다.</li>
+        </ul>
+        <h3>인계 완료</h3>
+        <ul class="checklist">
+          <li>당일 daylog와 local-memory에 변경 파일, 실제 검증 결과, 남은 위험과 다음 단일 작업을 기록한다.</li>
+          <li>commit/push는 event 계약이 허용하는 시점과 범위에서만 수행한다.</li>
+        </ul>
+      </section>
+
+      <section id="sources">
+        <h2>9. 근거와 작업 파일</h2>
+        <ol>
+          <li><a href="../../daylog/2026-08-23.md">2026-08-23 종료 daylog</a> — 중단 지점, exact 값, 다음 시작 순서.</li>
+          <li><a href="../control/walksafe-project-continuation-checkpoint.json">현재 continuation checkpoint</a> — seq76 READY와 FP046 R002 focus.</li>
+          <li><a href="../../scripts/build_walksafe_fp046_r002_seq77_78_review_20260823.py">R003 상태의 review builder</a>와 <a href="../../tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py">builder test</a>.</li>
+          <li><a href="../../scripts/apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py">seq77 reanchor</a>, <a href="../../scripts/run_walksafe_fp046_r002_goal_start_gate_20260823.py">private gate</a>, <a href="../../scripts/apply_walksafe_fp046_r002_goal_started_seq78_20260823.py">seq78 start</a>.</li>
+          <li><a href="../../scripts/check_walksafe_project_continuation_v2_4.py">continuation checker</a>, <a href="../../scripts/check_walksafe_goal_graph_v2_4.py">Goal checker</a>, <a href="../../scripts/generate_repository_catalogs.py">catalog generator</a>.</li>
+          <li><a href="../../backend/alembic/versions/202607130004_shared_actor_rate_limits.py">현재 rate-group CHECK migration</a>와 <a href="../../deploy/nginx/walksafe-android-gateway.conf.example">Nginx Gateway allowlist</a>.</li>
+          <li><a href="../../apps/android-gateway/src/routes.ts">Gateway route 계약</a>과 <a href="../../apps/android-gateway/openapi.json">OpenAPI</a>.</li>
+        </ol>
+      </section>
+    </main>
+
+    <footer>
+      WalkSafe FP046 R002 재개 실행 계획 · 2026-08-24 · checkpoint와 event가 바뀌면 다시 검토
+    </footer>
+  </div>
+</body>
+</html>

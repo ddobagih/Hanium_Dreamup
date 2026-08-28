@@ -1,0 +1,60 @@
+{
+  "authorization_quote": "알았어 해당 단계들 계획 먼저 세세하게 세우고 진행해. 팀 꾸려서 병렬로 진행해.",
+  "authorization_scope": {
+    "authorized_actions": [
+      "SEQ90_ZERO_CREDIT_GOAL_START_CONTROL_REANCHOR",
+      "R002_PRIVATE_INITIAL_START_GATE_AFTER_SEQ90",
+      "SEQ91_GOAL_STARTED_AFTER_FRESH_FIVE_CHECK_PASS",
+      "LOCAL_FP048_R002_IMPLEMENTATION_AFTER_SEQ91"
+    ],
+    "conditions": [
+      "SEQ89_EXACT_SOURCE_CAS_REQUIRED",
+      "SEQ90_MUST_PRESERVE_READY_STATUS",
+      "FINAL_GIT_VISIBLE_MANAGED_COHORT_MUST_BE_RUNTIME_CALCULATED",
+      "NONCREDIT_SUCCESSOR_ROOT_EDGES_MUST_BE_REVIEW_BOUND",
+      "ALL_FIVE_EVENT_SCOPED_GATE_CHECKS_MUST_PASS_FRESH",
+      "SEQ91_MUST_BIND_THE_EXACT_PASS_RECEIPT",
+      "ALL_CREDIT_DELTAS_REMAIN_ZERO_UNTIL_SEPARATE_COMPLETION"
+    ],
+    "excluded_actions": [
+      "RETROACTIVE_PRODUCT_IMPLEMENTATION_CREDIT",
+      "FORMAL_TEST_PASS_CLAIM",
+      "ACTUAL_DEVICE_OR_EXTERNAL_REVIEW_CREDIT",
+      "DEPLOYMENT_OR_RELEASE_APPROVAL"
+    ]
+  },
+  "authorization_status": "AUTHORIZED_FOR_CONDITIONAL_SEQ90_91_CONTINUATION",
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "document_id": "WS-FP048-R002-SEQ90-91-AUTHORIZATION-20260826-001",
+  "evidence_type": "USER_CONTINUATION_AUTHORIZATION",
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 2600767,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "sequence": 89,
+    "sha256": "c2ce759ff1b469d31dba266a47a91ca1e835869c011b6bed067fe6963c578e3d",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP048-R002-20260825-001",
+    "tail_event_sha256": "bb2594af4342c156df68a1b10b6c806ae91b4694edec864bb16f56236c8c53b0"
+  },
+  "target_started_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-001"
+}

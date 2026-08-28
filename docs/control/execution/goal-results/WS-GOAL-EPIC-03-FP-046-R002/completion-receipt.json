@@ -1,0 +1,99 @@
+{
+  "canonical_update_sequence": 86,
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_review_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "completion_sequence": 87,
+  "document_id": "WS-FP046-R002-CONSENT-WITHDRAWAL-DELETION-WORK-ITEM-COMPLETION-20260825-001",
+  "evidence_bindings": [
+    {
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260825-030",
+      "file_sha256": "ae37dc814f7bbc05861f329f4c0a05e01e2362a922ac6f232a3c86846c48df66",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260825-r030.json",
+      "role": "IMPLEMENTATION_GAP"
+    },
+    {
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260825-030",
+      "file_sha256": "e60301254dcdcdc18216e2640755f1726c5127d1e37bf520b167db34dd02ac83",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260825-r030.json",
+      "role": "IMPLEMENTATION_BACKLOG"
+    },
+    {
+      "byte_count": 4776,
+      "document_id": "WS-FP046-R002-IMPLEMENTATION-RECORD-20260825-001",
+      "file_sha256": "f2153bf35b11ea197d073b477634cb06172d15ed774a59020e1c40b43d77b8bc",
+      "mutable": false,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/implementation-record.json"
+    },
+    {
+      "byte_count": 1800,
+      "document_id": "WS-FP046-R002-VERIFICATION-RECEIPT-20260825-001",
+      "file_sha256": "77e90547518971c82ce68bdd3a11bf59eaf0f63179d9b0278343c5a8a350a0d2",
+      "mutable": false,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/verification-receipt.json"
+    },
+    {
+      "byte_count": 1368,
+      "document_id": "WS-FP046-R002-VERIFICATION-RESULT-20260825-001",
+      "file_sha256": "567b781005b948008ebe24dec38b3a021d68880928789486eefe2b30c2480eee",
+      "mutable": false,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/verification-result.json"
+    },
+    {
+      "byte_count": 1271,
+      "document_id": "WS-FP046-R002-SUCCESSOR-TRACE-20260825-001",
+      "file_sha256": "2c760dc4df2b5cce930b5d6c6efa11322d06ef8340261725130b875e9caaa90a",
+      "mutable": false,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/successor-trace.json"
+    },
+    {
+      "byte_count": 27349,
+      "document_id": "WS-FP046-R002-REVIEW-SUBJECT-20260825-R002",
+      "file_sha256": "7f566791361cb60a8cb75312130e21c423a79ed0e306b724ad11b36ad838adfc",
+      "mutable": false,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/review-rounds/R002/review-subject.json"
+    },
+    {
+      "byte_count": 1231,
+      "document_id": "WS-FP046-R002-INDEPENDENT-REVIEW-20260825-R002",
+      "file_sha256": "823f605789ebd17e19a4e079308d3766516e8a842f03000c347bbf9429f48a9b",
+      "mutable": false,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/review-rounds/R002/independent-review.json"
+    }
+  ],
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "goal_status": "COMPLETE_AT_TARGET",
+  "release_completion_claimed": false,
+  "source_sequence": 85,
+  "successor": {
+    "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+    "status": "PLANNED_NOT_ACTIVATED",
+    "work_item_id": "EPIC-03-FP048-ENCRYPTION-CONNECTION-SECURITY-INCIDENT"
+  },
+  "transition_control_review_binding": {
+    "assignment": {
+      "byte_length": 1394,
+      "path": "docs/control/execution/workstream-transitions/seq86-87/review-rounds/R002/assignment.json",
+      "sha256": "6f28eaf8cd7b910534f5adb8a943bb8f4a211394b87491ca4256996814ba7e9c"
+    },
+    "independent_review": {
+      "byte_length": 1107,
+      "path": "docs/control/execution/workstream-transitions/seq86-87/review-rounds/R002/independent-review.json",
+      "sha256": "0f3210c5f2261d840453514cfc0b6fbfc2488248f18eef57142831af734fee71"
+    },
+    "review_result": {
+      "byte_length": 1074,
+      "path": "docs/control/execution/workstream-transitions/seq86-87/review-rounds/R002/review-result.json",
+      "sha256": "ab2281789a989391577eeabd2a0e9d6c089e3d7433ed253bcc5757f0732c6b67"
+    }
+  }
+}

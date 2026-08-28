@@ -1,0 +1,31 @@
+{
+  "assigner": "walksafe-control-publisher",
+  "document_id": "WS-FP046-R002-SEQ86-87-RECOVERY-REVIEW-ASSIGNMENT-R003",
+  "executor": "walksafe-fp046-r002-publisher",
+  "external_independence_claimed": false,
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "required_reviewer": "walksafe-internal-transition-reviewer",
+  "review_scope": "SEQ86_87_CANONICAL_UPDATE_COMPLETION_AND_FP048_REOPEN",
+  "review_subject_binding": {
+    "byte_count": 35199,
+    "document_id": "WS-FP046-R002-RECOVERY-REVIEW-SUBJECT-20260825-R003",
+    "file_sha256": "c5542d27216753c7d6e269c00cdaa23b33e003917e4ed83948b1316f37f89c3c",
+    "mutable": false,
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/review-rounds/R003/review-subject.json"
+  },
+  "round_id": "FP046-R002-SEQ86-87-RECOVERY-R003",
+  "schema_version": "walksafe.transition-control-review.v1",
+  "sequence_pair": [
+    86,
+    87
+  ],
+  "source_checkpoint_binding": {
+    "byte_length": 2460703,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "sequence": 85,
+    "sha256": "b66ef10fecc540676aa5c47a2f5b842e12501e98c1bb2308762d09484ba91e79",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005",
+    "tail_event_sha256": "84758c3e54d38bde48fce3250e1af4a32376698801a8d3caf6be39d016d75bd3"
+  },
+  "transition_proposal_sha256": "19b2352fb829a7ee0a1d6f8873c91e1945f0b504bc08e84add1cf4893254e365"
+}

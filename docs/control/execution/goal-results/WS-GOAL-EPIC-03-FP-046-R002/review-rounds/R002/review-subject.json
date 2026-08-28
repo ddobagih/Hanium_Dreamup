@@ -1,0 +1,459 @@
+{
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_review_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "control_code_bindings": [
+    {
+      "byte_length": 80023,
+      "path": "scripts/apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py",
+      "sha256": "03c88ff0f5bdc2f21505827c71f62d8d461b84662cb47d8b40a68b1dd47d965e"
+    },
+    {
+      "byte_length": 21368,
+      "path": "tests/test_apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py",
+      "sha256": "c85217173b8049f5b326791e7574528856ee7ab36d8380d72c51de2014e107e2"
+    },
+    {
+      "byte_length": 451647,
+      "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+      "sha256": "22ccb8afea5b8a89b24ac70d409ae774e1cb3a4c439d80f23ac7ae881d16d09e"
+    },
+    {
+      "byte_length": 730784,
+      "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+      "sha256": "8995721ba985fd391672eb65092a024b10c3897146d5d647351b088ad3cb016a"
+    }
+  ],
+  "credit_scope": {
+    "exact_file_count": 6,
+    "files": [
+      {
+        "byte_count": 1048,
+        "path": "backend/alembic/versions/202608250001_actor_rate_limit_privacy_group.py",
+        "sha256": "d4536835e830b1abaae0f18a3ea708551623c8b1a02839a449d68c6d2096d494"
+      },
+      {
+        "byte_count": 5770,
+        "path": "backend/tests/test_actor_rate_limit_store.py",
+        "sha256": "89b4a57515cdd7bcd71d6d10c6e0af16c73132734e33978571ead1bbb12db7fc"
+      },
+      {
+        "byte_count": 3517,
+        "path": "deploy/nginx/walksafe-android-gateway.conf.example",
+        "sha256": "33bce150012f2b8003890ff66f2a6005e764e1c0c1dab89bac545d58af4aee9b"
+      },
+      {
+        "byte_count": 11390,
+        "path": "configs/walksafe_product_boundary_20260722.json",
+        "sha256": "77e0492abc807752f49e901848cf7107c091dfff3005d113dc352fd12a3d5a73"
+      },
+      {
+        "byte_count": 6450,
+        "path": "tests/test_walksafe_android_gateway_ingress_current.py",
+        "sha256": "375e3831ca15b0ff741c44f6f0191a068b99ad7e0fdf977307d0baeb2ec4ec61"
+      },
+      {
+        "byte_count": 15454,
+        "path": "tests/test_walksafe_android_product_boundary.py",
+        "sha256": "efc3a66ebf3b0526e250bfa854c3677046e1e660981fbae93f282fb759f1a8d8"
+      }
+    ],
+    "status": "FP046_R002_DIRECT_INTERNAL_STATIC_ONLY"
+  },
+  "document_id": "WS-FP046-R002-REVIEW-SUBJECT-20260825-R002",
+  "external_independence_claimed": false,
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "noncredit_scope": {
+    "concurrent_live_managed_files": [
+      {
+        "byte_length": 19738,
+        "path": "backend/app/api/health.py",
+        "reason": "concurrent Wave2 capacity/worker, shared runner, or generated catalog delta; excluded from FP046 R002 completion credit",
+        "sha256": "ab477d4ea0a9ec2ce68498950eb058121fe66c8a26d28d087a335bbae4a4b9f2",
+        "status": "LIVE_MANAGED_NONCREDIT"
+      },
+      {
+        "byte_length": 113346,
+        "path": "backend/tests/test_fp046_postgres_integration.py",
+        "reason": "concurrent Wave2 capacity/worker, shared runner, or generated catalog delta; excluded from FP046 R002 completion credit",
+        "sha256": "0685e211c488d7cacf2ade79c3904aaa032827c6bf30799bd40efe46be83dda3",
+        "status": "LIVE_MANAGED_NONCREDIT"
+      },
+      {
+        "byte_length": 4773,
+        "path": "backend/alembic/versions/202608250002_account_deletion_worker_role.py",
+        "reason": "concurrent Wave2 capacity/worker, shared runner, or generated catalog delta; excluded from FP046 R002 completion credit",
+        "sha256": "76836f2aa3219bf9921e99ed3984f41f8c12bd0a1905d7cebc2a957672f3cb4f",
+        "status": "LIVE_MANAGED_NONCREDIT"
+      },
+      {
+        "byte_length": 27593,
+        "path": "scripts/account_deletion_worker.py",
+        "reason": "concurrent Wave2 capacity/worker, shared runner, or generated catalog delta; excluded from FP046 R002 completion credit",
+        "sha256": "d5ad6b02f7888d01df1783999e92889a9f0f0ee4192ddde8c471ef29c2f07650",
+        "status": "LIVE_MANAGED_NONCREDIT"
+      },
+      {
+        "byte_length": 25755,
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "reason": "concurrent Wave2 capacity/worker, shared runner, or generated catalog delta; excluded from FP046 R002 completion credit",
+        "sha256": "5bceabcbee1b91667e5d9bfef5e43e2c92f248f5c7c7c77baa56fd3a0d118802",
+        "status": "LIVE_MANAGED_NONCREDIT"
+      },
+      {
+        "byte_length": 69719,
+        "path": "scripts/generate_repository_catalogs.py",
+        "reason": "concurrent Wave2 capacity/worker, shared runner, or generated catalog delta; excluded from FP046 R002 completion credit",
+        "sha256": "27ded6897392f6a94ac0e0eec47a510788320f59cd28575a646cd2335335339b",
+        "status": "LIVE_MANAGED_NONCREDIT"
+      },
+      {
+        "byte_length": 2980762,
+        "path": "docs/catalogs/repository-paths.json",
+        "reason": "concurrent Wave2 capacity/worker, shared runner, or generated catalog delta; excluded from FP046 R002 completion credit",
+        "sha256": "8e701f07a1a72bd29e6e7c0d5373811358d387973439ee16004b41233c419ab0",
+        "status": "LIVE_MANAGED_NONCREDIT"
+      },
+      {
+        "byte_length": 96625,
+        "path": "docs/catalogs/scripts.json",
+        "reason": "concurrent Wave2 capacity/worker, shared runner, or generated catalog delta; excluded from FP046 R002 completion credit",
+        "sha256": "29b0d624ee3db8370473206a0e2efcee06213b298a37298b76e44410dc8e06f4",
+        "status": "LIVE_MANAGED_NONCREDIT"
+      },
+      {
+        "byte_length": 94272,
+        "path": "docs/catalogs/tests.json",
+        "reason": "concurrent Wave2 capacity/worker, shared runner, or generated catalog delta; excluded from FP046 R002 completion credit",
+        "sha256": "de493557a64d9b1b2aff12baae13e9c56fe48770d6b73f60b788c12fba057b8a",
+        "status": "LIVE_MANAGED_NONCREDIT"
+      }
+    ],
+    "formal_device_external_deployment_release_credit": 0,
+    "r001_authorizes_publication": false,
+    "r001_failed_preparation_history": [
+      {
+        "byte_length": 2001,
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/review-subject.json",
+        "reason": "TRANSITION_REVIEW_RESULT_AND_INDEPENDENT_REVIEW_ABSENT",
+        "sha256": "2acc6d4b965f98dc776daaaf7772e72180e592e063c4202f3fcf628ff1ac1496",
+        "status": "FAILED_PREPARATION_HISTORICAL_NONCREDIT"
+      },
+      {
+        "byte_length": 1203,
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/independent-review.json",
+        "reason": "TRANSITION_REVIEW_RESULT_AND_INDEPENDENT_REVIEW_ABSENT",
+        "sha256": "abe2174cd7032e7bdc098170e217c13c34718b2c872ea4771bf11935371ce0a7",
+        "status": "FAILED_PREPARATION_HISTORICAL_NONCREDIT"
+      },
+      {
+        "byte_length": 859,
+        "path": "docs/control/execution/workstream-transitions/seq86-87/review-rounds/R001/assignment.json",
+        "reason": "TRANSITION_REVIEW_RESULT_AND_INDEPENDENT_REVIEW_ABSENT",
+        "sha256": "6dcc86ef38a262fd5103217c06aff896f8dcea52360707cf9ceb18c8d36f8933",
+        "status": "FAILED_PREPARATION_HISTORICAL_NONCREDIT"
+      }
+    ]
+  },
+  "producer_role": "walksafe-fp046-r002-publisher",
+  "required_checks": [
+    "seq1-85 byte-exact preservation",
+    "deterministic non-circular seq86/87 proposal seal",
+    "both completion validators exist and are dispatched",
+    "R030 add-only predecessor binding",
+    "FP048 R001 reopen impact binding",
+    "FP046 direct six-path scope and concurrent Wave2 noncredit exclusions",
+    "zero formal/device/external/deployment/release credit"
+  ],
+  "required_reviewer_role": "walksafe-internal-independent-reviewer",
+  "review_round": "R002",
+  "schema_version": "walksafe.fp046-r002.review-subject.v2",
+  "source_checkpoint_binding": {
+    "byte_length": 2460703,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "sequence": 85,
+    "sha256": "b66ef10fecc540676aa5c47a2f5b842e12501e98c1bb2308762d09484ba91e79",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005",
+    "tail_event_sha256": "84758c3e54d38bde48fce3250e1af4a32376698801a8d3caf6be39d016d75bd3"
+  },
+  "subject_bindings": [
+    {
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260825-030",
+      "file_sha256": "ae37dc814f7bbc05861f329f4c0a05e01e2362a922ac6f232a3c86846c48df66",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260825-r030.json",
+      "role": "IMPLEMENTATION_GAP"
+    },
+    {
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260825-030",
+      "file_sha256": "e60301254dcdcdc18216e2640755f1726c5127d1e37bf520b167db34dd02ac83",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260825-r030.json",
+      "role": "IMPLEMENTATION_BACKLOG"
+    },
+    {
+      "byte_count": 4776,
+      "document_id": "WS-FP046-R002-IMPLEMENTATION-RECORD-20260825-001",
+      "file_sha256": "f2153bf35b11ea197d073b477634cb06172d15ed774a59020e1c40b43d77b8bc",
+      "mutable": false,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/implementation-record.json"
+    }
+  ],
+  "successor_contract": {
+    "next_action": "FP-048 R002에서 7종 state rotation을 all-or-nothing으로 재개한다.",
+    "reopened_completion_event_sha256": "ad4addfbb44baa7a33e9e6640f591f20bbce22397fb3a120e26b8844a3f8b665",
+    "reopened_goal_id": "WS-GOAL-EPIC-03-FP-048-R001",
+    "successor_gap_id": "GAP-057",
+    "successor_goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+    "successor_work_item_id": "EPIC-03-FP048-ENCRYPTION-CONNECTION-SECURITY-INCIDENT"
+  },
+  "transition_proposal": {
+    "proposal_sha256": "4a5e96da6d1485d4c4694c2486be5d04994c2cb2f14019e7b82d26d757ba66de",
+    "skeleton": {
+      "canonical_update": {
+        "changed_binding_roles": [
+          "IMPLEMENTATION_BACKLOG",
+          "IMPLEMENTATION_GAP",
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R002"
+        ],
+        "event_id": "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-FP046-R002-20260825-001",
+        "event_type": "CANONICAL_BINDINGS_UPDATED",
+        "focus_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "from_status": "IN_PROGRESS",
+        "impact_closure_goal_ids": [
+          "WS-GOAL-EPIC-03",
+          "WS-GOAL-EPIC-03-FP-048-R001"
+        ],
+        "impact_disposition_by_goal": {
+          "WS-GOAL-EPIC-03": {
+            "result": "REVALIDATION_REFRESH_REQUIRED",
+            "target_status": "READY"
+          },
+          "WS-GOAL-EPIC-03-FP-048-R001": {
+            "result": "REOPEN_REQUIRED",
+            "target_status": "SUPERSEDED"
+          }
+        },
+        "pending_producer_completion_goal_id_after": "WS-GOAL-EPIC-03-FP-046-R002",
+        "previous_event_sha256": "84758c3e54d38bde48fce3250e1af4a32376698801a8d3caf6be39d016d75bd3",
+        "previous_focus_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "produced_binding_roles": [
+          "IMPLEMENTATION_BACKLOG",
+          "IMPLEMENTATION_GAP"
+        ],
+        "produced_by_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "reopened_completion_event_sha256_by_goal": {
+          "WS-GOAL-EPIC-03-FP-048-R001": "ad4addfbb44baa7a33e9e6640f591f20bbce22397fb3a120e26b8844a3f8b665"
+        },
+        "review_binding_source": "R002_PHYSICAL_REVIEW_INPUTS_AFTER_PROPOSAL",
+        "sequence": 86,
+        "status_changes": {},
+        "to_status": "IN_PROGRESS"
+      },
+      "completion": {
+        "canonical_update_event_reference": "DERIVED_SEQ86_EVENT_SHA256",
+        "completion_role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R002",
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-COMPLETED-FP046-R002-20260825-001",
+        "event_type": "GOAL_COMPLETED",
+        "focus_goal_id": "WS-GOAL-EPIC-03",
+        "fp048_r001_status_before_seq88": "COMPLETE_AT_TARGET",
+        "fp048_r002_activation_before_seq89": false,
+        "from_status": "IN_PROGRESS",
+        "pending_producer_completion_goal_id_after": "",
+        "previous_event_reference": "DERIVED_SEQ86_EVENT_SHA256",
+        "previous_focus_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "ready_frontier_goal_ids": [
+          "WS-GOAL-EPIC-03",
+          "WS-GOAL-EPIC-04",
+          "WS-GOAL-EPIC-12"
+        ],
+        "sequence": 87,
+        "status_changes": {
+          "WS-GOAL-EPIC-03-FP-046-R002": "COMPLETE_AT_TARGET"
+        },
+        "subject_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "to_status": "COMPLETE_AT_TARGET"
+      },
+      "completion_boundary": {
+        "actual_device_status": "NOT_RUN",
+        "deployment_credit_delta": 0,
+        "device_credit_delta": 0,
+        "external_credit_delta": 0,
+        "external_review_status": "NOT_RUN",
+        "formal_test_credit_delta": 0,
+        "formal_test_status": "NOT_RUN",
+        "production_deployment_status": "NOT_RUN",
+        "release_credit_delta": 0,
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "history_prefix_contract": {
+        "preserved_byte_exact": true,
+        "preserved_sequences": [
+          1,
+          85
+        ],
+        "source_tail_adjacency_sha256": "84758c3e54d38bde48fce3250e1af4a32376698801a8d3caf6be39d016d75bd3"
+      },
+      "review_dependent_fields_excluded": [
+        "seq86.event_sha256",
+        "seq86.transition_control_review_binding.sha256",
+        "seq87.previous_event_sha256",
+        "seq87.canonical_update_event_sha256",
+        "seq87.event_sha256",
+        "completion_receipt.file_sha256"
+      ],
+      "schema_version": "walksafe.fp046-r002.seq86-87-transition-proposal.v1",
+      "source_checkpoint_binding": {
+        "byte_length": 2460703,
+        "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+        "sequence": 85,
+        "sha256": "b66ef10fecc540676aa5c47a2f5b842e12501e98c1bb2308762d09484ba91e79",
+        "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-005",
+        "tail_event_sha256": "84758c3e54d38bde48fce3250e1af4a32376698801a8d3caf6be39d016d75bd3"
+      }
+    }
+  },
+  "validation_gate_boundary": {
+    "full_goal_graph_baseline": {
+      "comparison_rule": "PROJECTED_NEW_ERROR_MULTISET_DELTA_MUST_EQUAL_ZERO",
+      "error_count": 97,
+      "errors": [
+        "FP046/NPC R002 reviewed authority differs: recovery assignment differs",
+        "FP046 R002 seq77/78/79/80/81/82/83/84/85 authority differs: recovery assignment differs",
+        "NPC/FP022 successor authority differs",
+        "FP046 R014 archived completion successor differs",
+        "phase1 Android report FP048 successor evidence differs",
+        "phase1 Android report successor live binding differs: apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidIntegratedConsentClient.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarker.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PersistentReportQueueDisabledStaticTest.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionAccountDeletionTest.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionOriginHardeningTest.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarkerTest.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyAccountDeletionPolicyTest.kt",
+        "phase1 Android report successor live binding differs: apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionHardeningTest.kt",
+        "phase1 Android report successor live binding set differs",
+        "phase1 Android report successor bridge differs: apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "phase1 Android report successor bridge differs: apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+        "phase1 Android report successor bridge differs: apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+        "FP014 canonical completion package or seq20-23 tail differs",
+        "NPC single-admin recovery completion package or source successor differs",
+        "frozen v2.3: archived v2.2: Goal graph event 1: canonical binding SHA-256 differs: REQUIREMENTS_TRACEABILITY",
+        "frozen v2.3: archived v2.2: Goal graph event 6: canonical binding SHA-256 differs: REQUIREMENTS_TRACEABILITY",
+        "frozen v2.3: archived v2.2: Goal graph event 11: canonical binding SHA-256 differs: REQUIREMENTS_TRACEABILITY",
+        "frozen v2.3: archived v2.2: Goal graph event 17: canonical binding SHA-256 differs: REQUIREMENTS_TRACEABILITY",
+        "frozen v2.3: Goal graph event 1: canonical binding SHA-256 differs: REQUIREMENTS_TRACEABILITY",
+        "frozen v2.3: Goal graph event 4: canonical binding SHA-256 differs: REQUIREMENTS_TRACEABILITY",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 0 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 5 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 7 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 8 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 9 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 11 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 12 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 16 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 18 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 19 differs",
+        "frozen v2.3: Goal graph event 9: canonical binding SHA-256 differs: REQUIREMENTS_TRACEABILITY",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 0 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 1 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 4 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 5 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 9 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 10 differs",
+        "frozen v2.3: Goal graph event 14: canonical binding SHA-256 differs: REQUIREMENTS_TRACEABILITY",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 0 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 2 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 3 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 5 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 7 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 8 differs",
+        "frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 10 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 0 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 4 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 5 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 7 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 8 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 9 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 10 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 11 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 14 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 16 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 1 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 2 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 3 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 4 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 5 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 6 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 7 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 8 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 9 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 10 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 11 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 12 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 13 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 14 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 15 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 16 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 17 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 18 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 19 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 20 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 21 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 22 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 23 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 24 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 25 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 26 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 27 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-004-R001: implementation changed artifact 1 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-004-R001: implementation changed artifact 2 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-004-R001: implementation changed artifact 5 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-004-R001: implementation changed artifact 6 differs",
+        "frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-004-R001: implementation changed artifact 8 differs"
+      ],
+      "errors_sha256": "39fa1fca89c2eab86fb00233aef96d5a7771ab71fe771579d77bdeecae690802",
+      "status": "EXISTING_UNRELATED_ERRORS_NOT_GATE_NOT_CREDIT"
+    },
+    "full_goal_graph_credit_delta": 0,
+    "full_goal_graph_is_completion_gate": false,
+    "required_zero_error_gates_after_exchange": [
+      "FULL_PROJECT_CONTINUATION",
+      "CONTINUATION_FP046_R002_EXACT_SEQ86_87_SUFFIX",
+      "GOAL_GRAPH_FP046_R002_EXACT_SEQ86_87_SUFFIX"
+    ]
+  },
+  "validator_authority": [
+    {
+      "checker": "continuation",
+      "dispatcher": "validate",
+      "source_binding": {
+        "byte_length": 451647,
+        "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+        "sha256": "22ccb8afea5b8a89b24ac70d409ae774e1cb3a4c439d80f23ac7ae881d16d09e"
+      },
+      "validator": "validate_fp046_r002_completion_seq86_87"
+    },
+    {
+      "checker": "goal_graph",
+      "dispatcher": "validate",
+      "source_binding": {
+        "byte_length": 730784,
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "sha256": "8995721ba985fd391672eb65092a024b10c3897146d5d647351b088ad3cb016a"
+      },
+      "validator": "validate_fp046_r002_completion_seq86_87"
+    }
+  ]
+}

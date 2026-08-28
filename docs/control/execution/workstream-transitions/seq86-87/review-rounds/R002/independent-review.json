@@ -1,0 +1,27 @@
+{
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_review_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "decision": "PASS_INTERNAL_ONLY",
+  "document_id": "WS-FP046-R002-SEQ86-87-INDEPENDENT-REVIEW-R002",
+  "external_independence_claimed": false,
+  "external_review_status": "NOT_RUN",
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "review_result_binding": {
+    "byte_length": 1074,
+    "path": "docs/control/execution/workstream-transitions/seq86-87/review-rounds/R002/review-result.json",
+    "sha256": "ab2281789a989391577eeabd2a0e9d6c089e3d7433ed253bcc5757f0732c6b67"
+  },
+  "review_scope": "SEQ86_87_CANONICAL_UPDATE_COMPLETION_AND_FP048_REOPEN",
+  "reviewer_id": "walksafe-fp046-r002-seq86-87-transition-independent-reviewer-r002",
+  "reviewer_task_id": "/root/fp046_transition_r002_independent_review"
+}

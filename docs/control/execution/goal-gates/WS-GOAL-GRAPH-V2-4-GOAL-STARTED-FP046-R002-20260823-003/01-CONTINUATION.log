@@ -1,0 +1,5 @@
+WalkSafe v2.4 continuation check: FAIL
+- FP046 R002 recovery review authority differs: [Errno 2] No such file or directory: '/tmp/walksafe-fp008-authority-8kwkfof5/snapshots/repository-yyghr22v/repository/docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-002'
+- FP046 R002 seq80 reviewed suffix differs: [Errno 2] No such file or directory: '/tmp/walksafe-fp008-authority-8kwkfof5/snapshots/repository-yyghr22v/repository/docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-002'
+- FP046 R002 seq80 recovery review binding differs
+- FP046 R002 seq80 correction differs: [Errno 2] No such file or directory: '/tmp/walksafe-fp008-authority-8kwkfof5/snapshots/repository-yyghr22v/repository/docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-002'

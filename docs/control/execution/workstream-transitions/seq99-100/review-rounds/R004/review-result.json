@@ -1,0 +1,23 @@
+{
+  "assignment_binding": {
+    "byte_length": 39455,
+    "path": "docs/control/execution/workstream-transitions/seq99-100/review-rounds/R004/review-assignment.json",
+    "sha256": "24fe0232f3e6d5aeb49bcb98fed1d29d3b28f8a91cb95acd440d3fbf3fbb5cc9"
+  },
+  "decision": "APPROVED",
+  "document_id": "WS-FP048-R002-SEQ99-100-REVIEW-RESULT-20260827-R004",
+  "evidence_type": "TRANSITION_CONTROL_PRIMARY_REVIEW",
+  "external_independence_claimed": false,
+  "findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0
+  },
+  "reviewed_at": "2026-08-28T02:28:16+09:00",
+  "reviewer": {
+    "id": "codex-fp048-r002-seq99-correction-r004-primary-reviewer-20260828",
+    "task_id": "/root/seq99_r004_primary_review"
+  },
+  "round_id": "R004",
+  "schema_version": "1.0"
+}

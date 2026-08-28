@@ -1,0 +1,116 @@
+{
+  "authorization_quote": "이제 진행해",
+  "authorization_scope": {
+    "authorized_actions": [
+      "SEQ78_ZERO_CREDIT_GOAL_START_CONTROL_CORRECTION",
+      "PRIVATE_INITIAL_START_GATE_RETRY",
+      "SEQ79_GOAL_STARTED_AFTER_GATE_PASS",
+      "LOCAL_PRODUCT_IMPLEMENTATION_AFTER_GOAL_STARTED"
+    ],
+    "conditions": [
+      "SEQ78_CORRECTION_MUST_PRESERVE_READY_STATUS",
+      "SEQ78_MUST_BIND_THE_EXACT_SEQ77_CHECKPOINT_AND_FAILED_GATE_ATTEMPT",
+      "ALL_FIVE_EVENT_SCOPED_GATE_CHECKS_MUST_PASS",
+      "SEQ79_MUST_BIND_THE_EXACT_GATE_RECEIPT",
+      "PRODUCT_CHANGE_MUST_OCCUR_ONLY_AFTER_SEQ79",
+      "LIVE_SESSION_ARTIFACTS_MUST_NOT_BE_RESEALED_AS_REVIEW_AUTHORITY"
+    ],
+    "excluded_actions": [
+      "FORMAL_TEST_PASS_CLAIM",
+      "ACTUAL_DEVICE_CREDIT",
+      "EXTERNAL_REVIEW_CREDIT",
+      "DEPLOYMENT",
+      "RELEASE_APPROVAL"
+    ]
+  },
+  "authorization_status": "AUTHORIZED_FOR_CONDITIONAL_SEQ78_79_RECOVERY_CONTINUATION",
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_review_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "goal_started": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "sequence_78_status": "NOT_PUBLISHED",
+    "sequence_79_status": "NOT_PUBLISHED",
+    "start_gate_status": "NOT_RUN",
+    "test_credit_delta": 0
+  },
+  "document_id": "WS-FP046-R002-SEQ78-79-RECOVERY-AUTHORIZATION-20260824-001",
+  "evidence_type": "USER_CONTINUATION_AUTHORIZATION",
+  "failed_attempt": {
+    "attempt_directory": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-001",
+    "attempted_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-001",
+    "attempted_sequence": 78,
+    "check_status_by_id": {
+      "CONTINUATION": "FAIL",
+      "GOAL_GRAPH": "NOT_RUN",
+      "REPOSITORY_STATE": "NOT_RUN",
+      "ROOT_FP046_R002_CONTROL_REGRESSION": "NOT_RUN",
+      "TEST_LAYER_REGISTRY_VALIDATE": "NOT_RUN"
+    },
+    "failed_check_log_binding": {
+      "byte_length": 681,
+      "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-001/01-CONTINUATION.log",
+      "sha256": "b49838682f11cac1a78ef86bfb7866a7a5166e60c21d0fd39c78a9d1d7c1f411"
+    },
+    "gate_receipt_status": "NOT_CREATED",
+    "source_checkpoint_binding": {
+      "byte_length": 2249359,
+      "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "sequence": 77,
+      "sha256": "c88b6017f6b8a61d7dce6cb99b9af49b750d3c9e10791270ec0382e525c94747",
+      "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP046-R002-20260823-001",
+      "tail_event_sha256": "0d80244b6d1c1f7a91bcdce78f7861086f16b39c66874e21e5cb6ba8b2c88fd1"
+    },
+    "status": "FAILED_AT_CONTINUATION_WITH_ZERO_CREDIT",
+    "transition_event_status": "NOT_CREATED"
+  },
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "predecessor_review": {
+    "records": [
+      {
+        "byte_length": 31097,
+        "path": "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R006/review-assignment.json",
+        "sha256": "9ea8e8754b4a6c8a8b74899b27be1b0051ef8c7f81504092fc8745e4d670994c"
+      },
+      {
+        "byte_length": 31109,
+        "path": "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R006/review-result.json",
+        "sha256": "624bd4a9955939317e8d26c3424bf48b210b339e34d0f48ad09634d8cfe8dd18"
+      },
+      {
+        "byte_length": 31392,
+        "path": "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R006/independent-review.json",
+        "sha256": "f4758c8324c7acc55432d59ae6b2884f8b80c9a439889cdd00f60fe87d7e09e3"
+      }
+    ],
+    "round_id": "WS-FP046-R002-SEQ77-78-REVIEW-20260823-R006",
+    "session_artifact_disposition": "HISTORICAL_PREDECESSOR_BINDINGS_ONLY"
+  },
+  "schema_version": "1.0",
+  "session_artifact_scope": {
+    "excluded_from_live_authority_review_hash_cohort": [
+      "daylog/2026-08-23.md",
+      "daylog/2026-08-24.md",
+      "docs/planning/walksafe-fp046-r002-resumption-plan-20260824.html",
+      "docs/planning/walksafe-security-server-operations-feature-first-plan-20260824.html"
+    ],
+    "historical_predecessor_review_round_id": "WS-FP046-R002-SEQ77-78-REVIEW-20260823-R006",
+    "historical_r006_session_artifact_bindings_status": "PRESERVED_ONLY_IN_R006_BYTES",
+    "publication_time_binding": "CURRENT_MANAGED_WORKING_TREE_SNAPSHOT",
+    "reason_code": "LIVE_SESSION_ARTIFACT_APPEND_MUST_NOT_INVALIDATE_RECOVERY_AUTHORITY",
+    "still_required_in_publication_time_managed_snapshot": true
+  },
+  "supersedes": {
+    "authorization_status": "AUTHORIZED_FOR_CONDITIONAL_SEQ77_78_CONTINUATION",
+    "byte_length": 1853,
+    "document_id": "WS-FP046-R002-SEQ77-78-AUTHORIZATION-20260823-001",
+    "file_sha256": "6317c5ee8f037562a67c8d26695c385d2d464e7426768d2328e15d7e744d370f",
+    "path": "docs/control/execution/workstream-transitions/seq77-78/authorization.json"
+  }
+}

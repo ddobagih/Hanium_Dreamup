@@ -1,0 +1,101 @@
+{
+  "authorization_status": "AUTHORIZED_FOR_CONDITIONAL_SEQ97_98_SNAPSHOT_HYGIENE_CORRECTION_CONTINUATION",
+  "authorized_executor": {
+    "id": "codex-fp048-r002-seq97-snapshot-hygiene-executor-20260826",
+    "task_id": "/root/seq96_review_r002_update"
+  },
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "contract_correction_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-CONTRACT-CORRECTED-FP048-R002-20260826-005",
+  "document_id": "WS-FP048-R002-SEQ97-98-AUTHORIZATION-20260826-001",
+  "evidence_type": "USER_CONTINUATION_AUTHORIZATION",
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "previous_contract_binding": {
+    "canonical_contract_sha256": "4f39f9cc18a5fff55b1369c5c0ff15a50ec080e7cced227597adea0b902afb91",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R008",
+    "contract_version": "2026-08-26.7",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-008",
+    "file_sha256": "f3106c7038287399deac3bc711d1a7624dec3aa84b9c41abeb52300d5073828d",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r008.json",
+    "schema_version": "1.2"
+  },
+  "projected_transition": {
+    "contract_correction_sequence": 97,
+    "contract_correction_transition": "READY_TO_READY",
+    "started_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004",
+    "started_sequence": 98,
+    "started_transition": "READY_TO_IN_PROGRESS_AFTER_FRESH_R009_PASS"
+  },
+  "r008_preflight_attempt_004": {
+    "authority_status": "NONAUTHORITY",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R008",
+    "contract_version": "2026-08-26.7",
+    "directory": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004",
+    "error": "retained source ancestor identity changed: docs/control",
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004",
+    "event_identity_status": "REUSABLE_UNCONSUMED",
+    "exit_code": 2,
+    "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+    "namespace_present": false,
+    "reason_code": "R008_ROOT_REGRESSION_MUTATED_RETAINED_SOURCE_ANCESTOR",
+    "receipt_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004/implementation-start-gate-receipt.json",
+    "receipt_present": false,
+    "status": "PREVIEW_FAILED_BEFORE_NAMESPACE"
+  },
+  "replacement_contract_binding": {
+    "canonical_contract_sha256": "9e82e6c2ef8a35b412efa44567025b0316e42f2f3840a4ef290f426aadbd531b",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R009",
+    "contract_version": "2026-08-26.8",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-009",
+    "file_sha256": "cd027dde66924a19e1a7942c347b4b4a0e2bea44a8e6e0752a1a42993f9d20ff",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r009.json",
+    "schema_version": "1.2"
+  },
+  "required_independent_reviewer": {
+    "id": "codex-seq96-goalgraph-terminal-dispatch-auditor-20260826",
+    "task_id": "/root/seq96_goalgraph_terminal_dispatch_audit"
+  },
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 4414443,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "r008_preflight_attempt_004": {
+      "authority_status": "NONAUTHORITY",
+      "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R008",
+      "contract_version": "2026-08-26.7",
+      "directory": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004",
+      "error": "retained source ancestor identity changed: docs/control",
+      "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004",
+      "event_identity_status": "REUSABLE_UNCONSUMED",
+      "exit_code": 2,
+      "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+      "namespace_present": false,
+      "reason_code": "R008_ROOT_REGRESSION_MUTATED_RETAINED_SOURCE_ANCESTOR",
+      "receipt_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-004/implementation-start-gate-receipt.json",
+      "receipt_present": false,
+      "status": "PREVIEW_FAILED_BEFORE_NAMESPACE"
+    },
+    "sequence": 96,
+    "sha256": "c64919299dea316339afd777c37a33575458a94a158acd4c04ceed8b3075d85f",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-GATE-CONTRACT-CORRECTED-FP048-R002-20260826-004",
+    "tail_event_sha256": "ff0c91a5a98df66d6e44007c5c5fd51c50793fb6b896938418104aba05798dea"
+  }
+}

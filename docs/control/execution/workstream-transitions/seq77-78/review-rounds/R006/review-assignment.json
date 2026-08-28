@@ -1,0 +1,690 @@
+{
+  "assigned_at": "2026-08-24T11:27:02+00:00",
+  "assigner": {
+    "agent_instance_id": "codex-root-fp046-r002-seq77-78-r006-assigner-20260823",
+    "canonical_task": "/root",
+    "role": "INTERNAL_REVIEW_ASSIGNER"
+  },
+  "document_id": "WS-FP046-R002-SEQ77-78-REVIEW-ASSIGNMENT-20260823-R006",
+  "evidence_type": "FP046_R002_SEQ77_78_REVIEW_ASSIGNMENT",
+  "executor": {
+    "agent_instance_id": "codex-fp046-r002-seq77-78-r006-control-executor-20260823",
+    "canonical_task": "/root/seq77_78_control_review",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR"
+  },
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "review_boundary": {
+    "actual_device_credit_added": 0,
+    "approval_credit_added": 0,
+    "artifact_completion_credit_added": 0,
+    "deployment_credit_added": 0,
+    "external_independence_claimed": false,
+    "external_review_credit_added": 0,
+    "formal_test_credit_added": 0,
+    "product_implementation_credit_added": 0,
+    "release_credit_added": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "review_scope": {
+    "acceptance": {
+      "approved_r005_review_triad_is_preserved_exactly": true,
+      "authorization_is_current_and_add_only": true,
+      "control_delta_is_exactly_fifteen_paths": true,
+      "current_control_cohort_is_exactly_thirty_one_paths": true,
+      "eight_new_controls_are_add_only_without_fake_predecessors": true,
+      "formal_external_device_deployment_and_release_credit_remain_zero": true,
+      "only_declared_seven_predecessor_controls_changed": true,
+      "ordered_gate_checks_are_exactly_five": true,
+      "product_change_before_seq78_is_excluded": true,
+      "publication_consistency_uses_the_declared_linearization_point": true,
+      "r001_through_r004_assignments_are_preserved_without_outputs": true,
+      "r002_six_confirmed_findings_require_r003_reseal": true,
+      "r002_start_gate_contract_is_schema_1_1_successor": true,
+      "r003_input_cohort_aba_finding_requires_r004_reseal": true,
+      "r004_post_publication_regression_requires_r005_reseal": true,
+      "r005_post_approval_session_artifact_inventory_growth_requires_r006_reseal": true,
+      "r011_is_replayed_from_exact_review_records_and_frozen_cohort": true,
+      "r011_live_control_recomputation_is_forbidden": true,
+      "seq77_preserves_ready_status": true,
+      "seq78_requires_exact_private_gate_pass_receipt": true,
+      "session_artifact_cohort_is_exactly_four_paths": true,
+      "source_checkpoint_is_exact_seq76": true
+    },
+    "approved_r005_review_bindings": [
+      {
+        "byte_length": 28536,
+        "path": "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R005/review-assignment.json",
+        "sha256": "5c9927f92934b5ee6586a0b966a180824cae722cc389d38e031bf04eb6650d37"
+      },
+      {
+        "byte_length": 28548,
+        "path": "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R005/review-result.json",
+        "sha256": "f7bd94cb53e521c37f442982c7fb1f29df6a9f17bc3342f51fc7593748dc015c"
+      },
+      {
+        "byte_length": 28831,
+        "path": "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R005/independent-review.json",
+        "sha256": "9ed52ee716b8101e82938b909a2b1ba046a2f240f15b584d9577d09932a768ee"
+      }
+    ],
+    "approved_r005_supersession_reason_code": "R005_POST_APPROVAL_SESSION_ARTIFACT_INVENTORY_GROWTH_REQUIRES_R006_RESEAL",
+    "authorization_binding": {
+      "byte_length": 1853,
+      "path": "docs/control/execution/workstream-transitions/seq77-78/authorization.json",
+      "sha256": "6317c5ee8f037562a67c8d26695c385d2d464e7426768d2328e15d7e744d370f"
+    },
+    "frozen_r011_control_cohort": [
+      {
+        "byte_length": 345803,
+        "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+        "sha256": "04b31e2fad7d55fbb0386390eec4347d5edcafea4b28bf01046aeb4aab0adcc4"
+      },
+      {
+        "byte_length": 155749,
+        "path": "tests/test_walksafe_project_continuation_v2_4.py",
+        "sha256": "afd72b1cf60d68834bafe3297ba7ce4a1e03cb924fa66ee1673c968a1b2e11cb"
+      },
+      {
+        "byte_length": 633056,
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "sha256": "08d827b86242858ba61a3bfc46dd77776c7542282ee26f60d43cc4b626f7836a"
+      },
+      {
+        "byte_length": 358761,
+        "path": "tests/test_walksafe_goal_graph_v2_4.py",
+        "sha256": "da9114098315264af713fc4479dab923c7d2dc0f87d75a23eb1584752abdcbb8"
+      },
+      {
+        "byte_length": 66357,
+        "path": "scripts/generate_repository_catalogs.py",
+        "sha256": "b06be746c96d35bab4c5d321fd26111f3a4952b5d6c00251d00fa05a902fa9ff"
+      },
+      {
+        "byte_length": 39404,
+        "path": "tests/test_repository_catalogs.py",
+        "sha256": "15bd143e43dc54135afb70507b1afa3b7c5c95127753b045f349eb1f713f472a"
+      },
+      {
+        "byte_length": 24736,
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "sha256": "b3f415e21ac9d7fe141a6387076e37c01b666ac9f7c39ac43acbde834454b2ed"
+      },
+      {
+        "byte_length": 67953,
+        "path": "scripts/build_walksafe_fp022_navigation_internal_evidence_20260814.py",
+        "sha256": "0387c2460aa5e01452cdddbb21efbc4383d38bd3c2b4a602771183d8d237860d"
+      },
+      {
+        "byte_length": 18971,
+        "path": "tests/test_build_walksafe_fp022_navigation_internal_evidence_20260814.py",
+        "sha256": "ce3109e3824cc0b4288680e2dd7e9ac06c0ea21b0f90dbca9948eb744fde9af1"
+      },
+      {
+        "byte_length": 30144,
+        "path": "scripts/build_walksafe_fp022_gap_backlog_r028_20260814.py",
+        "sha256": "42e4efd47548c1bc32471595dc87c1e55e75bfe9b479da6b3ce2ca2a8304b901"
+      },
+      {
+        "byte_length": 13456,
+        "path": "tests/test_build_walksafe_fp022_gap_backlog_r028_20260814.py",
+        "sha256": "3bc2f17acefcda23ea9c9bc5b5bb95b267aeb02f8dc99e8981acbb40702e921e"
+      },
+      {
+        "byte_length": 50428,
+        "path": "scripts/apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
+        "sha256": "c5335bc100cbcfa23c06901590bf75b1b19b00993ebd0c006bbd40e6aa542ed7"
+      },
+      {
+        "byte_length": 12797,
+        "path": "tests/test_apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
+        "sha256": "a5dc5ac8be5c01462a56485b809e0133e3bb94f2da75f979a66bb04035dca3dd"
+      },
+      {
+        "byte_length": 253812,
+        "path": "scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+        "sha256": "f01d2936992fae1c0697ba976d9b848e609a17d0222be860401f4427c32d27a7"
+      },
+      {
+        "byte_length": 115827,
+        "path": "tests/test_build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+        "sha256": "8dd1433d449d42755cc61d73cb35e711770081263b20aaca5617c32567d97245"
+      },
+      {
+        "byte_length": 33124,
+        "path": "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+        "sha256": "1bc9666826cdba26e239af78149210d6eef18dace6ac3b83ad6877c8e229f4cb"
+      },
+      {
+        "byte_length": 15458,
+        "path": "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+        "sha256": "0a0b9b7e59648ce37f0b13b46e2225032babd05fcef3cb3b192f289caf6d4e5d"
+      },
+      {
+        "byte_length": 128609,
+        "path": "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+        "sha256": "3cc14e9b2e9721d5adbdab4eec9c85c0fafd68138cab22ecf4b99334fa14c371"
+      },
+      {
+        "byte_length": 33838,
+        "path": "tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+        "sha256": "23139cb63b294e9887e45e75b467ec42de2f9987b1cd5c5127fecd21eb4455d8"
+      },
+      {
+        "byte_length": 18858,
+        "path": "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py",
+        "sha256": "7a35d7db612a2467edd07b2145ec54eba19eabce1a159465b770c56c7f43c411"
+      },
+      {
+        "byte_length": 6215,
+        "path": "tests/test_build_walksafe_fp046_gap_backlog_r029_20260815.py",
+        "sha256": "b62f65d3ed0636ad812a7c2046af7af300c05872b3081c8014aa2bce6c44c4a4"
+      },
+      {
+        "byte_length": 98840,
+        "path": "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+        "sha256": "27ee8bd2d48c455cb5075bf3dfa614293afe5c6431313fe0f1b7d89abf84e681"
+      },
+      {
+        "byte_length": 60923,
+        "path": "tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+        "sha256": "f8de25db92821d92c69381dd292b1ec68017a8bbb5e1090d8c2d04b09e8e0816"
+      }
+    ],
+    "frozen_r011_control_cohort_sha256": "0326208db926bc8a88a19cbd39b06026ac69fd52f5c35c6518257e33b575c877",
+    "frozen_r011_review_bindings": [
+      {
+        "byte_length": 13846,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/assignment.json",
+        "sha256": "aa2a5341346fb383d681f42216e4bb8642be4f6d46fa1fded6040032c0f5403f"
+      },
+      {
+        "byte_length": 13864,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/review-result.json",
+        "sha256": "bc768f559ae645972df09b7f05ab46cb8e5bbadb723d642a23c217962f2bd000"
+      },
+      {
+        "byte_length": 14165,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/independent-review.json",
+        "sha256": "98b9575e681e118be12773e05aad7c7f408a71c94ba673edcd91e8eea6357794"
+      }
+    ],
+    "initial_start_gate_contract_binding": {
+      "byte_length": 5089,
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-046-R002/initial-start-gate-contract-r002.json",
+      "sha256": "62311945a57cd96bbaaf10e66ce6f4114835324f74f10ca00443b49482d96a6e"
+    },
+    "projected_transition": {
+      "control_reanchor": {
+        "contract_id": "WS-FP046-R002-INTERNAL-START-GATE-R002",
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP046-R002-20260823-001",
+        "event_type": "GOAL_START_CONTROL_REANCHORED",
+        "from_status": "READY",
+        "sequence": 77,
+        "status_changes": {},
+        "subject_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "to_status": "READY"
+      },
+      "goal_started": {
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-001",
+        "event_type": "GOAL_STARTED",
+        "from_status": "READY",
+        "sequence": 78,
+        "start_gate_required_status": "PASS",
+        "status_changes": {
+          "WS-GOAL-EPIC-03-FP-046-R002": "IN_PROGRESS"
+        },
+        "subject_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "to_status": "IN_PROGRESS"
+      }
+    },
+    "publication_consistency": {
+      "exclusive_write_lease": {
+        "holder": "ROOT_REVIEW_COORDINATOR",
+        "lifetime": "ASSIGNMENT_THROUGH_REVIEW_RESULT_INDEPENDENT_AND_CHECK_POST_REVIEW",
+        "path_count": 38,
+        "paths": [
+          "scripts/check_walksafe_project_continuation_v2_4.py",
+          "tests/test_walksafe_project_continuation_v2_4.py",
+          "scripts/check_walksafe_goal_graph_v2_4.py",
+          "tests/test_walksafe_goal_graph_v2_4.py",
+          "scripts/generate_repository_catalogs.py",
+          "tests/test_repository_catalogs.py",
+          "scripts/run_walksafe_test_layers_current.sh",
+          "scripts/build_walksafe_fp022_navigation_internal_evidence_20260814.py",
+          "tests/test_build_walksafe_fp022_navigation_internal_evidence_20260814.py",
+          "scripts/build_walksafe_fp022_gap_backlog_r028_20260814.py",
+          "tests/test_build_walksafe_fp022_gap_backlog_r028_20260814.py",
+          "scripts/apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
+          "tests/test_apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
+          "scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+          "tests/test_build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+          "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+          "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+          "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+          "tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+          "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py",
+          "tests/test_build_walksafe_fp046_gap_backlog_r029_20260815.py",
+          "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+          "tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+          "scripts/build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+          "tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+          "scripts/apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+          "tests/test_apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+          "scripts/run_walksafe_fp046_r002_goal_start_gate_20260823.py",
+          "tests/test_walksafe_fp046_r002_goal_start_gate_20260823.py",
+          "scripts/apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+          "tests/test_apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+          "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R005/review-assignment.json",
+          "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R005/review-result.json",
+          "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R005/independent-review.json",
+          "daylog/2026-08-23.md",
+          "daylog/2026-08-24.md",
+          "docs/planning/walksafe-fp046-r002-resumption-plan-20260824.html",
+          "docs/planning/walksafe-security-server-operations-feature-first-plan-20260824.html"
+        ]
+      },
+      "linearization_point": "SECOND_POSTPUBLISH_RETAINED_INPUT_GUARD_COMPLETED",
+      "postlinearization_drift_rule": "NEW_REPOSITORY_STATE_MUST_FAIL_SUBSEQUENT_VALIDATION",
+      "prelinearization_requirements": [
+        "OUTPUT_LINK_IDENTITY_BYTES_PARENT_FSYNC_AND_LIVE_WALK_VERIFIED",
+        "RETAINED_REVIEW_INPUT_COHORT_REVERIFIED"
+      ],
+      "return_time_permanent_immutability_claimed": false
+    },
+    "reviewed_added_control_code_bindings": [
+      {
+        "byte_length": 132733,
+        "path": "scripts/build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+        "sha256": "a46a7525895771db33d6ea6c1739ed18508dd7b82b22f3f8103840afbc606651"
+      },
+      {
+        "byte_length": 130072,
+        "path": "tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+        "sha256": "b12fab6cbd3cc5fa64a3d0decf37a93ee099e7e706f46a1c771578f4692b2b1c"
+      },
+      {
+        "byte_length": 78926,
+        "path": "scripts/apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+        "sha256": "dce104c995c26837dbd0cc75e1d95cb88ee966587853a82096a007a9cb60f86c"
+      },
+      {
+        "byte_length": 39370,
+        "path": "tests/test_apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+        "sha256": "93236bba76f72cdd4d9fff7fc24dc96d2cb887291db171d95529e05ac7a95297"
+      },
+      {
+        "byte_length": 25954,
+        "path": "scripts/run_walksafe_fp046_r002_goal_start_gate_20260823.py",
+        "sha256": "4d532970b4aa82875d70b94c5b2bd95b17eb1fa7f9f59db08d4828084e4abbfe"
+      },
+      {
+        "byte_length": 22037,
+        "path": "tests/test_walksafe_fp046_r002_goal_start_gate_20260823.py",
+        "sha256": "f490cd58e85d76f75d402d41f04bd150ec9219a7d1bb84e5f548015779256de1"
+      },
+      {
+        "byte_length": 79889,
+        "path": "scripts/apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+        "sha256": "f9311f062efa69f545b43010e815595c002390a95c96c5444152cc77e703d21e"
+      },
+      {
+        "byte_length": 34483,
+        "path": "tests/test_apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+        "sha256": "b8485f4b8bd95c43870c2884b3ea1bfd2137d6d96213f8a83bb5e483853b41ce"
+      }
+    ],
+    "reviewed_added_control_code_path_count": 8,
+    "reviewed_control_code_delta_path_count": 15,
+    "reviewed_control_code_successor_path_count": 7,
+    "reviewed_control_code_successors": [
+      {
+        "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+        "predecessor": {
+          "byte_length": 345803,
+          "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+          "sha256": "04b31e2fad7d55fbb0386390eec4347d5edcafea4b28bf01046aeb4aab0adcc4"
+        },
+        "successor": {
+          "byte_length": 369699,
+          "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+          "sha256": "8b2c62cb22a5c3d0b856a75dfa0791053723558eb76e86ab31c2ca4882ec5c59"
+        }
+      },
+      {
+        "path": "tests/test_walksafe_project_continuation_v2_4.py",
+        "predecessor": {
+          "byte_length": 155749,
+          "path": "tests/test_walksafe_project_continuation_v2_4.py",
+          "sha256": "afd72b1cf60d68834bafe3297ba7ce4a1e03cb924fa66ee1673c968a1b2e11cb"
+        },
+        "successor": {
+          "byte_length": 183513,
+          "path": "tests/test_walksafe_project_continuation_v2_4.py",
+          "sha256": "d4c148a4764ad5d2d2fbe8f6faaffb6b78206d4842c69e574e08818b81cced6b"
+        }
+      },
+      {
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "predecessor": {
+          "byte_length": 633056,
+          "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+          "sha256": "08d827b86242858ba61a3bfc46dd77776c7542282ee26f60d43cc4b626f7836a"
+        },
+        "successor": {
+          "byte_length": 674553,
+          "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+          "sha256": "f41993dfa4bf2ac83b86c0b06586d5b1a7faec9588a83a25ad0c76c4c9fdf66a"
+        }
+      },
+      {
+        "path": "tests/test_walksafe_goal_graph_v2_4.py",
+        "predecessor": {
+          "byte_length": 358761,
+          "path": "tests/test_walksafe_goal_graph_v2_4.py",
+          "sha256": "da9114098315264af713fc4479dab923c7d2dc0f87d75a23eb1584752abdcbb8"
+        },
+        "successor": {
+          "byte_length": 406900,
+          "path": "tests/test_walksafe_goal_graph_v2_4.py",
+          "sha256": "32a0bb11a44fc397e38912485075196a1c7ba889ea65e449549330ec8cb85ead"
+        }
+      },
+      {
+        "path": "scripts/generate_repository_catalogs.py",
+        "predecessor": {
+          "byte_length": 66357,
+          "path": "scripts/generate_repository_catalogs.py",
+          "sha256": "b06be746c96d35bab4c5d321fd26111f3a4952b5d6c00251d00fa05a902fa9ff"
+        },
+        "successor": {
+          "byte_length": 69046,
+          "path": "scripts/generate_repository_catalogs.py",
+          "sha256": "3b5c69344e3f5e62089e8e7b89aa332b80da2e71f00083d1380fb9fa8472b21e"
+        }
+      },
+      {
+        "path": "tests/test_repository_catalogs.py",
+        "predecessor": {
+          "byte_length": 39404,
+          "path": "tests/test_repository_catalogs.py",
+          "sha256": "15bd143e43dc54135afb70507b1afa3b7c5c95127753b045f349eb1f713f472a"
+        },
+        "successor": {
+          "byte_length": 46843,
+          "path": "tests/test_repository_catalogs.py",
+          "sha256": "e1e2e1bc41f04da9e761f4e4202452d2cf6c42d0caf75e138252ba80e32710d4"
+        }
+      },
+      {
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "predecessor": {
+          "byte_length": 24736,
+          "path": "scripts/run_walksafe_test_layers_current.sh",
+          "sha256": "b3f415e21ac9d7fe141a6387076e37c01b666ac9f7c39ac43acbde834454b2ed"
+        },
+        "successor": {
+          "byte_length": 25297,
+          "path": "scripts/run_walksafe_test_layers_current.sh",
+          "sha256": "b223fc78efce86da604e3f6e30e621902df7991c64a5ccbce99c4e3303f58f72"
+        }
+      }
+    ],
+    "reviewed_current_control_cohort": [
+      {
+        "byte_length": 369699,
+        "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+        "sha256": "8b2c62cb22a5c3d0b856a75dfa0791053723558eb76e86ab31c2ca4882ec5c59"
+      },
+      {
+        "byte_length": 183513,
+        "path": "tests/test_walksafe_project_continuation_v2_4.py",
+        "sha256": "d4c148a4764ad5d2d2fbe8f6faaffb6b78206d4842c69e574e08818b81cced6b"
+      },
+      {
+        "byte_length": 674553,
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "sha256": "f41993dfa4bf2ac83b86c0b06586d5b1a7faec9588a83a25ad0c76c4c9fdf66a"
+      },
+      {
+        "byte_length": 406900,
+        "path": "tests/test_walksafe_goal_graph_v2_4.py",
+        "sha256": "32a0bb11a44fc397e38912485075196a1c7ba889ea65e449549330ec8cb85ead"
+      },
+      {
+        "byte_length": 69046,
+        "path": "scripts/generate_repository_catalogs.py",
+        "sha256": "3b5c69344e3f5e62089e8e7b89aa332b80da2e71f00083d1380fb9fa8472b21e"
+      },
+      {
+        "byte_length": 46843,
+        "path": "tests/test_repository_catalogs.py",
+        "sha256": "e1e2e1bc41f04da9e761f4e4202452d2cf6c42d0caf75e138252ba80e32710d4"
+      },
+      {
+        "byte_length": 25297,
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "sha256": "b223fc78efce86da604e3f6e30e621902df7991c64a5ccbce99c4e3303f58f72"
+      },
+      {
+        "byte_length": 67953,
+        "path": "scripts/build_walksafe_fp022_navigation_internal_evidence_20260814.py",
+        "sha256": "0387c2460aa5e01452cdddbb21efbc4383d38bd3c2b4a602771183d8d237860d"
+      },
+      {
+        "byte_length": 18971,
+        "path": "tests/test_build_walksafe_fp022_navigation_internal_evidence_20260814.py",
+        "sha256": "ce3109e3824cc0b4288680e2dd7e9ac06c0ea21b0f90dbca9948eb744fde9af1"
+      },
+      {
+        "byte_length": 30144,
+        "path": "scripts/build_walksafe_fp022_gap_backlog_r028_20260814.py",
+        "sha256": "42e4efd47548c1bc32471595dc87c1e55e75bfe9b479da6b3ce2ca2a8304b901"
+      },
+      {
+        "byte_length": 13456,
+        "path": "tests/test_build_walksafe_fp022_gap_backlog_r028_20260814.py",
+        "sha256": "3bc2f17acefcda23ea9c9bc5b5bb95b267aeb02f8dc99e8981acbb40702e921e"
+      },
+      {
+        "byte_length": 50428,
+        "path": "scripts/apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
+        "sha256": "c5335bc100cbcfa23c06901590bf75b1b19b00993ebd0c006bbd40e6aa542ed7"
+      },
+      {
+        "byte_length": 12797,
+        "path": "tests/test_apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
+        "sha256": "a5dc5ac8be5c01462a56485b809e0133e3bb94f2da75f979a66bb04035dca3dd"
+      },
+      {
+        "byte_length": 253812,
+        "path": "scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+        "sha256": "f01d2936992fae1c0697ba976d9b848e609a17d0222be860401f4427c32d27a7"
+      },
+      {
+        "byte_length": 115827,
+        "path": "tests/test_build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+        "sha256": "8dd1433d449d42755cc61d73cb35e711770081263b20aaca5617c32567d97245"
+      },
+      {
+        "byte_length": 33124,
+        "path": "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+        "sha256": "1bc9666826cdba26e239af78149210d6eef18dace6ac3b83ad6877c8e229f4cb"
+      },
+      {
+        "byte_length": 15458,
+        "path": "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+        "sha256": "0a0b9b7e59648ce37f0b13b46e2225032babd05fcef3cb3b192f289caf6d4e5d"
+      },
+      {
+        "byte_length": 128609,
+        "path": "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+        "sha256": "3cc14e9b2e9721d5adbdab4eec9c85c0fafd68138cab22ecf4b99334fa14c371"
+      },
+      {
+        "byte_length": 33838,
+        "path": "tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+        "sha256": "23139cb63b294e9887e45e75b467ec42de2f9987b1cd5c5127fecd21eb4455d8"
+      },
+      {
+        "byte_length": 18858,
+        "path": "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py",
+        "sha256": "7a35d7db612a2467edd07b2145ec54eba19eabce1a159465b770c56c7f43c411"
+      },
+      {
+        "byte_length": 6215,
+        "path": "tests/test_build_walksafe_fp046_gap_backlog_r029_20260815.py",
+        "sha256": "b62f65d3ed0636ad812a7c2046af7af300c05872b3081c8014aa2bce6c44c4a4"
+      },
+      {
+        "byte_length": 98840,
+        "path": "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+        "sha256": "27ee8bd2d48c455cb5075bf3dfa614293afe5c6431313fe0f1b7d89abf84e681"
+      },
+      {
+        "byte_length": 60923,
+        "path": "tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+        "sha256": "f8de25db92821d92c69381dd292b1ec68017a8bbb5e1090d8c2d04b09e8e0816"
+      },
+      {
+        "byte_length": 132733,
+        "path": "scripts/build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+        "sha256": "a46a7525895771db33d6ea6c1739ed18508dd7b82b22f3f8103840afbc606651"
+      },
+      {
+        "byte_length": 130072,
+        "path": "tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+        "sha256": "b12fab6cbd3cc5fa64a3d0decf37a93ee099e7e706f46a1c771578f4692b2b1c"
+      },
+      {
+        "byte_length": 78926,
+        "path": "scripts/apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+        "sha256": "dce104c995c26837dbd0cc75e1d95cb88ee966587853a82096a007a9cb60f86c"
+      },
+      {
+        "byte_length": 39370,
+        "path": "tests/test_apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+        "sha256": "93236bba76f72cdd4d9fff7fc24dc96d2cb887291db171d95529e05ac7a95297"
+      },
+      {
+        "byte_length": 25954,
+        "path": "scripts/run_walksafe_fp046_r002_goal_start_gate_20260823.py",
+        "sha256": "4d532970b4aa82875d70b94c5b2bd95b17eb1fa7f9f59db08d4828084e4abbfe"
+      },
+      {
+        "byte_length": 22037,
+        "path": "tests/test_walksafe_fp046_r002_goal_start_gate_20260823.py",
+        "sha256": "f490cd58e85d76f75d402d41f04bd150ec9219a7d1bb84e5f548015779256de1"
+      },
+      {
+        "byte_length": 79889,
+        "path": "scripts/apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+        "sha256": "f9311f062efa69f545b43010e815595c002390a95c96c5444152cc77e703d21e"
+      },
+      {
+        "byte_length": 34483,
+        "path": "tests/test_apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+        "sha256": "b8485f4b8bd95c43870c2884b3ea1bfd2137d6d96213f8a83bb5e483853b41ce"
+      }
+    ],
+    "reviewed_current_control_cohort_sha256": "8a5548ae52f55bfb39e2ea1837553e62f08974a2722cb0ad4c911baa36fbb367",
+    "session_artifact_bindings": [
+      {
+        "byte_length": 5982,
+        "path": "daylog/2026-08-23.md",
+        "sha256": "96885bff8f5486493e04ae089d9ebb80ea1d5c677aa37e3b36fe4a2bd6707432"
+      },
+      {
+        "byte_length": 13479,
+        "path": "daylog/2026-08-24.md",
+        "sha256": "6bccb6222b2292446f20f48d54171850873f86c515547a74aefadab3fc89667f"
+      },
+      {
+        "byte_length": 37293,
+        "path": "docs/planning/walksafe-fp046-r002-resumption-plan-20260824.html",
+        "sha256": "1bc7662049d938c821f769278713af3dadb84e4c250450becb78dbb7edaaa742"
+      },
+      {
+        "byte_length": 53718,
+        "path": "docs/planning/walksafe-security-server-operations-feature-first-plan-20260824.html",
+        "sha256": "1a0baf026f86bd1b6624b70e2cda54c9c5547edacb7ec4459a45d3d64e193d14"
+      }
+    ],
+    "session_artifact_path_count": 4,
+    "source_checkpoint": {
+      "byte_length": 2217805,
+      "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "sequence": 76,
+      "sha256": "bf0f44f0ed2a777c2a3d62b81fa995d26e3b725e398a37034b7d70fa1d3a1a36",
+      "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP046-R002-20260815-001",
+      "tail_event_sha256": "f2a529bae5aa808fccb64191a42902d7e717d0340531410213486bdcfa279070"
+    },
+    "superseded_review_assignments": [
+      {
+        "assignment_binding": {
+          "byte_length": 22114,
+          "path": "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R001/review-assignment.json",
+          "sha256": "e1b3807d7de0d3473d271e8aa36cd73d0b2e5bde3ecc00f0c8652642efc376dd"
+        },
+        "disposition": "SUPERSEDED_WITHOUT_APPROVAL",
+        "independent_review_status": "NOT_CREATED",
+        "review_result_status": "NOT_CREATED",
+        "round_id": "WS-FP046-R002-SEQ77-78-REVIEW-20260823-R001",
+        "supersession_reason_code": "R001_BLOCKING_CONTROL_BOUNDARY_FINDINGS_REQUIRE_REVIEWED_COHORT_RESEAL"
+      },
+      {
+        "assignment_binding": {
+          "byte_length": 22838,
+          "path": "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R002/review-assignment.json",
+          "sha256": "1fbb07eb4fe16e943a5ca13f9d78ad10f51952d01dbbc1ca6d698b91ed0c5885"
+        },
+        "confirmed_rejection_findings": [
+          "GATE_CONTRACT_REFERENCES_MISSING_PYTEST_SELECTOR",
+          "VALID_SEQ79_PLUS_INVALIDATES_REVIEW_AUTHORITY",
+          "SEQ77_OCCURRED_AT_PREDATES_BOUND_REVIEW",
+          "SEQ78_MANAGED_COHORT_TOCTOU",
+          "SEQ77_CLAIM_BOUNDARY_CONFUSES_JSON_ZERO_AND_FALSE",
+          "POSTCOMMIT_INTERRUPT_ESCAPES_UNCERTAIN_CLASSIFICATION"
+        ],
+        "disposition": "SUPERSEDED_WITHOUT_APPROVAL",
+        "independent_review_status": "NOT_CREATED",
+        "review_result_status": "NOT_CREATED",
+        "round_id": "WS-FP046-R002-SEQ77-78-REVIEW-20260823-R002",
+        "supersession_reason_code": "R002_SIX_CONFIRMED_FINDINGS_REQUIRE_R003_RESEAL"
+      },
+      {
+        "assignment_binding": {
+          "byte_length": 24009,
+          "path": "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R003/review-assignment.json",
+          "sha256": "fb3bf40e349c4edf6cabdd7a8afde5c491802f3d943f8b2b4beda5b84d54658c"
+        },
+        "confirmed_rejection_findings": [
+          "REVIEW_INPUT_COHORT_ABA_CAN_PUBLISH_SELF_INVALID_EVIDENCE"
+        ],
+        "disposition": "SUPERSEDED_WITHOUT_APPROVAL",
+        "independent_review_status": "NOT_CREATED",
+        "review_result_status": "NOT_CREATED",
+        "round_id": "WS-FP046-R002-SEQ77-78-REVIEW-20260823-R003",
+        "supersession_reason_code": "R003_REVIEW_INPUT_COHORT_ABA_RETAINED_DESCRIPTOR_REQUIRED"
+      },
+      {
+        "assignment_binding": {
+          "byte_length": 27865,
+          "path": "docs/control/execution/workstream-transitions/seq77-78/review-rounds/R004/review-assignment.json",
+          "sha256": "810013bf9aab371a7cdd899e617afdfa9c3fda9979a387f20784277174e56ee7"
+        },
+        "disposition": "SUPERSEDED_WITHOUT_APPROVAL",
+        "independent_review_status": "NOT_CREATED",
+        "review_result_status": "NOT_CREATED",
+        "round_id": "WS-FP046-R002-SEQ77-78-REVIEW-20260823-R004",
+        "supersession_reason_code": "R004_POST_PUBLICATION_REGRESSION_NOT_RERUNNABLE"
+      }
+    ]
+  },
+  "reviewer": {
+    "agent_instance_id": "codex-fp046-r002-seq77-78-r006-independent-reviewer-20260823",
+    "canonical_task": "/root/seq77_78_final_review",
+    "role": "SEPARATE_INTERNAL_REVIEWER"
+  },
+  "round_id": "WS-FP046-R002-SEQ77-78-REVIEW-20260823-R006",
+  "schema_version": "1.0"
+}

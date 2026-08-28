@@ -1,0 +1,28 @@
+{
+  "assignment_binding": {
+    "byte_length": 73233,
+    "path": "docs/control/execution/workstream-transitions/seq99-100/review-rounds/R008/review-assignment.json",
+    "sha256": "9a6b8e024dad855947eae819b5a1bfe1434d70264720ba7df8f1b3c6bfe403f2"
+  },
+  "decision": "APPROVED",
+  "document_id": "WS-FP048-R002-SEQ99-100-INDEPENDENT-REVIEW-20260827-R008",
+  "evidence_type": "TRANSITION_CONTROL_INDEPENDENT_REVIEW",
+  "external_independence_claimed": false,
+  "findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0
+  },
+  "review_result_binding": {
+    "byte_length": 756,
+    "path": "docs/control/execution/workstream-transitions/seq99-100/review-rounds/R008/review-result.json",
+    "sha256": "a7aa97280df76e99b6bcadd3197de1c042df421fb7bb27f174ce3fcd3cfd35f0"
+  },
+  "reviewed_at": "2026-08-28T06:22:41+09:00",
+  "reviewer": {
+    "id": "codex-fp048-r002-seq99-correction-r008-independent-reviewer-20260828",
+    "task_id": "/root/goalgraph_fp022_perf_test_design"
+  },
+  "round_id": "R008",
+  "schema_version": "1.0"
+}

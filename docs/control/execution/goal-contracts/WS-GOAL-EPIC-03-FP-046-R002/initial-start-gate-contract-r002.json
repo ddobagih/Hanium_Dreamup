@@ -1,0 +1,59 @@
+{
+  "claim_boundary": {
+    "actual_event_credit_delta": 0,
+    "append_only_reanchor_event_required": true,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "binding_replacement_effective_without_reanchor_event": false,
+    "formal_test_credit_delta": 0,
+    "goal_started": false,
+    "intended_use": "ADD_ONLY_SEQ77_REANCHOR_THEN_PRIVATE_GATE_AND_SEQ78_START",
+    "product_implementation_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "seq76_ready_event_modified": false,
+    "start_gate_status": "NOT_RUN",
+    "test_credit_delta": 0
+  },
+  "contract_id": "WS-FP046-R002-INTERNAL-START-GATE-R002",
+  "contract_version": "2026-08-23.1",
+  "document_id": "WS-FP046-R002-INITIAL-START-GATE-CONTRACT-20260823-002",
+  "gate_purpose": "INITIAL_START",
+  "ordered_checks": [
+    {
+      "check_id": "CONTINUATION",
+      "command": "PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json"
+    },
+    {
+      "check_id": "GOAL_GRAPH",
+      "command": "PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_goal_graph_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json"
+    },
+    {
+      "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "command": "PYTHON_BIN=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python bash scripts/run_walksafe_test_layers_current.sh validate"
+    },
+    {
+      "check_id": "ROOT_FP046_R002_CONTROL_REGRESSION",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py tests/test_apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py tests/test_walksafe_fp046_r002_goal_start_gate_20260823.py tests/test_apply_walksafe_fp046_r002_goal_started_seq78_20260823.py tests/test_repository_catalogs.py && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_exact_seq77_78_prefix_survives_later_suffix tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_frozen_r011_predecessor_is_byte_exact tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_later_suffix_cannot_hide_seq77_authority_tampering tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_private_gate_contract_has_exact_five_control_checks tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_review_cohort_reanchors_frozen_r011_to_current_control tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_reviewed_seq78_fixture_uses_frozen_seq76_bytes tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_seq79_replay_and_unknown_type_remain_fail_closed tests/test_walksafe_project_continuation_v2_4.py::WalkSafeFp046R002Seq77Seq78BoundaryTest::test_validate_start_gate_uses_the_runner_receipt_path tests/test_walksafe_goal_graph_v2_4.py::WalkSafeFp046R002StartGraphTest"
+    },
+    {
+      "check_id": "REPOSITORY_STATE",
+      "command": ": \"${WALKSAFE_GATE_EVENT_ID:?required}\" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json --print-gate-repository-state --gate-event-id \"${WALKSAFE_GATE_EVENT_ID}\""
+    }
+  ],
+  "schema_version": "1.1",
+  "successor_reason_code": "SEQ76_READY_TRUST_ANCHOR_AND_CURRENT_CONTROL_COHORT_REQUIRED",
+  "supersedes": {
+    "byte_length": 1011,
+    "canonical_sha256": "a8295f1a693b41bbc3864f882fdd8ba9f17e0ddba49562517fcfc3bb26679214",
+    "contract_id": "WS-FP046-R002-INTERNAL-START-GATE-R001",
+    "contract_version": "2026-08-15.1",
+    "document_id": "WS-FP046-R002-INITIAL-START-GATE-CONTRACT-20260815-001",
+    "file_sha256": "506d6afb202b63e4e30f3bb5ba1a560b18b8f76679a37a18a144a442a4a0fe5e",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-046-R002/initial-start-gate-contract-r001.json",
+    "source_ready_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP046-R002-20260815-001",
+    "source_ready_event_sequence": 76,
+    "source_ready_event_sha256": "f2a529bae5aa808fccb64191a42902d7e717d0340531410213486bdcfa279070"
+  },
+  "target_goal_content_sha256": "4627c19b421f626323778fcdfd01cc2edbc36644c48c7d65c2b4847e698ac429",
+  "target_goal_id": "WS-GOAL-EPIC-03-FP-046-R002"
+}

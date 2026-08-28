@@ -25,14 +25,16 @@ TEST_DATABASE_URL = (
 )
 
 
-def test_database_post_migration_head_matches_repository() -> None:
+def test_database_post_migration_head_remains_in_repository_revision_graph() -> None:
     root = Path(__file__).parents[1]
     config = Config(str(root / "backend/alembic.ini"))
     config.set_main_option("script_location", str(root / "backend/alembic"))
+    revisions = ScriptDirectory.from_config(config)
 
-    assert ScriptDirectory.from_config(config).get_heads() == [
-        runner.DATABASE_POST_MIGRATION_HEAD
-    ]
+    assert len(revisions.get_heads()) == 1
+    frozen_revision = revisions.get_revision(runner.DATABASE_POST_MIGRATION_HEAD)
+    assert frozen_revision is not None
+    assert frozen_revision.revision == runner.DATABASE_POST_MIGRATION_HEAD
 
 
 @pytest.fixture(autouse=True)

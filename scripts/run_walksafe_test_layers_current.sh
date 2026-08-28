@@ -110,6 +110,7 @@ UNIT_PYTHON_TESTS=(
   tests/test_web_build_manifest.py
   tests/test_walksafe_isolated_python_bootstrap.py
   tests/test_walksafe_android_product_boundary.py
+  tests/test_walksafe_android_gateway_ingress_current.py
   tests/test_walksafe_artifact_baseline_materialization_20260722.py
   tests/test_walksafe_fp048_goal_start_gate_20260802.py
   tests/test_walksafe_fp008_policy_contract_20260809.py
@@ -139,10 +140,65 @@ UNIT_PYTHON_TESTS=(
   tests/test_build_walksafe_fp022_gap_backlog_r028_20260814.py
   tests/test_apply_walksafe_fp022_goal_completed_seq70_71_20260814.py
   tests/test_build_walksafe_fp022_completion_seq70_71_review_20260814.py
+  tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py
+  tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py
+  tests/test_build_walksafe_fp046_gap_backlog_r029_20260815.py
+  tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py
+  tests/test_build_walksafe_fp046_r002_seq78_79_recovery_review_20260824.py
+  tests/test_apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py
+  tests/test_apply_walksafe_fp048_r002_goal_seq88_89_20260825.py
+  tests/test_publish_walksafe_fp048_r002_goal_seq88_89_20260825.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq90_20260825.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_20260825.py
   tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py
+  tests/test_account_deletion_worker_operations.py
+  tests/test_apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_start_control_correction_seq91_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq91_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq92_20260826.py
+  tests/test_apply_walksafe_fp048_r002_start_gate_contract_correction_seq92_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq93_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_start_branch_semantics_reanchor_seq93_20260826.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_r005_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq94_20260826.py
+  tests/test_walksafe_fp048_r002_post_seq93_stage_regression_20260826.py
+  tests/test_apply_walksafe_fp048_r002_start_gate_contract_correction_seq94_20260826.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_r006_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq95_20260826.py
+  tests/test_walksafe_fp048_r002_post_seq94_stage_regression_20260826.py
+  tests/test_apply_walksafe_fp048_r002_start_gate_contract_correction_seq95_20260826.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_r007_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq96_20260826.py
+  tests/test_walksafe_fp048_r002_post_seq95_stage_regression_20260826.py
+  tests/test_apply_walksafe_fp048_r002_start_gate_contract_correction_seq96_20260826.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_r008_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq97_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_completed_seq98_99_20260826.py
+  tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_r009_20260826.py
+  tests/test_walksafe_fp048_r002_post_seq96_stage_regression_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq98_20260826.py
+  tests/test_apply_walksafe_fp048_r002_goal_completed_seq99_100_20260826.py
+  tests/test_apply_walksafe_fp048_r002_start_gate_execution_correction_seq98_20260827.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_r010_20260827.py
+  tests/test_walksafe_fp048_r002_post_seq97_stage_regression_20260827.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq99_20260827.py
+  tests/test_apply_walksafe_fp048_r002_goal_completed_seq100_101_20260827.py
+  tests/test_apply_walksafe_fp048_r002_start_gate_execution_correction_seq99_20260827.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_r011_20260827.py
+  tests/test_walksafe_fp048_r002_post_seq99_stage_regression_20260827.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq100_20260827.py
+  tests/test_apply_walksafe_fp048_r002_goal_started_seq100_projection_correction_20260828.py
+  tests/test_apply_walksafe_fp048_r002_goal_completed_seq101_102_20260827.py
+  tests/test_walksafe_backup_operations.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_r002_20260826.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_r003_20260826.py
+  tests/test_walksafe_fp048_r002_goal_start_gate_r004_20260826.py
   model/test_two_model_runtime.py
   backend/tests/test_admin_credential_issuer_binding.py
   backend/tests/test_admin_credential_issuer_key.py
+  backend/tests/test_account_deletion_worker.py
+  backend/tests/test_capacity_state.py
   backend/tests/test_field_test_security.py
   backend/tests/test_health_readiness.py
   backend/tests/test_openapi_contract.py
@@ -318,8 +374,8 @@ HISTORICAL_CONTROL_PYTHON_TESTS=(
   tests/test_walksafe_phase1_exact257_successor_r013_20260803.py
   tests/test_walksafe_fp008_strict_review_gate_20260803.py
   tests/test_walksafe_fp008_goal_completed_seq49_50_20260809.py
-  # These completed NPC recovery and FP022 transition suites require their
-  # original predecessor bytes. Keep them for history replay, not seq71 CI.
+  # These completed NPC recovery, FP022 and FP046 transition suites require their
+  # original predecessor bytes. Keep them for history replay, not current CI.
   tests/test_apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py
   tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py
   tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py
@@ -332,6 +388,13 @@ HISTORICAL_CONTROL_PYTHON_TESTS=(
   tests/test_walksafe_fp022_goal_start_gate_20260813.py
   tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py
   tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py
+  tests/test_apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py
+  tests/test_walksafe_fp046_r002_goal_start_gate_20260823.py
+  tests/test_apply_walksafe_fp046_r002_goal_started_seq78_20260823.py
+  tests/test_apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824.py
+  tests/test_apply_walksafe_fp046_r002_goal_started_seq79_20260824.py
+  # This pre-start candidate asserts the two FP046 defects are still unresolved.
+  tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py
   # Superseded before publication by the add-only seq59 correction/seq60 start.
   tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py
   tests/test_walksafe_fp046_goal_seq51_52_20260809.py

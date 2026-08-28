@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime
 import hashlib
 import json
 import os
@@ -17,6 +18,7 @@ from unittest import mock
 from scripts import (
     apply_walksafe_fp046_npc_r002_reopen_20260815 as r008_review,
     apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815 as r008_transaction,
+    apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825 as fp046_completion,
     build_walksafe_fp046_gap_backlog_r029_20260815 as r029_bridge,
     build_walksafe_fp046_gap_backlog_r029_candidate_20260815 as r029_candidate,
     build_walksafe_fp022_completion_seq70_71_review_20260814 as r008_control_review,
@@ -916,7 +918,7 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
     def test_latest_canonical_snapshot_supersedes_historical_physical_sha(
         self,
     ) -> None:
-        checkpoint = self._checkpoint_with_current_latest_canonical_bindings()
+        checkpoint = continuation.load_json(CHECKPOINT)
 
         errors = self._validate_transition_replay(checkpoint)
 
@@ -925,7 +927,7 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
     def test_historical_canonical_snapshot_seal_tampering_is_rejected(
         self,
     ) -> None:
-        checkpoint = self._checkpoint_with_current_latest_canonical_bindings()
+        checkpoint = continuation.load_json(CHECKPOINT)
         history = checkpoint["goal_execution"]["transition_history"]
         historical = next(
             event
@@ -946,39 +948,23 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
     def test_latest_canonical_snapshot_physical_sha_drift_is_rejected(
         self,
     ) -> None:
-        checkpoint = self._checkpoint_with_current_latest_canonical_bindings()
-        state = checkpoint["goal_execution"]
-        history = state["transition_history"]
-        latest_index = max(
-            index
-            for index, event in enumerate(history)
-            if "canonical_binding_snapshot_after" in event
-        )
-        latest = history[latest_index]
-        latest_label = f"event {latest['sequence']}"
+        checkpoint = continuation.load_json(CHECKPOINT)
         role = "ARTIFACT_REGISTER"
-        latest["canonical_binding_snapshot_after"][role][
-            "file_sha256"
-        ] = "0" * 64
-        for binding in checkpoint["canonical_bindings"]:
-            if binding["role"] == role:
-                binding["file_sha256"] = "0" * 64
-                break
-        for index in range(latest_index, len(history)):
-            if index:
-                history[index]["previous_event_sha256"] = history[index - 1][
-                    "event_sha256"
-                ]
-            history[index]["event_sha256"] = continuation.event_sha256(
-                history[index]
-            )
-        state["transition_history_anchor_sha256"] = history[-1]["event_sha256"]
+        target = (ROOT / "docs/deliverables/00-control/artifact-register.json").resolve()
+        real_sha256_file = continuation.sha256_file
 
-        errors = self._validate_transition_replay(checkpoint)
+        with mock.patch.object(
+            continuation,
+            "sha256_file",
+            side_effect=lambda path: (
+                "0" * 64 if path == target else real_sha256_file(path)
+            ),
+        ):
+            errors = self._validate_transition_replay(checkpoint)
 
         self.assertTrue(
             any(
-                f"{latest_label} canonical binding differs: ARTIFACT_REGISTER"
+                "canonical binding differs: ARTIFACT_REGISTER"
                 in error
                 for error in errors
             ),
@@ -2194,26 +2180,6 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
             previous = event["event_sha256"]
 
     @staticmethod
-    def _checkpoint_with_current_latest_canonical_bindings() -> dict:
-        checkpoint = continuation.load_json(CHECKPOINT)
-        state = checkpoint["goal_execution"]
-        history = state["transition_history"]
-        tail = history[-1]
-        snapshot = continuation.canonical_binding_snapshot(checkpoint)
-        top_level_by_role = {
-            binding["role"]: binding
-            for binding in checkpoint["canonical_bindings"]
-        }
-        for role, binding in snapshot.items():
-            digest = sha256_file(ROOT / binding["path"])
-            binding["file_sha256"] = digest
-            top_level_by_role[role]["file_sha256"] = digest
-        tail["canonical_binding_snapshot_after"] = snapshot
-        tail["event_sha256"] = continuation.event_sha256(tail)
-        state["transition_history_anchor_sha256"] = tail["event_sha256"]
-        return checkpoint
-
-    @staticmethod
     def _validate_transition_replay(checkpoint: dict) -> list[str]:
         return continuation.validate_transition_replay(
             ROOT,
@@ -2376,7 +2342,7 @@ class WalkSafeGenericDependencyClosureTest(unittest.TestCase):
         history = checkpoint["goal_execution"]["transition_history"]
         dispatch = copy.deepcopy(history[-1])
         dispatch.update(
-            sequence=72, event_id="WS-SYNTHETIC-CLOSURE-072", event_type="CANONICAL_BINDINGS_UPDATED",
+            sequence=len(history) + 1, event_id="WS-SYNTHETIC-CLOSURE-077", event_type="CANONICAL_BINDINGS_UPDATED",
             previous_event_sha256=history[-1]["event_sha256"], subject_goal_id="WS-GOAL-EPIC-03",
             produced_by_goal_id=None, produced_binding_roles=[],
             producer_completion_receipt_binding=None,
@@ -2385,7 +2351,7 @@ class WalkSafeGenericDependencyClosureTest(unittest.TestCase):
             changed_binding_roles=[], changed_subject_ids_by_role={}, impact_closure_goal_ids=[],
             impact_disposition_by_goal={"WS-GOAL-EPIC-03": {"result": "REOPEN_CONTAINER", "target_status": "PLANNED"}},
             reopened_completion_event_sha256_by_goal={"WS-GOAL-EPIC-03": "e" * 64}, status_changes={"WS-GOAL-EPIC-03": "PLANNED"},
-            from_status="COMPLETE_AT_TARGET", to_status="PLANNED",
+            from_status="READY", to_status="PLANNED",
         )
         dispatch["event_sha256"] = continuation.event_sha256(dispatch)
         history.append(dispatch)
@@ -2471,12 +2437,23 @@ class WalkSafeGenericDependencyClosureTest(unittest.TestCase):
         latest_children = copy.deepcopy(
             state["materialized_child_goal_ids_by_parent"]
         )
-        legacy_members = latest_children[fixture["epic"]]
-        self.assertNotEqual(legacy_members, sorted(legacy_members))
         successors = {
             fixture["fp_next"]: "f" * 64,
             fixture["npc_next"]: "d" * 64,
         }
+        for goal_id in successors:
+            latest_inventory.pop(goal_id)
+        legacy_members = list(
+            reversed(
+                [
+                    goal_id
+                    for goal_id in latest_children[fixture["epic"]]
+                    if goal_id not in successors
+                ]
+            )
+        )
+        latest_children[fixture["epic"]] = legacy_members
+        self.assertNotEqual(legacy_members, sorted(legacy_members))
 
         def record(goal_id: str, seal: str) -> dict[str, object]:
             node = fixture["nodes"][goal_id]
@@ -2925,69 +2902,8 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
                 os.chmod(directory, source.stat().st_mode & 0o777)
         os.symlink(ROOT / ".git", cls.root / ".git", target_is_directory=True)
 
-        control_context = r008_control_review.prepare_control_successor_r011_context(
-            cls.root
-        )
-        control_assignment_raw = (
-            r008_control_review.build_control_successor_r011_assignment(
-                control_context, assigned_at=assigned_at
-            ).encode("utf-8")
-        )
-        control_assignment = json.loads(control_assignment_raw)
-        control_result = {
-            "schema_version": "1.0",
-            "evidence_type": (
-                "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_"
-                "REVIEW_RESULT"
-            ),
-            "goal_id": r008_control_review.GOAL_ID,
-            "round_id": r008_control_review.CONTROL_SUCCESSOR_R011_ROUND_ID,
-            "reviewed_at": assigned_at,
-            "reviewer": copy.deepcopy(control_assignment["reviewer"]),
-            "assignment_binding": r008_control_review._binding(
-                r008_control_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL,
-                control_assignment_raw,
-            ),
-            "review_scope": copy.deepcopy(control_assignment["review_scope"]),
-            "decision": "APPROVED",
-            "findings": {"blocking": [], "major_open": [], "minor_open": []},
-            "finding_dispositions": [],
-            "review_boundary": copy.deepcopy(
-                control_assignment["review_boundary"]
-            ),
-        }
-        control_result_raw = r008_control_review.json_text(
-            control_result
-        ).encode("utf-8")
-        control_independent_raw = (
-            r008_control_review.build_control_successor_r011_independent_review(
-                control_context,
-                control_assignment,
-                control_assignment_raw,
-                control_result,
-                control_result_raw,
-            ).encode("utf-8")
-        )
-        for relative, raw in (
-            (
-                r008_control_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL,
-                control_assignment_raw,
-            ),
-            (
-                r008_control_review.CONTROL_SUCCESSOR_R011_RESULT_REL,
-                control_result_raw,
-            ),
-            (
-                r008_control_review.CONTROL_SUCCESSOR_R011_INDEPENDENT_REL,
-                control_independent_raw,
-            ),
-        ):
-            target = cls.root / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(raw)
-
         r011_binding, r011_raw = (
-            r008_review.load_validated_control_successor_r011(cls.root)
+            continuation._load_fp046_r002_frozen_r011_review(cls.root)
         )
         r010_binding, r010_raw = (
             r008_review.load_frozen_control_successor_r010(cls.root)
@@ -2996,43 +2912,8 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
             r008_review.load_frozen_control_successor_r009(cls.root)
         )
 
-        assignment_raw = r008_review.build_transition_assignment(
-            cls.root, assigned_at=assigned_at
-        ).encode("utf-8")
-        assignment = json.loads(assignment_raw)
-        result = {
-            "schema_version": "1.0",
-            "evidence_type": (
-                "FP046_NPC_R002_REOPEN_TRANSITION_REVIEWER_AUTHORED_RESULT"
-            ),
-            "goal_id": r008_review.TRANSITION_GOAL_ID,
-            "round_id": r008_review.TRANSITION_ROUND_ID,
-            "reviewed_at": assigned_at,
-            "reviewer": copy.deepcopy(assignment["reviewer"]),
-            "assignment_binding": r008_review._binding(
-                r008_review.TRANSITION_ASSIGNMENT_REL, assignment_raw
-            ),
-            "decision": "APPROVED",
-            "findings": {"blocking": [], "major_open": [], "minor_open": []},
-            "finding_dispositions": [],
-            "review_scope": copy.deepcopy(assignment["review_scope"]),
-            "review_boundary": copy.deepcopy(assignment["review_boundary"]),
-        }
-        result_raw = r008_review.json_text(result).encode("utf-8")
-        independent_raw = r008_review.build_transition_independent_review(
-            assignment, assignment_raw, result, result_raw
-        ).encode("utf-8")
-        review_overlay = {
-            r008_review.TRANSITION_R004_ASSIGNMENT_REL: assignment_raw,
-            r008_review.TRANSITION_R004_RESULT_REL: result_raw,
-            r008_review.TRANSITION_R004_INDEPENDENT_REL: independent_raw,
-        }
-        for relative, raw in review_overlay.items():
-            target = cls.root / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(raw)
-        r004_binding, r004_raw = r008_review.load_validated_transition_r004(
-            cls.root
+        r004_binding, r004_raw = (
+            continuation._load_fp046_r002_frozen_r004_review(cls.root)
         )
         r003_binding, r003_raw = r008_review.load_frozen_transition_r003(
             cls.root
@@ -3043,9 +2924,9 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
         _r001_binding, r001_raw = r008_review.load_frozen_transition_r001(
             cls.root
         )
-        transaction = r008_transaction.build_transaction(cls.root)
-        cls.transaction = transaction
-        cls.checkpoint = transaction["checkpoint"]
+        cls.checkpoint = continuation.load_json(
+            cls.root / r008_review.CHECKPOINT_REL
+        )
         cls.review_paths = tuple(
             sorted(
                 {
@@ -3080,7 +2961,7 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
                 for path in r003_raw
             },
             **{
-                path: "current R004 transition review"
+                path: "frozen R004 transition review"
                 for path in r004_raw
             },
             **{
@@ -3092,19 +2973,35 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
                 for path in r010_raw
             },
             **{
-                path: "current R011 control review"
+                path: "frozen R011 control review"
                 for path in r011_raw
             },
         }
         cls.authorization_sha256 = cls.checkpoint["goal_execution"][
             "transition_history"
         ][1]["package_activation_authorization_binding"]["file_sha256"]
-        for relative, raw in {
-            **transaction["output_bytes"],
-        }.items():
-            target = cls.root / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(raw)
+        seq72 = cls.checkpoint["goal_execution"]["transition_history"][71]
+        cls.transaction = {
+            "transition_review_subject_binding": copy.deepcopy(
+                seq72["transition_review_subject_binding"]
+            ),
+            "source_bindings": [
+                {
+                    "path": relative.as_posix(),
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                    "byte_length": len(raw),
+                }
+                for relative, raw in {
+                    **r001_raw,
+                    **r002_raw,
+                    **r003_raw,
+                    **r004_raw,
+                    **r009_raw,
+                    **r010_raw,
+                    **r011_raw,
+                }.items()
+            ],
+        }
 
     @classmethod
     def _replay(cls, checkpoint: dict[str, object]) -> list[str]:
@@ -3158,40 +3055,50 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
             ],
             "subject_goal_id": r008_review.FP046_R002,
         }
-        seq77 = {
+        if len(history) == 76:
+            seq77 = {
+                **copy.deepcopy(common),
+                "sequence": 77,
+                "event_id": continuation.FP046_R002_CONTROL_REANCHOR_EVENT_ID,
+                "event_type": "GOAL_START_CONTROL_REANCHORED",
+                "occurred_at": "2026-08-23T12:00:00+09:00",
+                "previous_event_sha256": seq76["event_sha256"],
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+            }
+            seq77["event_sha256"] = continuation.event_sha256(seq77)
+            history.append(seq77)
+        else:
+            seq77 = history[76]
+        seq78 = {
             **copy.deepcopy(common),
-            "sequence": 77,
-            "event_id": (
-                "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
-                "FP046-R002-20260823-001"
-            ),
+            "sequence": 78,
+            "event_id": continuation.FP046_R002_CONTROL_CORRECTION_EVENT_ID,
             "event_type": "GOAL_START_CONTROL_REANCHORED",
-            "occurred_at": "2026-08-23T12:00:00+09:00",
-            "previous_event_sha256": seq76["event_sha256"],
+            "occurred_at": "2026-08-23T12:00:01+09:00",
+            "previous_event_sha256": seq77["event_sha256"],
             "from_status": "READY",
             "to_status": "READY",
             "status_changes": {},
         }
-        seq77["event_sha256"] = continuation.event_sha256(seq77)
-        seq78 = {
+        seq78["event_sha256"] = continuation.event_sha256(seq78)
+        seq79 = {
             **copy.deepcopy(common),
-            "sequence": 78,
-            "event_id": (
-                "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-"
-                "FP046-R002-20260823-001"
-            ),
+            "sequence": 79,
+            "event_id": continuation.FP046_R002_STARTED_EVENT_ID,
             "event_type": "GOAL_STARTED",
-            "occurred_at": "2026-08-23T12:00:01+09:00",
-            "previous_event_sha256": seq77["event_sha256"],
+            "occurred_at": "2026-08-23T12:00:02+09:00",
+            "previous_event_sha256": seq78["event_sha256"],
             "from_status": "READY",
             "to_status": "IN_PROGRESS",
             "status_changes": {r008_review.FP046_R002: "IN_PROGRESS"},
         }
-        seq78["event_sha256"] = continuation.event_sha256(seq78)
-        history.extend((seq77, seq78))
+        seq79["event_sha256"] = continuation.event_sha256(seq79)
+        history.extend((seq78, seq79))
         state["status_by_goal"][r008_review.FP046_R002] = "IN_PROGRESS"
-        state["transition_history_anchor_sha256"] = seq78["event_sha256"]
-        state["validation_cutoff_at"] = seq78["occurred_at"]
+        state["transition_history_anchor_sha256"] = seq79["event_sha256"]
+        state["validation_cutoff_at"] = seq79["occurred_at"]
 
     @classmethod
     def _validate_boundary_with_live_checkpoint(
@@ -3202,7 +3109,6 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
         original = path.read_bytes()
         try:
             path.write_bytes(r008_review.json_text(checkpoint).encode("utf-8"))
-            r008_review.load_validated_transition_r004(cls.root)
             return continuation.validate_fp046_npc_r002_seq72_boundary(
                 cls.root,
                 checkpoint,
@@ -3253,15 +3159,11 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
         self.assertTrue(expected.issubset(handoff["changed_files"]))
 
     def test_seq72_r004_core_preserves_frozen_and_control_authority(self) -> None:
-        neutral = r008_review.approval_neutral_plan_core(
-            self.transaction["preflight"]
-        )
-        seq72 = neutral["events"][0]
+        seq72 = self.checkpoint["goal_execution"]["transition_history"][71]
 
-        self.assertNotIn("transition_review_binding", seq72)
-        self.assertNotIn("transition_review_subject_binding", seq72)
         for field in (
             "predecessor_transition_review_binding",
+            "transition_review_binding",
             "r009_control_review_binding",
             "r010_control_review_binding",
             "r011_control_review_binding",
@@ -3271,7 +3173,7 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
                 self.event_review_binding_by_field[field],
             )
         self.assertEqual(
-            r008_review.transition_plan_core_binding(neutral),
+            seq72["transition_review_subject_binding"],
             self.transaction["transition_review_subject_binding"],
         )
 
@@ -3373,7 +3275,7 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
             (
                 "path",
                 "transition_review_binding",
-                "current R004 transition review",
+                "frozen R004 transition review",
             ),
             (
                 "sha256",
@@ -3388,7 +3290,7 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
             (
                 "sha256",
                 "r011_control_review_binding",
-                "current R011 control review",
+                "frozen R011 control review",
             ),
         )
         for mutation, field, label in cases:
@@ -3542,7 +3444,7 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
         history = state["transition_history"]
         goal_id = "WS-GOAL-EPIC-03-POST-SEQ76-TEST-R001"
         seq79 = {
-            "sequence": 79,
+            "sequence": 80,
             "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-MATERIALIZED-TEST-001",
             "event_type": "GOAL_MATERIALIZED",
             "occurred_on": "2026-08-23",
@@ -3575,7 +3477,7 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
         history = state["transition_history"]
         successor_id = "WS-GOAL-EPIC-03-POST-SEQ76-SUCCESSOR-TEST-R001"
         seq79 = {
-            "sequence": 79,
+            "sequence": 80,
             "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-SUPERSEDED-TEST-001",
             "event_type": "GOAL_SUPERSEDED",
             "occurred_on": "2026-08-23",
@@ -3624,13 +3526,13 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
         checkpoint = copy.deepcopy(self.checkpoint)
         self._append_exact_seq77_78_status_suffix(checkpoint)
         state = checkpoint["goal_execution"]
-        seq78 = state["transition_history"][77]
-        seq78["status_changes"][r008_review.NPC_R002] = "READY"
+        seq79 = state["transition_history"][78]
+        seq79["status_changes"][r008_review.NPC_R002] = "READY"
         state["status_by_goal"][r008_review.NPC_R002] = "READY"
-        self._reseal_from(checkpoint, 77)
+        self._reseal_from(checkpoint, 78)
 
         self.assertIn(
-            "post-seq76 status transition is ambiguous: 78",
+            "post-seq76 status transition is ambiguous: 79",
             "\n".join(self._validate_boundary_with_live_checkpoint(checkpoint)),
         )
 
@@ -3654,7 +3556,7 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
             "canonical": "event type cannot change canonical bindings",
             "completion": "event type cannot project completion evidence",
             "archived": "event type cannot project archived completion evidence",
-            "inventory": "ordinary Goal inventory projection differs",
+            "inventory": "event type cannot project Goal inventory",
             "blockers": "event type cannot change blocker map",
         }
         for mutation, expected in cases.items():
@@ -3734,6 +3636,1497 @@ class WalkSafeR002Seq72BoundaryTest(unittest.TestCase):
         self.assertIn(
             "successor predecessor live binding differs", "\n".join(errors)
         )
+
+
+class WalkSafeFp046R002Seq77Seq78BoundaryTest(unittest.TestCase):
+    @staticmethod
+    def _reviewed_seq78_fixture():
+        review, reanchor, gate, _started = (
+            continuation._fp046_r002_seq77_78_modules()
+        )
+        source_raw, source = reanchor.load_frozen_source_checkpoint(ROOT)
+        if (
+            len(source_raw) != reanchor.SOURCE_BYTE_COUNT
+            or hashlib.sha256(source_raw).hexdigest() != reanchor.SOURCE_SHA256
+        ):
+            raise AssertionError("frozen seq76 fixture authority differs")
+        final = {
+            Path(path): "a" * 64
+            for path in source["working_tree_snapshot"][
+                "managed_changed_paths"
+            ]
+        }
+        final.update({path: "b" * 64 for path in reanchor.REQUIRED_CONTROL_PATHS})
+        successor = reanchor._load_r002_contract(ROOT)[1]
+        authorization = reanchor.authorization_binding(ROOT)
+        runner = reanchor.start_gate_runner_binding(ROOT)
+        review_binding = {
+            "assignment": {"path": "review-assignment.json"},
+            "review_result": {"path": "review-result.json"},
+            "independent_review": {"path": "independent-review.json"},
+        }
+        checkpoint, seq77 = reanchor.project(
+            source,
+            final,
+            event_occurred_at="2026-08-23T12:00:00+09:00",
+            successor_contract=successor,
+            authorization=authorization,
+            runner_binding=runner,
+            transition_review=review_binding,
+        )
+        seq78 = {
+            "sequence": 78,
+            "event_id": continuation.FP046_R002_STARTED_EVENT_ID,
+            "event_type": "GOAL_STARTED",
+            "occurred_on": "2026-08-23",
+            "occurred_at": "2026-08-23T12:00:04+09:00",
+            "previous_focus_goal_id": continuation.FP046_R002_GOAL_ID,
+            "previous_focus_content_sha256": continuation.FP046_R002_GOAL_SHA256,
+            "focus_goal_id": continuation.FP046_R002_GOAL_ID,
+            "focus_goal_content_sha256": continuation.FP046_R002_GOAL_SHA256,
+            "subject_goal_id": continuation.FP046_R002_GOAL_ID,
+            "from_status": "READY",
+            "to_status": "IN_PROGRESS",
+            "static_plan_manifest_sha256": seq77[
+                "static_plan_manifest_sha256"
+            ],
+            "status_changes": {
+                continuation.FP046_R002_GOAL_ID: "IN_PROGRESS"
+            },
+            "runtime_after": copy.deepcopy(seq77["runtime_after"]),
+            "repository_snapshot_before": {"sealed": True},
+            "implementation_start_gate_binding": {
+                "document_id": "WS-FP046-R002-START-GATE-RECEIPT-TEST",
+                "path": "private-test-receipt.json",
+                "file_sha256": "c" * 64,
+            },
+            "blockers_after": copy.deepcopy(seq77["blockers_after"]),
+            "blocker_resolution_ids_after": copy.deepcopy(
+                seq77["blocker_resolution_ids_after"]
+            ),
+            "source_checkpoint_version": checkpoint["schema_version"],
+            "evidence_refs": [],
+            "previous_event_sha256": seq77["event_sha256"],
+        }
+        seq78["event_sha256"] = continuation.event_sha256(seq78)
+        checkpoint["goal_execution"]["transition_history"].append(seq78)
+
+        context = mock.Mock(
+            frozen_r011_cohort=[None] * 23,
+            current_control_cohort=[None] * 31,
+            control_code_successors=[None] * 7,
+            added_control_code_bindings=[None] * 8,
+        )
+        reviewed = mock.Mock()
+        reviewed.validate_post_review.return_value = context
+        reviewed.transition_review_binding.return_value = review_binding
+        started = mock.Mock(EVENT_FIELDS=continuation.V24_FIRST_START_EVENT_FIELDS)
+        started.validate_history_suffix.return_value = []
+        return checkpoint, reviewed, reanchor, gate, started, review_binding
+
+    @staticmethod
+    def _validate_reviewed_fixture(
+        checkpoint, reviewed, reanchor, gate, started, review_binding
+    ) -> list[str]:
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp046_r002_seq77_78_modules",
+                return_value=(reviewed, reanchor, gate, started),
+            ),
+            mock.patch.object(
+                continuation,
+                "_validate_fp046_r002_frozen_r011",
+                return_value=[],
+            ),
+            mock.patch.object(
+                reanchor,
+                "transition_review_binding",
+                return_value=review_binding,
+            ),
+            mock.patch.object(
+                reanchor,
+                "validate_history_suffix",
+                return_value=[],
+            ),
+        ):
+            return continuation.validate_fp046_r002_seq77_78_boundary(
+                ROOT,
+                checkpoint,
+            )
+
+    @staticmethod
+    def _actual_private_suffix_fixture(root: Path) -> dict[str, object]:
+        checkpoint, reviewed, reanchor, gate, _started, review_binding = (
+            WalkSafeFp046R002Seq77Seq78BoundaryTest._reviewed_seq78_fixture()
+        )
+        _review, _reanchor, _gate, started = (
+            continuation._fp046_r002_seq77_78_modules()
+        )
+        checkpoint["goal_execution"]["transition_history"].pop()
+        control = checkpoint["goal_execution"]["transition_history"][-1]
+        frozen_source_raw = CHECKPOINT.read_bytes()
+        frozen_source = continuation.load_json(CHECKPOINT)
+        reconstructed_source = reanchor.reconstructed_seq77_checkpoint_bytes(
+            ROOT,
+            control,
+        )
+        checks, contract_document = gate._load_gate_contract(ROOT)
+        event_dir_relative = gate.GATE_ROOT_RELATIVE / gate.STARTED_EVENT_ID
+        event_dir = root / event_dir_relative
+        event_dir.mkdir(parents=True)
+        os.chmod(event_dir, 0o700)
+        control_after = control["repository_context_reanchor"]["after"]
+        zero = "d" * 64
+        repository_payload = {
+            "schema_version": "1.0.0",
+            "evidence_type": "GATE_REPOSITORY_STATE",
+            "gate_event_id": gate.STARTED_EVENT_ID,
+            "repository": {
+                "head_commit": reanchor.SOURCE_HEAD_COMMIT,
+                "branch": "current",
+                "object_format": "sha1",
+            },
+            "git_status_raw": {
+                "scope": gate.SNAPSHOT_SCOPE,
+                "sha256": zero,
+                "byte_count": 0,
+                "record_count": 0,
+            },
+            "dirty_snapshot": {
+                "dirty_path_count": 0,
+                "path_set_sha256": zero,
+                "content_set_sha256": zero,
+                "index_state_sha256": zero,
+            },
+            "checkpoint_controlled_working_snapshot": {
+                "base_head": reanchor.SOURCE_HEAD_COMMIT,
+                "managed_changed_path_count": control_after[
+                    "managed_changed_path_count"
+                ],
+                "path_set_sha256": control_after["path_set_sha256"],
+                "content_set_sha256": control_after["content_set_sha256"],
+            },
+            "transaction_exclusions": {
+                "allowed_rule_count": 2,
+                "checkpoint_exact_path": gate.CHECKPOINT_RELATIVE.as_posix(),
+                "gate_event_exact_prefix": event_dir_relative.as_posix() + "/",
+            },
+        }
+        runs = []
+        repository_output_sha256 = ""
+        for index, (check_id, command) in enumerate(checks, start=1):
+            output_relative = (
+                event_dir_relative / f"{index:02d}-{check_id}.log"
+            )
+            output = (
+                continuation.canonical_json_bytes(repository_payload) + b"\n"
+                if check_id == "REPOSITORY_STATE"
+                else f"{check_id}: PASS\n".encode()
+            )
+            output_path = root / output_relative
+            output_path.write_bytes(output)
+            os.chmod(output_path, 0o600)
+            output_sha256 = sha256_bytes(output)
+            if check_id == "REPOSITORY_STATE":
+                repository_output_sha256 = output_sha256
+            runs.append(
+                {
+                    "check_id": check_id,
+                    "command": command,
+                    "executed_at": (
+                        f"2026-08-23T12:00:02.{index:06d}+09:00"
+                    ),
+                    "exit_code": 0,
+                    "output_path": output_relative.as_posix(),
+                    "output_sha256": output_sha256,
+                }
+            )
+        repository_snapshot = gate.repository_snapshot_from_payload(
+            repository_payload,
+            event_id=gate.STARTED_EVENT_ID,
+            output_sha256=repository_output_sha256,
+        )
+        receipt = {
+            "schema_version": "1.1",
+            "document_id": gate._document_id(started.EVENT_ID),
+            "evidence_type": "IMPLEMENTATION_START_OR_RESUME_GATE",
+            "gate_purpose": "INITIAL_START",
+            "status": "PASS",
+            "package_id": gate.PACKAGE_ID,
+            "target_transition_event_id": gate.STARTED_EVENT_ID,
+            "target_goal_id": gate.TARGET_GOAL_ID,
+            "target_goal_content_sha256": gate.TARGET_GOAL_SHA256,
+            "static_plan_manifest_sha256": gate.MANIFEST_SHA256,
+            "source_activation_event_sha256": control["event_sha256"],
+            "source_checkpoint_sha256": sha256_bytes(reconstructed_source),
+            "source_ready_event_sha256": gate.SOURCE_READY_EVENT_SHA256,
+            "check_command_contract_version": gate.CONTRACT_VERSION,
+            "check_command_contract_sha256": gate.CONTRACT_CANONICAL_SHA256,
+            "implementation_start_gate_contract_binding": (
+                gate.expected_contract_binding()
+            ),
+            "runtime_bindings": [],
+            "execution_window": {
+                "started_at": "2026-08-23T12:00:02+09:00",
+                "ended_at": "2026-08-23T12:00:03+09:00",
+            },
+            "check_runs": runs,
+            "repository_snapshot": repository_snapshot,
+            "generated_at": "2026-08-23T12:00:04+09:00",
+        }
+        receipt_bytes = started.json_bytes(receipt)
+        receipt_relative = event_dir_relative / gate.RECEIPT_NAME
+        receipt_path = root / receipt_relative
+        receipt_path.write_bytes(receipt_bytes)
+        os.chmod(receipt_path, 0o600)
+        evidence = started.GateEvidence(
+            receipt=receipt,
+            receipt_bytes=receipt_bytes,
+            receipt_binding={
+                "document_id": receipt["document_id"],
+                "path": receipt_relative.as_posix(),
+                "file_sha256": sha256_bytes(receipt_bytes),
+            },
+            repository_payload=repository_payload,
+            event_occurred_at="2026-08-23T12:00:05+09:00",
+        )
+        final = {
+            Path(path): "e" * 64
+            for path in checkpoint["working_tree_snapshot"][
+                "managed_changed_paths"
+            ]
+        }
+        with mock.patch.object(started, "require_exact_source"):
+            projected, _event = started.project_seq78(
+                ROOT,
+                checkpoint,
+                evidence,
+                event_id=gate.STARTED_EVENT_ID,
+                final_sha256_by_path=final,
+            )
+        return {
+            "checkpoint": projected,
+            "reviewed": reviewed,
+            "reanchor": reanchor,
+            "gate": gate,
+            "started": started,
+            "review_binding": review_binding,
+            "successor_binding": control["contract_supersession"][
+                "replacement_contract_binding"
+            ],
+            "authorization_binding": control["authorization_binding"],
+            "runner_binding": control["start_gate_runner_binding"],
+            "frozen_source_raw": frozen_source_raw,
+            "frozen_source": frozen_source,
+            "checks": checks,
+            "contract_document": contract_document,
+            "receipt": receipt,
+            "receipt_path": receipt_path,
+            "receipt_bytes": receipt_bytes,
+            "event_dir": event_dir,
+        }
+
+    @staticmethod
+    def _validate_actual_private_suffix(
+        root: Path,
+        fixture: dict[str, object],
+    ) -> list[str]:
+        reanchor = fixture["reanchor"]
+        gate = fixture["gate"]
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp046_r002_seq77_78_modules",
+                return_value=(
+                    fixture["reviewed"],
+                    reanchor,
+                    gate,
+                    fixture["started"],
+                ),
+            ),
+            mock.patch.object(
+                continuation,
+                "_validate_fp046_r002_frozen_r011",
+                return_value=[],
+            ),
+            mock.patch.object(
+                reanchor,
+                "_load_r002_contract",
+                return_value=({}, fixture["successor_binding"]),
+            ),
+            mock.patch.object(
+                reanchor,
+                "authorization_binding",
+                return_value=fixture["authorization_binding"],
+            ),
+            mock.patch.object(
+                reanchor,
+                "start_gate_runner_binding",
+                return_value=fixture["runner_binding"],
+            ),
+            mock.patch.object(
+                reanchor,
+                "transition_review_binding",
+                return_value=fixture["review_binding"],
+            ),
+            mock.patch.object(
+                reanchor,
+                "load_frozen_source_checkpoint",
+                return_value=(
+                    fixture["frozen_source_raw"],
+                    fixture["frozen_source"],
+                ),
+            ),
+            mock.patch.object(
+                reanchor.review_authority,
+                "validated_reviewed_at",
+                return_value=datetime.fromisoformat(
+                    "2026-08-23T11:59:59+09:00"
+                ),
+            ),
+            mock.patch.object(
+                gate,
+                "_load_gate_contract",
+                return_value=(fixture["checks"], fixture["contract_document"]),
+            ),
+        ):
+            return continuation.validate_fp046_r002_seq77_78_boundary(
+                root,
+                fixture["checkpoint"],
+            )
+
+    def test_review_cohort_reanchors_frozen_r011_to_current_control(self) -> None:
+        review, _reanchor, _gate, _started = (
+            continuation._fp046_r002_seq77_78_modules()
+        )
+        context = review.prepare_review_context(
+            ROOT, require_exact_source=False
+        )
+
+        self.assertEqual(len(context.frozen_r011_cohort), 23)
+        self.assertEqual(len(context.current_control_cohort), 31)
+        self.assertEqual(len(context.control_code_successors), 7)
+        self.assertEqual(len(context.added_control_code_bindings), 8)
+        self.assertEqual(
+            len(context.control_code_successors)
+            + len(context.added_control_code_bindings),
+            15,
+        )
+        self.assertTrue(review.REVIEW_DIR.as_posix().endswith("review-rounds/R006"))
+        self.assertTrue(review.ROUND_ID.endswith("-R006"))
+        self.assertEqual(
+            tuple(review.PRESERVED_REVIEW_PATHS),
+            (
+                review.R001_ASSIGNMENT_REL,
+                review.R002_ASSIGNMENT_REL,
+                review.R003_ASSIGNMENT_REL,
+                review.R004_ASSIGNMENT_REL,
+            ),
+        )
+        self.assertEqual(
+            tuple(context.approved_r005_review_bindings),
+            tuple(
+                {
+                    "path": path.as_posix(),
+                    "sha256": review.R005_REVIEW_PINS[path][0],
+                    "byte_length": review.R005_REVIEW_PINS[path][1],
+                }
+                for path in review.R005_REVIEW_PATHS
+            ),
+        )
+        self.assertEqual(len(context.session_artifact_bindings), 4)
+        for path, actual in zip(
+            review.SESSION_ARTIFACT_PATHS,
+            context.session_artifact_bindings,
+            strict=True,
+        ):
+            with self.subTest(session_artifact=path.as_posix()):
+                self.assertEqual(
+                    actual,
+                    {
+                        "path": path.as_posix(),
+                        "sha256": review.SESSION_ARTIFACT_PINS[path][0],
+                        "byte_length": review.SESSION_ARTIFACT_PINS[path][1],
+                    },
+                )
+        preserved_r003 = context.superseded_review_assignments[2]
+        self.assertEqual(
+            preserved_r003["assignment_binding"],
+            {
+                "path": review.R003_ASSIGNMENT_REL.as_posix(),
+                "sha256": (
+                    "fb3bf40e349c4edf6cabdd7a8afde5c491802f3d943f8b2b4beda5b84d54658c"
+                ),
+                "byte_length": 24_009,
+            },
+        )
+        self.assertEqual(
+            preserved_r003["confirmed_rejection_findings"],
+            ["REVIEW_INPUT_COHORT_ABA_CAN_PUBLISH_SELF_INVALID_EVIDENCE"],
+        )
+
+    def test_reviewed_seq78_fixture_uses_frozen_seq76_bytes(self) -> None:
+        with mock.patch.object(
+            continuation,
+            "load_json",
+            side_effect=AssertionError("live checkpoint loader was called"),
+        ):
+            checkpoint = self._reviewed_seq78_fixture()[0]
+        history = checkpoint["goal_execution"]["transition_history"]
+        self.assertEqual(
+            history[75]["event_sha256"],
+            continuation.FP046_R002_READY_EVENT_SHA256,
+        )
+        self.assertEqual(history[76]["sequence"], 77)
+        self.assertEqual(history[77]["sequence"], 78)
+
+    def test_private_gate_contract_has_exact_five_control_checks(self) -> None:
+        self.assertEqual(
+            continuation.FP046_R002_START_GATE_CHECK_IDS,
+            [
+                "CONTINUATION",
+                "GOAL_GRAPH",
+                "TEST_LAYER_REGISTRY_VALIDATE",
+                "ROOT_FP046_R002_CONTROL_REGRESSION",
+                "REPOSITORY_STATE",
+            ],
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_runtime_bindings(
+                ROOT,
+                [],
+                event_id=continuation.FP046_R002_STARTED_EVENT_ID,
+            ),
+            [],
+        )
+        self.assertIn(
+            "runtime bindings differ",
+            "\n".join(
+                continuation._validate_fp046_r002_runtime_bindings(
+                    ROOT,
+                    [{"path": "forbidden", "file_sha256": "0" * 64}],
+                    event_id=continuation.FP046_R002_STARTED_EVENT_ID,
+                )
+            ),
+        )
+
+    def test_validate_start_gate_uses_the_runner_receipt_path(self) -> None:
+        _review, _reanchor, gate, _started = (
+            continuation._fp046_r002_seq77_78_modules()
+        )
+        expected_path = (
+            gate.GATE_ROOT_RELATIVE
+            / gate.STARTED_EVENT_ID
+            / gate.RECEIPT_NAME
+        ).as_posix()
+        event = {
+            "event_id": gate.STARTED_EVENT_ID,
+            "event_type": "GOAL_STARTED",
+            "subject_goal_id": continuation.FP046_R002_GOAL_ID,
+            "implementation_start_gate_binding": {
+                "document_id": "WS-FP046-R002-START-GATE-RECEIPT-TEST",
+                "path": expected_path,
+                "file_sha256": "a" * 64,
+            },
+        }
+        with mock.patch.object(
+            continuation,
+            "_load_fp008_private_binding",
+            return_value=(["receipt path probe"], {}, None, None),
+        ) as loader:
+            errors = continuation._validate_start_gate(
+                ROOT,
+                event=event,
+                checkpoint={},
+                goal_paths={},
+                manifest={},
+                manifest_sha256="b" * 64,
+                activation_sha256="c" * 64,
+                activation_occurred_at=None,
+            )
+
+        self.assertEqual(errors, ["receipt path probe"])
+        self.assertEqual(loader.call_args.kwargs["expected_path"], expected_path)
+
+    def test_frozen_r011_predecessor_is_byte_exact(self) -> None:
+        self.assertEqual(
+            continuation._validate_fp046_r002_frozen_r011(ROOT),
+            [],
+        )
+
+    def test_recovery_r014_preserves_r012_and_rejected_r013(self) -> None:
+        checkpoint_raw = CHECKPOINT.read_bytes()
+        checkpoint = json.loads(checkpoint_raw)
+        seq83 = checkpoint["goal_execution"]["transition_history"][82]
+        self.assertEqual(
+            len(checkpoint_raw),
+            continuation.FP046_R002_SEQ83_CHECKPOINT_BYTE_COUNT,
+        )
+        self.assertEqual(
+            hashlib.sha256(checkpoint_raw).hexdigest(),
+            continuation.FP046_R002_SEQ83_CHECKPOINT_SHA256,
+        )
+        self.assertEqual(
+            seq83["event_sha256"],
+            continuation.FP046_R002_SEQ83_EVENT_SHA256,
+        )
+        self.assertEqual(
+            seq83["transition_control_review_binding"],
+            continuation.FP046_R002_RECOVERY_APPROVED_R012_REVIEW_BINDING,
+        )
+        self.assertTrue(
+            continuation.FP046_R002_RECOVERY_REVIEW_DIR.as_posix().endswith(
+                "seq78-79/review-rounds/R014"
+            )
+        )
+        self.assertEqual(
+            continuation.FP046_R002_RECOVERY_SEQ79_MANAGED_PATH_COUNT,
+            998,
+        )
+        self.assertEqual(
+            continuation.FP046_R002_RECOVERY_HISTORICAL_MANAGED_PATH_COUNT,
+            1002,
+        )
+        self.assertEqual(
+            continuation.FP046_R002_RECOVERY_SEQ81_MANAGED_PATH_COUNT,
+            1006,
+        )
+        self.assertEqual(
+            continuation.FP046_R002_RECOVERY_SEQ82_MANAGED_PATH_COUNT,
+            1011,
+        )
+        self.assertEqual(
+            continuation.FP046_R002_RECOVERY_SEQ83_MANAGED_PATH_COUNT,
+            1015,
+        )
+        self.assertEqual(
+            continuation.FP046_R002_RECOVERY_MANAGED_PATH_COUNT,
+            1020,
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_approved_r006(ROOT),
+            [],
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_approved_r007(ROOT),
+            [],
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_approved_r008(ROOT),
+            [],
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_approved_r009(ROOT),
+            [],
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_rejected_r010(ROOT),
+            [],
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_approved_r011(ROOT),
+            [],
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_approved_r012(ROOT),
+            [],
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_rejected_r013(ROOT),
+            [],
+        )
+
+    def test_boundary_is_dormant_at_seq76(self) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        self.assertEqual(
+            continuation.validate_fp046_r002_seq77_78_boundary(
+                ROOT,
+                checkpoint,
+            ),
+            [],
+        )
+
+    def test_current_seq83_and_synthetic_seq84_seq85_projections(self) -> None:
+        from scripts import (
+            apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824
+            as correction,
+        )
+        from scripts import (
+            apply_walksafe_fp046_r002_goal_started_seq79_20260824 as started,
+        )
+
+        live = continuation.load_json(CHECKPOINT)
+        history = live["goal_execution"]["transition_history"]
+        self.assertGreaterEqual(len(history), 83)
+        self.assertEqual(
+            continuation.validate_fp046_r002_seq77_78_boundary(ROOT, live),
+            [],
+        )
+        source = (
+            live
+            if len(history) == 83
+            else json.loads(
+                correction.reconstructed_seq83_checkpoint_bytes(ROOT, history[82])
+            )
+        )
+        self.assertEqual(len(source["goal_execution"]["transition_history"]), 83)
+        review_binding = {
+            role: {
+                "path": path.as_posix(),
+                "sha256": str(index) * 64,
+                "byte_length": 1,
+            }
+            for index, (role, path) in enumerate(
+                zip(
+                    ("assignment", "review_result", "independent_review"),
+                    continuation.FP046_R002_RECOVERY_REVIEW_PATHS,
+                    strict=True,
+                ),
+                start=1,
+            )
+        }
+        seq84, event84 = correction.project_seq84(
+            source,
+            managed_paths=correction.exact_seq84_managed_paths(source),
+            path_set_sha256="4" * 64,
+            content_set_sha256="5" * 64,
+            authorization_binding={
+                "path": "authorization.json",
+                "sha256": "6" * 64,
+                "byte_length": 1,
+            },
+            transition_review_binding=review_binding,
+            runner_binding={
+                "path": "runner.py",
+                "sha256": "7" * 64,
+                "byte_length": 1,
+            },
+        )
+        self.assertEqual(
+            event84["event_id"],
+            continuation.FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID,
+        )
+        self.assertEqual(event84["sequence"], 84)
+        self.assertEqual(event84["from_status"], event84["to_status"])
+        self.assertEqual(event84["status_changes"], {})
+        self.assertEqual(
+            len(seq84["working_tree_snapshot"]["managed_changed_paths"]),
+            continuation.FP046_R002_RECOVERY_MANAGED_PATH_COUNT,
+        )
+        self.assertEqual(
+            seq84["working_tree_snapshot"]["managed_changed_path_count"],
+            continuation.FP046_R002_RECOVERY_MANAGED_PATH_COUNT,
+        )
+        self.assertNotIn(
+            continuation.FP046_R002_RECOVERY_FAILED_GATE_LOG,
+            seq84["working_tree_snapshot"]["managed_changed_paths"],
+        )
+
+        evidence = started.GateEvidence(
+            receipt={"repository_snapshot": {"sealed": True}},
+            receipt_bytes=b"{}\n",
+            receipt_binding={
+                "document_id": "WS-SYNTHETIC-SEQ85-RECEIPT",
+                "path": "synthetic/receipt.json",
+                "file_sha256": "8" * 64,
+            },
+            repository_payload={},
+            event_occurred_at="2026-08-25T03:40:00+09:00",
+        )
+        final_paths = sorted(
+            set(seq84["working_tree_snapshot"]["managed_changed_paths"])
+            | {
+                started.SCRIPT_RELATIVE.as_posix(),
+                started.TEST_RELATIVE.as_posix(),
+            }
+        )
+        with mock.patch.object(started, "require_exact_source", return_value=None):
+            seq85, event85 = started.project_seq85(
+                ROOT,
+                seq84,
+                evidence,
+                event_id=started.EVENT_ID,
+                final_sha256_by_path={Path(path): "9" * 64 for path in final_paths},
+            )
+        self.assertEqual(event85["event_id"], continuation.FP046_R002_STARTED_EVENT_ID)
+        self.assertEqual(event85["sequence"], 85)
+        self.assertEqual(event85["from_status"], "READY")
+        self.assertEqual(event85["to_status"], "IN_PROGRESS")
+        self.assertEqual(
+            seq85["working_tree_snapshot"]["managed_changed_path_count"],
+            continuation.FP046_R002_RECOVERY_MANAGED_PATH_COUNT,
+        )
+        self.assertEqual(
+            seq85["goal_execution"]["status_by_goal"][
+                continuation.FP046_R002_GOAL_ID
+            ],
+            "IN_PROGRESS",
+        )
+        contract_errors, checks, binding, _ready = (
+            continuation._fp046_r002_start_gate_contract(
+                ROOT,
+                event=event85,
+                checkpoint=seq85,
+            )
+        )
+        self.assertEqual(contract_errors, [])
+        self.assertEqual(
+            [item["check_id"] for item in checks],
+            continuation.FP046_R002_START_GATE_CHECK_IDS,
+        )
+        self.assertTrue(
+            binding["path"].endswith("initial-start-gate-contract-r002.json")
+        )
+
+    def test_post_seq85_recovery_count_accepts_live_successor_universe(self) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        state = checkpoint["goal_execution"]
+        successor = copy.deepcopy(state["transition_history"][-1])
+        successor["sequence"] = 86
+        successor["event_id"] = "WS-SYNTHETIC-FP046-R002-SUCCESSOR-SEQ86"
+        state["transition_history"].append(successor)
+        snapshot = checkpoint["working_tree_snapshot"]
+        paths = sorted(
+            set(snapshot["managed_changed_paths"])
+            | {
+                "scripts/apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py"
+            }
+        )
+        snapshot["managed_changed_paths"] = paths
+        snapshot["managed_changed_path_count"] = len(paths)
+
+        errors = continuation._validate_fp046_r002_recovery_seq78_79(
+            ROOT, checkpoint, state["transition_history"]
+        )
+
+        self.assertNotIn("FP046 R002 recovery managed path count differs", errors)
+
+    def test_recovery_rejected_r001_assignment_is_exact_and_output_free(
+        self,
+    ) -> None:
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_rejected_r001(ROOT),
+            [],
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binding = continuation.FP046_R002_RECOVERY_REJECTED_R001_ASSIGNMENT
+            assignment = root / binding["path"]
+            assignment.parent.mkdir(parents=True)
+            assignment.write_bytes((ROOT / binding["path"]).read_bytes())
+            os.chmod(assignment, 0o600)
+            rejected_output = root / continuation.FP046_R002_RECOVERY_REJECTED_R001_ABSENT_PATHS[0]
+            rejected_output.write_bytes(b"forbidden\n")
+
+            errors = continuation._validate_fp046_r002_recovery_rejected_r001(
+                root
+            )
+
+        self.assertTrue(
+            any("output must remain absent" in error for error in errors), errors
+        )
+
+    def test_recovery_rejected_r013_assignment_is_exact_and_output_free(
+        self,
+    ) -> None:
+        binding = continuation.FP046_R002_RECOVERY_REJECTED_R013_ASSIGNMENT
+        self.assertTrue(binding["path"].endswith("R013/review-assignment.json"))
+        self.assertEqual(
+            continuation.FP046_R002_RECOVERY_REJECTED_R013_ABSENT_PATHS,
+            (
+                binding["path"].replace("review-assignment.json", "review-result.json"),
+                binding["path"].replace(
+                    "review-assignment.json", "independent-review.json"
+                ),
+            ),
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_rejected_r013(ROOT), []
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            assignment = root / binding["path"]
+            assignment.parent.mkdir(parents=True)
+            assignment.write_bytes((ROOT / binding["path"]).read_bytes())
+            os.chmod(assignment, 0o600)
+            rejected_output = (
+                root / continuation.FP046_R002_RECOVERY_REJECTED_R013_ABSENT_PATHS[0]
+            )
+            rejected_output.write_bytes(b"forbidden\n")
+            errors = continuation._validate_fp046_r002_recovery_rejected_r013(root)
+        self.assertTrue(
+            any("rejected R013 output must remain absent" in error for error in errors),
+            errors,
+        )
+
+    def test_recovery_approved_r014_triad_is_frozen_and_byte_exact(self) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        seq84 = checkpoint["goal_execution"]["transition_history"][83]
+        self.assertEqual(
+            seq84["transition_control_review_binding"],
+            continuation.FP046_R002_RECOVERY_APPROVED_R014_REVIEW_BINDING,
+        )
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_approved_r014(ROOT),
+            [],
+        )
+
+    def test_recovery_approved_r014_byte_tamper_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for binding in (
+                continuation.FP046_R002_RECOVERY_APPROVED_R014_REVIEW_BINDING.values()
+            ):
+                relative = binding["path"]
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes((ROOT / relative).read_bytes())
+                os.chmod(destination, 0o600)
+            assignment = (
+                root
+                / continuation.FP046_R002_RECOVERY_APPROVED_R014_REVIEW_BINDING[
+                    "assignment"
+                ]["path"]
+            )
+            tampered = bytearray(assignment.read_bytes())
+            tampered[0] ^= 1
+            assignment.write_bytes(tampered)
+
+            errors = continuation._validate_fp046_r002_recovery_approved_r014(
+                root
+            )
+
+        self.assertEqual(
+            errors,
+            ["FP046 R002 recovery approved R014 assignment binding differs"],
+        )
+
+    def test_seq84_historical_r014_does_not_reload_mutable_current_cohort(
+        self,
+    ) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        recovery_review = continuation._fp046_r002_seq78_79_modules()[0]
+        with (
+            mock.patch.object(
+                recovery_review,
+                "transition_review_binding",
+                side_effect=AssertionError("mutable R014 cohort was reloaded"),
+            ) as transition_binding,
+            mock.patch.object(
+                recovery_review,
+                "validated_reviewed_at",
+                side_effect=AssertionError("mutable R014 cohort was reloaded"),
+            ) as reviewed_at,
+        ):
+            errors = continuation.validate_fp046_r002_seq77_78_boundary(
+                ROOT,
+                checkpoint,
+            )
+
+        self.assertEqual(errors, [])
+        transition_binding.assert_not_called()
+        reviewed_at.assert_not_called()
+
+    def test_recovery_approved_r002_triad_is_byte_exact(self) -> None:
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_approved_r002(ROOT),
+            [],
+        )
+
+    def test_recovery_approved_r003_triad_is_byte_exact(self) -> None:
+        self.assertEqual(
+            continuation._validate_fp046_r002_recovery_approved_r003(ROOT),
+            [],
+        )
+
+    def test_canonical_seq83_remains_outside_static_seq77_authority(self) -> None:
+        from scripts import (
+            build_walksafe_fp046_r002_seq78_79_recovery_review_20260824
+            as recovery_review,
+        )
+
+        self.assertEqual(
+            recovery_review.review_source_checkpoint_binding(ROOT)["sequence"], 83
+        )
+
+    def test_seq80_checkpoint_uses_stored_failure_and_not_active_r010(
+        self,
+    ) -> None:
+        from scripts import (
+            apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824
+            as correction,
+        )
+
+        live = continuation.load_json(CHECKPOINT)
+        history = live["goal_execution"]["transition_history"]
+        checkpoint = (
+            live
+            if len(history) == 80
+            else json.loads(
+                correction.reconstructed_seq80_checkpoint_bytes(ROOT, history[79])
+            )
+        )
+        review = continuation._fp046_r002_seq78_79_modules()[0]
+        historical = correction.validate_seq80_history_suffix
+        with (
+            mock.patch.object(
+                review,
+                "transition_review_binding",
+                side_effect=AssertionError("active R011 review was loaded"),
+            ) as binding,
+            mock.patch.object(
+                review,
+                "validated_reviewed_at",
+                side_effect=AssertionError("active R011 review was loaded"),
+            ) as reviewed_at,
+            mock.patch.object(
+                correction,
+                "validate_seq80_history_suffix",
+                wraps=historical,
+            ) as historical_validator,
+        ):
+            event = correction.validate_seq80_history_suffix(
+                ROOT, checkpoint, require_live_snapshot=False
+            )
+
+        self.assertEqual(event, checkpoint["goal_execution"]["transition_history"][79])
+        binding.assert_not_called()
+        reviewed_at.assert_not_called()
+        self.assertTrue(
+            any(
+                call.kwargs.get("require_live_snapshot") is False
+                for call in historical_validator.call_args_list
+            )
+        )
+
+    def test_seq80_failed_002_physical_check_is_live_tail_only(self) -> None:
+        from scripts import (
+            apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824
+            as correction,
+        )
+
+        live = continuation.load_json(CHECKPOINT)
+        seq80_checkpoint = json.loads(
+            correction.reconstructed_seq80_checkpoint_bytes(
+                ROOT, live["goal_execution"]["transition_history"][79]
+            )
+        )
+        physical_loader = correction.review.failed_gate_attempt_002_binding
+        with mock.patch.object(
+            correction.review,
+            "failed_gate_attempt_002_binding",
+            wraps=physical_loader,
+        ) as live_loader:
+            event = correction.validate_seq80_history_suffix(
+                ROOT, seq80_checkpoint, require_live_snapshot=True
+            )
+        self.assertEqual(
+            event["event_sha256"],
+            continuation.FP046_R002_SEQ80_EVENT_SHA256,
+        )
+        live_loader.assert_called_once_with(ROOT)
+
+        descendant = copy.deepcopy(live)
+        with mock.patch.object(
+            correction.review,
+            "failed_gate_attempt_002_binding",
+            side_effect=AssertionError("historical physical -002 was loaded"),
+        ) as descendant_loader:
+            event = correction.validate_seq80_history_suffix(
+                ROOT, descendant, require_live_snapshot=True
+            )
+        self.assertEqual(
+            event["event_sha256"],
+            continuation.FP046_R002_SEQ80_EVENT_SHA256,
+        )
+        descendant_loader.assert_not_called()
+
+    def test_unknown_r002_reanchor_is_rejected(self) -> None:
+        event = {
+            "sequence": 77,
+            "event_id": "WS-UNKNOWN-FP046-R002-REANCHOR",
+            "subject_goal_id": continuation.FP046_R002_GOAL_ID,
+        }
+        self.assertEqual(
+            continuation._validate_npc_single_admin_recovery_control_reanchor(
+                ROOT,
+                event=event,
+                checkpoint=continuation.load_json(CHECKPOINT),
+                history=[],
+            ),
+            ["FP046 R002 start-control reanchor event is not recognized"],
+        )
+
+    def test_seq79_r002_reanchor_routes_to_exact_correction_validator(self) -> None:
+        event = {
+            "sequence": 79,
+            "event_id": continuation.FP046_R002_RECOVERY_CONTROL_REANCHOR_EVENT_ID,
+            "subject_goal_id": continuation.FP046_R002_GOAL_ID,
+        }
+        correction = mock.Mock()
+        correction.validate_seq79_history_suffix.return_value = event
+        correction.strict_json_equal.return_value = True
+        import scripts
+
+        with mock.patch.object(
+            scripts,
+            "apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824",
+            correction,
+        ), mock.patch.dict(
+            sys.modules,
+            {
+                "scripts.apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824": correction,
+            },
+        ):
+            self.assertEqual(
+                continuation._validate_npc_single_admin_recovery_control_reanchor(
+                    ROOT,
+                    event=event,
+                    checkpoint={},
+                    history=[],
+                ),
+                [],
+            )
+        correction.validate_seq79_history_suffix.assert_called_once_with(
+            ROOT, {}, require_live_snapshot=False
+        )
+
+    def test_seq80_reanchor_uses_stored_history_for_descendant(self) -> None:
+        event = {
+            "sequence": (
+                continuation.FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+            ),
+            "event_id": (
+                continuation.FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+            ),
+            "subject_goal_id": continuation.FP046_R002_GOAL_ID,
+        }
+        correction = mock.Mock()
+        correction.validate_seq80_history_suffix.return_value = event
+        correction.strict_json_equal.return_value = True
+        import scripts
+
+        with mock.patch.object(
+            scripts,
+            "apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824",
+            correction,
+        ), mock.patch.dict(
+            sys.modules,
+            {
+                "scripts.apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824": correction,
+            },
+        ):
+            self.assertEqual(
+                continuation._validate_npc_single_admin_recovery_control_reanchor(
+                    ROOT,
+                    event=event,
+                    checkpoint={},
+                    history=[{}] * 81,
+                ),
+                [],
+            )
+        correction.validate_seq80_history_suffix.assert_called_once_with(
+            ROOT, {}, require_live_snapshot=False
+        )
+
+    def test_exact_seq80_reanchor_checker_uses_stored_failed_attempt(self) -> None:
+        event = {
+            "sequence": (
+                continuation.FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+            ),
+            "event_id": (
+                continuation.FP046_R002_SECOND_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+            ),
+            "subject_goal_id": continuation.FP046_R002_GOAL_ID,
+        }
+        correction = mock.Mock()
+        correction.validate_seq80_history_suffix.return_value = event
+        correction.strict_json_equal.return_value = True
+        import scripts
+
+        with mock.patch.object(
+            scripts,
+            "apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824",
+            correction,
+        ), mock.patch.dict(
+            sys.modules,
+            {
+                "scripts.apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824": correction,
+            },
+        ):
+            self.assertEqual(
+                continuation._validate_npc_single_admin_recovery_control_reanchor(
+                    ROOT,
+                    event=event,
+                    checkpoint={},
+                    history=[{}] * 80,
+                ),
+                [],
+            )
+        correction.validate_seq80_history_suffix.assert_called_once_with(
+            ROOT, {}, require_live_snapshot=False
+        )
+
+    def test_seq81_r002_reanchor_routes_to_historical_correction_validator(self) -> None:
+        event = {
+            "sequence": (
+                continuation.FP046_R002_THIRD_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+            ),
+            "event_id": (
+                continuation.FP046_R002_THIRD_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+            ),
+            "subject_goal_id": continuation.FP046_R002_GOAL_ID,
+        }
+        correction = mock.Mock()
+        correction.validate_seq81_history_suffix.return_value = event
+        correction.strict_json_equal.return_value = True
+        import scripts
+
+        with mock.patch.object(
+            scripts,
+            "apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824",
+            correction,
+        ), mock.patch.dict(
+            sys.modules,
+            {
+                "scripts.apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824": correction,
+            },
+        ):
+            self.assertEqual(
+                continuation._validate_npc_single_admin_recovery_control_reanchor(
+                    ROOT,
+                    event=event,
+                    checkpoint={},
+                    history=[{}] * 81,
+                ),
+                [],
+            )
+        correction.validate_seq81_history_suffix.assert_called_once_with(
+            ROOT, {}, require_live_snapshot=False
+        )
+
+    def test_seq82_r002_reanchor_routes_to_historical_correction_validator(self) -> None:
+        event = {
+            "sequence": (
+                continuation.FP046_R002_FOURTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+            ),
+            "event_id": (
+                continuation.FP046_R002_FOURTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+            ),
+            "subject_goal_id": continuation.FP046_R002_GOAL_ID,
+        }
+        correction = mock.Mock()
+        correction.validate_seq82_history_suffix.return_value = event
+        correction.strict_json_equal.return_value = True
+        import scripts
+
+        with mock.patch.object(
+            scripts,
+            "apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824",
+            correction,
+        ), mock.patch.dict(
+            sys.modules,
+            {
+                "scripts.apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824": correction,
+            },
+        ):
+            self.assertEqual(
+                continuation._validate_npc_single_admin_recovery_control_reanchor(
+                    ROOT,
+                    event=event,
+                    checkpoint={},
+                    history=[{}] * 82,
+                ),
+                [],
+            )
+        correction.validate_seq82_history_suffix.assert_called_once_with(
+            ROOT, {}, require_live_snapshot=False
+        )
+
+    def test_seq83_r002_reanchor_routes_to_historical_correction_validator(self) -> None:
+        event = {
+            "sequence": (
+                continuation.FP046_R002_FIFTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+            ),
+            "event_id": (
+                continuation.FP046_R002_FIFTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+            ),
+            "subject_goal_id": continuation.FP046_R002_GOAL_ID,
+        }
+        correction = mock.Mock()
+        correction.validate_seq83_history_suffix.return_value = event
+        correction.strict_json_equal.return_value = True
+        import scripts
+
+        with mock.patch.object(
+            scripts,
+            "apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824",
+            correction,
+        ), mock.patch.dict(
+            sys.modules,
+            {
+                "scripts.apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824": correction,
+            },
+        ):
+            self.assertEqual(
+                continuation._validate_npc_single_admin_recovery_control_reanchor(
+                    ROOT,
+                    event=event,
+                    checkpoint={},
+                    history=[{}] * 83,
+                ),
+                [],
+            )
+        correction.validate_seq83_history_suffix.assert_called_once_with(
+            ROOT, {}, require_live_snapshot=False
+        )
+
+    def test_seq84_r002_reanchor_routes_to_current_correction_validator(self) -> None:
+        event = {
+            "sequence": (
+                continuation.FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_SEQUENCE
+            ),
+            "event_id": (
+                continuation.FP046_R002_SIXTH_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+            ),
+            "subject_goal_id": continuation.FP046_R002_GOAL_ID,
+        }
+        correction = mock.Mock()
+        correction.validate_history_suffix.return_value = event
+        correction.strict_json_equal.return_value = True
+        import scripts
+
+        with mock.patch.object(
+            scripts,
+            "apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824",
+            correction,
+        ), mock.patch.dict(
+            sys.modules,
+            {
+                "scripts.apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824": correction,
+            },
+        ):
+            self.assertEqual(
+                continuation._validate_npc_single_admin_recovery_control_reanchor(
+                    ROOT,
+                    event=event,
+                    checkpoint={},
+                    history=[{}] * 84,
+                ),
+                [],
+            )
+        correction.validate_history_suffix.assert_called_once_with(
+            ROOT, {}, require_live_snapshot=False
+        )
+
+    def test_burned_seq78_start_cannot_be_hidden_by_later_suffix(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fixture = self._actual_private_suffix_fixture(root)
+            checkpoint = fixture["checkpoint"]
+            history = checkpoint["goal_execution"]["transition_history"]
+            seq79 = {
+                "sequence": 79,
+                "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-MATERIALIZED-TEST-079",
+                "event_type": "GOAL_MATERIALIZED",
+                "occurred_on": "2026-08-23",
+                "occurred_at": "2026-08-23T12:00:06+09:00",
+                "previous_event_sha256": history[-1]["event_sha256"],
+                "materialized_goal_id": "WS-GOAL-POST-SEQ78-TEST-R001",
+                "from_status": None,
+                "to_status": "PLANNED",
+                "status_changes": {
+                    "WS-GOAL-POST-SEQ78-TEST-R001": "PLANNED"
+                },
+            }
+            seq79["event_sha256"] = continuation.event_sha256(seq79)
+            history.append(seq79)
+            checkpoint["goal_execution"][
+                "transition_history_anchor_sha256"
+            ] = seq79["event_sha256"]
+            checkpoint["goal_execution"]["validation_cutoff_at"] = seq79[
+                "occurred_at"
+            ]
+
+            review = continuation._fp046_r002_seq77_78_modules()[0]
+            checkpoint_path = root / review.SOURCE_CHECKPOINT["path"]
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            checkpoint_path.write_bytes(
+                continuation.canonical_json_bytes(checkpoint) + b"\n"
+            )
+            os.chmod(checkpoint_path, 0o600)
+            reviewed_context = fixture[
+                "reviewed"
+            ].validate_post_review.return_value
+
+            def validate_with_actual_suffix_authority(candidate_root: Path):
+                review._require_allowed_checkpoint(candidate_root)
+                return reviewed_context
+
+            fixture["reviewed"].validate_post_review.side_effect = (
+                validate_with_actual_suffix_authority
+            )
+
+            self.assertIn(
+                "burned start event ID",
+                "\n".join(self._validate_actual_private_suffix(root, fixture)),
+            )
+
+    def test_seq77_nested_json_types_fail_closed(self) -> None:
+        for value in (False, 0.0):
+            with self.subTest(value=repr(value)):
+                fixture = self._reviewed_seq78_fixture()
+                checkpoint = fixture[0]
+                history = checkpoint["goal_execution"]["transition_history"]
+                history[76]["claim_boundary"][
+                    "product_implementation_credit_delta"
+                ] = value
+                history[76]["event_sha256"] = continuation.event_sha256(
+                    history[76]
+                )
+                history[77]["previous_event_sha256"] = history[76][
+                    "event_sha256"
+                ]
+                history[77]["event_sha256"] = continuation.event_sha256(
+                    history[77]
+                )
+
+        self.assertIn(
+            "seq77 event identity differs",
+            "\n".join(self._validate_reviewed_fixture(*fixture)),
+        )
+
+    def test_actual_suffix_validators_reject_receipt_authority_drift(
+        self,
+    ) -> None:
+        for field, value in (
+            ("schema_version", "1.0"),
+            ("source_ready_event_sha256", "f" * 64),
+            ("source_checkpoint_sha256", "f" * 64),
+        ):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                fixture = self._actual_private_suffix_fixture(root)
+                receipt = copy.deepcopy(fixture["receipt"])
+                receipt[field] = value
+                receipt_bytes = fixture["started"].json_bytes(receipt)
+                receipt_path = fixture["receipt_path"]
+                receipt_path.write_bytes(receipt_bytes)
+                os.chmod(receipt_path, 0o600)
+                event = fixture["checkpoint"]["goal_execution"][
+                    "transition_history"
+                ][77]
+                event["implementation_start_gate_binding"][
+                    "file_sha256"
+                ] = sha256_bytes(receipt_bytes)
+                event["event_sha256"] = continuation.event_sha256(event)
+
+                self.assertTrue(
+                    self._validate_actual_private_suffix(root, fixture)
+                )
+
+    def test_actual_suffix_validators_reject_resealed_wrong_document_id(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fixture = self._actual_private_suffix_fixture(root)
+            receipt = copy.deepcopy(fixture["receipt"])
+            receipt["document_id"] = "WS-FP046-R002-WRONG-RECEIPT"
+            receipt_bytes = fixture["started"].json_bytes(receipt)
+            receipt_path = fixture["receipt_path"]
+            receipt_path.write_bytes(receipt_bytes)
+            os.chmod(receipt_path, 0o600)
+            event = fixture["checkpoint"]["goal_execution"][
+                "transition_history"
+            ][77]
+            event["implementation_start_gate_binding"].update(
+                {
+                    "document_id": receipt["document_id"],
+                    "file_sha256": sha256_bytes(receipt_bytes),
+                }
+            )
+            event["event_sha256"] = continuation.event_sha256(event)
+
+            self.assertTrue(
+                self._validate_actual_private_suffix(root, fixture)
+            )
+
+    def test_actual_suffix_validators_reject_log_or_inventory_drift(
+        self,
+    ) -> None:
+        for mutation in ("log", "inventory"):
+            with (
+                self.subTest(mutation=mutation),
+                tempfile.TemporaryDirectory() as temp_dir,
+            ):
+                root = Path(temp_dir)
+                fixture = self._actual_private_suffix_fixture(root)
+                if mutation == "log":
+                    target = fixture["event_dir"] / "01-CONTINUATION.log"
+                    target.write_bytes(b"tampered\n")
+                    os.chmod(target, 0o600)
+                else:
+                    target = fixture["event_dir"] / "unexpected-private-file"
+                    target.write_bytes(b"unexpected\n")
+                    os.chmod(target, 0o600)
+
+                self.assertTrue(
+                    self._validate_actual_private_suffix(root, fixture)
+                )
+
+    def test_later_suffix_cannot_hide_seq77_authority_tampering(self) -> None:
+        fixture = self._reviewed_seq78_fixture()
+        checkpoint = fixture[0]
+        history = checkpoint["goal_execution"]["transition_history"]
+        history[76]["authorization_binding"] = {"forged": True}
+        history[76]["event_sha256"] = continuation.event_sha256(history[76])
+        history[77]["previous_event_sha256"] = history[76]["event_sha256"]
+        history[77]["event_sha256"] = continuation.event_sha256(history[77])
+
+        self.assertIn(
+            "seq77 event identity differs",
+            "\n".join(self._validate_reviewed_fixture(*fixture)),
+        )
+
+    def test_exact_seq77_78_prefix_survives_later_suffix(self) -> None:
+        self.test_later_suffix_cannot_hide_seq77_authority_tampering()
+
+    def test_burned_start_ids_are_evidence_only(self) -> None:
+        expected = {
+            "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-001",
+            "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-002",
+            "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-003",
+            "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260823-004",
+        }
+        self.assertEqual(continuation.FP046_R002_BURNED_STARTED_EVENT_IDS, expected)
+        for event_id in sorted(expected):
+            with self.subTest(event_id=event_id):
+                fixture = self._reviewed_seq78_fixture()
+                event = fixture[0]["goal_execution"]["transition_history"][77]
+                event["event_id"] = event_id
+                event["event_sha256"] = continuation.event_sha256(event)
+                self.assertIn(
+                    "burned start event ID",
+                    "\n".join(self._validate_reviewed_fixture(*fixture)),
+                )
+
+    def test_seq79_replay_and_unknown_type_remain_fail_closed(self) -> None:
+        fixture = self._reviewed_seq78_fixture()
+        checkpoint = fixture[0]
+        history = checkpoint["goal_execution"]["transition_history"]
+        seq79 = copy.deepcopy(history[77])
+        seq79["sequence"] = 79
+        seq79["event_type"] = "UNKNOWN_FUTURE_EVENT"
+        seq79["previous_event_sha256"] = history[77]["event_sha256"]
+        seq79["event_sha256"] = continuation.event_sha256(seq79)
+        history.append(seq79)
+
+        errors = continuation.validate_generic_event_order(history)
+
+        self.assertTrue(any("ID is invalid or duplicated" in error for error in errors))
+        self.assertTrue(any("type is invalid" in error for error in errors))
 
 
 class WalkSafeFp022CompletionSuffixTest(unittest.TestCase):
@@ -3839,6 +5232,4554 @@ class WalkSafeFp022CompletionSuffixTest(unittest.TestCase):
         errors = continuation.validate_fp022_completion_seq70_71(ROOT, checkpoint)
         self.assertIn("FP022 completion seq70 ID", "\n".join(errors))
         self.assertIn("FP022 completion seq71 ID", "\n".join(errors))
+
+
+def _fp046_r002_completion_checkpoint() -> dict[str, object]:
+    source = continuation.load_json(CHECKPOINT)
+    del source["goal_execution"]["transition_history"][85:]
+    completion_binding = {
+        "role": continuation.FP046_R002_COMPLETION_ROLE,
+        "document_id": (
+            "WS-FP046-R002-CONSENT-WITHDRAWAL-DELETION-"
+            "WORK-ITEM-COMPLETION-20260825-R005"
+        ),
+        "path": (
+            "docs/control/execution/goal-results/"
+            "WS-GOAL-EPIC-03-FP-046-R002/completion-receipt-r005.json"
+        ),
+        "file_sha256": "a" * 64,
+    }
+    gap = {
+        "metadata": {
+            "report_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260825-030",
+            "version": "0.30.0",
+        },
+        "assessments": [],
+        "summary": {"status_counts": {}},
+        "implementation_snapshot": {},
+    }
+    backlog = {
+        "metadata": {
+            "backlog_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260825-030"
+        },
+        "epics": [],
+    }
+    evidence = fp046_completion.CompletionEvidence(
+        raw_by_path={
+            fp046_completion.GAP_JSON_REL: fp046_completion.json_bytes(gap),
+            fp046_completion.BACKLOG_JSON_REL: fp046_completion.json_bytes(backlog),
+        },
+        bindings_by_role={
+            "IMPLEMENTATION_GAP": {
+                "role": "IMPLEMENTATION_GAP",
+                "document_id": gap["metadata"]["report_id"],
+                "path": fp046_completion.GAP_JSON_REL.as_posix(),
+                "file_sha256": "b" * 64,
+            },
+            "IMPLEMENTATION_BACKLOG": {
+                "role": "IMPLEMENTATION_BACKLOG",
+                "document_id": backlog["metadata"]["backlog_id"],
+                "path": fp046_completion.BACKLOG_JSON_REL.as_posix(),
+                "file_sha256": "c" * 64,
+            },
+            continuation.FP046_R002_COMPLETION_ROLE: completion_binding,
+        },
+        update_occurred_at="2026-08-25T03:08:31+09:00",
+        completion_occurred_at="2026-08-25T03:08:32+09:00",
+        final_sha256_by_path={},
+        transition_review_binding={
+            role: {
+                "path": (
+                    "docs/control/execution/workstream-transitions/seq86-87/"
+                    f"review-rounds/R005/{name}"
+                ),
+                "sha256": digest * 64,
+                "byte_length": 1,
+            }
+            for role, name, digest in (
+                ("assignment", "assignment.json", "d"),
+                ("review_result", "review-result.json", "e"),
+                ("independent_review", "independent-review.json", "f"),
+            )
+        },
+    )
+
+    def preserve_runtime(
+        _root: Path,
+        projected: dict[str, object],
+        _frontier: list[str],
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        state = projected["goal_execution"]
+        return (
+            copy.deepcopy(state["artifact_work_queue"]),
+            copy.deepcopy(state["completion_boundary"]),
+        )
+
+    projected, _update, _completion = fp046_completion.project_seq86_87(
+        ROOT,
+        source,
+        evidence,
+        runtime_deriver=preserve_runtime,
+    )
+    return projected
+
+
+def _reseal_fp046_r002_completion_pair(checkpoint: dict[str, object]) -> None:
+    state = checkpoint["goal_execution"]
+    update, completion = state["transition_history"][85:87]
+    update["event_sha256"] = continuation.event_sha256(update)
+    completion["previous_event_sha256"] = update["event_sha256"]
+    completion["canonical_update_event_sha256"] = update["event_sha256"]
+    completion["event_sha256"] = continuation.event_sha256(completion)
+    state["transition_history_anchor_sha256"] = completion["event_sha256"]
+
+
+class WalkSafeFp046R002CompletionSuffixTest(unittest.TestCase):
+    def test_exact_seq86_deferred_reopen_rejects_forged_authority(self) -> None:
+        history = continuation.load_json(CHECKPOINT)["goal_execution"][
+            "transition_history"
+        ]
+        expected = continuation._fp046_r002_deferred_reopen_after_completion(
+            history
+        )
+        self.assertEqual(
+            set(expected), {continuation.FP046_R002_FP048_R001_GOAL_ID}
+        )
+
+        mutations = {
+            "id": lambda events: events[85].__setitem__(
+                "event_id", "WS-FORGED-FP046-R002-SEQ86"
+            ),
+            "hash": lambda events: events[85].__setitem__(
+                "event_sha256", "0" * 64
+            ),
+            "impact": lambda events: events[85][
+                "impact_disposition_by_goal"
+            ][continuation.FP046_R002_FP048_R001_GOAL_ID].__setitem__(
+                "result", "NO_REOPEN"
+            ),
+            "reopen_seal": lambda events: events[85][
+                "reopened_completion_event_sha256_by_goal"
+            ].__setitem__(
+                continuation.FP046_R002_FP048_R001_GOAL_ID, "0" * 64
+            ),
+            "reordered": lambda events: events.__setitem__(
+                slice(85, 87), list(reversed(events[85:87]))
+            ),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label):
+                forged = copy.deepcopy(history)
+                mutate(forged)
+                self.assertEqual(
+                    continuation._fp046_r002_deferred_reopen_after_completion(
+                        forged
+                    ),
+                    {},
+                )
+
+    def test_seq85_is_dormant(self) -> None:
+        checkpoint = _fp046_r002_completion_checkpoint()
+        del checkpoint["goal_execution"]["transition_history"][85:]
+
+        self.assertEqual(
+            continuation.validate_fp046_r002_completion_seq86_87(checkpoint),
+            [],
+        )
+
+    def test_seq86_without_adjacent_seq87_fails_closed(self) -> None:
+        checkpoint = _fp046_r002_completion_checkpoint()
+        del checkpoint["goal_execution"]["transition_history"][86:]
+
+        self.assertEqual(
+            continuation.validate_fp046_r002_completion_seq86_87(checkpoint),
+            [
+                "FP046 R002 seq86 producer transaction lacks adjacent "
+                "seq87 completion"
+            ],
+        )
+
+    def test_valid_synthetic_pair_and_historical_descendant(self) -> None:
+        checkpoint = _fp046_r002_completion_checkpoint()
+        self.assertEqual(
+            continuation.validate_fp046_r002_completion_seq86_87(checkpoint),
+            [],
+        )
+
+        state = checkpoint["goal_execution"]
+        state["transition_history"].append({"sequence": 88})
+        state["focus_goal_id"] = "WS-GOAL-SYNTHETIC-DESCENDANT"
+        state["ready_frontier_goal_ids"] = ["WS-GOAL-SYNTHETIC-DESCENDANT"]
+        self.assertEqual(
+            continuation.validate_fp046_r002_completion_seq86_87(checkpoint),
+            [],
+        )
+
+    def test_reviewed_core_allows_only_adjacent_producer_completion(self) -> None:
+        checkpoint = _fp046_r002_completion_checkpoint()
+        errors = continuation.validate_fp046_npc_r002_seq72_boundary(
+            ROOT, checkpoint
+        )
+        self.assertNotIn("approval-neutral reviewed core", "\n".join(errors))
+
+        mutations = {
+            "event_type": lambda update, completion: update.__setitem__(
+                "event_type", "WORK_SESSION_RESUMED"
+            ),
+            "producer": lambda update, completion: update.__setitem__(
+                "produced_by_goal_id",
+                continuation.FP046_R002_COMPLETION_PARENT_GOAL_ID,
+            ),
+            "pending_completion": lambda update, completion: completion.__setitem__(
+                "event_type", "WORK_SESSION_RESUMED"
+            ),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label):
+                tampered = _fp046_r002_completion_checkpoint()
+                update, completion = tampered["goal_execution"][
+                    "transition_history"
+                ][85:87]
+                mutate(update, completion)
+                _reseal_fp046_r002_completion_pair(tampered)
+
+                errors = continuation.validate_fp046_npc_r002_seq72_boundary(
+                    ROOT, tampered
+                )
+                self.assertIn(
+                    "approval-neutral reviewed core", "\n".join(errors)
+                )
+
+    def test_seq85_descendant_receipt_reconstruction_preserves_order(self) -> None:
+        from scripts import (
+            apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824
+            as correction,
+        )
+
+        descendant = _fp046_r002_completion_checkpoint()
+        real_safe_file = correction._safe_file
+
+        def validate(serialized: str) -> list[str]:
+            projected = json.loads(serialized)
+            with tempfile.TemporaryDirectory() as temporary:
+                checkpoint_path = Path(temporary) / "checkpoint.json"
+                checkpoint_path.write_text(serialized, encoding="utf-8")
+
+                def safe_file(
+                    root: Path,
+                    relative: Path,
+                    *,
+                    modes: frozenset[int] | None = None,
+                ) -> Path:
+                    if relative == correction.CHECKPOINT_RELATIVE:
+                        return checkpoint_path
+                    return real_safe_file(root, relative, modes=modes)
+
+                with mock.patch.object(
+                    correction, "_safe_file", side_effect=safe_file
+                ):
+                    return continuation._validate_fp046_r002_recovery_seq78_79(
+                        ROOT,
+                        projected,
+                        projected["goal_execution"]["transition_history"],
+                    )
+
+        preserved = json.dumps(descendant, ensure_ascii=False, indent=2) + "\n"
+        rewritten = (
+            json.dumps(
+                descendant,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
+        self.assertEqual(validate(preserved), [])
+        self.assertEqual(
+            validate(rewritten), ["seq85 PASS receipt authority differs"]
+        )
+
+    def test_resealed_seq85_receipt_binding_tamper_is_rejected(self) -> None:
+        checkpoint = _fp046_r002_completion_checkpoint()
+        state = checkpoint["goal_execution"]
+        seq85 = state["transition_history"][84]
+        seq85["implementation_start_gate_binding"]["file_sha256"] = "0" * 64
+        seq85["event_sha256"] = continuation.event_sha256(seq85)
+        state["transition_history"][85]["previous_event_sha256"] = seq85[
+            "event_sha256"
+        ]
+        _reseal_fp046_r002_completion_pair(checkpoint)
+
+        errors = continuation._validate_fp046_r002_recovery_seq78_79(
+            ROOT, checkpoint, state["transition_history"]
+        )
+        self.assertIn(
+            "FP046 R002 seq85 start event identity differs", errors
+        )
+
+    def test_resealed_id_hash_binding_and_impact_tamper_are_rejected(self) -> None:
+        mutations = {
+            "id": lambda update, completion: update.__setitem__(
+                "event_id", "WS-FORGED-FP046-R002-SEQ86"
+            ),
+            "hash": lambda update, completion: update.__setitem__(
+                "previous_event_sha256", "0" * 64
+            ),
+            "binding": lambda update, completion: update[
+                "producer_completion_receipt_binding"
+            ].__setitem__("file_sha256", "0" * 64),
+            "impact": lambda update, completion: update[
+                "impact_disposition_by_goal"
+            ][continuation.FP046_R002_FP048_R001_GOAL_ID].__setitem__(
+                "result", "NO_REOPEN"
+            ),
+            "reopen_seal": lambda update, completion: update[
+                "reopened_completion_event_sha256_by_goal"
+            ].__setitem__(
+                continuation.FP046_R002_FP048_R001_GOAL_ID,
+                "0" * 64,
+            ),
+            "failed_r001_review": lambda update, completion: update[
+                "transition_control_review_binding"
+            ]["assignment"].__setitem__(
+                "path",
+                "docs/control/execution/workstream-transitions/seq86-87/"
+                "review-rounds/R001/assignment.json",
+            ),
+            "failed_r002_review": lambda update, completion: update[
+                "transition_control_review_binding"
+            ]["assignment"].__setitem__(
+                "path",
+                "docs/control/execution/workstream-transitions/seq86-87/"
+                "review-rounds/R002/assignment.json",
+            ),
+            "failed_r003_review": lambda update, completion: update[
+                "transition_control_review_binding"
+            ]["assignment"].__setitem__(
+                "path",
+                "docs/control/execution/workstream-transitions/seq86-87/"
+                "review-rounds/R003/assignment.json",
+            ),
+            "failed_r004_review": lambda update, completion: update[
+                "transition_control_review_binding"
+            ]["assignment"].__setitem__(
+                "path",
+                "docs/control/execution/workstream-transitions/seq86-87/"
+                "review-rounds/R004/assignment.json",
+            ),
+            "failed_r002_receipt": lambda update, completion: update[
+                "producer_completion_receipt_binding"
+            ].__setitem__(
+                "path",
+                "docs/control/execution/goal-results/"
+                f"{continuation.FP046_R002_GOAL_ID}/completion-receipt.json",
+            ),
+            "failed_r003_receipt": lambda update, completion: update[
+                "producer_completion_receipt_binding"
+            ].__setitem__(
+                "path",
+                "docs/control/execution/goal-results/"
+                f"{continuation.FP046_R002_GOAL_ID}/completion-receipt-r003.json",
+            ),
+            "failed_r004_receipt": lambda update, completion: update[
+                "producer_completion_receipt_binding"
+            ].__setitem__(
+                "path",
+                "docs/control/execution/goal-results/"
+                f"{continuation.FP046_R002_GOAL_ID}/completion-receipt-r004.json",
+            ),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label):
+                checkpoint = _fp046_r002_completion_checkpoint()
+                update, completion = checkpoint["goal_execution"][
+                    "transition_history"
+                ][85:87]
+                mutate(update, completion)
+                _reseal_fp046_r002_completion_pair(checkpoint)
+
+                self.assertTrue(
+                    continuation.validate_fp046_r002_completion_seq86_87(
+                        checkpoint
+                    ),
+                    label,
+                )
+
+    def test_validate_dispatches_exact_completion_suffix_validator(self) -> None:
+        checkpoint = {"goal_execution": {"transition_history": []}}
+        sentinel = "FP046 R002 exact completion suffix dispatcher sentinel"
+        with (
+            mock.patch.object(
+                continuation,
+                "validate_frozen_v23_boundary",
+                return_value=([], {}),
+            ),
+            mock.patch.object(continuation, "load_json", return_value=checkpoint),
+            mock.patch.object(
+                continuation,
+                "validate_seq39_canonical_binding_authorization_request",
+                return_value=[],
+            ),
+            mock.patch.object(
+                continuation,
+                "validate_seq39_canonical_binding_update",
+                return_value=[],
+            ),
+            mock.patch.object(
+                continuation,
+                "validate_fp022_completion_seq70_71",
+                return_value=[],
+            ),
+            mock.patch.object(
+                continuation,
+                "validate_fp046_r002_completion_seq86_87",
+                return_value=[sentinel],
+            ) as exact,
+            mock.patch.object(
+                continuation,
+                "validate_working_snapshot",
+                return_value=[],
+            ),
+        ):
+            errors = continuation.validate(ROOT, CHECKPOINT)
+
+        self.assertEqual(errors, [sentinel])
+        exact.assert_called_once_with(checkpoint)
+
+
+class WalkSafeFp048R002Seq90Seq91BoundaryTest(unittest.TestCase):
+    EDGES = {"modified": [], "added": []}
+
+    @staticmethod
+    def _seq90_checkpoint() -> tuple[dict[str, object], dict[str, object]]:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        state = checkpoint["goal_execution"]
+        history = state["transition_history"]
+        published = history[89] if len(history) >= 90 else None
+        if published is not None:
+            assert published["sequence"] == continuation.FP048_R002_CONTROL_REANCHOR_SEQUENCE
+            assert published["event_id"] == continuation.FP048_R002_CONTROL_REANCHOR_EVENT_ID
+            assert published["event_sha256"] == continuation.event_sha256(published)
+            repository_after = copy.deepcopy(
+                published["repository_context_reanchor"]["after"]
+            )
+            history[:] = history[:89]
+            state["transition_history_anchor_sha256"] = history[-1]["event_sha256"]
+            state["validation_cutoff_at"] = history[-1]["occurred_at"]
+            state["status_by_goal"][continuation.FP048_R002_GOAL_ID] = "READY"
+            checkpoint["current_work"]["status"] = "READY"
+            snapshot = checkpoint["working_tree_snapshot"]
+            snapshot.update(
+                {
+                    "managed_changed_path_count": repository_after[
+                        "managed_changed_path_count"
+                    ],
+                    "path_set_sha256": repository_after["path_set_sha256"],
+                    "content_set_sha256": repository_after[
+                        "content_set_sha256"
+                    ],
+                }
+            )
+            mirror = checkpoint["session_handoff"][
+                "source_commit_or_snapshot"
+            ]
+            mirror.update(
+                {
+                    "base_commit": repository_after["base_commit"],
+                    "current_head": repository_after["current_head"],
+                }
+            )
+        else:
+            repository_after = continuation._fp048_r002_reanchor_repository_after(
+                checkpoint,
+                history,
+            )
+        ready = history[88]
+        event = {
+            "sequence": continuation.FP048_R002_CONTROL_REANCHOR_SEQUENCE,
+            "event_id": continuation.FP048_R002_CONTROL_REANCHOR_EVENT_ID,
+            "event_type": "GOAL_START_CONTROL_REANCHORED",
+            "occurred_on": "2026-08-26",
+            "occurred_at": "2026-08-26T02:00:00+09:00",
+            "previous_focus_goal_id": continuation.FP048_R002_GOAL_ID,
+            "previous_focus_content_sha256": continuation.FP048_R002_GOAL_SHA256,
+            "focus_goal_id": continuation.FP048_R002_GOAL_ID,
+            "focus_goal_content_sha256": continuation.FP048_R002_GOAL_SHA256,
+            "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+            "from_status": "READY",
+            "to_status": "READY",
+            "static_plan_manifest_sha256": ready[
+                "static_plan_manifest_sha256"
+            ],
+            "status_changes": {},
+            "runtime_after": copy.deepcopy(ready["runtime_after"]),
+            "blockers_after": copy.deepcopy(ready["blockers_after"]),
+            "blocker_resolution_ids_after": copy.deepcopy(
+                ready["blocker_resolution_ids_after"]
+            ),
+            "source_checkpoint_version": "1.25.0",
+            "evidence_refs": [],
+            "source_checkpoint_binding": {},
+            "source_ready_event_binding": {
+                "event_id": continuation.FP048_R002_READY_EVENT_ID,
+                "event_sha256": continuation.FP048_R002_READY_EVENT_SHA256,
+                "goal_id": continuation.FP048_R002_GOAL_ID,
+                "sequence": 89,
+                "status": "READY",
+            },
+            "contract_supersession": {
+                "previous_contract_binding": copy.deepcopy(
+                    ready["implementation_start_gate_contract_binding"]
+                ),
+                "replacement_contract_binding": {},
+                "reason_code": "SYNTHETIC_REVIEWED_SUCCESSOR",
+            },
+            "start_gate_runner_binding": {},
+            "transition_control_review_binding": {},
+            "repository_context_reanchor": {
+                "before": {},
+                "after": repository_after,
+            },
+            "authorization_binding": {},
+            "claim_boundary": copy.deepcopy(
+                continuation.NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_CLAIM_BOUNDARY
+            ),
+            "unchanged_control_projection": {},
+            "canonical_binding_snapshot_after": copy.deepcopy(
+                ready["canonical_binding_snapshot_after"]
+            ),
+            "noncredit_successor_edges": copy.deepcopy(
+                WalkSafeFp048R002Seq90Seq91BoundaryTest.EDGES
+            ),
+            "previous_event_sha256": continuation.FP048_R002_READY_EVENT_SHA256,
+        }
+        event["event_sha256"] = continuation.event_sha256(event)
+        history.append(event)
+        return checkpoint, event
+
+    @staticmethod
+    def _seq91_event(reanchor: dict[str, object]) -> dict[str, object]:
+        event = {
+            "sequence": continuation.FP048_R002_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_STARTED_EVENT_ID,
+            "event_type": "GOAL_STARTED",
+            "occurred_on": "2026-08-26",
+            "occurred_at": "2026-08-26T02:10:00+09:00",
+            "previous_focus_goal_id": continuation.FP048_R002_GOAL_ID,
+            "previous_focus_content_sha256": continuation.FP048_R002_GOAL_SHA256,
+            "focus_goal_id": continuation.FP048_R002_GOAL_ID,
+            "focus_goal_content_sha256": continuation.FP048_R002_GOAL_SHA256,
+            "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+            "from_status": "READY",
+            "to_status": "IN_PROGRESS",
+            "static_plan_manifest_sha256": reanchor[
+                "static_plan_manifest_sha256"
+            ],
+            "status_changes": {
+                continuation.FP048_R002_GOAL_ID: "IN_PROGRESS"
+            },
+            "runtime_after": copy.deepcopy(reanchor["runtime_after"]),
+            "repository_snapshot_before": {
+                "branch": "current",
+                "checkpoint_base_head": "a" * 40,
+                "head_commit": "b" * 40,
+                "checkpoint_managed_path_count": 7,
+                "checkpoint_path_set_sha256": "c" * 64,
+                "checkpoint_content_set_sha256": "d" * 64,
+            },
+            "implementation_start_gate_binding": {},
+            "blockers_after": copy.deepcopy(reanchor["blockers_after"]),
+            "blocker_resolution_ids_after": copy.deepcopy(
+                reanchor["blocker_resolution_ids_after"]
+            ),
+            "source_checkpoint_version": "1.25.0",
+            "evidence_refs": [],
+            "previous_event_sha256": reanchor["event_sha256"],
+        }
+        event["event_sha256"] = continuation.event_sha256(event)
+        return event
+
+    @staticmethod
+    def _authority() -> mock.Mock:
+        authority = mock.Mock()
+        authority.require_control_reanchored_checkpoint.return_value = None
+        authority.validated_noncredit_successor_edges.return_value = (
+            copy.deepcopy(WalkSafeFp048R002Seq90Seq91BoundaryTest.EDGES)
+        )
+        return authority
+
+    def test_seq90_routes_to_exact_reanchor_and_reviewed_successor_authority(
+        self,
+    ) -> None:
+        checkpoint, event = self._seq90_checkpoint()
+        authority = self._authority()
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_reanchor_authority",
+            return_value=authority,
+        ):
+            errors = continuation._validate_npc_single_admin_recovery_control_reanchor(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=checkpoint["goal_execution"]["transition_history"],
+            )
+
+        self.assertEqual(errors, [])
+        authority.require_control_reanchored_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+        authority.validated_noncredit_successor_edges.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+
+    def test_seq90_fails_closed_on_missing_authority_or_edge_drift(self) -> None:
+        checkpoint, event = self._seq90_checkpoint()
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_reanchor_authority",
+            side_effect=RuntimeError("synthetic authority missing"),
+        ):
+            errors = continuation._validate_fp048_r002_control_reanchor_seq90(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=checkpoint["goal_execution"]["transition_history"],
+            )
+        self.assertIn("authority differs", "\n".join(errors))
+
+        authority = self._authority()
+        authority.validated_noncredit_successor_edges.return_value = {
+            "modified": [],
+            "added": [{"path": "forged"}],
+        }
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_reanchor_authority",
+            return_value=authority,
+        ):
+            errors = continuation._validate_fp048_r002_control_reanchor_seq90(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=checkpoint["goal_execution"]["transition_history"],
+            )
+        self.assertIn("reviewed noncredit successor edges", "\n".join(errors))
+
+    def test_seq90_repository_after_uses_exact_seq91_gate_snapshot(self) -> None:
+        checkpoint, reanchor = self._seq90_checkpoint()
+        started = self._seq91_event(reanchor)
+        checkpoint["goal_execution"]["transition_history"].append(started)
+
+        self.assertEqual(
+            continuation._fp048_r002_reanchor_repository_after(
+                checkpoint,
+                checkpoint["goal_execution"]["transition_history"],
+            ),
+            {
+                "branch": "current",
+                "base_commit": "a" * 40,
+                "current_head": "b" * 40,
+                "managed_changed_path_count": 7,
+                "path_set_sha256": "c" * 64,
+                "content_set_sha256": "d" * 64,
+            },
+        )
+
+    def test_seq91_loads_only_exact_reviewed_r002_five_check_contract(
+        self,
+    ) -> None:
+        checkpoint, reanchor = self._seq90_checkpoint()
+        started = self._seq91_event(reanchor)
+        checkpoint["goal_execution"]["transition_history"].append(started)
+        contract = {
+            "schema_version": "1.1",
+            "document_id": "WS-FP048-R002-START-R002-TEST",
+            "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R002",
+            "contract_version": "2026-08-26.1",
+            "target_goal_id": continuation.FP048_R002_GOAL_ID,
+            "target_goal_content_sha256": continuation.FP048_R002_GOAL_SHA256,
+            "gate_purpose": "INITIAL_START",
+            "ordered_checks": [
+                {"check_id": check_id, "command": "true"}
+                for check_id in continuation.FP048_R002_START_GATE_CHECK_IDS
+            ],
+            "claim_boundary": {"start_gate_status": "NOT_RUN"},
+            "successor_reason_code": "SYNTHETIC_REVIEWED_SUCCESSOR",
+            "supersedes": {"source_ready_event_sequence": 89},
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            path = root / continuation.FP048_R002_START_GATE_CONTRACT_PATH
+            path.parent.mkdir(parents=True)
+            raw = json.dumps(contract, ensure_ascii=False, indent=2).encode() + b"\n"
+            path.write_bytes(raw)
+            binding = {
+                "schema_version": "1.1",
+                "document_id": contract["document_id"],
+                "path": continuation.FP048_R002_START_GATE_CONTRACT_PATH,
+                "file_sha256": sha256_bytes(raw),
+                "contract_id": contract["contract_id"],
+                "contract_version": contract["contract_version"],
+                "canonical_contract_sha256": continuation.canonical_json_sha256(
+                    contract
+                ),
+            }
+            reanchor["contract_supersession"][
+                "replacement_contract_binding"
+            ] = binding
+            reanchor["event_sha256"] = continuation.event_sha256(reanchor)
+            started["previous_event_sha256"] = reanchor["event_sha256"]
+            started["event_sha256"] = continuation.event_sha256(started)
+            authority = self._authority()
+            authority.load_r002_contract.return_value = (contract, binding)
+            with mock.patch.object(
+                continuation,
+                "_fp048_r002_reanchor_authority",
+                return_value=authority,
+            ):
+                errors, checks, actual_binding, ready = (
+                    continuation._fp048_r002_start_gate_contract(
+                        root,
+                        event=started,
+                        checkpoint=checkpoint,
+                    )
+                )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            [item["check_id"] for item in checks],
+            continuation.FP048_R002_START_GATE_CHECK_IDS,
+        )
+        self.assertEqual(actual_binding, binding)
+        self.assertEqual(ready["event_sha256"], continuation.FP048_R002_READY_EVENT_SHA256)
+
+    def test_seq91_private_gate_uses_fresh_event_namespace(self) -> None:
+        expected_path = (
+            "docs/control/execution/goal-gates/"
+            f"{continuation.FP048_R002_STARTED_EVENT_ID}/"
+            "implementation-start-gate-receipt.json"
+        )
+        event = {
+            "event_id": continuation.FP048_R002_STARTED_EVENT_ID,
+            "event_type": "GOAL_STARTED",
+            "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+            "implementation_start_gate_binding": {
+                "document_id": "WS-FP048-R002-START-GATE-RECEIPT-TEST",
+                "path": expected_path,
+                "file_sha256": "a" * 64,
+            },
+        }
+        with mock.patch.object(
+            continuation,
+            "_load_fp008_private_binding",
+            return_value=(["fresh receipt path probe"], {}, None, None),
+        ) as loader:
+            errors = continuation._validate_start_gate(
+                ROOT,
+                event=event,
+                checkpoint={},
+                goal_paths={},
+                manifest={},
+                manifest_sha256="b" * 64,
+                activation_sha256="c" * 64,
+                activation_occurred_at=None,
+            )
+
+        self.assertEqual(errors, ["fresh receipt path probe"])
+        self.assertEqual(loader.call_args.kwargs["expected_path"], expected_path)
+        self.assertEqual(
+            continuation._validate_fp048_r002_runtime_bindings(
+                ROOT,
+                [],
+                event_id=continuation.FP048_R002_STARTED_EVENT_ID,
+            ),
+            [],
+        )
+        self.assertEqual(len(continuation.FP048_R002_START_GATE_CHECK_IDS), 5)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            event_dir = (
+                root
+                / continuation.FP008_GATE_ROOT_RELATIVE
+                / continuation.FP048_R002_STARTED_EVENT_ID
+            )
+            event_dir.mkdir(parents=True)
+            os.chmod(event_dir, 0o700)
+            names = {"implementation-start-gate-receipt.json"}
+            names.update(
+                f"{index:02d}-{check_id}.log"
+                for index, check_id in enumerate(
+                    continuation.FP048_R002_START_GATE_CHECK_IDS,
+                    start=1,
+                )
+            )
+            for name in names:
+                target = event_dir / name
+                target.write_bytes(b"test\n")
+                os.chmod(target, 0o600)
+            metadata = event_dir.stat()
+            inventory_errors = continuation._validate_fp008_gate_event_inventory(
+                root,
+                event_id=continuation.FP048_R002_STARTED_EVENT_ID,
+                expected_checks=[
+                    {"check_id": check_id, "command": "true"}
+                    for check_id in continuation.FP048_R002_START_GATE_CHECK_IDS
+                ],
+                expected_directory_identity=(metadata.st_dev, metadata.st_ino),
+                label="FP048 R002 synthetic private five-check gate",
+            )
+        self.assertEqual(inventory_errors, [])
+
+
+class WalkSafeFp048R002Seq91Seq92CorrectionBoundaryTest(unittest.TestCase):
+    @staticmethod
+    def _checkpoint() -> tuple[dict[str, object], dict[str, object], mock.Mock]:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        state = checkpoint["goal_execution"]
+        history = state["transition_history"]
+        event = history[90]
+        assert event["sequence"] == continuation.FP048_R002_CONTROL_CORRECTION_SEQUENCE
+        assert event["event_id"] == continuation.FP048_R002_CONTROL_CORRECTION_EVENT_ID
+        assert event["event_sha256"] == continuation.event_sha256(event)
+        history[:] = history[:91]
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = event["occurred_at"]
+        state["status_by_goal"][continuation.FP048_R002_GOAL_ID] = "READY"
+        state["goal_status"] = "READY"
+        checkpoint["current_work"]["status"] = "READY"
+        repository_after = event["repository_context_reanchor"]["after"]
+        snapshot = checkpoint["working_tree_snapshot"]
+        snapshot.update(
+            {
+                "managed_changed_path_count": repository_after[
+                    "managed_changed_path_count"
+                ],
+                "path_set_sha256": repository_after["path_set_sha256"],
+                "content_set_sha256": repository_after["content_set_sha256"],
+            }
+        )
+        mirror = checkpoint["session_handoff"]["source_commit_or_snapshot"]
+        mirror.update(
+            {
+                "base_commit": repository_after["base_commit"],
+                "current_head": repository_after["current_head"],
+            }
+        )
+        authority = mock.Mock()
+        authority.require_control_corrected_checkpoint.return_value = None
+        return checkpoint, event, authority
+
+    @staticmethod
+    def _seq92_event(correction_event: dict[str, object]) -> dict[str, object]:
+        event = WalkSafeFp048R002Seq90Seq91BoundaryTest._seq91_event(
+            correction_event
+        )
+        event["sequence"] = continuation.FP048_R002_CORRECTED_STARTED_SEQUENCE
+        event["event_id"] = continuation.FP048_R002_CORRECTED_STARTED_EVENT_ID
+        event["previous_event_sha256"] = correction_event["event_sha256"]
+        event["event_sha256"] = continuation.event_sha256(event)
+        return event
+
+    def test_seq91_dispatches_exact_ready_to_ready_zero_credit_authority(
+        self,
+    ) -> None:
+        checkpoint, event, authority = self._checkpoint()
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_correction_authority",
+            return_value=authority,
+        ):
+            errors = continuation._validate_npc_single_admin_recovery_control_reanchor(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=checkpoint["goal_execution"]["transition_history"],
+            )
+
+        self.assertEqual(errors, [])
+        authority.require_control_corrected_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+
+    def test_seq91_rejects_status_credit_and_reason_drift(self) -> None:
+        for field, value in (
+            ("to_status", "IN_PROGRESS"),
+            ("status_changes", {continuation.FP048_R002_GOAL_ID: "IN_PROGRESS"}),
+            ("correction_reason", {}),
+        ):
+            with self.subTest(field=field):
+                checkpoint, event, authority = self._checkpoint()
+                event[field] = value
+                event["event_sha256"] = continuation.event_sha256(event)
+                with mock.patch.object(
+                    continuation,
+                    "_fp048_r002_correction_authority",
+                    return_value=authority,
+                ):
+                    errors = continuation._validate_fp048_r002_control_correction_seq91(
+                        ROOT,
+                        event=event,
+                        checkpoint=checkpoint,
+                        history=checkpoint["goal_execution"]["transition_history"],
+                    )
+                self.assertTrue(errors)
+
+    def test_seq90_repository_binding_remains_frozen_after_seq91(self) -> None:
+        checkpoint, _event, _authority = self._checkpoint()
+        history = checkpoint["goal_execution"]["transition_history"]
+        expected = history[89]["repository_context_reanchor"]["after"]
+        self.assertEqual(
+            continuation._fp048_r002_reanchor_repository_after(
+                checkpoint,
+                history,
+            ),
+            expected,
+        )
+
+    def test_seq91_repository_after_uses_only_exact_seq92_snapshot(self) -> None:
+        checkpoint, correction_event, _authority = self._checkpoint()
+        started = self._seq92_event(correction_event)
+        checkpoint["goal_execution"]["transition_history"].append(started)
+        self.assertEqual(
+            continuation._fp048_r002_correction_repository_after(
+                checkpoint,
+                checkpoint["goal_execution"]["transition_history"],
+            ),
+            {
+                "branch": "current",
+                "base_commit": "a" * 40,
+                "current_head": "b" * 40,
+                "managed_changed_path_count": 7,
+                "path_set_sha256": "c" * 64,
+                "content_set_sha256": "d" * 64,
+            },
+        )
+
+    def test_seq92_gate_contract_fails_closed_on_inverse_delta_authority_error(
+        self,
+    ) -> None:
+        checkpoint, correction_event, authority = self._checkpoint()
+        started = self._seq92_event(correction_event)
+        checkpoint["goal_execution"]["transition_history"].append(started)
+        authority.require_control_corrected_checkpoint.side_effect = RuntimeError(
+            "seq92 pre-overwrite inverse-delta state differs"
+        )
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_correction_authority",
+            return_value=authority,
+        ):
+            errors, _checks, _binding, _ready = (
+                continuation._fp048_r002_r003_start_gate_contract(
+                    ROOT,
+                    event=started,
+                    checkpoint=checkpoint,
+                )
+            )
+        self.assertTrue(
+            any("correction authority differs" in error for error in errors)
+        )
+
+    def test_only_new_seq92_start_id_is_reserved(self) -> None:
+        self.assertEqual(
+            continuation.FP048_R002_CORRECTED_STARTED_SEQUENCE,
+            92,
+        )
+        self.assertEqual(
+            continuation.FP048_R002_CORRECTED_STARTED_EVENT_ID,
+            "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-002",
+        )
+        self.assertEqual(
+            [93, 94],
+            [
+                continuation.FP048_R002_CORRECTED_STARTED_SEQUENCE + 1,
+                continuation.FP048_R002_CORRECTED_STARTED_SEQUENCE + 2,
+            ],
+        )
+
+
+class WalkSafeFp048R002Seq92Seq93R004BoundaryTest(unittest.TestCase):
+    @staticmethod
+    def _checkpoint() -> tuple[
+        dict[str, object],
+        dict[str, object],
+        bytes,
+        dict[str, object],
+        mock.Mock,
+        mock.Mock,
+    ]:
+        from scripts import (
+            apply_walksafe_fp048_r002_goal_start_control_correction_seq91_20260826
+            as seq91,
+        )
+        from scripts import (
+            apply_walksafe_fp048_r002_start_gate_contract_correction_seq92_20260826
+            as seq92,
+        )
+
+        live_raw = CHECKPOINT.read_bytes()
+        live = json.loads(live_raw)
+        live_history = live["goal_execution"]["transition_history"]
+        seq94_checkpoint = None
+        if (
+            len(live_history) == continuation.FP048_R002_R007_STARTED_SEQUENCE
+            and live_history[-1].get("event_id")
+            == continuation.FP048_R002_R007_STARTED_EVENT_ID
+        ):
+            from scripts import (
+                apply_walksafe_fp048_r002_goal_started_seq96_20260826 as seq96,
+            )
+            from scripts import (
+                apply_walksafe_fp048_r002_start_gate_contract_correction_seq95_20260826
+                as seq95,
+            )
+
+            seq95_checkpoint = json.loads(
+                seq96.reconstructed_seq95_checkpoint_bytes(ROOT, live)
+            )
+            seq94_checkpoint = seq95._restored_seq94_checkpoint(seq95_checkpoint)
+        elif (
+            len(live_history)
+            == continuation.FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE
+            and live_history[-1].get("event_id")
+            == continuation.FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID
+        ):
+            from scripts import (
+                apply_walksafe_fp048_r002_start_gate_contract_correction_seq95_20260826
+                as seq95,
+            )
+
+            seq94_checkpoint = seq95._restored_seq94_checkpoint(live)
+        elif (
+            len(live_history)
+            == continuation.FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE
+            and live_history[-1].get("event_id")
+            == continuation.FP048_R002_R006_CONTRACT_CORRECTION_EVENT_ID
+        ):
+            seq94_checkpoint = live
+        if seq94_checkpoint is not None:
+            from scripts import (
+                apply_walksafe_fp048_r002_start_gate_contract_correction_seq94_20260826
+                as seq94,
+            )
+
+            seq93_checkpoint = seq94._restored_seq93_checkpoint(seq94_checkpoint)
+        elif (
+            len(live_history)
+            == continuation.FP048_R002_BRANCH_SEMANTICS_REANCHOR_SEQUENCE
+            and live_history[92].get("event_id")
+            == continuation.FP048_R002_BRANCH_SEMANTICS_REANCHOR_EVENT_ID
+        ):
+            seq93_checkpoint = live
+        else:
+            seq93_checkpoint = None
+        if seq93_checkpoint is not None:
+            from scripts import (
+                apply_walksafe_fp048_r002_goal_start_branch_semantics_reanchor_seq93_20260826
+                as seq93,
+            )
+
+            seq92_checkpoint = seq93._restored_seq92_checkpoint(
+                seq93_checkpoint
+            )
+        elif len(live_history) == seq92.CORRECTION_SEQUENCE:
+            seq92_checkpoint = live
+        elif (
+            len(live_history) == continuation.FP048_R002_R004_STARTED_SEQUENCE
+            and live_history[-1].get("event_id")
+            == continuation.FP048_R002_R004_STARTED_EVENT_ID
+        ):
+            from scripts import (
+                apply_walksafe_fp048_r002_goal_started_seq93_20260826
+                as legacy_seq93,
+            )
+
+            seq92_checkpoint = json.loads(
+                legacy_seq93.reconstructed_seq92_checkpoint_bytes(ROOT, live)
+            )
+        else:
+            seq92_checkpoint = None
+        if seq92_checkpoint is not None:
+            raw = seq92.checkpoint_json_bytes(
+                seq92._restored_seq91_checkpoint(seq92_checkpoint)
+            )
+            source = json.loads(raw)
+        else:
+            raw = live_raw
+            source = live
+        paths = source["working_tree_snapshot"]["managed_changed_paths"]
+        checkpoint, event = seq92.project_seq92(
+            ROOT,
+            source,
+            managed_paths=paths,
+            path_set_sha256=source["working_tree_snapshot"][
+                "path_set_sha256"
+            ],
+            content_set_sha256=source["working_tree_snapshot"][
+                "content_set_sha256"
+            ],
+            occurred_at="2026-08-26T10:00:00+09:00",
+            authorization_binding_value={
+                "path": "synthetic-authorization",
+                "sha256": "a" * 64,
+                "byte_length": 1,
+            },
+            review_binding={
+                role: {
+                    "path": f"synthetic-{role}",
+                    "sha256": "b" * 64,
+                    "byte_length": 1,
+                }
+                for role in ("assignment", "review_result", "independent_review")
+            },
+            replacement_contract_binding=seq92.r004_contract_binding(ROOT),
+            replacement_runner_binding=seq92.r004_runner_binding(ROOT),
+        )
+        seq92_authority = mock.Mock()
+        seq92_authority.load_exact_seq91_source.return_value = (raw, source)
+        seq92_authority.reconstructed_seq91_checkpoint_bytes.return_value = raw
+        seq92_authority.r004_contract_binding.return_value = (
+            seq92.r004_contract_binding(ROOT)
+        )
+        seq92_authority.require_contract_corrected_checkpoint.return_value = None
+        seq91_authority = mock.Mock()
+        seq91_authority.r003_contract_binding.return_value = (
+            seq91.r003_contract_binding(ROOT)
+        )
+        return (
+            checkpoint,
+            event,
+            raw,
+            source,
+            seq92_authority,
+            seq91_authority,
+        )
+
+    @staticmethod
+    def _seq93_event(contract_event: dict[str, object]) -> dict[str, object]:
+        event = WalkSafeFp048R002Seq90Seq91BoundaryTest._seq91_event(
+            contract_event
+        )
+        event.update(
+            {
+                "sequence": continuation.FP048_R002_R004_STARTED_SEQUENCE,
+                "event_id": continuation.FP048_R002_R004_STARTED_EVENT_ID,
+                "occurred_at": "2026-08-26T10:10:00+09:00",
+                "previous_event_sha256": contract_event["event_sha256"],
+            }
+        )
+        event["event_sha256"] = continuation.event_sha256(event)
+        return event
+
+    def test_seq92_dispatches_exact_ready_to_ready_r003_to_r004_authority(
+        self,
+    ) -> None:
+        checkpoint, event, _raw, _source, seq92_authority, seq91_authority = (
+            self._checkpoint()
+        )
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_contract_correction_authority",
+                return_value=seq92_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_correction_authority",
+                return_value=seq91_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_require_fp048_r002_exact_seq92_source_authority",
+                return_value=True,
+            ) as exact_source_authority,
+        ):
+            errors = continuation._validate_npc_single_admin_recovery_control_reanchor(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=checkpoint["goal_execution"]["transition_history"],
+            )
+
+        self.assertEqual(errors, [])
+        exact_source_authority.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            checkpoint["goal_execution"]["transition_history"],
+        )
+        seq92_authority.require_contract_corrected_checkpoint.assert_not_called()
+        seq92_authority.reconstructed_seq91_checkpoint_bytes.assert_not_called()
+        seq92_authority.load_exact_seq91_source.assert_not_called()
+
+    def test_seq92_rejects_status_source_cas_and_supersession_drift(self) -> None:
+        for field, value in (
+            ("to_status", "IN_PROGRESS"),
+            ("previous_event_sha256", "0" * 64),
+            ("contract_supersession", {}),
+        ):
+            with self.subTest(field=field):
+                (
+                    checkpoint,
+                    event,
+                    _raw,
+                    _source,
+                    seq92_authority,
+                    seq91_authority,
+                ) = self._checkpoint()
+                event[field] = value
+                event["event_sha256"] = continuation.event_sha256(event)
+                with (
+                    mock.patch.object(
+                        continuation,
+                        "_fp048_r002_contract_correction_authority",
+                        return_value=seq92_authority,
+                    ),
+                    mock.patch.object(
+                        continuation,
+                        "_fp048_r002_correction_authority",
+                        return_value=seq91_authority,
+                    ),
+                    mock.patch.object(
+                        continuation,
+                        "_require_fp048_r002_exact_seq92_source_authority",
+                        return_value=True,
+                    ),
+                ):
+                    errors = (
+                        continuation._validate_fp048_r002_start_gate_contract_correction_seq92(
+                            ROOT,
+                            event=event,
+                            checkpoint=checkpoint,
+                            history=checkpoint["goal_execution"][
+                                "transition_history"
+                            ],
+                        )
+                    )
+                self.assertTrue(errors)
+
+    def test_seq93_selects_r004_contract_and_exact_started_authority(self) -> None:
+        checkpoint, correction_event, _raw, _source, seq92_authority, seq91_authority = (
+            self._checkpoint()
+        )
+        started = self._seq93_event(correction_event)
+        checkpoint["goal_execution"]["transition_history"].append(started)
+        started_authority = mock.Mock()
+        started_authority.require_exact_seq93_projection.return_value = None
+        started_authority.goal_start_gate_receipt_binding.return_value = {}
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_contract_correction_authority",
+                return_value=seq92_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_correction_authority",
+                return_value=seq91_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r004_started_authority",
+                return_value=started_authority,
+            ),
+        ):
+            errors, checks, binding, ready = (
+                continuation._fp048_r002_start_gate_contract(
+                    ROOT,
+                    event=started,
+                    checkpoint=checkpoint,
+                )
+            )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            [row["check_id"] for row in checks],
+            continuation.FP048_R002_START_GATE_CHECK_IDS,
+        )
+        self.assertEqual(
+            binding["contract_id"],
+            continuation.FP048_R002_R004_START_GATE_CONTRACT_ID,
+        )
+        self.assertEqual(
+            ready["event_sha256"],
+            continuation.FP048_R002_READY_EVENT_SHA256,
+        )
+        started_authority.require_exact_seq93_projection.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=True,
+        )
+
+    def test_seq92_descendant_keeps_logical_branch_not_physical_branch(self) -> None:
+        correction_event = {
+            "event_sha256": "e" * 64,
+        }
+        started = {
+            "sequence": continuation.FP048_R002_R004_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_R004_STARTED_EVENT_ID,
+            "event_type": "GOAL_STARTED",
+            "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+            "previous_event_sha256": correction_event["event_sha256"],
+            "repository_snapshot_before": {
+                "branch": "recovery/fp046-r008-wip-20260822",
+                "checkpoint_base_head": "a" * 40,
+                "head_commit": "b" * 40,
+                "checkpoint_managed_path_count": 7,
+                "checkpoint_path_set_sha256": "c" * 64,
+                "checkpoint_content_set_sha256": "d" * 64,
+            },
+        }
+        history = [{} for _ in range(91)] + [correction_event, started]
+        checkpoint = {
+            "session_handoff": {"branch": "current"},
+        }
+
+        restored = continuation._fp048_r002_contract_correction_repository_after(
+            checkpoint,
+            history,
+        )
+
+        self.assertEqual(
+            restored,
+            {
+                "branch": "current",
+                "base_commit": "a" * 40,
+                "current_head": "b" * 40,
+                "managed_changed_path_count": 7,
+                "path_set_sha256": "c" * 64,
+                "content_set_sha256": "d" * 64,
+            },
+        )
+
+    def test_new_contract_correction_has_zero_credit_generic_grammar(self) -> None:
+        statuses = {continuation.FP048_R002_GOAL_ID: "READY"}
+        event = {"subject_goal_id": continuation.FP048_R002_GOAL_ID}
+        self.assertIn(
+            "GOAL_START_GATE_CONTRACT_CORRECTED",
+            continuation.ALLOWED_EVENT_TYPES,
+        )
+        self.assertEqual(
+            continuation._expected_status_change(
+                "GOAL_START_GATE_CONTRACT_CORRECTED",
+                event,
+                statuses,
+            ),
+            ({}, None),
+        )
+        self.assertEqual(
+            continuation._expected_from_to(
+                "GOAL_START_GATE_CONTRACT_CORRECTED",
+                event,
+                statuses,
+                {},
+            ),
+            ("READY", "READY"),
+        )
+
+
+class WalkSafeFp048R002Seq93Seq94R005BoundaryTest(unittest.TestCase):
+    @staticmethod
+    def _synthetic_reanchor() -> tuple[
+        dict[str, object],
+        dict[str, object],
+        list[dict[str, object]],
+        mock.Mock,
+    ]:
+        live = continuation.load_json(CHECKPOINT)
+        source = copy.deepcopy(
+            live["goal_execution"]["transition_history"][91]
+        )
+        passed_attempt = {
+            "event_id": continuation.FP048_R002_R004_STARTED_EVENT_ID,
+            "directory": (
+                "docs/control/execution/goal-gates/"
+                f"{continuation.FP048_R002_R004_STARTED_EVENT_ID}"
+            ),
+            "directory_mode": "0700",
+            "status": "PASS_UNCONSUMED",
+            "files": [],
+        }
+        replacement = {
+            "schema_version": "1.2",
+            "document_id": continuation.FP048_R002_R005_START_GATE_DOCUMENT_ID,
+            "path": continuation.FP048_R002_R005_START_GATE_CONTRACT_PATH,
+            "file_sha256": "a" * 64,
+            "contract_id": continuation.FP048_R002_R005_START_GATE_CONTRACT_ID,
+            "contract_version": (
+                continuation.FP048_R002_R005_START_GATE_CONTRACT_VERSION
+            ),
+            "canonical_contract_sha256": "b" * 64,
+        }
+        event = copy.deepcopy(source)
+        event.update(
+            {
+                "sequence": (
+                    continuation.FP048_R002_BRANCH_SEMANTICS_REANCHOR_SEQUENCE
+                ),
+                "event_id": (
+                    continuation.FP048_R002_BRANCH_SEMANTICS_REANCHOR_EVENT_ID
+                ),
+                "event_type": "GOAL_START_CONTROL_REANCHORED",
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+                "previous_event_sha256": source["event_sha256"],
+                "source_checkpoint_binding": {
+                    **copy.deepcopy(source["source_checkpoint_binding"]),
+                    "passed_gate_attempt_003": copy.deepcopy(passed_attempt),
+                },
+                "contract_supersession": {
+                    "previous_contract_binding": copy.deepcopy(
+                        source["contract_supersession"][
+                            "replacement_contract_binding"
+                        ]
+                    ),
+                    "reason_code": (
+                        "SEQ93_BRANCH_SEMANTICS_REANCHOR_AND_FRESH_GATE_REQUIRED"
+                    ),
+                    "replacement_contract_binding": copy.deepcopy(replacement),
+                },
+            }
+        )
+        event["repository_context_reanchor"]["after"].update(
+            {
+                "branch": "current",
+                "logical_branch": "current",
+                "logical_branch_semantics": "WORKSTREAM_LABEL",
+                "physical_git_branch": "recovery/fp046-r008-wip-20260822",
+                "branch_mismatch_reason_code": (
+                    "LOGICAL_CURRENT_LABEL_IS_NOT_PHYSICAL_GIT_BRANCH"
+                ),
+            }
+        )
+        event["event_sha256"] = continuation.event_sha256(event)
+        history = [copy.deepcopy(source) for _ in range(92)] + [event]
+        checkpoint = {
+            "approved_state": copy.deepcopy(live["approved_state"]),
+            "session_handoff": {"branch": "current"},
+            "verification_boundary": copy.deepcopy(
+                live["verification_boundary"]
+            ),
+        }
+        authority = mock.Mock()
+        authority.EVENT_FIELDS = frozenset(event)
+        authority.CLAIM_BOUNDARY = copy.deepcopy(event["claim_boundary"])
+        authority.LOGICAL_BRANCH = "current"
+        authority.LOGICAL_BRANCH_SEMANTICS = "WORKSTREAM_LABEL"
+        authority.PHYSICAL_GIT_BRANCH = "recovery/fp046-r008-wip-20260822"
+        authority.BRANCH_MISMATCH_REASON_CODE = (
+            "LOGICAL_CURRENT_LABEL_IS_NOT_PHYSICAL_GIT_BRANCH"
+        )
+        authority.R005_SUCCESSOR_REASON_CODE = (
+            "SEQ93_BRANCH_SEMANTICS_REANCHOR_AND_FRESH_GATE_REQUIRED"
+        )
+        authority.passed_gate_attempt_003_binding.return_value = passed_attempt
+        authority.r005_contract_binding.return_value = replacement
+        authority.require_branch_semantics_reanchored_checkpoint.return_value = None
+        return checkpoint, event, history, authority
+
+    def test_seq93_dispatches_exact_ready_zero_credit_branch_authority(
+        self,
+    ) -> None:
+        checkpoint, event, history, authority = self._synthetic_reanchor()
+        frozen = mock.Mock()
+        frozen.reconstructed_seq93_checkpoint_bytes.return_value = json.dumps(
+            {"goal_execution": {"transition_history": history}}
+        ).encode("utf-8")
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_branch_semantics_reanchor_authority",
+                return_value=authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r006_contract_correction_authority",
+                return_value=frozen,
+            ),
+        ):
+            errors = continuation._validate_npc_single_admin_recovery_control_reanchor(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=history,
+            )
+
+        self.assertEqual(errors, [])
+        frozen.reconstructed_seq93_checkpoint_bytes.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+        authority.require_branch_semantics_reanchored_checkpoint.assert_not_called()
+
+    def test_seq93_rejects_consumed_attempt_and_r004_r005_drift(self) -> None:
+        for field in ("passed_gate_attempt_003", "contract_supersession"):
+            with self.subTest(field=field):
+                checkpoint, event, history, authority = self._synthetic_reanchor()
+                if field == "passed_gate_attempt_003":
+                    event["source_checkpoint_binding"][field]["status"] = "PASS"
+                else:
+                    event[field]["replacement_contract_binding"] = {}
+                event["event_sha256"] = continuation.event_sha256(event)
+                with mock.patch.object(
+                    continuation,
+                    "_fp048_r002_branch_semantics_reanchor_authority",
+                    return_value=authority,
+                ):
+                    errors = (
+                        continuation._validate_fp048_r002_branch_semantics_reanchor_seq93(
+                            ROOT,
+                            event=event,
+                            checkpoint=checkpoint,
+                            history=history,
+                        )
+                    )
+                self.assertTrue(errors)
+
+    def test_direct_seq94_r005_start_is_nonauthoritative(self) -> None:
+        checkpoint = {"goal_execution": {"transition_history": []}}
+        event = {
+            "sequence": continuation.FP048_R002_R005_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_R005_STARTED_EVENT_ID,
+        }
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r005_start_gate_contract",
+            ) as retired,
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r006_start_gate_contract",
+            ) as successor,
+        ):
+            actual = continuation._fp048_r002_start_gate_contract(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+            )
+
+        self.assertTrue(
+            any("direct pre-seq97 -004 start is nonauthoritative" in error for error in actual[0])
+        )
+        self.assertEqual(actual[1:], ([], {}, {}))
+        retired.assert_not_called()
+        successor.assert_not_called()
+
+    def test_seq94_descendant_requires_contract_correction(self) -> None:
+        checkpoint, reanchor, history, reanchor_authority = (
+            self._synthetic_reanchor()
+        )
+        started = {
+            "sequence": continuation.FP048_R002_R005_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_R005_STARTED_EVENT_ID,
+        }
+        history.append(started)
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_branch_semantics_reanchor_authority",
+                return_value=reanchor_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r005_started_authority",
+            ) as retired,
+        ):
+            with self.assertRaisesRegex(ValueError, "exact R005-to-R006 correction"):
+                continuation._require_fp048_r002_branch_semantics_descendant(
+                    ROOT,
+                    checkpoint,
+                    history,
+                )
+
+        retired.assert_not_called()
+        reanchor_authority.require_branch_semantics_reanchored_checkpoint.assert_not_called()
+
+    def test_pass_unconsumed_seq93_cannot_fall_back_to_legacy_r004(
+        self,
+    ) -> None:
+        checkpoint, event, history, _authority = self._synthetic_reanchor()
+        event.update(
+            {
+                "event_id": continuation.FP048_R002_R004_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "to_status": "IN_PROGRESS",
+                "status_changes": {
+                    continuation.FP048_R002_GOAL_ID: "IN_PROGRESS"
+                },
+            }
+        )
+        event["event_sha256"] = continuation.event_sha256(event)
+        checkpoint["goal_execution"] = {"transition_history": history}
+
+        with self.assertRaisesRegex(ValueError, "cannot fall back"):
+            continuation._require_fp048_r002_branch_semantics_descendant(
+                ROOT,
+                checkpoint,
+                history,
+            )
+
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_r004_start_gate_contract",
+        ) as legacy_gate:
+            errors, checks, binding, ready = (
+                continuation._fp048_r002_start_gate_contract(
+                    ROOT,
+                    event=event,
+                    checkpoint=checkpoint,
+                )
+            )
+        self.assertTrue(
+            any("cannot dispatch legacy R004 -003" in error for error in errors)
+        )
+        self.assertEqual((checks, binding, ready), ([], {}, {}))
+        legacy_gate.assert_not_called()
+
+        direct_errors, direct_checks, direct_binding, direct_ready = (
+            continuation._fp048_r002_r004_start_gate_contract(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+            )
+        )
+        self.assertTrue(
+            any(
+                "cannot dispatch legacy R004 -003" in error
+                for error in direct_errors
+            )
+        )
+        self.assertEqual(
+            (direct_checks, direct_binding, direct_ready),
+            ([], {}, {}),
+        )
+
+    def test_genuine_legacy_seq93_still_dispatches_r004(self) -> None:
+        event = {
+            "sequence": continuation.FP048_R002_R004_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_R004_STARTED_EVENT_ID,
+        }
+        checkpoint = {
+            "goal_execution": {
+                "transition_history": [{} for _ in range(92)] + [event]
+            }
+        }
+        expected = ([], [], {"contract_id": "R004"}, {})
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_r004_start_gate_contract",
+            return_value=expected,
+        ) as legacy_gate:
+            actual = continuation._fp048_r002_start_gate_contract(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+            )
+
+        self.assertEqual(actual, expected)
+        legacy_gate.assert_called_once_with(
+            ROOT,
+            event=event,
+            checkpoint=checkpoint,
+        )
+
+    def test_seq92_validator_rejects_marked_legacy_fallback(self) -> None:
+        (
+            checkpoint,
+            event,
+            _raw,
+            _source,
+            seq92_authority,
+            seq91_authority,
+        ) = WalkSafeFp048R002Seq92Seq93R004BoundaryTest._checkpoint()
+        fallback = copy.deepcopy(event)
+        fallback.update(
+            {
+                "sequence": continuation.FP048_R002_R004_STARTED_SEQUENCE,
+                "event_id": continuation.FP048_R002_R004_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "previous_event_sha256": event["event_sha256"],
+            }
+        )
+        fallback["source_checkpoint_binding"]["passed_gate_attempt_003"] = {
+            "event_id": continuation.FP048_R002_R004_STARTED_EVENT_ID,
+            "status": "PASS_UNCONSUMED",
+        }
+        fallback["event_sha256"] = continuation.event_sha256(fallback)
+        checkpoint["goal_execution"]["transition_history"].append(fallback)
+
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_contract_correction_authority",
+                return_value=seq92_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_correction_authority",
+                return_value=seq91_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_require_fp048_r002_exact_seq92_source_authority",
+                return_value=False,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r004_started_authority",
+            ) as legacy_authority,
+        ):
+            errors = (
+                continuation._validate_fp048_r002_start_gate_contract_correction_seq92(
+                    ROOT,
+                    event=event,
+                    checkpoint=checkpoint,
+                    history=checkpoint["goal_execution"][
+                        "transition_history"
+                    ],
+                )
+            )
+
+        self.assertTrue(
+            any("cannot fall back to legacy R004 -003" in error for error in errors)
+        )
+        legacy_authority.assert_not_called()
+
+    def test_seq92_historical_validation_uses_seq93_frozen_overlay(self) -> None:
+        (
+            checkpoint,
+            event,
+            _raw,
+            _source,
+            seq92_authority,
+            seq91_authority,
+        ) = WalkSafeFp048R002Seq92Seq93R004BoundaryTest._checkpoint()
+        seq92_checkpoint = copy.deepcopy(checkpoint)
+        seq92_raw = json.dumps(
+            seq92_checkpoint,
+            ensure_ascii=False,
+            indent=2,
+        ).encode("utf-8") + b"\n"
+        branch_event = copy.deepcopy(event)
+        branch_event.update(
+            {
+                "sequence": (
+                    continuation.FP048_R002_BRANCH_SEMANTICS_REANCHOR_SEQUENCE
+                ),
+                "event_id": (
+                    continuation.FP048_R002_BRANCH_SEMANTICS_REANCHOR_EVENT_ID
+                ),
+                "event_type": "GOAL_START_CONTROL_REANCHORED",
+                "previous_event_sha256": event["event_sha256"],
+                "repository_context_reanchor": {
+                    "before": {
+                        "current_work": copy.deepcopy(
+                            checkpoint["current_work"]
+                        ),
+                        "working_tree_snapshot": copy.deepcopy(
+                            checkpoint["working_tree_snapshot"]
+                        ),
+                        "session_handoff": copy.deepcopy(
+                            checkpoint["session_handoff"]
+                        ),
+                    },
+                    "after": copy.deepcopy(
+                        event["repository_context_reanchor"]["after"]
+                    ),
+                },
+            }
+        )
+        branch_event["event_sha256"] = continuation.event_sha256(
+            branch_event
+        )
+        checkpoint["goal_execution"]["transition_history"].append(
+            branch_event
+        )
+        branch_authority = mock.Mock()
+        branch_authority.reconstructed_seq92_checkpoint_bytes.return_value = (
+            seq92_raw
+        )
+        branch_authority.require_branch_semantics_reanchored_checkpoint.return_value = (
+            None
+        )
+        frozen_authority = mock.Mock()
+        frozen_authority.reconstructed_seq93_checkpoint_bytes.return_value = (
+            json.dumps(
+                {
+                    "goal_execution": {
+                        "transition_history": checkpoint["goal_execution"][
+                            "transition_history"
+                        ]
+                    }
+                }
+            ).encode("utf-8")
+        )
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_contract_correction_authority",
+                return_value=seq92_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_correction_authority",
+                return_value=seq91_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_branch_semantics_reanchor_authority",
+                return_value=branch_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r006_contract_correction_authority",
+                return_value=frozen_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_reconstructed_seq93_descendant",
+                return_value=checkpoint,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_reconstructed_seq92_from_frozen_seq93",
+                return_value=seq92_raw,
+            ) as frozen_inverse,
+        ):
+            errors = (
+                continuation._validate_fp048_r002_start_gate_contract_correction_seq92(
+                    ROOT,
+                    event=event,
+                    checkpoint=checkpoint,
+                    history=checkpoint["goal_execution"][
+                        "transition_history"
+                    ],
+                )
+            )
+
+        self.assertEqual(errors, [])
+        seq92_authority.reconstructed_seq91_checkpoint_bytes.assert_not_called()
+        seq92_authority.require_contract_corrected_checkpoint.assert_not_called()
+        frozen_inverse.assert_called_once_with(
+            ROOT,
+            mock.ANY,
+        )
+        frozen_authority.reconstructed_seq93_checkpoint_bytes.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+
+
+class WalkSafeFp048R002Seq94Seq95R006BoundaryTest(unittest.TestCase):
+    @staticmethod
+    def _synthetic_correction() -> tuple[
+        dict[str, object],
+        dict[str, object],
+        list[dict[str, object]],
+        mock.Mock,
+    ]:
+        checkpoint, source, history, _reanchor_authority = (
+            WalkSafeFp048R002Seq93Seq94R005BoundaryTest._synthetic_reanchor()
+        )
+        passed = copy.deepcopy(
+            source["source_checkpoint_binding"]["passed_gate_attempt_003"]
+        )
+        preflight = {
+            "event_id": continuation.FP048_R002_R006_STARTED_EVENT_ID,
+            "directory": (
+                "docs/control/execution/goal-gates/"
+                f"{continuation.FP048_R002_R006_STARTED_EVENT_ID}"
+            ),
+            "receipt_path": (
+                "docs/control/execution/goal-gates/"
+                f"{continuation.FP048_R002_R006_STARTED_EVENT_ID}/"
+                "implementation-start-gate-receipt.json"
+            ),
+            "status": "PREFLIGHT_FAILED_NO_GATE_NAMESPACE_CREATED",
+            "authority_status": "NONAUTHORITY",
+            "event_identity_status": "REUSABLE_UNCONSUMED",
+            "namespace_present": False,
+            "receipt_present": False,
+            "reason_code": "R005_PREVIEW_FAILED_NO_NAMESPACE_NONAUTHORITY",
+        }
+        previous = copy.deepcopy(
+            source["contract_supersession"]["replacement_contract_binding"]
+        )
+        replacement = {
+            "schema_version": "1.2",
+            "document_id": continuation.FP048_R002_R006_START_GATE_DOCUMENT_ID,
+            "path": continuation.FP048_R002_R006_START_GATE_CONTRACT_PATH,
+            "file_sha256": "c" * 64,
+            "contract_id": continuation.FP048_R002_R006_START_GATE_CONTRACT_ID,
+            "contract_version": (
+                continuation.FP048_R002_R006_START_GATE_CONTRACT_VERSION
+            ),
+            "canonical_contract_sha256": "d" * 64,
+        }
+        runner = {
+            "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r006_20260826.py",
+            "sha256": "e" * 64,
+            "byte_length": 1,
+        }
+        reason = {
+            "failed_contract_id": continuation.FP048_R002_R005_START_GATE_CONTRACT_ID,
+            "failed_contract_version": continuation.FP048_R002_R005_START_GATE_CONTRACT_VERSION,
+            "preflight_attempt_004": copy.deepcopy(preflight),
+            "reason_code": "R005_PREDECESSOR_LIVE_SOURCE_REGRESSION_NOT_POSTPUBLICATION_SAFE",
+            "remediation": "SUPERSEDE_R005_WITH_STAGE_AWARE_R006_BEFORE_SEQ95_START",
+        }
+        event = copy.deepcopy(source)
+        event.update(
+            {
+                "sequence": continuation.FP048_R002_R006_CONTRACT_CORRECTION_SEQUENCE,
+                "event_id": continuation.FP048_R002_R006_CONTRACT_CORRECTION_EVENT_ID,
+                "event_type": "GOAL_START_GATE_CONTRACT_CORRECTED",
+                "previous_event_sha256": source["event_sha256"],
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+                "runtime_after": copy.deepcopy(source["runtime_after"]),
+                "blockers_after": copy.deepcopy(source["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    source["blocker_resolution_ids_after"]
+                ),
+                "canonical_binding_snapshot_after": copy.deepcopy(
+                    source["canonical_binding_snapshot_after"]
+                ),
+                "source_checkpoint_binding": {
+                    **copy.deepcopy(source["source_checkpoint_binding"]),
+                    "passed_gate_attempt_003": copy.deepcopy(passed),
+                    "preflight_attempt_004": copy.deepcopy(preflight),
+                },
+                "contract_supersession": {
+                    "previous_contract_binding": copy.deepcopy(previous),
+                    "reason_code": reason["reason_code"],
+                    "replacement_contract_binding": copy.deepcopy(replacement),
+                },
+                "start_gate_runner_binding": copy.deepcopy(runner),
+                "correction_reason": copy.deepcopy(reason),
+            }
+        )
+        event["event_sha256"] = continuation.event_sha256(event)
+        history.append(event)
+        live = continuation.load_json(CHECKPOINT)
+        state = copy.deepcopy(live["goal_execution"])
+        state["transition_history"] = history
+        state["status_by_goal"][continuation.FP048_R002_GOAL_ID] = "READY"
+        state["goal_status"] = "READY"
+        checkpoint["goal_execution"] = state
+        checkpoint["current_work"] = copy.deepcopy(live["current_work"])
+        checkpoint["current_work"]["status"] = "READY"
+        checkpoint["current_work"]["release_completion_claimed"] = False
+        authority = mock.Mock()
+        authority.EVENT_FIELDS = frozenset(event)
+        authority.CLAIM_BOUNDARY = copy.deepcopy(event["claim_boundary"])
+        authority.CORRECTION_REASON = copy.deepcopy(reason)
+        authority.R006_SUCCESSOR_REASON_CODE = reason["reason_code"]
+        authority.passed_gate_attempt_003_binding.return_value = passed
+        authority.preflight_attempt_004_observation.return_value = preflight
+        authority.r005_contract_binding.return_value = previous
+        authority.r006_contract_binding.return_value = replacement
+        authority.r006_runner_binding.return_value = runner
+        authority.require_contract_corrected_checkpoint.return_value = None
+        return checkpoint, event, history, authority
+
+    @staticmethod
+    def _started_authority() -> mock.Mock:
+        authority = mock.Mock()
+        authority.reconstructed_seq94_checkpoint_bytes.return_value = b"{}"
+        authority.require_exact_seq95_projection.return_value = None
+        return authority
+
+    def test_seq94_dispatches_exact_zero_credit_r006_correction(self) -> None:
+        checkpoint, event, history, authority = self._synthetic_correction()
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r006_contract_correction_authority",
+                return_value=authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_require_fp048_r002_frozen_seq94_source",
+            ) as frozen_source,
+        ):
+            errors = continuation._validate_npc_single_admin_recovery_control_reanchor(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=history,
+            )
+
+        self.assertEqual(errors, [])
+        frozen_source.assert_called_once_with(ROOT, checkpoint)
+        authority.require_contract_corrected_checkpoint.assert_not_called()
+
+    def test_seq94_rejects_preflight_credit_and_successor_tamper(self) -> None:
+        for mutation in ("preflight", "successor", "status", "global_status"):
+            with self.subTest(mutation=mutation):
+                checkpoint, event, history, authority = self._synthetic_correction()
+                if mutation == "preflight":
+                    event["source_checkpoint_binding"]["preflight_attempt_004"][
+                        "authority_status"
+                    ] = "AUTHORITY"
+                elif mutation == "successor":
+                    event["contract_supersession"][
+                        "replacement_contract_binding"
+                    ] = {}
+                else:
+                    if mutation == "status":
+                        event["to_status"] = "IN_PROGRESS"
+                        event["status_changes"] = {
+                            continuation.FP048_R002_GOAL_ID: "IN_PROGRESS"
+                        }
+                    else:
+                        checkpoint["goal_execution"]["status_by_goal"][
+                            continuation.FP048_R002_GOAL_ID
+                        ] = "IN_PROGRESS"
+                        checkpoint["goal_execution"]["goal_status"] = (
+                            "IN_PROGRESS"
+                        )
+                        checkpoint["current_work"]["status"] = "IN_PROGRESS"
+                event["event_sha256"] = continuation.event_sha256(event)
+                with (
+                    mock.patch.object(
+                        continuation,
+                        "_fp048_r002_r006_contract_correction_authority",
+                        return_value=authority,
+                    ),
+                    mock.patch.object(
+                        continuation,
+                        "_require_fp048_r002_frozen_seq94_source",
+                    ),
+                ):
+                    errors = continuation._validate_fp048_r002_r006_contract_correction_seq94(
+                        ROOT,
+                        event=event,
+                        checkpoint=checkpoint,
+                        history=history,
+                    )
+                self.assertTrue(errors)
+
+    def test_new_lineage_rejects_float_sequences_wrong_pair_and_extra_tail(
+        self,
+    ) -> None:
+        checkpoint, event, history, correction_authority = (
+            self._synthetic_correction()
+        )
+        event["sequence"] = 94.0
+        event["event_sha256"] = continuation.event_sha256(event)
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_r006_contract_correction_authority",
+            return_value=correction_authority,
+        ):
+            errors = continuation._validate_npc_single_admin_recovery_control_reanchor(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=history,
+            )
+        self.assertTrue(errors)
+
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_r006_start_gate_contract",
+        ) as loader:
+            errors, checks, binding, ready = (
+                continuation._fp048_r002_start_gate_contract(
+                    ROOT,
+                    event={
+                        "sequence": 95.0,
+                        "event_id": continuation.FP048_R002_R006_STARTED_EVENT_ID,
+                    },
+                    checkpoint=checkpoint,
+                )
+            )
+        self.assertTrue(errors)
+        self.assertEqual((checks, binding, ready), ([], {}, {}))
+        loader.assert_not_called()
+
+        checkpoint, _event, history, correction_authority = (
+            self._synthetic_correction()
+        )
+        history.append(
+            {
+                "sequence": continuation.FP048_R002_R006_STARTED_SEQUENCE,
+                "event_id": continuation.FP048_R002_R006_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+            }
+        )
+        history[93]["event_id"] = continuation.FP048_R002_R005_STARTED_EVENT_ID
+        with self.assertRaisesRegex(ValueError, "exact R006-to-R007 correction"):
+            continuation._require_fp048_r002_branch_semantics_descendant(
+                ROOT,
+                checkpoint,
+                history,
+            )
+        history[93]["event_id"] = (
+            continuation.FP048_R002_R006_CONTRACT_CORRECTION_EVENT_ID
+        )
+        history[94] = {
+            "sequence": continuation.FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE,
+            "event_id": continuation.FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID,
+            "event_type": "GOAL_START_GATE_CONTRACT_CORRECTED",
+        }
+        history.append(
+            {
+                "sequence": continuation.FP048_R002_R007_STARTED_SEQUENCE,
+                "event_id": continuation.FP048_R002_R007_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+            }
+        )
+        history.append({"sequence": 97, "event_id": "WS-FORGED-TAIL"})
+        history.append({"sequence": 98, "event_id": "WS-FORGED-EXTRA-TAIL"})
+        with self.assertRaisesRegex(ValueError, "must end exactly"):
+            continuation._require_fp048_r002_branch_semantics_descendant(
+                ROOT,
+                checkpoint,
+                history,
+            )
+
+    def test_new_authority_loaders_fail_closed_on_missing_public_inverse_api(
+        self,
+    ) -> None:
+        import scripts as scripts_package
+
+        with mock.patch.object(
+            scripts_package,
+            "apply_walksafe_fp048_r002_start_gate_contract_correction_seq94_20260826",
+            object(),
+            create=True,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "API is missing"):
+                continuation._fp048_r002_r006_contract_correction_authority()
+        with mock.patch.object(
+            scripts_package,
+            "apply_walksafe_fp048_r002_goal_started_seq95_20260826",
+            object(),
+            create=True,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "nonauthoritative"):
+                continuation._fp048_r002_r006_started_authority()
+
+    def test_direct_seq95_started_descendant_is_rejected(self) -> None:
+        checkpoint, _event, history, correction_authority = (
+            self._synthetic_correction()
+        )
+        started = {
+            "sequence": continuation.FP048_R002_R006_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_R006_STARTED_EVENT_ID,
+            "event_type": "GOAL_STARTED",
+        }
+        history.append(started)
+        with self.assertRaisesRegex(ValueError, "exact R006-to-R007 correction"):
+            continuation._require_fp048_r002_branch_semantics_descendant(
+                ROOT,
+                checkpoint,
+                history,
+            )
+
+    def test_seq95_historical_seq94_validation_does_not_recheck_absent_namespace(
+        self,
+    ) -> None:
+        checkpoint, event, history, correction_authority = (
+            self._synthetic_correction()
+        )
+        history.append(
+            {
+                "sequence": continuation.FP048_R002_R006_STARTED_SEQUENCE,
+                "event_id": continuation.FP048_R002_R006_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+            }
+        )
+        correction_authority.preflight_attempt_004_observation.side_effect = (
+            AssertionError("live seq95 namespace must not reopen seq94 absence")
+        )
+        started_authority = self._started_authority()
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r006_contract_correction_authority",
+                return_value=correction_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r006_started_authority",
+                return_value=started_authority,
+            ),
+        ):
+            errors = continuation._validate_fp048_r002_r006_contract_correction_seq94(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=history,
+            )
+
+        self.assertTrue(errors)
+        correction_authority.preflight_attempt_004_observation.assert_not_called()
+
+    def test_seq95_start_dispatches_r006_and_retired_helpers_stay_closed(
+        self,
+    ) -> None:
+        checkpoint = {"goal_execution": {"transition_history": []}}
+        event = {
+            "sequence": continuation.FP048_R002_R006_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_R006_STARTED_EVENT_ID,
+        }
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_r006_start_gate_contract",
+        ) as loader:
+            actual = continuation._fp048_r002_start_gate_contract(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+            )
+        self.assertTrue(
+            any("pre-seq97 -004 start is nonauthoritative" in row for row in actual[0])
+        )
+        loader.assert_not_called()
+
+        retired = continuation._fp048_r002_r005_start_gate_contract(
+            ROOT,
+            event={
+                "sequence": continuation.FP048_R002_R005_STARTED_SEQUENCE,
+                "event_id": continuation.FP048_R002_R005_STARTED_EVENT_ID,
+            },
+            checkpoint=checkpoint,
+        )
+        self.assertTrue(any("nonauthoritative" in error for error in retired[0]))
+        with self.assertRaisesRegex(RuntimeError, "nonauthoritative"):
+            continuation._fp048_r002_r005_started_authority()
+
+    def test_r006_start_contract_consumes_only_exact_receipt_and_binding(
+        self,
+    ) -> None:
+        errors, checks, binding, ready = (
+            continuation._fp048_r002_r006_start_gate_contract(
+                ROOT,
+                event={},
+                checkpoint={},
+            )
+        )
+        self.assertTrue(any("nonauthoritative" in row for row in errors))
+        self.assertEqual((checks, binding, ready), ([], {}, {}))
+        with self.assertRaisesRegex(RuntimeError, "nonauthoritative"):
+            continuation._fp048_r002_r006_started_authority()
+
+
+class WalkSafeFp048R002Seq95Seq96R007BoundaryTest(unittest.TestCase):
+    @staticmethod
+    def _synthetic_correction() -> tuple[
+        dict[str, object],
+        dict[str, object],
+        list[dict[str, object]],
+        mock.Mock,
+    ]:
+        checkpoint, source, history, _prior_authority = (
+            WalkSafeFp048R002Seq94Seq95R006BoundaryTest._synthetic_correction()
+        )
+        passed = copy.deepcopy(
+            source["source_checkpoint_binding"]["passed_gate_attempt_003"]
+        )
+        preflight = {
+            "event_id": continuation.FP048_R002_R007_STARTED_EVENT_ID,
+            "contract_id": continuation.FP048_R002_R006_START_GATE_CONTRACT_ID,
+            "contract_version": (
+                continuation.FP048_R002_R006_START_GATE_CONTRACT_VERSION
+            ),
+            "directory": (
+                "docs/control/execution/goal-gates/"
+                f"{continuation.FP048_R002_R007_STARTED_EVENT_ID}"
+            ),
+            "receipt_path": (
+                "docs/control/execution/goal-gates/"
+                f"{continuation.FP048_R002_R007_STARTED_EVENT_ID}/"
+                "implementation-start-gate-receipt.json"
+            ),
+            "status": "PREVIEW_FAILED_BEFORE_NAMESPACE",
+            "authority_status": "NONAUTHORITY",
+            "event_identity_status": "REUSABLE_UNCONSUMED",
+            "namespace_present": False,
+            "receipt_present": False,
+            "error": "checkpoint gate evidence reference is malformed",
+            "reason_code": (
+                "R006_CHECKPOINT_NONAUTHORITY_RECEIPT_PATH_NOT_STAGE_AWARE"
+            ),
+        }
+        previous = copy.deepcopy(
+            source["contract_supersession"]["replacement_contract_binding"]
+        )
+        replacement = {
+            "schema_version": "1.2",
+            "document_id": continuation.FP048_R002_R007_START_GATE_DOCUMENT_ID,
+            "path": continuation.FP048_R002_R007_START_GATE_CONTRACT_PATH,
+            "file_sha256": "1" * 64,
+            "contract_id": continuation.FP048_R002_R007_START_GATE_CONTRACT_ID,
+            "contract_version": (
+                continuation.FP048_R002_R007_START_GATE_CONTRACT_VERSION
+            ),
+            "canonical_contract_sha256": "2" * 64,
+        }
+        runner = {
+            "path": (
+                "scripts/run_walksafe_fp048_r002_goal_start_gate_r007_"
+                "20260826.py"
+            ),
+            "sha256": "3" * 64,
+            "byte_length": 1,
+        }
+        reason = {
+            "failed_contract_id": (
+                continuation.FP048_R002_R006_START_GATE_CONTRACT_ID
+            ),
+            "failed_contract_version": (
+                continuation.FP048_R002_R006_START_GATE_CONTRACT_VERSION
+            ),
+            "r006_preflight_attempt_004": copy.deepcopy(preflight),
+            "reason_code": preflight["reason_code"],
+            "remediation": (
+                "SUPERSEDE_R006_WITH_STAGE_AWARE_R007_BEFORE_SEQ96_START"
+            ),
+        }
+        event = copy.deepcopy(source)
+        event.update(
+            {
+                "sequence": (
+                    continuation.FP048_R002_R007_CONTRACT_CORRECTION_SEQUENCE
+                ),
+                "event_id": (
+                    continuation.FP048_R002_R007_CONTRACT_CORRECTION_EVENT_ID
+                ),
+                "event_type": "GOAL_START_GATE_CONTRACT_CORRECTED",
+                "previous_event_sha256": source["event_sha256"],
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+                "runtime_after": copy.deepcopy(source["runtime_after"]),
+                "blockers_after": copy.deepcopy(source["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    source["blocker_resolution_ids_after"]
+                ),
+                "canonical_binding_snapshot_after": copy.deepcopy(
+                    source["canonical_binding_snapshot_after"]
+                ),
+                "source_checkpoint_binding": {
+                    **copy.deepcopy(source["source_checkpoint_binding"]),
+                    "passed_gate_attempt_003": copy.deepcopy(passed),
+                    "r006_preflight_attempt_004": copy.deepcopy(preflight),
+                },
+                "contract_supersession": {
+                    "previous_contract_binding": copy.deepcopy(previous),
+                    "reason_code": reason["reason_code"],
+                    "replacement_contract_binding": copy.deepcopy(replacement),
+                },
+                "start_gate_runner_binding": copy.deepcopy(runner),
+                "correction_reason": copy.deepcopy(reason),
+            }
+        )
+        event["event_sha256"] = continuation.event_sha256(event)
+        history.append(event)
+        checkpoint["goal_execution"]["transition_history"] = history
+        checkpoint["goal_execution"]["status_by_goal"][
+            continuation.FP048_R002_GOAL_ID
+        ] = "READY"
+        checkpoint["goal_execution"]["goal_status"] = "READY"
+        checkpoint["current_work"]["status"] = "READY"
+        authority = mock.Mock()
+        authority.EVENT_FIELDS = frozenset(event)
+        authority.CLAIM_BOUNDARY = copy.deepcopy(event["claim_boundary"])
+        authority.CORRECTION_REASON = copy.deepcopy(reason)
+        authority.R007_SUCCESSOR_REASON_CODE = reason["reason_code"]
+        authority.passed_gate_attempt_003_binding.return_value = passed
+        authority.r006_preflight_attempt_004_observation.return_value = preflight
+        authority.r006_contract_binding.return_value = previous
+        authority.r007_contract_binding.return_value = replacement
+        authority.r007_runner_binding.return_value = runner
+        authority.require_contract_corrected_checkpoint.return_value = None
+        return checkpoint, event, history, authority
+
+    @staticmethod
+    def _started_authority(source: dict[str, object]) -> mock.Mock:
+        authority = mock.Mock()
+        authority.reconstructed_seq95_checkpoint_bytes.return_value = json.dumps(
+            source
+        ).encode("utf-8")
+        authority.require_published_r007_gate_for_seq95.return_value = {
+            "document_id": "R007-PASS",
+            "path": "implementation-start-gate-receipt.json",
+            "file_sha256": "a" * 64,
+        }
+        authority.require_exact_seq96_projection.return_value = None
+        authority.require_started_checkpoint.return_value = None
+        return authority
+
+    def test_seq95_dispatches_exact_zero_credit_r007_correction(self) -> None:
+        checkpoint, event, history, authority = self._synthetic_correction()
+        frozen_authority = mock.Mock()
+        frozen_authority.require_frozen_seq95_checkpoint.return_value = None
+        frozen_authority.r007_preflight_attempt_004_observation.return_value = {}
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r007_contract_correction_authority",
+                return_value=authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_contract_correction_authority",
+                return_value=frozen_authority,
+            ),
+        ):
+            errors = continuation._validate_npc_single_admin_recovery_control_reanchor(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=history,
+            )
+
+        self.assertEqual(errors, [])
+        frozen_authority.require_frozen_seq95_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+        frozen_authority.r007_preflight_attempt_004_observation.assert_called_once_with(
+            ROOT
+        )
+        authority.r006_preflight_attempt_004_observation.assert_called_once_with(
+            ROOT
+        )
+        authority.require_contract_corrected_checkpoint.assert_not_called()
+
+    def test_seq95_rejects_r007_namespace_before_r008_correction(self) -> None:
+        checkpoint, event, history, authority = self._synthetic_correction()
+        frozen_authority = mock.Mock()
+        frozen_authority.require_frozen_seq95_checkpoint.return_value = None
+        frozen_authority.r007_preflight_attempt_004_observation.side_effect = (
+            ValueError("R007 namespace must remain absent")
+        )
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r007_contract_correction_authority",
+                return_value=authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_contract_correction_authority",
+                return_value=frozen_authority,
+            ),
+        ):
+            errors = continuation._validate_fp048_r002_r007_contract_correction_seq95(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=history,
+            )
+
+        self.assertTrue(
+            any("R007 namespace must remain absent" in row for row in errors)
+        )
+
+    def test_seq95_rejects_forged_parser_metadata_and_successor(self) -> None:
+        for mutation in (
+            "receipt_path",
+            "parser_error",
+            "authority",
+            "reusable",
+            "namespace",
+            "successor",
+            "status",
+            "float_sequence",
+        ):
+            with self.subTest(mutation=mutation):
+                checkpoint, event, history, authority = self._synthetic_correction()
+                preflight = event["source_checkpoint_binding"][
+                    "r006_preflight_attempt_004"
+                ]
+                if mutation == "receipt_path":
+                    preflight["receipt_path"] = "forged-receipt.json"
+                elif mutation == "parser_error":
+                    preflight["error"] = ""
+                elif mutation == "authority":
+                    preflight["authority_status"] = "AUTHORITY"
+                elif mutation == "reusable":
+                    preflight["event_identity_status"] = "CONSUMED"
+                elif mutation == "namespace":
+                    preflight["namespace_present"] = True
+                elif mutation == "successor":
+                    event["contract_supersession"][
+                        "replacement_contract_binding"
+                    ] = {}
+                elif mutation == "status":
+                    event["to_status"] = "IN_PROGRESS"
+                    event["status_changes"] = {
+                        continuation.FP048_R002_GOAL_ID: "IN_PROGRESS"
+                    }
+                else:
+                    event["sequence"] = 95.0
+                event["event_sha256"] = continuation.event_sha256(event)
+                with mock.patch.object(
+                    continuation,
+                    "_fp048_r002_r007_contract_correction_authority",
+                    return_value=authority,
+                ):
+                    errors = continuation._validate_fp048_r002_r007_contract_correction_seq95(
+                        ROOT,
+                        event=event,
+                        checkpoint=checkpoint,
+                        history=history,
+                    )
+                self.assertTrue(errors)
+
+    def test_legacy_direct_seq96_started_descendant_is_rejected(self) -> None:
+        checkpoint, _event, history, correction_authority = (
+            self._synthetic_correction()
+        )
+        started = {
+            "sequence": continuation.FP048_R002_R007_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_R007_STARTED_EVENT_ID,
+            "event_type": "GOAL_STARTED",
+        }
+        history.append(started)
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r007_contract_correction_authority",
+                return_value=correction_authority,
+            ),
+        ):
+            with self.assertRaisesRegex(ValueError, "exact R007-to-R008 correction"):
+                continuation._require_fp048_r002_branch_semantics_descendant(
+                    ROOT,
+                    checkpoint,
+                    history,
+                )
+
+    def test_seq95_historical_inverse_uses_new_frozen_public_api(self) -> None:
+        from scripts import (
+            apply_walksafe_fp048_r002_start_gate_contract_correction_seq96_20260826
+            as frozen,
+        )
+
+        checkpoint = continuation.load_json(CHECKPOINT)
+        history = checkpoint["goal_execution"]["transition_history"]
+        restored_raw = frozen.reconstructed_seq93_checkpoint_bytes(
+            ROOT,
+            checkpoint,
+        )
+        restored = json.loads(restored_raw)
+        authority = mock.Mock()
+        authority.reconstructed_seq93_checkpoint_bytes.return_value = restored_raw
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_contract_correction_authority",
+                return_value=authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r006_contract_correction_authority",
+            ) as stale_authority,
+        ):
+            actual = continuation._fp048_r002_reconstructed_seq93_descendant(
+                ROOT,
+                checkpoint,
+                history,
+            )
+
+        self.assertEqual(actual, restored)
+        authority.reconstructed_seq93_checkpoint_bytes.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+        stale_authority.assert_not_called()
+
+    def test_frozen_inverse_chain_performs_no_current_file_reads(self) -> None:
+        from scripts import (
+            apply_walksafe_fp048_r002_start_gate_contract_correction_seq96_20260826
+            as frozen,
+        )
+
+        _source_raw, seq95 = frozen.load_exact_seq95_source(ROOT)
+        snapshot = seq95["working_tree_snapshot"]
+
+        def sealed(path: Path, marker: str) -> dict[str, object]:
+            return {
+                "path": path.as_posix(),
+                "sha256": marker * 64,
+                "byte_length": 1,
+            }
+
+        seq96, _event = frozen.project_seq96(
+            ROOT,
+            seq95,
+            managed_paths=snapshot["managed_changed_paths"],
+            path_set_sha256=snapshot["path_set_sha256"],
+            content_set_sha256=snapshot["content_set_sha256"],
+            occurred_at="2026-08-26T21:20:00+09:00",
+            authorization_binding_value=sealed(frozen.AUTHORIZATION_REL, "a"),
+            review_binding={
+                "assignment": sealed(frozen.REVIEW_ASSIGNMENT_REL, "b"),
+                "review_result": sealed(frozen.REVIEW_RESULT_REL, "c"),
+                "independent_review": sealed(
+                    frozen.INDEPENDENT_REVIEW_REL,
+                    "d",
+                ),
+            },
+            r007_preflight_binding=(
+                frozen.r007_preflight_attempt_004_observation(ROOT)
+            ),
+            replacement_contract_binding=frozen.r008_contract_binding(ROOT),
+            replacement_runner_binding=frozen.r008_runner_binding(ROOT),
+        )
+        seq93_raw = frozen.reconstructed_seq93_checkpoint_bytes(ROOT, seq95)
+        seq93 = json.loads(seq93_raw)
+        with (
+            mock.patch.object(
+                frozen.seq90,
+                "_stable_read",
+                side_effect=AssertionError("CURRENT_FILE_READ"),
+            ),
+            mock.patch.object(
+                Path,
+                "read_bytes",
+                side_effect=AssertionError("CURRENT_FILE_READ"),
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r007_contract_correction_authority",
+                side_effect=AssertionError("CURRENT_FILE_READ"),
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_started_authority",
+                side_effect=AssertionError("CURRENT_FILE_READ"),
+            ),
+        ):
+            for descendant in (seq95, seq96):
+                history = descendant["goal_execution"]["transition_history"]
+                recovered = (
+                    continuation._fp048_r002_reconstructed_seq93_descendant(
+                        ROOT,
+                        descendant,
+                        history,
+                    )
+                )
+                self.assertEqual(recovered, seq93)
+                seq92_raw = (
+                    continuation._fp048_r002_reconstructed_seq92_from_frozen_seq93(
+                        ROOT,
+                        recovered,
+                    )
+                )
+                self.assertEqual(
+                    hashlib.sha256(seq92_raw).hexdigest(),
+                    continuation.FP048_R002_FROZEN_SEQ92_CHECKPOINT_SHA256,
+                )
+                self.assertEqual(
+                    len(seq92_raw),
+                    continuation.FP048_R002_FROZEN_SEQ92_CHECKPOINT_BYTE_LENGTH,
+                )
+
+
+    def test_new_authority_loaders_fail_closed_on_missing_public_api(self) -> None:
+        import scripts as scripts_package
+
+        with mock.patch.object(
+            scripts_package,
+            "apply_walksafe_fp048_r002_start_gate_contract_correction_seq95_20260826",
+            object(),
+            create=True,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "API is missing"):
+                continuation._fp048_r002_r007_contract_correction_authority()
+        with mock.patch.object(
+            scripts_package,
+            "apply_walksafe_fp048_r002_goal_started_seq96_20260826",
+            object(),
+            create=True,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "API is missing"):
+                continuation._fp048_r002_r007_started_authority()
+
+    def test_seq96_r007_direct_start_is_rejected(self) -> None:
+        checkpoint = {"goal_execution": {"transition_history": []}}
+        seq96 = {
+            "sequence": continuation.FP048_R002_R007_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_R007_STARTED_EVENT_ID,
+        }
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_r007_start_gate_contract",
+        ) as loader:
+            actual = continuation._fp048_r002_start_gate_contract(
+                ROOT, event=seq96, checkpoint=checkpoint
+            )
+        self.assertTrue(any("nonauthoritative" in row for row in actual[0]))
+        loader.assert_not_called()
+
+        for sequence in (95, 96.0, 94):
+            with self.subTest(sequence=sequence):
+                rejected = continuation._fp048_r002_start_gate_contract(
+                    ROOT,
+                    event={
+                        "sequence": sequence,
+                        "event_id": continuation.FP048_R002_R007_STARTED_EVENT_ID,
+                    },
+                    checkpoint=checkpoint,
+                )
+                self.assertTrue(
+                    any("nonauthoritative" in row for row in rejected[0])
+                )
+
+    def test_retired_r007_start_helper_rejects_direct_consumption(self) -> None:
+        errors, checks, binding, ready = (
+            continuation._fp048_r002_r007_start_gate_contract(
+                ROOT,
+                event={},
+                checkpoint={},
+            )
+        )
+        self.assertTrue(any("nonauthoritative" in row for row in errors))
+        self.assertEqual((checks, binding, ready), ([], {}, {}))
+
+
+
+class WalkSafeFp048R002Seq96Seq97R008BoundaryTest(unittest.TestCase):
+    @staticmethod
+    def _synthetic_correction() -> tuple[
+        dict[str, object],
+        dict[str, object],
+        list[dict[str, object]],
+        mock.Mock,
+    ]:
+        checkpoint, source, history, _prior_authority = (
+            WalkSafeFp048R002Seq95Seq96R007BoundaryTest._synthetic_correction()
+        )
+        preflight = {
+            "event_id": continuation.FP048_R002_R008_STARTED_EVENT_ID,
+            "contract_id": continuation.FP048_R002_R007_START_GATE_CONTRACT_ID,
+            "contract_version": (
+                continuation.FP048_R002_R007_START_GATE_CONTRACT_VERSION
+            ),
+            "directory": (
+                "docs/control/execution/goal-gates/"
+                f"{continuation.FP048_R002_R008_STARTED_EVENT_ID}"
+            ),
+            "receipt_path": (
+                "docs/control/execution/goal-gates/"
+                f"{continuation.FP048_R002_R008_STARTED_EVENT_ID}/"
+                "implementation-start-gate-receipt.json"
+            ),
+            "status": "PREVIEW_FAILED_BEFORE_NAMESPACE",
+            "authority_status": "NONAUTHORITY",
+            "event_identity_status": "REUSABLE_UNCONSUMED",
+            "namespace_present": False,
+            "receipt_present": False,
+            "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+            "exit_code": 1,
+            "error": (
+                "ROOT_FP048_R002_CONTROL_REGRESSION failed with exit code 1; "
+                "see PREVIEW_ONLY"
+            ),
+            "reason_code": (
+                "R007_ROOT_REGRESSION_INCLUDED_PREPUBLICATION_ONLY_SEQ95_TESTS"
+            ),
+        }
+        previous = copy.deepcopy(
+            source["contract_supersession"]["replacement_contract_binding"]
+        )
+        replacement = {
+            "schema_version": "1.2",
+            "document_id": continuation.FP048_R002_R008_START_GATE_DOCUMENT_ID,
+            "path": continuation.FP048_R002_R008_START_GATE_CONTRACT_PATH,
+            "file_sha256": "5" * 64,
+            "contract_id": continuation.FP048_R002_R008_START_GATE_CONTRACT_ID,
+            "contract_version": (
+                continuation.FP048_R002_R008_START_GATE_CONTRACT_VERSION
+            ),
+            "canonical_contract_sha256": "6" * 64,
+        }
+        runner = {
+            "path": (
+                "scripts/run_walksafe_fp048_r002_goal_start_gate_r008_"
+                "20260826.py"
+            ),
+            "sha256": "7" * 64,
+            "byte_length": 1,
+        }
+        reason_code = preflight["reason_code"]
+        reason = {
+            "failed_contract_id": (
+                continuation.FP048_R002_R007_START_GATE_CONTRACT_ID
+            ),
+            "failed_contract_version": (
+                continuation.FP048_R002_R007_START_GATE_CONTRACT_VERSION
+            ),
+            "r007_preflight_attempt_004": copy.deepcopy(preflight),
+            "reason_code": reason_code,
+            "remediation": (
+                "SUPERSEDE_R007_WITH_STAGE_AWARE_R008_BEFORE_SEQ97_START"
+            ),
+        }
+        event = copy.deepcopy(source)
+        event.update(
+            {
+                "sequence": (
+                    continuation.FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE
+                ),
+                "event_id": (
+                    continuation.FP048_R002_R008_CONTRACT_CORRECTION_EVENT_ID
+                ),
+                "event_type": "GOAL_START_GATE_CONTRACT_CORRECTED",
+                "previous_event_sha256": source["event_sha256"],
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+                "runtime_after": copy.deepcopy(source["runtime_after"]),
+                "blockers_after": copy.deepcopy(source["blockers_after"]),
+                "blocker_resolution_ids_after": copy.deepcopy(
+                    source["blocker_resolution_ids_after"]
+                ),
+                "canonical_binding_snapshot_after": copy.deepcopy(
+                    source["canonical_binding_snapshot_after"]
+                ),
+                "source_checkpoint_binding": {
+                    **copy.deepcopy(source["source_checkpoint_binding"]),
+                    "r007_preflight_attempt_004": copy.deepcopy(preflight),
+                },
+                "contract_supersession": {
+                    "previous_contract_binding": copy.deepcopy(previous),
+                    "reason_code": reason_code,
+                    "replacement_contract_binding": copy.deepcopy(replacement),
+                },
+                "start_gate_runner_binding": copy.deepcopy(runner),
+                "correction_reason": copy.deepcopy(reason),
+            }
+        )
+        event["event_sha256"] = continuation.event_sha256(event)
+        history.append(event)
+        checkpoint["goal_execution"]["transition_history"] = history
+        checkpoint["goal_execution"]["status_by_goal"][
+            continuation.FP048_R002_GOAL_ID
+        ] = "READY"
+        checkpoint["goal_execution"]["goal_status"] = "READY"
+        checkpoint["current_work"]["status"] = "READY"
+        authority = mock.Mock()
+        authority.EVENT_FIELDS = frozenset(event)
+        authority.CLAIM_BOUNDARY = copy.deepcopy(event["claim_boundary"])
+        authority.CORRECTION_REASON = copy.deepcopy(reason)
+        authority.R008_SUCCESSOR_REASON_CODE = reason_code
+        authority.r007_preflight_attempt_004_observation.return_value = preflight
+        authority.r007_contract_binding.return_value = previous
+        authority.r008_contract_binding.return_value = replacement
+        authority.r008_runner_binding.return_value = runner
+        authority.require_contract_corrected_checkpoint.return_value = None
+        return checkpoint, event, history, authority
+
+    @staticmethod
+    def _started_authority(source: dict[str, object]) -> mock.Mock:
+        authority = mock.Mock()
+        authority.reconstructed_seq96_checkpoint_bytes.return_value = json.dumps(
+            source
+        ).encode("utf-8")
+        authority.require_published_r008_gate_for_seq96.return_value = {
+            "document_id": "R008-PASS",
+            "path": "implementation-start-gate-receipt.json",
+            "file_sha256": "8" * 64,
+        }
+        authority.require_exact_seq97_projection.return_value = None
+        authority.require_started_checkpoint.return_value = None
+        return authority
+
+    def test_seq96_dispatches_exact_zero_credit_r008_correction(self) -> None:
+        checkpoint, event, history, authority = self._synthetic_correction()
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_r008_contract_correction_authority",
+            return_value=authority,
+        ):
+            errors = continuation._validate_npc_single_admin_recovery_control_reanchor(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=history,
+            )
+
+        self.assertEqual(errors, [])
+        authority.require_contract_corrected_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=True,
+            run_external_validators=False,
+        )
+        authority.r007_preflight_attempt_004_observation.assert_called_once_with(
+            ROOT
+        )
+
+    def test_seq96_postgate_requires_exact_published_r008_pass(self) -> None:
+        checkpoint, event, history, authority = self._synthetic_correction()
+        started_authority = self._started_authority(checkpoint)
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_gate_namespace_present",
+                return_value=True,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_contract_correction_authority",
+                return_value=authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_started_authority",
+                return_value=started_authority,
+            ),
+        ):
+            errors = continuation._validate_fp048_r002_r008_contract_correction_seq96(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=history,
+            )
+
+        self.assertEqual(errors, [])
+        started_authority.require_published_r008_gate_for_seq96.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+        authority.require_contract_corrected_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+            run_external_validators=False,
+        )
+        authority.r007_preflight_attempt_004_observation.assert_not_called()
+
+        started_authority.require_published_r008_gate_for_seq96.side_effect = (
+            ValueError("R008 receipt differs")
+        )
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_gate_namespace_present",
+                return_value=True,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_contract_correction_authority",
+                return_value=authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_started_authority",
+                return_value=started_authority,
+            ),
+        ):
+            rejected = continuation._validate_fp048_r002_r008_contract_correction_seq96(
+                ROOT,
+                event=event,
+                checkpoint=checkpoint,
+                history=history,
+            )
+        self.assertTrue(any("R008 receipt differs" in row for row in rejected))
+
+    def test_seq96_rejects_forged_preflight_successor_and_credit(self) -> None:
+        for mutation in (
+            "failed_check",
+            "float_exit",
+            "error",
+            "reason",
+            "namespace",
+            "successor",
+            "status",
+            "float_sequence",
+        ):
+            with self.subTest(mutation=mutation):
+                checkpoint, event, history, authority = self._synthetic_correction()
+                preflight = event["source_checkpoint_binding"][
+                    "r007_preflight_attempt_004"
+                ]
+                if mutation == "failed_check":
+                    preflight["failed_check_id"] = "FORGED"
+                elif mutation == "float_exit":
+                    preflight["exit_code"] = 1.0
+                elif mutation == "error":
+                    preflight["error"] = ""
+                elif mutation == "reason":
+                    preflight["reason_code"] = "FORGED"
+                elif mutation == "namespace":
+                    preflight["namespace_present"] = True
+                elif mutation == "successor":
+                    event["contract_supersession"][
+                        "replacement_contract_binding"
+                    ] = {}
+                elif mutation == "status":
+                    event["to_status"] = "IN_PROGRESS"
+                    event["status_changes"] = {
+                        continuation.FP048_R002_GOAL_ID: "IN_PROGRESS"
+                    }
+                else:
+                    event["sequence"] = 96.0
+                event["event_sha256"] = continuation.event_sha256(event)
+                with mock.patch.object(
+                    continuation,
+                    "_fp048_r002_r008_contract_correction_authority",
+                    return_value=authority,
+                ):
+                    errors = continuation._validate_fp048_r002_r008_contract_correction_seq96(
+                        ROOT,
+                        event=event,
+                        checkpoint=checkpoint,
+                        history=history,
+                    )
+                self.assertTrue(errors)
+
+    def test_legacy_direct_seq97_descendant_is_rejected(self) -> None:
+        checkpoint, _event, history, correction_authority = (
+            self._synthetic_correction()
+        )
+        seq96_source = copy.deepcopy(checkpoint)
+        started = {
+            "sequence": continuation.FP048_R002_R008_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_R008_STARTED_EVENT_ID,
+            "event_type": "GOAL_STARTED",
+        }
+        history.append(started)
+        with self.assertRaisesRegex(ValueError, "legacy direct seq97"):
+            continuation._require_fp048_r002_branch_semantics_descendant(
+                ROOT,
+                checkpoint,
+                history,
+            )
+
+    def test_seq97_dispatches_only_r008_and_rejects_legacy_seq96(self) -> None:
+        checkpoint = {"goal_execution": {"transition_history": []}}
+        seq97 = {
+            "sequence": continuation.FP048_R002_R008_STARTED_SEQUENCE,
+            "event_id": continuation.FP048_R002_R008_STARTED_EVENT_ID,
+        }
+        expected = ([], [], {"contract_id": "R008"}, {})
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_r008_start_gate_contract",
+            return_value=expected,
+        ) as loader:
+            actual = continuation._fp048_r002_start_gate_contract(
+                ROOT,
+                event=seq97,
+                checkpoint=checkpoint,
+            )
+        self.assertTrue(any("legacy direct seq97" in row for row in actual[0]))
+        loader.assert_not_called()
+
+        for sequence in (96, 97.0, 95):
+            with self.subTest(sequence=sequence):
+                rejected = continuation._fp048_r002_start_gate_contract(
+                    ROOT,
+                    event={
+                        "sequence": sequence,
+                        "event_id": continuation.FP048_R002_R008_STARTED_EVENT_ID,
+                    },
+                    checkpoint=checkpoint,
+                )
+                self.assertTrue(
+                    any("nonauthoritative" in row for row in rejected[0])
+                )
+
+    def test_seq96_seq97_replay_uses_sealed_r006_preflight(self) -> None:
+        for terminal_sequence in (
+            continuation.FP048_R002_R008_CONTRACT_CORRECTION_SEQUENCE,
+            continuation.FP048_R002_R008_STARTED_SEQUENCE,
+        ):
+            with self.subTest(terminal_sequence=terminal_sequence):
+                checkpoint, _correction, history, correction_authority = (
+                    self._synthetic_correction()
+                )
+                seq95_event = history[94]
+                _old_checkpoint, _old_event, _old_history, seq95_authority = (
+                    WalkSafeFp048R002Seq95Seq96R007BoundaryTest._synthetic_correction()
+                )
+                seq95_authority.r006_preflight_attempt_004_observation.side_effect = (
+                    AssertionError("PHYSICAL_R006_PREFLIGHT_RECHECK")
+                )
+                started_authority = None
+                if terminal_sequence == continuation.FP048_R002_R008_STARTED_SEQUENCE:
+                    seq96_source = copy.deepcopy(checkpoint)
+                    history.append(
+                        {
+                            "sequence": continuation.FP048_R002_R008_STARTED_SEQUENCE,
+                            "event_id": continuation.FP048_R002_R008_STARTED_EVENT_ID,
+                            "event_type": "GOAL_STARTED",
+                        }
+                    )
+                    started_authority = self._started_authority(seq96_source)
+                patches = [
+                    mock.patch.object(
+                        continuation,
+                        "_fp048_r002_r007_contract_correction_authority",
+                        return_value=seq95_authority,
+                    ),
+                    mock.patch.object(
+                        continuation,
+                        "_fp048_r002_r008_contract_correction_authority",
+                        return_value=correction_authority,
+                    ),
+                ]
+                if started_authority is not None:
+                    patches.append(
+                        mock.patch.object(
+                            continuation,
+                            "_fp048_r002_r008_started_authority",
+                            return_value=started_authority,
+                        )
+                    )
+                with patches[0], patches[1]:
+                    if started_authority is None:
+                        errors = continuation._validate_fp048_r002_r007_contract_correction_seq95(
+                            ROOT,
+                            event=seq95_event,
+                            checkpoint=checkpoint,
+                            history=history,
+                        )
+                    else:
+                        with patches[2]:
+                            errors = continuation._validate_fp048_r002_r007_contract_correction_seq95(
+                                ROOT,
+                                event=seq95_event,
+                                checkpoint=checkpoint,
+                                history=history,
+                            )
+                if terminal_sequence == continuation.FP048_R002_R008_STARTED_SEQUENCE:
+                    self.assertTrue(
+                        any("legacy direct seq97" in row for row in errors)
+                    )
+                else:
+                    self.assertEqual(errors, [])
+                seq95_authority.r006_preflight_attempt_004_observation.assert_not_called()
+
+    def test_r008_start_consumes_exact_receipt_and_contract(self) -> None:
+        checkpoint, correction, history, correction_authority = (
+            self._synthetic_correction()
+        )
+        seq96_source = copy.deepcopy(checkpoint)
+        live = continuation.load_json(CHECKPOINT)
+        history[88] = copy.deepcopy(
+            live["goal_execution"]["transition_history"][88]
+        )
+        receipt = {
+            "document_id": "WS-FP048-R002-R008-START-004",
+            "path": (
+                "docs/control/execution/goal-gates/"
+                f"{continuation.FP048_R002_R008_STARTED_EVENT_ID}/"
+                "implementation-start-gate-receipt.json"
+            ),
+            "file_sha256": "8" * 64,
+        }
+        started = WalkSafeFp048R002Seq90Seq91BoundaryTest._seq91_event(correction)
+        started.update(
+            {
+                "sequence": continuation.FP048_R002_R008_STARTED_SEQUENCE,
+                "event_id": continuation.FP048_R002_R008_STARTED_EVENT_ID,
+                "previous_event_sha256": correction["event_sha256"],
+                "implementation_start_gate_binding": copy.deepcopy(receipt),
+            }
+        )
+        started["event_sha256"] = continuation.event_sha256(started)
+        history.append(started)
+        checkpoint["goal_execution"]["status_by_goal"][
+            continuation.FP048_R002_GOAL_ID
+        ] = "IN_PROGRESS"
+        checkpoint["goal_execution"]["goal_status"] = "IN_PROGRESS"
+        checkpoint["current_work"]["status"] = "IN_PROGRESS"
+        replacement = correction_authority.r008_contract_binding.return_value
+        contract = {
+            "schema_version": "1.2",
+            "document_id": continuation.FP048_R002_R008_START_GATE_DOCUMENT_ID,
+            "contract_id": continuation.FP048_R002_R008_START_GATE_CONTRACT_ID,
+            "contract_version": (
+                continuation.FP048_R002_R008_START_GATE_CONTRACT_VERSION
+            ),
+            "target_goal_id": continuation.FP048_R002_GOAL_ID,
+            "target_goal_content_sha256": continuation.FP048_R002_GOAL_SHA256,
+            "gate_purpose": "INITIAL_START",
+            "ordered_checks": [
+                {"check_id": check_id, "command": f"run-{check_id}"}
+                for check_id in continuation.FP048_R002_START_GATE_CHECK_IDS
+            ],
+        }
+        correction_authority.load_r008_contract.return_value = (
+            contract,
+            replacement,
+        )
+        started_authority = self._started_authority(seq96_source)
+        started_authority.goal_start_gate_receipt_binding.return_value = receipt
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_contract_correction_authority",
+                return_value=correction_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_started_authority",
+                return_value=started_authority,
+            ),
+        ):
+            errors, checks, binding, ready = (
+                continuation._fp048_r002_r008_start_gate_contract(
+                    ROOT,
+                    event=started,
+                    checkpoint=checkpoint,
+                )
+            )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            [row["check_id"] for row in checks],
+            continuation.FP048_R002_START_GATE_CHECK_IDS,
+        )
+        self.assertEqual(binding, replacement)
+        self.assertEqual(ready["event_id"], continuation.FP048_R002_READY_EVENT_ID)
+
+        started["implementation_start_gate_binding"]["file_sha256"] = "0" * 64
+        started["event_sha256"] = continuation.event_sha256(started)
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_contract_correction_authority",
+                return_value=correction_authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_started_authority",
+                return_value=started_authority,
+            ),
+        ):
+            tampered, _checks, _binding, _ready = (
+                continuation._fp048_r002_r008_start_gate_contract(
+                    ROOT,
+                    event=started,
+                    checkpoint=checkpoint,
+                )
+            )
+        self.assertTrue(any("reviewed receipt binding" in row for row in tampered))
+
+    def test_new_r008_authority_loaders_fail_closed_without_public_api(self) -> None:
+        import scripts as scripts_package
+
+        with mock.patch.object(
+            scripts_package,
+            "apply_walksafe_fp048_r002_start_gate_contract_correction_seq96_20260826",
+            object(),
+            create=True,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "API is missing"):
+                continuation._fp048_r002_r008_contract_correction_authority()
+        with mock.patch.object(
+            scripts_package,
+            "apply_walksafe_fp048_r002_goal_started_seq97_20260826",
+            object(),
+            create=True,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "API is missing"):
+                continuation._fp048_r002_r008_started_authority()
+
+
+class WalkSafeFp048R002Seq97Seq98R009BoundaryTest(unittest.TestCase):
+    @staticmethod
+    def _seq97_fixture() -> tuple[dict, dict, mock.Mock, mock.Mock, mock.Mock]:
+        checkpoint, _event, history, r008 = (
+            WalkSafeFp048R002Seq96Seq97R008BoundaryTest._synthetic_correction()
+        )
+        seq96 = copy.deepcopy(checkpoint)
+        correction = {
+            "sequence": continuation.FP048_R002_R009_CONTRACT_CORRECTION_SEQUENCE,
+            "event_id": continuation.FP048_R002_R009_CONTRACT_CORRECTION_EVENT_ID,
+            "event_type": "GOAL_START_GATE_CONTRACT_CORRECTED",
+        }
+        history.append(correction)
+        checkpoint["goal_execution"]["transition_history"] = history
+        seq96_raw = continuation.canonical_json_bytes(seq96)
+        seq97_raw = continuation.canonical_json_bytes(checkpoint)
+        r008.canonical_seq96_checkpoint_bytes.return_value = seq96_raw
+        r009 = mock.Mock()
+        r009.reconstructed_seq96_checkpoint_bytes.return_value = seq96_raw
+        r009.canonical_seq97_checkpoint_bytes.return_value = seq97_raw
+        r009.require_snapshot_hygiene_corrected_checkpoint.return_value = None
+        execution = mock.Mock()
+        execution.CORRECTION_EVENT_TYPE = "GOAL_START_GATE_EXECUTION_CORRECTED"
+        execution.r009_execution_failure_binding.return_value = {
+            "event_identity_status": "CONSUMED_FAILED_NO_RECEIPT"
+        }
+        return checkpoint, seq96, r008, r009, execution
+
+    def test_exact_seq97_reconstructs_seq96_through_public_authority(self) -> None:
+        checkpoint, _seq96, r008, r009, execution = self._seq97_fixture()
+        history = checkpoint["goal_execution"]["transition_history"]
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_contract_correction_authority",
+                return_value=r008,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r009_contract_correction_authority",
+                return_value=r009,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r009_execution_correction_authority",
+                return_value=execution,
+            ),
+        ):
+            self.assertTrue(
+                continuation._require_fp048_r002_branch_semantics_descendant(
+                    ROOT,
+                    checkpoint,
+                    history,
+                )
+            )
+        r009.require_snapshot_hygiene_corrected_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+            run_external_validators=False,
+        )
+
+    def test_exact_seq98_reconstructs_seq97_and_inverse_tamper_fails(self) -> None:
+        checkpoint, _seq96, r008, r009, execution = self._seq97_fixture()
+        seq97 = copy.deepcopy(checkpoint)
+        seq97_raw = continuation.canonical_json_bytes(seq97)
+        checkpoint["goal_execution"]["transition_history"].append(
+            {
+                "sequence": continuation.FP048_R002_R009_STARTED_SEQUENCE,
+                "event_id": continuation.FP048_R002_R009_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+            }
+        )
+        starter = mock.Mock()
+        starter.reconstructed_seq97_checkpoint_bytes.return_value = seq97_raw
+        starter.require_started_checkpoint.return_value = None
+        history = checkpoint["goal_execution"]["transition_history"]
+        patches = (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_contract_correction_authority",
+                return_value=r008,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r009_contract_correction_authority",
+                return_value=r009,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r009_started_authority",
+                return_value=starter,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r009_execution_correction_authority",
+                return_value=execution,
+            ),
+        )
+        with patches[0], patches[1], patches[2], patches[3]:
+            with self.assertRaisesRegex(ValueError, "legacy direct seq98 R009"):
+                continuation._require_fp048_r002_branch_semantics_descendant(
+                    ROOT,
+                    checkpoint,
+                    history,
+                )
+
+    def test_retired_seq98_start_plus_seq99_update_is_rejected_by_successor_dispatch(
+        self,
+    ) -> None:
+        checkpoint, *_rest = self._seq97_fixture()
+        history = checkpoint["goal_execution"]["transition_history"]
+        history.extend(
+            [
+                {
+                    "sequence": continuation.FP048_R002_R009_STARTED_SEQUENCE,
+                    "event_id": continuation.FP048_R002_R009_STARTED_EVENT_ID,
+                    "event_type": "GOAL_STARTED",
+                },
+                {
+                    "sequence": continuation.FP048_R002_COMPLETION_EVIDENCE_SEQUENCE,
+                    "event_id": continuation.FP048_R002_COMPLETION_EVIDENCE_EVENT_ID,
+                    "event_type": "CANONICAL_BINDINGS_UPDATED",
+                },
+            ]
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "seq99 successor identity or status differs",
+        ):
+            continuation._require_fp048_r002_branch_semantics_descendant(
+                ROOT,
+                checkpoint,
+                history,
+            )
+
+
+class WalkSafeFp048R002Seq98Seq99R010BoundaryTest(unittest.TestCase):
+    @staticmethod
+    def _generic_seq98_history() -> list[dict]:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        history = copy.deepcopy(
+            checkpoint["goal_execution"]["transition_history"][:97]
+        )
+        if len(history) != 97:
+            raise AssertionError("exact seq97 generic replay source is missing")
+        tail = history[-1]
+        event = {
+            "sequence": 98,
+            "event_id": (
+                continuation.FP048_R002_R009_EXECUTION_CORRECTION_EVENT_ID
+            ),
+            "event_type": "GOAL_START_GATE_EXECUTION_CORRECTED",
+            "previous_event_sha256": tail["event_sha256"],
+            "from_status": "READY",
+            "to_status": "READY",
+            "status_changes": {},
+            "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+            "focus_goal_id": continuation.FP048_R002_GOAL_ID,
+            "static_plan_manifest_sha256": tail[
+                "static_plan_manifest_sha256"
+            ],
+        }
+        event["event_sha256"] = continuation.event_sha256(event)
+        history.append(event)
+        return history
+
+    @staticmethod
+    def _reseal(history: list[dict]) -> None:
+        previous = ""
+        for event in history:
+            event["previous_event_sha256"] = previous
+            event["event_sha256"] = continuation.event_sha256(event)
+            previous = event["event_sha256"]
+
+    @staticmethod
+    def _fixture() -> tuple[dict, bytes, mock.Mock, mock.Mock, mock.Mock]:
+        checkpoint, _seq96, r008, r009, execution = (
+            WalkSafeFp048R002Seq97Seq98R009BoundaryTest._seq97_fixture()
+        )
+        seq97 = copy.deepcopy(checkpoint)
+        seq97_raw = continuation.canonical_json_bytes(seq97)
+        correction = {
+            "sequence": continuation.FP048_R002_R009_EXECUTION_CORRECTION_SEQUENCE,
+            "event_id": continuation.FP048_R002_R009_EXECUTION_CORRECTION_EVENT_ID,
+            "event_type": execution.CORRECTION_EVENT_TYPE,
+        }
+        checkpoint["goal_execution"]["transition_history"].append(correction)
+        execution.reconstructed_seq97_checkpoint_bytes.return_value = seq97_raw
+        execution.canonical_seq98_checkpoint_bytes.return_value = (
+            continuation.canonical_json_bytes(checkpoint)
+        )
+        execution.require_start_gate_execution_corrected_checkpoint.return_value = None
+        return checkpoint, seq97_raw, r008, r009, execution
+
+    @staticmethod
+    def _patches(
+        r008: mock.Mock,
+        r009: mock.Mock,
+        execution: mock.Mock,
+        starter: mock.Mock | None = None,
+    ) -> tuple[object, ...]:
+        patches: list[object] = [
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r008_contract_correction_authority",
+                return_value=r008,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r009_contract_correction_authority",
+                return_value=r009,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r009_execution_correction_authority",
+                return_value=execution,
+            ),
+        ]
+        if starter is not None:
+            patches.append(
+                mock.patch.object(
+                    continuation,
+                    "_fp048_r002_r010_started_authority",
+                    return_value=starter,
+                )
+            )
+        return tuple(patches)
+
+    def test_exact_seq98_uses_public_inverse_and_failed_seq99_is_rejected(self) -> None:
+        checkpoint, _seq97_raw, r008, r009, execution = self._fixture()
+        patches = self._patches(r008, r009, execution)
+        with patches[0], patches[1], patches[2]:
+            self.assertTrue(
+                continuation._require_fp048_r002_branch_semantics_descendant(
+                    ROOT,
+                    checkpoint,
+                    checkpoint["goal_execution"]["transition_history"],
+                )
+            )
+        execution.require_start_gate_execution_corrected_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=True,
+            run_external_validators=False,
+        )
+
+        checkpoint["goal_execution"]["transition_history"].append(
+            {
+                "sequence": continuation.FP048_R002_R010_STARTED_SEQUENCE,
+                "event_id": continuation.FP048_R002_R010_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "legacy failed R010"):
+            continuation._require_fp048_r002_branch_semantics_descendant(
+                ROOT,
+                checkpoint,
+                checkpoint["goal_execution"]["transition_history"],
+            )
+
+    def test_projected_seq99_marks_inverse_seq98_as_historical(self) -> None:
+        checkpoint, _seq97_raw, r008, r009, execution = self._fixture()
+        checkpoint["goal_execution"]["transition_history"][-1].update(
+            {
+                "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+            }
+        )
+        seq98_raw = (
+            json.dumps(checkpoint, ensure_ascii=False, indent=2) + "\n"
+        ).encode("utf-8")
+        projected = copy.deepcopy(checkpoint)
+        projected["goal_execution"]["transition_history"].append(
+            {
+                "sequence": continuation.FP048_R002_SUCCESSOR_CORRECTION_SEQUENCE,
+                "event_id": continuation.FP048_R002_SUCCESSOR_CORRECTION_EVENT_ID,
+                "event_type": "GOAL_START_GATE_EXECUTION_CORRECTED",
+                "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+            }
+        )
+        successor = mock.Mock()
+        successor.reconstructed_seq98_checkpoint_bytes.return_value = seq98_raw
+        patches = self._patches(r008, r009, execution)
+        with (
+            patches[0],
+            patches[1],
+            patches[2],
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_correction_authority",
+                return_value=successor,
+            ),
+        ):
+            self.assertTrue(
+                continuation._require_fp048_r002_branch_semantics_descendant(
+                    ROOT,
+                    projected,
+                    projected["goal_execution"]["transition_history"],
+                )
+            )
+        execution.require_start_gate_execution_corrected_checkpoint.assert_called_once_with(
+            ROOT,
+            checkpoint,
+            require_live_snapshot=False,
+            run_external_validators=False,
+        )
+
+    def test_direct_seq98_live_drift_is_not_bypassed(self) -> None:
+        checkpoint, _seq97_raw, r008, r009, execution = self._fixture()
+        execution.require_start_gate_execution_corrected_checkpoint.side_effect = (
+            RuntimeError("direct seq98 live drift")
+        )
+        patches = self._patches(r008, r009, execution)
+        with patches[0], patches[1], patches[2], self.assertRaisesRegex(
+            RuntimeError,
+            "direct seq98 live drift",
+        ):
+            continuation._require_fp048_r002_branch_semantics_descendant(
+                ROOT,
+                checkpoint,
+                checkpoint["goal_execution"]["transition_history"],
+            )
+        self.assertTrue(
+            execution.require_start_gate_execution_corrected_checkpoint.call_args.kwargs[
+                "require_live_snapshot"
+            ]
+        )
+
+    def test_failure_binding_and_inverse_tamper_fail_closed(self) -> None:
+        checkpoint, seq97_raw, r008, r009, execution = self._fixture()
+        execution.r009_execution_failure_binding.return_value = {}
+        patches = self._patches(r008, r009, execution)
+        with patches[0], patches[1], patches[2]:
+            with self.assertRaisesRegex(ValueError, "failed execution binding"):
+                continuation._require_fp048_r002_branch_semantics_descendant(
+                    ROOT,
+                    checkpoint,
+                    checkpoint["goal_execution"]["transition_history"],
+                )
+        execution.r009_execution_failure_binding.return_value = {"status": "FAILED"}
+        execution.reconstructed_seq97_checkpoint_bytes.return_value = seq97_raw + b" "
+        with patches[0], patches[1], patches[2]:
+            with self.assertRaisesRegex(ValueError, "noncanonical"):
+                continuation._require_fp048_r002_branch_semantics_descendant(
+                    ROOT,
+                    checkpoint,
+                    checkpoint["goal_execution"]["transition_history"],
+                )
+
+    def test_seq98_execution_correction_has_exact_generic_ready_replay(
+        self,
+    ) -> None:
+        history = self._generic_seq98_history()
+
+        self.assertEqual(continuation.validate_generic_event_order(history), [])
+        self.assertEqual(
+            continuation._expected_status_change(
+                "GOAL_START_GATE_EXECUTION_CORRECTED",
+                history[-1],
+                {continuation.FP048_R002_GOAL_ID: "READY"},
+            ),
+            ({}, None),
+        )
+        self.assertEqual(
+            continuation._expected_from_to(
+                "GOAL_START_GATE_EXECUTION_CORRECTED",
+                history[-1],
+                {continuation.FP048_R002_GOAL_ID: "READY"},
+                {},
+            ),
+            ("READY", "READY"),
+        )
+
+    def test_seq98_execution_correction_generic_tamper_fails_closed(
+        self,
+    ) -> None:
+        for mutation in ("status_changes", "from_to", "unknown_type", "sole_ready"):
+            with self.subTest(mutation=mutation):
+                history = self._generic_seq98_history()
+                event = history[-1]
+                if mutation == "status_changes":
+                    event["status_changes"] = {
+                        continuation.FP048_R002_GOAL_ID: "READY"
+                    }
+                elif mutation == "from_to":
+                    event["from_status"] = "IN_PROGRESS"
+                elif mutation == "unknown_type":
+                    event["event_type"] = "UNKNOWN_EXECUTION_CORRECTION"
+                else:
+                    history[0]["status_changes"]["WS-OTHER-ACTIVE"] = (
+                        "IN_PROGRESS"
+                    )
+                self._reseal(history)
+
+                errors = continuation.validate_generic_event_order(history)
+
+                self.assertTrue(errors)
+                if mutation == "status_changes":
+                    self.assertTrue(
+                        any("status transition differs" in row for row in errors)
+                    )
+                elif mutation == "from_to":
+                    self.assertTrue(any("from/to" in row for row in errors))
+                elif mutation == "unknown_type":
+                    self.assertTrue(any("type is invalid" in row for row in errors))
+                else:
+                    self.assertTrue(any("sole READY" in row for row in errors))
+
+    def test_seq98_execution_correction_uses_exact_authority_dispatch(
+        self,
+    ) -> None:
+        history = self._generic_seq98_history()
+        event = history[-1]
+        checkpoint = {"goal_execution": {"transition_history": history}}
+        expected = ["exact seq98 authority called"]
+        with mock.patch.object(
+            continuation,
+            "_validate_fp048_r002_r009_execution_correction_seq98",
+            return_value=expected,
+        ) as authority:
+            self.assertEqual(
+                continuation._validate_npc_single_admin_recovery_control_reanchor(
+                    ROOT,
+                    event=event,
+                    checkpoint=checkpoint,
+                    history=history,
+                ),
+                expected,
+            )
+        authority.assert_called_once_with(
+            ROOT,
+            event=event,
+            checkpoint=checkpoint,
+            history=history,
+        )
+
+
+class WalkSafeFp048R002ContinuationCallCacheTest(unittest.TestCase):
+    @staticmethod
+    def _checkpoint() -> dict[str, object]:
+        return {
+            "goal_execution": {
+                "transition_history": [
+                    {
+                        "sequence": 98,
+                        "event_id": "SYNTHETIC-98",
+                        "event_sha256": "1" * 64,
+                    }
+                ],
+                "transition_history_anchor_sha256": "2" * 64,
+                "goal_status": {continuation.FP048_R002_GOAL_ID: "READY"},
+            },
+            "working_tree_snapshot": {
+                "path_set_sha256": "3" * 64,
+                "content_set_sha256": "4" * 64,
+            },
+            "current_work": {"release_completion_claimed": False},
+        }
+
+    def _cached_source(
+        self,
+        checkpoint: dict[str, object],
+        *,
+        root: Path = ROOT,
+        historical: bool = False,
+    ) -> dict[str, object] | None:
+        history = checkpoint["goal_execution"]["transition_history"]
+        return continuation._fp048_r002_current_descendant_seq96_source(
+            root,
+            checkpoint,
+            history,
+            _historical_successor_source=historical,
+        )
+
+    def test_one_validate_call_caches_source_and_returns_defensive_copies(
+        self,
+    ) -> None:
+        checkpoint = self._checkpoint()
+        checkpoint_before = copy.deepcopy(checkpoint)
+        source = {"payload": {"items": []}}
+        compute = mock.Mock(return_value=source)
+
+        def fake_validate(*args: object, **kwargs: object) -> list[str]:
+            del args, kwargs
+            first = self._cached_source(checkpoint)
+            first["payload"]["items"].append("caller mutation")
+            observed = [self._cached_source(checkpoint) for _ in range(9)]
+            self.assertTrue(all(row == {"payload": {"items": []}} for row in observed))
+            self.assertEqual(len({id(row) for row in observed}), 9)
+            return []
+
+        with (
+            mock.patch.object(
+                continuation,
+                "_compute_fp048_r002_current_descendant_seq96_source",
+                compute,
+            ),
+            mock.patch.object(
+                continuation,
+                "_validate",
+                side_effect=fake_validate,
+            ),
+        ):
+            self.assertEqual(continuation.validate(ROOT), [])
+        compute.assert_called_once()
+        self.assertEqual(checkpoint, checkpoint_before)
+        self.assertIsNone(
+            continuation._FP048_R002_CONTINUATION_CALL_CACHE.get()
+        )
+        with mock.patch.object(
+            continuation,
+            "_validate_transition_replay",
+            side_effect=RuntimeError("replay failed"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "replay failed"):
+                continuation.validate_transition_replay(ROOT, checkpoint, {})
+        self.assertIsNone(
+            continuation._FP048_R002_CONTINUATION_CALL_CACHE.get()
+        )
+
+    def test_none_error_and_interrupt_cache_semantics(self) -> None:
+        checkpoint = self._checkpoint()
+
+        for label, outcome in (
+            ("none", None),
+            ("error", ValueError("sealed failure")),
+        ):
+            with self.subTest(label=label):
+                compute = mock.Mock(
+                    side_effect=outcome if isinstance(outcome, Exception) else None,
+                    return_value=outcome,
+                )
+
+                def fake_validate(*args: object, **kwargs: object) -> list[str]:
+                    del args, kwargs
+                    for _ in range(2):
+                        if isinstance(outcome, Exception):
+                            with self.assertRaisesRegex(ValueError, "sealed failure"):
+                                self._cached_source(checkpoint)
+                        else:
+                            self.assertIsNone(self._cached_source(checkpoint))
+                    return []
+
+                with (
+                    mock.patch.object(
+                        continuation,
+                        "_compute_fp048_r002_current_descendant_seq96_source",
+                        compute,
+                    ),
+                    mock.patch.object(
+                        continuation,
+                        "_validate",
+                        side_effect=fake_validate,
+                    ),
+                ):
+                    self.assertEqual(continuation.validate(ROOT), [])
+                compute.assert_called_once()
+
+        compute = mock.Mock(
+            side_effect=[KeyboardInterrupt("stop"), {"recomputed": True}]
+        )
+
+        def fake_interrupt(*args: object, **kwargs: object) -> list[str]:
+            del args, kwargs
+            with self.assertRaises(KeyboardInterrupt):
+                self._cached_source(checkpoint)
+            self.assertEqual(
+                self._cached_source(checkpoint),
+                {"recomputed": True},
+            )
+            return []
+
+        with (
+            mock.patch.object(
+                continuation,
+                "_compute_fp048_r002_current_descendant_seq96_source",
+                compute,
+            ),
+            mock.patch.object(
+                continuation,
+                "_validate",
+                side_effect=fake_interrupt,
+            ),
+        ):
+            self.assertEqual(continuation.validate(ROOT), [])
+        self.assertEqual(compute.call_count, 2)
+
+    def test_cache_key_separates_identity_phase_and_mutations(self) -> None:
+        checkpoint = self._checkpoint()
+        compute = mock.Mock(return_value=None)
+
+        def fake_validate(*args: object, **kwargs: object) -> list[str]:
+            del args, kwargs
+            self._cached_source(checkpoint)
+            self._cached_source(checkpoint)
+            self._cached_source(copy.deepcopy(checkpoint))
+            self._cached_source(checkpoint, root=ROOT / "other-root")
+            self._cached_source(checkpoint, historical=True)
+            history = checkpoint["goal_execution"]["transition_history"]
+            history[-1]["event_sha256"] = "5" * 64
+            self._cached_source(checkpoint)
+            checkpoint["working_tree_snapshot"]["content_set_sha256"] = "6" * 64
+            self._cached_source(checkpoint)
+            checkpoint["goal_execution"]["goal_status"][
+                continuation.FP048_R002_GOAL_ID
+            ] = "IN_PROGRESS"
+            self._cached_source(checkpoint)
+            checkpoint["current_work"]["release_completion_claimed"] = True
+            self._cached_source(checkpoint)
+            return []
+
+        with (
+            mock.patch.object(
+                continuation,
+                "_compute_fp048_r002_current_descendant_seq96_source",
+                compute,
+            ),
+            mock.patch.object(
+                continuation,
+                "_validate",
+                side_effect=fake_validate,
+            ),
+        ):
+            self.assertEqual(continuation.validate(ROOT), [])
+        self.assertEqual(compute.call_count, 8)
+
+    def test_top_level_and_direct_replay_calls_do_not_share_cache(self) -> None:
+        checkpoint = self._checkpoint()
+        compute = mock.Mock(return_value=None)
+
+        def exercise() -> list[str]:
+            self._cached_source(checkpoint)
+            self._cached_source(checkpoint)
+            return []
+
+        with (
+            mock.patch.object(
+                continuation,
+                "_compute_fp048_r002_current_descendant_seq96_source",
+                compute,
+            ),
+            mock.patch.object(
+                continuation,
+                "_validate",
+                side_effect=lambda *args, **kwargs: exercise(),
+            ),
+        ):
+            self.assertEqual(continuation.validate(ROOT), [])
+            self.assertEqual(continuation.validate(ROOT), [])
+        self.assertEqual(compute.call_count, 2)
+
+        compute.reset_mock()
+        with (
+            mock.patch.object(
+                continuation,
+                "_compute_fp048_r002_current_descendant_seq96_source",
+                compute,
+            ),
+            mock.patch.object(
+                continuation,
+                "_validate_transition_replay",
+                side_effect=lambda *args, **kwargs: exercise(),
+            ),
+        ):
+            self.assertEqual(
+                continuation.validate_transition_replay(ROOT, checkpoint, {}),
+                [],
+            )
+            self.assertEqual(
+                continuation.validate_transition_replay(ROOT, checkpoint, {}),
+                [],
+            )
+        self.assertEqual(compute.call_count, 2)
+
+    def test_nested_validate_reuses_and_exception_restores_context(self) -> None:
+        checkpoint = self._checkpoint()
+        compute = mock.Mock(return_value=None)
+        depth = 0
+
+        def fake_validate(*args: object, **kwargs: object) -> list[str]:
+            nonlocal depth
+            del args, kwargs
+            self._cached_source(checkpoint)
+            if depth == 0:
+                depth += 1
+                try:
+                    self.assertEqual(continuation.validate(ROOT), [])
+                finally:
+                    depth -= 1
+            self._cached_source(checkpoint)
+            return []
+
+        with (
+            mock.patch.object(
+                continuation,
+                "_compute_fp048_r002_current_descendant_seq96_source",
+                compute,
+            ),
+            mock.patch.object(
+                continuation,
+                "_validate",
+                side_effect=fake_validate,
+            ),
+        ):
+            self.assertEqual(continuation.validate(ROOT), [])
+        compute.assert_called_once()
+
+        with mock.patch.object(
+            continuation,
+            "_validate",
+            side_effect=RuntimeError("validator failed"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "validator failed"):
+                continuation.validate(ROOT)
+        self.assertIsNone(
+            continuation._FP048_R002_CONTINUATION_CALL_CACHE.get()
+        )
+
+    def test_successor_result_is_cached_as_immutable_data(self) -> None:
+        checkpoint = self._checkpoint()
+        compute = mock.Mock(return_value=["sentinel"])
+
+        def fake_validate(*args: object, **kwargs: object) -> list[str]:
+            del args, kwargs
+            first = continuation.validate_fp048_r002_successor_seq99_102(
+                checkpoint,
+                root=ROOT,
+            )
+            first.append("caller mutation")
+            self.assertEqual(
+                continuation.validate_fp048_r002_successor_seq99_102(
+                    checkpoint,
+                    root=ROOT,
+                ),
+                ["sentinel"],
+            )
+            self.assertEqual(
+                continuation.validate_fp048_r002_successor_seq99_102(
+                    checkpoint,
+                    root=ROOT,
+                ),
+                ["sentinel"],
+            )
+            self.assertEqual(
+                continuation.validate_fp048_r002_successor_seq99_102(
+                    checkpoint,
+                    root=ROOT,
+                    require_live_snapshot=False,
+                ),
+                ["sentinel"],
+            )
+            return []
+
+        with (
+            mock.patch.object(
+                continuation,
+                "_compute_validate_fp048_r002_successor_seq99_102",
+                compute,
+            ),
+            mock.patch.object(
+                continuation,
+                "_validate",
+                side_effect=fake_validate,
+            ),
+        ):
+            self.assertEqual(continuation.validate(ROOT), [])
+        self.assertEqual(compute.call_count, 2)
+
+
+class WalkSafeFp048R002SuccessorSeq99Seq102Test(unittest.TestCase):
+    @classmethod
+    def _checkpoint(cls, length: int) -> dict[str, object]:
+        history: list[dict[str, object]] = [
+            {"sequence": sequence, "event_id": f"SYNTHETIC-{sequence}"}
+            for sequence in range(1, length + 1)
+        ]
+        history[97] = {
+            "sequence": 98,
+            "event_id": continuation.FP048_R002_R009_EXECUTION_CORRECTION_EVENT_ID,
+            "event_type": "GOAL_START_GATE_EXECUTION_CORRECTED",
+            "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+            "from_status": "READY",
+            "to_status": "READY",
+            "status_changes": {},
+        }
+        if length >= 99:
+            history[98] = {
+                "sequence": 99,
+                "event_id": continuation.FP048_R002_SUCCESSOR_CORRECTION_EVENT_ID,
+                "event_type": "GOAL_START_GATE_EXECUTION_CORRECTED",
+                "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "READY",
+                "status_changes": {},
+            }
+        if length >= 100:
+            history[99] = {
+                "sequence": 100,
+                "event_id": continuation.FP048_R002_SUCCESSOR_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+                "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "status_changes": {
+                    continuation.FP048_R002_GOAL_ID: "IN_PROGRESS"
+                },
+            }
+        if length >= 101:
+            history[100] = {
+                "sequence": 101,
+                "event_id": continuation.FP048_R002_SUCCESSOR_EVIDENCE_EVENT_ID,
+                "event_type": "CANONICAL_BINDINGS_UPDATED",
+                "produced_by_goal_id": continuation.FP048_R002_GOAL_ID,
+                "from_status": "IN_PROGRESS",
+                "to_status": "IN_PROGRESS",
+                "status_changes": {},
+            }
+        if length >= 102:
+            history[101] = {
+                "sequence": 102,
+                "event_id": continuation.FP048_R002_SUCCESSOR_COMPLETION_EVENT_ID,
+                "event_type": "GOAL_COMPLETED",
+                "subject_goal_id": continuation.FP048_R002_GOAL_ID,
+                "from_status": "IN_PROGRESS",
+                "to_status": "COMPLETE_AT_TARGET",
+                "status_changes": {
+                    continuation.FP048_R002_GOAL_ID: "COMPLETE_AT_TARGET"
+                },
+            }
+        return {"goal_execution": {"transition_history": history}}
+
+    @staticmethod
+    def _raw(checkpoint: dict[str, object]) -> bytes:
+        return (
+            json.dumps(checkpoint, ensure_ascii=False, indent=2) + "\n"
+        ).encode("utf-8")
+
+    def _authorities(self) -> tuple[mock.Mock, mock.Mock, mock.Mock]:
+        correction = mock.Mock()
+        correction.reconstructed_seq98_checkpoint_bytes.return_value = self._raw(
+            self._checkpoint(98)
+        )
+        starter = mock.Mock()
+        starter.reconstructed_seq99_checkpoint_bytes.return_value = self._raw(
+            self._checkpoint(99)
+        )
+        completion = mock.Mock()
+        completion.reconstructed_seq100_checkpoint_bytes.return_value = self._raw(
+            self._checkpoint(100)
+        )
+        return correction, starter, completion
+
+    def test_seq99_seq100_and_adjacent_seq102_are_dispatched(self) -> None:
+        for length in (99, 100, 102):
+            with self.subTest(length=length):
+                correction, starter, completion = self._authorities()
+                with (
+                    mock.patch.object(
+                        continuation,
+                        "_fp048_r002_successor_correction_authority",
+                        return_value=correction,
+                    ),
+                    mock.patch.object(
+                        continuation,
+                        "_fp048_r002_successor_started_authority",
+                        return_value=starter,
+                    ),
+                    mock.patch.object(
+                        continuation,
+                        "_fp048_r002_successor_completion_authority",
+                        return_value=completion,
+                    ),
+                ):
+                    self.assertEqual(
+                        continuation.validate_fp048_r002_successor_seq99_102(
+                            self._checkpoint(length),
+                            require_live_snapshot=True,
+                        ),
+                        [],
+                    )
+                correction.require_start_gate_execution_corrected_checkpoint.assert_called_once()
+                self.assertEqual(
+                    correction.require_start_gate_execution_corrected_checkpoint.call_args.kwargs[
+                        "require_live_snapshot"
+                    ],
+                    length == 99,
+                )
+                self.assertEqual(
+                    starter.require_started_checkpoint.call_count,
+                    int(length >= 100),
+                )
+                if length >= 100:
+                    self.assertEqual(
+                        starter.require_started_checkpoint.call_args.kwargs[
+                            "require_live_snapshot"
+                        ],
+                        length == 100,
+                    )
+                self.assertEqual(
+                    completion.require_completed_checkpoint.call_count,
+                    int(length == 102),
+                )
+                if length == 102:
+                    self.assertTrue(
+                        completion.require_completed_checkpoint.call_args.kwargs[
+                            "require_live_snapshot"
+                        ]
+                    )
+
+    def test_projected_seq102_uses_nonlive_chain_and_live_drift_fails(self) -> None:
+        correction, starter, completion = self._authorities()
+        checkpoint = self._checkpoint(102)
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_correction_authority",
+                return_value=correction,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_started_authority",
+                return_value=starter,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_completion_authority",
+                return_value=completion,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_is_live_checkpoint",
+                return_value=False,
+            ),
+        ):
+            self.assertEqual(
+                continuation.validate_fp048_r002_successor_seq99_102(
+                    checkpoint,
+                ),
+                [],
+            )
+        for validator in (
+            correction.require_start_gate_execution_corrected_checkpoint,
+            starter.require_started_checkpoint,
+            completion.require_completed_checkpoint,
+        ):
+            self.assertFalse(
+                validator.call_args.kwargs["require_live_snapshot"]
+            )
+
+        completion.require_completed_checkpoint.side_effect = RuntimeError(
+            "live checkpoint drift"
+        )
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_correction_authority",
+                return_value=correction,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_started_authority",
+                return_value=starter,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_completion_authority",
+                return_value=completion,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_is_live_checkpoint",
+                return_value=True,
+            ),
+        ):
+            errors = continuation.validate_fp048_r002_successor_seq99_102(
+                checkpoint,
+            )
+        self.assertTrue(any("live checkpoint drift" in error for error in errors))
+
+    def test_explicit_false_cannot_downgrade_live_and_io_fails_closed(self) -> None:
+        checkpoint = self._checkpoint(99)
+        correction, starter, completion = self._authorities()
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_correction_authority",
+                return_value=correction,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_started_authority",
+                return_value=starter,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_completion_authority",
+                return_value=completion,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_successor_is_live_checkpoint",
+                return_value=True,
+            ),
+        ):
+            self.assertEqual(
+                continuation.validate_fp048_r002_successor_seq99_102(
+                    checkpoint,
+                    require_live_snapshot=False,
+                ),
+                [],
+            )
+        self.assertTrue(
+            correction.require_start_gate_execution_corrected_checkpoint
+            .call_args.kwargs["require_live_snapshot"]
+        )
+
+        with mock.patch.object(
+            continuation,
+            "_fp048_r002_successor_is_live_checkpoint",
+            side_effect=ValueError("live checkpoint cannot be read"),
+        ), mock.patch.object(
+            continuation.importlib,
+            "import_module",
+            side_effect=AssertionError("authority load must remain fail-closed"),
+        ):
+            errors = continuation.validate_fp048_r002_successor_seq99_102(
+                checkpoint,
+                require_live_snapshot=False,
+            )
+        self.assertTrue(
+            any("live checkpoint cannot be read" in error for error in errors)
+        )
+
+    def test_seq101_without_adjacent_seq102_is_rejected_before_import(self) -> None:
+        with mock.patch.object(
+            continuation.importlib,
+            "import_module",
+            side_effect=AssertionError("successor authority must stay lazy"),
+        ):
+            errors = continuation.validate_fp048_r002_successor_seq99_102(
+                self._checkpoint(101)
+            )
+        self.assertTrue(any("lacks adjacent seq102" in error for error in errors))
+
+    def test_bool_sequence_and_wrong_identity_are_rejected(self) -> None:
+        mutations = {
+            "bool sequence": {"sequence": True},
+            "wrong event ID": {"event_id": "FORGED-SEQ99"},
+            "wrong event type": {"event_type": "GOAL_STARTED"},
+        }
+        for label, mutation in mutations.items():
+            with self.subTest(label=label):
+                checkpoint = self._checkpoint(99)
+                checkpoint["goal_execution"]["transition_history"][-1].update(
+                    mutation
+                )
+                errors = continuation.validate_fp048_r002_successor_seq99_102(
+                    checkpoint
+                )
+                self.assertTrue(errors)
+                self.assertIn("identity or status differs", errors[0])
+
+    def test_failed_r010_direct_seq99_is_rejected(self) -> None:
+        checkpoint = self._checkpoint(99)
+        checkpoint["goal_execution"]["transition_history"][-1].update(
+            {
+                "event_id": continuation.FP048_R002_R010_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+            }
+        )
+        errors = continuation.validate_fp048_r002_successor_seq99_102(checkpoint)
+        self.assertTrue(any("legacy failed R010" in error for error in errors))
+
+    def test_historical_seq98_does_not_import_successor_modules(self) -> None:
+        with mock.patch.object(
+            continuation.importlib,
+            "import_module",
+            side_effect=AssertionError("historical seq98 must remain isolated"),
+        ):
+            self.assertEqual(
+                continuation.validate_fp048_r002_successor_seq99_102(
+                    self._checkpoint(98)
+                ),
+                [],
+            )
+
+    def test_authority_loaders_import_only_the_exact_successor_modules(self) -> None:
+        modules = {
+            continuation.FP048_R002_SUCCESSOR_CORRECTION_MODULE: mock.Mock(),
+            continuation.FP048_R002_SUCCESSOR_STARTED_MODULE: mock.Mock(),
+            continuation.FP048_R002_SUCCESSOR_COMPLETION_MODULE: mock.Mock(),
+        }
+        with mock.patch.object(
+            continuation.importlib,
+            "import_module",
+            side_effect=modules.__getitem__,
+        ) as importer:
+            self.assertIs(
+                continuation._fp048_r002_successor_correction_authority(),
+                modules[continuation.FP048_R002_SUCCESSOR_CORRECTION_MODULE],
+            )
+            self.assertIs(
+                continuation._fp048_r002_successor_started_authority(),
+                modules[continuation.FP048_R002_SUCCESSOR_STARTED_MODULE],
+            )
+            self.assertIs(
+                continuation._fp048_r002_successor_completion_authority(),
+                modules[continuation.FP048_R002_SUCCESSOR_COMPLETION_MODULE],
+            )
+        self.assertEqual(
+            importer.call_args_list,
+            [
+                mock.call(continuation.FP048_R002_SUCCESSOR_CORRECTION_MODULE),
+                mock.call(continuation.FP048_R002_SUCCESSOR_STARTED_MODULE),
+                mock.call(continuation.FP048_R002_SUCCESSOR_COMPLETION_MODULE),
+            ],
+        )
+
+    def test_completion_producer_hook_uses_the_successor_dispatch(self) -> None:
+        checkpoint = self._checkpoint(102)
+        with mock.patch.object(
+            continuation,
+            "validate_fp048_r002_successor_seq99_102",
+            return_value=["sentinel"],
+        ) as validator:
+            self.assertEqual(
+                continuation.validate_fp048_r002_completion_seq101_102(
+                    checkpoint,
+                    root=ROOT,
+                ),
+                ["sentinel"],
+            )
+        validator.assert_called_once_with(
+            checkpoint,
+            root=ROOT,
+            require_live_snapshot=False,
+        )
+
+
+class WalkSafeFp048R002CompletionSeq100Seq101Test(unittest.TestCase):
+    @staticmethod
+    def _checkpoint(length: int) -> dict[str, object]:
+        history = [
+            {"sequence": sequence, "event_id": f"SYNTHETIC-{sequence}"}
+            for sequence in range(1, length + 1)
+        ]
+        if length >= 99:
+            history[98] = {
+                "sequence": 99,
+                "event_id": continuation.FP048_R002_R010_STARTED_EVENT_ID,
+                "event_type": "GOAL_STARTED",
+            }
+        if length >= 100:
+            history[99] = {
+                "sequence": 100,
+                "event_id": continuation.FP048_R002_COMPLETION_EVIDENCE_EVENT_ID,
+                "event_type": "CANONICAL_BINDINGS_UPDATED",
+            }
+        if length >= 101:
+            history[100] = {
+                "sequence": 101,
+                "event_id": continuation.FP048_R002_COMPLETION_EVENT_ID,
+                "event_type": "GOAL_COMPLETED",
+            }
+        return {"goal_execution": {"transition_history": history}}
+
+    def test_seq100_without_adjacent_seq101_is_rejected(self) -> None:
+        self.assertEqual(
+            continuation.validate_fp048_r002_completion_seq100_101(
+                self._checkpoint(100)
+            ),
+            [
+                "FP048 R002 seq100 producer transaction lacks adjacent "
+                "seq101 completion"
+            ],
+        )
+
+    def test_completion_loader_pins_receipt_and_review_paths(self) -> None:
+        authority = mock.Mock()
+        authority.SOURCE_SEQUENCE = continuation.FP048_R002_COMPLETION_SOURCE_SEQUENCE
+        authority.EVIDENCE_SEQUENCE = continuation.FP048_R002_COMPLETION_EVIDENCE_SEQUENCE
+        authority.COMPLETION_SEQUENCE = continuation.FP048_R002_COMPLETION_SEQUENCE
+        authority.EVIDENCE_EVENT_ID = continuation.FP048_R002_COMPLETION_EVIDENCE_EVENT_ID
+        authority.COMPLETION_EVENT_ID = continuation.FP048_R002_COMPLETION_EVENT_ID
+        authority.COMPLETION_RECEIPT_REL = continuation.FP048_R002_COMPLETION_RECEIPT_REL
+        authority.REVIEW_ROOT = continuation.FP048_R002_COMPLETION_REVIEW_ROOT
+        with mock.patch.object(
+            continuation.importlib,
+            "import_module",
+            return_value=authority,
+        ):
+            self.assertIs(continuation._fp048_r002_completion_authority(), authority)
+            authority.COMPLETION_RECEIPT_REL = Path("forged-receipt.json")
+            with self.assertRaisesRegex(RuntimeError, "constant differs"):
+                continuation._fp048_r002_completion_authority()
+
+    def test_exact_seq101_uses_public_inverse_and_projection_authority(self) -> None:
+        checkpoint = self._checkpoint(101)
+        source = self._checkpoint(99)
+        source_raw = (json.dumps(source, sort_keys=True) + "\n").encode()
+        authority = mock.Mock()
+        authority.reconstructed_seq99_checkpoint_bytes.return_value = source_raw
+        authority.checkpoint_bytes.side_effect = (
+            lambda value: (json.dumps(value, sort_keys=True) + "\n").encode()
+        )
+        authority.validate_projection.return_value = None
+        started = mock.Mock()
+        started.require_started_checkpoint.return_value = None
+        evidence = object()
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_completion_authority",
+                return_value=authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r010_started_authority",
+                return_value=started,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_completion_evidence_seq100_101",
+                return_value=evidence,
+            ),
+        ):
+            errors = continuation.validate_fp048_r002_completion_seq100_101(
+                checkpoint
+            )
+        self.assertEqual(errors, [])
+        authority.reconstructed_seq99_checkpoint_bytes.assert_called_once_with(
+            ROOT,
+            checkpoint,
+        )
+        started.require_started_checkpoint.assert_called_once_with(
+            ROOT,
+            source,
+            require_live_snapshot=False,
+            run_external_validators=False,
+        )
+        authority.validate_projection.assert_called_once_with(
+            ROOT,
+            source,
+            checkpoint,
+            evidence,
+        )
+
+    def test_seq101_projection_tamper_fails_closed(self) -> None:
+        checkpoint = self._checkpoint(101)
+        source = self._checkpoint(99)
+        source_raw = (json.dumps(source, sort_keys=True) + "\n").encode()
+        authority = mock.Mock()
+        authority.reconstructed_seq99_checkpoint_bytes.return_value = source_raw
+        authority.checkpoint_bytes.side_effect = (
+            lambda value: (json.dumps(value, sort_keys=True) + "\n").encode()
+        )
+        authority.validate_projection.side_effect = RuntimeError(
+            "seq100/101 event seal differs"
+        )
+        started = mock.Mock()
+        with (
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_completion_authority",
+                return_value=authority,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_r010_started_authority",
+                return_value=started,
+            ),
+            mock.patch.object(
+                continuation,
+                "_fp048_r002_completion_evidence_seq100_101",
+                return_value=object(),
+            ),
+        ):
+            errors = continuation.validate_fp048_r002_completion_seq100_101(
+                checkpoint
+            )
+        self.assertTrue(any("event seal differs" in row for row in errors))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,93 @@
+{
+  "authorization_quote": "이제 진행해",
+  "authorization_scope": {
+    "authorized_actions": [
+      "SEQ83_ZERO_CREDIT_GOAL_START_CONTROL_CORRECTION",
+      "ATOMIC_CHECKPOINT_AND_CATALOG_PUBLICATION",
+      "PRIVATE_INITIAL_START_GATE_RETRY_WITH_UNUSED_EVENT_ID_004",
+      "SEQ84_GOAL_STARTED_AFTER_GATE_PASS",
+      "LOCAL_PRODUCT_IMPLEMENTATION_AFTER_GOAL_STARTED"
+    ],
+    "conditions": [
+      "SEQ83_CORRECTION_MUST_PRESERVE_READY_STATUS",
+      "SEQ83_MUST_BIND_THE_EXACT_SEQ82_CORRECTION_R011_REVIEW_AND_FAILED_GATE_003",
+      "CHECKPOINT_AND_ALL_THREE_CATALOGS_MUST_PUBLISH_ATOMICALLY",
+      "CATALOG_HEADERS_MUST_BIND_THE_DESTINATION_CHECKPOINT",
+      "WORKING_SNAPSHOT_CONTENT_HASH_MUST_INCLUDE_FINAL_CATALOG_BYTES",
+      "GOAL_STARTED_EVENT_ID_004_MUST_REMAIN_UNUSED_UNTIL_THE_REAL_GATE_RUN",
+      "ALL_FIVE_EVENT_SCOPED_GATE_CHECKS_MUST_PASS",
+      "SEQ84_MUST_BIND_THE_EXACT_GATE_RECEIPT",
+      "PRODUCT_CHANGE_MUST_OCCUR_ONLY_AFTER_SEQ84",
+      "AUTHORITY_SCOPE_IS_NOT_EXPANDED_BEYOND_THE_EXISTING_RECOVERY_CONTINUATION"
+    ],
+    "excluded_actions": [
+      "FORMAL_TEST_PASS_CLAIM",
+      "ACTUAL_DEVICE_CREDIT",
+      "EXTERNAL_REVIEW_CREDIT",
+      "DEPLOYMENT",
+      "RELEASE_APPROVAL"
+    ]
+  },
+  "authorization_status": "AUTHORIZED_FOR_CONDITIONAL_SEQ83_84_RECOVERY_CONTINUATION",
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_review_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "goal_started": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "sequence_78_status": "PUBLISHED_ZERO_CREDIT",
+    "sequence_79_status": "PUBLISHED_ZERO_CREDIT",
+    "sequence_80_status": "PUBLISHED_ZERO_CREDIT",
+    "sequence_81_status": "PUBLISHED_ZERO_CREDIT",
+    "sequence_82_status": "PUBLISHED_ZERO_CREDIT",
+    "sequence_83_status": "NOT_PUBLISHED",
+    "sequence_84_status": "NOT_PUBLISHED",
+    "start_gate_status": "NOT_RUN_WITH_NAMESPACE_004",
+    "test_credit_delta": 0
+  },
+  "document_id": "WS-FP046-R002-SEQ83-84-RECOVERY-AUTHORIZATION-20260825-001",
+  "evidence_type": "USER_CONTINUATION_AUTHORIZATION",
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "predecessor_review": {
+    "records": [
+      {
+        "byte_length": 36828,
+        "path": "docs/control/execution/workstream-transitions/seq78-79/review-rounds/R011/review-assignment.json",
+        "sha256": "8a27b0661d75d17e9e972a70082c0a3e0cfad21d89a177c3b36d1a4904a1ad89"
+      },
+      {
+        "byte_length": 36620,
+        "path": "docs/control/execution/workstream-transitions/seq78-79/review-rounds/R011/review-result.json",
+        "sha256": "00f44cae1ffbb1af25b95433e89ab2b098be58af7b734d083cdf448875a264f8"
+      },
+      {
+        "byte_length": 36903,
+        "path": "docs/control/execution/workstream-transitions/seq78-79/review-rounds/R011/independent-review.json",
+        "sha256": "3c71039c6dfa57dd9001c4f5f4893c08f1b10db5e64bccca0d578c3d76e07702"
+      }
+    ],
+    "round_id": "WS-FP046-R002-SEQ82-83-RECOVERY-REVIEW-20260825-R011"
+  },
+  "reason_code": "CHECKPOINT_AND_CATALOG_DESTINATION_PUBLICATION_REANCHORED_ATOMICALLY",
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 2396998,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "sequence": 82,
+    "sha256": "26a8f735effa785833ce8c369c47c593cb69eb1747499147f790fd1ec65cbf80",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP046-R002-CORRECTION-20260824-005",
+    "tail_event_sha256": "33204f6ded1b4b2cf05fe039b409d072addc26ed78e4da867deb02632ba6ba53"
+  },
+  "supersedes": {
+    "authorization_status": "AUTHORIZED_FOR_CONDITIONAL_SEQ82_83_RECOVERY_CONTINUATION",
+    "byte_length": 3924,
+    "document_id": "WS-FP046-R002-SEQ82-83-RECOVERY-AUTHORIZATION-20260825-001",
+    "file_sha256": "9357fabc81719cd5ed5057b48e50d6aa4cdb1c3116b3b96a16b069fed0e70d55",
+    "path": "docs/control/execution/workstream-transitions/seq82-83/authorization.json"
+  }
+}

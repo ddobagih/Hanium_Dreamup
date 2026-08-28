@@ -1,0 +1,30 @@
+{
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_review_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "decision": "PASS_INTERNAL_ONLY",
+  "document_id": "WS-FP046-R002-RECOVERY-INDEPENDENT-REVIEW-20260825-R003",
+  "external_independence_claimed": false,
+  "external_review_status": "NOT_RUN",
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "producer_role": "walksafe-fp046-r002-publisher",
+  "review_scope": "FP046_R002_COMPLETION_AND_FP048_R001_REOPEN",
+  "review_subject_binding": {
+    "byte_count": 35199,
+    "document_id": "WS-FP046-R002-RECOVERY-REVIEW-SUBJECT-20260825-R003",
+    "file_sha256": "c5542d27216753c7d6e269c00cdaa23b33e003917e4ed83948b1316f37f89c3c",
+    "mutable": false,
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/review-rounds/R003/review-subject.json"
+  },
+  "reviewer_id": "walksafe-fp046-r002-recovery-goal-independent-reviewer-r003",
+  "reviewer_task_id": "/root/fp046_goal_r002_independent_review/r003"
+}

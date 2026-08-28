@@ -1,0 +1,52 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "backend/tests/test_actor_rate_limit_store.py::test_privacy_group_migration_replaces_only_the_named_check"
+      ],
+      "exit_code": 0,
+      "output_byte_count": 98,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/verification-rate-limit.log",
+      "output_sha256": "8989a153a4f265bdf8bf8abfcbf7ce96cf91c69ee66d543244ebf0fc2c9d041d"
+    },
+    {
+      "argv": [
+        "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "tests/test_walksafe_android_gateway_ingress_current.py"
+      ],
+      "exit_code": 0,
+      "output_byte_count": 98,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R002/verification-gateway-ingress.log",
+      "output_sha256": "9310d484212a1fe2c33b4b8accdf50a2639f09ba039354f8448f8aa8d173e1ff"
+    }
+  ],
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_review_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "database_integration_status": "NOT_RUN",
+  "document_id": "WS-FP046-R002-VERIFICATION-RECEIPT-20260825-001",
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "status": "PASS_INTERNAL_STATIC_ONLY"
+}

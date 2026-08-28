@@ -57,6 +57,15 @@
     },
     {
       "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/account_deletion_worker.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
       "language": "SHELL",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-maintained-script",
@@ -184,6 +193,51 @@
     {
       "entrypoint": true,
       "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp046_r002_goal_started_seq78_20260823.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp046_r002_goal_started_seq79_20260824.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "documented-historical-exact",
       "path": "scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py",
@@ -196,6 +250,240 @@
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "documented-historical-exact",
       "path": "scripts/apply_walksafe_fp048_goal_started_seq42_20260802.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_completed_seq100_101_20260827.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_completed_seq101_102_20260827.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_completed_seq98_99_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_completed_seq99_100_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_start_branch_semantics_reanchor_seq93_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_start_control_correction_seq91_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq100_20260827.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq90_20260825.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq91_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq92_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq93_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq94_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq95_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq96_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq97_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq98_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq99_20260827.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_start_gate_contract_correction_seq92_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_start_gate_contract_correction_seq94_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_start_gate_contract_correction_seq95_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_start_gate_contract_correction_seq96_20260826.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_start_gate_execution_correction_seq98_20260827.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_start_gate_execution_correction_seq99_20260827.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py",
       "strongest_side_effect": "REPOSITORY_WRITE",
       "strongest_side_effect_rule": "verb:apply"
     },
@@ -886,9 +1174,27 @@
     {
       "entrypoint": true,
       "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-maintained-script",
-      "path": "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+      "path": "scripts/build_walksafe_fp046_r002_seq77_78_review_20260823.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_fp046_r002_seq78_79_recovery_review_20260824.py",
       "strongest_side_effect": "REPOSITORY_WRITE",
       "strongest_side_effect_rule": "repository-write-capability-exact"
     },
@@ -2004,6 +2310,15 @@
       "language": "PYTHON",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/publish_walksafe_fp048_r002_goal_seq88_89_20260825.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
       "path": "scripts/pull_android_field_sessions_20260710.py",
       "strongest_side_effect": "DB_DEVICE",
       "strongest_side_effect_rule": "database-or-device-capability-exact"
@@ -2091,6 +2406,15 @@
     },
     {
       "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_backup_oneshot_20260825.sh",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
       "language": "PYTHON",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "documented-historical-exact",
@@ -2128,9 +2452,117 @@
     {
       "entrypoint": true,
       "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp046_r002_goal_start_gate_20260823.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "documented-historical-exact",
       "path": "scripts/run_walksafe_fp048_goal_start_gate_20260802.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_20260825.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r002_20260826.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r003_20260826.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r004_20260826.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r005_20260826.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r006_20260826.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r007_20260826.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r008_20260826.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r009_20260826.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r010_20260827.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r011_20260827.py",
       "strongest_side_effect": "LOCAL_BUILD",
       "strongest_side_effect_rule": "verb:run"
     },
@@ -2524,10 +2956,10 @@
   ],
   "lifecycle_counts": {
     "BLOCKED": 3,
-    "CURRENT": 163,
-    "HISTORICAL": 114
+    "CURRENT": 210,
+    "HISTORICAL": 115
   },
-  "path_count": 280,
+  "path_count": 328,
   "roots": [
     "data_sources/scripts/",
     "scripts/"
@@ -2543,12 +2975,12 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "bb49f85723d704c2c5373cb04e4fad26e43d6b7e837f47c9f800273c11e126f3",
+  "source_set_sha256": "8797c1b5feee79e4531bfd239c4633703ac7f71c2df31914c01ef42a08c57149",
   "strongest_side_effect_counts": {
-    "DB_DEVICE": 21,
+    "DB_DEVICE": 23,
     "EXTERNAL": 8,
-    "LOCAL_BUILD": 42,
+    "LOCAL_BUILD": 52,
     "READ_ONLY": 39,
-    "REPOSITORY_WRITE": 170
+    "REPOSITORY_WRITE": 206
   }
 }

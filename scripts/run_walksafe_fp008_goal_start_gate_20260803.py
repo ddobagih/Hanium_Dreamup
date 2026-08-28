@@ -2017,6 +2017,87 @@ def _snapshot_root_identity(metadata: os.stat_result) -> tuple[int, ...]:
     )
 
 
+_SNAPSHOT_PUBLIC_PARENT_MODES = frozenset({0o755, 0o775})
+
+
+def _materialize_snapshot_parent_modes(
+    live_tree: _RetainedDirectoryTree,
+    snapshot_root: Path,
+    private_directories: frozenset[Path],
+) -> None:
+    live_tree.verify()
+    for relative in sorted(
+        live_tree.metadata,
+        key=lambda value: (len(value.parts), value.as_posix()),
+    ):
+        metadata = live_tree.metadata[relative]
+        mode = stat.S_IMODE(metadata[2])
+        if metadata[3] != os.geteuid():
+            raise GateError(f"isolated snapshot parent owner is unsafe: {relative}")
+        if relative in private_directories:
+            if mode != 0o700:
+                raise GateError(
+                    f"isolated snapshot private parent mode is unsafe: {relative}"
+                )
+            if any(
+                candidate != relative and relative in candidate.parents
+                for candidate in live_tree.metadata
+            ):
+                raise GateError(
+                    f"isolated snapshot private parent is not terminal: {relative}"
+                )
+            continue
+        if mode not in _SNAPSHOT_PUBLIC_PARENT_MODES:
+            raise GateError(f"isolated snapshot parent mode is unsafe: {relative}")
+        if relative == Path("."):
+            continue
+        destination = snapshot_root / relative
+        destination.mkdir(mode=0o700, exist_ok=True)
+        before = destination.lstat()
+        if (
+            destination.is_symlink()
+            or not stat.S_ISDIR(before.st_mode)
+            or before.st_uid != os.geteuid()
+        ):
+            raise GateError(f"isolated snapshot parent is unsafe: {relative}")
+        os.chmod(destination, mode, follow_symlinks=False)
+        after = destination.lstat()
+        if (
+            not stat.S_ISDIR(after.st_mode)
+            or after.st_dev != before.st_dev
+            or after.st_ino != before.st_ino
+            or stat.S_IMODE(after.st_mode) != mode
+            or after.st_uid != os.geteuid()
+        ):
+            raise GateError(f"isolated snapshot parent mode differs: {relative}")
+    live_tree.verify()
+
+
+def _require_snapshot_parent_modes(
+    live_tree: _RetainedDirectoryTree,
+    snapshot_tree: _RetainedDirectoryTree,
+    private_directories: frozenset[Path],
+) -> None:
+    live_tree.verify()
+    snapshot_tree.verify()
+    if live_tree.metadata.keys() != snapshot_tree.metadata.keys():
+        raise GateError("isolated snapshot parent inventory differs")
+    for relative, live_metadata in live_tree.metadata.items():
+        snapshot_metadata = snapshot_tree.metadata[relative]
+        expected_mode = (
+            0o700
+            if relative == Path(".") or relative in private_directories
+            else stat.S_IMODE(live_metadata[2])
+        )
+        if (
+            stat.S_IMODE(snapshot_metadata[2]) != expected_mode
+            or snapshot_metadata[3] != os.geteuid()
+        ):
+            raise GateError(f"isolated snapshot parent mode differs: {relative}")
+    live_tree.verify()
+    snapshot_tree.verify()
+
+
 def _write_descriptor_all(descriptor: int, content: bytes) -> None:
     offset = 0
     while offset < len(content):
@@ -2441,12 +2522,14 @@ class _RetainedIsolatedRepositorySnapshot:
         container_identity: tuple[int, ...],
         root_descriptor: int,
         root_identity: tuple[int, ...],
+        git_identity: tuple[int, ...],
         authority: _RepositoryStateAuthority | None,
         repository_guard: RetainedRepositoryAuthorityGuard,
         event_id: str,
         repository_state_guard: Callable[[Path, Path, str], dict[str, Any]],
         namespace_guard: RetainedRepositoryAuthorityGuard | None = None,
         snapshot_evidence_guard: _RetainedSourceGuard | None = None,
+        snapshot_parent_guard: _RetainedDirectoryTree | None = None,
     ) -> None:
         self.live_root = live_root
         self.container = container
@@ -2454,12 +2537,14 @@ class _RetainedIsolatedRepositorySnapshot:
         self.container_identity = container_identity
         self.root_descriptor = root_descriptor
         self.root_identity = root_identity
+        self.git_identity = git_identity
         self.authority = authority
         self.repository_guard = repository_guard
         self.event_id = event_id
         self.repository_state_guard = repository_state_guard
         self.namespace_guard = namespace_guard
         self.snapshot_evidence_guard = snapshot_evidence_guard
+        self.snapshot_parent_guard = snapshot_parent_guard
 
     @staticmethod
     def _run_git(
@@ -2500,6 +2585,7 @@ class _RetainedIsolatedRepositorySnapshot:
         repository_guard: RetainedRepositoryAuthorityGuard,
         event_id: str,
         repository_state_guard: Callable[[Path, Path, str], dict[str, Any]],
+        snapshot_parent_guard: _RetainedDirectoryTree | None = None,
     ) -> "_RetainedIsolatedRepositorySnapshot":
         live_root = live_root.resolve(strict=True)
         container = container.resolve(strict=True)
@@ -2534,8 +2620,16 @@ class _RetainedIsolatedRepositorySnapshot:
         ):
             raise GateError("isolated repository snapshot authority is unsafe")
         git_metadata = (root / ".git").lstat()
-        if not stat.S_ISDIR(git_metadata.st_mode) or (root / ".git").is_symlink():
+        if (
+            not stat.S_ISDIR(git_metadata.st_mode)
+            or (root / ".git").is_symlink()
+            or stat.S_IMODE(git_metadata.st_mode) != 0o700
+            or git_metadata.st_uid != os.geteuid()
+            or git_metadata.st_gid != os.getegid()
+        ):
             raise GateError("isolated repository does not own an independent .git")
+        if snapshot_parent_guard is not None and snapshot_parent_guard.root != root:
+            raise GateError("isolated snapshot parent authority differs")
         root_descriptor = os.open(
             root,
             os.O_RDONLY
@@ -2564,12 +2658,14 @@ class _RetainedIsolatedRepositorySnapshot:
                 _event_directory_identity(container_metadata),
                 root_descriptor,
                 _snapshot_root_identity(root_metadata),
+                _snapshot_root_identity(git_metadata),
                 authority,
                 repository_guard,
                 event_id,
                 repository_state_guard,
                 namespace_guard,
                 snapshot_evidence_guard,
+                snapshot_parent_guard,
             )
             retained.verify()
             if authority is not None:
@@ -2580,6 +2676,8 @@ class _RetainedIsolatedRepositorySnapshot:
                 namespace_guard.close(primary)
             if snapshot_evidence_guard is not None:
                 snapshot_evidence_guard.close(primary)
+            if snapshot_parent_guard is not None:
+                snapshot_parent_guard.close(primary)
             try:
                 os.close(root_descriptor)
             except BaseException:
@@ -2602,6 +2700,8 @@ class _RetainedIsolatedRepositorySnapshot:
         )
         os.chmod(container, 0o700)
         snapshot_root = container / "repository"
+        live_parent_guard: _RetainedDirectoryTree | None = None
+        snapshot_parent_guard: _RetainedDirectoryTree | None = None
         try:
             clone = cls._run_git(
                 repository_guard,
@@ -2648,8 +2748,26 @@ class _RetainedIsolatedRepositorySnapshot:
             relatives = set(visible_relatives)
             relatives.update(authority.authorized_controlled_paths)
             evidence = authority.authorized_gate_evidence
+            parent_sources = set(relatives)
+            private_directories: frozenset[Path] = frozenset()
             if evidence is not None:
                 relatives.difference_update(evidence.paths)
+                parent_sources.update(evidence.paths)
+                private_directories = frozenset(evidence.event_inventories)
+            try:
+                live_parent_guard = _RetainedDirectoryTree.capture(
+                    live_root,
+                    tuple(parent_sources),
+                )
+            except OSError as exc:
+                raise GateError(
+                    "isolated snapshot live parent authority is unsafe"
+                ) from exc
+            _materialize_snapshot_parent_modes(
+                live_parent_guard,
+                snapshot_root,
+                private_directories,
+            )
             for relative in sorted(
                 relatives,
                 key=lambda value: (len(value.parts), value.as_posix()),
@@ -2660,7 +2778,6 @@ class _RetainedIsolatedRepositorySnapshot:
                     before = source.lstat()
                 except FileNotFoundError:
                     continue
-                destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
                 if stat.S_ISREG(before.st_mode):
                     _copy_snapshot_regular_file(source, destination)
                 elif stat.S_ISLNK(before.st_mode):
@@ -2688,6 +2805,16 @@ class _RetainedIsolatedRepositorySnapshot:
                     )
             if evidence is not None:
                 evidence.copy_to(snapshot_root)
+            live_parent_guard.verify()
+            snapshot_parent_guard = _RetainedDirectoryTree.capture(
+                snapshot_root,
+                tuple(parent_sources),
+            )
+            _require_snapshot_parent_modes(
+                live_parent_guard,
+                snapshot_parent_guard,
+                private_directories,
+            )
 
             stage_result = cls._run_git(
                 repository_guard,
@@ -2744,17 +2871,32 @@ class _RetainedIsolatedRepositorySnapshot:
             ).stdout
             if final_visible != visible_raw:
                 raise GateError("live repository paths changed during snapshot capture")
+            live_parent_guard.verify()
             repository_guard.verify()
-            return cls.bind(
-                live_root,
-                container,
-                snapshot_root,
-                authority,
-                repository_guard,
-                event_id,
-                repository_state_guard,
-            )
-        except BaseException:
+            live_parent_guard.close()
+            live_parent_guard = None
+            try:
+                retained = cls.bind(
+                    live_root,
+                    container,
+                    snapshot_root,
+                    authority,
+                    repository_guard,
+                    event_id,
+                    repository_state_guard,
+                    snapshot_parent_guard=snapshot_parent_guard,
+                )
+            except BaseException as primary:
+                snapshot_parent_guard.close(primary)
+                snapshot_parent_guard = None
+                raise
+            snapshot_parent_guard = None
+            return retained
+        except BaseException as primary:
+            if live_parent_guard is not None:
+                live_parent_guard.close(primary)
+            if snapshot_parent_guard is not None:
+                snapshot_parent_guard.close(primary)
             try:
                 if container.is_dir() and not container.is_symlink():
                     shutil.rmtree(container)
@@ -2830,6 +2972,8 @@ class _RetainedIsolatedRepositorySnapshot:
 
     def verify(self) -> None:
         self.repository_guard.verify()
+        if self.snapshot_parent_guard is not None:
+            self.snapshot_parent_guard.verify()
         if self.snapshot_evidence_guard is not None:
             self.snapshot_evidence_guard.verify()
         if self.namespace_guard is not None:
@@ -2847,12 +2991,20 @@ class _RetainedIsolatedRepositorySnapshot:
             or stat.S_IMODE(root_opened.st_mode) != 0o700
         ):
             raise GateError("isolated repository snapshot identity changed")
-        if not (self.root / ".git").is_dir() or (self.root / ".git").is_symlink():
+        git_named = (self.root / ".git").lstat()
+        if (
+            not stat.S_ISDIR(git_named.st_mode)
+            or (self.root / ".git").is_symlink()
+            or _snapshot_root_identity(git_named) != self.git_identity
+            or stat.S_IMODE(git_named.st_mode) != 0o700
+        ):
             raise GateError("isolated repository .git authority changed")
         if self.namespace_guard is not None:
             self.namespace_guard.verify()
         if self.snapshot_evidence_guard is not None:
             self.snapshot_evidence_guard.verify()
+        if self.snapshot_parent_guard is not None:
+            self.snapshot_parent_guard.verify()
         self.repository_guard.verify()
 
     def verify_repository(self) -> None:
@@ -2889,6 +3041,13 @@ class _RetainedIsolatedRepositorySnapshot:
                 if first is None:
                     first = exc
             self.snapshot_evidence_guard = None
+        if self.snapshot_parent_guard is not None:
+            try:
+                self.snapshot_parent_guard.close(primary or first)
+            except BaseException as exc:
+                if first is None:
+                    first = exc
+            self.snapshot_parent_guard = None
         try:
             os.close(self.root_descriptor)
         except BaseException as exc:
@@ -3666,7 +3825,10 @@ def _validate_ready_source(
 def load_gate_context(
     root: Path,
     retained_contents: Mapping[Path, bytes] | None = None,
+    *,
+    require_live_snapshot: bool = True,
 ) -> GateContext:
+    del require_live_snapshot
     root = root.resolve(strict=True)
     if retained_contents is not None:
         if set(retained_contents) != set(SOURCE_GUARD_RELATIVES):
@@ -4188,7 +4350,14 @@ def _run_gate_locked(
     )
 
     resources.verify_source()
-    if load_gate_context(root, resources.source_guard.contents) != context:
+    if (
+        load_gate_context(
+            root,
+            resources.source_guard.contents,
+            require_live_snapshot=False,
+        )
+        != context
+    ):
         raise GateError("FP008 seq46 source changed during gate execution")
     resources.verify_source()
     for run in check_runs:
@@ -4217,6 +4386,7 @@ def _run_gate_locked(
         guarded_context = load_gate_context(
             root,
             resources.source_guard.contents,
+            require_live_snapshot=False,
         )
     except (GateError, OSError, ValueError) as exc:
         raise GateError(
@@ -4294,6 +4464,7 @@ def _run_gate_locked(
             prepublish_context = load_gate_context(
                 root,
                 resources.source_guard.contents,
+                require_live_snapshot=False,
             )
         except (GateError, OSError, ValueError) as exc:
             raise GateError(

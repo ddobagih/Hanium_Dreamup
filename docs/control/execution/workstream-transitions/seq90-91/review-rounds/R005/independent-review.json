@@ -1,0 +1,31 @@
+{
+  "assignment_binding": {
+    "byte_length": 24542,
+    "path": "docs/control/execution/workstream-transitions/seq90-91/review-rounds/R005/review-assignment.json",
+    "sha256": "999ba6b4560a332e0e55d85158ffd15170b8c6247409cebc74c68ed62f86e2fe"
+  },
+  "decision": "CONCUR_INTERNAL_ZERO_CREDIT_CONTROL_ONLY",
+  "document_id": "WS-FP048-R002-SEQ90-91-INDEPENDENT-REVIEW-20260826-R005",
+  "external_independence_claimed": false,
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "independent_checks": {
+    "all_credit_deltas_zero": true,
+    "exact_seq89_source_cas": true,
+    "noncredit_successor_edges_exact": true,
+    "ready_to_ready_only": true,
+    "review_input_set_closed": true
+  },
+  "noncredit_successor_edges_sha256": "bebe6ecf211f92fb1aaf934a72989b2930b15d2d164e1829e68478b360514c21",
+  "review_result_binding": {
+    "byte_length": 1576,
+    "path": "docs/control/execution/workstream-transitions/seq90-91/review-rounds/R005/review-result.json",
+    "sha256": "e3b2302a5b5b5c3ac1a41ae8db80a7baf8b274f7ee8cb95e5c6213c1cf54f39b"
+  },
+  "reviewed_at": "2026-08-26T04:34:46+09:00",
+  "reviewer": {
+    "id": "codex-fp048-r002-seq90-independent-reviewer-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl/seq90_independent_review_r005"
+  },
+  "round_id": "WS-FP048-R002-SEQ90-91-REVIEW-20260826-R005",
+  "schema_version": "1.0"
+}

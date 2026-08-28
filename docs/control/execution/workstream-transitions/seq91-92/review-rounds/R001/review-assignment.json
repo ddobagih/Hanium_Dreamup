@@ -1,0 +1,159 @@
+{
+  "assigner": {
+    "id": "codex-root",
+    "task_id": "/root"
+  },
+  "authorization_binding": {
+    "byte_length": 2999,
+    "path": "docs/control/execution/workstream-transitions/seq91-92/authorization.json",
+    "sha256": "43b0dcaa38594e3f682cefcb766df332087a0118a6acd55ed53922aba9069cbd"
+  },
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "correction_reason": {
+    "failed_check_id": "ROOT_FP048_R002_CONTROL_REGRESSION",
+    "failed_contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R002",
+    "failed_contract_version": "2026-08-26.1",
+    "observed_failed_test_count": 2,
+    "reason_code": "PUBLISHED_SEQ90_SYNTHETIC_REPLAY_DUPLICATED_SEQ90",
+    "remediation": "RECONSTRUCT_EXACT_SEQ89_BEFORE_SYNTHETIC_SEQ90_BOUNDARY_TEST"
+  },
+  "document_id": "WS-FP048-R002-SEQ91-92-REVIEW-ASSIGNMENT-20260826-R001",
+  "executor": {
+    "id": "codex-fp048-r002-seq91-control-executor-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl"
+  },
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "projected_transition": {
+    "completion_sequences": [
+      93,
+      94
+    ],
+    "correction_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP048-R002-CORRECTION-20260826-001",
+    "correction_sequence": 91,
+    "correction_transition": "READY_TO_READY",
+    "started_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-R002-20260826-002",
+    "started_sequence": 92,
+    "started_transition": "READY_TO_IN_PROGRESS_AFTER_FRESH_R003_PASS"
+  },
+  "replacement_contract_binding": {
+    "canonical_contract_sha256": "e782541d53e7350da55eaef9d608d5c1a878db86bde0e7f28807527974607d9f",
+    "contract_id": "WS-FP048-R002-INTERNAL-START-GATE-R003",
+    "contract_version": "2026-08-26.2",
+    "document_id": "WS-FP048-R002-INITIAL-START-GATE-CONTRACT-20260826-003",
+    "file_sha256": "bce459dc4454b11638bc7d09320ba90671aea02c711a7b502db13e52d7b45e75",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r003.json",
+    "schema_version": "1.2"
+  },
+  "required_reviewer": {
+    "id": "codex-fp048-r002-seq91-independent-reviewer-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl/seq91_independent_review_r001"
+  },
+  "review_scope": [
+    "exact published seq90 source CAS and seq91 adjacency",
+    "R002 root-regression failure classification and deterministic source replay",
+    "READY-to-READY status with all credit deltas zero",
+    "runtime final Git-visible managed snapshot reseal",
+    "R003 five-check private gate and conditional seq92 start"
+  ],
+  "reviewed_control_inputs": [
+    {
+      "byte_length": 36190,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_start_control_correction_seq91_20260826.py",
+      "sha256": "dc1f750d087d3626d4551be85d8acf9695249ce317cc9bb925a833b8cd2a2c38"
+    },
+    {
+      "byte_length": 9224,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_start_control_correction_seq91_20260826.py",
+      "sha256": "58a62e3b10406fd5fa7c72e734d8954db1af79e1c6205d76982740092ca57bc1"
+    },
+    {
+      "byte_length": 3882,
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-048-R002/initial-start-gate-contract-r003.json",
+      "sha256": "bce459dc4454b11638bc7d09320ba90671aea02c711a7b502db13e52d7b45e75"
+    },
+    {
+      "byte_length": 18171,
+      "path": "scripts/run_walksafe_fp048_r002_goal_start_gate_r003_20260826.py",
+      "sha256": "ffbf6e143642f508c25c143f16f54516a986151f7d6c044e956fef854522e137"
+    },
+    {
+      "byte_length": 7309,
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r003_20260826.py",
+      "sha256": "ac7ee2aab23de024101b1be6ed15a1a0a589363f78ba62088d2e45354243e320"
+    },
+    {
+      "byte_length": 23799,
+      "path": "scripts/apply_walksafe_fp048_r002_goal_started_seq92_20260826.py",
+      "sha256": "9abd77c46be7ff20ad41807e2e18e701266259357d743da9cf0b2775cca1b270"
+    },
+    {
+      "byte_length": 13981,
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq92_20260826.py",
+      "sha256": "4702d516ad40e6050d95fe5773f9f271901f7002d9e10e636867b4a2d1e3f211"
+    },
+    {
+      "byte_length": 169708,
+      "path": "scripts/run_walksafe_fp008_goal_start_gate_20260803.py",
+      "sha256": "0bc6f491b1a1b3fa3cbd7b1c1cc04e473c2b25258ebee9ebb0f7c9479eb24abc"
+    },
+    {
+      "byte_length": 57687,
+      "path": "tests/test_walksafe_fp008_goal_start_gate_20260803.py",
+      "sha256": "eed51cd567f25839738aa4167ce3869f24d1bb8c9c371f0035ed8fcef4716d56"
+    },
+    {
+      "byte_length": 492386,
+      "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+      "sha256": "29a58c8af883e4acb6a7f70d3174df171b369a89a05909e22be2621b81cd469c"
+    },
+    {
+      "byte_length": 247193,
+      "path": "tests/test_walksafe_project_continuation_v2_4.py",
+      "sha256": "bf69ffb92ab2e12fee45e2be7081175095ca3fe9b7b414eabea8894c582932f5"
+    },
+    {
+      "byte_length": 768890,
+      "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+      "sha256": "b33c8a8a400304b208dde589d268a51bafb1ef6c240cebd9c5f0fa6bab92faca"
+    },
+    {
+      "byte_length": 487723,
+      "path": "tests/test_walksafe_goal_graph_v2_4.py",
+      "sha256": "94138b7cec14a8e69297e4e99095573ce551ef67401f442c51f5445dd24d8030"
+    },
+    {
+      "byte_length": 26631,
+      "path": "scripts/run_walksafe_test_layers_current.sh",
+      "sha256": "cf630840e6f9711b123809741ef831f25eed5bd6b9ae448738738f2f3e4b6cef"
+    }
+  ],
+  "round_id": "R001",
+  "schema_version": "1.0",
+  "source_checkpoint_binding": {
+    "byte_length": 2654910,
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "sequence": 90,
+    "sha256": "33c691c307555a0a594356d40707ccb9862105d56cab39e7a26b49f44da778ad",
+    "tail_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP048-R002-20260826-001",
+    "tail_event_sha256": "ba64b564f388e8598db038e8d3e20e6bf3fdada8f2ec0e5649b6b5db02fe625c"
+  }
+}

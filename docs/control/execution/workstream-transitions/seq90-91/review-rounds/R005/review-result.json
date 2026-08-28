@@ -1,0 +1,40 @@
+{
+  "assignment_binding": {
+    "byte_length": 24542,
+    "path": "docs/control/execution/workstream-transitions/seq90-91/review-rounds/R005/review-assignment.json",
+    "sha256": "999ba6b4560a332e0e55d85158ffd15170b8c6247409cebc74c68ed62f86e2fe"
+  },
+  "claim_boundary": {
+    "actual_device_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "goal_status_change_count": 0,
+    "implementation_start_authorized": false,
+    "product_implementation_credit_delta": 0,
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "signing_credit_delta": 0,
+    "test_credit_delta": 0
+  },
+  "decision": "APPROVE_INTERNAL_ZERO_CREDIT_CONTROL_ONLY",
+  "document_id": "WS-FP048-R002-SEQ90-91-REVIEW-RESULT-20260826-R005",
+  "external_independence_claimed": false,
+  "findings": [],
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R002",
+  "noncredit_successor_edges_sha256": "bebe6ecf211f92fb1aaf934a72989b2930b15d2d164e1829e68478b360514c21",
+  "reviewed_at": "2026-08-26T04:34:45+09:00",
+  "reviewer": {
+    "id": "codex-fp048-r002-seq90-independent-reviewer-20260826",
+    "task_id": "/root/fp048_seq90_reanchor_impl/seq90_independent_review_r005"
+  },
+  "round_id": "WS-FP048-R002-SEQ90-91-REVIEW-20260826-R005",
+  "schema_version": "1.0"
+}

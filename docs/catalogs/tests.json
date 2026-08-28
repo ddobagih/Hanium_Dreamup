@@ -1,11 +1,11 @@
 {
   "area_counts": {
     "ANDROID_ADMIN": 12,
-    "ANDROID_GATEWAY": 12,
-    "ANDROID_USER": 114,
-    "BACKEND": 31,
-    "CONTROL": 104,
-    "CROSS_REPOSITORY": 67,
+    "ANDROID_GATEWAY": 13,
+    "ANDROID_USER": 117,
+    "BACKEND": 33,
+    "CONTROL": 157,
+    "CROSS_REPOSITORY": 70,
     "LEGACY_WEB": 20,
     "MODEL_DATA": 8,
     "TOOLING": 13,
@@ -82,6 +82,13 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
       "path": "apps/android-gateway/test/privacy-rights.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/server-capacity.test.ts"
     },
     {
       "area": "ANDROID_GATEWAY",
@@ -236,6 +243,13 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
       "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/GatewayCapacityMainActivityStaticTest.kt"
     },
     {
       "area": "ANDROID_USER",
@@ -648,6 +662,13 @@
       "framework": "JUNIT",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/EncryptedRouteSnapshotStoreTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
       "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/LocationPolicyTest.kt"
     },
     {
@@ -719,6 +740,13 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
       "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayActivityCallbackPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayCapacityTest.kt"
     },
     {
       "area": "ANDROID_USER",
@@ -1124,6 +1152,13 @@
       "framework": "PYTEST",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_account_deletion_worker.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
       "path": "backend/tests/test_actor_rate_limit_store.py"
     },
     {
@@ -1181,6 +1216,13 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
       "path": "backend/tests/test_backup_source.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_capacity_state.py"
     },
     {
       "area": "BACKEND",
@@ -1372,6 +1414,13 @@
       "path": "scripts/test_tts.py"
     },
     {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_account_deletion_worker_operations.py"
+    },
+    {
       "area": "TOOLING",
       "framework": "PYTEST",
       "lifecycle": "CURRENT",
@@ -1447,6 +1496,230 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
       "path": "tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp046_r002_goal_completed_seq86_87_20260825.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_apply_walksafe_fp046_r002_goal_start_control_correction_seq78_20260824.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_apply_walksafe_fp046_r002_goal_start_control_reanchor_seq77_20260823.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_apply_walksafe_fp046_r002_goal_started_seq78_20260823.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_apply_walksafe_fp046_r002_goal_started_seq79_20260824.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_completed_seq100_101_20260827.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_completed_seq101_102_20260827.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_completed_seq98_99_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_completed_seq99_100_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_seq88_89_20260825.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_start_branch_semantics_reanchor_seq93_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_start_control_correction_seq91_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq100_20260827.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq100_projection_correction_20260828.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq90_20260825.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq91_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq92_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq93_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq94_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq95_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq96_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq97_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq98_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_goal_started_seq99_20260827.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_start_gate_contract_correction_seq92_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_start_gate_contract_correction_seq94_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_start_gate_contract_correction_seq95_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_start_gate_contract_correction_seq96_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_start_gate_execution_correction_seq98_20260827.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_start_gate_execution_correction_seq99_20260827.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp048_r002_start_gate_snapshot_hygiene_correction_seq97_20260826.py"
     },
     {
       "area": "CONTROL",
@@ -1549,9 +1822,23 @@
     {
       "area": "CONTROL",
       "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
-      "path": "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py"
+      "path": "tests/test_build_walksafe_fp046_r002_seq77_78_review_20260823.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_fp046_r002_seq78_79_recovery_review_20260824.py"
     },
     {
       "area": "CONTROL",
@@ -1699,6 +1986,13 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
       "path": "tests/test_local_model_registry.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_publish_walksafe_fp048_r002_goal_seq88_89_20260825.py"
     },
     {
       "area": "CROSS_REPOSITORY",
@@ -1880,6 +2174,13 @@
       "framework": "PYTEST",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_android_gateway_ingress_current.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
       "path": "tests/test_walksafe_android_product_boundary.py"
     },
     {
@@ -1944,6 +2245,13 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
       "path": "tests/test_walksafe_backup_integrity.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_backup_operations.py"
     },
     {
       "area": "CROSS_REPOSITORY",
@@ -2405,6 +2713,13 @@
       "framework": "PYTEST",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp046_r002_goal_start_gate_20260823.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
       "path": "tests/test_walksafe_fp046_strict_review_gate_20260810.py"
     },
     {
@@ -2455,6 +2770,125 @@
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "test-runner-historical-array",
       "path": "tests/test_walksafe_fp048_goal_started_seq42_20260802.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_20260825.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r002_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r003_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r004_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r005_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r006_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r007_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r008_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r009_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r010_20260827.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_goal_start_gate_r011_20260827.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_post_seq93_stage_regression_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_post_seq94_stage_regression_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_post_seq95_stage_regression_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_post_seq96_stage_regression_20260826.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_post_seq97_stage_regression_20260827.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_r002_post_seq99_stage_regression_20260827.py"
     },
     {
       "area": "CONTROL",
@@ -2718,17 +3152,17 @@
   ],
   "framework_counts": {
     "ANDROID_INSTRUMENTATION_JUNIT": 2,
-    "JUNIT": 124,
-    "NODE_TEST": 12,
-    "PYTEST": 226,
+    "JUNIT": 127,
+    "NODE_TEST": 13,
+    "PYTEST": 284,
     "PYTHON_CLI": 2,
     "TYPESCRIPT_POLICY": 20
   },
   "lifecycle_counts": {
-    "CURRENT": 243,
-    "HISTORICAL": 143
+    "CURRENT": 299,
+    "HISTORICAL": 149
   },
-  "path_count": 386,
+  "path_count": 448,
   "schema_version": "1.0",
   "selection": [
     "test_*.py",
@@ -2746,5 +3180,5 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "bb49f85723d704c2c5373cb04e4fad26e43d6b7e837f47c9f800273c11e126f3"
+  "source_set_sha256": "8797c1b5feee79e4531bfd239c4633703ac7f71c2df31914c01ef42a08c57149"
 }

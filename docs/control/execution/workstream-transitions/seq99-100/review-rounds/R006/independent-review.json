@@ -1,0 +1,28 @@
+{
+  "assignment_binding": {
+    "byte_length": 55653,
+    "path": "docs/control/execution/workstream-transitions/seq99-100/review-rounds/R006/review-assignment.json",
+    "sha256": "006434e6f88b2ff1588655141a50c1387858c7538e6391fa1e11968297dfba6c"
+  },
+  "decision": "APPROVED",
+  "document_id": "WS-FP048-R002-SEQ99-100-INDEPENDENT-REVIEW-20260827-R006",
+  "evidence_type": "TRANSITION_CONTROL_INDEPENDENT_REVIEW",
+  "external_independence_claimed": false,
+  "findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0
+  },
+  "review_result_binding": {
+    "byte_length": 756,
+    "path": "docs/control/execution/workstream-transitions/seq99-100/review-rounds/R006/review-result.json",
+    "sha256": "67358df4d23f7f8898ff5705683622e7e0d61a1a88feb99d243950481f1cdd1d"
+  },
+  "reviewed_at": "2026-08-28T04:23:49+09:00",
+  "reviewer": {
+    "id": "codex-fp048-r002-seq99-correction-r006-independent-reviewer-20260828",
+    "task_id": "/root/seq99_serialization_perf_audit"
+  },
+  "round_id": "R006",
+  "schema_version": "1.0"
+}

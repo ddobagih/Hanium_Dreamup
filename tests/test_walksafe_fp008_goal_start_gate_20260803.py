@@ -440,6 +440,52 @@ class WalkSafeFp008GoalStartGateTest(unittest.TestCase):
             ):
                 self.assertNotIn(name, environment)  # type: ignore[operator]
 
+    def test_context_reload_is_phase_aware_and_keeps_fresh_attempt_safety(
+        self,
+    ) -> None:
+        original_load_gate_context = gate.load_gate_context
+        observations: list[tuple[bool, bool]] = []
+
+        def observing_load_gate_context(
+            root: Path,
+            retained_contents: object | None = None,
+            *,
+            require_live_snapshot: bool = True,
+        ) -> gate.GateContext:
+            event_exists = os.path.lexists(
+                root / gate.GATE_ROOT_RELATIVE / EVENT_ID
+            )
+            observations.append((require_live_snapshot, event_exists))
+            return original_load_gate_context(
+                root,
+                retained_contents,  # type: ignore[arg-type]
+                require_live_snapshot=require_live_snapshot,
+            )
+
+        with mock.patch.object(
+            gate,
+            "load_gate_context",
+            side_effect=observing_load_gate_context,
+        ):
+            receipt_path = self._run(FakeRunner(empty_indices={3}))
+
+        self.assertEqual(
+            observations,
+            [
+                (True, False),
+                (False, True),
+                (False, True),
+                (False, True),
+                (False, True),
+            ],
+        )
+        self.assertEqual(json.loads(receipt_path.read_bytes())["status"], "PASS")
+
+        retry_runner = FakeRunner()
+        with self.assertRaisesRegex(gate.GateError, "already exists"):
+            self._run(retry_runner)
+        self.assertEqual(retry_runner.calls, [])
+
     def test_seq47_checker_accepts_goal_scoped_receipt_and_keeps_legacy_contract(self) -> None:
         receipt_path = self._run(FakeRunner(empty_indices={3}))
         receipt = json.loads(receipt_path.read_bytes())
@@ -602,6 +648,7 @@ class WalkSafeFp008GoalStartGateTest(unittest.TestCase):
     ) -> None:
         with tempfile.TemporaryDirectory() as repository_directory:
             repository = Path(repository_directory)
+            repository.chmod(0o755)
             subprocess.run(
                 ["git", "init", "--quiet", "--initial-branch=main"],
                 cwd=repository,
@@ -612,8 +659,21 @@ class WalkSafeFp008GoalStartGateTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (repository / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+            historical_relative = Path("reviews/historical/nested/review.json")
+            (repository / historical_relative).parent.mkdir(parents=True)
+            (repository / historical_relative).parent.chmod(0o775)
+            (repository / historical_relative).write_text(
+                '{"review":"historical"}\n',
+                encoding="utf-8",
+            )
             subprocess.run(
-                ["git", "add", ".gitignore", "tracked.txt"],
+                [
+                    "git",
+                    "add",
+                    ".gitignore",
+                    "tracked.txt",
+                    historical_relative.as_posix(),
+                ],
                 cwd=repository,
                 check=True,
             )
@@ -662,6 +722,7 @@ class WalkSafeFp008GoalStartGateTest(unittest.TestCase):
             (repository / bound_event_relative).mkdir(parents=True)
             (repository / bound_receipt_relative).write_bytes(b"bound receipt\n")
             (repository / bound_log_relative).write_bytes(b"bound log\n")
+            (repository / bound_event_relative).chmod(0o700)
             (repository / unbound_event_relative).mkdir(parents=True)
             (repository / unbound_event_relative / "01-CONTINUATION.log").write_bytes(
                 b"unbound log\n"
@@ -746,9 +807,27 @@ class WalkSafeFp008GoalStartGateTest(unittest.TestCase):
                     self.assertFalse(
                         (snapshot.root / unbound_event_relative).exists()
                     )
+                    self.assertEqual(stat.S_IMODE(snapshot.container.stat().st_mode), 0o700)
+                    self.assertEqual(stat.S_IMODE(snapshot.root.stat().st_mode), 0o700)
+                    self.assertEqual(
+                        stat.S_IMODE((snapshot.root / ".git").stat().st_mode),
+                        0o700,
+                    )
+                    self.assertEqual(
+                        stat.S_IMODE(
+                            (snapshot.root / historical_relative).parent.stat().st_mode
+                        ),
+                        0o775,
+                    )
                     snapshot.verify_repository()
+                    (snapshot.root / historical_relative).parent.chmod(0o755)
+                    with self.assertRaisesRegex(
+                        gate.GateError,
+                        "ancestor identity changed",
+                    ):
+                        snapshot.verify()
                 finally:
-                    snapshot.close()
+                    snapshot.close(RuntimeError("expected snapshot parent drift"))
 
                 capture_source_guard = gate._RetainedSourceGuard.capture
 
@@ -830,6 +909,86 @@ class WalkSafeFp008GoalStartGateTest(unittest.TestCase):
                 if authority is not None:
                     authority.close()
                 repository_guard.close()
+
+    def test_snapshot_parent_modes_fail_closed_on_unsafe_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            live_root = base / "live"
+            snapshot_root = base / "snapshot"
+            live_root.mkdir(mode=0o755)
+            snapshot_root.mkdir(mode=0o700)
+            relative = Path("reviews/historical/nested/review.json")
+            live_parent = live_root / relative.parent
+            live_parent.mkdir(parents=True)
+            live_parent.chmod(0o775)
+            (live_root / relative).write_text("review\n", encoding="utf-8")
+
+            live_tree = gate._RetainedDirectoryTree.capture(live_root, (relative,))
+            snapshot_tree = None
+            try:
+                gate._materialize_snapshot_parent_modes(
+                    live_tree,
+                    snapshot_root,
+                    frozenset(),
+                )
+                self.assertEqual(
+                    stat.S_IMODE((snapshot_root / relative.parent).stat().st_mode),
+                    0o775,
+                )
+                snapshot_tree = gate._RetainedDirectoryTree.capture(
+                    snapshot_root,
+                    (relative,),
+                )
+                gate._require_snapshot_parent_modes(
+                    live_tree,
+                    snapshot_tree,
+                    frozenset(),
+                )
+                (snapshot_root / relative.parent).chmod(0o755)
+                with self.assertRaisesRegex(
+                    gate.GateError,
+                    "ancestor identity changed",
+                ):
+                    snapshot_tree.verify()
+            finally:
+                if snapshot_tree is not None:
+                    snapshot_tree.close(RuntimeError("expected snapshot drift"))
+                live_tree.close()
+
+            live_parent.chmod(0o750)
+            unsafe_tree = gate._RetainedDirectoryTree.capture(live_root, (relative,))
+            try:
+                with self.assertRaisesRegex(gate.GateError, "mode is unsafe"):
+                    gate._materialize_snapshot_parent_modes(
+                        unsafe_tree,
+                        snapshot_root,
+                        frozenset(),
+                    )
+            finally:
+                unsafe_tree.close()
+
+            live_parent.chmod(0o775)
+            drift_tree = gate._RetainedDirectoryTree.capture(live_root, (relative,))
+            live_parent.chmod(0o755)
+            try:
+                with self.assertRaisesRegex(
+                    gate.GateError,
+                    "ancestor identity changed",
+                ):
+                    gate._materialize_snapshot_parent_modes(
+                        drift_tree,
+                        snapshot_root,
+                        frozenset(),
+                    )
+            finally:
+                drift_tree.close(RuntimeError("expected live mode drift"))
+
+            live_parent.chmod(0o775)
+            moved_parent = live_parent.with_name("nested-real")
+            live_parent.rename(moved_parent)
+            live_parent.symlink_to(moved_parent.name, target_is_directory=True)
+            with self.assertRaises(OSError):
+                gate._RetainedDirectoryTree.capture(live_root, (relative,))
 
     def test_checkpoint_bound_gate_evidence_rejects_missing_and_unsafe_entries(
         self,
@@ -960,6 +1119,7 @@ class WalkSafeFp008GoalStartGateTest(unittest.TestCase):
             (snapshot_root / ".git").mkdir()
             os.chmod(container, 0o700)
             os.chmod(snapshot_root, 0o700)
+            os.chmod(snapshot_root / ".git", 0o700)
             repository_guard = mock.Mock()
             repository_guard.workspace = workspace
             authority = gate._RepositoryStateAuthority.from_payload(
