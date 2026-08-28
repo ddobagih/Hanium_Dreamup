@@ -33,7 +33,8 @@ export type GatewayStateKind =
   | "field-walk-ledger"
   | "privacy-rights-ledger"
   | "privacy-deletion-v2"
-  | "integrated-consent";
+  | "integrated-consent"
+  | "server-capacity";
 
 export type GatewayStateContext = {
   kind: GatewayStateKind;
@@ -488,7 +489,8 @@ function validateContext(context: GatewayStateContext): void {
       "field-walk-ledger",
       "privacy-rights-ledger",
       "privacy-deletion-v2",
-      "integrated-consent"
+      "integrated-consent",
+      "server-capacity"
     ].includes(context.kind) ||
     !RECORD_ID.test(context.recordId)
   ) {

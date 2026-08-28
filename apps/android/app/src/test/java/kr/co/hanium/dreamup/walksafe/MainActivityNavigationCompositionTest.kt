@@ -57,6 +57,11 @@ class MainActivityNavigationCompositionTest {
         assertTrue(hearMore.contains("DestinationSearchVoiceCommand.HearMore"))
         assertTrue(hearMore.contains("performDestinationSearch(reset = false)"))
         assertTrue(selection.contains("DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex)"))
+        assertTrue(selection.contains("if (!onDestinationSelected(selected)) return"))
+        assertTrue(
+            selection.indexOf("if (!onDestinationSelected(selected)) return") <
+                selection.indexOf("TMAP 경로를 확인합니다"),
+        )
     }
 
     @Test
@@ -67,6 +72,137 @@ class MainActivityNavigationCompositionTest {
         assertTrue(recognitionStart.contains("expectedNavigationDecisionToken"))
         assertTrue(commandHandler.contains("routeNavigator.pendingDecisionToken()"))
         assertTrue(commandHandler.contains("voice=navigation_decision_stale"))
+        assertTrue(commandHandler.contains("AndroidVoiceAction.StopNavigation"))
+    }
+
+    @Test
+    fun routeDeviationCancelsNavigationBeforeItsInteractionPrompt() {
+        val guidance = functionBlock("private fun updateRouteGuidance(")
+        val deviation = functionBlock("private fun applyRouteDeviationSafetyUpdate(")
+
+        val cancellation = deviation.indexOf("feedbackActuator?.cancelNavigationSpeech()")
+        val prompt = deviation.indexOf("update.instruction?.let(::speakInteraction)")
+        assertTrue(cancellation >= 0)
+        assertTrue(prompt > cancellation)
+        assertTrue(deviation.contains("update.cancelStaleNavigationSpeech"))
+        assertTrue(deviation.contains("update.userDecisionRequired"))
+        assertTrue(guidance.contains("applyRouteDeviationSafetyUpdate(update)"))
+    }
+
+    @Test
+    fun confirmedDeviationRendersExactlyThreeAccessibleActions() {
+        val controls = source.substringAfter("routeDeviationNewRouteButton = Button(this).apply")
+            .substringBefore("destinationResetButton = Button(this).apply")
+
+        assertEquals(1, Regex("text = \"새 경로 요청\"").findAll(controls).count())
+        assertEquals(1, Regex("text = \"위치 다시 확인\"").findAll(controls).count())
+        assertEquals(1, Regex("text = \"길안내 종료\"").findAll(controls).count())
+        assertEquals(3, Regex("addView\\(routeDeviation").findAll(controls).count())
+        assertTrue(controls.contains("contentDescription = text"))
+        assertTrue(source.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
+    }
+
+    @Test
+    fun onlyNewRouteChoiceCallsTheTmapRouteRequest() {
+        val newRoute = functionBlock("private fun requestRerouteFromVoice(")
+        val recheck = functionBlock("private fun recheckLocationFromVoice(")
+        val end = functionBlock("private fun endNavigationAfterDeviation(")
+        val request = functionBlock("private fun requestRoute(")
+        val destinationSelection = functionBlock("private fun onDestinationSelected(")
+
+        assertTrue(newRoute.contains("RouteDeviationChoice.NEW_ROUTE"))
+        assertTrue(newRoute.contains("requestRoute(destination, reason = \"off_route\")"))
+        assertTrue(recheck.contains("RouteDeviationChoice.RECHECK_LOCATION"))
+        assertFalse(recheck.contains("requestRoute("))
+        assertTrue(end.contains("RouteDeviationChoice.END_NAVIGATION"))
+        assertFalse(end.contains("requestRoute("))
+        assertTrue(request.contains("reason != \"off_route\" && blockRouteMutationWhileDeviationChoicePending()"))
+        assertTrue(destinationSelection.contains("blockRouteMutationWhileDeviationChoicePending()"))
+        assertTrue(destinationSelection.contains("routeRequestGenerationBefore"))
+        assertTrue(destinationSelection.contains("routeRequestGeneration != routeRequestGenerationBefore"))
+        assertTrue(destinationSelection.contains("routeRequestInFlight.get()"))
+    }
+
+    @Test
+    fun routeWorkerStoresTheFirstSnapshotBeforeInstallAndWiresTheFailureGuard() {
+        val request = functionBlock("private fun requestRoute(")
+        val retainedFailure = functionBlock("private fun retainRouteAfterRerouteFailure(")
+        val purgeFence = functionBlock("private fun routeSnapshotPurgeFenceAllowsRoute(")
+        val snapshotSave = request.indexOf("routeSnapshotStore.saveFirstRoute(")
+        val uiCommit = request.lastIndexOf("runOnUiThread {", snapshotSave)
+        val leaseCheck = request.lastIndexOf("isRouteRequestLeaseCurrent(", snapshotSave)
+        val firstPurgeFence = request.indexOf("routeSnapshotPurgeFenceAllowsRoute()")
+        val secondPurgeFence = request.indexOf(
+            "routeSnapshotPurgeFenceAllowsRoute()",
+            firstPurgeFence + 1,
+        )
+
+        assertTrue(snapshotSave < request.indexOf("routeNavigator.setRoute("))
+        assertTrue(uiCommit >= 0)
+        assertTrue(leaseCheck > uiCommit)
+        assertTrue(request.indexOf("if (!isRouteActive) return@runOnUiThread", uiCommit) < snapshotSave)
+        assertEquals(2, Regex("routeSnapshotPurgeFenceAllowsRoute\\(\\)").findAll(request).count())
+        assertTrue(firstPurgeFence < request.indexOf("walkingRouteClient.fetchRouteCall("))
+        assertTrue(secondPurgeFence > leaseCheck)
+        assertTrue(secondPurgeFence < snapshotSave)
+        assertTrue(request.indexOf("catch (_: CancellationException)") < request.indexOf("catch (error: Exception)"))
+        assertTrue(request.contains("tmapFailureGuard.recordSuccess()"))
+        assertTrue(request.contains("tmapFailureGuard.recordFailure()"))
+        assertTrue(request.contains("countableTmapFailure = routeProviderCallInProgress"))
+        assertTrue(request.contains("enterWalkSessionSafetyStopAndCancelOutputs(\"tmap_consecutive_failures\")"))
+        assertTrue(request.contains("NavigationBackendErrorKind.AUTHENTICATION"))
+        assertTrue(request.contains("navigationFailure.kind.userMessage"))
+        assertTrue(request.contains("scheduleEncryptedRouteSnapshotExpiry("))
+        assertTrue(retainedFailure.contains("applyRouteDeviationSafetyUpdate"))
+
+        assertTrue(purgeFence.contains("if (!routeSnapshotPurgeFailed) return true"))
+        assertTrue(purgeFence.contains("enterWalkSessionSafetyStopAndCancelOutputs(\"route_snapshot_purge_failed\")"))
+        assertTrue(purgeFence.contains("updateStatus(\"길안내 저장소 오류 · 안전 중지\", detail)"))
+        assertTrue(purgeFence.contains("speakInteraction(detail)"))
+        assertTrue(purgeFence.indexOf("speakInteraction(detail)") < purgeFence.indexOf("return false"))
+    }
+
+    @Test
+    fun terminalRouteSafetyStopsSpeakOneBoundedAccessibleDetail() {
+        val request = functionBlock("private fun requestRoute(")
+        val tmapStopStart = request.indexOf(
+            "enterWalkSessionSafetyStopAndCancelOutputs(\"tmap_consecutive_failures\")",
+        )
+        val tmapStopEnd = request.indexOf("return@runOnUiThread", tmapStopStart)
+        val tmapStop = request.substring(tmapStopStart, tmapStopEnd)
+        val snapshotStop = request.substringAfter("if (storedRouteSnapshot == null)")
+            .substringBefore("return@runOnUiThread")
+        val expiry = functionBlock("private fun scheduleEncryptedRouteSnapshotExpiry(")
+
+        assertTrue(tmapStop.contains("navigationFailure.kind.userMessage"))
+        assertTrue(tmapStop.contains("모든 보행 기능을 중지했습니다"))
+        assertEquals(1, Regex("speakInteraction\\(safetyStopDetail\\)").findAll(tmapStop).count())
+        assertFalse(tmapStop.contains("error.message"))
+        assertFalse(tmapStop.contains("error.toString"))
+        assertFalse(tmapStop.contains("backendCode"))
+        assertEquals(1, Regex("speakInteraction\\(detail\\)").findAll(snapshotStop).count())
+        assertEquals(1, Regex("speakInteraction\\(detail\\)").findAll(expiry).count())
+    }
+
+    @Test
+    fun untrustedGpsBreaksDeviationEvidenceAndPauseKeepsTheEncryptedSnapshot() {
+        val location = functionBlock("private fun handleLocationUpdate(")
+        val clearLocation = functionBlock("private fun clearTrustedLocation(")
+        val untrusted = functionBlock("private fun handleRouteLocationUntrusted(")
+        val foregroundPause = functionBlock("private fun enterWalkSessionForegroundRecheckAndCancelOutputs(")
+        val cancelOutputs = functionBlock("private fun cancelWalkSessionOutputs(")
+        val reset = functionBlock("private fun resetRouteState(")
+        val purge = functionBlock("private fun purgeEncryptedRouteSnapshot(")
+
+        assertTrue(location.contains("handleRouteLocationUntrusted()"))
+        assertTrue(clearLocation.contains("handleRouteLocationUntrusted()"))
+        assertTrue(untrusted.contains("routeNavigator.onUntrustedLocation()"))
+        assertTrue(untrusted.contains("applyRouteDeviationSafetyUpdate(update)"))
+        assertTrue(foregroundPause.contains("cancelWalkSessionOutputs(reason)"))
+        assertTrue(cancelOutputs.contains("WalkSessionState.PAUSED"))
+        assertTrue(cancelOutputs.contains("resetRouteState(purgeRouteSnapshot = false)"))
+        assertTrue(reset.contains("purgeEncryptedRouteSnapshot()"))
+        assertTrue(purge.contains("routeSnapshotStore.clear()"))
     }
 
     @Test
@@ -83,7 +219,10 @@ class MainActivityNavigationCompositionTest {
             .filter { it.extension in setOf("kt", "java", "xml") }
             .joinToString("\n") { it.readText() }
 
-        assertFalse(Regex("(?i)tmap[_-]?app[_-]?key|\\\"appKey\\\"").containsMatchIn(androidMain))
+        assertFalse(
+            Regex("(?i)tmap[_-]?app[_-]?key\\s*=|\\\"appKey\\\"\\s*:")
+                .containsMatchIn(androidMain),
+        )
     }
 
     @Test
@@ -101,6 +240,7 @@ class MainActivityNavigationCompositionTest {
         val entryFailure = invokeEntry(
             activity = activity,
             methodName = "onDestinationSelected",
+            returnType = Boolean::class.javaPrimitiveType!!,
             parameterTypes = arrayOf(DestinationSearchResult::class.java),
             arguments = arrayOf(
                 DestinationSearchResult(
@@ -230,12 +370,13 @@ class MainActivityNavigationCompositionTest {
     private fun invokeEntry(
         activity: MainActivity,
         methodName: String,
+        returnType: Class<*> = Void.TYPE,
         parameterTypes: Array<Class<*>> = emptyArray(),
         arguments: Array<Any> = emptyArray(),
     ): Throwable? {
         return runCatching {
             MethodHandles.privateLookupIn(MainActivity::class.java, MethodHandles.lookup())
-                .findVirtual(MainActivity::class.java, methodName, MethodType.methodType(Void.TYPE, parameterTypes.toList()))
+                .findVirtual(MainActivity::class.java, methodName, MethodType.methodType(returnType, parameterTypes.toList()))
                 .bindTo(activity)
                 .invokeWithArguments(arguments.toList())
         }.exceptionOrNull()

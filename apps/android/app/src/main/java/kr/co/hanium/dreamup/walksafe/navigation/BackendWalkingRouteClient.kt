@@ -2,7 +2,9 @@ package kr.co.hanium.dreamup.walksafe.navigation
 
 import java.io.OutputStreamWriter
 import java.io.UnsupportedEncodingException
+import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.URLEncoder
 import kotlin.math.abs
@@ -14,6 +16,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
 import kr.co.hanium.dreamup.walksafe.network.GatewayFieldSession
+import kr.co.hanium.dreamup.walksafe.network.NetworkResponseTooLargeException
 import kr.co.hanium.dreamup.walksafe.network.cancellableHttpCall
 import kr.co.hanium.dreamup.walksafe.network.readBoundedResponse
 import org.json.JSONArray
@@ -181,7 +184,11 @@ class HttpUrlConnectionWalkingRouteTransport : WalkingRouteTransport {
             }
             val response = connection.readBoundedResponse(WALKING_ROUTE_MAX_RESPONSE_BYTES, cancellation)
             if (response.statusCode !in 200..299) {
-                throw GatewayProxyHttpException(response.statusCode, failureReason)
+                throw GatewayProxyHttpException(
+                    statusCode = response.statusCode,
+                    requestReason = failureReason,
+                    backendCode = parseBackendErrorCode(response.body),
+                )
             }
             response.body
         } finally {
@@ -193,8 +200,96 @@ class HttpUrlConnectionWalkingRouteTransport : WalkingRouteTransport {
 
 class GatewayProxyHttpException(
     val statusCode: Int,
-    reason: String,
-) : IllegalStateException("gateway proxy request failed: $reason status=$statusCode")
+    val requestReason: String,
+    val backendCode: String? = null,
+) : IllegalStateException(
+    "gateway proxy request failed: $requestReason status=$statusCode code=${backendCode ?: "unknown"}",
+)
+
+enum class NavigationBackendErrorKind(val statusToken: String, val userMessage: String) {
+    AUTHENTICATION("authentication", "길안내 로그인을 다시 확인해 주세요."),
+    PROVIDER_CONFIGURATION("provider_configuration", "TMAP 서버 설정 오류로 길안내를 사용할 수 없습니다."),
+    RATE_LIMITED("rate_limited", "TMAP 사용 한도에 도달해 새 경로를 요청할 수 없습니다."),
+    TIMEOUT("timeout", "TMAP 응답 시간이 초과되었습니다."),
+    PROVIDER_UNAVAILABLE("provider_unavailable", "TMAP 연결 장애로 새 경로를 확인할 수 없습니다."),
+    INVALID_RESPONSE("invalid_response", "TMAP 경로 응답을 안전하게 확인할 수 없습니다."),
+    NETWORK("network", "네트워크 연결 오류로 TMAP 경로를 확인할 수 없습니다."),
+    BACKEND_UNAVAILABLE("backend_unavailable", "길안내 서버 장애로 TMAP 경로를 확인할 수 없습니다."),
+    UNKNOWN("unknown", "길안내 오류 종류를 확인할 수 없습니다."),
+}
+
+data class NavigationBackendFailure(
+    val kind: NavigationBackendErrorKind,
+    val backendCode: String? = null,
+    val statusCode: Int? = null,
+)
+
+fun classifyNavigationBackendFailure(error: Throwable): NavigationBackendFailure {
+    if (error is GatewayProxyHttpException) {
+        val code = error.backendCode
+        val kind = when {
+            error.statusCode in setOf(401, 403) || code == "gateway_upstream_auth_failed" ->
+                NavigationBackendErrorKind.AUTHENTICATION
+            error.statusCode == 429 -> NavigationBackendErrorKind.RATE_LIMITED
+            code in setOf("tmap_app_key_missing", "tmap_invalid_api_key", "walking_route_provider_invalid") ->
+                NavigationBackendErrorKind.PROVIDER_CONFIGURATION
+            code == "tmap_timeout" || error.statusCode == 504 -> NavigationBackendErrorKind.TIMEOUT
+            code in setOf("tmap_network_error", "tmap_provider_error", "route_unavailable") ->
+                NavigationBackendErrorKind.PROVIDER_UNAVAILABLE
+            code == "invalid_tmap_response" || code?.startsWith("route_") == true ->
+                NavigationBackendErrorKind.INVALID_RESPONSE
+            error.statusCode >= 500 -> NavigationBackendErrorKind.BACKEND_UNAVAILABLE
+            else -> NavigationBackendErrorKind.UNKNOWN
+        }
+        return NavigationBackendFailure(kind, code, error.statusCode)
+    }
+    val kind = when (error) {
+        is SocketTimeoutException -> NavigationBackendErrorKind.TIMEOUT
+        is GatewayResponseProtocolException,
+        is NetworkResponseTooLargeException,
+        -> NavigationBackendErrorKind.INVALID_RESPONSE
+        is IOException -> NavigationBackendErrorKind.NETWORK
+        else -> NavigationBackendErrorKind.UNKNOWN
+    }
+    return NavigationBackendFailure(kind)
+}
+
+class ConsecutiveTmapFailureGuard(
+    private val safetyStopThreshold: Int = 2,
+) {
+    init {
+        require(safetyStopThreshold > 0)
+    }
+
+    private var consecutiveFailures = 0
+
+    @Synchronized
+    fun recordFailure(): Boolean {
+        consecutiveFailures += 1
+        return consecutiveFailures >= safetyStopThreshold
+    }
+
+    @Synchronized
+    fun recordSuccess() {
+        consecutiveFailures = 0
+    }
+
+    @Synchronized
+    fun reset() {
+        consecutiveFailures = 0
+    }
+
+    @Synchronized
+    fun failureCount(): Int = consecutiveFailures
+}
+
+private fun parseBackendErrorCode(body: String): String? = runCatching {
+    val root = JSONObject(body)
+    val detail = root.optJSONObject("detail") ?: root
+    detail.optString("code")
+        .trim()
+        .takeIf { it.matches(BACKEND_ERROR_CODE) }
+}.getOrNull()
 
 fun parseWalkingRoute(json: JSONObject, request: WalkingRouteRequest): WalkingRoute {
     requireProtocolValue(json, "schema_version", WALKING_ROUTE_SCHEMA)
@@ -556,5 +651,6 @@ private const val GUIDE_DISTANCE_RELATIVE_TOLERANCE = 0.1
 private const val GUIDE_MONOTONIC_TOLERANCE_M = 10.0
 private const val METERS_PER_LATITUDE_DEGREE = 111_320.0
 private const val EARTH_RADIUS_M = 6_371_000.0
+private val BACKEND_ERROR_CODE = Regex("^[a-z][a-z0-9_]{0,63}$")
 private val ALLOWED_DESTINATION_RESULT_TYPES = setOf("poi", "address", "alias")
 private val DESTINATION_OPTIONAL_STRING_FIELDS = listOf("address", "road_address", "category")

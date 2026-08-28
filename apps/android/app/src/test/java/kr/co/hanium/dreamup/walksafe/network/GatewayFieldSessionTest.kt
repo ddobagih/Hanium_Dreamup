@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.network
 
+import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -16,6 +17,7 @@ class GatewayFieldSessionTest {
     @Before
     fun resetProcessRefreshFence() {
         resetGatewayRefreshProofFenceForTests()
+        GatewayCapacityProcessState.resetForTests()
     }
 
     @Test
@@ -325,6 +327,95 @@ class GatewayFieldSessionTest {
         assertEquals(1, transport.getCount)
         assertEquals("https://field.example/api/field-session", transport.lastGetUrl)
         assertTrue(session.isUsableFor("tester-01", nowEpochMs = 2_000L))
+    }
+
+    @Test
+    fun revalidationUpdatesCapacityWithoutCouplingItToSessionReadiness() {
+        val transport = FakeTransport(
+            statusBody = capacityStatus(
+                version = 7L,
+                observedAt = "2026-08-25T00:00:00Z",
+                expiresAt = "2026-08-25T01:00:00Z",
+                level = GatewayCapacityLevel.HOLD_NEW_RAW_COLLECTION_SESSIONS,
+            ),
+        )
+        val client = GatewayFieldSessionClient(transport)
+        val session = client.login(
+            "https://field.example",
+            "tester-01",
+            ACCOUNT_TOKEN,
+            nowEpochMs = CAPACITY_NOW_MS,
+        )
+
+        val result = client.revalidate(
+            session,
+            "tester-01",
+            nowEpochMs = CAPACITY_NOW_MS + 1L,
+        )
+
+        assertEquals(GatewaySessionRevalidationStatus.READY, result.status)
+        assertEquals(GatewayCapacityAvailability.AVAILABLE, result.capacityAvailability)
+        assertEquals(
+            GatewayCapacityUpdateDisposition.ACCEPTED,
+            result.capacityUpdate?.disposition,
+        )
+        assertEquals(
+            7L,
+            GatewayCapacityProcessState.admission(
+                Instant.ofEpochMilli(CAPACITY_NOW_MS + 1L),
+            ).snapshot?.version,
+        )
+        assertTrue(session.isUsableFor("tester-01", CAPACITY_NOW_MS + 1L))
+    }
+
+    @Test
+    fun missingMalformedAndExpiredCapacityKeepTheVerifiedSessionReady() {
+        val cases = listOf(
+            """{"required":true,"authenticated":true,"actor_id":"tester-01"}""" to
+                GatewayCapacityAvailability.MISSING,
+            capacityStatus(
+                version = 1L,
+                observedAt = "2026-08-25T00:00:00Z",
+                expiresAt = "2026-08-25T01:00:00Z",
+                level = GatewayCapacityLevel.NORMAL,
+                versionOverride = "\"1\"",
+            ) to GatewayCapacityAvailability.MALFORMED,
+            capacityStatus(
+                version = 2L,
+                observedAt = "2026-08-24T23:00:00Z",
+                expiresAt = "2026-08-25T00:05:00Z",
+                level = GatewayCapacityLevel.NORMAL,
+            ) to GatewayCapacityAvailability.EXPIRED,
+        )
+
+        cases.forEach { (statusBody, expectedAvailability) ->
+            GatewayCapacityProcessState.resetForTests()
+            val transport = FakeTransport(statusBody = statusBody)
+            val client = GatewayFieldSessionClient(transport)
+            val session = client.login(
+                "https://field.example",
+                "tester-01",
+                ACCOUNT_TOKEN,
+                nowEpochMs = CAPACITY_NOW_MS,
+            )
+
+            val result = client.revalidate(
+                session,
+                "tester-01",
+                nowEpochMs = CAPACITY_NOW_MS + 1L,
+            )
+
+            assertEquals(GatewaySessionRevalidationStatus.READY, result.status)
+            assertEquals(expectedAvailability, result.capacityAvailability)
+            assertTrue(session.isUsableFor("tester-01", CAPACITY_NOW_MS + 1L))
+            val admission = GatewayCapacityProcessState.admission(
+                Instant.ofEpochMilli(CAPACITY_NOW_MS + 1L),
+            )
+            assertFalse(admission.newRawCollectionSessionAllowed)
+            assertFalse(admission.automaticReportCandidateAllowed)
+            assertTrue(admission.explicitSafetyReportAllowed)
+            assertTrue(admission.activeSafetyFeaturesAllowed)
+        }
     }
 
     @Test
@@ -920,6 +1011,17 @@ class GatewayFieldSessionTest {
         return result
     }
 
+    private fun capacityStatus(
+        version: Long,
+        observedAt: String,
+        expiresAt: String,
+        level: GatewayCapacityLevel,
+        versionOverride: String? = null,
+    ): String {
+        val versionJson = versionOverride ?: version.toString()
+        return """{"required":true,"authenticated":true,"actor_id":"tester-01","capacity":{"version":$versionJson,"observed_at":"$observedAt","expires_at":"$expiresAt","level":"${level.name}","reason":"STORAGE_UTILIZATION"}}"""
+    }
+
     private class FakeTransport(
         private val setCookie: String = COOKIE_ATTRIBUTES,
         statusBody: String = """{"required":true,"authenticated":true,"actor_id":"tester-01"}""",
@@ -990,6 +1092,7 @@ class GatewayFieldSessionTest {
         val REFRESH_TOKEN_0 = "r".repeat(64)
         val REFRESH_TOKEN_1 = "s".repeat(64)
         const val NOW = 1_000L
+        val CAPACITY_NOW_MS = Instant.parse("2026-08-25T00:10:00Z").toEpochMilli()
         const val ACCESS_EXPIRES_AT = 61_000L
         const val IDLE_EXPIRES_AT = 121_000L
         const val ABSOLUTE_EXPIRES_AT = 241_000L

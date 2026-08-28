@@ -42,6 +42,18 @@ test("real loopback HTTP adapter supplies peer IP for direct Android login", asy
   try {
     const address = server.address() as AddressInfo;
     const origin = `http://127.0.0.1:${address.port}`;
+    const health = await fetch(`${origin}/internal/health`);
+    assert.equal(health.status, 200);
+    assert.deepEqual(await health.json(), { status: "ok" });
+    assert.equal(health.headers.get("cache-control"), "no-store");
+
+    const healthWithQuery = await fetch(`${origin}/internal/health?token=sensitive`);
+    assert.equal(healthWithQuery.status, 404);
+    const healthWrongMethod = await fetch(`${origin}/internal/health`, {
+      method: "POST"
+    });
+    assert.equal(healthWrongMethod.status, 404);
+
     const login = await fetch(`${origin}/api/field-session`, {
       method: "POST",
       headers: { "content-type": "application/json" },

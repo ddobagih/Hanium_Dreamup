@@ -145,7 +145,10 @@
         "/api/navigation/walking",
         "/api/navigation/destinations/search",
         "/api/reports/v2",
-        "/api/field-walk"
+        "/api/field-walk",
+        "/privacy/account-deletions",
+        "/privacy/account-deletions/{request_id}/status",
+        "/privacy/account-deletions/{request_id}/device-evidence"
       ],
       "public_non_api_routes": [
         "/privacy/rights"

@@ -8,6 +8,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
@@ -460,6 +461,9 @@ enum class GatewaySessionRevalidationStatus {
 data class GatewaySessionRevalidation(
     val status: GatewaySessionRevalidationStatus,
     val reason: String,
+    val capacityAvailability: GatewayCapacityAvailability =
+        GatewayCapacityAvailability.MISSING,
+    val capacityUpdate: GatewayCapacityUpdate? = null,
 )
 
 class GatewayFieldSessionClient(
@@ -649,10 +653,23 @@ class GatewayFieldSessionClient(
         session: GatewayFieldSession,
         actorId: String?,
         nowEpochMs: Long = System.currentTimeMillis(),
+        capacitySessionGeneration: Long? = null,
     ): GatewaySessionRevalidation {
+        val now = Instant.ofEpochMilli(nowEpochMs)
+        fun result(
+            status: GatewaySessionRevalidationStatus,
+            reason: String,
+            capacityUpdate: GatewayCapacityUpdate? = null,
+        ): GatewaySessionRevalidation = GatewaySessionRevalidation(
+            status = status,
+            reason = reason,
+            capacityAvailability =
+                GatewayCapacityProcessState.admission(now).availability,
+            capacityUpdate = capacityUpdate,
+        )
         val actor = GatewayCredentialPolicy.normalizedActorIdOrNull(actorId)
         if (!session.isUsableFor(actor, nowEpochMs)) {
-            return GatewaySessionRevalidation(
+            return result(
                 GatewaySessionRevalidationStatus.NOT_READY,
                 "local_session_unavailable",
             )
@@ -661,7 +678,7 @@ class GatewayFieldSessionClient(
         val response = try {
             transport.get(endpoint, session.cookieHeaders(nowEpochMs))
         } catch (_: RuntimeException) {
-            return GatewaySessionRevalidation(
+            return result(
                 GatewaySessionRevalidationStatus.PENDING,
                 "gateway_status_unreachable",
             )
@@ -674,13 +691,13 @@ class GatewayFieldSessionClient(
                     GatewaySessionRevalidationStatus.PENDING
                 else -> GatewaySessionRevalidationStatus.NOT_READY
             }
-            return GatewaySessionRevalidation(
+            return result(
                 status,
                 "gateway_status_http_${response.statusCode}",
             )
         }
         val statusJson = runCatching { JSONObject(response.responseBody) }.getOrNull()
-            ?: return GatewaySessionRevalidation(
+            ?: return result(
                 GatewaySessionRevalidationStatus.PENDING,
                 "gateway_status_malformed",
             )
@@ -690,15 +707,22 @@ class GatewayFieldSessionClient(
                 statusJson.optString("actor_id") == actor &&
                 statusScopeMatches(statusJson, session.sessionScope) &&
                 statusMatchesLease(statusJson, session)
+        val capacityUpdate = GatewayCapacityProcessState.apply(
+            GatewayCapacityParser.fromSessionStatus(statusJson),
+            now,
+            capacitySessionGeneration,
+        )
         if (!bindingReady) {
-            return GatewaySessionRevalidation(
+            return result(
                 GatewaySessionRevalidationStatus.NOT_READY,
                 "gateway_actor_binding_unavailable",
+                capacityUpdate,
             )
         }
-        return GatewaySessionRevalidation(
+        return result(
             GatewaySessionRevalidationStatus.READY,
             "gateway_session_ready",
+            capacityUpdate,
         )
     }
 

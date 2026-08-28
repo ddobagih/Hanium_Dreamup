@@ -21,7 +21,7 @@ Gateway는 Android 사용자 앱의 독립 Node.js 22 서비스입니다. field 
 
 ## 배포 경계
 
-[`deploy/README.md`](../../../deploy/README.md)와 같은 경로의 nginx 예제는 완료 근거에 hash로 결속된 과거 Phase E 초안입니다. README 문구는 네 API 경로라고 적혀 있지만 실제 nginx 예제는 다섯 `/api/*` 경로와 `/privacy/rights`를 엽니다. 두 자료 모두 현재 OpenAPI의 계정 삭제 3경로를 배포하지 않으므로 현행 Gateway를 배포하려면 OpenAPI에 맞춘 새 IaC와 별도 검토 증거가 필요합니다.
+[`deploy/README.md`](../../../deploy/README.md)와 같은 경로의 nginx 예제는 `DRAFT_DEPLOYMENT_EXAMPLE / NOT_APPLIED`입니다. 현행 예제는 기존 다섯 `/api/*` 경로, 계정 삭제 3경로와 `/privacy/rights`를 Gateway OpenAPI에 맞춰 열되 나머지는 404로 닫습니다. 계정 삭제 status·device-evidence location은 16~128자의 `[A-Za-z0-9_-]` request ID만 허용하며 본문 상한은 요청 4 KiB, 상태 1 KiB, 기기증거 16 KiB입니다. 이 정적 예제와 내부 검증은 실제 nginx 적용·외부 배포·실기기 연결 증거가 아닙니다.
 
 ## 계약 확인
 

@@ -2,14 +2,14 @@
   "openapi": "3.1.0",
   "info": {
     "title": "WalkSafe Android Gateway API",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "Single-process Android gateway contract, including server-confirmed integrated consent and durable account-deletion v2 fencing with capability recovery. Every response is Cache-Control: no-store."
   },
   "paths": {
     "/api/field-session": {
       "get": {
         "operationId": "getFieldSession",
-        "description": "Without a query, returns the current session status and exact session_scope. With exactly devices=true, requires a general-scope current long-lived access cookie and lists only that actor's active devices.",
+        "description": "Without a query, returns the current session status and exact session_scope, optionally including a fresh server capacity snapshot. With exactly devices=true, requires a general-scope current long-lived access cookie and lists only that actor's active devices without a capacity snapshot.",
         "parameters": [
           {
             "name": "devices",
@@ -1079,6 +1079,48 @@
         },
         "additionalProperties": false
       },
+      "CapacitySnapshot": {
+        "type": "object",
+        "required": [
+          "version",
+          "observed_at",
+          "expires_at",
+          "level",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "ADMIN_ONLY_WARNING",
+              "PAUSE_NEW_FIELD_TEST_PARTICIPANTS",
+              "HOLD_NEW_RAW_COLLECTION_SESSIONS",
+              "HOLD_NEW_TRAINING_AND_AUTO_REPORT_CANDIDATES"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "const": "STORAGE_UTILIZATION"
+          }
+        },
+        "additionalProperties": false
+      },
       "FieldSessionStatus": {
         "oneOf": [
           {
@@ -1119,6 +1161,9 @@
                 "type": "null"
               }
             ]
+          },
+          "capacity": {
+            "$ref": "#/components/schemas/CapacitySnapshot"
           }
         },
         "additionalProperties": false
@@ -1177,6 +1222,9 @@
           },
           "absolute_expires_at_epoch_ms": {
             "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "capacity": {
+            "$ref": "#/components/schemas/CapacitySnapshot"
           }
         },
         "additionalProperties": false

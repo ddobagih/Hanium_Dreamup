@@ -244,6 +244,9 @@ class WalkSafeAndroidProductBoundaryTests(unittest.TestCase):
                 "/api/navigation/destinations/search",
                 "/api/reports/v2",
                 "/api/field-walk",
+                "/privacy/account-deletions",
+                "/privacy/account-deletions/{request_id}/status",
+                "/privacy/account-deletions/{request_id}/device-evidence",
             ],
         )
         self.assertEqual(gateway["legacy_next_fallback"], "PROHIBITED")

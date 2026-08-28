@@ -83,10 +83,18 @@ import {
   type AccountDeletionStatusV2
 } from "./privacy-deletion-v2.js";
 import {
-  recordGatewayFailure,
+  GATEWAY_ROUTE_TEMPLATES,
+  gatewayCorrelationId,
+  gatewayRouteTemplate,
+  recordGatewayRequestCompleted,
+  withGatewayRequestId,
   writeGatewayTelemetry,
   type GatewayTelemetrySink
 } from "./telemetry.js";
+import {
+  currentServerCapacityLevelForTelemetry,
+  mergeServerCapacityIntoFieldSessionResponse
+} from "./server-capacity.js";
 
 const ALLOWED_METHODS = new Map<string, readonly string[]>([
   ["/api/field-session", ["GET", "POST", "DELETE"]],
@@ -97,11 +105,7 @@ const ALLOWED_METHODS = new Map<string, readonly string[]>([
 ]);
 
 export const PUBLIC_GATEWAY_ROUTES = Object.freeze([
-  ...ALLOWED_METHODS.keys(),
-  "/privacy/rights",
-  "/privacy/account-deletions",
-  "/privacy/account-deletions/{request_id}/status",
-  "/privacy/account-deletions/{request_id}/device-evidence"
+  ...GATEWAY_ROUTE_TEMPLATES
 ]);
 
 export type GatewayDependencies = {
@@ -345,7 +349,10 @@ function privacyRightsPage(requestUrl: string, headOnly: boolean): Response {
   });
 }
 
-async function fieldSession(request: Request): Promise<Response> {
+async function fieldSession(
+  request: Request,
+  fetchImpl?: GatewayFetch
+): Promise<Response> {
   const url = new URL(request.url);
   const queryEntries = [...url.searchParams.entries()];
   const recoveryScoped = gatewaySessionScope(request) === "account_deletion_recovery";
@@ -363,7 +370,14 @@ async function fieldSession(request: Request): Promise<Response> {
         return longStatus ?? gatewaySessionStatus(request);
       };
       const actorId = gatewaySessionActor(request);
-      return actorId ? withFieldActorOperation(actorId, status) : status();
+      const response = actorId
+        ? await withFieldActorOperation(actorId, status)
+        : status();
+      return mergeServerCapacityIntoFieldSessionResponse(
+        request,
+        response,
+        fetchImpl
+      );
     }
     if (
       queryEntries.length === 1 &&
@@ -1080,7 +1094,9 @@ async function dispatchGatewayRequest(
   }
 
   let response: Response;
-  if (pathname === "/api/field-session") response = await fieldSession(request);
+  if (pathname === "/api/field-session") {
+    response = await fieldSession(request, dependencies.fetchImpl);
+  }
   else if (pathname === "/api/field-walk") {
     response = await fieldWalk(
       request,
@@ -1102,9 +1118,22 @@ export async function handleGatewayRequest(
   request: Request,
   dependencies: GatewayDependencies = {}
 ): Promise<Response> {
+  const startedAt = performance.now();
+  const correlationId = gatewayCorrelationId(request);
+  const routeTemplate = gatewayRouteTemplate(request);
   const response = await dispatchGatewayRequest(request, dependencies);
+  const responseWithRequestId = withGatewayRequestId(response, correlationId);
   const sink = dependencies.telemetrySink
     ?? (process.env.NODE_ENV === "test" ? undefined : writeGatewayTelemetry);
-  recordGatewayFailure(request, response, sink);
-  return response;
+  if (routeTemplate) {
+    recordGatewayRequestCompleted(
+      correlationId,
+      routeTemplate,
+      responseWithRequestId,
+      performance.now() - startedAt,
+      currentServerCapacityLevelForTelemetry(),
+      sink
+    );
+  }
+  return responseWithRequestId;
 }

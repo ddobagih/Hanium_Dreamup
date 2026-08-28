@@ -131,7 +131,10 @@ class RouteNavigatorTest {
         val repeated = navigator.update(offRouteLocation(), nowMs = 3_000L, requestInFlight = false)
 
         assertFalse(pending.shouldReroute)
-        assertFalse(pending.userDecisionRequired)
+        assertTrue(pending.userDecisionRequired)
+        assertEquals(RouteNavigatorUserDecision.LOCATION_RECHECK, pending.pendingUserDecision)
+        assertTrue(pending.cancelStaleNavigationSpeech)
+        assertEquals(null, navigator.currentInstruction(offRouteLocation()))
         listOf(confirmed, repeated).forEach { update ->
             assertTrue(update.offRoute)
             assertFalse(update.shouldReroute)
@@ -172,11 +175,48 @@ class RouteNavigatorTest {
         navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
         assertTrue(navigator.approveReroute().shouldReroute)
 
-        navigator.rerouteRequestFailed()
+        val restored = navigator.rerouteRequestFailed()
 
         assertEquals(RouteNavigatorUserDecision.REROUTE, navigator.pendingUserDecision())
+        assertEquals(RouteNavigatorUserDecision.REROUTE, restored?.pendingUserDecision)
+        assertTrue(restored?.instruction?.contains("새 경로 요청") == true)
         assertTrue(navigator.approveReroute().shouldReroute)
         assertTrue(navigator.hasRoute())
+    }
+
+    @Test
+    fun confirmedDeviationOffersOnlyNewRouteLocationRecheckOrEndNavigation() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
+        navigator.setRoute(route())
+        navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+
+        val recheck = navigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
+        val stillLatched = navigator.update(locationNearStart(), nowMs = 2_000L, requestInFlight = false)
+
+        assertEquals("off_route_location_recheck_requested", recheck.reason)
+        assertFalse(recheck.shouldReroute)
+        assertEquals(RouteNavigatorUserDecision.REROUTE, recheck.pendingUserDecision)
+        assertTrue(stillLatched.offRoute)
+        assertTrue(stillLatched.userDecisionRequired)
+        assertEquals(null, navigator.currentInstruction(locationNearStart()))
+
+        val ended = navigator.selectDeviationChoice(RouteDeviationChoice.END_NAVIGATION)
+        assertEquals("off_route_navigation_ended", ended.reason)
+        assertFalse(navigator.hasRoute())
+    }
+
+    @Test
+    fun confirmedLocationRecheckInvalidatesThePreviousDecisionToken() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
+        navigator.setRoute(route())
+        navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+        val beforeRecheck = navigator.pendingDecisionToken()
+
+        navigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
+
+        assertNotNull(beforeRecheck)
+        assertNotNull(navigator.pendingDecisionToken())
+        assertTrue(beforeRecheck != navigator.pendingDecisionToken())
     }
 
     @Test
@@ -205,11 +245,82 @@ class RouteNavigatorTest {
 
         assertFalse(first.shouldReroute)
         assertFalse(first.offRoute)
+        assertTrue(first.userDecisionRequired)
+        assertEquals(RouteNavigatorUserDecision.LOCATION_RECHECK, first.pendingUserDecision)
         assertEquals("off_route_pending", first.reason)
         assertFalse(second.shouldReroute)
         assertTrue(second.offRoute)
         assertTrue(second.userDecisionRequired)
         assertEquals("off_route_user_decision_required", second.reason)
+    }
+
+    @Test
+    fun untrustedFixBreaksOffRouteConfirmationEvidence() {
+        val navigator = RouteNavigator()
+        navigator.setRoute(route())
+
+        val first = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+        navigator.onUntrustedLocation()
+        val afterUntrusted = navigator.update(offRouteLocation(), nowMs = 2_000L, requestInFlight = false)
+
+        assertEquals("off_route_pending", first.reason)
+        assertEquals("off_route_pending", afterUntrusted.reason)
+        assertEquals(RouteNavigatorUserDecision.LOCATION_RECHECK, afterUntrusted.pendingUserDecision)
+        assertFalse(afterUntrusted.offRoute)
+    }
+
+    @Test
+    fun untrustedLocationRequiresExplicitRecheckBeforeFreshGpsCanResumeGuidance() {
+        val navigator = RouteNavigator()
+        navigator.setRoute(route(guideInstruction = "직진하세요."))
+
+        val untrusted = navigator.onUntrustedLocation()
+        val recoverySignalOnly = navigator.update(locationNearStart(), nowMs = 2_000L, requestInFlight = false)
+        val blocked = navigator.currentInstruction(locationNearStart())
+        navigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
+        val freshAfterRecheck = navigator.update(locationNearStart(), nowMs = 3_000L, requestInFlight = false)
+
+        assertEquals("location_untrusted_recheck_required", untrusted?.reason)
+        assertEquals(RouteNavigatorUserDecision.LOCATION_RECHECK, untrusted?.pendingUserDecision)
+        assertTrue(untrusted?.instruction?.contains("현재 위치 정확도를 신뢰할 수 없어") == true)
+        assertTrue(untrusted?.instruction?.contains("위치 다시 확인을 선택할 때까지") == true)
+        assertEquals("off_route_location_recheck_required", recoverySignalOnly.reason)
+        assertEquals(null, blocked)
+        assertEquals("route_guidance", freshAfterRecheck.reason)
+        assertTrue(freshAfterRecheck.instruction?.contains("직진하세요") == true)
+    }
+
+    @Test
+    fun excessiveSampleGapBreaksOffRouteConfirmationEvidence() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(maximumOffRouteSampleGapMs = 5_000L))
+        navigator.setRoute(route())
+
+        val first = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+        val afterGap = navigator.update(offRouteLocation(), nowMs = 6_001L, requestInFlight = false)
+
+        assertEquals("off_route_pending", first.reason)
+        assertEquals("off_route_pending", afterGap.reason)
+        assertEquals(RouteNavigatorUserDecision.LOCATION_RECHECK, afterGap.pendingUserDecision)
+        assertFalse(afterGap.offRoute)
+    }
+
+    @Test
+    fun suspectedDeviationResumesOnlyAfterExplicitRecheckAndFreshOnRouteGps() {
+        val navigator = RouteNavigator()
+        navigator.setRoute(route(guideInstruction = "직진하세요."))
+        val suspected = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+
+        val recoverySignalOnly = navigator.update(locationNearStart(), nowMs = 2_000L, requestInFlight = false)
+        val blockedInstruction = navigator.currentInstruction(locationNearStart())
+        val recheck = navigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
+        val freshOnRoute = navigator.update(locationNearStart(), nowMs = 3_000L, requestInFlight = false)
+
+        assertEquals("off_route_pending", suspected.reason)
+        assertEquals("off_route_location_recheck_required", recoverySignalOnly.reason)
+        assertEquals(null, blockedInstruction)
+        assertEquals("off_route_location_recheck_requested", recheck.reason)
+        assertEquals("route_guidance", freshOnRoute.reason)
+        assertTrue(freshOnRoute.instruction?.contains("직진하세요") == true)
     }
 
     @Test
@@ -348,19 +459,20 @@ class RouteNavigatorTest {
     }
 
     @Test
-    fun pendingDecisionTokenChangesAcrossSameRouteDecisionAba() {
+    fun confirmedDeviationCannotBeClearedByOneOnRouteGpsFix() {
         val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
         navigator.setRoute(route())
         navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
         val firstToken = navigator.pendingDecisionToken()
 
-        navigator.update(locationNearStart(), nowMs = 2_000L, requestInFlight = false)
-        navigator.update(offRouteLocation(), nowMs = 3_000L, requestInFlight = false)
-        val replacementToken = navigator.pendingDecisionToken()
+        val onRouteFix = navigator.update(locationNearStart(), nowMs = 2_000L, requestInFlight = false)
+        val retainedToken = navigator.pendingDecisionToken()
 
         assertNotNull(firstToken)
-        assertNotNull(replacementToken)
-        assertTrue(firstToken != replacementToken)
+        assertEquals(firstToken, retainedToken)
+        assertTrue(onRouteFix.offRoute)
+        assertTrue(onRouteFix.userDecisionRequired)
+        assertEquals(null, navigator.currentInstruction(locationNearStart()))
     }
 
     @Test

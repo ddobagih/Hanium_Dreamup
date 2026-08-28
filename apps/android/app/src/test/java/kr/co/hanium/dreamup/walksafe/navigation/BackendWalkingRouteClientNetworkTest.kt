@@ -134,6 +134,28 @@ class BackendWalkingRouteClientNetworkTest {
         }
     }
 
+    @Test
+    fun preservesOnlyTheBoundedBackendErrorCodeForTaxonomy() {
+        val payload =
+            """{"detail":{"code":"tmap_timeout","message":"provider detail must not be retained"}}"""
+        LocalHttpTestServer { _, socket ->
+            socket.writeFixedResponse(504, payload.toByteArray())
+        }.use { server ->
+            val error = assertThrows(GatewayProxyHttpException::class.java) {
+                BackendWalkingRouteClient()
+                    .fetchRouteCall(session(server.baseUrl), ROUTE_REQUEST)
+                    .execute()
+            }
+
+            assertEquals("tmap_timeout", error.backendCode)
+            assertEquals(
+                NavigationBackendErrorKind.TIMEOUT,
+                classifyNavigationBackendFailure(error).kind,
+            )
+            assertTrue(!error.message.orEmpty().contains("provider detail"))
+        }
+    }
+
     private fun session(baseUrl: String): GatewayFieldSession {
         return GatewayFieldSession.verified(
             gatewayBaseUrl = baseUrl,

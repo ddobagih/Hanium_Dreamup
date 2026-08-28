@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, afterEach, before, test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { withExclusiveFileLockAsync } from "../src/exclusive-file-lock.js";
 import {
@@ -38,6 +40,7 @@ const ACCESS_TTL_SECONDS = "60";
 const IDLE_TTL_SECONDS = "300";
 const ABSOLUTE_TTL_SECONDS = "3600";
 const FIELD_LONG_SESSION_MAX_PLAINTEXT_BYTES = 4 * 1024 * 1024;
+const CHILD_PROCESS_TIMEOUT_MS = 10_000;
 
 type SessionBody = {
   session_scope: "general";
@@ -179,6 +182,35 @@ function spawnFieldSessionWorker(
   );
 }
 
+async function availableGatewayPort(): Promise<number> {
+  const probe = createServer();
+  await new Promise<void>((resolve, reject) => {
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", resolve);
+  });
+  const port = (probe.address() as AddressInfo).port;
+  await new Promise<void>((resolve, reject) => {
+    probe.close((error) => error ? reject(error) : resolve());
+  });
+  return port;
+}
+
+function spawnGatewayProcess(port: number): ChildProcessWithoutNullStreams {
+  return spawn(
+    process.execPath,
+    [fileURLToPath(new URL("../server.js", import.meta.url))],
+    {
+      env: {
+        ...process.env,
+        WALKSAFE_ANDROID_GATEWAY_HOST: "127.0.0.1",
+        WALKSAFE_ANDROID_GATEWAY_PORT: String(port),
+        WALKSAFE_FIELD_WALK_LEDGER_PATH: path.join(stateDirectory, "field-walk-ledger.json"),
+        WALKSAFE_PRIVACY_RIGHTS_REQUEST_URL: "https://privacy.invalid/requests"
+      }
+    }
+  );
+}
+
 function waitForChildLine(
   child: ChildProcessWithoutNullStreams,
   prefix: string
@@ -187,6 +219,7 @@ function waitForChildLine(
     let buffered = "";
     let errorOutput = "";
     const cleanup = (): void => {
+      clearTimeout(timeout);
       child.stdout.off("data", onData);
       child.stderr.off("data", onErrorData);
       child.off("error", onError);
@@ -217,6 +250,15 @@ function waitForChildLine(
       cleanup();
       reject(new Error(`child exited with ${code}: ${errorOutput.trim()}`));
     };
+    const timeout = setTimeout(() => {
+      cleanup();
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      reject(new Error(
+        `child did not emit ${JSON.stringify(prefix)} within ${CHILD_PROCESS_TIMEOUT_MS}ms: ` +
+        (errorOutput.trim() || "no stderr")
+      ));
+    }, CHILD_PROCESS_TIMEOUT_MS);
+    timeout.unref();
     child.stdout.on("data", onData);
     child.stderr.on("data", onErrorData);
     child.once("error", onError);
@@ -231,6 +273,59 @@ async function assertChildExitedSuccessfully(
     child.once("close", resolve);
   });
   assert.equal(code, 0);
+}
+
+async function stopGatewayProcess(
+  child: ChildProcessWithoutNullStreams
+): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    assert.equal(child.signalCode, null);
+    assert.equal(child.exitCode, 0);
+    return;
+  }
+  const closed = new Promise<{
+    code: number | null;
+    signal: NodeJS.Signals | null;
+    stderr: string;
+  }>((resolve, reject) => {
+    let errorOutput = "";
+    const cleanup = (): void => {
+      clearTimeout(timeout);
+      child.stderr.off("data", onErrorData);
+      child.off("error", onError);
+      child.off("close", onClose);
+    };
+    const onErrorData = (chunk: Buffer): void => {
+      errorOutput += chunk.toString("utf8");
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const onClose = (code: number | null, signal: NodeJS.Signals | null): void => {
+      cleanup();
+      resolve({ code, signal, stderr: errorOutput.trim() });
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      reject(new Error(
+        `gateway did not stop within ${CHILD_PROCESS_TIMEOUT_MS}ms: ` +
+        (errorOutput.trim() || "no stderr")
+      ));
+    }, CHILD_PROCESS_TIMEOUT_MS);
+    timeout.unref();
+    child.stderr.on("data", onErrorData);
+    child.once("error", onError);
+    child.once("close", onClose);
+    if (!child.kill("SIGTERM")) {
+      cleanup();
+      reject(new Error("gateway SIGTERM delivery failed"));
+    }
+  });
+  const result = await closed;
+  assert.equal(result.signal, null, result.stderr);
+  assert.equal(result.code, 0, result.stderr);
 }
 
 async function responseSession(response: Response): Promise<Session> {
@@ -467,6 +562,79 @@ test("rotation is one-time and consumed-token reuse revokes only that device fam
     code: "field_session_revoked",
     reauthentication_required: true
   });
+});
+
+test("a real gateway restart preserves refresh rotation and isolates token reuse to one device", async () => {
+  const port = await availableGatewayPort();
+  const origin = `http://127.0.0.1:${port}`;
+  const forwardedHeaders = {
+    "content-type": "application/json",
+    "x-forwarded-proto": "https"
+  };
+  const gatewayLogin = async (deviceId: string): Promise<Session> => responseSession(await fetch(
+    `${origin}/api/field-session`,
+    {
+      method: "POST",
+      headers: { ...forwardedHeaders, "cf-connecting-ip": nextClientIp() },
+      body: JSON.stringify({
+        actor_id: ACTOR_ID,
+        token: ACCOUNT_TOKEN,
+        device_id: deviceId
+      })
+    }
+  ));
+  const gatewayRefresh = (session: Session): Promise<Response> => fetch(
+    `${origin}/api/field-session`,
+    {
+      method: "POST",
+      headers: forwardedHeaders,
+      body: JSON.stringify(refreshPayload(session))
+    }
+  );
+  const gatewayStatus = async (cookie: string): Promise<Record<string, unknown>> => {
+    const response = await fetch(`${origin}/api/field-session`, { headers: { cookie } });
+    assert.equal(response.status, 200);
+    return response.json() as Promise<Record<string, unknown>>;
+  };
+
+  let completed = false;
+  let gateway: ChildProcessWithoutNullStreams | null = spawnGatewayProcess(port);
+  try {
+    assert.match(
+      await waitForChildLine(gateway, "walksafe-android-gateway listening "),
+      new RegExp(`:${port}$`)
+    );
+    const firstDevice = await gatewayLogin("restart-device-a");
+    const secondDevice = await gatewayLogin("restart-device-b");
+    const encryptedStateBeforeRestart = await readFile(actorStatePath(), "utf8");
+
+    await stopGatewayProcess(gateway);
+    gateway = spawnGatewayProcess(port);
+    assert.match(
+      await waitForChildLine(gateway, "walksafe-android-gateway listening "),
+      new RegExp(`:${port}$`)
+    );
+    assert.equal(await readFile(actorStatePath(), "utf8"), encryptedStateBeforeRestart);
+
+    const rotated = await responseSession(await gatewayRefresh(firstDevice));
+    assert.equal(rotated.rotation, 1);
+    assert.notEqual(rotated.refresh_token, firstDevice.refresh_token);
+
+    const reused = await gatewayRefresh(firstDevice);
+    assert.equal(reused.status, 401);
+    assert.deepEqual(await reused.json(), {
+      code: "refresh_token_reuse_detected",
+      reauthentication_required: true
+    });
+    assert.equal((await gatewayStatus(rotated.cookie)).authenticated, false);
+    assert.equal((await gatewayStatus(secondDevice.cookie)).authenticated, true);
+    completed = true;
+  } finally {
+    if (gateway !== null && gateway.exitCode === null && gateway.signalCode === null) {
+      if (completed) await stopGatewayProcess(gateway);
+      else gateway.kill("SIGKILL");
+    }
+  }
 });
 
 test("concurrent use of one refresh token permits one rotation then fails closed", async () => {

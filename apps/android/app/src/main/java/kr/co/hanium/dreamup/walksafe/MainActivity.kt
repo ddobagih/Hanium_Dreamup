@@ -13,6 +13,8 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import android.hardware.GeomagneticField
 import android.location.Location
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.Uri
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
@@ -158,13 +160,19 @@ import kr.co.hanium.dreamup.walksafe.navigation.TactileFrameFeedbackActuator
 import kr.co.hanium.dreamup.walksafe.navigation.TactileFrameFeedbackDispatch
 import kr.co.hanium.dreamup.walksafe.navigation.AndroidVoiceAction
 import kr.co.hanium.dreamup.walksafe.navigation.BackendWalkingRouteClient
+import kr.co.hanium.dreamup.walksafe.navigation.ConsecutiveTmapFailureGuard
+import kr.co.hanium.dreamup.walksafe.navigation.EncryptedRouteSnapshotStore
 import kr.co.hanium.dreamup.walksafe.navigation.FrozenImageToDepthTransform
 import kr.co.hanium.dreamup.walksafe.navigation.GatewayProxyHttpException
 import kr.co.hanium.dreamup.walksafe.navigation.LocationTrustPolicy
+import kr.co.hanium.dreamup.walksafe.navigation.NavigationBackendErrorKind
 import kr.co.hanium.dreamup.walksafe.navigation.haversineMeters
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigator
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorDecisionToken
+import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorUpdate
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorUserDecision
+import kr.co.hanium.dreamup.walksafe.navigation.RouteDeviationChoice
+import kr.co.hanium.dreamup.walksafe.navigation.ROUTE_SNAPSHOT_TTL_MS
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchResult
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceCommand
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState
@@ -178,6 +186,7 @@ import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
 import kr.co.hanium.dreamup.walksafe.navigation.WalkingRouteRequest
 import kr.co.hanium.dreamup.walksafe.navigation.formatDestinationDistance
 import kr.co.hanium.dreamup.walksafe.navigation.reliableMovementHeadingDegrees
+import kr.co.hanium.dreamup.walksafe.navigation.classifyNavigationBackendFailure
 import kr.co.hanium.dreamup.walksafe.navigation.selectAndroidVoiceAction
 import kr.co.hanium.dreamup.walksafe.navigation.createProductionAndroidTactileFrameCoordinator
 import kr.co.hanium.dreamup.walksafe.network.AndroidNavigationCancellation
@@ -209,6 +218,7 @@ import kr.co.hanium.dreamup.walksafe.network.deviceDeletionEvidenceSha256
 import kr.co.hanium.dreamup.walksafe.network.validatedAccountDeletionStatusOrNull
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
 import kr.co.hanium.dreamup.walksafe.network.GatewayCredentialPolicy
+import kr.co.hanium.dreamup.walksafe.network.GatewayCapacityProcessState
 import kr.co.hanium.dreamup.walksafe.network.GatewayEndpointPolicy
 import kr.co.hanium.dreamup.walksafe.network.GatewayFieldSession
 import kr.co.hanium.dreamup.walksafe.network.GatewayFieldSessionClient
@@ -430,6 +440,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var destinationLatInput: EditText
     private lateinit var destinationLngInput: EditText
     private lateinit var navigationStatusText: TextView
+    private lateinit var routeDeviationActions: LinearLayout
+    private lateinit var routeDeviationNewRouteButton: Button
+    private lateinit var routeDeviationRecheckButton: Button
+    private lateinit var routeDeviationEndButton: Button
     private lateinit var debugBboxOverlay: DebugBboxOverlayView
     private lateinit var loginUserIdInput: EditText
     private lateinit var loginSaveButton: Button
@@ -549,6 +563,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var earthOrientationTracker: AndroidEarthOrientationTracker
     private val stepLengthEstimator = StepLengthEstimator()
     private lateinit var stepLengthPrefs: SharedPreferences
+    private lateinit var routeSnapshotStore: EncryptedRouteSnapshotStore
     private lateinit var sensitivePrefs: AndroidSensitivePreferenceStore
     private lateinit var gatewaySessionStore: AndroidGatewaySessionStore
     private lateinit var accountDeletionResetCoordinator: AccountDeletionResetCoordinator
@@ -580,6 +595,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         requestGatewayWalkRenewal()
     }
     private val routeNavigator = RouteNavigator()
+    private val tmapFailureGuard = ConsecutiveTmapFailureGuard(safetyStopThreshold = 2)
     private val reportUploaderExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "walksafe-report-uploader").apply {
             priority = Thread.NORM_PRIORITY - 1
@@ -710,6 +726,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         get() = GatewaySessionProcessCoordinator.snapshot().generation
     private val gatewaySessionStorageBlocked: Boolean
         get() = GatewaySessionProcessCoordinator.snapshot().storageBlocked
+    private var gatewayCapacityConnectivityManager: ConnectivityManager? = null
+    private var gatewayCapacityNetworkObserverRegistered = false
+    private val gatewayCapacityNetworkCallback =
+        object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                requestGatewayCapacityRefresh("network_reconnected")
+            }
+        }
     private var currentDestination: RoutePoint? = null
     @Volatile
     private var latestStepCount: Int = 0
@@ -734,6 +758,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     @Volatile
     private var latestTmapOnRoute = false
     private var directionGuidancePauseReason: String? = null
+    private var lastAnnouncedRouteDecisionToken: RouteNavigatorDecisionToken? = null
+    private var routeDeviationHapticDecision: RouteNavigatorUserDecision? = null
+    private var routeSnapshotPurgeFailed = false
+    private var routeSnapshotExpiryRunnable: Runnable? = null
     @Volatile
     private var latestTactileRouteState = "localRoute=tmap:navigation_inactive"
     private var navigationPermissionsRequestedForRoute = false
@@ -926,6 +954,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             epoch = SystemClock.elapsedRealtimeNanos().coerceAtLeast(1L),
         )
         stepLengthPrefs = getSharedPreferences("walksafe", MODE_PRIVATE)
+        routeSnapshotStore = EncryptedRouteSnapshotStore(
+            getSharedPreferences("walksafe_route_snapshot", MODE_PRIVATE),
+        )
+        val routeSnapshotNowEpochMs = System.currentTimeMillis()
+        routeSnapshotPurgeFailed = !runCatching {
+            routeSnapshotStore.purgeExpired(routeSnapshotNowEpochMs)
+        }.getOrDefault(false)
+        if (!routeSnapshotPurgeFailed) {
+            runCatching { routeSnapshotStore.load(routeSnapshotNowEpochMs) }
+                .getOrNull()
+                ?.let { snapshot ->
+                    scheduleEncryptedRouteSnapshotExpiry(
+                        walkSessionId = snapshot.walkSessionId,
+                        expiresAtEpochMs = snapshot.expiresAtEpochMs,
+                    )
+                }
+        }
         accountDeletionIntentFence = AccountDeletionIntentFence(
             read = {
                 runCatching {
@@ -1123,6 +1168,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     gatewaySessionOwner,
                     ::onGatewayProcessSessionChanged,
                 )
+                registerGatewayCapacityNetworkObserver()
                 scheduleGatewaySessionRestoreAfterPrivacyStartupInspection()
                 enforcePriorityUserAccountEligibility()
                 fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -5321,6 +5367,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 accountDeletionActivityLease,
             )
         ) return
+        GatewayCapacityProcessState.fenceSessionGeneration(snapshot.generation)
         val deletionJournal = accountDeletionStateMachine.snapshotOrNull()
         if (
             snapshot.session != null &&
@@ -5367,6 +5414,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         } else {
             permissionSessionPolicy.authenticationExpired()
         }
+        if (
+            session != null &&
+            !snapshot.deletionRecoveryOnly &&
+            !snapshot.storageBlocked &&
+            session.verificationState == GatewaySessionVerificationState.VERIFIED &&
+            session.isUsableFor(session.actorId)
+        ) {
+            requestGatewayCapacityRefresh("verified_session_startup")
+        }
         if (::backendAuthApplyButton.isInitialized) {
             runOnUiThread {
                 if (
@@ -5380,6 +5436,118 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 updateAccountDeletionUi()
             }
         }
+    }
+
+    private fun registerGatewayCapacityNetworkObserver() {
+        if (gatewayCapacityNetworkObserverRegistered) return
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        runCatching {
+            manager.registerDefaultNetworkCallback(gatewayCapacityNetworkCallback)
+        }.onSuccess {
+            gatewayCapacityConnectivityManager = manager
+            gatewayCapacityNetworkObserverRegistered = true
+        }
+    }
+
+    private fun unregisterGatewayCapacityNetworkObserver() {
+        if (!gatewayCapacityNetworkObserverRegistered) return
+        runCatching {
+            gatewayCapacityConnectivityManager?.unregisterNetworkCallback(
+                gatewayCapacityNetworkCallback,
+            )
+        }
+        gatewayCapacityConnectivityManager = null
+        gatewayCapacityNetworkObserverRegistered = false
+    }
+
+    private fun requestGatewayCapacityRefresh(trigger: String) {
+        if (privacyStartupInspectionDestroyed) return
+        val snapshot = GatewaySessionProcessCoordinator.snapshot()
+        val session = snapshot.session?.takeUnless { snapshot.deletionRecoveryOnly } ?: return
+        val expectedSessionGeneration = snapshot.generation
+        if (!isGatewayCapacityRefreshSessionCurrent(session, expectedSessionGeneration)) return
+        GatewayCapacityProcessState.fenceSessionGeneration(expectedSessionGeneration)
+        if (!GatewayCapacityProcessState.tryBeginRefresh()) return
+        val expectedActivityLease = accountDeletionActivityLease
+        try {
+            gatewaySessionExecutor.execute {
+                try {
+                    if (
+                        !isGatewayCapacityRefreshSessionCurrent(
+                            session,
+                            expectedSessionGeneration,
+                        )
+                    ) return@execute
+                    val revalidation = gatewaySessionClient.revalidate(
+                        session = session,
+                        actorId = session.actorId,
+                        capacitySessionGeneration = expectedSessionGeneration,
+                    )
+                    val capacityUpdate = revalidation.capacityUpdate
+                    val adminWarning =
+                        capacityUpdate?.signals?.adminWarningOneShot == true
+                    val participantRestricted =
+                        capacityUpdate?.signals
+                            ?.participantAdmissionRestricted == true
+                    if (adminWarning || participantRestricted) {
+                        postGatewayActivityCallback(expectedActivityLease) {
+                            if (
+                                !isGatewayCapacityRefreshSessionCurrent(
+                                    session,
+                                    expectedSessionGeneration,
+                                )
+                            ) {
+                                return@postGatewayActivityCallback
+                            }
+                            if (::fieldSessionLog.isInitialized) fieldSessionLog.recordEvent(
+                                "gateway_capacity_signal",
+                                mapOf(
+                                    "trigger" to trigger,
+                                    "version" to
+                                        capacityUpdate?.admission
+                                            ?.snapshot?.version,
+                                    "admin_warning" to adminWarning,
+                                    "participant_admission_restricted" to
+                                        participantRestricted,
+                                ),
+                            )
+                        }
+                    }
+                    if (
+                        revalidation.status ==
+                        GatewaySessionRevalidationStatus.NOT_READY
+                    ) {
+                        postGatewayActivityCallback(expectedActivityLease) {
+                            clearGatewaySession(
+                                logoutRemote = false,
+                                expectedSession = session,
+                            )
+                        }
+                    }
+                } finally {
+                    if (GatewayCapacityProcessState.finishRefresh()) {
+                        requestGatewayCapacityRefresh("coalesced_latest_session")
+                    }
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            if (GatewayCapacityProcessState.finishRefresh()) {
+                requestGatewayCapacityRefresh("coalesced_latest_session")
+            }
+        }
+    }
+
+    private fun isGatewayCapacityRefreshSessionCurrent(
+        session: GatewayFieldSession,
+        expectedGeneration: Long? = null,
+    ): Boolean {
+        val snapshot = GatewaySessionProcessCoordinator.snapshot()
+        return !snapshot.deletionRecoveryOnly &&
+            !snapshot.storageBlocked &&
+            snapshot.session === session &&
+            (expectedGeneration == null || snapshot.generation == expectedGeneration) &&
+            session.verificationState == GatewaySessionVerificationState.VERIFIED &&
+            session.isUsableFor(session.actorId)
     }
 
     private fun gatewayActivityCallbackAllowed(
@@ -7686,6 +7854,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             privacyStartupInspectionDestroyed = true
             privacyStartupInspectionGeneration += 1L
         }
+        unregisterGatewayCapacityNetworkObserver()
+        cancelEncryptedRouteSnapshotExpirySchedule()
         pendingPrivacyStartupReadyAction = null
         if (!privacyStartupInspectionComplete) {
             if (::accountDeletionActivityLease.isInitialized) {
@@ -9122,9 +9292,34 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             text = "경로 시작"
             setOnClickListener { onRouteButtonClicked() }
         }
+        routeDeviationNewRouteButton = Button(this).apply {
+            text = "새 경로 요청"
+            contentDescription = text
+            setOnClickListener { requestRerouteFromVoice() }
+        }
+        routeDeviationRecheckButton = Button(this).apply {
+            text = "위치 다시 확인"
+            contentDescription = text
+            setOnClickListener { recheckLocationFromVoice() }
+        }
+        routeDeviationEndButton = Button(this).apply {
+            text = "길안내 종료"
+            contentDescription = text
+            setOnClickListener { endNavigationAfterDeviation() }
+        }
+        routeDeviationActions = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            addView(routeDeviationNewRouteButton)
+            addView(routeDeviationRecheckButton)
+            addView(routeDeviationEndButton)
+        }
         destinationResetButton = Button(this).apply {
             text = "경로 초기화"
-            setOnClickListener { resetRouteState() }
+            setOnClickListener {
+                if (!blockRouteMutationWhileDeviationChoicePending()) resetRouteState()
+            }
         }
         progressBeepToggleButton = Button(this).apply {
             setOnClickListener {
@@ -9167,6 +9362,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(statusText)
             addView(detailText)
             addView(navigationStatusText)
+            addView(routeDeviationActions)
             addView(actionButton)
             if (BuildConfig.DEBUG) {
                 addView(debugUploadButton)
@@ -16271,6 +16467,7 @@ generation != cameraFallbackGeneration
 
     private fun resetWalkTransientStateForNewWalk() {
         latestStepCount = 0
+        tmapFailureGuard.reset()
         if (::stepTracker.isInitialized) stepTracker.resetForNewWalk()
         clearTrustedLocation()
         pendingVoiceDestinationQuery = null
@@ -16321,7 +16518,14 @@ generation != cameraFallbackGeneration
         }
         val navigationCancellation = cancelNavigationRequestsForPause()
         clearDestinationSearchState(navigationCancellation.destinationSearchCancelled)
-        resetRouteState()
+        if (
+            ::walkSessionLifecycle.isInitialized &&
+            walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED
+        ) {
+            resetRouteState(purgeRouteSnapshot = false)
+        } else {
+            resetRouteState()
+        }
         invalidateFrameStateForPause()
         stopLocationUpdates()
         stopStepTracking()
@@ -16486,6 +16690,19 @@ generation != cameraFallbackGeneration
             )
         ) {
             return "reportCandidate=blocked:automatic_report_consent_required"
+        }
+        if (
+            !explicitRequest &&
+            run {
+                GatewayCapacityProcessState.fenceSessionGeneration(
+                    GatewaySessionProcessCoordinator.snapshot().generation,
+                )
+                !GatewayCapacityProcessState.admission(
+                    java.time.Instant.ofEpochMilli(nowMs),
+                ).automaticReportCandidateAllowed
+            }
+        ) {
+            return "reportCandidate=blocked:gateway_capacity"
         }
         val reporterId = currentReporterUserId() ?: return "reportCandidate=blocked:login_required"
         val output = reportOutput ?: return "reportCandidate=blocked:no_depth_object"
@@ -16661,6 +16878,16 @@ generation != cameraFallbackGeneration
         }
         val gatewaySession = gatewaySessionOrNull(reason = "report", speak = explicitRequest)
             ?: return "reportCandidate=blocked:gateway_session_required"
+        val gatewayProcessSnapshot = GatewaySessionProcessCoordinator.snapshot()
+        if (
+            gatewayProcessSnapshot.session !== gatewaySession ||
+            gatewayProcessSnapshot.deletionRecoveryOnly ||
+            gatewayProcessSnapshot.storageBlocked
+        ) return "reportCandidate=blocked:gateway_session_changed"
+        val expectedGatewaySessionGeneration = gatewayProcessSnapshot.generation
+        GatewayCapacityProcessState.fenceSessionGeneration(
+            expectedGatewaySessionGeneration,
+        )
         val transferPurpose = if (explicitRequest) {
             ReportTransferPurpose.EXPLICIT
         } else {
@@ -16863,6 +17090,8 @@ generation != cameraFallbackGeneration
                     val revalidation = gatewaySessionClient.revalidate(
                         gatewaySession,
                         gatewaySession.actorId,
+                        capacitySessionGeneration =
+                            expectedGatewaySessionGeneration,
                     )
                     if (
                         !walkSafetyOutputsAllowed() ||
@@ -16896,6 +17125,19 @@ generation != cameraFallbackGeneration
                                 )
                             }
                         }
+                        return@execute
+                    }
+                    if (
+                        transferPurpose == ReportTransferPurpose.AUTOMATIC &&
+                        run {
+                            GatewayCapacityProcessState.fenceSessionGeneration(
+                                GatewaySessionProcessCoordinator.snapshot().generation,
+                            )
+                            !GatewayCapacityProcessState.admission()
+                                .automaticReportCandidateAllowed
+                        }
+                    ) {
+                        uploadCall.cancel()
                         return@execute
                     }
                     runOnUiThread {
@@ -17543,8 +17785,11 @@ generation != cameraFallbackGeneration
         if (
             action in setOf(
                 AndroidVoiceAction.RequestReroute,
+                AndroidVoiceAction.RecheckLocation,
+                AndroidVoiceAction.CancelDestination,
                 AndroidVoiceAction.ConfirmArrival,
                 AndroidVoiceAction.RejectArrival,
+                AndroidVoiceAction.StopNavigation,
             ) && expectedNavigationDecisionToken != routeNavigator.pendingDecisionToken()
         ) {
             updateNavigationStatus("voice=navigation_decision_stale")
@@ -17566,6 +17811,7 @@ generation != cameraFallbackGeneration
             AndroidVoiceAction.CancelDestination -> cancelDestinationFromVoice()
             AndroidVoiceAction.SpeakNextNavigationInstruction -> speakNextNavigationInstruction()
             AndroidVoiceAction.RequestReroute -> requestRerouteFromVoice()
+            AndroidVoiceAction.RecheckLocation -> recheckLocationFromVoice()
             AndroidVoiceAction.ConfirmArrival -> confirmArrivalFromVoice()
             AndroidVoiceAction.RejectArrival -> rejectArrivalFromVoice()
             AndroidVoiceAction.StopNavigation -> stopNavigationFromVoice()
@@ -17616,6 +17862,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun cancelDestinationFromVoice() {
+        if (blockRouteMutationWhileDeviationChoicePending()) return
         val hadDestination = isRouteActive ||
             routeRequestInFlight.get() ||
             destinationSearchInFlight ||
@@ -17661,7 +17908,7 @@ generation != cameraFallbackGeneration
         pendingVoiceDestinationQuery = null
         pendingVoiceDestinationPageIndex = null
         destinationSearchVoiceState = null
-        onDestinationSelected(selected)
+        if (!onDestinationSelected(selected)) return
         updateNavigationStatus("voice=destination_candidate_selected index=$oneBasedIndex")
         speakInteraction("${selected.name} 목적지를 선택했습니다. TMAP 경로를 확인합니다.")
     }
@@ -17676,12 +17923,59 @@ generation != cameraFallbackGeneration
             speakInteraction("지금은 새 경로를 요청할 이탈 상태가 아닙니다.")
             return
         }
-        val decision = routeNavigator.approveReroute()
+        val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.NEW_ROUTE)
+        updateRouteDeviationActions(decision.pendingUserDecision)
         updateNavigationStatus("navigation=off_route_reroute_user_confirmed")
         speakInteraction(requireNotNull(decision.instruction))
         requestRoute(destination, reason = "off_route")
         if (!routeRequestInFlight.get() && routeNavigator.hasRoute()) {
             retainRouteAfterRerouteFailure("TMAP 새 경로 요청을 시작할 수 없어 방향 안내를 중지했습니다.")
+        }
+    }
+
+    private fun recheckLocationFromVoice() {
+        if (
+            !isRouteActive ||
+            routeNavigator.pendingUserDecision() !in setOf(
+                RouteNavigatorUserDecision.LOCATION_RECHECK,
+                RouteNavigatorUserDecision.REROUTE,
+            )
+        ) {
+            speakInteraction("지금은 위치를 다시 확인할 이탈 상태가 아닙니다.")
+            return
+        }
+        val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
+        updateRouteDeviationActions(decision.pendingUserDecision)
+        latestTmapOnRoute = false
+        directionGuidancePauseReason = "off_route_recheck"
+        startNavigationServicesIfNeeded()
+        updateNavigationStatus("navigation=off_route_location_recheck_requested auto_resume=false")
+        speakInteraction(requireNotNull(decision.instruction))
+    }
+
+    private fun endNavigationAfterDeviation() {
+        if (
+            !isRouteActive ||
+            routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE
+        ) {
+            speakInteraction("지금은 종료 선택을 기다리는 경로 이탈 상태가 아닙니다.")
+            return
+        }
+        val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.END_NAVIGATION)
+        if (decision.reason != "off_route_navigation_ended") return
+        resetRouteState()
+        if (routeSnapshotPurgeFailed) {
+            val detail =
+                "암호화 경로 기록을 삭제하지 못했습니다. 새 길안내를 시작하지 말고 앱 저장소를 확인해 주세요."
+            updateStatus(
+                "길안내 종료 저장소 확인 필요",
+                detail,
+            )
+            updateNavigationStatus("navigation=route_snapshot_purge_failed")
+            speakInteraction(detail)
+        } else {
+            updateNavigationStatus("navigation=off_route_navigation_ended_by_user")
+            speakInteraction(requireNotNull(decision.instruction))
         }
     }
 
@@ -17738,6 +18032,13 @@ generation != cameraFallbackGeneration
 
     private fun stopNavigationFromVoice() {
         val hadActiveNavigation = isRouteActive || routeRequestInFlight.get()
+        if (
+            isRouteActive &&
+            routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.REROUTE
+        ) {
+            endNavigationAfterDeviation()
+            return
+        }
         if (routeRequestInFlight.get()) {
             cancelActiveRouteRequest()
         } else if (isRouteActive) {
@@ -17793,12 +18094,14 @@ generation != cameraFallbackGeneration
                         trustedFixAvailable = false,
                         horizontalAccuracyMeters = null,
                     )
-                    clearTrustedLocation()
+                    val routeDecisionRequired = clearTrustedLocation()
                     updateNavigationStatus("navigation=gps_unavailable")
-                    pauseDirectionGuidance(
-                        reason = "gps_unavailable",
-                        message = "GPS 위치를 확인할 수 없어 방향 안내를 중지했습니다.",
-                    )
+                    if (!routeDecisionRequired) {
+                        pauseDirectionGuidance(
+                            reason = "gps_unavailable",
+                            message = "GPS 위치를 확인할 수 없어 방향 안내를 중지했습니다.",
+                        )
+                    }
                 }
             }
         }
@@ -17836,17 +18139,35 @@ generation != cameraFallbackGeneration
         val fresh = LocationTrustPolicy.freshOrNull(current, nowElapsedRealtimeMs)
         if (current != null && fresh == null) {
             clearLocationDerivedState()
-            pauseDirectionGuidance(
-                reason = "gps_stale",
-                message = "GPS 위치가 오래되어 방향 안내를 중지했습니다.",
-            )
+            if (!handleRouteLocationUntrusted()) {
+                pauseDirectionGuidance(
+                    reason = "gps_stale",
+                    message = "GPS 위치가 오래되어 방향 안내를 중지했습니다.",
+                )
+            }
         }
         return fresh
     }
 
-    private fun clearTrustedLocation() {
+    private fun clearTrustedLocation(): Boolean {
         latestTrustedLocation = null
         clearLocationDerivedState()
+        return handleRouteLocationUntrusted()
+    }
+
+    private fun handleRouteLocationUntrusted(): Boolean {
+        val update = routeNavigator.onUntrustedLocation() ?: return false
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            applyRouteDeviationSafetyUpdate(update)
+        } else {
+            val expectedToken = routeNavigator.pendingDecisionToken()
+            runOnUiThread {
+                if (expectedToken == routeNavigator.pendingDecisionToken()) {
+                    applyRouteDeviationSafetyUpdate(update)
+                }
+            }
+        }
+        return true
     }
 
     private fun clearLocationDerivedState() {
@@ -17914,11 +18235,14 @@ generation != cameraFallbackGeneration
             // Keep the last accepted fix only as the jump-filter baseline. Freshness gates
             // continue to block it from reports and routing once it is older than maxAgeMs.
             clearLocationDerivedState()
+            val routeDecisionRequired = handleRouteLocationUntrusted()
             updateNavigationStatus("navigation=gps_untrusted accuracy=${accuracy?.toInt() ?: "null"}m")
-            pauseDirectionGuidance(
-                reason = "gps_untrusted",
-                message = "GPS 정확도를 신뢰할 수 없어 방향 안내를 중지했습니다.",
-            )
+            if (!routeDecisionRequired) {
+                pauseDirectionGuidance(
+                    reason = "gps_untrusted",
+                    message = "GPS 정확도를 신뢰할 수 없어 방향 안내를 중지했습니다.",
+                )
+            }
             return
         }
         latestTrustedLocation = freshTrusted
@@ -18118,6 +18442,7 @@ generation != cameraFallbackGeneration
     private fun onRouteButtonClicked() {
         if (!currentNavigationCollectionAllowsWork()) return
         if (!requireReporterUserId("login_required_route")) return
+        if (blockRouteMutationWhileDeviationChoicePending()) return
         if (routeRequestInFlight.get()) {
             cancelActiveRouteRequest()
             return
@@ -18152,7 +18477,18 @@ generation != cameraFallbackGeneration
         requestRoute(destination, reason = "user_destination")
     }
 
-    private fun resetRouteState() {
+    private fun routeSnapshotPurgeFenceAllowsRoute(): Boolean {
+        if (!routeSnapshotPurgeFailed) return true
+        val detail =
+            "암호화 경로 기록을 삭제하지 못해 새 길안내를 시작하지 않습니다. 저장소를 확인하고 새 보행을 시작해 주세요."
+        enterWalkSessionSafetyStopAndCancelOutputs("route_snapshot_purge_failed")
+        updateStatus("길안내 저장소 오류 · 안전 중지", detail)
+        updateNavigationStatus("navigation=safety_stopped reason=route_snapshot_purge_failed")
+        speakInteraction(detail)
+        return false
+    }
+
+    private fun resetRouteState(purgeRouteSnapshot: Boolean = true) {
         navigationRequests.cancelRoute()
         isRouteActive = false
         latestTmapOnRoute = false
@@ -18162,12 +18498,71 @@ generation != cameraFallbackGeneration
         currentDestination = null
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
+        if (purgeRouteSnapshot) purgeEncryptedRouteSnapshot()
+        lastAnnouncedRouteDecisionToken = null
+        routeDeviationHapticDecision = null
+        updateRouteDeviationActions(null)
         routeStartStepCount = null
         destinationSearchResults.clear()
         destinationSearchVoiceState = null
         updateDestinationSearchUi()
         updateRouteButtonText()
-        updateNavigationStatus("navigation=destination_none hazard_only")
+        updateNavigationStatus(
+            if (routeSnapshotPurgeFailed) {
+                "navigation=route_snapshot_purge_failed"
+            } else {
+                "navigation=destination_none hazard_only"
+            },
+        )
+    }
+
+    private fun purgeEncryptedRouteSnapshot(): Boolean {
+        cancelEncryptedRouteSnapshotExpirySchedule()
+        val purged = !::routeSnapshotStore.isInitialized || runCatching {
+            routeSnapshotStore.clear()
+        }.getOrDefault(false)
+        routeSnapshotPurgeFailed = !purged
+        return purged
+    }
+
+    private fun cancelEncryptedRouteSnapshotExpirySchedule() {
+        routeSnapshotExpiryRunnable?.let(reportCleanupCallbackHandler::removeCallbacks)
+        routeSnapshotExpiryRunnable = null
+    }
+
+    private fun scheduleEncryptedRouteSnapshotExpiry(
+        walkSessionId: String,
+        expiresAtEpochMs: Long,
+    ) {
+        cancelEncryptedRouteSnapshotExpirySchedule()
+        lateinit var expiry: Runnable
+        expiry = Runnable {
+            if (routeSnapshotExpiryRunnable !== expiry) return@Runnable
+            routeSnapshotExpiryRunnable = null
+            val purged = purgeEncryptedRouteSnapshot()
+            val activeSnapshotExpired = ::walkSessionLifecycle.isInitialized &&
+                walkSessionLifecycle.currentRuntimeEpochOrNull()?.walkSessionId == walkSessionId &&
+                isRouteActive
+            if (activeSnapshotExpired) {
+                enterWalkSessionSafetyStopAndCancelOutputs("route_snapshot_expired")
+                val detail =
+                    "암호화 경로 기록의 24시간 보관 시간이 끝나 길안내를 중지했습니다."
+                updateStatus(
+                    "길안내 안전 중지",
+                    detail,
+                )
+                updateNavigationStatus(
+                    "navigation=safety_stopped reason=route_snapshot_expired purge=$purged",
+                )
+                speakInteraction(detail)
+            } else if (!purged) {
+                updateNavigationStatus("navigation=route_snapshot_purge_failed")
+            }
+        }
+        routeSnapshotExpiryRunnable = expiry
+        val remainingMs = (expiresAtEpochMs - System.currentTimeMillis())
+            .coerceIn(0L, ROUTE_SNAPSHOT_TTL_MS)
+        reportCleanupCallbackHandler.postDelayed(expiry, remainingMs)
     }
 
     private fun cancelActiveRouteRequest() {
@@ -18193,9 +18588,19 @@ generation != cameraFallbackGeneration
         currentDestination = null
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
+        purgeEncryptedRouteSnapshot()
+        lastAnnouncedRouteDecisionToken = null
+        routeDeviationHapticDecision = null
+        updateRouteDeviationActions(null)
         routeStartStepCount = null
         updateRouteButtonText()
-        updateNavigationStatus("navigation=route_request_cancelled hazard_only")
+        updateNavigationStatus(
+            if (routeSnapshotPurgeFailed) {
+                "navigation=route_snapshot_purge_failed"
+            } else {
+                "navigation=route_request_cancelled hazard_only"
+            },
+        )
     }
 
     private fun suspendNavigationForRecovery(
@@ -18214,6 +18619,9 @@ generation != cameraFallbackGeneration
         latestTactileRouteState = "localRoute=tmap:navigation_inactive"
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
+        lastAnnouncedRouteDecisionToken = null
+        routeDeviationHapticDecision = null
+        updateRouteDeviationActions(null)
         routeStartStepCount = null
         currentDestination = retainedDestination
         destinationSearchResults.clear()
@@ -18239,10 +18647,21 @@ generation != cameraFallbackGeneration
 
     private fun performDestinationSearch(reset: Boolean): Boolean {
         if (!currentNavigationCollectionAllowsWork()) return false
+        if (blockRouteMutationWhileDeviationChoicePending()) return false
         val expectedWalkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return false
         if (!requireReporterUserId("login_required_destination_search")) return false
         if (!isGatewayNetworkAllowed(reason = "destination_search")) return false
         val gatewaySession = gatewaySessionOrNull("destination_search") ?: return false
+        val gatewayProcessSnapshot = GatewaySessionProcessCoordinator.snapshot()
+        if (
+            gatewayProcessSnapshot.session !== gatewaySession ||
+            gatewayProcessSnapshot.deletionRecoveryOnly ||
+            gatewayProcessSnapshot.storageBlocked
+        ) return false
+        val expectedGatewaySessionGeneration = gatewayProcessSnapshot.generation
+        GatewayCapacityProcessState.fenceSessionGeneration(
+            expectedGatewaySessionGeneration,
+        )
         if (destinationSearchInFlight || navigationRequests.hasActiveDestinationSearch()) return false
         if (!isRouteLocationPermissionReady() && !ensureNavigationPermissionForRouteOrStep()) {
             return false
@@ -18297,6 +18716,8 @@ generation != cameraFallbackGeneration
                     val revalidation = gatewaySessionClient.revalidate(
                         gatewaySession,
                         currentReporterUserId(),
+                        capacitySessionGeneration =
+                            expectedGatewaySessionGeneration,
                     )
                     if (revalidation.status != GatewaySessionRevalidationStatus.READY) {
                         completeDestinationSearchRequest(searchCall)
@@ -18517,11 +18938,12 @@ generation != cameraFallbackGeneration
         updateNavigationStatus("navigation=destination_search_cancelled")
     }
 
-    private fun onDestinationSelected(result: DestinationSearchResult) {
+    private fun onDestinationSelected(result: DestinationSearchResult): Boolean {
+        if (blockRouteMutationWhileDeviationChoicePending()) return false
         val cancellation = cancelNavigationRequestsForDestinationSelection()
         clearDestinationSearchState(cancellation.destinationSearchCancelled)
-        if (!currentNavigationCollectionAllowsWork()) return
-        if (!requireReporterUserId("login_required_route_select")) return
+        if (!currentNavigationCollectionAllowsWork()) return false
+        if (!requireReporterUserId("login_required_route_select")) return false
         if (routeRequestInFlight.get() || cancellation.routeCancelled) {
             clearActiveRouteRequestState(cancellation.routeCancelled)
         } else if (isRouteActive) {
@@ -18538,7 +18960,10 @@ generation != cameraFallbackGeneration
         latestTmapOnRoute = false
         updateRouteButtonText()
         updateNavigationStatus("navigation=destination_selected ${result.name} ${formatDestinationDistance(result.distanceM)}")
+        val routeRequestGenerationBefore = routeRequestGeneration
         requestRoute(result.point, reason = "user_destination")
+        return routeRequestGeneration != routeRequestGenerationBefore &&
+            routeRequestInFlight.get()
     }
 
     private fun updateDestinationSearchUi() {
@@ -18586,6 +19011,8 @@ generation != cameraFallbackGeneration
     /** Serializes route requests so user start and off-route reroute cannot race each other. */
     private fun requestRoute(destination: RoutePoint, reason: String) {
         if (!currentNavigationCollectionAllowsWork()) return
+        if (reason != "off_route" && blockRouteMutationWhileDeviationChoicePending()) return
+        if (!routeSnapshotPurgeFenceAllowsRoute()) return
         val expectedWalkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return
         val deviceResources = walkSessionResourceProbe.snapshot()
         if (deviceResources.readinessStatus != WalkSessionReadinessStatus.READY) {
@@ -18608,6 +19035,16 @@ generation != cameraFallbackGeneration
             updateRouteButtonText()
             return
         }
+        val gatewayProcessSnapshot = GatewaySessionProcessCoordinator.snapshot()
+        if (
+            gatewayProcessSnapshot.session !== gatewaySession ||
+            gatewayProcessSnapshot.deletionRecoveryOnly ||
+            gatewayProcessSnapshot.storageBlocked
+        ) return
+        val expectedGatewaySessionGeneration = gatewayProcessSnapshot.generation
+        GatewayCapacityProcessState.fenceSessionGeneration(
+            expectedGatewaySessionGeneration,
+        )
         val origin = freshTrustedLocationOrNull()
         if (origin == null) {
             latestTmapOnRoute = false
@@ -18648,6 +19085,7 @@ generation != cameraFallbackGeneration
         )
         try {
             routeExecutor.execute {
+                var routeProviderCallInProgress = false
                 try {
                     if (
                         !isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId) ||
@@ -18660,6 +19098,8 @@ generation != cameraFallbackGeneration
                     val revalidation = gatewaySessionClient.revalidate(
                         gatewaySession,
                         currentReporterUserId(),
+                        capacitySessionGeneration =
+                            expectedGatewaySessionGeneration,
                     )
                     if (revalidation.status != GatewaySessionRevalidationStatus.READY) {
                         completeRouteRequest(routeCall)
@@ -18710,7 +19150,9 @@ generation != cameraFallbackGeneration
                         routeCall.cancel()
                         return@execute
                     }
+                    routeProviderCallInProgress = true
                     val route = routeCall.execute()
+                    routeProviderCallInProgress = false
                     if (!isCurrentGatewaySession(gatewaySession)) {
                         completeRouteRequest(routeCall)
                         runOnUiThread {
@@ -18727,6 +19169,10 @@ generation != cameraFallbackGeneration
                             updateRouteButtonText()
                             updateNavigationStatus("navigation=route_cancelled session_changed")
                         }
+                        return@execute
+                    }
+                    if (!isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId)) {
+                        completeRouteRequest(routeCall)
                         return@execute
                     }
                     completeRouteRequest(routeCall)
@@ -18747,6 +19193,36 @@ generation != cameraFallbackGeneration
                             return@runOnUiThread
                         }
                         if (!isRouteActive) return@runOnUiThread
+                        if (!routeSnapshotPurgeFenceAllowsRoute()) return@runOnUiThread
+                        val storedRouteSnapshot = runCatching {
+                            val saved = routeSnapshotStore.saveFirstRoute(
+                                walkSessionId = expectedWalkEpoch.walkSessionId,
+                                route = route,
+                                destination = destination,
+                            )
+                            if (!saved) null else routeSnapshotStore.load()
+                        }.getOrNull()?.takeIf {
+                            it.walkSessionId == expectedWalkEpoch.walkSessionId
+                        }
+                        if (storedRouteSnapshot == null) {
+                            routeRequestInFlight.set(false)
+                            enterWalkSessionSafetyStopAndCancelOutputs("route_snapshot_store_failed")
+                            val detail =
+                                "최초 TMAP 경로를 암호화해 저장하지 못해 보행 기능을 중지했습니다."
+                            updateStatus(
+                                "길안내 안전 중지",
+                                detail,
+                            )
+                            updateNavigationStatus("navigation=safety_stopped reason=route_snapshot_store_failed")
+                            speakInteraction(detail)
+                            return@runOnUiThread
+                        }
+                        routeSnapshotPurgeFailed = false
+                        scheduleEncryptedRouteSnapshotExpiry(
+                            walkSessionId = storedRouteSnapshot.walkSessionId,
+                            expiresAtEpochMs = storedRouteSnapshot.expiresAtEpochMs,
+                        )
+                        tmapFailureGuard.recordSuccess()
                         routeNavigator.setRoute(
                             route,
                             destination = destination,
@@ -18779,8 +19255,11 @@ generation != cameraFallbackGeneration
                         updateRouteButtonText()
                         updateNavigationStatus("navigation=route_cancelled")
                     }
-                } catch (error: RuntimeException) {
+                } catch (error: Exception) {
                     completeRouteRequest(routeCall)
+                    val navigationFailure = classifyNavigationBackendFailure(error)
+                    val countableTmapFailure = routeProviderCallInProgress &&
+                        navigationFailure.kind != NavigationBackendErrorKind.AUTHENTICATION
                     runOnUiThread {
                         if (
                             !isRouteRequestLeaseCurrent(
@@ -18791,12 +19270,31 @@ generation != cameraFallbackGeneration
                         val failureGuard = gatewayFailureUiGuardOrNull(
                             session = gatewaySession,
                             expectedAuthenticationFailure =
-                                error is GatewayProxyHttpException &&
-                                    error.statusCode in setOf(401, 403),
+                                navigationFailure.kind == NavigationBackendErrorKind.AUTHENTICATION,
                         )
                         routeRequestInFlight.set(false)
                         updateRouteButtonText()
                         if (failureGuard == null || !isGatewayFailureUiGuardCurrent(gatewaySession, failureGuard)) {
+                            return@runOnUiThread
+                        }
+                        if (
+                            countableTmapFailure &&
+                            tmapFailureGuard.recordFailure()
+                        ) {
+                            enterWalkSessionSafetyStopAndCancelOutputs("tmap_consecutive_failures")
+                            val safetyStopDetail =
+                                "${navigationFailure.kind.userMessage} " +
+                                    "TMAP 경로 요청이 두 번 연속 실패해 모든 보행 기능을 중지했습니다. " +
+                                    "새 보행을 직접 시작해 주세요."
+                            updateStatus(
+                                "길안내 안전 중지",
+                                safetyStopDetail,
+                            )
+                            updateNavigationStatus(
+                                "navigation=safety_stopped reason=tmap_consecutive_failures " +
+                                    "kind=${navigationFailure.kind.statusToken}",
+                            )
+                            speakInteraction(safetyStopDetail)
                             return@runOnUiThread
                         }
                         if (!preserveExistingRoute) isRouteActive = false
@@ -18805,15 +19303,15 @@ generation != cameraFallbackGeneration
                         updateRouteButtonText()
                         updateNavigationStatus(
                             if (preserveExistingRoute) {
-                                "navigation=reroute_failed ${error::class.java.simpleName} existing_route_retained"
+                                "navigation=reroute_failed ${navigationFailure.kind.statusToken} existing_route_retained"
                             } else {
-                                "navigation=route_failed ${error::class.java.simpleName}"
+                                "navigation=route_failed ${navigationFailure.kind.statusToken}"
                             },
                         )
                         if (preserveExistingRoute) {
-                            retainRouteAfterRerouteFailure("TMAP 새 경로를 확인할 수 없어 방향 안내를 중지했습니다.")
+                            retainRouteAfterRerouteFailure(navigationFailure.kind.userMessage)
                         } else {
-                            speakInteraction("TMAP 경로를 확인할 수 없어 길안내를 시작하지 않았습니다.")
+                            speakInteraction(navigationFailure.kind.userMessage)
                         }
                     }
                 } finally {
@@ -18866,6 +19364,7 @@ generation != cameraFallbackGeneration
             requestInFlight = routeRequestInFlight.get(),
             stepProgressM = routeStepProgressMOrNull(),
         )
+        applyRouteDeviationSafetyUpdate(update)
         if (!update.userDecisionRequired && !update.offRoute && update.reason !in setOf("route_missing", "polyline_missing")) {
             directionGuidancePauseReason = null
         }
@@ -18877,7 +19376,11 @@ generation != cameraFallbackGeneration
             !update.shouldReroute &&
             !update.arrived &&
             !update.userDecisionRequired
-        maybePlayProgressBeep(nowMs, offRoute = update.offRoute, arrived = update.arrived)
+        maybePlayProgressBeep(
+            nowMs,
+            offRoute = update.offRoute || update.userDecisionRequired,
+            arrived = update.arrived,
+        )
         updateNavigationStatus(
             "navigation=${update.reason} offRoute=${update.offRoute} " +
                 "arrived=${update.arrived} decisionRequired=${update.userDecisionRequired}",
@@ -18889,6 +19392,7 @@ generation != cameraFallbackGeneration
             )
         }
         val instruction = update.instruction ?: return
+        if (update.userDecisionRequired) return
         if (feedbackPolicy.canSpeakNavigation(nowMs)) {
             val requestGeneration = routeRequestGeneration
             speakNavigation(instruction) {
@@ -18906,6 +19410,72 @@ generation != cameraFallbackGeneration
         }
     }
 
+    private fun applyRouteDeviationSafetyUpdate(update: RouteNavigatorUpdate): Boolean {
+        if (update.cancelStaleNavigationSpeech) {
+            feedbackActuator?.cancelNavigationSpeech()
+        }
+        updateRouteDeviationActions(update.pendingUserDecision)
+        maybePlayRouteDeviationHaptic(update.pendingUserDecision)
+        if (!update.userDecisionRequired) {
+            lastAnnouncedRouteDecisionToken = null
+            return false
+        }
+        latestTmapOnRoute = false
+        directionGuidancePauseReason = update.reason
+        val token = routeNavigator.pendingDecisionToken()
+        if (token != null && token != lastAnnouncedRouteDecisionToken) {
+            lastAnnouncedRouteDecisionToken = token
+            update.instruction?.let(::speakInteraction)
+        }
+        return true
+    }
+
+    private fun updateRouteDeviationActions(decision: RouteNavigatorUserDecision?) {
+        if (!::routeDeviationActions.isInitialized) return
+        val suspected = decision == RouteNavigatorUserDecision.LOCATION_RECHECK
+        val confirmed = decision == RouteNavigatorUserDecision.REROUTE
+        routeDeviationActions.visibility = if (suspected || confirmed) View.VISIBLE else View.GONE
+        routeDeviationActions.contentDescription = when {
+            confirmed -> "경로 이탈 확정. 새 경로 요청, 위치 다시 확인, 길안내 종료 중 선택"
+            suspected -> "경로 이탈 의심. 위치 다시 확인 선택"
+            else -> null
+        }
+        routeDeviationNewRouteButton.visibility = if (confirmed) View.VISIBLE else View.GONE
+        routeDeviationRecheckButton.visibility = if (suspected || confirmed) View.VISIBLE else View.GONE
+        routeDeviationEndButton.visibility = if (confirmed) View.VISIBLE else View.GONE
+        if (::routeButton.isInitialized) {
+            routeButton.visibility = if (suspected || confirmed) View.GONE else View.VISIBLE
+        }
+        if (::destinationResetButton.isInitialized) {
+            destinationResetButton.visibility = if (suspected || confirmed) View.GONE else View.VISIBLE
+        }
+    }
+
+    private fun routeDeviationChoicePending(): Boolean =
+        routeNavigator.pendingUserDecision() in setOf(
+            RouteNavigatorUserDecision.LOCATION_RECHECK,
+            RouteNavigatorUserDecision.REROUTE,
+        )
+
+    private fun blockRouteMutationWhileDeviationChoicePending(): Boolean {
+        if (!routeDeviationChoicePending()) return false
+        updateNavigationStatus("navigation=route_deviation_choice_required")
+        speakInteraction("현재 경로 상태에서 표시된 이탈 선택지를 먼저 골라 주세요.")
+        return true
+    }
+
+    private fun maybePlayRouteDeviationHaptic(decision: RouteNavigatorUserDecision?) {
+        if (decision == routeDeviationHapticDecision) return
+        routeDeviationHapticDecision = decision
+        when (decision) {
+            RouteNavigatorUserDecision.LOCATION_RECHECK ->
+                ensureFeedbackActuator().playRouteGuidancePausedVibration()
+            RouteNavigatorUserDecision.REROUTE ->
+                ensureFeedbackActuator().playRouteDeviationConfirmedVibration()
+            else -> Unit
+        }
+    }
+
     private fun routeStepProgressMOrNull(): Double? {
         val baseline = routeStartStepCount ?: return null
         if (!isRouteActive || !routeNavigator.hasRoute()) return null
@@ -18915,7 +19485,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun retainRouteAfterRerouteFailure(message: String) {
-        routeNavigator.rerouteRequestFailed()
+        routeNavigator.rerouteRequestFailed()?.let(::applyRouteDeviationSafetyUpdate)
         pauseDirectionGuidance(reason = "tmap_unavailable", message = message)
     }
 
@@ -19442,6 +20012,24 @@ generation != cameraFallbackGeneration
             )
             if (missing.isNotEmpty()) {
                 enterPermissionRecoveryBarrier(missing, "field_session_start")
+                return
+            }
+            GatewayCapacityProcessState.fenceSessionGeneration(
+                GatewaySessionProcessCoordinator.snapshot().generation,
+            )
+            val capacityAdmission = GatewayCapacityProcessState.admission()
+            if (!capacityAdmission.newRawCollectionSessionAllowed) {
+                updateStatus(
+                    "현장 로그 시작 보류",
+                    "서버 용량 상태를 확인한 뒤 새 원본 수집 세션을 시작할 수 있습니다.",
+                )
+                fieldSessionLog.recordEvent(
+                    "field_log_start_blocked_gateway_capacity",
+                    mapOf(
+                        "availability" to capacityAdmission.availability.name,
+                        "version" to capacityAdmission.snapshot?.version,
+                    ),
+                )
                 return
             }
             fieldSessionLog.startAfterUserConfirmation()

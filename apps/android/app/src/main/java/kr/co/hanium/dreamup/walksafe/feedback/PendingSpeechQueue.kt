@@ -51,6 +51,9 @@ internal class PendingSpeechQueue(
     fun hasPriority(priority: SpeechPriority): Boolean = priority in pending
 
     @Synchronized
+    fun removePriority(priority: SpeechPriority): Boolean = pending.remove(priority) != null
+
+    @Synchronized
     fun clear() {
         pending.clear()
     }

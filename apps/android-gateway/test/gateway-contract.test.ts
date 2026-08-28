@@ -218,7 +218,7 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
   assert.deepEqual(Object.keys(contract.paths[expected[6]!]!), ["post"]);
   assert.deepEqual(Object.keys(contract.paths[expected[7]!]!), ["get"]);
   assert.deepEqual(Object.keys(contract.paths[expected[8]!]!), ["post"]);
-  assert.equal(contract.info.version, "0.6.0");
+  assert.equal(contract.info.version, "0.7.0");
   const reportOperation = (
     contract as unknown as {
       paths: Record<string, {
@@ -988,7 +988,11 @@ test("walking and search proxy only approved data and internal actor credentials
   assert.equal(walking.headers.get("cache-control"), "no-store");
   assert.equal(walking.headers.get("set-cookie"), null);
   assert.equal(walking.headers.get(FIELD_TEST_TOKEN_HEADER), null);
-  assert.equal(walking.headers.get("x-request-id"), "request-123");
+  assert.match(
+    walking.headers.get("x-request-id") ?? "",
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+  );
+  assert.notEqual(walking.headers.get("x-request-id"), "request-123");
 
   const first = calls[0]!;
   assert.equal(first.url, "http://127.0.0.1:8000/navigation/walking");

@@ -3,11 +3,32 @@ import { Readable } from "node:stream";
 
 import { handleGatewayRequest, type GatewayDependencies } from "./routes.js";
 
+const INTERNAL_HEALTH_PATH = "/internal/health";
+
 function loopbackPeerAddress(request: IncomingMessage): string | null {
   const address = request.socket.remoteAddress ?? "";
   if (address === "127.0.0.1" || address === "::1") return address;
   if (address === "::ffff:127.0.0.1") return "127.0.0.1";
   return null;
+}
+
+function internalHealthResponse(
+  request: IncomingMessage,
+  webRequest: Request
+): Response | null {
+  const url = new URL(webRequest.url);
+  if (
+    loopbackPeerAddress(request) === null ||
+    webRequest.method !== "GET" ||
+    url.pathname !== INTERNAL_HEALTH_PATH ||
+    url.search !== ""
+  ) {
+    return null;
+  }
+  return Response.json(
+    { status: "ok" },
+    { headers: { "cache-control": "no-store" } }
+  );
 }
 
 function requestHeaders(request: IncomingMessage): Headers {
@@ -130,7 +151,8 @@ export function createGatewayServer(dependencies: GatewayDependencies = {}): Ser
       try {
         const localPort = request.socket.localPort ?? 8081;
         const webRequest = toWebRequest(request, clientAbort.signal, localPort);
-        gatewayResponse = await handleGatewayRequest(webRequest, dependencies);
+        gatewayResponse = internalHealthResponse(request, webRequest)
+          ?? await handleGatewayRequest(webRequest, dependencies);
       } catch (error) {
         gatewayResponse = error instanceof TypeError
           ? adapterError(400, "gateway_invalid_request")

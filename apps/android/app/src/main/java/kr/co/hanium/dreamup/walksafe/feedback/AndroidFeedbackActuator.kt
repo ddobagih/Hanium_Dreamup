@@ -210,6 +210,11 @@ class AndroidFeedbackActuator(
 
     fun vibrateRiskOnly(action: FeedbackAction): Boolean = vibrate(action.vibrationPatternMs)
 
+    fun playRouteGuidancePausedVibration(): Boolean = vibrate(longArrayOf(0L, 120L))
+
+    fun playRouteDeviationConfirmedVibration(): Boolean =
+        vibrate(checkNotNull(VibrationPatterns.forLevel(MessageLevel.STOP)))
+
     /** Adds a short haptic cue to the separate spoken and on-screen mounting correction. */
     fun playPhoneMountingCorrectionVibration(): Boolean =
         vibrate(longArrayOf(0L, 120L))
@@ -311,6 +316,21 @@ class AndroidFeedbackActuator(
         onCompleted = onCompleted,
         onFailed = onFailed,
     )
+
+    /** Cancels every stale route utterance; dispatch rules prevent navigation/risk coexistence. */
+    fun cancelNavigationSpeech(): Boolean {
+        val queuedNavigationRemoved = pendingSpeechQueue.removePriority(SpeechPriority.NAVIGATION)
+        val snapshot = synchronized(pendingUtterances) { pendingUtterances.toList() }
+        val navigation = snapshot.filter { it.startsWith("$ANNOUNCE_NAV_PREFIX-") }
+        if (navigation.isEmpty()) return queuedNavigationRemoved
+        if (ttsState == TtsState.READY) textToSpeech.stop()
+        navigation.forEach {
+            markUtteranceFinished(it, completed = false, notifyFailure = false)
+        }
+        lastNavMessage = ""
+        lastNavMessageAtMs = 0L
+        return true
+    }
 
     fun speakInteraction(message: String): Boolean =
         speak(message, SpeechPriority.INTERACTION) == NavigationSpeechDispatchResult.ACCEPTED

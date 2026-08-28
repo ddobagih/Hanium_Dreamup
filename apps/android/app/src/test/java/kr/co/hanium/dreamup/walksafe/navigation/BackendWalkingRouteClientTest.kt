@@ -213,6 +213,37 @@ class BackendWalkingRouteClientTest {
     }
 
     @Test
+    fun classifiesBackendFailuresWithoutExposingProviderMessages() {
+        val cases = mapOf(
+            GatewayProxyHttpException(503, "walking_route_failed", "tmap_app_key_missing") to
+                NavigationBackendErrorKind.PROVIDER_CONFIGURATION,
+            GatewayProxyHttpException(429, "walking_route_failed", "tmap_provider_error") to
+                NavigationBackendErrorKind.RATE_LIMITED,
+            GatewayProxyHttpException(504, "walking_route_failed", "tmap_timeout") to
+                NavigationBackendErrorKind.TIMEOUT,
+            GatewayProxyHttpException(502, "walking_route_failed", "invalid_tmap_response") to
+                NavigationBackendErrorKind.INVALID_RESPONSE,
+            GatewayProxyHttpException(502, "walking_route_failed", "gateway_upstream_auth_failed") to
+                NavigationBackendErrorKind.AUTHENTICATION,
+        )
+
+        cases.forEach { (error, expected) ->
+            assertEquals(expected, classifyNavigationBackendFailure(error).kind)
+        }
+    }
+
+    @Test
+    fun twoConsecutiveTmapFailuresRequireSafetyStopAndSuccessResetsTheCount() {
+        val guard = ConsecutiveTmapFailureGuard(safetyStopThreshold = 2)
+
+        assertEquals(false, guard.recordFailure())
+        assertEquals(true, guard.recordFailure())
+        guard.recordSuccess()
+        assertEquals(0, guard.failureCount())
+        assertEquals(false, guard.recordFailure())
+    }
+
+    @Test
     fun destinationSearchRejectsNonTmapOrUnversionedPayloads() {
         listOf(
             """{"provider":"tmap_poi","results":[]}""",

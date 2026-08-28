@@ -58,6 +58,11 @@ import {
   PRIVACY_LEDGER_MAX_BYTES,
   validPrivacyLedgerStateForMaintenance
 } from "./privacy-rights.js";
+import {
+  resolveServerCapacityStatePath,
+  SERVER_CAPACITY_MAX_PLAINTEXT_BYTES,
+  validServerCapacitySnapshotForMaintenance
+} from "./server-capacity.js";
 
 export type GatewayStateMaintenanceCommand =
   | "inspect"
@@ -94,8 +99,15 @@ type ClassifiedState = {
   value?: unknown;
 };
 
+type PreparedState = {
+  state: ManagedState;
+  result: GatewayStateMaintenanceResult;
+  encoded: string | null;
+};
+
 const SHORT_SESSION_FILE = /^field-[0-9a-f]{64}\.json$/;
 const DIGEST_FILE = /^[0-9a-f]{64}\.json$/;
+const SERVER_CAPACITY_FILE = /^snapshot\.json$/;
 
 function ownedByCurrentProcess(uid: number): boolean {
   return typeof process.getuid !== "function" || uid === process.getuid();
@@ -185,6 +197,7 @@ function managedStates(environment: NodeJS.ProcessEnv): ManagedState[] {
         context: { kind: "privacy-rights-ledger", recordId: "ledger.json" },
         maxPlaintextBytes: PRIVACY_LEDGER_MAX_BYTES,
         integratedConsentLock: false,
+        lockPath: path.join(privacyDirectory, "ledger.lock"),
         validate: validPrivacyLedgerStateForMaintenance
       });
     } catch (error) {
@@ -216,6 +229,19 @@ function managedStates(environment: NodeJS.ProcessEnv): ManagedState[] {
       maxPlaintextBytes: INTEGRATED_CONSENT_MAX_STATE_BYTES,
       integratedConsentLock: true,
       validate: (value) => validIntegratedConsentStateForMaintenance(value, recordId)
+    });
+  }
+  const capacityPath = resolveServerCapacityStatePath(environment);
+  for (const filePath of matchingFiles(
+    path.dirname(capacityPath),
+    SERVER_CAPACITY_FILE
+  )) {
+    states.push({
+      filePath,
+      context: { kind: "server-capacity", recordId: path.basename(filePath) },
+      maxPlaintextBytes: SERVER_CAPACITY_MAX_PLAINTEXT_BYTES,
+      integratedConsentLock: false,
+      validate: validServerCapacitySnapshotForMaintenance
     });
   }
 
@@ -378,7 +404,9 @@ export function assertGatewayManagedStateReady(
   environment: NodeJS.ProcessEnv = process.env
 ): GatewayStateMaintenanceResult[] {
   initializeGatewayStateEncryption(environment);
-  const results = managedStates(environment).map((state) => updateOne("inspect", state));
+  const results = managedStates(environment).map(
+    (state) => prepareOne("inspect", state).result
+  );
   for (const result of results) {
     if (result.statusBefore === "plaintext") {
       throw new GatewayStateEncryptionError(
@@ -402,22 +430,20 @@ export function assertGatewayManagedStateReady(
   return results;
 }
 
-function updateOne(
+function prepareOne(
   command: GatewayStateMaintenanceCommand,
   state: ManagedState
-): GatewayStateMaintenanceResult {
+): PreparedState {
   const raw = readManagedState(state);
   const classified = classifyState(state, raw);
   let action: GatewayStateMaintenanceResult["action"] = "none";
+  let encoded: string | null = null;
 
   if (command === "migrate-plaintext" && classified.status === "plaintext") {
-    atomicReplace(
-      state,
-      encryptGatewayStateJson(
-        state.context,
-        classified.value,
-        state.maxPlaintextBytes
-      )
+    encoded = encryptGatewayStateJson(
+      state.context,
+      classified.value,
+      state.maxPlaintextBytes
     );
     action = "migrated";
   } else if (command === "rotate") {
@@ -434,13 +460,10 @@ function updateOne(
       throw blockedKeyError(classified);
     }
     if (classified.status === "encrypted-decrypt-only") {
-      atomicReplace(
-        state,
-        encryptGatewayStateJson(
-          state.context,
-          classified.value,
-          state.maxPlaintextBytes
-        )
+      encoded = encryptGatewayStateJson(
+        state.context,
+        classified.value,
+        state.maxPlaintextBytes
       );
       action = "rotated";
     }
@@ -452,8 +475,26 @@ function updateOne(
     throw blockedKeyError(classified);
   }
 
-  if (action !== "none") {
-    const verified = classifyState(state, readManagedState(state));
+  return {
+    state,
+    encoded,
+    result: {
+      file: state.filePath,
+      kind: state.context.kind,
+      statusBefore: classified.status,
+      action,
+      keyId: classified.keyId
+    }
+  };
+}
+
+function applyPrepared(prepared: PreparedState): GatewayStateMaintenanceResult {
+  if (prepared.encoded !== null) {
+    atomicReplace(prepared.state, prepared.encoded);
+    const verified = classifyState(
+      prepared.state,
+      readManagedState(prepared.state)
+    );
     if (verified.status !== "encrypted-active") {
       throw new GatewayStateEncryptionError(
         "integrity",
@@ -461,13 +502,7 @@ function updateOne(
       );
     }
   }
-  return {
-    file: state.filePath,
-    kind: state.context.kind,
-    statusBefore: classified.status,
-    action,
-    keyId: classified.keyId
-  };
+  return prepared.result;
 }
 
 async function withStateLock<T>(
@@ -478,6 +513,19 @@ async function withStateLock<T>(
     return withIntegratedConsentStateFileLockForMaintenance(state.filePath, action);
   }
   return withExclusiveFileLockAsync(state.lockPath ?? `${state.filePath}.lock`, action);
+}
+
+async function withAllStateLocks<T>(
+  states: readonly ManagedState[],
+  index: number,
+  action: () => Promise<T> | T
+): Promise<T> {
+  const state = states[index];
+  if (state === undefined) return action();
+  return withStateLock(
+    state,
+    () => withAllStateLocks(states, index + 1, action)
+  );
 }
 
 export async function runGatewayStateMaintenance(
@@ -493,11 +541,11 @@ export async function runGatewayStateMaintenance(
     resolveGatewayServiceRuntimeLockPath(environment),
     async () => {
       initializeGatewayStateEncryption(environment);
-      const results: GatewayStateMaintenanceResult[] = [];
-      for (const state of managedStates(environment)) {
-        results.push(await withStateLock(state, () => updateOne(command, state)));
-      }
-      return results;
+      const states = managedStates(environment);
+      return withAllStateLocks(states, 0, () => {
+        const prepared = states.map((state) => prepareOne(command, state));
+        return prepared.map(applyPrepared);
+      });
     }
   );
 }

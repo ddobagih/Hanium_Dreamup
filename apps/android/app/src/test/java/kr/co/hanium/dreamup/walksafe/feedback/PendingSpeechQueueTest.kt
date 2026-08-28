@@ -58,4 +58,18 @@ class PendingSpeechQueueTest {
         assertFalse(queue.hasPriority(SpeechPriority.RISK))
         assertTrue(queue.drainPriorityOrder().isEmpty())
     }
+
+    @Test
+    fun removingNavigationPreservesRiskAndInteraction() {
+        val queue = PendingSpeechQueue()
+        queue.offer("길안내", SpeechPriority.NAVIGATION)
+        queue.offer("확인", SpeechPriority.INTERACTION)
+        queue.offer("정지", SpeechPriority.RISK)
+
+        assertTrue(queue.removePriority(SpeechPriority.NAVIGATION))
+        assertEquals(
+            listOf(SpeechPriority.RISK, SpeechPriority.INTERACTION),
+            queue.drainPriorityOrder().map(PendingSpeech::priority),
+        )
+    }
 }

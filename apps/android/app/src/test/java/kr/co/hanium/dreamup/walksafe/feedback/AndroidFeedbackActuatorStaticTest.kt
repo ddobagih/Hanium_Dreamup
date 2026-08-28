@@ -37,6 +37,21 @@ class AndroidFeedbackActuatorStaticTest {
     }
 
     @Test
+    fun routeDeviationCancellationAlwaysStopsAndRetiresNavigationSpeech() {
+        val cancellation = source.substringAfter("fun cancelNavigationSpeech(): Boolean")
+            .substringBefore("fun speakInteraction(message: String)")
+        val dispatch = source.substringAfter("private fun speakReady(")
+            .substringBefore("private fun vibrate(patternMs: LongArray?)")
+
+        assertTrue(cancellation.contains("ANNOUNCE_NAV_PREFIX"))
+        assertTrue(cancellation.contains("if (ttsState == TtsState.READY) textToSpeech.stop()"))
+        assertTrue(cancellation.contains("completed = false, notifyFailure = false"))
+        assertTrue(dispatch.contains("pendingIds.any { !it.startsWith(\"\$ANNOUNCE_ADVISORY_PREFIX-\") }"))
+        assertTrue(dispatch.contains("return NavigationSpeechDispatchResult.SUPPRESSED"))
+        assertTrue(dispatch.contains("SpeechPriority.RISK -> TextToSpeech.QUEUE_FLUSH"))
+    }
+
+    @Test
     fun externalRiskAnnouncementStopsAppOwnedSpeechBeforeTalkBack() {
         val preparation = source.substringAfter("fun prepareForExternalRiskAnnouncement()")
             .substringBefore("fun speakNavigation(")
