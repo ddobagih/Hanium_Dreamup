@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import stat
 import sys
 import threading
 import time
@@ -1209,8 +1210,9 @@ def test_deployment_environment_requires_real_detector_artifacts(
 
     model = tmp_path / "unified.pt"
     runtime_config = tmp_path / "runtime.json"
-    lock_dir = tmp_path / "locks"
-    lock_dir.mkdir(mode=0o700)
+    upload_dir = tmp_path / "uploads"
+    upload_dir.mkdir(mode=0o750)
+    upload_dir.chmod(0o2750)
     model.write_bytes(b"model")
     runtime_payload = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
     runtime_payload["models"]["unified_walksafe"]["artifact_sha256"] = hashlib.sha256(b"model").hexdigest()
@@ -1218,31 +1220,47 @@ def test_deployment_environment_requires_real_detector_artifacts(
     monkeypatch.setenv("DETECT_V2_MODE", "real")
     monkeypatch.setenv("DETECT_V2_UNIFIED_MODEL_PATH", str(model))
     monkeypatch.setenv("DETECT_V2_RUNTIME_CONFIG_PATH", str(runtime_config))
-    monkeypatch.setenv("WALKSAFE_MAINTENANCE_LOCK_PATH", str(lock_dir / "maintenance.lock"))
-
-    with pytest.raises(ValueError, match="root-owned non-writable authority ancestry"):
-        Settings()
-
-    monkeypatch.setattr("backend.app.config._trusted_maintenance_lock_parent", lambda _parent: True)
+    monkeypatch.setenv("UPLOAD_DIR", str(upload_dir.resolve()))
+    monkeypatch.setenv(
+        "WALKSAFE_MAINTENANCE_LOCK_GROUP",
+        config_module.MAINTENANCE_LOCK_GROUP,
+    )
+    monkeypatch.setenv(
+        "WALKSAFE_UPLOAD_BACKUP_READER_GROUP",
+        config_module.UPLOAD_BACKUP_READER_GROUP,
+    )
+    maintenance_gid = next(
+        (gid for gid in os.getgroups() if gid not in {0, os.getegid()}),
+        os.getegid() + 1,
+    )
+    monkeypatch.setattr(
+        config_module.grp,
+        "getgrnam",
+        lambda name: type(
+            "Group",
+            (),
+            {
+                "gr_gid": (
+                    maintenance_gid
+                    if name == config_module.MAINTENANCE_LOCK_GROUP
+                    else os.getegid()
+                )
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        config_module.os,
+        "getgroups",
+        lambda: [maintenance_gid],
+    )
+    monkeypatch.setattr(
+        Settings,
+        "_validate_deployment_maintenance_lock",
+        lambda _settings: None,
+    )
 
     settings = Settings()
     assert settings.detect_v2_unified_model_path == model
-
-    lock_dir.chmod(0o500)
-    with pytest.raises(ValueError, match="mode 0700"):
-        Settings()
-    lock_dir.chmod(0o700)
-
-    lock_path = lock_dir / "maintenance.lock"
-    lock_path.touch(mode=0o644)
-    with pytest.raises(ValueError, match="single-link 0600"):
-        Settings()
-    lock_path.chmod(0o600)
-    second_link = lock_dir / "maintenance-second-link.lock"
-    os.link(lock_path, second_link)
-    with pytest.raises(ValueError, match="single-link 0600"):
-        Settings()
-    second_link.unlink()
 
     monkeypatch.setenv("TMAP_POI_PROVIDER", "mock")
     with pytest.raises(ValueError, match="must be live"):
@@ -1252,14 +1270,22 @@ def test_deployment_environment_requires_real_detector_artifacts(
     monkeypatch.setenv("UPLOAD_DIR", "relative-uploads")
     with pytest.raises(ValueError, match="UPLOAD_DIR must be absolute"):
         Settings()
-    upload_dir = tmp_path / "uploads"
-    upload_dir.mkdir(mode=0o700)
     monkeypatch.setenv("UPLOAD_DIR", str(upload_dir.resolve()))
 
     upload_dir.chmod(0o755)
-    with pytest.raises(ValueError, match="denies group/other"):
+    with pytest.raises(ValueError, match="dedicated backup-reader group"):
         Settings()
-    upload_dir.chmod(0o700)
+    upload_dir.chmod(0o2750)
+
+    real_listxattr = config_module.os.listxattr
+    monkeypatch.setattr(
+        config_module.os,
+        "listxattr",
+        lambda _descriptor: [b"system.posix_acl_default"],
+    )
+    with pytest.raises(ValueError, match="ACL-free"):
+        Settings()
+    monkeypatch.setattr(config_module.os, "listxattr", real_listxattr)
 
     upload_link = tmp_path / "uploads-link"
     upload_link.symlink_to(upload_dir, target_is_directory=True)
@@ -1288,3 +1314,48 @@ def test_deployment_environment_requires_real_detector_artifacts(
     monkeypatch.setenv("DETECT_V2_RUNTIME_CONFIG_PATH", str(tmp_path / "missing.json"))
     with pytest.raises(ValueError, match="RUNTIME_CONFIG_PATH"):
         Settings()
+
+
+def test_shared_maintenance_lock_metadata_contract_is_exact(tmp_path: Path) -> None:
+    base = list(tmp_path.stat())
+    expected_gid = os.getegid()
+
+    parent_fields = base.copy()
+    parent_fields[0] = (parent_fields[0] & ~0o7777) | 0o750
+    parent_fields[4] = 0
+    parent_fields[5] = expected_gid
+    lock_fields = base.copy()
+    lock_fields[0] = stat.S_IFREG | 0o440
+    lock_fields[3] = 1
+    lock_fields[4] = 0
+    lock_fields[5] = expected_gid
+
+    parent = os.stat_result(parent_fields)
+    lock = os.stat_result(lock_fields)
+    assert config_module._shared_maintenance_lock_metadata_is_safe(
+        parent,
+        lock,
+        expected_gid,
+    )
+
+    for index, replacement in (
+        (3, 2),
+        (4, 1),
+        (5, expected_gid + 1),
+    ):
+        changed = lock_fields.copy()
+        changed[index] = replacement
+        assert not config_module._shared_maintenance_lock_metadata_is_safe(
+            parent,
+            os.stat_result(changed),
+            expected_gid,
+        )
+
+    for unsafe_mode in (0o400, 0o460, 0o640):
+        changed = lock_fields.copy()
+        changed[0] = stat.S_IFREG | unsafe_mode
+        assert not config_module._shared_maintenance_lock_metadata_is_safe(
+            parent,
+            os.stat_result(changed),
+            expected_gid,
+        )

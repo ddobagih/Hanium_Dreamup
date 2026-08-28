@@ -2084,6 +2084,7 @@ def _validate_runtime_contracts(source: Path) -> None:
                 "CHANGE_ME_REPORT_IMAGE_KEY_BOUNDARY"
             ),
             "UPLOAD_DIR": "/var/lib/walksafe/uploads",
+            "WALKSAFE_UPLOAD_BACKUP_READER_GROUP": "walksafe-backup-readers",
             "WALKSAFE_REPORT_IMAGE_KEY_PROVIDER": "secret_file",
             "WALKSAFE_REPORT_IMAGE_KEY_FILE": (
                 "/etc/walksafe/report-image-keyring.json"
@@ -2123,12 +2124,16 @@ def _validate_runtime_contracts(source: Path) -> None:
                 "CHANGE_ME_RANDOM_PRIVACY_HMAC_SECRET_AT_LEAST_32_UTF8_BYTES"
             ),
             "WALKSAFE_PRIVACY_HMAC_KEY_VERSION": "1",
-            "WALKSAFE_MAINTENANCE_LOCK_PATH": "/run/walksafe-backend/maintenance.lock",
+            "WALKSAFE_MAINTENANCE_LOCK_PATH": (
+                "/run/walksafe-maintenance-lock/maintenance.lock"
+            ),
+            "WALKSAFE_MAINTENANCE_LOCK_GROUP": "walksafe-maintenance-lock",
         },
         allowed_keys=set(
             """WALKSAFE_ENVIRONMENT WALKSAFE_SOURCE_COMMIT WALKSAFE_BACKEND_WORKERS
             WALKSAFE_BACKEND_REPLICAS WALKSAFE_ACTOR_RATE_LIMIT_STORE DATABASE_URL
             DATABASE_CONNECT_TIMEOUT_SECONDS DATABASE_STATEMENT_TIMEOUT_MS UPLOAD_DIR
+            WALKSAFE_UPLOAD_BACKUP_READER_GROUP
             WALKSAFE_DATABASE_AT_REST_ENCRYPTION_CONFIRMED
             WALKSAFE_DATABASE_TRANSPORT_SECURITY_CONFIRMED
             WALKSAFE_DATABASE_ENCRYPTION_KEY_BOUNDARY WALKSAFE_REPORT_IMAGE_KEY_BOUNDARY
@@ -2151,7 +2156,8 @@ def _validate_runtime_contracts(source: Path) -> None:
             WALKSAFE_ADMIN_RECOVERY_TTL_SECONDS WALKSAFE_ADMIN_AUTH_RATE_LIMIT_ATTEMPTS
             WALKSAFE_ADMIN_AUTH_RATE_LIMIT_WINDOW_SECONDS
             WALKSAFE_GATEWAY_SESSION_SECRET WALKSAFE_PRIVACY_HMAC_SECRET
-            WALKSAFE_PRIVACY_HMAC_KEY_VERSION WALKSAFE_MAINTENANCE_LOCK_PATH""".split()
+            WALKSAFE_PRIVACY_HMAC_KEY_VERSION WALKSAFE_MAINTENANCE_LOCK_PATH
+            WALKSAFE_MAINTENANCE_LOCK_GROUP""".split()
         ),
         context="backend runtime example",
     )
@@ -2235,7 +2241,11 @@ def _validate_runtime_contracts(source: Path) -> None:
             "DATABASE_CONNECT_TIMEOUT_SECONDS": "5",
             "DATABASE_STATEMENT_TIMEOUT_MS": "10000",
             "UPLOAD_DIR": "/var/lib/walksafe/uploads",
-            "WALKSAFE_MAINTENANCE_LOCK_PATH": "/run/walksafe-backend/maintenance.lock",
+            "WALKSAFE_UPLOAD_BACKUP_READER_GROUP": "walksafe-backup-readers",
+            "WALKSAFE_MAINTENANCE_LOCK_PATH": (
+                "/run/walksafe-maintenance-lock/maintenance.lock"
+            ),
+            "WALKSAFE_MAINTENANCE_LOCK_GROUP": "walksafe-maintenance-lock",
             "WALKSAFE_RETENTION_PYTHON": "/srv/walksafe/backend/.venv/bin/python",
             "WALKSAFE_REPORT_RETENTION_MANIFEST_DIR": (
                 "/var/lib/walksafe/report-retention"
@@ -2262,7 +2272,9 @@ def _validate_runtime_contracts(source: Path) -> None:
             "DATABASE_CONNECT_TIMEOUT_SECONDS",
             "DATABASE_STATEMENT_TIMEOUT_MS",
             "UPLOAD_DIR",
+            "WALKSAFE_UPLOAD_BACKUP_READER_GROUP",
             "WALKSAFE_MAINTENANCE_LOCK_PATH",
+            "WALKSAFE_MAINTENANCE_LOCK_GROUP",
             "WALKSAFE_RETENTION_PYTHON",
             "WALKSAFE_REPORT_RETENTION_MANIFEST_DIR",
             "GNUPGHOME",
@@ -2332,7 +2344,17 @@ def _validate_runtime_contracts(source: Path) -> None:
         'candidate["age_days"] != expected_age_days',
         'reason != expected_reason',
         'status_value == "completed" and payload.get("cleanup_errors") != []',
+        '"reconciled_runs"',
+        'image_fields = {',
+        '"envelope_sha256"',
+        '"envelope_size"',
+        'reconciled_fields = {"run_id", "status", "report_ids"}',
+        '"RECONCILED_PRECOMMIT_ABORTED"',
+        '"RECONCILED_POSTCOMMIT_COMPLETED"',
+        "current_reconciliations = [",
+        'current_reconciliations[0]["report_ids"] != candidate_ids',
         'status_value == "failed_before_commit"',
+        'status_value == "recovery_copied" and not candidates',
         "0o600",
         "gnupg_home.parent != manifest_directory",
         "resolved != path",
@@ -2458,6 +2480,7 @@ def _validate_runtime_contracts(source: Path) -> None:
             "Type": ["simple"],
             "User": ["walksafe-backend"],
             "Group": ["walksafe-backend"],
+            "SupplementaryGroups": ["walksafe-maintenance-lock"],
             "WorkingDirectory": ["/srv/walksafe/backend"],
             "Environment": [
                 "PYTHONPATH=/srv/walksafe/backend",
@@ -2466,7 +2489,7 @@ def _validate_runtime_contracts(source: Path) -> None:
             "EnvironmentFile": ["/etc/walksafe/backend-runtime.env"],
             "RuntimeDirectory": ["walksafe-backend"],
             "RuntimeDirectoryMode": ["0700"],
-            "StateDirectory": ["walksafe/uploads walksafe/android-debug-logs"],
+            "StateDirectory": ["walksafe/android-debug-logs walksafe/capacity"],
             "StateDirectoryMode": ["0700"],
             "ExecStart": [
                 "/srv/walksafe/backend/.venv/bin/python -m uvicorn backend.app.main:app "
@@ -2478,14 +2501,20 @@ def _validate_runtime_contracts(source: Path) -> None:
             **common_service_hardening,
             "ReadOnlyPaths": [
                 "/etc/walksafe/report-image-keyring.json "
-                "/etc/walksafe/admin-credential-issuer.key"
+                "/etc/walksafe/admin-credential-issuer.key "
+                "/run/walksafe-maintenance-lock"
             ],
             "InaccessiblePaths": [
-                "/etc/walksafe/backend-migration.env /etc/walksafe/backend.env"
+                "/etc/walksafe/backend-migration.env /etc/walksafe/backend.env "
+                "/etc/walksafe/backup.env /etc/walksafe/backup-key-control.json "
+                "/etc/walksafe/backup-key-control.json.sig "
+                "/etc/walksafe/backup-key-control.lock "
+                "-/var/lib/walksafe-backup -/var/lib/walksafe-backup-gnupg "
+                "-/run/walksafe-backup"
             ],
             "ReadWritePaths": [
                 "/var/lib/walksafe/uploads /var/lib/walksafe/android-debug-logs "
-                "/run/walksafe-backend"
+                "/var/lib/walksafe/capacity /run/walksafe-backend"
             ],
         },
         "Install": {"WantedBy": ["multi-user.target"]},
@@ -2506,6 +2535,7 @@ def _validate_runtime_contracts(source: Path) -> None:
             "Type": ["oneshot"],
             "User": ["walksafe-backend"],
             "Group": ["walksafe-backend"],
+            "SupplementaryGroups": ["walksafe-maintenance-lock"],
             "WorkingDirectory": ["/srv/walksafe/backend"],
             "Environment": [
                 "PYTHONPATH=/srv/walksafe/backend",
@@ -2523,9 +2553,14 @@ def _validate_runtime_contracts(source: Path) -> None:
             "TimeoutStopSec": ["130s"],
             "LimitCORE": ["0"],
             **common_service_hardening,
+            "ReadOnlyPaths": ["/run/walksafe-maintenance-lock"],
+            "InaccessiblePaths": [
+                "/etc/walksafe/backup.env /etc/walksafe/backup-key-control.lock "
+                "-/var/lib/walksafe-backup -/var/lib/walksafe-backup-gnupg "
+                "-/run/walksafe-backup"
+            ],
             "ReadWritePaths": [
-                "/var/lib/walksafe/uploads /var/lib/walksafe/report-retention "
-                "/run/walksafe-backend"
+                "/var/lib/walksafe/uploads /var/lib/walksafe/report-retention"
             ],
         },
     }
@@ -2644,6 +2679,10 @@ def _validate_runtime_contracts(source: Path) -> None:
         context="backend issuer binding unit",
     )
     expected_sysusers = (
+        "g walksafe-maintenance-lock -\n"
+        "g walksafe-backup-readers -\n"
+        'u walksafe-backup - "WalkSafe encrypted backup" '
+        "/nonexistent /usr/sbin/nologin\n"
         'u walksafe-maintenance - "WalkSafe database migration" '
         "/nonexistent /usr/sbin/nologin\n"
         'u walksafe-issuer-bind - "WalkSafe issuer-key binding" '

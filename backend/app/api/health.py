@@ -6,6 +6,7 @@ import asyncio
 from concurrent.futures import Future
 import os
 from pathlib import Path
+import re
 import stat
 from threading import Lock, Thread
 import time
@@ -41,9 +42,54 @@ from backend.app.services.tmap_pedestrian import (
 )
 
 
-EXPECTED_ALEMBIC_HEAD = "202608150002"
+EXPECTED_ALEMBIC_HEAD = "202608250002"
 READINESS_LOCAL_CHECK_TIMEOUT_SECONDS = 5.0
 TMAP_READINESS_FAILURE_COOLDOWN_SECONDS = 5.0
+ACTOR_RATE_LIMIT_GROUP_CONSTRAINT = "ck_actor_rate_limit_events_group"
+EXPECTED_ACTOR_RATE_LIMIT_GROUPS = frozenset(
+    {"report", "navigation", "detect", "export", "admin_read", "privacy"}
+)
+
+_SQL_QUOTED_LITERAL = re.compile(r"'((?:''|[^'])*)'")
+_RATE_GROUP_CAST = re.compile(
+    r"::\s*(?:character\s+varying|text)\s*(?:\[\s*\])?",
+    re.IGNORECASE,
+)
+
+
+def _exact_actor_rate_limit_group_expression(expression: object) -> bool:
+    """Recognize PostgreSQL's canonical scalar-array form without trusting formatting."""
+
+    if not isinstance(expression, str):
+        return False
+    groups: list[str] = []
+
+    def replace_literal(match: re.Match[str]) -> str:
+        groups.append(match.group(1).replace("''", "'"))
+        return "?"
+
+    without_literals = _SQL_QUOTED_LITERAL.sub(replace_literal, expression)
+    without_casts = _RATE_GROUP_CAST.sub("", without_literals)
+    skeleton = re.sub(r"[\s()]", "", without_casts)
+    return (
+        skeleton == "rate_group=ANYARRAY[?,?,?,?,?,?]"
+        and len(groups) == len(EXPECTED_ACTOR_RATE_LIMIT_GROUPS)
+        and frozenset(groups) == EXPECTED_ACTOR_RATE_LIMIT_GROUPS
+    )
+
+
+def _actor_rate_limit_group_constraint_ready(rows: list[dict[str, object]]) -> bool:
+    if len(rows) != 1:
+        return False
+    row = rows[0]
+    return (
+        row.get("schema_name") == "public"
+        and row.get("table_name") == "actor_rate_limit_events"
+        and row.get("constraint_name") == ACTOR_RATE_LIMIT_GROUP_CONSTRAINT
+        and row.get("constraint_type") == "c"
+        and row.get("validated") is True
+        and _exact_actor_rate_limit_group_expression(row.get("expression"))
+    )
 
 
 async def health() -> dict[str, str]:
@@ -66,12 +112,38 @@ def _database_readiness(database_url: str) -> dict[str, object]:
             connection.execute(text("SET LOCAL statement_timeout = 1500"))
             connection.execute(text("SELECT 1"))
             migration = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
+            constraint_rows = connection.execute(
+                text(
+                    "SELECT namespace.nspname AS schema_name, "
+                    "relation.relname AS table_name, "
+                    "constraint_record.conname AS constraint_name, "
+                    "constraint_record.contype AS constraint_type, "
+                    "constraint_record.convalidated AS validated, "
+                    "pg_get_expr(constraint_record.conbin, "
+                    "constraint_record.conrelid, false) AS expression "
+                    "FROM pg_constraint AS constraint_record "
+                    "JOIN pg_class AS relation "
+                    "ON relation.oid = constraint_record.conrelid "
+                    "JOIN pg_namespace AS namespace "
+                    "ON namespace.oid = relation.relnamespace "
+                    "WHERE namespace.nspname = 'public' "
+                    "AND relation.relname = 'actor_rate_limit_events' "
+                    "AND constraint_record.conname = "
+                    "'ck_actor_rate_limit_events_group'"
+                )
+            ).mappings().all()
         if migration != EXPECTED_ALEMBIC_HEAD:
             return {
                 "ready": False,
                 "reason": "migration_not_at_head",
                 "current_revision": migration,
                 "expected_revision": EXPECTED_ALEMBIC_HEAD,
+            }
+        if not _actor_rate_limit_group_constraint_ready(constraint_rows):
+            return {
+                "ready": False,
+                "reason": "actor_rate_limit_group_constraint_invalid",
+                "current_revision": migration,
             }
         return {"ready": True, "current_revision": migration}
     finally:

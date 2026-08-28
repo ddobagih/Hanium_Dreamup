@@ -22,6 +22,7 @@
 | `test_walksafe_product_quality_receipt.py`, `test_walksafe_operator_attestation.py`, `test_release_evidence_gate.py`, `test_submission_toolchain_host_lock_20260713_history.py` | Web을 필수 제품으로 묶은 2026-07-13 Full-RC 품질·operator·release evidence와 당시 LibreOffice host bytes를 재현하는 역사 검사. 현재 Android 사용자·관리자·Gateway의 commit-stable `all`에는 포함하지 않음 |
 | `test_walksafe_goal_package.py` | 활성화되지 않고 대체된 A~D Goal package 후보를 재현하는 역사 검사. 현재 Goal graph·세션 통제로 사용하지 않고 history inventory에만 보존 |
 | `test_walksafe_android_product_boundary.py` | EPIC-01의 Android 사용자·관리자 앱 ID·역할·배포·세션 분리 계약, 잠긴 관리자 앱, 제품 목적·지원기기·출시 fail-closed 설정 |
+| `test_walksafe_android_gateway_ingress_current.py` | 현행 Gateway OpenAPI·제품 경계·nginx의 8개 API와 권리 안내 경로 일치, 계정 삭제 request ID·본문 상한, catch-all 404·no-store·접근 로그 차단을 검증 |
 | `test_walksafe_android_gateway_boundary_20260723.py` | Phase E 당시 독립 Gateway 5-route snapshot을 재현하는 역사 검사. 현재 9 path/13 operation 계약에는 직접 실행하지 않음 |
 | `test_walksafe_legacy_web_boundary_20260722.py` | Phase D의 전환형 Next BFF 4개 보존 경계를 재현하는 역사 검사이며 Phase E 현재성 판정에는 사용하지 않음 |
 | `test_voice_intents.py` | 한국어 음성 intent 분류, 실행 정책, telemetry schema |

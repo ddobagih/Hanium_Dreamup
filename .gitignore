@@ -154,6 +154,9 @@ data_sources/manifests/*_privacy_location_audit_results*.csv
 data_sources/manifests/*_val_image_error_summary_*.csv
 datasets/*/materialized_manifest.csv
 
+# Local Wave 5 decision intake export (plaintext operational metadata)
+walksafe-wave5-decisions-answers.json
+
 # External-AI working imagery and annotations stay local. Only instructions,
 # manifests, and textual review results are publishable.
 ai_tasks/**/components/images/

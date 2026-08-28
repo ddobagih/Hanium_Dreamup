@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+from datetime import timedelta
+import grp
 import hashlib
 import json
 import math
@@ -80,6 +82,64 @@ ADMIN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
 TOTP_SECRET_PATTERN = re.compile(r"^[A-Z2-7]+$")
 KEY_BOUNDARY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{2,127}$")
 DATABASE_ROLE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,62}$")
+MAINTENANCE_LOCK_GROUP = "walksafe-maintenance-lock"
+UPLOAD_BACKUP_READER_GROUP = "walksafe-backup-readers"
+
+
+def _required_system_group_gid(configured: str, expected: str, setting: str) -> int:
+    if configured != expected:
+        raise ValueError(f"{setting} must be {expected}")
+    try:
+        group_gid = grp.getgrnam(configured).gr_gid
+    except KeyError as exc:
+        raise ValueError(f"{setting} group does not exist") from exc
+    if group_gid <= 0:
+        raise ValueError(f"{setting} group must not be root")
+    return group_gid
+
+
+def _directory_acl_is_absent(path: Path) -> bool:
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+        )
+        opened = os.fstat(descriptor)
+        anchored = path.stat(follow_symlinks=False)
+        return (
+            (opened.st_dev, opened.st_ino) == (anchored.st_dev, anchored.st_ino)
+            and not any(
+                "acl" in os.fsdecode(name).casefold()
+                for name in os.listxattr(descriptor)
+            )
+        )
+    except (AttributeError, OSError):
+        return False
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def _shared_maintenance_lock_metadata_is_safe(
+    parent_metadata: os.stat_result,
+    lock_metadata: os.stat_result,
+    expected_gid: int,
+) -> bool:
+    return (
+        stat.S_ISDIR(parent_metadata.st_mode)
+        and parent_metadata.st_uid == 0
+        and parent_metadata.st_gid == expected_gid
+        and stat.S_IMODE(parent_metadata.st_mode) == 0o750
+        and stat.S_ISREG(lock_metadata.st_mode)
+        and lock_metadata.st_uid == 0
+        and lock_metadata.st_gid == expected_gid
+        and stat.S_IMODE(lock_metadata.st_mode) == 0o440
+        and lock_metadata.st_nlink == 1
+    )
 
 
 def _env_text(name: str, default: str = "") -> str:
@@ -158,6 +218,20 @@ def _parse_positive_float(name: str, default: float) -> float:
     value = float(raw_value)
     if not math.isfinite(value) or value <= 0:
         raise ValueError(f"{name} must be finite and greater than 0")
+    return value
+
+
+def _parse_optional_positive_float(name: str) -> float | None:
+    raw_value = _env_text(name)
+    if not raw_value:
+        return None
+    try:
+        value = float(raw_value)
+        timedelta(seconds=value)
+    except (OverflowError, ValueError):
+        raise ValueError(f"{name} must be a finite positive number") from None
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be a finite positive number")
     return value
 
 
@@ -640,6 +714,12 @@ class Settings:
         self._maintenance_lock_was_absolute = (
             raw_maintenance_lock.is_absolute() if raw_maintenance_lock is not None else False
         )
+        self.maintenance_lock_group = _env_text("WALKSAFE_MAINTENANCE_LOCK_GROUP")
+        self.maintenance_lock_group_gid: int | None = None
+        self.upload_backup_reader_group = _env_text(
+            "WALKSAFE_UPLOAD_BACKUP_READER_GROUP"
+        )
+        self.upload_backup_reader_group_gid: int | None = None
         self.walksafe_environment = _env_text("WALKSAFE_ENVIRONMENT", "development").lower()
         self.admin_credential_issuer_key_file = (
             _parse_admin_credential_issuer_key_file(
@@ -649,6 +729,55 @@ class Settings:
         )
         self.backend_workers = _parse_positive_int("WALKSAFE_BACKEND_WORKERS", 1)
         self.backend_replicas = _parse_positive_int("WALKSAFE_BACKEND_REPLICAS", 1)
+        capacity_interval_name = "WALKSAFE_CAPACITY_MEASUREMENT_INTERVAL_SECONDS"
+        capacity_ttl_name = "WALKSAFE_CAPACITY_STATE_TTL_SECONDS"
+        capacity_state_path_name = "WALKSAFE_CAPACITY_VERSION_STATE_PATH"
+        capacity_interval = _parse_optional_positive_float(capacity_interval_name)
+        capacity_ttl = _parse_optional_positive_float(capacity_ttl_name)
+        raw_capacity_state_path = _env_text(capacity_state_path_name)
+        configured_capacity_values = (
+            capacity_interval is not None,
+            capacity_ttl is not None,
+            bool(raw_capacity_state_path),
+        )
+        if any(configured_capacity_values) and not all(configured_capacity_values):
+            raise ValueError(
+                "capacity measurement interval, TTL, and version state path "
+                "must all be set or all be absent"
+            )
+        self.capacity_measurement_interval_seconds = capacity_interval
+        self.capacity_state_ttl_seconds = capacity_ttl
+        self.capacity_version_state_path: Path | None = None
+        if all(configured_capacity_values):
+            assert capacity_interval is not None
+            assert capacity_ttl is not None
+            if capacity_ttl <= capacity_interval:
+                raise ValueError(
+                    "WALKSAFE_CAPACITY_STATE_TTL_SECONDS must be greater than "
+                    "WALKSAFE_CAPACITY_MEASUREMENT_INTERVAL_SECONDS"
+                )
+            capacity_state_path = Path(raw_capacity_state_path).expanduser()
+            if (
+                not capacity_state_path.is_absolute()
+                or Path(os.path.abspath(capacity_state_path)) != capacity_state_path
+                or not capacity_state_path.name
+            ):
+                raise ValueError(
+                    "WALKSAFE_CAPACITY_VERSION_STATE_PATH must be a canonical absolute file path"
+                )
+            try:
+                capacity_state_path.relative_to(self.upload_dir)
+            except ValueError:
+                pass
+            else:
+                raise ValueError(
+                    "WALKSAFE_CAPACITY_VERSION_STATE_PATH must be outside UPLOAD_DIR"
+                )
+            if self.backend_workers != 1 or self.backend_replicas != 1:
+                raise ValueError(
+                    "local capacity measurement requires one backend worker and one replica"
+                )
+            self.capacity_version_state_path = capacity_state_path
         self.actor_rate_limit_store = _env_text(
             "WALKSAFE_ACTOR_RATE_LIMIT_STORE",
             "postgresql" if self.walksafe_environment in DEPLOYMENT_ENVIRONMENTS else "memory",
@@ -761,6 +890,31 @@ class Settings:
                 raise ValueError("TMAP_APP_KEY is required in deployment environments")
             if self.tmap_poi_provider != "live":
                 raise ValueError("TMAP_POI_PROVIDER must be live in deployment environments")
+            self._validate_deployment_detector()
+            self.maintenance_lock_group_gid = _required_system_group_gid(
+                self.maintenance_lock_group,
+                MAINTENANCE_LOCK_GROUP,
+                "WALKSAFE_MAINTENANCE_LOCK_GROUP",
+            )
+            self.upload_backup_reader_group_gid = _required_system_group_gid(
+                self.upload_backup_reader_group,
+                UPLOAD_BACKUP_READER_GROUP,
+                "WALKSAFE_UPLOAD_BACKUP_READER_GROUP",
+            )
+            if (
+                self.upload_backup_reader_group_gid
+                == self.maintenance_lock_group_gid
+            ):
+                raise ValueError(
+                    "maintenance-lock and upload backup-reader groups must differ"
+                )
+            if self.maintenance_lock_group_gid not in {
+                os.getegid(),
+                *os.getgroups(),
+            }:
+                raise ValueError(
+                    "backend process must belong to WALKSAFE_MAINTENANCE_LOCK_GROUP"
+                )
             if not self._upload_dir_was_absolute:
                 raise ValueError("UPLOAD_DIR must be absolute in deployment environments")
             try:
@@ -771,12 +925,15 @@ class Settings:
                 self._configured_upload_dir.is_symlink()
                 or not self._configured_upload_dir.is_dir()
                 or upload_metadata.st_uid != os.geteuid()
-                or upload_metadata.st_mode & 0o077
+                or upload_metadata.st_gid != self.upload_backup_reader_group_gid
+                or stat.S_IMODE(upload_metadata.st_mode) != 0o2750
+                or not _directory_acl_is_absent(self._configured_upload_dir)
             ):
                 raise ValueError(
-                    "UPLOAD_DIR must be a service-owned real directory that denies group/other access"
+                    "UPLOAD_DIR must be a service-owned ACL-free 2750 real directory "
+                    "in the dedicated backup-reader group"
                 )
-            self._validate_deployment_detector()
+            self._validate_deployment_maintenance_lock()
             if not self.admin_security_enabled:
                 raise ValueError(
                     "WALKSAFE_ADMIN_SECURITY_ENABLED must be true in deployment environments"
@@ -822,29 +979,33 @@ class Settings:
             )
         except Exception as exc:
             raise ValueError("DETECT_V2_RUNTIME_CONFIG_PATH is invalid") from exc
+
+    def _validate_deployment_maintenance_lock(self) -> None:
         if self.maintenance_lock_path is None or not self._maintenance_lock_was_absolute:
             raise ValueError("WALKSAFE_MAINTENANCE_LOCK_PATH must be an absolute path")
         lock_parent = self.maintenance_lock_path.parent
         if not lock_parent.is_dir() or lock_parent.is_symlink():
             raise ValueError("WALKSAFE_MAINTENANCE_LOCK_PATH parent must be a real directory")
         lock_parent_stat = lock_parent.stat()
-        if lock_parent_stat.st_uid != os.geteuid():
-            raise ValueError("WALKSAFE_MAINTENANCE_LOCK_PATH parent must be owned by the service user")
-        if stat.S_IMODE(lock_parent_stat.st_mode) != 0o700:
-            raise ValueError("WALKSAFE_MAINTENANCE_LOCK_PATH parent must have mode 0700")
+        assert self.maintenance_lock_group_gid is not None
         if self.maintenance_lock_path.is_symlink():
             raise ValueError("WALKSAFE_MAINTENANCE_LOCK_PATH must not be a symlink")
-        if self.maintenance_lock_path.exists():
+        try:
             lock_stat = self.maintenance_lock_path.stat()
-            if (
-                not stat.S_ISREG(lock_stat.st_mode)
-                or lock_stat.st_uid != os.geteuid()
-                or stat.S_IMODE(lock_stat.st_mode) != 0o600
-                or lock_stat.st_nlink != 1
-            ):
-                raise ValueError(
-                    "WALKSAFE_MAINTENANCE_LOCK_PATH must be a service-owned single-link 0600 regular file"
-                )
+        except OSError as exc:
+            raise ValueError(
+                "WALKSAFE_MAINTENANCE_LOCK_PATH must be provisioned before startup"
+            ) from exc
+        if not _shared_maintenance_lock_metadata_is_safe(
+            lock_parent_stat,
+            lock_stat,
+            self.maintenance_lock_group_gid,
+        ):
+            raise ValueError(
+                "WALKSAFE_MAINTENANCE_LOCK_PATH requires a root-owned 0750 parent and "
+                "root-owned single-link 0440 regular file in the dedicated "
+                "maintenance-lock group"
+            )
         if not _trusted_maintenance_lock_parent(lock_parent):
             raise ValueError(
                 "WALKSAFE_MAINTENANCE_LOCK_PATH parent must be protected by a root-owned "

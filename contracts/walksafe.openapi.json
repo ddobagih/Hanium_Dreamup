@@ -1350,6 +1350,55 @@
         "title": "Body_detect_objects_v2_detect_v2_post",
         "type": "object"
       },
+      "CapacityLevel": {
+        "enum": [
+          "NORMAL",
+          "ADMIN_ONLY_WARNING",
+          "PAUSE_NEW_FIELD_TEST_PARTICIPANTS",
+          "HOLD_NEW_RAW_COLLECTION_SESSIONS",
+          "HOLD_NEW_TRAINING_AND_AUTO_REPORT_CANDIDATES"
+        ],
+        "title": "CapacityLevel",
+        "type": "string"
+      },
+      "CapacityStateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?Z$",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CapacityLevel"
+          },
+          "observed_at": {
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?Z$",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "reason": {
+            "const": "STORAGE_UTILIZATION",
+            "title": "Reason",
+            "type": "string"
+          },
+          "version": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 9007199254740991.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "observed_at",
+          "expires_at",
+          "level",
+          "reason"
+        ],
+        "title": "CapacityStateResponse",
+        "type": "object"
+      },
       "DestinationSearchResponse": {
         "properties": {
           "provider": {
@@ -5088,6 +5137,37 @@
           }
         ],
         "summary": "Health",
+        "x-walksafe-actor-identity-required": false,
+        "x-walksafe-required-role": "field"
+      }
+    },
+    "/internal/capacity": {
+      "get": {
+        "operationId": "get_capacity_internal_capacity_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapacityStateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "description": "Capacity state unavailable or expired."
+          }
+        },
+        "security": [
+          {
+            "WalkSafeFieldToken": []
+          }
+        ],
+        "summary": "Get Capacity",
+        "tags": [
+          "capacity"
+        ],
         "x-walksafe-actor-identity-required": false,
         "x-walksafe-required-role": "field"
       }

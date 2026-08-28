@@ -32,6 +32,7 @@ from backend.app import database as database_api
 from backend.app import field_test_security as field_test_security_api
 from backend.app.api import admin_security as admin_security_api
 from backend.app.api import reports as reports_api
+import backend.app.config as config_module
 from backend.app.config import Settings
 from backend.app.field_test_security import (
     ADMIN_RECONFIRM_NONCE_HEADER_NAME,
@@ -2040,7 +2041,7 @@ def test_postgres_recovery_custody_migration_preflights_control_count(
             assert revision == prior_revision
             assert custody_column_count == 0
         else:
-            assert revision == "202608150002"
+            assert revision == "202608250002"
             assert custody_column_count == 1
     finally:
         engine.dispose()
@@ -2443,7 +2444,8 @@ def test_deployment_requires_database_backed_admin_security(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     upload_dir = tmp_path / "uploads"
-    upload_dir.mkdir(mode=0o700)
+    upload_dir.mkdir(mode=0o750)
+    upload_dir.chmod(0o2750)
     monkeypatch.setenv("UPLOAD_DIR", str(upload_dir.resolve()))
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://walksafe:test@127.0.0.1/walksafe")
     monkeypatch.setenv("WALKSAFE_ENVIRONMENT", "field")
@@ -2454,7 +2456,44 @@ def test_deployment_requires_database_backed_admin_security(
     monkeypatch.setenv("WALKSAFE_GATEWAY_SESSION_SECRET", "gateway-session-secret-for-tests-1234567890")
     monkeypatch.setenv("WALKSAFE_ACTOR_RATE_LIMIT_STORE", "postgresql")
     monkeypatch.setenv("TMAP_APP_KEY", "test-tmap-key")
+    monkeypatch.setenv(
+        "WALKSAFE_MAINTENANCE_LOCK_GROUP",
+        config_module.MAINTENANCE_LOCK_GROUP,
+    )
+    monkeypatch.setenv(
+        "WALKSAFE_UPLOAD_BACKUP_READER_GROUP",
+        config_module.UPLOAD_BACKUP_READER_GROUP,
+    )
+    maintenance_gid = next(
+        (gid for gid in os.getgroups() if gid not in {0, os.getegid()}),
+        os.getegid() + 1,
+    )
+    monkeypatch.setattr(
+        config_module.grp,
+        "getgrnam",
+        lambda name: type(
+            "Group",
+            (),
+            {
+                "gr_gid": (
+                    maintenance_gid
+                    if name == config_module.MAINTENANCE_LOCK_GROUP
+                    else os.getegid()
+                )
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        config_module.os,
+        "getgroups",
+        lambda: [maintenance_gid],
+    )
     monkeypatch.setattr(Settings, "_validate_deployment_detector", lambda self: None)
+    monkeypatch.setattr(
+        Settings,
+        "_validate_deployment_maintenance_lock",
+        lambda self: None,
+    )
     monkeypatch.setenv("WALKSAFE_ADMIN_SECURITY_ENABLED", "false")
 
     with pytest.raises(ValueError, match="ADMIN_SECURITY_ENABLED must be true"):

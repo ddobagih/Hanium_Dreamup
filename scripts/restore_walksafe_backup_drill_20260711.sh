@@ -17,7 +17,7 @@ export WALKSAFE_BACKUP_RUNTIME_PYTHON="${BACKUP_RUNTIME_PYTHON}"
 ORIGINAL_ARGUMENTS=("$@")
 
 usage() {
-  echo "Usage: $0 --backup-dir DIR --target-database-url URL --target-upload-dir DIR --receipt FILE --trusted-signer-fingerprint FINGERPRINT --key-control-document ABSOLUTE_FILE --key-control-signature ABSOLUTE_FILE --key-control-authority-lock ABSOLUTE_FILE --trusted-key-control-signer-fingerprint FINGERPRINT --expected-key-control-sha256 SHA256 --receipt-gpg-signer SECRET_KEY --confirm RESTORE-TO-EMPTY-TARGET [--actor-id ID]" >&2
+  echo "Usage: $0 --backup-dir DIR --target-database-url URL --target-upload-dir DIR --receipt FILE --trusted-signer-fingerprint FINGERPRINT --key-control-document ABSOLUTE_FILE --key-control-signature ABSOLUTE_FILE --key-control-authority-lock ABSOLUTE_FILE --trusted-key-control-signer-fingerprint FINGERPRINT --expected-key-control-sha256 SHA256 --receipt-gpg-signer SECRET_KEY --max-backup-age-seconds SECONDS --backup-future-skew-seconds SECONDS --confirm RESTORE-TO-EMPTY-TARGET [--actor-id ID]" >&2
 }
 
 BACKUP_DIR=""
@@ -41,6 +41,8 @@ TRUSTED_VALIDATION_SIGNER_FINGERPRINT="${WALKSAFE_BACKUP_VALIDATION_TRUSTED_SIGN
 BEFORE_REKEY_ROOT="${WALKSAFE_BACKUP_BEFORE_REKEY_ROOT:-}"
 AFTER_REKEY_ROOT="${WALKSAFE_BACKUP_AFTER_REKEY_ROOT:-}"
 RECEIPT_GPG_SIGNER="${WALKSAFE_RESTORE_GPG_SIGNER:-}"
+MAX_BACKUP_AGE_SECONDS=""
+BACKUP_FUTURE_SKEW_SECONDS=""
 while (($#)); do
   case "$1" in
     --backup-dir) BACKUP_DIR="${2:-}"; shift 2 ;;
@@ -64,6 +66,8 @@ while (($#)); do
     --before-rekey-root) BEFORE_REKEY_ROOT="${2:-}"; shift 2 ;;
     --after-rekey-root) AFTER_REKEY_ROOT="${2:-}"; shift 2 ;;
     --receipt-gpg-signer) RECEIPT_GPG_SIGNER="${2:-}"; shift 2 ;;
+    --max-backup-age-seconds) MAX_BACKUP_AGE_SECONDS="${2:-}"; shift 2 ;;
+    --backup-future-skew-seconds) BACKUP_FUTURE_SKEW_SECONDS="${2:-}"; shift 2 ;;
     *) usage; exit 2 ;;
   esac
 done
@@ -72,8 +76,19 @@ done
   && -n "${RECEIPT}" && -n "${TRUSTED_SIGNER_FINGERPRINT}" \
   && -n "${KEY_CONTROL_DOCUMENT}" && -n "${KEY_CONTROL_SIGNATURE}" && -n "${KEY_CONTROL_AUTHORITY_LOCK}" \
   && -n "${TRUSTED_KEY_CONTROL_SIGNER_FINGERPRINT}" && -n "${EXPECTED_KEY_CONTROL_SHA256}" \
-  && -n "${RECEIPT_GPG_SIGNER}" ]] || { usage; exit 2; }
+  && -n "${RECEIPT_GPG_SIGNER}" && -n "${MAX_BACKUP_AGE_SECONDS}" \
+  && -n "${BACKUP_FUTURE_SKEW_SECONDS}" ]] || { usage; exit 2; }
 [[ "${CONFIRM}" == "RESTORE-TO-EMPTY-TARGET" ]] || { echo "explicit restore confirmation is required" >&2; exit 2; }
+[[ "${MAX_BACKUP_AGE_SECONDS}" =~ ^[0-9]+$ \
+  && "${MAX_BACKUP_AGE_SECONDS}" -ge 1 && "${MAX_BACKUP_AGE_SECONDS}" -le 3024000 ]] || {
+  echo "backup max age must be between 1 and 3024000 seconds" >&2
+  exit 2
+}
+[[ "${BACKUP_FUTURE_SKEW_SECONDS}" =~ ^[0-9]+$ \
+  && "${BACKUP_FUTURE_SKEW_SECONDS}" -le 3600 ]] || {
+  echo "backup future skew must be between 0 and 3600 seconds" >&2
+  exit 2
+}
 [[ "${ACTOR_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$ ]] || { echo "invalid actor id" >&2; exit 2; }
 [[ -d "${BACKUP_DIR}" && ! -L "${BACKUP_DIR}" ]] || { echo "backup directory must be a real directory" >&2; exit 2; }
 [[ "${TARGET_UPLOAD_DIR}" == /* ]] || { echo "target upload directory must be absolute" >&2; exit 2; }
@@ -194,12 +209,14 @@ if [[ -z "${WALKSAFE_VERIFIED_BACKUP_FDS:-}" ]]; then
     --key-control-authority-lock "${KEY_CONTROL_AUTHORITY_LOCK}" \
     --trusted-key-control-signer-fingerprint "${TRUSTED_KEY_CONTROL_SIGNER_FINGERPRINT}" \
     --expected-key-control-sha256 "${EXPECTED_KEY_CONTROL_SHA256}" \
+    --max-age-seconds "${MAX_BACKUP_AGE_SECONDS}" \
+    --future-skew-seconds "${BACKUP_FUTURE_SKEW_SECONDS}" \
     "${KEY_TRANSITION_ARGUMENTS[@]}" \
     -- "${ORIGINAL_ARGUMENTS[@]}"
 fi
 VERIFIED_BACKUP_FDS="${WALKSAFE_VERIFIED_BACKUP_FDS}"
 unset WALKSAFE_VERIFIED_BACKUP_FDS
-[[ "${VERIFIED_BACKUP_FDS}" =~ ^[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+$ ]] || {
+[[ "${VERIFIED_BACKUP_FDS}" =~ ^[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+$ ]] || {
   echo "verified backup descriptor handoff is invalid" >&2
   exit 2
 }
@@ -211,7 +228,8 @@ IFS=: read -r \
   KEY_CONTROL_DOCUMENT_FD \
   KEY_CONTROL_SIGNATURE_FD \
   DECRYPTED_REPORTS_FD \
-  DECRYPTED_UPLOADS_FD <<< "${VERIFIED_BACKUP_FDS}"
+  DECRYPTED_UPLOADS_FD \
+  BACKUP_AGE_POLICY_FD <<< "${VERIFIED_BACKUP_FDS}"
 INHERITED_AUTHORITY_LOCK_FD="${WALKSAFE_VERIFIED_BACKUP_AUTHORITY_LOCK_FD:-}"
 unset WALKSAFE_VERIFIED_BACKUP_AUTHORITY_LOCK_FD
 [[ "${INHERITED_AUTHORITY_LOCK_FD}" =~ ^[0-9]+$ ]] || {
@@ -244,6 +262,9 @@ verify_inherited_backup() {
     --key-control-signature-fd "${KEY_CONTROL_SIGNATURE_FD}" \
     --decrypted-reports-fd "${DECRYPTED_REPORTS_FD}" \
     --decrypted-uploads-fd "${DECRYPTED_UPLOADS_FD}" \
+    --age-policy-fd "${BACKUP_AGE_POLICY_FD}" \
+    --max-age-seconds "${MAX_BACKUP_AGE_SECONDS}" \
+    --future-skew-seconds "${BACKUP_FUTURE_SKEW_SECONDS}" \
     --trusted-signer-fingerprint "${TRUSTED_SIGNER_FINGERPRINT}" \
     --trusted-key-control-signer-fingerprint "${TRUSTED_KEY_CONTROL_SIGNER_FINGERPRINT}" \
     --expected-key-control-sha256 "${EXPECTED_KEY_CONTROL_SHA256}" \

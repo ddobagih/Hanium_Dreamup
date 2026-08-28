@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 from contextlib import contextmanager
 from dataclasses import dataclass
+import errno
 import hashlib
 import json
 import os
@@ -23,7 +24,15 @@ from backend.app.services.report_image_crypto import (
     ReportImageCryptoError,
     parse_report_image_envelope,
 )
-from backend.app.uploads import remove_image_file, write_image_file
+from backend.app.uploads import (
+    PRIVATE_UPLOAD_DIRECTORY_MODE,
+    descriptor_acl_is_absent,
+    expected_upload_file_mode,
+    remove_image_file,
+    upload_file_metadata_is_safe,
+    validate_upload_directory_descriptor,
+    write_image_file,
+)
 
 
 JOURNAL_DIRECTORY_NAME = ".report-write-journal"
@@ -186,6 +195,13 @@ def stage_report_image(destination: Path, encrypted: EncryptedReportImage) -> Pe
 
 def complete_report_image_write(pending: PendingReportWrite) -> None:
     remove_image_file(pending.journal_path)
+    try:
+        pending.journal_path.parent.rmdir()
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        if exc.errno not in {errno.EEXIST, errno.ENOTEMPTY}:
+            raise
 
 
 def _remove_interrupted_temporary_files(destination: Path) -> None:
@@ -199,7 +215,7 @@ def _validate_journal_directory(journal_dir: Path) -> None:
         not stat.S_ISDIR(metadata.st_mode)
         or journal_dir.is_symlink()
         or metadata.st_uid != os.geteuid()
-        or metadata.st_mode & 0o077
+        or stat.S_IMODE(metadata.st_mode) != PRIVATE_UPLOAD_DIRECTORY_MODE
     ):
         raise RuntimeError("report write journal directory is not private")
 
@@ -300,11 +316,11 @@ def _read_committed_envelope(pending: PendingReportWrite) -> bytes:
         try:
             metadata = os.fstat(descriptor)
             path_metadata = pending.destination.stat(follow_symlinks=False)
+            # Inventory paths are intentionally anchored through /proc/self/fd.
+            directory_metadata = pending.destination.parent.stat()
             if (
-                not stat.S_ISREG(metadata.st_mode)
-                or metadata.st_nlink != 1
-                or metadata.st_uid != os.geteuid()
-                or stat.S_IMODE(metadata.st_mode) != 0o600
+                not upload_file_metadata_is_safe(metadata, directory_metadata)
+                or not descriptor_acl_is_absent(descriptor)
                 or (metadata.st_dev, metadata.st_ino) != (path_metadata.st_dev, path_metadata.st_ino)
                 or metadata.st_size != pending.envelope_size
                 or metadata.st_size > MAX_ENVELOPE_BYTES
@@ -318,6 +334,8 @@ def _read_committed_envelope(pending: PendingReportWrite) -> bytes:
                     raise RuntimeError("committed report image is truncated")
                 chunks.append(chunk)
                 remaining -= len(chunk)
+            if not descriptor_acl_is_absent(descriptor):
+                raise RuntimeError("committed report image ACL changed")
             return b"".join(chunks)
         finally:
             os.close(descriptor)
@@ -375,10 +393,30 @@ def reconcile_pending_report_writes(
     upload_root: Path,
     commit_state: Callable[[uuid.UUID], ReportStorageCommitState],
 ) -> ReportStorageReconciliation:
+    root_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        root_descriptor = os.open(upload_root, root_flags)
+        try:
+            validate_upload_directory_descriptor(upload_root, root_descriptor)
+        finally:
+            os.close(root_descriptor)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(
+            "report upload root does not satisfy the private/read-only-backup contract"
+        ) from exc
+
     journal_dir = pending_journal_directory(upload_root)
     if not journal_dir.exists():
         return ReportStorageReconciliation(retained_committed=0, removed_orphans=0)
-    _validate_journal_directory(journal_dir)
+    try:
+        _validate_journal_directory(journal_dir)
+    except FileNotFoundError:
+        return ReportStorageReconciliation(retained_committed=0, removed_orphans=0)
     journal_paths = sorted(journal_dir.glob("*.json"))
     if len(journal_paths) > MAX_PENDING_REPORT_WRITES:
         raise RuntimeError("too many pending report write journals")
@@ -403,6 +441,14 @@ def reconcile_pending_report_writes(
         _validate_committed(pending, state.image_object)
         retained_committed += 1
         complete_report_image_write(pending)
+
+    try:
+        journal_dir.rmdir()
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        if exc.errno not in {errno.EEXIST, errno.ENOTEMPTY}:
+            raise
 
     return ReportStorageReconciliation(
         retained_committed=retained_committed,
@@ -443,6 +489,7 @@ def _validate_empty_private_directory_at(
             or not stat.S_ISDIR(opened.st_mode)
             or opened.st_uid != os.geteuid()
             or stat.S_IMODE(opened.st_mode) != 0o700
+            or not descriptor_acl_is_absent(descriptor)
         ):
             raise RuntimeError(f"{label} directory is not private")
         if os.listdir(descriptor):
@@ -452,6 +499,7 @@ def _validate_empty_private_directory_at(
         if (
             _directory_identity(after) != _directory_identity(opened)
             or _directory_identity(path_after) != _directory_identity(opened)
+            or not descriptor_acl_is_absent(descriptor)
         ):
             raise RuntimeError(f"{label} directory identity changed during preflight")
     finally:
@@ -474,9 +522,15 @@ def _opened_flat_upload_inventory(upload_root: Path) -> Iterator[dict[str, Path]
             _directory_identity(before) != _directory_identity(path_before)
             or not stat.S_ISDIR(before.st_mode)
             or before.st_uid != os.geteuid()
-            or before.st_mode & 0o077
+            or not descriptor_acl_is_absent(descriptor)
         ):
             raise RuntimeError("report upload root is not a private real directory")
+        try:
+            expected_upload_file_mode(before)
+        except ValueError as exc:
+            raise RuntimeError(
+                "report upload root does not satisfy the private/read-only-backup contract"
+            ) from exc
         actual_objects: dict[str, Path] = {}
         for name in sorted(os.listdir(descriptor)):
             if name == JOURNAL_DIRECTORY_NAME:
@@ -494,14 +548,27 @@ def _opened_flat_upload_inventory(upload_root: Path) -> Iterator[dict[str, Path]
                 )
                 continue
             metadata = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
-            if (
-                not stat.S_ISREG(metadata.st_mode)
-                or metadata.st_nlink != 1
-                or metadata.st_uid != os.geteuid()
-                or stat.S_IMODE(metadata.st_mode) != 0o600
-                or _ENCRYPTED_IMAGE_NAME_PATTERN.fullmatch(name) is None
-            ):
-                raise RuntimeError("report upload root contains a legacy or unknown entry")
+            object_descriptor = os.open(
+                name,
+                os.O_RDONLY
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=descriptor,
+            )
+            try:
+                opened_object = os.fstat(object_descriptor)
+                if (
+                    not upload_file_metadata_is_safe(opened_object, before)
+                    or (opened_object.st_dev, opened_object.st_ino)
+                    != (metadata.st_dev, metadata.st_ino)
+                    or not descriptor_acl_is_absent(object_descriptor)
+                    or _ENCRYPTED_IMAGE_NAME_PATTERN.fullmatch(name) is None
+                ):
+                    raise RuntimeError(
+                        "report upload root contains a legacy or unknown entry, or an ACL-bearing object"
+                    )
+            finally:
+                os.close(object_descriptor)
             actual_objects[name] = Path(f"/proc/self/fd/{descriptor}") / name
         yield actual_objects
         after = os.fstat(descriptor)
@@ -509,6 +576,7 @@ def _opened_flat_upload_inventory(upload_root: Path) -> Iterator[dict[str, Path]
         if (
             _directory_identity(after) != _directory_identity(before)
             or (path_after.st_dev, path_after.st_ino) != (after.st_dev, after.st_ino)
+            or not descriptor_acl_is_absent(descriptor)
         ):
             raise RuntimeError("report upload root identity changed during preflight")
     finally:

@@ -62,6 +62,9 @@ DELETION_OVERALL_STATES = frozenset(
     {"PROCESSING", "RETRY_WAIT", "PARTIAL", "RESTRICTED", "FAILED", "COMPLETED"}
 )
 TERMINAL_ITEM_STATES = frozenset({"COMPLETED", "NOT_APPLICABLE"})
+SERVER_OWNED_ITEM_KEYS = frozenset(
+    {"server_originals", "server_quarantine", "server_copies", "report_records"}
+)
 EXTERNAL_ITEM_KEYS = frozenset(
     {
         "device_untransmitted_data",
@@ -281,6 +284,8 @@ def assert_privacy_runtime_database_role(db: Session) -> None:
             "runtime_role.rolcanlogin AS runtime_group_login, "
             "pg_has_role(current_user, 'walksafe_backend_runtime', 'USAGE') "
             "AS is_runtime, "
+            "pg_has_role(current_user, 'walksafe_account_deletion_worker', 'USAGE') "
+            "AS is_account_deletion_worker, "
             "pg_has_role(current_user, 'walksafe_receipt_purge_owner', 'MEMBER') "
             "AS is_purge_owner_member, "
             "pg_get_userbyid(table_class.relowner) = current_user AS owns_receipts, "
@@ -365,6 +370,7 @@ def assert_privacy_runtime_database_role(db: Session) -> None:
         or role["runtime_group_bypassrls"]
         or role["runtime_group_login"]
         or not role["is_runtime"]
+        or role["is_account_deletion_worker"]
         or role["is_purge_owner_member"]
         or role["owns_receipts"]
         or role["can_delete"]
@@ -381,6 +387,213 @@ def assert_privacy_runtime_database_role(db: Session) -> None:
         raise PrivacyLifecycleError(
             "privacy_database_role_unsafe",
             "The runtime database role violates the privacy least-privilege boundary.",
+            status_code=503,
+        )
+
+
+def assert_account_deletion_worker_database_role(db: Session) -> None:
+    role = db.execute(
+        text(
+            "SELECT current_user AS role_name, session_user AS session_role_name, "
+            "role.rolsuper, role.rolcreaterole, role.rolcreatedb, "
+            "role.rolreplication, role.rolbypassrls, "
+            "worker.rolcanlogin AS worker_group_login, "
+            "worker.rolsuper AS worker_group_super, "
+            "worker.rolcreaterole AS worker_group_createrole, "
+            "worker.rolcreatedb AS worker_group_createdb, "
+            "worker.rolreplication AS worker_group_replication, "
+            "worker.rolbypassrls AS worker_group_bypassrls, "
+            "worker_membership.admin_option AS worker_membership_admin, "
+            "worker_membership.inherit_option AS worker_membership_inherit, "
+            "worker_membership.set_option AS worker_membership_set, "
+            "pg_has_role(current_user, 'walksafe_account_deletion_worker', 'USAGE') "
+            "AS is_worker, "
+            "pg_has_role(current_user, 'walksafe_backend_runtime', 'USAGE') "
+            "AS is_runtime, "
+            "pg_has_role(current_user, 'walksafe_receipt_purge_owner', 'MEMBER') "
+            "AS is_purge_owner_member, "
+            "pg_has_role(current_user, 'walksafe_receipt_purger', 'MEMBER') "
+            "AS is_purger_member, "
+            "has_schema_privilege(current_user, 'public', 'CREATE') AS can_create, "
+            "has_table_privilege(current_user, 'public.reports', 'DELETE') "
+            "AS can_delete_reports, "
+            "has_table_privilege(current_user, 'public.account_deletion_items', 'UPDATE') "
+            "AS can_update_items, "
+            "has_table_privilege(current_user, 'public.account_deletion_events', 'INSERT') "
+            "AS can_insert_events, "
+            "has_table_privilege(current_user, 'public.account_deletion_device_targets', "
+            "'SELECT') AS can_read_device_targets, "
+            "(has_table_privilege(current_user, 'public.account_deletion_tombstones', 'DELETE') "
+            "OR has_table_privilege(current_user, 'public.account_deletion_requests', 'DELETE') "
+            "OR has_table_privilege(current_user, 'public.account_deletion_items', 'DELETE') "
+            "OR has_table_privilege(current_user, 'public.account_deletion_events', 'DELETE') "
+            "OR has_table_privilege(current_user, 'public.account_deletion_receipts', 'DELETE') "
+            "OR has_table_privilege(current_user, 'public.privacy_consent_events', 'DELETE')) "
+            "AS can_delete_retained_ledger, "
+            "EXISTS (SELECT 1 FROM pg_class AS grantable_class "
+            "JOIN pg_namespace AS grantable_namespace "
+            "ON grantable_namespace.oid = grantable_class.relnamespace "
+            "WHERE grantable_namespace.nspname = 'public' "
+            "AND grantable_class.relkind IN ('r', 'p', 'v', 'm', 'f') "
+            "AND (has_table_privilege(current_user, grantable_class.oid, "
+            "'SELECT WITH GRANT OPTION') "
+            "OR has_table_privilege(current_user, grantable_class.oid, "
+            "'INSERT WITH GRANT OPTION') "
+            "OR has_table_privilege(current_user, grantable_class.oid, "
+            "'UPDATE WITH GRANT OPTION') "
+            "OR has_table_privilege(current_user, grantable_class.oid, "
+            "'DELETE WITH GRANT OPTION') "
+            "OR has_table_privilege(current_user, grantable_class.oid, "
+            "'TRUNCATE WITH GRANT OPTION') "
+            "OR has_table_privilege(current_user, grantable_class.oid, "
+            "'REFERENCES WITH GRANT OPTION') "
+            "OR has_table_privilege(current_user, grantable_class.oid, "
+            "'TRIGGER WITH GRANT OPTION'))) AS has_table_grant_option, "
+            "(has_schema_privilege(current_user, 'public', "
+            "'USAGE WITH GRANT OPTION') "
+            "OR has_schema_privilege(current_user, 'public', "
+            "'CREATE WITH GRANT OPTION')) AS has_schema_grant_option, "
+            "EXISTS (SELECT 1 FROM pg_roles AS privileged_role "
+            "WHERE privileged_role.rolname IN ("
+            "'pg_read_all_data', 'pg_write_all_data', 'pg_monitor', "
+            "'pg_read_all_settings', 'pg_read_all_stats', 'pg_stat_scan_tables', "
+            "'pg_read_server_files', 'pg_write_server_files', "
+            "'pg_execute_server_program', 'pg_signal_backend', 'pg_checkpoint', "
+            "'pg_database_owner', 'pg_create_subscription', "
+            "'pg_use_reserved_connections', 'pg_maintain') "
+            "AND pg_has_role(current_user, privileged_role.oid, 'MEMBER')) "
+            "AS is_privileged_role_member, "
+            "EXISTS (SELECT 1 FROM pg_class AS public_sequence "
+            "JOIN pg_namespace AS sequence_namespace "
+            "ON sequence_namespace.oid = public_sequence.relnamespace "
+            "WHERE sequence_namespace.nspname = 'public' "
+            "AND public_sequence.relkind = 'S' "
+            "AND (has_sequence_privilege(current_user, public_sequence.oid, 'USAGE') "
+            "OR has_sequence_privilege(current_user, public_sequence.oid, 'SELECT') "
+            "OR has_sequence_privilege(current_user, public_sequence.oid, 'UPDATE'))) "
+            "AS can_access_public_sequence, "
+            "EXISTS (SELECT 1 FROM pg_class AS extension_class "
+            "JOIN pg_namespace AS extension_namespace "
+            "ON extension_namespace.oid = extension_class.relnamespace "
+            "JOIN pg_depend AS extension_dependency "
+            "ON extension_dependency.classid = 'pg_class'::regclass "
+            "AND extension_dependency.objid = extension_class.oid "
+            "AND extension_dependency.objsubid = 0 "
+            "AND extension_dependency.refclassid = 'pg_extension'::regclass "
+            "AND extension_dependency.deptype = 'e' "
+            "WHERE extension_namespace.nspname = 'public' "
+            "AND extension_class.relkind IN ('r', 'p', 'v', 'm', 'f') "
+            "AND (has_table_privilege(current_user, extension_class.oid, 'INSERT') "
+            "OR has_table_privilege(current_user, extension_class.oid, 'UPDATE') "
+            "OR has_table_privilege(current_user, extension_class.oid, 'DELETE') "
+            "OR has_table_privilege(current_user, extension_class.oid, 'TRUNCATE') "
+            "OR has_table_privilege(current_user, extension_class.oid, 'REFERENCES') "
+            "OR has_table_privilege(current_user, extension_class.oid, 'TRIGGER'))) "
+            "AS can_mutate_extension_object, "
+            "has_function_privilege(current_user, "
+            "'walksafe_purge_expired_account_deletion_receipts(integer)', 'EXECUTE') "
+            "AS can_purge, "
+            "EXISTS (SELECT 1 FROM pg_proc AS security_definer_function "
+            "JOIN pg_namespace AS function_namespace "
+            "ON function_namespace.oid = security_definer_function.pronamespace "
+            "WHERE function_namespace.nspname = 'public' "
+            "AND security_definer_function.prosecdef "
+            "AND has_function_privilege(current_user, "
+            "security_definer_function.oid, 'EXECUTE')) "
+            "AS can_execute_security_definer, "
+            "EXISTS (SELECT 1 FROM pg_proc AS grantable_function "
+            "JOIN pg_namespace AS grantable_function_namespace "
+            "ON grantable_function_namespace.oid = grantable_function.pronamespace "
+            "WHERE grantable_function_namespace.nspname = 'public' "
+            "AND has_function_privilege(current_user, grantable_function.oid, "
+            "'EXECUTE WITH GRANT OPTION')) AS has_function_grant_option, "
+            "EXISTS (SELECT 1 FROM pg_class AS application_class "
+            "JOIN pg_namespace AS application_namespace "
+            "ON application_namespace.oid = application_class.relnamespace "
+            "WHERE application_namespace.nspname = 'public' "
+            "AND application_class.relkind IN ('r', 'p', 'v', 'm', 'f') "
+            "AND NOT EXISTS (SELECT 1 FROM pg_depend AS extension_dependency "
+            "WHERE extension_dependency.classid = 'pg_class'::regclass "
+            "AND extension_dependency.objid = application_class.oid "
+            "AND extension_dependency.objsubid = 0 "
+            "AND extension_dependency.refclassid = 'pg_extension'::regclass "
+            "AND extension_dependency.deptype = 'e') "
+            "AND ((has_table_privilege(current_user, application_class.oid, 'SELECT') "
+            "AND application_class.relname NOT IN ("
+            "'reports', 'report_image_objects', 'account_deletion_tombstones', "
+            "'account_deletion_requests', 'account_deletion_items', "
+            "'account_deletion_events', 'account_deletion_receipts', "
+            "'account_deletion_device_targets', 'privacy_consent_events')) "
+            "OR (has_table_privilege(current_user, application_class.oid, 'INSERT') "
+            "AND application_class.relname NOT IN ("
+            "'account_deletion_events', 'account_deletion_receipts')) "
+            "OR (has_table_privilege(current_user, application_class.oid, 'UPDATE') "
+            "AND application_class.relname NOT IN ("
+            "'account_deletion_requests', 'account_deletion_items')) "
+            "OR (has_table_privilege(current_user, application_class.oid, 'DELETE') "
+            "AND application_class.relname <> 'reports') "
+            "OR has_table_privilege(current_user, application_class.oid, 'TRUNCATE') "
+            "OR has_table_privilege(current_user, application_class.oid, 'REFERENCES') "
+            "OR has_table_privilege(current_user, application_class.oid, 'TRIGGER'))) "
+            "AS has_unexpected_application_privilege, "
+            "EXISTS (SELECT 1 FROM pg_class AS owned_class "
+            "JOIN pg_namespace AS owned_namespace "
+            "ON owned_namespace.oid = owned_class.relnamespace "
+            "JOIN pg_roles AS owner_role ON owner_role.oid = owned_class.relowner "
+            "WHERE owned_namespace.nspname = 'public' "
+            "AND owned_class.relkind IN ('r', 'p', 'S', 'v', 'm', 'f') "
+            "AND (owner_role.rolname IN (current_user, 'walksafe_account_deletion_worker') "
+            "OR pg_has_role(current_user, owner_role.rolname, 'MEMBER'))) "
+            "AS owns_or_inherits_object_owner "
+            "FROM pg_roles AS role "
+            "JOIN pg_roles AS worker "
+            "ON worker.rolname = 'walksafe_account_deletion_worker' "
+            "LEFT JOIN pg_auth_members AS worker_membership "
+            "ON worker_membership.roleid = worker.oid "
+            "AND worker_membership.member = role.oid "
+            "WHERE role.rolname = current_user"
+        )
+    ).mappings().one()
+    if (
+        role["role_name"] != role["session_role_name"]
+        or role["rolsuper"]
+        or role["rolcreaterole"]
+        or role["rolcreatedb"]
+        or role["rolreplication"]
+        or role["rolbypassrls"]
+        or role["worker_group_login"]
+        or role["worker_group_super"]
+        or role["worker_group_createrole"]
+        or role["worker_group_createdb"]
+        or role["worker_group_replication"]
+        or role["worker_group_bypassrls"]
+        or role["worker_membership_admin"] is not False
+        or role["worker_membership_inherit"] is not True
+        or role["worker_membership_set"] is not False
+        or not role["is_worker"]
+        or role["is_runtime"]
+        or role["is_purge_owner_member"]
+        or role["is_purger_member"]
+        or role["can_create"]
+        or not role["can_delete_reports"]
+        or not role["can_update_items"]
+        or not role["can_insert_events"]
+        or not role["can_read_device_targets"]
+        or role["can_delete_retained_ledger"]
+        or role["has_table_grant_option"]
+        or role["has_schema_grant_option"]
+        or role["is_privileged_role_member"]
+        or role["can_access_public_sequence"]
+        or role["can_mutate_extension_object"]
+        or role["can_purge"]
+        or role["can_execute_security_definer"]
+        or role["has_function_grant_option"]
+        or role["has_unexpected_application_privilege"]
+        or role["owns_or_inherits_object_owner"]
+    ):
+        raise PrivacyLifecycleError(
+            "account_deletion_worker_role_unsafe",
+            "The account-deletion worker database role violates least privilege.",
             status_code=503,
         )
 
@@ -1436,6 +1649,12 @@ def transition_deletion_item(
             "Device deletion state must be changed through device evidence.",
             status_code=409,
         )
+    if item_key in SERVER_OWNED_ITEM_KEYS and next_state in TERMINAL_ITEM_STATES:
+        raise PrivacyLifecycleError(
+            "account_deletion_server_manifest_required",
+            "Server-owned deletion completion requires a verified worker manifest.",
+            status_code=409,
+        )
     request = db.get(AccountDeletionRequest, request_id)
     if request is None:
         raise _not_found()
@@ -1492,6 +1711,158 @@ def transition_deletion_item(
         legal_hold_review_at=legal_hold_review_at,
         legal_hold_contact=legal_hold_contact,
     )
+
+
+def complete_server_deletion_inventory_from_manifest(
+    db: Session,
+    *,
+    request_id: str,
+    manifest_sha256: str,
+    terminal_at: datetime,
+) -> AccountDeletionStatusV2:
+    """Atomically bind the four server-owned terminal states to one manifest."""
+
+    if _SHA256.fullmatch(manifest_sha256) is None:
+        raise ValueError("manifest_sha256 must be one lowercase SHA-256 digest")
+    assert_account_deletion_worker_database_role(db)
+    request = db.get(AccountDeletionRequest, request_id)
+    if request is None:
+        raise _not_found()
+    lock_report_deletion_transaction(
+        db,
+        request.privacy_subject_hmac,
+        request.account_generation,
+    )
+    db.expire_all()
+    request = db.scalar(
+        select(AccountDeletionRequest)
+        .where(AccountDeletionRequest.request_id == request_id)
+        .with_for_update()
+    )
+    if request is None:
+        raise _not_found()
+    inventory = db.scalars(
+        select(AccountDeletionItem)
+        .where(AccountDeletionItem.request_id == request_id)
+        .order_by(AccountDeletionItem.item_key)
+        .with_for_update()
+    ).all()
+    by_key = {item.item_key: item for item in inventory}
+    if set(by_key) != set(DELETION_ITEM_KEYS):
+        raise PrivacyLifecycleError(
+            "account_deletion_inventory_invalid",
+            "The deletion request does not contain the canonical nine-item inventory.",
+            status_code=503,
+        )
+    transitions: tuple[tuple[str, str, str | None], ...] = (
+        ("server_originals", "COMPLETED", None),
+        (
+            "server_quarantine",
+            "NOT_APPLICABLE",
+            "isolated worker inventory has no separate server quarantine location",
+        ),
+        (
+            "server_copies",
+            "NOT_APPLICABLE",
+            "isolated worker inventory has no separate server copy location",
+        ),
+        ("report_records", "COMPLETED", None),
+    )
+    terminal_items = [
+        by_key[key]
+        for key, _state, _basis in transitions
+        if by_key[key].state in TERMINAL_ITEM_STATES
+    ]
+    if terminal_items:
+        exact = all(
+            item.state == next_state
+            and compare_digest(item.evidence_sha256 or "", manifest_sha256)
+            and item.disposition_basis == basis
+            for item, (_key, next_state, basis) in zip(
+                [by_key[key] for key, _state, _basis in transitions],
+                transitions,
+                strict=True,
+            )
+        )
+        if not exact:
+            raise PrivacyLifecycleError(
+                "account_deletion_server_manifest_conflict",
+                "Server-owned deletion state conflicts with the worker manifest.",
+                status_code=409,
+            )
+        response = _status(db, request)
+        db.commit()
+        return response
+
+    now = db.execute(text("SELECT clock_timestamp()")).scalar_one()
+    _require_time_window(
+        terminal_at,
+        lower=request.accepted_at,
+        upper=now,
+        code="account_deletion_terminal_time_out_of_range",
+        message="The terminal time must be between acceptance and the database clock.",
+    )
+    for item_key, next_state, disposition_basis in transitions:
+        item = by_key[item_key]
+        operation_id = f"server-delete-{manifest_sha256}-{item_key}"
+        operation_sha256 = hashlib.sha256(
+            b"walksafe/account-deletion-server-manifest-transition/v1\0"
+            + _canonical_json(
+                {
+                    "disposition_basis": disposition_basis,
+                    "evidence_sha256": manifest_sha256,
+                    "item_key": item_key,
+                    "next_state": next_state,
+                    "operation_id": operation_id,
+                    "request_id": request_id,
+                    "terminal_at": _iso(terminal_at),
+                }
+            )
+        ).hexdigest()
+        previous_state = item.state
+        item.state = next_state
+        item.item_revision += 1
+        item.updated_at = now
+        item.evidence_sha256 = manifest_sha256
+        item.disposition_basis = disposition_basis
+        item.retry_after = None
+        item.restriction_reason = None
+        item.legal_hold_review_at = None
+        item.legal_hold_contact = None
+        item.terminal_at = terminal_at
+        request.status_revision += 1
+        request.updated_at = now
+        next_overall_status = overall_deletion_status(
+            {candidate.item_key: candidate.state for candidate in inventory}
+        )
+        request.overall_status = next_overall_status
+        if next_overall_status == "COMPLETED":
+            _completion_receipt(db, request, now)
+        event = AccountDeletionEvent(
+            request_id=request_id,
+            operation_id=operation_id,
+            event_type="ITEM_TRANSITION",
+            item_key=item_key,
+            previous_state=previous_state,
+            next_state=next_state,
+            status_revision=request.status_revision,
+            operation_sha256=operation_sha256,
+            evidence_sha256=manifest_sha256,
+            disposition_basis=disposition_basis,
+            failure_reason=None,
+            retry_after=None,
+            restriction_reason=None,
+            legal_hold_review_at=None,
+            legal_hold_contact=None,
+            terminal_at=terminal_at,
+            recorded_at=now,
+        )
+        db.flush([item, request])
+        db.add(event)
+        db.flush([event])
+    response = _status(db, request)
+    db.commit()
+    return response
 
 
 def record_consent_event(

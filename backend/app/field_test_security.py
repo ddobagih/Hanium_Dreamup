@@ -211,6 +211,8 @@ def required_field_test_access(path: str, method: str) -> FieldTestAccess | None
 
     if path in {"/docs", "/redoc", "/openapi.json"}:
         return FieldTestAccess.ADMIN
+    if normalized_method == "GET" and path == "/internal/capacity":
+        return FieldTestAccess.FIELD
     if normalized_method == "POST" and path == "/privacy/consent-events":
         return FieldTestAccess.FIELD
     if _privacy_deletion_route(path, normalized_method) is not None:

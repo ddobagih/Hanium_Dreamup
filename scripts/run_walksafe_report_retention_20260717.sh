@@ -12,7 +12,9 @@ required_environment=(
   DATABASE_STATEMENT_TIMEOUT_MS
   GNUPGHOME
   UPLOAD_DIR
+  WALKSAFE_UPLOAD_BACKUP_READER_GROUP
   WALKSAFE_MAINTENANCE_LOCK_PATH
+  WALKSAFE_MAINTENANCE_LOCK_GROUP
   WALKSAFE_RETENTION_PYTHON
   WALKSAFE_REPORT_RETENTION_MANIFEST_DIR
   WALKSAFE_REPORT_RETENTION_BACKUP_MANIFEST
@@ -457,7 +459,6 @@ try:
         "recovery_copied",
         "database_committed",
         "completed",
-        "completed_with_cleanup_errors",
         "failed_planning",
         "failed_before_commit",
         "failed_after_database_commit",
@@ -489,6 +490,7 @@ try:
         "candidates",
         "candidate_ids_sha256",
         "images",
+        "reconciled_runs",
     }
     state_fields = {
         "batch_limit_reached",
@@ -509,15 +511,10 @@ try:
             "cleanup_errors",
             "finished_at",
         },
-        "completed_with_cleanup_errors": {
-            "batch_limit_reached",
-            "deleted_count",
-            "cleanup_errors",
-            "finished_at",
-        },
-        "failed_planning": {"error_type", "finished_at"},
+        "failed_planning": {"error_type", "restore_errors", "finished_at"},
         "failed_before_commit": {
             "batch_limit_reached",
+            "error_type",
             "restore_errors",
             "finished_at",
         },
@@ -525,9 +522,15 @@ try:
             "batch_limit_reached",
             "deleted_count",
             "error_type",
+            "restore_errors",
             "finished_at",
         },
-        "failed": {"batch_limit_reached", "error_type", "finished_at"},
+        "failed": {
+            "batch_limit_reached",
+            "error_type",
+            "restore_errors",
+            "finished_at",
+        },
     }
     candidates = payload.get("candidates")
     if (
@@ -606,7 +609,13 @@ try:
             if not isinstance(candidate, dict) or set(candidate) != candidate_fields:
                 fail()
             candidate_id = candidate["id"]
-            if not isinstance(candidate_id, str) or not candidate_id or len(candidate_id) > 128:
+            if not isinstance(candidate_id, str):
+                fail()
+            try:
+                parsed_candidate_id = uuid.UUID(candidate_id)
+            except ValueError:
+                fail()
+            if str(parsed_candidate_id) != candidate_id:
                 fail()
             created_at = require_timestamp(candidate["created_at"])
             reason = candidate["reason"]
@@ -647,32 +656,130 @@ try:
     ).hexdigest()
     if payload.get("candidate_ids_sha256") != candidate_digest:
         fail()
-    image_fields = {"report_id", "filename", "state"}
+    image_fields = {
+        "report_id",
+        "storage_name",
+        "envelope_sha256",
+        "envelope_size",
+        "key_id",
+        "state",
+    }
     image_report_ids = []
     for image in payload["images"]:
         if not isinstance(image, dict) or set(image) != image_fields:
             fail()
         report_id = image["report_id"]
-        filename = image["filename"]
+        try:
+            parsed_report_id = uuid.UUID(report_id)
+        except (AttributeError, TypeError, ValueError):
+            fail()
         if (
-            not isinstance(report_id, str)
+            str(parsed_report_id) != report_id
             or report_id not in candidate_ids
-            or not isinstance(filename, str)
-            or not filename
-            or len(filename) > 255
-            or "/" in filename
-            or "\\" in filename
-            or image["state"] not in {"recovery_copy_created", "already_missing"}
+            or image["storage_name"] != f"{report_id}.wse"
+            or type(image["envelope_size"]) is not int
+            or not 0 < image["envelope_size"] <= 32 * 1024 * 1024 + 4_096 + 8 + 4 + 16
+            or not isinstance(image["key_id"], str)
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", image["key_id"])
+            is None
+            or image["state"] != "recovery_copy_created"
         ):
             fail()
+        require_sha256(image["envelope_sha256"])
         image_report_ids.append(report_id)
     if len(set(image_report_ids)) != len(image_report_ids):
         fail()
-    if status_value == "planning" and (candidates or payload["images"]):
+
+    reconciled_runs = payload["reconciled_runs"]
+    if not isinstance(reconciled_runs, list):
+        fail()
+    reconciled_run_ids = []
+    reconciled_fields = {"run_id", "status", "report_ids"}
+    for reconciled in reconciled_runs:
+        if not isinstance(reconciled, dict) or set(reconciled) != reconciled_fields:
+            fail()
+        reconciled_run_id = reconciled["run_id"]
+        reconciled_report_ids = reconciled["report_ids"]
+        if (
+            not isinstance(reconciled_run_id, str)
+            or re.fullmatch(r"[0-9a-f]{32}", reconciled_run_id) is None
+            or reconciled["status"]
+            not in {
+                "RECONCILED_PRECOMMIT_ABORTED",
+                "RECONCILED_POSTCOMMIT_COMPLETED",
+            }
+            or not isinstance(reconciled_report_ids, list)
+            or not reconciled_report_ids
+        ):
+            fail()
+        canonical_reconciled_report_ids = []
+        for reconciled_report_id in reconciled_report_ids:
+            try:
+                parsed_reconciled_report_id = uuid.UUID(reconciled_report_id)
+            except (AttributeError, TypeError, ValueError):
+                fail()
+            if str(parsed_reconciled_report_id) != reconciled_report_id:
+                fail()
+            canonical_reconciled_report_ids.append(reconciled_report_id)
+        if (
+            canonical_reconciled_report_ids != sorted(canonical_reconciled_report_ids)
+            or len(canonical_reconciled_report_ids)
+            != len(set(canonical_reconciled_report_ids))
+        ):
+            fail()
+        reconciled_run_ids.append(reconciled_run_id)
+    if len(reconciled_run_ids) != len(set(reconciled_run_ids)):
+        fail()
+    current_reconciliations = [
+        reconciled
+        for reconciled in reconciled_runs
+        if reconciled["run_id"] == run_id
+    ]
+    if current_reconciliations and (
+        current_reconciliations[0]["report_ids"] != candidate_ids
+    ):
+        fail()
+    if status_value == "completed":
+        if candidates:
+            if (
+                len(current_reconciliations) != 1
+                or current_reconciliations[0]["status"]
+                != "RECONCILED_POSTCOMMIT_COMPLETED"
+            ):
+                fail()
+        elif current_reconciliations:
+            fail()
+    elif status_value == "failed_before_commit":
+        if (
+            not candidates
+            or len(current_reconciliations) != 1
+            or current_reconciliations[0]["status"]
+            != "RECONCILED_PRECOMMIT_ABORTED"
+        ):
+            fail()
+    elif status_value == "failed_after_database_commit":
+        if current_reconciliations and (
+            current_reconciliations[0]["status"]
+            != "RECONCILED_POSTCOMMIT_COMPLETED"
+        ):
+            fail()
+    elif current_reconciliations:
+        fail()
+
+    if status_value in {"planning", "failed_planning"} and (
+        candidates or payload["images"]
+    ):
+        fail()
+    if status_value == "recovery_copied" and not candidates:
         fail()
     if status_value == "planned" and payload["images"]:
         fail()
-    if status_value in {"recovery_copied", "database_committed"} and (
+    if status_value in {
+        "recovery_copied",
+        "database_committed",
+        "completed",
+        "failed_after_database_commit",
+    } and (
         len(payload["images"]) != len(candidates)
     ):
         fail()
@@ -681,12 +788,10 @@ try:
     committed_statuses = {
         "database_committed",
         "completed",
-        "completed_with_cleanup_errors",
         "failed_after_database_commit",
     }
     finished_statuses = {
         "completed",
-        "completed_with_cleanup_errors",
         "failed_planning",
         "failed_before_commit",
         "failed_after_database_commit",
@@ -704,22 +809,23 @@ try:
         require_timestamp(payload.get("finished_at"))
     if status_value == "completed" and payload.get("cleanup_errors") != []:
         fail()
-    if status_value == "completed_with_cleanup_errors" and (
-        not isinstance(payload.get("cleanup_errors"), list)
-        or not payload["cleanup_errors"]
-        or any(not isinstance(error, str) or not error for error in payload["cleanup_errors"])
-    ):
-        fail()
-    if status_value == "failed_before_commit" and (
-        not isinstance(payload.get("restore_errors"), list)
-        or any(not isinstance(error, str) or not error for error in payload["restore_errors"])
-    ):
-        fail()
-    if status_value in {"failed_planning", "failed_after_database_commit", "failed"} and (
-        not isinstance(payload.get("error_type"), str)
-        or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", payload["error_type"]) is None
-    ):
-        fail()
+    if status_value in {
+        "failed_planning",
+        "failed_before_commit",
+        "failed_after_database_commit",
+        "failed",
+    }:
+        if (
+            not isinstance(payload.get("error_type"), str)
+            or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", payload["error_type"])
+            is None
+            or not isinstance(payload.get("restore_errors"), list)
+            or any(
+                not isinstance(error, str) or not error
+                for error in payload["restore_errors"]
+            )
+        ):
+            fail()
 
     if inode_identity(os.fstat(manifest_fd)) != inode_identity(metadata):
         fail()

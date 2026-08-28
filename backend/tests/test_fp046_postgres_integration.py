@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
+from pathlib import Path
 import threading
 import time
 from types import SimpleNamespace
@@ -15,6 +17,7 @@ from alembic.migration import MigrationContext
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine, delete, inspect, select, text, update
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -29,10 +32,12 @@ from backend.app.models import (
     AccountDeletionItem,
     AccountDeletionReceipt,
     AccountDeletionRequest,
+    AccountDeletionTombstone,
     Base,
     PrivacyConsentEvent,
     PrivacyHmacKeyBinding,
     Report,
+    ReportImageObject,
 )
 from backend.app.schemas import (
     AccountDeletionRequestV2,
@@ -50,8 +55,11 @@ from backend.app.services.privacy_lifecycle import (
     EXTERNAL_ITEM_KEYS,
     ITEM_SLA,
     PrivacyLifecycleError,
+    SERVER_OWNED_ITEM_KEYS,
     accept_account_deletion,
+    assert_account_deletion_worker_database_role,
     assert_privacy_runtime_database_role,
+    complete_server_deletion_inventory_from_manifest,
     deletion_evidence_sha256,
     get_account_deletion_status,
     lock_privacy_subject_exclusive,
@@ -62,6 +70,11 @@ from backend.app.services.privacy_lifecycle import (
     training_ingest_allowed,
     transition_deletion_item,
     bind_or_verify_privacy_hmac_key,
+)
+from scripts.account_deletion_worker import (
+    _prepare_roots as prepare_account_deletion_worker_roots,
+    process_request as process_account_deletion_request,
+    reconcile_journal as reconcile_account_deletion_journal,
 )
 
 
@@ -79,6 +92,45 @@ def _session_factory():
         pool_pre_ping=True,
     )
     return engine, sessionmaker(bind=engine, expire_on_commit=False)
+
+
+@contextmanager
+def _worker_session_factory(engine, suffix: str):
+    role_name = f"walksafe_delete_worker_{suffix}"
+    role_password = f"WorkerRole{suffix}"
+    role_created = False
+    worker_engine = None
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    f"CREATE ROLE {role_name} LOGIN INHERIT NOSUPERUSER "
+                    f"NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS "
+                    f"PASSWORD '{role_password}'"
+                )
+            )
+            connection.execute(
+                text(
+                    "GRANT walksafe_account_deletion_worker "
+                    f"TO {role_name} WITH ADMIN FALSE, INHERIT TRUE, SET FALSE"
+                )
+            )
+        role_created = True
+        worker_url = make_url(os.environ["WALKSAFE_TEST_DATABASE_URL"]).set(
+            username=role_name,
+            password=role_password,
+        ).render_as_string(hide_password=False)
+        worker_engine = create_engine(worker_url, pool_pre_ping=True)
+        yield sessionmaker(worker_engine, expire_on_commit=False)
+    finally:
+        if worker_engine is not None:
+            worker_engine.dispose()
+        if role_created:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(f"REVOKE walksafe_account_deletion_worker FROM {role_name}")
+                )
+                connection.execute(text(f"DROP ROLE {role_name}"))
 
 
 def _request(request_id: str) -> AccountDeletionRequestV2:
@@ -255,7 +307,7 @@ def test_fp046_schema_migration_constraints_and_append_only_evidence() -> None:
         return table is not None and table.name in privacy_tables
 
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "202608150002"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "202608250002"
         assert compare_metadata(
             MigrationContext.configure(
                 connection,
@@ -287,6 +339,7 @@ def test_fp046_schema_migration_constraints_and_append_only_evidence() -> None:
         "privacy_hmac_key_bindings_append_only",
         "account_deletion_tombstones_append_only",
         "account_deletion_items_no_delete",
+        "account_deletion_items_server_terminal_worker_only",
         "account_deletion_items_terminal_immutable",
         "account_deletion_device_targets_no_delete",
         "account_deletion_device_targets_terminal_immutable",
@@ -756,7 +809,7 @@ def test_fp046_gateway_scoped_assertion_binds_body_path_and_tombstone(
     monkeypatch.setattr(app_settings, "gateway_session_secret", gateway_secret)
     monkeypatch.setattr(app_settings, "walksafe_environment", "test")
     monkeypatch.setattr(app_settings, "allow_insecure_local_dev", False)
-    monkeypatch.setattr(app_settings, "actor_rate_limit_store", "memory")
+    monkeypatch.setattr(app_settings, "actor_rate_limit_store", "postgresql")
 
     suffix = uuid.uuid4().hex[:12]
     actor_id = f"scoped.{suffix}"
@@ -794,6 +847,8 @@ def test_fp046_gateway_scoped_assertion_binds_body_path_and_tombstone(
         ),
         separators=(",", ":"),
     ).encode("utf-8")
+    # This first secured privacy admission previously failed with a PostgreSQL
+    # CHECK violation and surfaced as actor_rate_limit_store_unavailable (503).
     consent_response = client.post(
         "/privacy/consent-events",
         headers={
@@ -947,7 +1002,22 @@ def test_fp046_all_items_terminal_create_only_source_less_three_year_receipt() -
             tombstone_id=current.tombstone_id,
             secret=PRIVACY_SECRET,
         )
-    for index, key in enumerate(DELETION_ITEM_KEYS[1:], start=1):
+    with _worker_session_factory(engine, suffix) as WorkerSessionFactory:
+        with WorkerSessionFactory() as db:
+            current = complete_server_deletion_inventory_from_manifest(
+                db,
+                request_id=current.request_id,
+                manifest_sha256="1" * 64,
+                terminal_at=datetime.now(timezone.utc),
+            )
+    assert current.overall_status == "PARTIAL"
+    assert current.completion_receipt_sha256 is None
+    remaining_keys = [
+        key
+        for key in DELETION_ITEM_KEYS
+        if key != "device_untransmitted_data" and key not in SERVER_OWNED_ITEM_KEYS
+    ]
+    for index, key in enumerate(remaining_keys, start=2):
         state = "NOT_APPLICABLE" if key == "training_labels" else "COMPLETED"
         with SessionFactory() as db:
             current = transition_deletion_item(
@@ -977,6 +1047,579 @@ def test_fp046_all_items_terminal_create_only_source_less_three_year_receipt() -
     assert "tombstone_id" not in receipt_columns
     assert "actor_id" not in receipt_columns
     engine.dispose()
+
+
+def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
+    tmp_path: Path,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex[:12]
+    actor_id = f"worker.{suffix}"
+    request_id = f"delete_worker_{suffix}"
+    subject = privacy_subject_hmac(actor_id, 1, PRIVACY_SECRET)
+    report_id = uuid.uuid4()
+    storage_name = f"{uuid.uuid4()}.wse"
+    envelope = (b"walksafe-worker-envelope-" + suffix.encode("ascii")) * 3
+    envelope_sha256 = hashlib.sha256(envelope).hexdigest()
+    upload_dir = tmp_path / "uploads"
+    upload_dir.mkdir(mode=0o700)
+    object_path = upload_dir / storage_name
+    object_path.write_bytes(envelope)
+    object_path.chmod(0o600)
+    tmp_path.chmod(0o700)
+
+    _record_consent(SessionFactory, actor_id=actor_id)
+    with SessionFactory.begin() as db:
+        db.add(
+            Report(
+                id=report_id,
+                status="new",
+                class_id=0,
+                class_name="damaged_tactile_block",
+                confidence=0.9,
+                bbox_x=0.1,
+                bbox_y=0.1,
+                bbox_width=0.5,
+                bbox_height=0.5,
+                captured_at=datetime.now(timezone.utc),
+                source="android",
+                image_path=f"/uploads/{storage_name}",
+                image_content_type="image/jpeg",
+                payload={"source": "account-deletion-worker-test"},
+                privacy_subject_hmac=subject,
+                account_generation=1,
+            )
+        )
+        db.add(
+            ReportImageObject(
+                report_id=report_id,
+                storage_name=storage_name,
+                envelope_version=1,
+                algorithm="AES-256-GCM",
+                aad_version=1,
+                key_id=f"worker-key-{suffix}",
+                nonce=uuid.uuid4().bytes[:12],
+                plaintext_sha256=hashlib.sha256(b"plaintext").hexdigest(),
+                plaintext_size=9,
+                envelope_sha256=envelope_sha256,
+                envelope_size=len(envelope),
+                content_type="image/jpeg",
+            )
+        )
+    accepted = _accept(
+        SessionFactory,
+        actor_id=actor_id,
+        request_id=request_id,
+    )
+    device_evidence = _evidence(
+        accepted.status,
+        installation_id=_installation_id(actor_id),
+        evidence_id=f"worker-device-{suffix}",
+    )
+    with SessionFactory() as db:
+        current = record_device_deletion_evidence(
+            db,
+            payload=device_evidence,
+            actor_id=actor_id,
+            account_generation=1,
+            access_pre_digest="a" * 64,
+            tombstone_id=accepted.status.tombstone_id,
+            secret=PRIVACY_SECRET,
+        )
+    external_keys = [
+        key
+        for key in EXTERNAL_ITEM_KEYS
+        if key != "device_untransmitted_data"
+    ]
+    for index, item_key in enumerate(sorted(external_keys), start=1):
+        next_state = "NOT_APPLICABLE" if item_key == "training_labels" else "COMPLETED"
+        with SessionFactory() as db:
+            current = transition_deletion_item(
+                db,
+                request_id=request_id,
+                item_key=item_key,
+                operation_id=f"worker-external-{index}-{suffix}",
+                expected_status_revision=current.revision,
+                next_state=next_state,
+                evidence_sha256=f"{index:064x}",
+                disposition_basis=(
+                    "no_training_label_rows"
+                    if next_state == "NOT_APPLICABLE"
+                    else None
+                ),
+                terminal_at=datetime.now(timezone.utc),
+            )
+    assert current.overall_status == "PARTIAL"
+    assert current.completion_receipt_sha256 is None
+
+    role_name = f"walksafe_delete_test_{suffix}"
+    role_password = f"WorkerTest{suffix}"
+    role_created = False
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    f"CREATE ROLE {role_name} LOGIN INHERIT NOSUPERUSER "
+                    f"NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS "
+                    f"PASSWORD '{role_password}'"
+                )
+            )
+            connection.execute(
+                text(
+                    "GRANT walksafe_account_deletion_worker "
+                    f"TO {role_name} WITH ADMIN FALSE, INHERIT TRUE, SET FALSE"
+                )
+            )
+        role_created = True
+        worker_url = make_url(os.environ["WALKSAFE_TEST_DATABASE_URL"]).set(
+            username=role_name,
+            password=role_password,
+        ).render_as_string(hide_password=False)
+        journal_root = tmp_path / "worker"
+
+        prepare_account_deletion_worker_roots(journal_root.resolve())
+        worker_engine = create_engine(worker_url, pool_pre_ping=True)
+        WorkerSessionFactory = sessionmaker(worker_engine, expire_on_commit=False)
+
+        class SimulatedCrash(BaseException):
+            pass
+
+        def crash_after_database_commit(point: str) -> None:
+            if point == "after_database_commit":
+                raise SimulatedCrash
+
+        try:
+            with pytest.raises(SimulatedCrash):
+                process_account_deletion_request(
+                    WorkerSessionFactory,
+                    request_id=request_id,
+                    upload_dir=upload_dir.resolve(),
+                    root=journal_root.resolve(),
+                    fault=crash_after_database_commit,
+                )
+        finally:
+            worker_engine.dispose()
+        assert not object_path.exists()
+        journal_path = next((journal_root / "journals").glob("*.json"))
+
+        worker_engine = create_engine(worker_url, pool_pre_ping=True)
+        WorkerSessionFactory = sessionmaker(worker_engine, expire_on_commit=False)
+        try:
+            manifest_digest = reconcile_account_deletion_journal(
+                WorkerSessionFactory,
+                journal_root.resolve(),
+                journal_path,
+            )
+            with WorkerSessionFactory() as db:
+                repeated = complete_server_deletion_inventory_from_manifest(
+                    db,
+                    request_id=request_id,
+                    manifest_sha256=manifest_digest,
+                    terminal_at=datetime.now(timezone.utc),
+                )
+        finally:
+            worker_engine.dispose()
+
+        assert repeated.overall_status == "COMPLETED"
+        assert repeated.completion_receipt_sha256 is not None
+        assert not object_path.exists()
+        manifest_path = journal_root / "manifests" / f"{request_id}.json"
+        assert manifest_path.is_file()
+        assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == manifest_digest
+        with SessionFactory() as db:
+            assert db.get(Report, report_id) is None
+            assert db.get(ReportImageObject, report_id) is None
+            assert db.scalar(
+                select(AccountDeletionTombstone).where(
+                    AccountDeletionTombstone.privacy_subject_hmac == subject,
+                    AccountDeletionTombstone.account_generation == 1,
+                )
+            ) is not None
+            request = db.get(AccountDeletionRequest, request_id)
+            assert request is not None
+            assert request.overall_status == "COMPLETED"
+            assert request.completion_receipt_sha256 is not None
+            items = db.scalars(
+                select(AccountDeletionItem).where(
+                    AccountDeletionItem.request_id == request_id
+                )
+            ).all()
+            assert len(items) == 9
+            server_items = [item for item in items if item.item_key in SERVER_OWNED_ITEM_KEYS]
+            assert {item.state for item in server_items} == {"COMPLETED", "NOT_APPLICABLE"}
+            assert {item.evidence_sha256 for item in server_items} == {manifest_digest}
+            assert db.scalar(
+                select(AccountDeletionReceipt).where(
+                    AccountDeletionReceipt.receipt_sha256
+                    == request.completion_receipt_sha256
+                )
+            ) is not None
+            assert db.scalar(
+                select(PrivacyConsentEvent.id).where(
+                    PrivacyConsentEvent.privacy_subject_hmac == subject,
+                    PrivacyConsentEvent.account_generation == 1,
+                )
+            ) is not None
+    finally:
+        if role_created:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(f"REVOKE walksafe_account_deletion_worker FROM {role_name}")
+                )
+                connection.execute(text(f"DROP ROLE {role_name}"))
+        engine.dispose()
+
+
+def test_fp046_account_deletion_worker_role_rejects_privilege_escalation() -> None:
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex[:12]
+    role_name = f"walksafe_delete_acl_{suffix}"
+    role_password = f"WorkerAcl{suffix}"
+    accepted = _accept(
+        SessionFactory,
+        actor_id=f"worker-acl.{suffix}",
+        request_id=f"delete_worker_acl_{suffix}",
+    )
+    role_created = False
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    f"CREATE ROLE {role_name} LOGIN INHERIT NOSUPERUSER "
+                    f"NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS "
+                    f"PASSWORD '{role_password}'"
+                )
+            )
+            connection.execute(
+                text(
+                    "GRANT walksafe_account_deletion_worker "
+                    f"TO {role_name} WITH ADMIN FALSE, INHERIT TRUE, SET FALSE"
+                )
+            )
+        role_created = True
+        worker_url = make_url(os.environ["WALKSAFE_TEST_DATABASE_URL"]).set(
+            username=role_name,
+            password=role_password,
+        ).render_as_string(hide_password=False)
+
+        worker_engine = create_engine(worker_url, pool_pre_ping=True)
+        try:
+            with Session(worker_engine) as db:
+                assert_account_deletion_worker_database_role(db)
+        finally:
+            worker_engine.dispose()
+
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "GRANT walksafe_account_deletion_worker "
+                    f"TO {role_name} WITH ADMIN TRUE, INHERIT TRUE, SET FALSE"
+                )
+            )
+        admin_option_engine = create_engine(worker_url, pool_pre_ping=True)
+        try:
+            with Session(admin_option_engine) as db:
+                with pytest.raises(PrivacyLifecycleError) as admin_option:
+                    assert_account_deletion_worker_database_role(db)
+            assert admin_option.value.code == "account_deletion_worker_role_unsafe"
+        finally:
+            admin_option_engine.dispose()
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "GRANT walksafe_account_deletion_worker "
+                    f"TO {role_name} WITH ADMIN FALSE, INHERIT TRUE, SET FALSE"
+                )
+            )
+
+        with engine.begin() as connection:
+            connection.execute(text(f"GRANT walksafe_receipt_purger TO {role_name}"))
+        purger_engine = create_engine(worker_url, pool_pre_ping=True)
+        try:
+            with Session(purger_engine) as db:
+                with pytest.raises(PrivacyLifecycleError) as purger:
+                    assert_account_deletion_worker_database_role(db)
+            assert purger.value.code == "account_deletion_worker_role_unsafe"
+        finally:
+            purger_engine.dispose()
+        with engine.begin() as connection:
+            connection.execute(text(f"REVOKE walksafe_receipt_purger FROM {role_name}"))
+
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "GRANT EXECUTE ON FUNCTION "
+                    "walksafe_purge_expired_account_deletion_receipts(integer) "
+                    f"TO {role_name}"
+                )
+            )
+        purge_function_engine = create_engine(worker_url, pool_pre_ping=True)
+        try:
+            with Session(purge_function_engine) as db:
+                with pytest.raises(PrivacyLifecycleError) as purge_function:
+                    assert_account_deletion_worker_database_role(db)
+            assert purge_function.value.code == "account_deletion_worker_role_unsafe"
+        finally:
+            purge_function_engine.dispose()
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "REVOKE EXECUTE ON FUNCTION "
+                    "walksafe_purge_expired_account_deletion_receipts(integer) "
+                    f"FROM {role_name}"
+                )
+            )
+
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "GRANT EXECUTE ON FUNCTION "
+                    "walksafe_bind_admin_credential_issuer_key(text,text) "
+                    f"TO {role_name}"
+                )
+            )
+        security_definer_engine = create_engine(worker_url, pool_pre_ping=True)
+        try:
+            with Session(security_definer_engine) as db:
+                with pytest.raises(PrivacyLifecycleError) as security_definer:
+                    assert_account_deletion_worker_database_role(db)
+            assert security_definer.value.code == "account_deletion_worker_role_unsafe"
+        finally:
+            security_definer_engine.dispose()
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "REVOKE EXECUTE ON FUNCTION "
+                    "walksafe_bind_admin_credential_issuer_key(text,text) "
+                    f"FROM {role_name}"
+                )
+            )
+
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "GRANT EXECUTE ON FUNCTION "
+                    "walksafe_guard_server_deletion_terminal_transition() "
+                    f"TO {role_name} WITH GRANT OPTION"
+                )
+            )
+        function_grant_option_engine = create_engine(worker_url, pool_pre_ping=True)
+        try:
+            with Session(function_grant_option_engine) as db:
+                with pytest.raises(PrivacyLifecycleError) as function_grant_option:
+                    assert_account_deletion_worker_database_role(db)
+            assert function_grant_option.value.code == (
+                "account_deletion_worker_role_unsafe"
+            )
+        finally:
+            function_grant_option_engine.dispose()
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "REVOKE EXECUTE ON FUNCTION "
+                    "walksafe_guard_server_deletion_terminal_transition() "
+                    f"FROM {role_name}"
+                )
+            )
+
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "GRANT DELETE ON TABLE public.reports "
+                    f"TO {role_name} WITH GRANT OPTION"
+                )
+            )
+        grant_option_engine = create_engine(worker_url, pool_pre_ping=True)
+        try:
+            with Session(grant_option_engine) as db:
+                with pytest.raises(PrivacyLifecycleError) as grant_option:
+                    assert_account_deletion_worker_database_role(db)
+            assert grant_option.value.code == "account_deletion_worker_role_unsafe"
+        finally:
+            grant_option_engine.dispose()
+        with engine.begin() as connection:
+            connection.execute(
+                text(f"REVOKE DELETE ON TABLE public.reports FROM {role_name}")
+            )
+
+        with engine.begin() as connection:
+            connection.execute(text(f"GRANT pg_read_all_data TO {role_name}"))
+        overprivileged_engine = create_engine(worker_url, pool_pre_ping=True)
+        try:
+            with Session(overprivileged_engine) as db:
+                with pytest.raises(PrivacyLifecycleError) as overprivileged:
+                    assert_account_deletion_worker_database_role(db)
+            assert overprivileged.value.code == "account_deletion_worker_role_unsafe"
+        finally:
+            overprivileged_engine.dispose()
+        with engine.begin() as connection:
+            connection.execute(text(f"REVOKE pg_read_all_data FROM {role_name}"))
+
+        with engine.begin() as connection:
+            connection.execute(text(f"GRANT walksafe_backend_runtime TO {role_name}"))
+            connection.execute(
+                text(
+                    "GRANT walksafe_account_deletion_worker "
+                    f"TO {role_name} WITH ADMIN FALSE, INHERIT TRUE, SET TRUE"
+                )
+            )
+        dual_role_engine = create_engine(worker_url, pool_pre_ping=True)
+        try:
+            with Session(dual_role_engine) as db:
+                with pytest.raises(PrivacyLifecycleError) as unsafe_worker:
+                    assert_account_deletion_worker_database_role(db)
+                with pytest.raises(PrivacyLifecycleError) as unsafe_runtime:
+                    assert_privacy_runtime_database_role(db)
+            assert unsafe_worker.value.code == "account_deletion_worker_role_unsafe"
+            assert unsafe_runtime.value.code == "privacy_database_role_unsafe"
+            with dual_role_engine.connect() as connection:
+                transaction = connection.begin()
+                try:
+                    connection.execute(
+                        text("SET ROLE walksafe_account_deletion_worker")
+                    )
+                    with pytest.raises(SQLAlchemyError) as runtime_bypass:
+                        connection.execute(
+                            text(
+                                "UPDATE account_deletion_items SET state = 'COMPLETED', "
+                                "item_revision = item_revision + 1, "
+                                "evidence_sha256 = :evidence_sha256, "
+                                "terminal_at = clock_timestamp(), "
+                                "updated_at = clock_timestamp() "
+                                "WHERE request_id = :request_id "
+                                "AND item_key = 'server_originals'"
+                            ),
+                            {
+                                "evidence_sha256": "b" * 64,
+                                "request_id": accepted.status.request_id,
+                            },
+                        )
+                    assert getattr(runtime_bypass.value.orig, "sqlstate", None) == "42501"
+                finally:
+                    transaction.rollback()
+        finally:
+            dual_role_engine.dispose()
+    finally:
+        if role_created:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(f"REVOKE walksafe_receipt_purger FROM {role_name}")
+                )
+                connection.execute(
+                    text(
+                        "REVOKE EXECUTE ON FUNCTION "
+                        "walksafe_purge_expired_account_deletion_receipts(integer) "
+                        f"FROM {role_name}"
+                    )
+                )
+                connection.execute(
+                    text(
+                        "REVOKE EXECUTE ON FUNCTION "
+                        "walksafe_bind_admin_credential_issuer_key(text,text) "
+                        f"FROM {role_name}"
+                    )
+                )
+                connection.execute(
+                    text(
+                        "REVOKE EXECUTE ON FUNCTION "
+                        "walksafe_guard_server_deletion_terminal_transition() "
+                        f"FROM {role_name}"
+                    )
+                )
+                connection.execute(
+                    text(f"REVOKE DELETE ON TABLE public.reports FROM {role_name}")
+                )
+                connection.execute(text(f"REVOKE pg_read_all_data FROM {role_name}"))
+                connection.execute(
+                    text(f"REVOKE walksafe_backend_runtime FROM {role_name}")
+                )
+                connection.execute(
+                    text(f"REVOKE walksafe_account_deletion_worker FROM {role_name}")
+                )
+                connection.execute(text(f"DROP ROLE {role_name}"))
+        engine.dispose()
+
+
+def test_fp046_server_terminal_transition_rejects_nonworker_with_direct_acl() -> None:
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex[:12]
+    role_name = f"walksafe_delete_nonworker_{suffix}"
+    role_password = f"NonworkerTest{suffix}"
+    accepted = _accept(
+        SessionFactory,
+        actor_id=f"worker-boundary.{suffix}",
+        request_id=f"delete_worker_boundary_{suffix}",
+    )
+    role_created = False
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    f"CREATE ROLE {role_name} LOGIN INHERIT NOSUPERUSER "
+                    f"NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS "
+                    f"PASSWORD '{role_password}'"
+                )
+            )
+            connection.execute(
+                text(
+                    "GRANT UPDATE ON TABLE public.account_deletion_items "
+                    f"TO {role_name}"
+                )
+            )
+            connection.execute(
+                text(
+                    "GRANT INSERT ON TABLE public.account_deletion_events "
+                    f"TO {role_name}"
+                )
+            )
+        role_created = True
+        nonworker_url = make_url(os.environ["WALKSAFE_TEST_DATABASE_URL"]).set(
+            username=role_name,
+            password=role_password,
+        ).render_as_string(hide_password=False)
+        nonworker_engine = create_engine(nonworker_url, pool_pre_ping=True)
+        try:
+            with nonworker_engine.connect() as connection:
+                transaction = connection.begin()
+                try:
+                    with pytest.raises(SQLAlchemyError) as blocked:
+                        connection.execute(
+                            text(
+                                "UPDATE account_deletion_items SET state = 'COMPLETED', "
+                                "item_revision = item_revision + 1, "
+                                "evidence_sha256 = :evidence_sha256, "
+                                "terminal_at = clock_timestamp(), "
+                                "updated_at = clock_timestamp() "
+                                "WHERE request_id = :request_id "
+                                "AND item_key = 'server_originals'"
+                            ),
+                            {
+                                "evidence_sha256": "c" * 64,
+                                "request_id": accepted.status.request_id,
+                            },
+                        )
+                    assert getattr(blocked.value.orig, "sqlstate", None) == "42501"
+                finally:
+                    transaction.rollback()
+        finally:
+            nonworker_engine.dispose()
+    finally:
+        if role_created:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "REVOKE UPDATE ON TABLE public.account_deletion_items "
+                        f"FROM {role_name}"
+                    )
+                )
+                connection.execute(
+                    text(
+                        "REVOKE INSERT ON TABLE public.account_deletion_events "
+                        f"FROM {role_name}"
+                    )
+                )
+                connection.execute(text(f"DROP ROLE {role_name}"))
+        engine.dispose()
 
 
 def test_fp046_report_ingest_and_tombstone_use_one_actor_generation_lock() -> None:
@@ -1936,17 +2579,52 @@ def test_fp046_database_rejects_false_completion_and_terminal_rewrite() -> None:
                     completion_receipt_sha256="f" * 64,
                 )
             )
-    with SessionFactory() as db:
-        transitioned = transition_deletion_item(
-            db,
-            request_id=accepted.status.request_id,
-            item_key="server_originals",
-            operation_id=f"terminal-{suffix}",
-            expected_status_revision=accepted.status.revision,
-            next_state="COMPLETED",
-            evidence_sha256="c" * 64,
-            terminal_at=datetime.now(timezone.utc),
-        )
+    with pytest.raises(PrivacyLifecycleError) as unverified:
+        with SessionFactory() as db:
+            transition_deletion_item(
+                db,
+                request_id=accepted.status.request_id,
+                item_key="server_originals",
+                operation_id=f"terminal-{suffix}",
+                expected_status_revision=accepted.status.revision,
+                next_state="COMPLETED",
+                evidence_sha256="c" * 64,
+                terminal_at=datetime.now(timezone.utc),
+            )
+    assert unverified.value.code == "account_deletion_server_manifest_required"
+    with engine.connect() as connection:
+        transaction = connection.begin()
+        try:
+            connection.execute(
+                text("SET SESSION AUTHORIZATION walksafe_backend_runtime")
+            )
+            with pytest.raises(SQLAlchemyError) as runtime_bypass:
+                connection.execute(
+                    text(
+                        "UPDATE account_deletion_items SET state = 'COMPLETED', "
+                        "item_revision = item_revision + 1, "
+                        "evidence_sha256 = :evidence_sha256, "
+                        "terminal_at = clock_timestamp(), "
+                        "updated_at = clock_timestamp() "
+                        "WHERE request_id = :request_id "
+                        "AND item_key = 'server_originals'"
+                    ),
+                    {
+                        "evidence_sha256": "b" * 64,
+                        "request_id": accepted.status.request_id,
+                    },
+                )
+            assert getattr(runtime_bypass.value.orig, "sqlstate", None) == "42501"
+        finally:
+            transaction.rollback()
+    with _worker_session_factory(engine, suffix) as WorkerSessionFactory:
+        with WorkerSessionFactory() as db:
+            transitioned = complete_server_deletion_inventory_from_manifest(
+                db,
+                request_id=accepted.status.request_id,
+                manifest_sha256="c" * 64,
+                terminal_at=datetime.now(timezone.utc),
+            )
     with pytest.raises(SQLAlchemyError):
         with SessionFactory.begin() as db:
             db.execute(
@@ -1959,17 +2637,14 @@ def test_fp046_database_rejects_false_completion_and_terminal_rewrite() -> None:
             )
     with pytest.raises(PrivacyLifecycleError) as service_rewrite:
         with SessionFactory() as db:
-            transition_deletion_item(
+            complete_server_deletion_inventory_from_manifest(
                 db,
                 request_id=accepted.status.request_id,
-                item_key="server_originals",
-                operation_id=f"terminal-rewrite-{suffix}",
-                expected_status_revision=transitioned.revision,
-                next_state="COMPLETED",
-                evidence_sha256="d" * 64,
+                manifest_sha256="d" * 64,
                 terminal_at=datetime.now(timezone.utc),
             )
-    assert service_rewrite.value.code == "account_deletion_item_already_terminal"
+    assert transitioned.revision == accepted.status.revision + 4
+    assert service_rewrite.value.code == "account_deletion_worker_role_unsafe"
     engine.dispose()
 
 
@@ -2211,7 +2886,7 @@ def test_fp046_service_rejects_future_or_pre_acceptance_transition_times() -> No
                 transition_deletion_item(
                     db,
                     request_id=accepted.status.request_id,
-                    item_key="server_originals",
+                    item_key="training_datasets",
                     expected_status_revision=accepted.status.revision,
                     **transition,
                 )

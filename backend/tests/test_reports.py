@@ -394,7 +394,7 @@ def test_report_status_write_fails_closed_during_maintenance(
     monkeypatch.setattr("backend.app.api.reports._trusted_maintenance_lock_parent", lambda *_args: True)
     lock_path = tmp_path / "maintenance.lock"
     lock_path.touch(mode=0o600)
-    descriptor = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    descriptor = os.open(lock_path, os.O_RDONLY | os.O_NOFOLLOW)
     monkeypatch.setattr(get_settings(), "maintenance_lock_path", lock_path)
     fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
     try:

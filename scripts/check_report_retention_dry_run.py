@@ -10,6 +10,7 @@ import ctypes
 from datetime import UTC, datetime, timedelta
 import errno
 import fcntl
+import grp
 import hashlib
 import ipaddress
 import json
@@ -441,13 +442,89 @@ def _validate_trusted_maintenance_lock_parent(parent: Path, parent_descriptor: i
             os.close(descriptor)
 
 
+def _maintenance_lock_group_gid_from_environment() -> int | None:
+    environment = os.getenv("WALKSAFE_ENVIRONMENT", "").strip().lower()
+    group_name = os.getenv("WALKSAFE_MAINTENANCE_LOCK_GROUP", "").strip()
+    if not group_name:
+        if environment in {"staging", "production"}:
+            raise ValueError("WALKSAFE_MAINTENANCE_LOCK_GROUP is required")
+        return None
+    try:
+        group_gid = grp.getgrnam(group_name).gr_gid
+    except KeyError as exc:
+        raise ValueError("WALKSAFE_MAINTENANCE_LOCK_GROUP does not exist") from exc
+    if group_gid == 0:
+        raise ValueError("WALKSAFE_MAINTENANCE_LOCK_GROUP must not be root")
+    return group_gid
+
+
+def _upload_backup_reader_group_gid_from_environment() -> int | None:
+    environment = os.getenv("WALKSAFE_ENVIRONMENT", "").strip().lower()
+    if environment not in {"staging", "production"}:
+        return None
+    group_name = os.getenv("WALKSAFE_UPLOAD_BACKUP_READER_GROUP", "").strip()
+    if not group_name:
+        raise ValueError("WALKSAFE_UPLOAD_BACKUP_READER_GROUP is required")
+    try:
+        group_gid = grp.getgrnam(group_name).gr_gid
+    except KeyError as exc:
+        raise ValueError("WALKSAFE_UPLOAD_BACKUP_READER_GROUP does not exist") from exc
+    if group_gid == 0:
+        raise ValueError("WALKSAFE_UPLOAD_BACKUP_READER_GROUP must not be root")
+    return group_gid
+
+
+def _upload_file_contract(expected_group_gid: int | None) -> tuple[int, int]:
+    if expected_group_gid is None:
+        return 0o700, 0o600
+    if expected_group_gid <= 0:
+        raise ValueError("upload backup reader group must not be root")
+    return 0o2750, 0o640
+
+
+def _validate_upload_root_metadata(
+    metadata: os.stat_result,
+    *,
+    expected_group_gid: int | None,
+) -> None:
+    directory_mode, _file_mode = _upload_file_contract(expected_group_gid)
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+        or (
+            expected_group_gid is not None
+            and metadata.st_gid != expected_group_gid
+        )
+        or stat.S_IMODE(metadata.st_mode) != directory_mode
+    ):
+        raise ValueError("retention upload root contract differs")
+
+
+def _descriptor_acl_is_absent(descriptor: int) -> bool:
+    try:
+        return not any(
+            "acl" in os.fsdecode(name).casefold()
+            for name in os.listxattr(descriptor)
+        )
+    except (AttributeError, OSError):
+        return False
+
+
 @contextmanager
-def exclusive_maintenance_lock(path: Path, *, timeout_seconds: int = 30) -> Any:
-    if not path.is_absolute():
+def exclusive_maintenance_lock(
+    path: Path,
+    *,
+    timeout_seconds: int = 30,
+    expected_group_gid: int | None = None,
+) -> Any:
+    if not path.is_absolute() or Path(os.path.abspath(path)) != path:
         raise ValueError("maintenance lock path must be absolute")
-    resolved = path.expanduser().absolute()
+    resolved = path
     parent = resolved.parent
-    private_restore_output_path(str(resolved))
+    if expected_group_gid is None:
+        private_restore_output_path(str(resolved))
+    elif parent.resolve(strict=True) != parent:
+        raise ValueError("maintenance lock parent must be a canonical real directory")
     parent_descriptor = os.open(
         parent,
         os.O_RDONLY
@@ -457,40 +534,75 @@ def exclusive_maintenance_lock(path: Path, *, timeout_seconds: int = 30) -> Any:
     )
     try:
         parent_metadata = os.fstat(parent_descriptor)
+        expected_parent_owner = 0 if expected_group_gid is not None else os.geteuid()
+        expected_parent_mode = 0o750 if expected_group_gid is not None else 0o700
         if (
             not stat.S_ISDIR(parent_metadata.st_mode)
-            or parent_metadata.st_uid != os.geteuid()
-            or stat.S_IMODE(parent_metadata.st_mode) != 0o700
-        ):
-            raise ValueError(
-                "maintenance lock parent must be a current-user-owned 0700 real directory"
+            or parent_metadata.st_uid != expected_parent_owner
+            or (
+                expected_group_gid is not None
+                and parent_metadata.st_gid != expected_group_gid
             )
+            or stat.S_IMODE(parent_metadata.st_mode) != expected_parent_mode
+            or not _descriptor_acl_is_absent(parent_descriptor)
+            or (
+                expected_group_gid is not None
+                and os.access(
+                    ".",
+                    os.W_OK,
+                    dir_fd=parent_descriptor,
+                    effective_ids=True,
+                    follow_symlinks=False,
+                )
+            )
+        ):
+            raise ValueError("maintenance lock parent metadata is unsafe")
         _validate_trusted_maintenance_lock_parent(parent, parent_descriptor)
     except BaseException:
         os.close(parent_descriptor)
         raise
-    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
-        descriptor = os.open(resolved.name, flags, 0o600, dir_fd=parent_descriptor)
+        descriptor = os.open(resolved.name, flags, dir_fd=parent_descriptor)
+    except FileNotFoundError as exc:
+        os.close(parent_descriptor)
+        raise ValueError("maintenance lock must already exist") from exc
     except BaseException:
         os.close(parent_descriptor)
         raise
     try:
         opened_metadata = os.fstat(descriptor)
+        expected_file_owner = 0 if expected_group_gid is not None else os.geteuid()
+        expected_file_mode = 0o440 if expected_group_gid is not None else 0o600
         if (
             not stat.S_ISREG(opened_metadata.st_mode)
-            or opened_metadata.st_uid != os.geteuid()
-            or stat.S_IMODE(opened_metadata.st_mode) != 0o600
+            or opened_metadata.st_uid != expected_file_owner
+            or (
+                expected_group_gid is not None
+                and opened_metadata.st_gid != expected_group_gid
+            )
+            or stat.S_IMODE(opened_metadata.st_mode) != expected_file_mode
             or opened_metadata.st_nlink != 1
+            or not _descriptor_acl_is_absent(descriptor)
         ):
-            raise ValueError("existing maintenance lock must be a current-user-owned single-link 0600 file")
+            raise ValueError("existing maintenance lock metadata is unsafe")
         parent_stable_state = (
             parent_metadata.st_dev,
             parent_metadata.st_ino,
             parent_metadata.st_mode,
             parent_metadata.st_uid,
-            os.fstat(parent_descriptor).st_mtime_ns,
-            os.fstat(parent_descriptor).st_ctime_ns,
+            parent_metadata.st_gid,
+            parent_metadata.st_nlink,
+            parent_metadata.st_ctime_ns,
+        )
+        lock_stable_state = (
+            opened_metadata.st_dev,
+            opened_metadata.st_ino,
+            opened_metadata.st_mode,
+            opened_metadata.st_uid,
+            opened_metadata.st_gid,
+            opened_metadata.st_nlink,
+            opened_metadata.st_ctime_ns,
         )
 
         def verify_binding() -> None:
@@ -512,20 +624,47 @@ def exclusive_maintenance_lock(path: Path, *, timeout_seconds: int = 30) -> Any:
                     anchored_parent.st_ino,
                     anchored_parent.st_mode,
                     anchored_parent.st_uid,
-                    anchored_parent.st_mtime_ns,
+                    anchored_parent.st_gid,
+                    anchored_parent.st_nlink,
                     anchored_parent.st_ctime_ns,
                 )
                 != parent_stable_state
                 or (path_parent.st_dev, path_parent.st_ino)
                 != (anchored_parent.st_dev, anchored_parent.st_ino)
+                or not _descriptor_acl_is_absent(parent_descriptor)
+                or not _descriptor_acl_is_absent(descriptor)
                 or (anchored_lock.st_dev, anchored_lock.st_ino)
                 != (current_lock.st_dev, current_lock.st_ino)
                 or (path_lock.st_dev, path_lock.st_ino)
                 != (current_lock.st_dev, current_lock.st_ino)
                 or not stat.S_ISREG(current_lock.st_mode)
-                or current_lock.st_uid != os.geteuid()
-                or stat.S_IMODE(current_lock.st_mode) != 0o600
+                or current_lock.st_uid != expected_file_owner
+                or (
+                    expected_group_gid is not None
+                    and current_lock.st_gid != expected_group_gid
+                )
+                or stat.S_IMODE(current_lock.st_mode) != expected_file_mode
                 or current_lock.st_nlink != 1
+                or (
+                    current_lock.st_dev,
+                    current_lock.st_ino,
+                    current_lock.st_mode,
+                    current_lock.st_uid,
+                    current_lock.st_gid,
+                    current_lock.st_nlink,
+                    current_lock.st_ctime_ns,
+                )
+                != lock_stable_state
+                or (
+                    expected_group_gid is not None
+                    and os.access(
+                        ".",
+                        os.W_OK,
+                        dir_fd=parent_descriptor,
+                        effective_ids=True,
+                        follow_symlinks=False,
+                    )
+                )
             ):
                 raise ValueError("maintenance lock path or parent changed while held")
 
@@ -533,7 +672,7 @@ def exclusive_maintenance_lock(path: Path, *, timeout_seconds: int = 30) -> Any:
         deadline = time.monotonic() + timeout_seconds
         while True:
             try:
-                fcntl.flock(parent_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
             except BlockingIOError:
                 if time.monotonic() >= deadline:
@@ -541,7 +680,7 @@ def exclusive_maintenance_lock(path: Path, *, timeout_seconds: int = 30) -> Any:
                 time.sleep(0.1)
         try:
             verify_binding()
-            authority_metadata = os.fstat(parent_descriptor)
+            authority_metadata = os.fstat(descriptor)
             try:
                 yield {
                     "identity_sha256": path_identity_sha256(resolved),
@@ -553,7 +692,7 @@ def exclusive_maintenance_lock(path: Path, *, timeout_seconds: int = 30) -> Any:
             finally:
                 verify_binding()
         finally:
-            fcntl.flock(parent_descriptor, fcntl.LOCK_UN)
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
     finally:
         os.close(descriptor)
         os.close(parent_descriptor)
@@ -1587,9 +1726,11 @@ def _open_private_child_directory(
     create: bool,
     exclusive: bool,
 ) -> int:
+    created = False
     if create:
         try:
             os.mkdir(name, 0o700, dir_fd=parent_fd)
+            created = True
             os.fsync(parent_fd)
         except FileExistsError:
             if exclusive:
@@ -1603,6 +1744,8 @@ def _open_private_child_directory(
         dir_fd=parent_fd,
     )
     try:
+        if created:
+            os.fchmod(descriptor, 0o700)
         _validate_private_child_directory(parent_fd, name, descriptor)
         return descriptor
     except BaseException:
@@ -1644,6 +1787,7 @@ def prepare_private_quarantine(
     run_id: str,
     *,
     expected_upload_identity: tuple[int, int, int, int],
+    expected_upload_group_gid: int | None = None,
 ) -> tuple[Path, int, int, int]:
     if re.fullmatch(r"[0-9a-f]{32}", run_id) is None:
         raise ValueError("retention run id is invalid")
@@ -1663,10 +1807,12 @@ def prepare_private_quarantine(
     quarantine_run_identity: tuple[int, int, int, int] | None = None
     try:
         opened_upload = os.fstat(upload_fd)
+        _validate_upload_root_metadata(
+            opened_upload,
+            expected_group_gid=expected_upload_group_gid,
+        )
         if (
-            not stat.S_ISDIR(opened_upload.st_mode)
-            or opened_upload.st_uid != os.geteuid()
-            or stat.S_IMODE(opened_upload.st_mode) & 0o077
+            not _descriptor_acl_is_absent(upload_fd)
             or (opened_upload.st_dev, opened_upload.st_ino)
             != (upload_path_metadata.st_dev, upload_path_metadata.st_ino)
             or (
@@ -1676,10 +1822,10 @@ def prepare_private_quarantine(
                 opened_upload.st_mode,
             )
             != expected_upload_identity
-        ):
-            raise ValueError(
-                "retention upload root must be a current-user-owned private real directory"
-            )
+            ):
+                raise ValueError(
+                    "retention upload root must remain the same private real directory with no ACL"
+                )
         try:
             os.mkdir(".retention-quarantine", 0o700, dir_fd=upload_fd)
             quarantine_root_created = True
@@ -1691,6 +1837,7 @@ def prepare_private_quarantine(
                 | getattr(os, "O_NOFOLLOW", 0),
                 dir_fd=upload_fd,
             )
+            os.fchmod(quarantine_root_fd, 0o700)
             created_root = os.fstat(quarantine_root_fd)
             quarantine_root_identity = _directory_identity(created_root)
             _validate_private_child_directory(
@@ -1896,6 +2043,8 @@ def create_recovery_copy(
     expected_source_identity: tuple[int, ...] | None = None,
     expected_size: int | None = None,
     expected_sha256: str | None = None,
+    expected_source_mode: int | None = None,
+    expected_source_gid: int | None = None,
     fault_hook: Callable[[str], None] | None = None,
 ) -> tuple[
     tuple[int, ...],
@@ -1911,10 +2060,17 @@ def create_recovery_copy(
         | getattr(os, "O_CLOEXEC", 0)
         | getattr(os, "O_NOFOLLOW", 0)
     )
-    owned_source_parent_fd = _open_directory(source.parent) if source_parent_fd is None else -1
-    owned_recovery_parent_fd = (
-        _open_directory(recovery.parent) if recovery_parent_fd is None else -1
-    )
+    owned_source_parent_fd = -1
+    owned_recovery_parent_fd = -1
+    try:
+        if source_parent_fd is None:
+            owned_source_parent_fd = _open_directory(source.parent)
+        if recovery_parent_fd is None:
+            owned_recovery_parent_fd = _open_directory(recovery.parent)
+    except BaseException:
+        if owned_source_parent_fd >= 0:
+            os.close(owned_source_parent_fd)
+        raise
     source_directory_fd = (
         owned_source_parent_fd if owned_source_parent_fd >= 0 else source_parent_fd
     )
@@ -1928,6 +2084,11 @@ def create_recovery_copy(
     partial_recovery_identity: tuple[int, int, int, int] | None = None
     recovery_registered = False
     try:
+        if (
+            not _descriptor_acl_is_absent(source_directory_fd)
+            or not _descriptor_acl_is_absent(recovery_directory_fd)
+        ):
+            raise ValueError("retention source or recovery directory has an ACL")
         with signal_guard.blocked() if signal_guard is not None else nullcontext():
             source_metadata = os.stat(
                 source.name,
@@ -1937,6 +2098,14 @@ def create_recovery_copy(
             if (
                 not stat.S_ISREG(source_metadata.st_mode)
                 or source_metadata.st_uid != os.geteuid()
+                or (
+                    expected_source_gid is not None
+                    and source_metadata.st_gid != expected_source_gid
+                )
+                or (
+                    expected_source_mode is not None
+                    and stat.S_IMODE(source_metadata.st_mode) != expected_source_mode
+                )
                 or source_metadata.st_nlink != 1
             ):
                 raise ValueError(
@@ -1950,7 +2119,20 @@ def create_recovery_copy(
                 raise ValueError(f"retention encrypted object metadata changed: {source.name}")
             source_fd = os.open(source.name, source_flags, dir_fd=source_directory_fd)
             opened_source = os.fstat(source_fd)
-            if file_identity(opened_source) != source_identity or opened_source.st_nlink != 1:
+            if (
+                file_identity(opened_source) != source_identity
+                or opened_source.st_nlink != 1
+                or opened_source.st_uid != os.geteuid()
+                or (
+                    expected_source_gid is not None
+                    and opened_source.st_gid != expected_source_gid
+                )
+                or (
+                    expected_source_mode is not None
+                    and stat.S_IMODE(opened_source.st_mode) != expected_source_mode
+                )
+                or not _descriptor_acl_is_absent(source_fd)
+            ):
                 raise ValueError(f"retention image changed while opening: {source.name}")
         if signal_guard is None:
             target_fd = os.open(
@@ -1959,6 +2141,8 @@ def create_recovery_copy(
                 0o600,
                 dir_fd=recovery_directory_fd,
             )
+            if not _descriptor_acl_is_absent(target_fd):
+                raise ValueError("retention recovery copy has an ACL")
             partial_recovery_identity = file_binding_identity(os.fstat(target_fd))
         else:
             with signal_guard.blocked():
@@ -1968,6 +2152,8 @@ def create_recovery_copy(
                     0o600,
                     dir_fd=recovery_directory_fd,
                 )
+                if not _descriptor_acl_is_absent(target_fd):
+                    raise ValueError("retention recovery copy has an ACL")
                 partial_recovery_identity = file_binding_identity(os.fstat(target_fd))
         copied_sha256 = _copy_recovery_file_descriptors(
             source_fd,
@@ -1988,6 +2174,8 @@ def create_recovery_copy(
                 or stat.S_IMODE(final_recovery.st_mode) != 0o600
                 or final_recovery.st_nlink != 1
                 or final_recovery.st_size != final_source.st_size
+                or not _descriptor_acl_is_absent(source_fd)
+                or not _descriptor_acl_is_absent(target_fd)
             ):
                 raise ValueError(f"retention recovery copy is invalid: {recovery.name}")
             if expected_sha256 is not None and copied_sha256 != expected_sha256:
@@ -2007,6 +2195,8 @@ def create_recovery_copy(
                     or stat.S_IMODE(final_recovery.st_mode) != 0o600
                     or final_recovery.st_nlink != 1
                     or final_recovery.st_size != final_source.st_size
+                    or not _descriptor_acl_is_absent(source_fd)
+                    or not _descriptor_acl_is_absent(target_fd)
                 ):
                     raise ValueError(f"retention recovery copy is invalid: {recovery.name}")
                 if expected_sha256 is not None and copied_sha256 != expected_sha256:
@@ -2174,6 +2364,8 @@ def _inspect_encrypted_object(
     expected_size: int,
     expected_sha256: str,
     expected_binding: dict[str, Any] | None = None,
+    expected_mode: int = 0o600,
+    expected_gid: int | None = None,
 ) -> tuple[int, ...]:
     from backend.app.services.report_image_crypto import (
         ReportImageCryptoError,
@@ -2189,10 +2381,16 @@ def _inspect_encrypted_object(
     try:
         opened = os.fstat(descriptor)
         if (
-            not stat.S_ISREG(anchored.st_mode)
+            not _descriptor_acl_is_absent(upload_fd)
+            or not _descriptor_acl_is_absent(descriptor)
+            or not stat.S_ISREG(anchored.st_mode)
             or not stat.S_ISREG(opened.st_mode)
             or anchored.st_uid != os.geteuid()
-            or stat.S_IMODE(anchored.st_mode) != 0o600
+            or opened.st_uid != os.geteuid()
+            or (expected_gid is not None and anchored.st_gid != expected_gid)
+            or (expected_gid is not None and opened.st_gid != expected_gid)
+            or stat.S_IMODE(anchored.st_mode) != expected_mode
+            or stat.S_IMODE(opened.st_mode) != expected_mode
             or anchored.st_nlink != 1
             or file_identity(anchored) != file_identity(opened)
             or opened.st_size != expected_size
@@ -2211,7 +2409,11 @@ def _inspect_encrypted_object(
         if os.read(descriptor, 1):
             raise RuntimeError(f"encrypted report object size changed: {storage_name}")
         final = os.fstat(descriptor)
-        if file_identity(final) != file_identity(opened):
+        if (
+            file_identity(final) != file_identity(opened)
+            or not _descriptor_acl_is_absent(upload_fd)
+            or not _descriptor_acl_is_absent(descriptor)
+        ):
             raise RuntimeError(f"encrypted report object changed while hashing: {storage_name}")
         if digest.hexdigest() != expected_sha256:
             raise RuntimeError(f"encrypted report object digest changed: {storage_name}")
@@ -2263,7 +2465,12 @@ def _recovery_manifest(
     }
 
 
-def _validate_recovery_object(entry: Any) -> dict[str, Any]:
+def _validate_recovery_object(
+    entry: Any,
+    *,
+    expected_source_mode: int = 0o600,
+    expected_source_gid: int | None = None,
+) -> dict[str, Any]:
     if not isinstance(entry, dict) or set(entry) != RETENTION_RECOVERY_OBJECT_FIELDS:
         raise RuntimeError("retention recovery object shape changed")
     report_id = entry["report_id"]
@@ -2316,7 +2523,7 @@ def _validate_recovery_object(entry: Any) -> dict[str, Any]:
     if (
         not stat.S_ISREG(source_identity[3])
         or source_identity[2] != os.geteuid()
-        or stat.S_IMODE(source_identity[3]) != 0o600
+        or stat.S_IMODE(source_identity[3]) != expected_source_mode
         or source_identity[4] != entry["envelope_size"]
         or source_identity[7] != 1
     ):
@@ -2340,7 +2547,13 @@ def _validate_recovery_object(entry: Any) -> dict[str, Any]:
     return entry
 
 
-def _validate_recovery_manifest(payload: Any, run_id: str) -> dict[str, Any]:
+def _validate_recovery_manifest(
+    payload: Any,
+    run_id: str,
+    *,
+    expected_source_mode: int = 0o600,
+    expected_source_gid: int | None = None,
+) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise RuntimeError("retention recovery manifest is not an object")
     if payload.get("schema_version") != RETENTION_RECOVERY_SCHEMA:
@@ -2356,7 +2569,14 @@ def _validate_recovery_manifest(payload: Any, run_id: str) -> dict[str, Any]:
         or payload["objects_sha256"] != _recovery_objects_sha256(objects)
     ):
         raise RuntimeError("retention recovery manifest binding changed")
-    validated = [_validate_recovery_object(entry) for entry in objects]
+    validated = [
+        _validate_recovery_object(
+            entry,
+            expected_source_mode=expected_source_mode,
+            expected_source_gid=expected_source_gid,
+        )
+        for entry in objects
+    ]
     report_ids = [entry["report_id"] for entry in validated]
     storage_names = [entry["storage_name"] for entry in validated]
     recovery_names = [entry["recovery_name"] for entry in validated]
@@ -2374,7 +2594,13 @@ def _validate_recovery_manifest(payload: Any, run_id: str) -> dict[str, Any]:
     return payload
 
 
-def _read_recovery_manifest(run_fd: int, run_id: str) -> dict[str, Any]:
+def _read_recovery_manifest(
+    run_fd: int,
+    run_id: str,
+    *,
+    expected_source_mode: int = 0o600,
+    expected_source_gid: int | None = None,
+) -> dict[str, Any]:
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
         anchored = os.stat(
@@ -2411,7 +2637,12 @@ def _read_recovery_manifest(run_fd: int, run_id: str) -> dict[str, Any]:
             payload = json.loads(b"".join(chunks).decode("utf-8"))
         except (UnicodeError, json.JSONDecodeError) as exc:
             raise RuntimeError("retention recovery manifest is invalid JSON") from exc
-        return _validate_recovery_manifest(payload, run_id)
+        return _validate_recovery_manifest(
+            payload,
+            run_id,
+            expected_source_mode=expected_source_mode,
+            expected_source_gid=expected_source_gid,
+        )
     finally:
         os.close(descriptor)
 
@@ -2421,8 +2652,15 @@ def _write_recovery_manifest(
     payload: dict[str, Any],
     *,
     signal_guard: RetentionSignalGuard,
+    expected_source_mode: int = 0o600,
+    expected_source_gid: int | None = None,
 ) -> None:
-    validated = _validate_recovery_manifest(payload, str(payload.get("run_id", "")))
+    validated = _validate_recovery_manifest(
+        payload,
+        str(payload.get("run_id", "")),
+        expected_source_mode=expected_source_mode,
+        expected_source_gid=expected_source_gid,
+    )
     content = (json.dumps(validated, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
     if len(content) > MAX_RETENTION_RECOVERY_MANIFEST_BYTES:
         raise RuntimeError("retention recovery manifest is too large")
@@ -2485,6 +2723,8 @@ def _unlink_recovery_file(
     expected_size: int | None = None,
     expected_sha256: str | None = None,
     expected_binding: dict[str, Any] | None = None,
+    expected_mode: int = 0o600,
+    expected_gid: int | None = None,
 ) -> bool:
     try:
         metadata = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
@@ -2493,7 +2733,8 @@ def _unlink_recovery_file(
     if (
         not stat.S_ISREG(metadata.st_mode)
         or metadata.st_uid != os.geteuid()
-        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or (expected_gid is not None and metadata.st_gid != expected_gid)
+        or stat.S_IMODE(metadata.st_mode) != expected_mode
         or metadata.st_nlink != 1
         or (expected_identity is not None and file_identity(metadata) != expected_identity)
         or (expected_size is not None and metadata.st_size > expected_size)
@@ -2506,6 +2747,8 @@ def _unlink_recovery_file(
             expected_size=metadata.st_size,
             expected_sha256=expected_sha256,
             expected_binding=expected_binding,
+            expected_mode=expected_mode,
+            expected_gid=expected_gid,
         )
         if expected_identity is not None and observed_identity != expected_identity:
             raise RuntimeError(f"retention recovery file identity drifted: {name}")
@@ -2609,6 +2852,8 @@ def _reconcile_retention_run(
     *,
     database_state_loader: Any,
     signal_guard: RetentionSignalGuard,
+    expected_source_mode: int = 0o600,
+    expected_source_gid: int | None = None,
     fault_hook: Callable[[str], None] | None = None,
 ) -> dict[str, Any] | None:
     run_fd = _open_private_child_directory(
@@ -2645,7 +2890,12 @@ def _reconcile_retention_run(
                 expected_size=MAX_RETENTION_RECOVERY_MANIFEST_BYTES,
             )
             names.remove(RETENTION_RECOVERY_TEMP_NAME)
-        manifest = _read_recovery_manifest(run_fd, run_id)
+        manifest = _read_recovery_manifest(
+            run_fd,
+            run_id,
+            expected_source_mode=expected_source_mode,
+            expected_source_gid=expected_source_gid,
+        )
         objects = manifest["objects"]
         expected_names = {
             RETENTION_RECOVERY_MANIFEST_NAME,
@@ -2663,6 +2913,8 @@ def _reconcile_retention_run(
                     expected_size=entry["envelope_size"],
                     expected_sha256=entry["envelope_sha256"],
                     expected_binding=entry,
+                    expected_mode=expected_source_mode,
+                    expected_gid=expected_source_gid,
                 )
                 if observed != _identity_tuple(entry["source_identity"]):
                     raise RuntimeError(
@@ -2693,6 +2945,8 @@ def _reconcile_retention_run(
                         expected_size=entry["envelope_size"],
                         expected_sha256=entry["envelope_sha256"],
                         expected_binding=entry,
+                        expected_mode=expected_source_mode,
+                        expected_gid=expected_source_gid,
                     )
                 except RuntimeError as exc:
                     try:
@@ -2713,6 +2967,8 @@ def _reconcile_retention_run(
                         expected_size=entry["envelope_size"],
                         expected_sha256=entry["envelope_sha256"],
                         expected_binding=entry,
+                        expected_mode=expected_source_mode,
+                        expected_gid=expected_source_gid,
                     )
                 recovery_identity = (
                     _identity_tuple(entry["recovery_identity"])
@@ -2731,7 +2987,13 @@ def _reconcile_retention_run(
                 )
             terminal_state = "RECONCILED_POSTCOMMIT_COMPLETED"
         terminal = _recovery_manifest(run_id, terminal_state, objects)
-        _write_recovery_manifest(run_fd, terminal, signal_guard=signal_guard)
+        _write_recovery_manifest(
+            run_fd,
+            terminal,
+            signal_guard=signal_guard,
+            expected_source_mode=expected_source_mode,
+            expected_source_gid=expected_source_gid,
+        )
         if fault_hook is not None:
             fault_hook("P7")
         result = {
@@ -2752,23 +3014,27 @@ def reconcile_retention_quarantine(
     *,
     database_state_loader: Any,
     signal_guard: RetentionSignalGuard,
+    expected_upload_group_gid: int | None = None,
     fault_hook: Callable[[str], None] | None = None,
 ) -> list[dict[str, Any]]:
     upload_fd = _open_canonical_directory(upload_dir)
     quarantine_root_fd = -1
     try:
+        _directory_mode, source_mode = _upload_file_contract(
+            expected_upload_group_gid
+        )
         opened_upload = os.fstat(upload_fd)
         anchored_upload = os.stat(upload_dir, follow_symlinks=False)
+        _validate_upload_root_metadata(
+            opened_upload,
+            expected_group_gid=expected_upload_group_gid,
+        )
         if (
-            not stat.S_ISDIR(opened_upload.st_mode)
-            or opened_upload.st_uid != os.geteuid()
-            or stat.S_IMODE(opened_upload.st_mode) & 0o077
+            not _descriptor_acl_is_absent(upload_fd)
             or (opened_upload.st_dev, opened_upload.st_ino)
             != (anchored_upload.st_dev, anchored_upload.st_ino)
         ):
-            raise ValueError(
-                "retention upload root must be a current-user-owned private real directory"
-            )
+            raise ValueError("retention upload root identity changed")
         try:
             quarantine_root_fd = _open_private_child_directory(
                 upload_fd,
@@ -2791,6 +3057,8 @@ def reconcile_retention_quarantine(
                 run_id,
                 database_state_loader=database_state_loader,
                 signal_guard=signal_guard,
+                expected_source_mode=source_mode,
+                expected_source_gid=expected_upload_group_gid,
                 fault_hook=fault_hook,
             )
             if result is not None:
@@ -2828,6 +3096,7 @@ def _apply_database_retention_locked(
     maintenance_lock_path: Path,
     maintenance_lock: dict[str, Any],
     signal_guard: RetentionSignalGuard,
+    upload_backup_reader_group_gid: int | None = None,
     actor_id: str = "system",
     authorized_admin_id: str | None = None,
     authorized_session_id: str | None = None,
@@ -2852,6 +3121,24 @@ def _apply_database_retention_locked(
     if resolved_upload_dir != absolute_upload_dir:
         raise ValueError("retention upload root must be a canonical real directory")
     initial_upload_metadata = os.lstat(resolved_upload_dir)
+    _validate_upload_root_metadata(
+        initial_upload_metadata,
+        expected_group_gid=upload_backup_reader_group_gid,
+    )
+    initial_upload_fd = _open_canonical_directory(resolved_upload_dir)
+    try:
+        opened_initial_upload = os.fstat(initial_upload_fd)
+        if (
+            (opened_initial_upload.st_dev, opened_initial_upload.st_ino)
+            != (initial_upload_metadata.st_dev, initial_upload_metadata.st_ino)
+            or not _descriptor_acl_is_absent(initial_upload_fd)
+        ):
+            raise ValueError("retention upload root identity or ACL differs")
+    finally:
+        os.close(initial_upload_fd)
+    _upload_directory_mode, source_file_mode = _upload_file_contract(
+        upload_backup_reader_group_gid
+    )
     expected_upload_identity = (
         initial_upload_metadata.st_dev,
         initial_upload_metadata.st_ino,
@@ -2883,6 +3170,7 @@ def _apply_database_retention_locked(
                 resolved_upload_dir,
                 database_state_loader=database_state_loader,
                 signal_guard=signal_guard,
+                expected_upload_group_gid=upload_backup_reader_group_gid,
             )
         )
 
@@ -2993,6 +3281,7 @@ def _apply_database_retention_locked(
                         upload_dir,
                         run_id,
                         expected_upload_identity=expected_upload_identity,
+                        expected_upload_group_gid=upload_backup_reader_group_gid,
                     )
                 if fault_hook is not None:
                     fault_hook("P1")
@@ -3009,6 +3298,8 @@ def _apply_database_retention_locked(
                         expected_size=entry["envelope_size"],
                         expected_sha256=entry["envelope_sha256"],
                         expected_binding=entry,
+                        expected_mode=source_file_mode,
+                        expected_gid=upload_backup_reader_group_gid,
                     )
                     entry.update(
                         {
@@ -3028,6 +3319,8 @@ def _apply_database_retention_locked(
                     quarantine_run_fd,
                     recovery_manifest,
                     signal_guard=signal_guard,
+                    expected_source_mode=source_file_mode,
+                    expected_source_gid=upload_backup_reader_group_gid,
                 )
                 recovery_journal_started = True
                 if fault_hook is not None:
@@ -3045,6 +3338,8 @@ def _apply_database_retention_locked(
                         expected_source_identity=_identity_tuple(entry["source_identity"]),
                         expected_size=entry["envelope_size"],
                         expected_sha256=entry["envelope_sha256"],
+                        expected_source_mode=source_file_mode,
+                        expected_source_gid=upload_backup_reader_group_gid,
                         fault_hook=fault_hook,
                     )
                     if source_identity != _identity_tuple(entry["source_identity"]):
@@ -3060,6 +3355,8 @@ def _apply_database_retention_locked(
                         quarantine_run_fd,
                         _recovery_manifest(run_id, "PREPARING", recovery_objects),
                         signal_guard=signal_guard,
+                        expected_source_mode=source_file_mode,
+                        expected_source_gid=upload_backup_reader_group_gid,
                     )
                     if fault_hook is not None:
                         fault_hook("P3")
@@ -3078,6 +3375,8 @@ def _apply_database_retention_locked(
                     quarantine_run_fd,
                     _recovery_manifest(run_id, "PRECOMMIT_READY", recovery_objects),
                     signal_guard=signal_guard,
+                    expected_source_mode=source_file_mode,
+                    expected_source_gid=upload_backup_reader_group_gid,
                 )
                 if fault_hook is not None:
                     fault_hook("P4")
@@ -3089,6 +3388,8 @@ def _apply_database_retention_locked(
                     quarantine_run_fd,
                     _recovery_manifest(run_id, "DATABASE_COMMITTING", recovery_objects),
                     signal_guard=signal_guard,
+                    expected_source_mode=source_file_mode,
+                    expected_source_gid=upload_backup_reader_group_gid,
                 )
                 if fault_hook is not None:
                     fault_hook("P5")
@@ -3116,6 +3417,7 @@ def _apply_database_retention_locked(
                 resolved_upload_dir,
                 database_state_loader=database_state_loader,
                 signal_guard=signal_guard,
+                expected_upload_group_gid=upload_backup_reader_group_gid,
                 fault_hook=fault_hook,
             )
             if not any(
@@ -3162,6 +3464,7 @@ def _apply_database_retention_locked(
                         report_ids,
                     ),
                     signal_guard=signal_guard,
+                    expected_upload_group_gid=upload_backup_reader_group_gid,
                 )
                 reconciled_runs.extend(recovered)
                 if any(
@@ -3173,6 +3476,7 @@ def _apply_database_retention_locked(
             except BaseException as recovery_exc:
                 recovery_errors.append(type(recovery_exc).__name__)
         if manifest_publisher is not None and manifest:
+            manifest.pop("cleanup_errors", None)
             if manifest.get("status") == "planning":
                 manifest["status"] = "failed_planning"
             elif database_committed:
@@ -3237,6 +3541,9 @@ def apply_database_retention(
         raise ValueError("maintenance lock timeout must be an integer") from exc
     if not 1 <= timeout_seconds <= 300:
         raise ValueError("maintenance lock timeout must be between 1 and 300 seconds")
+    upload_backup_reader_group_gid = (
+        _upload_backup_reader_group_gid_from_environment()
+    )
     with walksafe_admin_high_risk_operation(
         "DATA_DELETE",
         database_url=database_url,
@@ -3248,6 +3555,7 @@ def apply_database_retention(
             with exclusive_maintenance_lock(
                 maintenance_lock_path,
                 timeout_seconds=timeout_seconds,
+                expected_group_gid=_maintenance_lock_group_gid_from_environment(),
             ) as maintenance_lock:
                 return _apply_database_retention_locked(
                     database_url=database_url,
@@ -3261,6 +3569,7 @@ def apply_database_retention(
                     maintenance_lock_path=maintenance_lock_path,
                     maintenance_lock=maintenance_lock,
                     signal_guard=signal_guard,
+                    upload_backup_reader_group_gid=upload_backup_reader_group_gid,
                     actor_id=actor_id,
                     authorized_admin_id=(
                         admin_identity.admin_id

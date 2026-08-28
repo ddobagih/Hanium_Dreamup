@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import errno
 import fcntl
 import os
 from pathlib import Path
@@ -362,7 +363,7 @@ def test_report_write_fails_closed_while_maintenance_has_exclusive_lock(
     monkeypatch.setattr(reports_api, "_trusted_maintenance_lock_parent", lambda *_args: True)
     lock_path = tmp_path / "maintenance.lock"
     lock_path.touch(mode=0o600)
-    descriptor = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    descriptor = os.open(lock_path, os.O_RDONLY | os.O_NOFOLLOW)
     fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
     destination = tmp_path / "report.wse"
     try:
@@ -383,6 +384,74 @@ def test_report_write_fails_closed_while_maintenance_has_exclusive_lock(
     assert exc_info.value.status_code == 503
     assert exc_info.value.detail["code"] == "maintenance_in_progress"
     assert not destination.exists()
+
+
+def test_report_write_requires_preprovisioned_single_link_maintenance_leaf(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tmp_path.chmod(0o700)
+    lock_path = tmp_path / "maintenance.lock"
+    monkeypatch.setattr(reports_api, "_trusted_maintenance_lock_parent", lambda *_args: True)
+
+    with pytest.raises(HTTPException) as missing:
+        with reports_api._shared_report_write_lock(lock_path):
+            pytest.fail("missing maintenance lock must not be entered")
+    assert missing.value.detail["code"] == "maintenance_lock_unavailable"
+    assert not lock_path.exists()
+
+    lock_path.touch(mode=0o600)
+    os.link(lock_path, tmp_path / "maintenance.alias")
+    with pytest.raises(HTTPException) as aliased:
+        with reports_api._shared_report_write_lock(lock_path):
+            pytest.fail("hard-linked maintenance lock must not be entered")
+    assert aliased.value.detail["code"] == "maintenance_lock_unavailable"
+
+
+def test_backend_shared_leaf_lock_blocks_retention(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts import check_report_retention_dry_run as retention
+
+    tmp_path.chmod(0o700)
+    lock_path = tmp_path / "maintenance.lock"
+    lock_path.touch(mode=0o600)
+    monkeypatch.setattr(
+        reports_api,
+        "_trusted_maintenance_lock_parent",
+        lambda *_args: True,
+    )
+    monkeypatch.setattr(
+        retention,
+        "_validate_trusted_maintenance_lock_parent",
+        lambda *_args: None,
+    )
+
+    with reports_api._shared_report_write_lock(lock_path):
+        with pytest.raises(TimeoutError, match="timed out acquiring maintenance lock"):
+            with retention.exclusive_maintenance_lock(lock_path, timeout_seconds=0):
+                pytest.fail("retention must not enter while Backend holds the leaf")
+
+
+def test_report_write_rejects_maintenance_lock_acl_inspection_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tmp_path.chmod(0o700)
+    lock_path = tmp_path / "maintenance.lock"
+    lock_path.touch(mode=0o600)
+    monkeypatch.setattr(reports_api, "_trusted_maintenance_lock_parent", lambda *_args: True)
+    monkeypatch.setattr(
+        reports_api.os,
+        "listxattr",
+        lambda _descriptor: (_ for _ in ()).throw(OSError(errno.EACCES, "denied")),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        with reports_api._shared_report_write_lock(lock_path):
+            pytest.fail("uninspectable ACL state must not be entered")
+    assert exc_info.value.detail["code"] == "maintenance_lock_unavailable"
 
 
 def test_report_write_rejects_replaceable_maintenance_lock_parent(tmp_path) -> None:

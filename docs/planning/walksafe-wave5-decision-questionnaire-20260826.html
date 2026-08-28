@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="WalkSafe Wave 5A부터 5G까지 실운영 전환 전에 확정할 사항을 답변하는 오프라인 질문지">
+  <link rel="icon" href="data:,">
+  <title>WalkSafe Wave 5 사전 결정 질문지</title>
+  <style>
+    :root {
+      --bg: #f3f6f9;
+      --surface: #ffffff;
+      --surface-muted: #edf2f6;
+      --text: #18212f;
+      --muted: #5d6877;
+      --line: #cbd4df;
+      --line-strong: #8e9aac;
+      --navy: #17324d;
+      --blue: #075c9f;
+      --blue-soft: #e5f1fb;
+      --green: #087443;
+      --green-soft: #e3f5ec;
+      --amber: #8a5300;
+      --amber-soft: #fff1cf;
+      --red: #a42e27;
+      --red-soft: #fce8e6;
+      --focus: #e15d00;
+      --shadow: 0 12px 32px rgb(21 44 68 / 10%);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; min-width: 20rem; color: var(--text); background: var(--bg); line-height: 1.6; }
+    button, input, textarea, select { font: inherit; }
+    button, input[type="radio"], summary { cursor: pointer; touch-action: manipulation; }
+    a { color: var(--blue); }
+    h1, h2, h3, p { margin-top: 0; }
+    h1, h2, h3 { line-height: 1.25; word-break: keep-all; text-wrap: balance; }
+    code { padding: 0.08rem 0.3rem; border-radius: 0.25rem; color: var(--navy); background: var(--surface-muted); }
+
+    :focus-visible { outline: 0.2rem solid var(--focus); outline-offset: 0.15rem; }
+    .skip-link { position: fixed; left: 1rem; top: -6rem; z-index: 100; padding: 0.75rem 1rem; color: #fff; background: #000; }
+    .skip-link:focus { top: 1rem; }
+    .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+
+    header { color: #fff; background: linear-gradient(130deg, #12283d, #245778); }
+    .hero { width: min(76rem, calc(100% - 2rem)); margin: 0 auto; padding: clamp(2rem, 6vw, 4.5rem) 0 2.25rem; }
+    .eyebrow { margin-bottom: 0.6rem; color: #b9d8ee; font-size: 0.84rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    h1 { max-width: 54rem; margin-bottom: 0.9rem; font-size: clamp(2rem, 5vw, 3.6rem); }
+    .lead { max-width: 62rem; margin-bottom: 1.4rem; color: #eef7fc; font-size: clamp(1rem, 2vw, 1.18rem); }
+    .hero-status { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+    .pill { display: inline-flex; align-items: center; min-height: 2rem; padding: 0.25rem 0.65rem; border: 1px solid rgb(255 255 255 / 34%); border-radius: 999px; color: #fff; background: rgb(255 255 255 / 10%); font-size: 0.86rem; font-weight: 750; }
+
+    .toolbar { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid var(--line); background: rgb(255 255 255 / 96%); box-shadow: 0 5px 18px rgb(21 44 68 / 8%); backdrop-filter: blur(8px); }
+    .toolbar-inner { width: min(76rem, calc(100% - 2rem)); margin: 0 auto; padding: 0.75rem 0; }
+    .toolbar-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+    .progress-copy { min-width: 15rem; flex: 1 1 24rem; }
+    .progress-copy strong { display: block; }
+    .progress-copy span { color: var(--muted); font-size: 0.9rem; }
+    .progress-track { height: 0.55rem; margin-top: 0.45rem; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }
+    .progress-bar { width: 0; height: 100%; background: var(--green); transition: width 160ms ease; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+    .button { min-height: 2.65rem; padding: 0.5rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 0.5rem; color: var(--text); background: var(--surface); font-weight: 750; }
+    .button:hover { border-color: var(--blue); }
+    .button-primary { border-color: var(--blue); color: #fff; background: var(--blue); }
+    .button-danger { border-color: var(--red); color: var(--red); }
+
+    main { width: min(76rem, calc(100% - 2rem)); margin: 0 auto; padding: 1.5rem 0 5rem; }
+    .notice { margin-bottom: 1rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-left: 0.35rem solid var(--blue); border-radius: 0.65rem; background: var(--surface); }
+    .notice.warning { border-left-color: var(--amber); background: var(--amber-soft); }
+    .notice.danger { border-left-color: var(--red); background: var(--red-soft); }
+    .notice.success { border-left-color: var(--green); background: var(--green-soft); }
+    .notice p:last-child { margin-bottom: 0; }
+    #sensitive-warning[hidden] { display: none; }
+
+    .baseline { margin: 1.6rem 0; }
+    .baseline-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.75rem; }
+    .fact { min-height: 7.2rem; padding: 1rem; border: 1px solid var(--line); border-radius: 0.65rem; background: var(--surface); box-shadow: var(--shadow); }
+    .fact b { display: block; margin-bottom: 0.35rem; color: var(--navy); }
+    .fact p { margin: 0; color: var(--muted); font-size: 0.93rem; }
+    .fact.state { border-top: 0.28rem solid var(--red); }
+    .fact.locked { border-top: 0.28rem solid var(--green); }
+
+    .contents { margin: 1.5rem 0; padding: 1rem; border: 1px solid var(--line); border-radius: 0.65rem; background: var(--surface); }
+    .contents h2 { font-size: 1.15rem; }
+    .phase-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.55rem; }
+    .phase-link { display: block; padding: 0.7rem; border: 1px solid var(--line); border-radius: 0.5rem; color: var(--text); text-decoration: none; }
+    .phase-link:hover { border-color: var(--blue); background: var(--blue-soft); }
+    .phase-link strong, .phase-link span { display: block; }
+    .phase-link span { color: var(--muted); font-size: 0.85rem; }
+
+    .phase { scroll-margin-top: 8.5rem; margin-top: 1.25rem; border: 1px solid var(--line); border-radius: 0.8rem; background: var(--surface); box-shadow: var(--shadow); }
+    .phase > summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.15rem; list-style: none; }
+    .phase > summary::-webkit-details-marker { display: none; }
+    .phase > summary::after { content: "+"; flex: 0 0 auto; color: var(--blue); font-size: 1.6rem; line-height: 1; }
+    .phase[open] > summary::after { content: "−"; }
+    .phase-title { display: flex; align-items: flex-start; gap: 0.8rem; }
+    .wave-badge { flex: 0 0 auto; min-width: 3.2rem; padding: 0.35rem 0.5rem; border-radius: 0.4rem; color: #fff; background: var(--navy); text-align: center; font-weight: 850; }
+    .phase-copy, .phase-heading, .phase-summary { display: block; }
+    .phase-heading { margin-bottom: 0.25rem; font-size: 1.35rem; font-weight: 750; line-height: 1.25; }
+    .phase-summary { color: var(--muted); }
+    .phase-count { white-space: nowrap; color: var(--muted); font-size: 0.9rem; font-weight: 750; }
+    .phase-body { padding: 0 1.15rem 1.25rem; border-top: 1px solid var(--line); }
+    .later-evidence { margin: 1rem 0; padding: 0.8rem 0.95rem; border-radius: 0.5rem; background: var(--surface-muted); color: var(--muted); font-size: 0.92rem; }
+    .later-evidence strong { color: var(--text); }
+
+    .question { scroll-margin-top: 8.5rem; padding: 1.1rem 0; border-bottom: 1px solid var(--line); }
+    .question:last-child { border-bottom: 0; }
+    .question-head { display: flex; align-items: baseline; gap: 0.55rem; }
+    .question-id { flex: 0 0 auto; color: var(--blue); font-size: 0.82rem; font-weight: 850; }
+    .question h3 { margin-bottom: 0.35rem; font-size: 1.08rem; }
+    .why { margin-bottom: 0.7rem; color: var(--muted); font-size: 0.92rem; }
+    .required-mark { color: var(--red); font-weight: 850; }
+    fieldset { min-width: 0; padding: 0; border: 0; }
+    .options { display: grid; gap: 0.5rem; }
+    .option { display: grid; grid-template-columns: auto 1fr; gap: 0.65rem; padding: 0.75rem; border: 1px solid var(--line); border-radius: 0.55rem; background: var(--surface); }
+    .option:hover { border-color: var(--blue); }
+    .option:has(input:checked) { border-color: var(--blue); box-shadow: 0 0 0 0.1rem var(--blue-soft); background: var(--blue-soft); }
+    .option input { width: 1.2rem; height: 1.2rem; margin-top: 0.2rem; }
+    .option strong { display: block; }
+    .option small { display: block; margin-top: 0.15rem; color: var(--muted); }
+    .recommend { display: inline-block; margin-left: 0.35rem; padding: 0.05rem 0.35rem; border-radius: 999px; color: var(--green); background: var(--green-soft); font-size: 0.72rem; font-weight: 850; vertical-align: middle; }
+    .text-control, .number-control, textarea { width: 100%; padding: 0.7rem 0.75rem; border: 1px solid var(--line-strong); border-radius: 0.5rem; color: var(--text); background: var(--surface); }
+    textarea { min-height: 8rem; resize: vertical; }
+    .decision-note-label { display: block; margin-top: 0.75rem; color: var(--muted); font-size: 0.88rem; font-weight: 750; }
+    .decision-note { min-height: 4.5rem; margin-top: 0.3rem; }
+    .number-row { display: flex; align-items: center; gap: 0.6rem; }
+    .number-control { max-width: 18rem; }
+    .unit { color: var(--muted); }
+    .answer-state { min-height: 1.5rem; margin: 0.45rem 0 0; color: var(--muted); font-size: 0.85rem; }
+    .question[data-state="done"] .answer-state { color: var(--green); }
+    .question[data-state="blocked"] .answer-state { color: var(--amber); }
+    .question[data-state="invalid"] .answer-state { color: var(--red); font-weight: 750; }
+
+    .finish { margin-top: 1.6rem; padding: 1.2rem; border: 1px solid var(--line); border-radius: 0.7rem; background: var(--surface); }
+    .finish ul { margin-bottom: 0; }
+    .sources { margin-top: 1.5rem; color: var(--muted); font-size: 0.92rem; }
+    .sources ul { padding-left: 1.25rem; }
+    footer { padding: 1.5rem 1rem 2.5rem; color: var(--muted); text-align: center; font-size: 0.88rem; }
+
+    body.high-contrast { --bg: #fff; --surface: #fff; --surface-muted: #f1f1f1; --text: #000; --muted: #222; --line: #555; --line-strong: #000; --blue: #003e73; --blue-soft: #d9efff; --green: #005b2d; --green-soft: #d8f5e5; --amber-soft: #fff0a8; --red: #8b0000; --red-soft: #ffdede; }
+
+    @media (max-width: 48rem) {
+      .toolbar { position: static; }
+      .actions { width: 100%; }
+      .button { flex: 1 1 9rem; }
+      .phase > summary { position: relative; display: block; padding-right: 3.25rem; }
+      .phase > summary::after { position: absolute; right: 1.15rem; top: 1.35rem; display: block; }
+      .phase-count { display: block; margin: 0.6rem 0 0 4rem; }
+      .question-head { display: block; }
+      .question-id { display: inline-block; margin-bottom: 0.25rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+    }
+
+    @media print {
+      :root { --bg: #fff; --surface: #fff; --text: #000; --muted: #333; --line: #aaa; }
+      header { color: #000; background: #fff; }
+      .eyebrow, .lead { color: #222; }
+      .hero-status, .toolbar, .skip-link, .storage-only, .button { display: none !important; }
+      main { width: 100%; padding: 0; }
+      .baseline-grid { grid-template-columns: repeat(3, 1fr); }
+      .fact, .phase { box-shadow: none; break-inside: avoid; }
+      .phase { display: block; }
+      .phase > summary::after { display: none; }
+      .phase-body { display: block !important; }
+      .question:not([data-state="empty"]) .option:has(input:not(:checked)) { display: none; }
+      input, textarea { border: 0; padding: 0; overflow: visible; }
+      textarea { min-height: 4rem; }
+      .sources a { color: #000; text-decoration: none; }
+      body.print-blocked > * { display: none !important; }
+      body.print-blocked::before { content: attr(data-print-block-reason); display: block; padding: 2rem; color: #000; font-size: 1.1rem; font-weight: 700; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#questionnaire">질문지로 건너뛰기</a>
+
+  <header>
+    <div class="hero">
+      <p class="eyebrow">WalkSafe · Wave 5 Decision Intake · 2026-08-26</p>
+      <h1>실운영 전환 전에<br>먼저 정할 것</h1>
+      <p class="lead">Wave 5A부터 5G까지 필요한 결정을 쉬운 질문으로 모았습니다. 모르는 항목은 “비교안 필요”를 선택하면 되고, 비밀번호·API 키·인증서 원문은 절대 적지 않습니다.</p>
+      <div class="hero-status">
+        <span class="pill">오프라인 단일 HTML</span>
+        <span class="pill">브라우저 자동 저장</span>
+        <span class="pill">JSON 내보내기·불러오기</span>
+        <span class="pill">작성 ≠ 배포 승인</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="toolbar" aria-label="질문지 도구">
+    <div class="toolbar-inner">
+      <div class="toolbar-row">
+        <div class="progress-copy">
+          <strong id="progress-label">진행률 계산 중</strong>
+          <span id="save-status">저장된 답변을 확인하고 있습니다.</span>
+          <div class="progress-track" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-bar" id="progress-bar"></div></div>
+        </div>
+        <div class="actions" aria-label="저장과 내보내기">
+          <button class="button" id="first-unanswered" type="button">첫 미결정으로</button>
+          <button class="button" id="contrast-button" type="button" aria-pressed="false">고대비</button>
+          <button class="button" id="print-button" type="button">인쇄</button>
+          <button class="button button-primary" id="export-button" type="button">답변 JSON 저장</button>
+          <button class="button" id="import-button" type="button">JSON 불러오기</button>
+          <input class="sr-only" id="import-file" type="file" accept="application/json,.json" tabindex="-1" aria-label="Wave 5 답변 JSON 선택">
+          <button class="button button-danger" id="reset-button" type="button">초기화</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main id="questionnaire" tabindex="-1">
+    <section class="notice warning" aria-labelledby="security-title">
+      <h2 id="security-title">먼저 확인하세요</h2>
+      <p><strong>입력 금지:</strong> 비밀번호, API key/token, private key, 인증서 원문, 결제계정 번호, 개인 전화번호·개인 이메일, 실제 사용자 개인정보. 담당자는 <code>ops-primary</code>, 연락처는 <code>#walksafe-incident</code> 같은 역할·채널 별칭만 적으세요.</p>
+      <p>답변은 브라우저 저장소에 저장되고 내보낸 JSON은 암호화되지 않은 평문입니다. 민감정보 탐지는 보조 기능일 뿐 전부 찾아내지는 못합니다. 공용 PC에서 작성하지 말고, JSON은 Git 저장소 밖의 접근 제한·암호화 위치에 보관하세요. 브라우저별 자동 저장·인쇄 동작도 다를 수 있습니다.</p>
+    </section>
+    <section class="notice danger" id="sensitive-warning" role="alert" hidden></section>
+
+    <section class="notice" aria-labelledby="boundary-title">
+      <h2 id="boundary-title">이 문서의 권한 경계</h2>
+      <p>이 HTML은 Wave 5 준비 입력을 모으는 <strong>비정본 작업 문서</strong>입니다. 답변 완료·자동 저장·JSON 내보내기는 정책 변경, cloud 자원 생성, 비용 발생, 외부 데이터 전송, 정식시험 PASS, gate 종결, staging·production 배포, public ingress 활성화 또는 출시 승인을 뜻하지 않습니다.</p>
+      <p>GCS 서울 리전이라는 정책 방향도 GCP 계약·개인정보 처리위탁 검토가 끝났다는 뜻은 아닙니다. 실제 계약과 적용성은 Wave 5 실행 중 별도 증거로 확인합니다.</p>
+      <p>답변 초안의 <code>[추가 결정 필요]</code> 표시는 값이 입력되어 있어도 완료가 아니라 <strong>협의 필요</strong>로 계산됩니다.</p>
+    </section>
+
+    <section class="baseline" aria-labelledby="baseline-title">
+      <h2 id="baseline-title">선택하지 않는 고정 기준</h2>
+      <p>아래 값은 승인된 정책 또는 현재 사실입니다. 다르게 가려면 질문지 답변이 아니라 별도 정책 변경·재승인이 필요합니다.</p>
+      <div class="baseline-grid">
+        <article class="fact locked"><b>저장소와 지역</b><p>Google Cloud Storage, <code>asia-northeast3</code>(서울)</p></article>
+        <article class="fact locked"><b>용량 기준</b><p>주 원본 Standard 300GiB + 백업 Nearline 300GiB</p></article>
+        <article class="fact locked"><b>백업 보존</b><p>35일 순환. 운영과 분리된 환경에서 실제 복원해야 함</p></article>
+        <article class="fact locked"><b>자료 보존·삭제</b><p>수신·검역 14일, 일반·자동신고 원본 180일, 승인 학습자료 3년. 삭제요청은 서버 7일·가공본 30일</p></article>
+        <article class="fact locked"><b>저장비 안전상한</b><p>저장·요청·복원 비용 합계 최대 월 30,000원. 지출 승인이 아니며, 전체 예산을 0원으로 답하면 더 엄격한 0원 기준이 적용됨</p></article>
+        <article class="fact locked"><b>서버 용량 단계</b><p>주 원본 70·85·95·100% 단계 고정. 휴대전화 byte 상한은 별도 실기기 측정 gate</p></article>
+        <article class="fact locked"><b>제품 경계</b><p>사용자 Android 앱 + 비공개 등록기기용 관리자 Android 앱 + Gateway + Backend. Web/PWA는 운영 대상 아님</p></article>
+        <article class="fact locked"><b>앱 배포 경계</b><p>사용자 앱은 Google Play, 관리자 앱은 등록된 관리자 기기에만 비공개 배포</p></article>
+        <article class="fact locked"><b>정식시험</b><p>총 279건: 기능 123, 장애·복구 46, 실기기·현장 54, API·통합 32, 접근성·사용성 15, 기타 9</p></article>
+        <article class="fact locked"><b>출시 gate</b><p>5개 모두 실제 실행·독립 판정, <code>waived=false</code>. 279건 안의 case PASS만으로 자동 종결되지 않음</p></article>
+        <article class="fact locked"><b>실패와 최종 권한</b><p>필수 FAIL·NOT_RUN은 severity와 무관하게 차단. 최종 관리자·출시 승인자는 1명이며 부재 시 고위험 변경·출시 동결</p></article>
+        <article class="fact locked"><b>배포 순서</b><p>비공개 검증 → GO 판단 → staging → production canary. 삭제 scheduler는 마지막</p></article>
+        <article class="fact locked"><b>지원 기본시간</b><p>평일 09:00~18:00 Asia/Seoul. 시간 외 운영에는 자동 안전조치와 지정 비상대응자가 필요</p></article>
+        <article class="fact state"><b>현재 상태</b><p>정식시험 0/279, gate 0/5, 배포 사건 0, release <code>NOT_ELIGIBLE</code></p></article>
+      </div>
+    </section>
+
+    <nav class="contents" aria-labelledby="contents-title">
+      <h2 id="contents-title">Wave별 바로가기</h2>
+      <div class="phase-links" id="phase-links"></div>
+    </nav>
+
+    <form id="decision-form" novalidate autocomplete="off" spellcheck="false"></form>
+
+    <section class="finish" aria-labelledby="finish-title">
+      <h2 id="finish-title">이 질문지를 다 쓰면</h2>
+      <ul>
+        <li>답변 JSON을 내보내 <strong>Git 저장소 밖</strong>의 접근 제한·암호화 위치에 둡니다. 메신저·이메일로 보내지 않습니다.</li>
+        <li>답변은 구현·견적·권한 요청의 입력입니다. 답변만으로 cloud 생성, 배포, 시험 PASS 또는 출시 승인이 되지 않습니다.</li>
+        <li>실제 자원 ID·명령·hash·시험 결과·승인은 실행하면서 별도 추가 전용 기록으로 남깁니다.</li>
+        <li>현재 작업 종료·변경 권한 정합화와 정식 Goal/focus·Wave 5 start gate 승인을 모두 확인한 뒤에만 Wave 5A 인프라/IaC와 fail-closed preflight를 구현합니다.</li>
+      </ul>
+    </section>
+
+    <section class="sources" aria-labelledby="sources-title">
+      <h2 id="sources-title">근거 문서</h2>
+      <ul>
+        <li><a href="walksafe-security-server-operations-next-plan-20260825.html">Wave 3·4·5 통합 실행 계획</a></li>
+        <li><a href="../control/decision-interview/walksafe-feature-policy-review-resolution-rules.json">승인 정책 해석 규칙</a></li>
+        <li><a href="../deliverables/03-requirements/system-requirements.md">시스템 요구사항</a></li>
+        <li><a href="../deliverables/09-release/registers/release-control-register.json">출시 통제 원장</a></li>
+        <li><a href="../deliverables/10-operations/registers/operations-registers.json">운영 원장</a></li>
+        <li><a href="../../deploy/README.md">현재 배포 예제의 적용 경계</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>WalkSafe Wave 5 사전 결정 질문지 · v2026-08-26.1 · 이 HTML 코드의 네트워크 요청 없음</footer>
+  <p class="sr-only" id="live-region" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <script>
+    "use strict";
+    (() => {
+      const schemaVersion = "walksafe.wave5-decisions.v1";
+      const questionnaireId = "WS-WAVE5-DECISION-QUESTIONNAIRE-20260826";
+      const questionnaireVersion = "2026-08-26.1";
+      const storageKey = `${schemaVersion}:${questionnaireId}:${questionnaireVersion}`;
+      const maxTextLength = 8000;
+      const maxShortTextLength = 4000;
+      const maxNoteLength = 4000;
+      const maxImportBytes = 1024 * 1024;
+      const fixedBaseline = {
+        storage_provider: "GOOGLE_CLOUD_STORAGE",
+        region: "asia-northeast3",
+        primary_storage: "STANDARD_300_GIB",
+        backup_storage: "NEARLINE_300_GIB",
+        backup_retention_days: 35,
+        monthly_storage_budget_krw: 30000,
+        formal_test_case_count: 279,
+        release_gate_count: 5,
+        gates_waived: false,
+        mandatory_fail_or_not_run_blocks: true,
+        single_final_administrator_and_approver: true,
+        user_app_distribution: "GOOGLE_PLAY",
+        support_hours: "WEEKDAYS_09:00-18:00_ASIA_SEOUL",
+        current_release_status: "NOT_ELIGIBLE"
+      };
+
+      const phases = [
+        {
+          id: "wave5a", wave: "5A", title: "운영 환경과 책임 확정", summary: "돈이 들거나 외부에 영향을 주기 전에 실제 집·열쇠·담당자를 정합니다.",
+          evidence: "나중 완료 증거: 실제 resource/role ID, DNS/TLS chain·만료, IAM·firewall, key rotation canary, 비밀 원문 없는 접속 결과",
+          questions: [
+            { id: "W5A-01", title: "실제로 사용할 GCP 프로젝트와 결제 상태는 무엇인가요?", why: "프로젝트를 모르면 어떤 cloud 자원도 안전하게 만들 수 없습니다. 결제계정 번호 대신 연결 여부와 담당 역할 별칭만 적습니다.", type: "textarea", placeholder: "staging project ID:\nproduction project ID(아직 없으면 미정):\nbilling 연결 상태: 연결됨 / 미연결\nbilling 담당 역할 별칭:", required: true },
+            { id: "W5A-02", title: "유료 cloud 자원 생성 권한을 어디까지 허용하나요?", why: "질문지 작성과 실제 과금 자원 생성은 다른 승인입니다.", type: "choice", required: true, options: [
+              { value: "staging_only", label: "비공개 staging만 생성 허용", note: "production 자원은 5E GO 뒤 별도 승인합니다.", recommended: true },
+              { value: "staging_and_prod_after_go", label: "staging과 GO 이후 production 허용", note: "GO 전 production 생성·공개는 하지 않습니다." },
+              { value: "no_paid_resources", label: "유료 자원 생성 불허", note: "견적과 IaC 후보까지만 작성합니다." },
+              { value: "undecided", label: "비용 비교안이 필요함", note: "비용표를 먼저 만든 뒤 다시 결정합니다.", blocking: true }
+            ]},
+            { id: "W5A-03", title: "전체 월 운영비 상한은 얼마인가요?", why: "30,000원은 저장비 정책일 뿐 서버·DB·관측·DNS·알림을 포함한 전체 예산이 아닙니다.", type: "number", unit: "원/월", min: 0, max: 100000000, step: 1000, required: true },
+            { id: "W5A-04", title: "서버 실행 방식은 무엇으로 할까요?", why: "현재 배포 예제는 Linux VM의 systemd·Nginx를 전제로 합니다. 다른 방식을 택하면 배포 설계를 바꿔야 합니다.", type: "choice", required: true, options: [
+              { value: "gce_vm_systemd", label: "GCE VM + systemd/Nginx", note: "현재 배포 예제를 가장 작게 수정해 사용할 수 있습니다.", recommended: true },
+              { value: "managed_container", label: "관리형 container runtime", note: "systemd·파일권한·scheduler·restore 계약을 다시 설계해야 합니다." },
+              { value: "other", label: "다른 실행 환경", note: "결정 메모에 구체 환경을 적습니다." },
+              { value: "undecided", label: "비용·운영 비교안이 필요함", note: "후보별 월비용과 운영 부담을 먼저 비교합니다.", blocking: true }
+            ]},
+            { id: "W5A-05", title: "PostgreSQL/PostGIS는 어디서 운영할까요?", why: "관리형 DB와 자체 운영 DB는 비용·백업·권한·장애 대응 방식이 다릅니다.", type: "choice", required: true, options: [
+              { value: "managed_cloud_sql", label: "관리형 Cloud SQL/PostgreSQL", note: "운영 안전 우선. PostGIS 지원·비용·복원 절차를 실측합니다.", recommended: true },
+              { value: "separate_self_managed_vm", label: "별도 VM 자체 운영", note: "DB 격리는 유지하지만 패치·백업·HA를 직접 담당합니다." },
+              { value: "same_vm", label: "앱과 같은 VM", note: "비용은 낮지만 장애·권한·복구 경계가 함께 무너질 수 있습니다." },
+              { value: "undecided", label: "비용·안전 비교안이 필요함", note: "월비용과 복구 부담을 먼저 비교합니다.", blocking: true }
+            ]},
+            { id: "W5A-06", title: "운영 도메인·DNS·TLS 통제 역할은 무엇인가요?", why: "HTTPS 인증서와 앱의 고정 endpoint를 만들려면 실제 hostname, DNS 변경 권한, 인증서 발급·갱신 책임이 필요합니다.", type: "textarea", placeholder: "staging hostname:\nproduction hostname:\nDNS zone 보유 상태:\nDNS 변경 담당 역할 별칭:\nTLS 발급 방식:\n인증서 자동갱신 담당 역할:", required: true },
+            { id: "W5A-07", title: "주 원본과 offsite backup을 어떻게 분리할까요?", why: "같은 계정·같은 삭제 권한에 있으면 실수나 계정 침해가 원본과 백업을 함께 없앨 수 있습니다.", type: "choice", required: true, options: [
+              { value: "separate_project_identity", label: "별도 project·service identity", note: "backup 삭제권과 운영 쓰기권을 분리합니다.", recommended: true },
+              { value: "same_project_separate_bucket", label: "같은 project의 별도 bucket", note: "IAM은 분리하되 project 단위 사고 위험이 남습니다." },
+              { value: "undecided", label: "구조 비교안이 필요함", note: "권한·비용·복구 차이를 먼저 비교합니다.", blocking: true }
+            ]},
+            { id: "W5A-08", title: "IaC와 변경 적용 방식을 무엇으로 통일할까요?", why: "수동 console 변경만 사용하면 재현·review·rollback이 어려워집니다.", type: "choice", required: true, options: [
+              { value: "terraform_reviewed", label: "Terraform + 검토된 plan", note: "적용 전 diff와 비용·권한을 검토합니다.", recommended: true },
+              { value: "opentofu_reviewed", label: "OpenTofu + 검토된 plan", note: "같은 원칙으로 상태파일과 적용권한을 분리합니다." },
+              { value: "manual_console", label: "수동 console 중심", note: "모든 변경의 별도 실행기록과 복구 절차가 필요합니다." },
+              { value: "undecided", label: "도구 선택이 필요함", note: "팀 환경을 확인한 뒤 결정합니다.", blocking: true }
+            ]},
+            { id: "W5A-09", title: "Secret Manager/KMS 운영 규칙을 적어 주세요.", why: "키 원문이 Git·환경파일·관리자 휴대전화에 남지 않도록 소유·회전·비상폐기 책임을 먼저 정합니다.", type: "textarea", placeholder: "secret 저장소: GCP Secret Manager / 기타\nKMS key ring·key 명명 규칙:\n키 관리자 역할 별칭:\n회전 주기:\n비상 폐기 승인 역할:\n접근로그 검토 주기:", required: true },
+            { id: "W5A-10", title: "공개 ingress와 관리자 접속 경계를 어떻게 제한할까요?", why: "DB·내부 health·SSH를 인터넷에 직접 열면 안 됩니다.", type: "choice", required: true, options: [
+              { value: "https_only_iap_admin", label: "공개 443만, 관리는 IAP/승인 tunnel", note: "DB·내부 health는 private, SSH 공인 노출 없음.", recommended: true },
+              { value: "https_and_allowlisted_admin", label: "443 + 고정 IP allowlist 관리", note: "고정 IP·회수·감사 절차가 필요합니다." },
+              { value: "custom", label: "별도 보안 경계", note: "허용 포트·source·만료·승인자를 구체적으로 적습니다." },
+              { value: "undecided", label: "접속 설계가 필요함", note: "threat model과 운영 방식부터 비교합니다.", blocking: true }
+            ]},
+            { id: "W5A-11", title: "운영·검토·비상 역할을 지정해 주세요.", why: "한 사람이 여러 역할을 겸할 수 있어도 독립 검토자와 부재 시 비상 대응자는 별도로 이름 붙여야 합니다. 개인 연락처 대신 역할·채널 별칭을 적습니다.", type: "textarea", placeholder: "서비스 책임자:\n보안·서버 운영자:\n릴리스 책임자:\nQA 책임자:\n독립 보안·개인정보 검토자:\n주 비상대응자:\n대체 비상대응자:\n주/대체 연락 채널:", required: true },
+            { id: "W5A-12", title: "이번 Wave 5 실행의 목표 범위는 어디까지인가요?", why: "준비만 할지, 정식시험과 GO를 거쳐 production까지 계속할지에 따라 계정·인력·비용 일정이 달라집니다. 어느 경우에도 단계 gate는 생략하지 않으며, 이 답변과 별개로 정식 Goal/focus·start gate 승인이 필요합니다.", type: "choice", required: true, options: [
+              { value: "private_validation_only", label: "비공개 환경·정식검증 준비까지", note: "5A~5C를 먼저 완료하고 다음 실행은 별도 승인합니다." },
+              { value: "through_formal_go", label: "정식 279건과 GO/NO-GO까지", note: "5D~5E 인력·기기·독립검토 일정을 함께 확보합니다." },
+              { value: "through_production_if_go", label: "GO일 때 production 전환까지", note: "5F~5G도 포함하되 GO 전 배포는 하지 않습니다.", recommended: true },
+              { value: "undecided", label: "예산·인력 확인 뒤 결정", note: "5A 인프라 견적과 시험 인력표를 먼저 만듭니다.", blocking: true }
+            ]},
+            { id: "W5A-13", title: "단일 관리자 계정 복구 gate의 운영 조건을 적어 주세요.", why: "최종 관리자 1명이라는 고정 정책에서는 외부 복구수단·분리 보관·세션 폐기·부재 시 동결을 실제로 연습해야 사용자시험과 배포로 갈 수 있습니다. 복구코드·키 원문은 적지 않습니다.", type: "textarea", placeholder: "외부 복구매체 종류/별칭(원문 금지):\n운영계정과 분리된 보관 위치 별칭:\n보관 책임 역할:\n복구 직후 기존 session/key 폐기 담당:\n관리자 부재 시 고위험 변경·출시 동결 확인: 예\n복구 훈련 예정일/주기:\n독립 관찰·판정 역할:", required: true }
+          ]
+        },
+        {
+          id: "wave5b", wave: "5B", title: "하나의 출시 후보와 시험환경 고정", summary: "시험·배포할 소스와 앱·서버·모델·설정을 한 세대로 묶습니다.",
+          evidence: "나중 완료 증거: 후보 ID, 모든 구성요소 hash·서명, SBOM, 환경 ID, 지원 기기표, reviewer 승인과 변경 불변성",
+          questions: [
+            { id: "W5B-01", title: "첫 release candidate의 이름 규칙은 무엇인가요?", why: "모든 시험과 배포 증거를 같은 후보에 연결할 공통 ID가 필요합니다.", type: "text", placeholder: "예: WALKSAFE-RC-2026-01 (실제 hash는 나중에 자동 기록)", required: true },
+            { id: "W5B-02", title: "후보 고정 범위와 승인자를 적어 주세요.", why: "source·사용자 앱·관리자 앱·Gateway·Backend·model·config·OpenAPI·migration·unit 중 하나라도 빠지면 동일 후보라고 할 수 없습니다.", type: "textarea", placeholder: "후보 생성 담당 역할:\n후보 검토 역할:\n후보 승인 역할:\n서명 key alias(원문 금지):\nartifact 보관 위치 별칭:", required: true },
+            { id: "W5B-03", title: "SBOM과 서명 결과 형식은 무엇으로 남길까요?", why: "의존성과 배포물이 무엇이었는지 나중에 재검증할 수 있어야 합니다.", type: "choice", required: true, options: [
+              { value: "cyclonedx_and_signature", label: "CycloneDX + artifact signature", note: "앱·Gateway·Backend·모델을 같은 후보 manifest에 연결합니다.", recommended: true },
+              { value: "spdx_and_signature", label: "SPDX + artifact signature", note: "팀 도구와 검토자 수용 여부를 확인합니다." },
+              { value: "both", label: "CycloneDX와 SPDX 모두", note: "외부 제출 요구가 둘 다 있을 때 선택합니다." },
+              { value: "undecided", label: "검토자 요구 확인 필요", note: "형식을 고르기 전 제출·검토 요구를 확인합니다.", blocking: true }
+            ]},
+            { id: "W5B-04", title: "비공개 정식 시험환경을 어떻게 식별하고 누가 접근하나요?", why: "public ingress와 production scheduler가 꺼진 독립 환경이어야 합니다.", type: "textarea", placeholder: "시험환경 ID/별칭:\n접근 가능 역할:\n접근 승인 역할:\n네트워크 범위:\npublic ingress: 비활성\nproduction scheduler: 비활성", required: true },
+            { id: "W5B-05", title: "공식 지원 Android 기기·OS 범위를 적어 주세요.", why: "정식시험의 실기기·현장 54건과 접근성 시험 대상을 미리 고정해야 결과를 유리하게 바꾸지 않습니다.", type: "textarea", placeholder: "최소 Android 버전:\n최대/주요 Android 버전:\n필수 대표 기기군:\nARCore 지원/미지원 범위:\n관리자 앱 기기:\n기기표 승인 역할:", required: true },
+            { id: "W5B-06", title: "후보 변경 시 재고정 규칙을 누가 집행하나요?", why: "시험 중 한 byte라도 바뀌면 긴급 수정도 예외 없이 새 generation으로 다시 고정하고 승인된 영향 시험을 다시 해야 합니다.", type: "textarea", placeholder: "변경 감지 담당:\n새 generation 발행 담당:\n영향 시험 범위 승인자:\n긴급 수정도 예외 없이 재고정 확인: 예", required: true },
+            { id: "W5B-07", title: "정식 시험계획·279개 case를 누가 검토하고 승인하나요?", why: "Draft 시험 문서를 그대로 정식 기준으로 부르지 않고, 후보·환경·기기·판정 기준과 함께 명시적으로 승인해야 합니다.", type: "textarea", placeholder: "시험계획 검토 역할:\n279 case catalog 검토 역할:\n적용성/N-A 승인 역할:\n정식 승인 역할:\n승인 목표일:\n수정요청 처리 담당:", required: true },
+            { id: "W5B-08", title: "Google Play 단계 배포와 관리자 앱 비공개 배포를 어떻게 운영할까요?", why: "사용자 앱은 Google Play 배포로 고정하고 internal·closed·production track을 단계적으로 사용합니다. 관리자 앱은 등록된 관리자 기기에만 비공개 배포합니다.", type: "textarea", placeholder: "Google Play 계정/앱 별칭:\ninternal track 운영·승인 역할:\nclosed track 대상·승인 역할:\nGO 이후 production 단계 배포 비율/승인 역할:\n관리자 앱 비공개 배포 방식:\n등록 관리자 기기 관리 방식:\n앱 서명·배포 담당 역할:", required: true }
+          ]
+        },
+        {
+          id: "wave5c", wave: "5C", title: "복구·경보·scheduler 운영 연습", summary: "비공개 환경에서 백업부터 복원·rollback·경보 전달까지 실제로 연습합니다.",
+          evidence: "나중 완료 증거: backup ID/hash, 격리 restore count·bytes·hash·시간, RTO/RPO 실측, alert 전달/clear, scheduler crash·retry·멱등 기록",
+          questions: [
+            { id: "W5C-01", title: "목표 RPO·RTO와 backup 실행 주기를 정해 주세요.", why: "백업 보존 35일만으로는 허용 가능한 데이터 손실과 복구시간을 알 수 없습니다.", type: "textarea", placeholder: "목표 RPO(허용 데이터 손실):\n목표 RTO(허용 복구시간):\nDB backup 주기:\n원본/manifest backup 주기:\n최대 허용 backup age:\n목표 승인 역할:", required: true },
+            { id: "W5C-02", title: "격리 복원 환경은 어디에 만들까요?", why: "운영 DB와 같은 이름·계정·network에 복원하면 실데이터를 덮어쓸 수 있습니다.", type: "textarea", placeholder: "격리 restore project/환경 별칭:\n운영망과 분리 방법:\n복원용 DB 이름 규칙:\n복원 실행 역할:\n복원 자료 폐기 절차:", required: true },
+            { id: "W5C-03", title: "DB 변경·복원 훈련 시간대와 승인자는 누구인가요?", why: "backup → migration dry-run → 적용 → 검증 → restore → rollback 순서를 중단 없이 확보해야 합니다.", type: "textarea", placeholder: "훈련 가능 요일/시간:\n쓰기 중단 허용시간:\n변경 승인 역할:\nrollback 결정 역할:\n관찰 담당:", required: true },
+            { id: "W5C-04", title: "중앙 dashboard와 실제 경보 채널을 정해 주세요.", why: "로그가 존재하는 것과 담당자에게 경보가 전달되는 것은 다릅니다. 개인 연락처 대신 채널 별칭을 적습니다.", type: "textarea", placeholder: "dashboard/metrics 도구:\nlog 집계 도구:\n주 경보 채널 별칭:\n대체 경보 채널 별칭:\n경보 확인 담당:\n경보 clear 승인 규칙:", required: true },
+            { id: "W5C-05", title: "계정 삭제 scheduler의 비공개 시험 설정은 무엇인가요?", why: "report retention timer와 분리하고 합성 계정으로 여러 주기·crash·retry·멱등성을 검증해야 합니다.", type: "textarea", placeholder: "시험 실행 간격:\n시험 batch 크기:\n합성 계정 수/상태:\n강제 crash 지점:\nretry 상한/간격:\n시험 승인 역할:", required: true },
+            { id: "W5C-06", title: "어떤 장애를 필수 훈련에 포함할까요?", why: "정상 복원 한 번만으로 실제 운영 복구 능력을 확인할 수 없습니다.", type: "textarea", placeholder: "필수: 손상 backup / KMS 접근 거부 / DB migration 실패 / alert 주채널 실패 / scheduler 중간 crash\n추가 장애:\n훈련 실행자:\n독립 관찰자:\n실패 시 재시험 기준:", required: true },
+            { id: "W5C-07", title: "SLI/SLO와 경보 발생·해제 기준을 어떻게 정할까요?", why: "단순 dashboard 존재가 아니라 어떤 오류·지연·backup age·capacity stale에서 누구에게 알릴지 고정해야 합니다. 수치는 staging 실측 뒤 최종 승인할 수 있습니다.", type: "textarea", placeholder: "관찰할 SLI:\n초기 SLO 후보 또는 실측 후 결정:\n경보 severity 기준:\n지속시간/window:\ndedup/silence 규칙:\nclear 기준:\n수치 최종 승인 역할:", required: true }
+          ]
+        },
+        {
+          id: "wave5d", wave: "5D", title: "정식 279건 실행 준비", summary: "승인된 후보·환경·기기·사람으로 개발시험과 분리된 공식 검증을 준비합니다.",
+          evidence: "나중 완료 증거: case별 후보·build·환경·기기·수행자·시각·원자료 hash와 PASS/FAIL/N/A, 결함·재시험·잔여위험 기록",
+          questions: [
+            { id: "W5D-01", title: "정식시험 실행 기간과 하루 운영시간은 언제인가요?", why: "실기기·현장·접근성 담당자와 안전요원 일정을 함께 잡아야 합니다.", type: "textarea", placeholder: "예상 시작일:\n예상 종료일:\n일일 시험시간:\n재시험 예비기간:\n시험 중단 권한 역할:", required: true },
+            { id: "W5D-02", title: "정식시험 역할을 지정해 주세요.", why: "개발자 자체시험만으로 정식 279건을 완료할 수 없습니다. 역할 별칭만 적습니다.", type: "textarea", placeholder: "정식 QA 책임자:\nAPI·통합 담당:\n실기기·현장 담당:\n접근성·사용성 담당:\n현장 안전 담당:\n독립 보안·개인정보 검토자:\n결과 승인자:", required: true },
+            { id: "W5D-03", title: "기기·참여자·현장 확보 상태는 어떤가요?", why: "54개 실기기·현장 case와 15개 접근성·사용성 case는 실제 자원과 일정이 없으면 실행할 수 없습니다.", type: "textarea", placeholder: "지원 기기 확보 수/부족 항목:\n참여자 모집 상태:\n안전요원 확보 상태:\n시험 장소/허가 상태:\n접근성 보조기술 준비:\n미확보 항목의 확보 예정일:", required: true },
+            { id: "W5D-04", title: "시험 원자료의 고정 수명주기를 어디서 집행하고 audit receipt는 얼마나 보관할까요?", why: "원자료에는 자료유형별 14일·180일·3년, backup 35일과 삭제요청 7일·30일 기준을 그대로 적용합니다. Git 저장소에는 원자료를 넣지 않고 외부 통제 ID·접근등급·기한·hash만 남깁니다.", type: "textarea", placeholder: "정본 보존·삭제기한 적용 확인: 예\n외부 evidence 저장 위치 별칭:\n암호화/KMS key alias(원문 금지):\n접근 가능 역할:\n저장소 기록: 통제 ID·등급·기한·hash만\n마스킹/비식별 규칙:\n별도 audit receipt 보존기간:\n삭제 실행/승인 역할:", required: true },
+            { id: "W5D-05", title: "고정된 결함 차단 규칙을 누가 집행하고 언제 재시험하나요?", why: "필수 항목의 FAIL·NOT_RUN·자료 없음은 severity와 무관하게 다음 단계와 배포를 차단합니다. 사전 승인된 N/A만 예외이며, 후보 수정 뒤 승인된 영향범위를 다시 시험합니다.", type: "textarea", placeholder: "필수 FAIL/NOT_RUN 차단 확인: 예\n결함 분류 담당 역할:\n수정 목표시간:\n영향범위 작성/승인 역할:\n재시험 실행/판정 역할:\n승인된 N/A 근거 보관 위치 별칭:", required: true },
+            { id: "W5D-06", title: "현장 안전·참여자 동의·중단 계획을 적어 주세요.", why: "현재 공식 범위는 밝고 비·눈이 없는 일반 도심 보도이며, 야간·악천후·공사·고혼잡 환경은 별도 검증 전 지원 범위가 아닙니다.", type: "textarea", placeholder: "시험 환경/통제 경로:\n기상·조도 중단 조건:\n안전요원 역할·배치:\n참여자 고지·동의·철회 담당:\n비상 연락 채널 별칭:\n즉시 시험중단 권한자:", required: true },
+            { id: "W5D-07", title: "N/A와 영향 재시험의 승인자를 지정해 주세요.", why: "N/A 설명·서명과 후보 수정 뒤 재시험 범위를 독립적으로 확인해야 합니다.", type: "textarea", placeholder: "case 적용성 검토 역할:\nN/A 승인 역할:\n결함 severity 판정 역할:\n영향범위 작성 역할:\n재시험 범위 승인 역할:\n잔여위험 수용/반려 역할:", required: true }
+          ]
+        },
+        {
+          id: "wave5e", wave: "5E", title: "5개 gate와 GO/NO-GO 판단", summary: "시험 결과와 전문 검토를 모아 공개 가능한지 권한 있는 사람이 결정합니다.",
+          evidence: "나중 완료 증거: 같은 후보에 결속된 gate별 독립 판정, 실제 서명·시각·evidence ref, 잔여위험 승인과 GO/조건부 GO/NO-GO 기록",
+          questions: [
+            { id: "W5E-01", title: "5개 gate의 검토자·판정자를 지정해 주세요.", why: "case PASS만으로 gate가 자동 종결되지 않으며, 각 gate에는 실제 원자료 검토와 제품책임자 판정이 필요합니다.", type: "textarea", placeholder: "휴대전화 queue byte 한도 — 실행/검토/판정:\n서버 capacity 전달 — 실행/검토/판정:\n무가림 원본 개인정보 — 독립 검토/판정:\ncloud 비용 — 측정/검토/판정:\n단일 관리자 복구 — 실행/관찰/판정:", required: true },
+            { id: "W5E-02", title: "동적 보안·침투시험과 취약점 신고는 누가 맡나요?", why: "정적·의존성·비밀 검사만으로 승인된 실제 환경의 위험을 확인할 수 없습니다.", type: "textarea", placeholder: "동적/침투시험 수행 조직·역할:\n허용된 대상과 시간:\n금지된 시험 범위:\n취약점 신고 채널 별칭:\n긴급 취약점 접수 담당:\n재검증 승인자:", required: true },
+            { id: "W5E-03", title: "단일 최종 출시 승인자 역할 별칭은 무엇인가요?", why: "최종 관리자·출시 승인자는 한 명으로 고정하며 대리 승인체를 두지 않습니다. 그 사람이 부재하면 고위험 변경과 출시를 동결하고, 각 전문 검토자는 자문·반려 의견을 제공합니다.", type: "textarea", placeholder: "단일 최종 release approver 역할 별칭:\n부재 시 고위험 변경·출시 동결 확인: 예\n보안 자문/반려 역할:\n개인정보 자문/반려 역할:\n현장 안전 자문/반려 역할:", required: true },
+            { id: "W5E-04", title: "조건부 GO를 허용한다면 조건의 최대 유효기간은 얼마인가요?", why: "조건부 GO는 모든 필수 case가 PASS 또는 사전 승인 N/A이고 5개 gate가 모두 실제 PASS한 뒤의 잔여 운영조건에만 쓸 수 있습니다. FAIL·NOT_RUN·자료 없음을 덮을 수 없습니다.", type: "choice", required: true, options: [
+              { value: "no_conditional_go", label: "조건부 GO 사용 안 함", note: "모든 조건 해소 뒤 GO 또는 NO-GO만 결정합니다.", recommended: true },
+              { value: "max_7_days", label: "최대 7일", note: "모든 필수항목·gate PASS 뒤 범위·담당자·기한·자동 중지 조건을 함께 승인합니다." },
+              { value: "max_30_days", label: "최대 30일", note: "모든 필수항목·gate PASS 뒤 남은 저위험 운영조건에만 사용합니다." },
+              { value: "undecided", label: "출시회의에서 결정", note: "5E 회의 전에 규칙을 고정해야 합니다.", blocking: true }
+            ]},
+            { id: "W5E-05", title: "GO/NO-GO 회의와 서명 방식은 무엇인가요?", why: "같은 후보·환경·증거를 본 실제 승인 시각과 단일 최종 승인자의 서명을 남겨야 합니다.", type: "textarea", placeholder: "예상 회의일:\n필수 참석·자문 역할:\n자문/반려 의견 취합 방식:\n단일 최종 승인자의 결정·전자서명 위치:\n결정 기록 담당:", required: true }
+          ]
+        },
+        {
+          id: "wave5f", wave: "5F", title: "staging 승격과 제한 canary", summary: "GO를 받은 동일 후보를 정식 사전운영 환경에 올리고 복귀까지 확인합니다.",
+          evidence: "나중 완료 증거: 배포 대상·명령·시간·hash, migration, smoke/canary 지표, session/key 폐기, rollback 결과의 추가 전용 기록",
+          questions: [
+            { id: "W5F-01", title: "staging 배포 시간대와 승인자는 누구인가요?", why: "backup·migration·issuer·Backend·Gateway·TLS 순서를 지킬 배포창이 필요합니다.", type: "textarea", placeholder: "배포 가능 일시/요일:\n최대 중단시간:\n배포 승인자:\n실행자:\n관찰자:\n중단/rollback 결정자:", required: true },
+            { id: "W5F-02", title: "관리자 앱 호환 버전과 구 session 폐기 기준은 무엇인가요?", why: "관리자 앱을 먼저 갱신하지 않으면 서버 승격 뒤 관리·복구 권한을 잃을 수 있습니다.", type: "textarea", placeholder: "최소 호환 관리자 앱 version:\nactive 관리자 기기 확인 방법:\n미갱신 session 폐기 시각:\ndevice key 회전/폐기 담당:\n복구용 관리자 기기 확인:", required: true },
+            { id: "W5F-03", title: "migration 전 쓰기 중단과 되돌리기 경계를 적어 주세요.", why: "downgrade가 안전하지 않은 schema에서 무리하게 DB를 되돌리면 자료를 잃을 수 있습니다.", type: "textarea", placeholder: "새 session 차단 방법:\n쓰기 중단 확인 방법:\nDB backup freshness 기준:\nmigration 검증 담당:\ndowngrade 허용 조건:\n불가 시 restore/roll-forward 선택 권한:", required: true },
+            { id: "W5F-04", title: "staging smoke와 canary 범위는 무엇인가요?", why: "health만 보지 않고 로그인·권한·길안내·신고·삭제를 짧게 확인해야 합니다.", type: "textarea", placeholder: "smoke 담당:\n필수 smoke 항목:\ncanary 계정/기기 수:\ncanary 지속시간:\n성공 지표:\n민감 로그 점검 담당:", required: true },
+            { id: "W5F-05", title: "어떤 수치나 사건에서 즉시 rollback/안전정지할까요?", why: "배포 중 판단을 즉흥적으로 하지 않도록 오류·지연·권한·삭제·용량 기준을 미리 고정합니다.", type: "textarea", placeholder: "5xx/error 기준:\np95 지연 기준:\n로그인/issuer 실패 기준:\n오삭제·삭제 누락 기준:\ncapacity/backup stale 기준:\n보안·개인정보 즉시 중지 사건:\n최종 판단 역할:", required: true }
+          ]
+        },
+        {
+          id: "wave5g", wave: "5G", title: "production canary·scheduler·운영 인계", summary: "작게 공개하고 관찰한 뒤 안정적일 때만 확대하며 삭제 timer를 마지막에 켭니다.",
+          evidence: "나중 완료 증거: production smoke·canary, alert 전달, scheduler 별도 승인/활성화, 인계 기록과 3~7일 안정화 관찰",
+          questions: [
+            { id: "W5G-01", title: "production 배포창과 change 승인자는 누구인가요?", why: "fresh backup·쓰기 중단·migration·service/TLS 검증과 canary를 한 변경 사건으로 통제합니다.", type: "textarea", placeholder: "배포 일시/요일:\n최대 중단시간:\nchange 승인자:\n배포 실행자:\nrollback 실행자:\n현장/사용자 공지 담당:", required: true },
+            { id: "W5G-02", title: "production canary를 몇 명·몇 단계로 확대할까요?", why: "처음부터 전체 공개하지 않고 오류·지연·용량·안전 신호를 단계마다 확인합니다.", type: "textarea", placeholder: "1단계 사용자/기기 수와 시간:\n2단계 사용자/기기 수와 시간:\n전체 확대 조건:\n단계별 승인자:\n즉시 중단 기준:", required: true },
+            { id: "W5G-03", title: "계정 삭제 scheduler의 production 초기값은 무엇인가요?", why: "canary 성공 뒤 별도 승인을 받고 낮은 batch로 마지막에 활성화해야 합니다.", type: "textarea", placeholder: "초기 실행 간격:\n초기 batch 크기:\n최대 retry/간격:\n동시 retention 실행 방지 방법:\n활성화 승인자:\n첫 실행 관찰자:\n자동 중지 기준:", required: true },
+            { id: "W5G-04", title: "첫 출시 안정화 관찰 기간은 며칠로 할까요?", why: "계획상 3~7일 동안 오류·지연·용량·backup·보안·삭제 지표를 확인합니다.", type: "choice", required: true, options: [
+              { value: "7_days", label: "7일", note: "첫 production 전환에 권장합니다.", recommended: true },
+              { value: "5_days", label: "5일", note: "주말·업무시간 coverage를 별도로 확인합니다." },
+              { value: "3_days", label: "3일", note: "최소 범위이며 위험 수용 근거가 필요합니다." },
+              { value: "undecided", label: "일정 협의 필요", note: "production 배포 전 반드시 결정합니다.", blocking: true }
+            ]},
+            { id: "W5G-05", title: "시간 외 자동 안전조치와 제한권한 비상대응 담당을 적어 주세요.", why: "평일 09:00~18:00 밖에는 중대 안전사건만 긴급처리합니다. 자동 신규차단·안전정지와 실제 호출 가능한 제한권한 대응자가 모두 필요하며, 일반지원 확대는 이 답변이 아니라 별도 정책 변경 대상입니다.", type: "textarea", placeholder: "시간 외 자동 신규차단/안전정지 확인 방법:\n민감자료 접근차단·증거보존 확인 방법:\n주 비상대응 역할/채널:\n대체 비상대응 역할/채널:\n비상대응 제한권한 범위:\n호출 훈련 예정일/주기:", required: true },
+            { id: "W5G-06", title: "주·대체 당직과 장애 escalation 규칙을 적어 주세요.", why: "경보가 울려도 실제로 받을 사람과 응답시간이 없으면 정식 운영할 수 없습니다. 개인 연락처 대신 역할·채널 별칭만 적습니다.", type: "textarea", placeholder: "주당직 역할/채널:\n대체당직 역할/채널:\nP0 확인 목표시간:\nP1 확인 목표시간:\n미응답 escalation 순서:\nincident commander 역할:\n외부 공지 승인 역할:", required: true },
+            { id: "W5G-07", title: "운영 인계와 사용자 지원 창구를 누구에게 넘길까요?", why: "배포한 사람만 아는 상태로 두지 않고 지원·장애·복구·종료 절차를 실제 담당자에게 인계해야 합니다.", type: "textarea", placeholder: "운영 인수 역할:\n지원 인수 역할:\n보안사고 인수 역할:\n복구/backup 인수 역할:\n사용자 지원 채널 별칭:\n서비스 상태 공지 위치:\n인계 완료 승인자:", required: true }
+          ]
+        }
+      ];
+
+      const form = document.getElementById("decision-form");
+      const phaseLinks = document.getElementById("phase-links");
+      const progressLabel = document.getElementById("progress-label");
+      const progressBar = document.getElementById("progress-bar");
+      const progressTrack = progressBar.parentElement;
+      const saveStatus = document.getElementById("save-status");
+      const sensitiveWarning = document.getElementById("sensitive-warning");
+      const liveRegion = document.getElementById("live-region");
+      const questionMap = new Map();
+      const controlMap = new Map();
+      const noteMap = new Map();
+      for (const phase of phases) for (const question of phase.questions) questionMap.set(question.id, question);
+
+      function announce(message) {
+        liveRegion.textContent = "";
+        window.setTimeout(() => { liveRegion.textContent = message; }, 20);
+      }
+
+      function make(tag, className, text) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text !== undefined) element.textContent = text;
+        return element;
+      }
+
+      function renderChoice(question, container) {
+        const fieldset = make("fieldset");
+        fieldset.setAttribute("aria-labelledby", `title-${question.id}`);
+        fieldset.setAttribute("aria-describedby", `state-${question.id}`);
+        const legend = make("legend", "sr-only", `${question.title} 답변`);
+        fieldset.append(legend);
+        const options = make("div", "options");
+        for (const option of question.options) {
+          const label = make("label", "option");
+          const input = document.createElement("input");
+          input.type = "radio";
+          input.name = question.id;
+          input.value = option.value;
+          input.required = question.required;
+          const copy = make("span");
+          const strong = make("strong", "", option.label);
+          if (option.recommended) strong.append(make("span", "recommend", "권장"));
+          copy.append(strong, make("small", "", option.note));
+          label.append(input, copy);
+          options.append(label);
+        }
+        fieldset.append(options);
+        const noteId = `note-${question.id}`;
+        const noteLabel = make("label", "decision-note-label", "추가 결정 메모 (선택)");
+        noteLabel.htmlFor = noteId;
+        const note = document.createElement("textarea");
+        note.id = noteId;
+        note.name = noteId;
+        note.className = "decision-note";
+        note.placeholder = "추천안과 다르거나 사용자 정의 선택이면 구체 값·이유·책임자·재검토 조건을 적어 주세요.";
+        note.autocomplete = "off";
+        note.spellcheck = false;
+        note.maxLength = maxNoteLength;
+        note.setAttribute("autocorrect", "off");
+        note.setAttribute("autocapitalize", "off");
+        container.append(fieldset, noteLabel, note);
+        controlMap.set(question.id, [...options.querySelectorAll("input")]);
+        noteMap.set(question.id, note);
+      }
+
+      function renderText(question, container) {
+        const control = question.type === "textarea" ? document.createElement("textarea") : document.createElement("input");
+        if (question.type !== "textarea") control.type = "text";
+        control.id = `answer-${question.id}`;
+        control.name = question.id;
+        control.className = question.type === "textarea" ? "" : "text-control";
+        control.placeholder = question.placeholder || "";
+        control.autocomplete = "off";
+        control.spellcheck = false;
+        control.maxLength = question.type === "textarea" ? maxTextLength : maxShortTextLength;
+        control.setAttribute("autocorrect", "off");
+        control.setAttribute("autocapitalize", "off");
+        if (question.required) control.required = true;
+        control.setAttribute("aria-labelledby", `title-${question.id}`);
+        control.setAttribute("aria-describedby", `state-${question.id}`);
+        container.append(control);
+        controlMap.set(question.id, control);
+      }
+
+      function renderNumber(question, container) {
+        const row = make("div", "number-row");
+        const control = document.createElement("input");
+        control.type = "number";
+        control.id = `answer-${question.id}`;
+        control.name = question.id;
+        control.className = "number-control";
+        control.min = String(question.min);
+        control.max = String(question.max);
+        control.step = String(question.step);
+        control.inputMode = "numeric";
+        const unitId = `unit-${question.id}`;
+        if (question.required) control.required = true;
+        control.setAttribute("aria-labelledby", `title-${question.id}`);
+        control.setAttribute("aria-describedby", `${unitId} state-${question.id}`);
+        const unit = make("span", "unit", question.unit);
+        unit.id = unitId;
+        row.append(control, unit);
+        container.append(row);
+        controlMap.set(question.id, control);
+      }
+
+      function render() {
+        for (const phase of phases) {
+          const link = make("a", "phase-link");
+          link.href = `#${phase.id}`;
+          link.append(make("strong", "", `Wave ${phase.wave}`), make("span", "", `${phase.questions.length}개 결정`));
+          const linkStatus = make("span", "", "0개 완료");
+          linkStatus.dataset.phaseStatus = phase.id;
+          link.append(linkStatus);
+          phaseLinks.append(link);
+
+          const details = make("details", "phase");
+          details.id = phase.id;
+          details.open = phase.id === "wave5a";
+          const summary = document.createElement("summary");
+          const titleWrap = make("span", "phase-title");
+          titleWrap.append(make("span", "wave-badge", phase.wave));
+          const copy = make("span", "phase-copy");
+          const phaseHeading = make("span", "phase-heading", phase.title);
+          phaseHeading.setAttribute("role", "heading");
+          phaseHeading.setAttribute("aria-level", "2");
+          copy.append(phaseHeading, make("span", "phase-summary", phase.summary));
+          titleWrap.append(copy);
+          const count = make("span", "phase-count", `0/${phase.questions.length} 결정`);
+          count.dataset.phaseCount = phase.id;
+          summary.append(titleWrap, count);
+          const body = make("div", "phase-body");
+          const evidence = make("p", "later-evidence");
+          evidence.append(make("strong", "", "실행하면서 확인할 것: "), document.createTextNode(phase.evidence.replace(/^나중 완료 증거: /, "")));
+          body.append(evidence);
+
+          for (const question of phase.questions) {
+            const article = make("article", "question");
+            article.id = question.id;
+            article.dataset.state = "empty";
+            const head = make("div", "question-head");
+            head.append(make("span", "question-id", question.id));
+            const heading = make("h3", "", question.title);
+            heading.id = `title-${question.id}`;
+            if (question.required) heading.append(document.createTextNode(" "), make("span", "required-mark", "필수"));
+            head.append(heading);
+            article.append(head, make("p", "why", question.why));
+            if (question.type === "choice") renderChoice(question, article);
+            else if (question.type === "number") renderNumber(question, article);
+            else renderText(question, article);
+            const state = make("p", "answer-state", "아직 결정하지 않았습니다.");
+            state.id = `state-${question.id}`;
+            article.append(state);
+            body.append(article);
+          }
+          details.append(summary, body);
+          form.append(details);
+        }
+      }
+
+      function collectAnswers() {
+        const answers = {};
+        for (const [id, question] of questionMap) {
+          const control = controlMap.get(id);
+          if (question.type === "choice") {
+            const selected = control.find((input) => input.checked);
+            if (selected) answers[id] = selected.value;
+          } else {
+            const value = control.value.trim();
+            if (value !== "") answers[id] = question.type === "number" ? Number(value) : value;
+          }
+        }
+        return answers;
+      }
+
+      function collectNotes() {
+        const notes = {};
+        for (const [id, control] of noteMap) {
+          const value = control.value.trim();
+          if (value !== "") notes[id] = value;
+        }
+        return notes;
+      }
+
+      function isBlocking(question, value) {
+        if (typeof value === "string" && value.includes("[추가 결정 필요]")) return true;
+        return question.type === "choice" && question.options.some((option) => option.value === value && option.blocking);
+      }
+
+      function valueIsValid(question, value) {
+        if (question.type === "choice") return typeof value === "string" && question.options.some((option) => option.value === value);
+        if (question.type === "number") {
+          if (typeof value !== "number" || !Number.isFinite(value) || value < question.min || value > question.max) return false;
+          const steps = (value - question.min) / question.step;
+          const tolerance = Number.EPSILON * Math.max(1, Math.abs(steps)) * 8;
+          return Math.abs(steps - Math.round(steps)) <= tolerance;
+        }
+        const limit = question.type === "textarea" ? maxTextLength : maxShortTextLength;
+        return typeof value === "string" && value.trim() !== "" && value.length <= limit;
+      }
+
+      function statusFor(question, answers) {
+        if (!Object.prototype.hasOwnProperty.call(answers, question.id)) return "empty";
+        if (!valueIsValid(question, answers[question.id])) return "invalid";
+        return isBlocking(question, answers[question.id]) ? "blocked" : "done";
+      }
+
+      function sensitiveFindings(answers) {
+        const patterns = [
+          { label: "private key 원문", regex: /-----BEGIN [A-Z ]*PRIVATE KEY-----/i },
+          { label: "인증서 원문", regex: /-----BEGIN CERTIFICATE-----/i },
+          { label: "GCP service account JSON", regex: /"type"\s*:\s*"service_account"|"private_key_id"\s*:/i },
+          { label: "GCP 결제계정 번호 형태", regex: /\b[0-9A-F]{6}-[0-9A-F]{6}-[0-9A-F]{6}\b/i },
+          { label: "Google API/OAuth token 형태", regex: /\b(?:AIza[0-9A-Za-z_-]{30,}|ya29\.[0-9A-Za-z_-]{20,})\b/ },
+          { label: "AWS access key 형태", regex: /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/ },
+          { label: "GitHub token 형태", regex: /\bgh[pousr]_[0-9A-Za-z]{20,}\b/i },
+          { label: "Slack token 형태", regex: /\bxox[baprs]-[0-9A-Za-z-]{10,}\b/i },
+          { label: "Bearer token 형태", regex: /\bBearer\s+[0-9A-Za-z._~+/=-]{12,}/i },
+          { label: "JWT/token 형태", regex: /\beyJ[0-9A-Za-z_-]{10,}\.[0-9A-Za-z_-]{10,}\.[0-9A-Za-z_-]{5,}\b/ },
+          { label: "DB 접속정보 형태", regex: /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?):\/\/[^/\s:@]+:[^@\s/]+@/i },
+          { label: "비밀번호·secret 값 형태", regex: /\b(?:password|passwd|api[_ -]?key|private[_ -]?key|client[_ -]?secret|secret[_ -]?access[_ -]?key)\s*[:=]\s*\S{4,}/i },
+          { label: "개인 이메일 형태", regex: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i },
+          { label: "개인 전화번호 형태", regex: /(?:\+82[- ]?)?0?1[016789][- ]?\d{3,4}[- ]?\d{4}\b/ },
+          { label: "주민등록번호 형태", regex: /\b\d{6}[- ]?[1-4]\d{6}\b/ }
+        ];
+        const findings = [];
+        for (const [id, value] of Object.entries(answers)) {
+          const text = String(value);
+          for (const pattern of patterns) {
+            if (pattern.regex.test(text)) findings.push(`${id}: ${pattern.label}`);
+            if (findings.length >= 20) return findings;
+          }
+        }
+        return findings;
+      }
+
+      function responseAudit(answers, notes) {
+        const invalid = [];
+        for (const question of questionMap.values()) {
+          if (Object.prototype.hasOwnProperty.call(answers, question.id) && !valueIsValid(question, answers[question.id])) invalid.push(question.id);
+        }
+        for (const [id, value] of Object.entries(notes)) if (typeof value !== "string" || value.length > maxNoteLength) invalid.push(`${id}-NOTE`);
+        const withNotes = { ...answers, ...Object.fromEntries(Object.entries(notes).map(([id, value]) => [`${id}-NOTE`, value])) };
+        return { invalid, findings: sensitiveFindings(withNotes) };
+      }
+
+      function updateProgress(answers) {
+        let decided = 0;
+        let blocked = 0;
+        let invalid = 0;
+        const allQuestions = [...questionMap.values()];
+        for (const phase of phases) {
+          let phaseDone = 0;
+          for (const question of phase.questions) {
+            const status = statusFor(question, answers);
+            const article = document.getElementById(question.id);
+            article.dataset.state = status;
+            const state = document.getElementById(`state-${question.id}`);
+            if (status === "done") { phaseDone += 1; decided += 1; state.textContent = "결정값이 입력되었습니다."; }
+            else if (status === "blocked") { blocked += 1; state.textContent = "비교·협의가 필요한 항목입니다."; }
+            else if (status === "invalid") { invalid += 1; state.textContent = "입력값의 숫자 범위·단위 또는 길이를 확인해 주세요."; }
+            else state.textContent = "아직 결정하지 않았습니다.";
+          }
+          document.querySelector(`[data-phase-count="${phase.id}"]`).textContent = `${phaseDone}/${phase.questions.length} 결정`;
+          document.querySelector(`[data-phase-status="${phase.id}"]`).textContent = `${phaseDone}개 완료`;
+        }
+        const percent = Math.round((decided / allQuestions.length) * 100);
+        progressLabel.textContent = `확정 ${decided}/${allQuestions.length} · 협의 필요 ${blocked} · 입력 오류 ${invalid} · ${percent}%`;
+        progressBar.style.width = `${percent}%`;
+        progressTrack.setAttribute("aria-valuenow", String(percent));
+        return { decided, blocked, invalid, total: allQuestions.length, percent };
+      }
+
+      function showSensitive(findings) {
+        if (findings.length === 0) {
+          sensitiveWarning.hidden = true;
+          sensitiveWarning.textContent = "";
+          return;
+        }
+        sensitiveWarning.hidden = false;
+        sensitiveWarning.textContent = `민감정보 보조 탐지가 의심 입력을 찾았습니다. 저장·내보내기·복원·인쇄를 중단했으니 역할/채널 별칭으로 바꿔 주세요. 이 탐지는 모든 민감정보를 찾아내지는 못합니다: ${findings.join(", ")}`;
+      }
+
+      function save() {
+        const answers = collectAnswers();
+        const notes = collectNotes();
+        const { invalid, findings } = responseAudit(answers, notes);
+        showSensitive(findings);
+        const progress = updateProgress(answers);
+        if (invalid.length > 0) {
+          saveStatus.textContent = `입력 오류(${invalid.join(", ")}) 때문에 자동 저장하지 않았습니다.`;
+          announce("입력 오류 때문에 자동 저장하지 않았습니다.");
+          return;
+        }
+        if (findings.length > 0) {
+          saveStatus.textContent = "민감정보 의심 입력 때문에 자동 저장하지 않았습니다.";
+          return;
+        }
+        try {
+          const now = new Date().toISOString();
+          localStorage.setItem(storageKey, JSON.stringify({ schema_version: schemaVersion, questionnaire_id: questionnaireId, questionnaire_version: questionnaireVersion, updated_at: now, answers, notes }));
+          saveStatus.textContent = `이 브라우저에 자동 저장됨 · ${new Date(now).toLocaleString("ko-KR")} · 미확정 ${progress.total - progress.decided}개`;
+        } catch (error) {
+          saveStatus.textContent = "브라우저 자동 저장에 실패했습니다. 안전한 답변만 JSON으로 내보내세요.";
+          announce("브라우저 자동 저장에 실패했습니다.");
+        }
+      }
+
+      function applyAnswers(answers) {
+        for (const [id, question] of questionMap) {
+          const control = controlMap.get(id);
+          const value = answers[id];
+          if (question.type === "choice") for (const input of control) input.checked = value === input.value;
+          else control.value = value === undefined || value === null ? "" : String(value);
+        }
+        updateProgress(collectAnswers());
+      }
+
+      function applyNotes(notes) {
+        for (const [id, control] of noteMap) control.value = typeof notes[id] === "string" ? notes[id] : "";
+      }
+
+      function validatePayloadEntries(payload) {
+        if (!payload.answers || typeof payload.answers !== "object" || Array.isArray(payload.answers)) throw new Error("answers 객체가 없습니다.");
+        const answers = {};
+        for (const [id, value] of Object.entries(payload.answers)) {
+          const question = questionMap.get(id);
+          if (!question) throw new Error(`알 수 없는 질문 ID: ${id}`);
+          if (!valueIsValid(question, value)) throw new Error(`${id} 답변의 선택값·숫자 범위·단위 또는 길이가 올바르지 않습니다.`);
+          answers[id] = value;
+        }
+        const notes = {};
+        if (payload.notes !== undefined) {
+          if (!payload.notes || typeof payload.notes !== "object" || Array.isArray(payload.notes)) throw new Error("notes는 질문 ID별 문자열 객체여야 합니다.");
+          for (const [id, value] of Object.entries(payload.notes)) {
+            if (!questionMap.has(id) || !noteMap.has(id) || typeof value !== "string" || value.length > maxNoteLength) throw new Error(`notes의 ${id} 값이 올바르지 않습니다.`);
+            notes[id] = value;
+          }
+        }
+        return { answers, notes };
+      }
+
+      function load() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+          if (!saved || saved.schema_version !== schemaVersion || saved.questionnaire_id !== questionnaireId || saved.questionnaire_version !== questionnaireVersion || !saved.answers || typeof saved.answers !== "object") {
+            updateProgress({});
+            saveStatus.textContent = "새 질문지입니다. 입력하면 자동 저장됩니다.";
+            return;
+          }
+          const { answers, notes } = validatePayloadEntries(saved);
+          const { findings } = responseAudit(answers, notes);
+          showSensitive(findings);
+          if (findings.length > 0) {
+            updateProgress({});
+            saveStatus.textContent = "기존 브라우저 저장 데이터에 민감정보 의심 입력이 있어 화면 복원을 중단했습니다. 안전하게 처리한 뒤 초기화하세요.";
+            announce("민감정보 의심 입력 때문에 이전 답변 복원을 중단했습니다.");
+            return;
+          }
+          applyAnswers(answers);
+          applyNotes(notes);
+          saveStatus.textContent = `이 브라우저의 이전 답변을 복원했습니다 · ${new Date(saved.updated_at).toLocaleString("ko-KR")}`;
+        } catch (error) {
+          updateProgress({});
+          saveStatus.textContent = "저장된 답변을 읽지 못했습니다. JSON 백업을 확인해 주세요.";
+          announce("저장된 답변을 읽지 못했습니다.");
+        }
+      }
+
+      function exportAnswers() {
+        const answers = collectAnswers();
+        const notes = collectNotes();
+        const { invalid, findings } = responseAudit(answers, notes);
+        showSensitive(findings);
+        updateProgress(answers);
+        if (invalid.length > 0) { announce("입력 오류 때문에 내보내지 않았습니다."); return; }
+        if (findings.length > 0) { announce("민감정보 의심 입력 때문에 내보내지 않았습니다."); return; }
+        const missing = [];
+        const unresolved = [];
+        for (const question of questionMap.values()) {
+          const status = statusFor(question, answers);
+          if (status === "empty") missing.push(question.id);
+          if (status === "blocked") unresolved.push(question.id);
+        }
+        const payload = {
+          schema_version: schemaVersion,
+          questionnaire_id: questionnaireId,
+          questionnaire_version: questionnaireVersion,
+          exported_at: new Date().toISOString(),
+          decision_status: missing.length === 0 && unresolved.length === 0 ? "READY_FOR_REVIEW" : "INCOMPLETE",
+          fixed_baseline: fixedBaseline,
+          missing_question_ids: missing,
+          unresolved_question_ids: unresolved,
+          answers,
+          notes
+        };
+        const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "walksafe-wave5-decisions-answers.json";
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+        announce("현재 답변을 JSON으로 내보냈습니다.");
+      }
+
+      async function importAnswers(file) {
+        if (file.size > maxImportBytes) throw new Error("JSON 파일은 1MiB 이하여야 합니다.");
+        let payload;
+        try { payload = JSON.parse(await file.text()); }
+        catch (error) { throw new Error("올바른 JSON 파일이 아닙니다."); }
+        if (!payload || payload.schema_version !== schemaVersion || payload.questionnaire_id !== questionnaireId || payload.questionnaire_version !== questionnaireVersion) throw new Error("이 질문지 버전의 답변 파일이 아닙니다.");
+        const { answers, notes } = validatePayloadEntries(payload);
+        const { findings } = responseAudit(answers, notes);
+        if (findings.length > 0) throw new Error(`민감정보 의심 입력이 있습니다: ${findings.join(", ")}`);
+        if ((Object.keys(collectAnswers()).length > 0 || Object.keys(collectNotes()).length > 0) && !window.confirm("현재 브라우저 답변과 메모를 불러온 JSON으로 바꿀까요?")) return;
+        applyAnswers(answers);
+        applyNotes(notes);
+        save();
+        announce("JSON 답변을 불러왔습니다.");
+      }
+
+      function safePrint() {
+        const answers = collectAnswers();
+        const notes = collectNotes();
+        const { invalid, findings } = responseAudit(answers, notes);
+        showSensitive(findings);
+        updateProgress(answers);
+        if (invalid.length > 0 || findings.length > 0) {
+          window.alert(invalid.length > 0 ? "입력 오류를 수정한 뒤 인쇄해 주세요." : "민감정보 의심 입력을 역할·채널 별칭으로 바꾼 뒤 인쇄해 주세요.");
+          return;
+        }
+        window.print();
+      }
+
+      render();
+      load();
+
+      let autosaveTimer;
+      form.addEventListener("input", () => {
+        window.clearTimeout(autosaveTimer);
+        autosaveTimer = window.setTimeout(save, 250);
+      });
+      form.addEventListener("change", () => {
+        window.clearTimeout(autosaveTimer);
+        save();
+      });
+      document.getElementById("export-button").addEventListener("click", exportAnswers);
+      document.getElementById("import-button").addEventListener("click", () => document.getElementById("import-file").click());
+      document.getElementById("import-file").addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try { await importAnswers(file); }
+        catch (error) { window.alert(error.message); }
+        finally { event.target.value = ""; }
+      });
+      document.getElementById("print-button").addEventListener("click", safePrint);
+      document.getElementById("contrast-button").addEventListener("click", (event) => {
+        const enabled = !document.body.classList.contains("high-contrast");
+        document.body.classList.toggle("high-contrast", enabled);
+        event.currentTarget.setAttribute("aria-pressed", String(enabled));
+        announce(enabled ? "고대비를 켰습니다." : "고대비를 껐습니다.");
+      });
+      document.getElementById("first-unanswered").addEventListener("click", () => {
+        const answers = collectAnswers();
+        const question = [...questionMap.values()].find((item) => statusFor(item, answers) !== "done");
+        if (!question) { announce("모든 항목이 결정되었습니다."); return; }
+        const article = document.getElementById(question.id);
+        article.closest("details").open = true;
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        article.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+        const control = controlMap.get(question.id);
+        window.setTimeout(() => (Array.isArray(control) ? control[0] : control).focus(), reducedMotion ? 0 : 200);
+      });
+      document.getElementById("reset-button").addEventListener("click", () => {
+        if (!window.confirm("이 브라우저에 저장된 Wave 5 답변을 모두 지울까요? 먼저 JSON으로 내보냈는지 확인하세요.")) return;
+        window.clearTimeout(autosaveTimer);
+        let removed = false;
+        try {
+          localStorage.removeItem(storageKey);
+          removed = localStorage.getItem(storageKey) === null;
+        } catch (error) { removed = false; }
+        applyAnswers({});
+        applyNotes({});
+        showSensitive([]);
+        if (removed) {
+          saveStatus.textContent = "이 브라우저의 답변을 초기화했습니다.";
+          announce("답변을 초기화했습니다.");
+        } else {
+          sensitiveWarning.hidden = false;
+          sensitiveWarning.textContent = "화면만 비웠습니다. 브라우저 저장 데이터 삭제에 실패해 다시 열면 이전 답변이 복원될 수 있습니다.";
+          saveStatus.textContent = "화면 초기화만 완료 · 저장 데이터 삭제 실패";
+          announce("저장 데이터 삭제에 실패했습니다.");
+        }
+      });
+      const printHeights = new Map();
+      const printOpenStates = new Map();
+      window.addEventListener("beforeprint", () => {
+        const answers = collectAnswers();
+        const notes = collectNotes();
+        const { invalid, findings } = responseAudit(answers, notes);
+        if (invalid.length > 0 || findings.length > 0) {
+          document.body.classList.add("print-blocked");
+          document.body.dataset.printBlockReason = "입력 오류 또는 민감정보 의심 입력 때문에 인쇄 내용을 가렸습니다. 질문지 화면에서 수정한 뒤 다시 인쇄하세요.";
+          showSensitive(findings);
+          return;
+        }
+        document.body.classList.remove("print-blocked");
+        delete document.body.dataset.printBlockReason;
+        for (const details of document.querySelectorAll("details.phase")) {
+          printOpenStates.set(details, details.open);
+          details.open = true;
+        }
+        for (const textarea of document.querySelectorAll("textarea")) {
+          printHeights.set(textarea, textarea.style.height);
+          textarea.style.height = `${textarea.scrollHeight}px`;
+        }
+      });
+      window.addEventListener("afterprint", () => {
+        document.body.classList.remove("print-blocked");
+        delete document.body.dataset.printBlockReason;
+        for (const [details, open] of printOpenStates) details.open = open;
+        printOpenStates.clear();
+        for (const [textarea, height] of printHeights) textarea.style.height = height;
+        printHeights.clear();
+      });
+    })();
+  </script>
+</body>
+</html>

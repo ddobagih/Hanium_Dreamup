@@ -224,8 +224,9 @@ def write_backup_manifest(tmp_path: Path, *, database_url: str, upload_dir: Path
     lock_dir = tmp_path / f"maintenance-{uuid.uuid4().hex}"
     lock_dir.mkdir(mode=0o700)
     lock_path = lock_dir / "walksafe.lock"
+    lock_path.touch(mode=0o600)
     lock_identity = retention.path_identity_sha256(lock_path)
-    lock_device_inode = f"{lock_dir.stat().st_dev}:{lock_dir.stat().st_ino}"
+    lock_device_inode = f"{lock_path.stat().st_dev}:{lock_path.stat().st_ino}"
     artifacts: dict[str, str] = {}
     for name, content in {
         "reports.dump.gpg": b"encrypted-database",
@@ -377,6 +378,32 @@ def test_recovery_copy_removes_its_exact_partial_file_when_copy_fails(
     assert not list(recovery.parent.glob(".walksafe-retention-delete-*"))
 
 
+def test_recovery_copy_closes_source_parent_when_recovery_parent_open_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source" / "report.wse"
+    source.parent.mkdir(mode=0o700)
+    source.write_bytes(b"encrypted-object")
+    recovery = tmp_path / "missing" / "report.wse.recovery"
+    real_open_directory = retention._open_directory
+    source_parent_fd = -1
+
+    def tracking_open_directory(path: Path) -> int:
+        nonlocal source_parent_fd
+        descriptor = real_open_directory(path)
+        if path == source.parent:
+            source_parent_fd = descriptor
+        return descriptor
+
+    monkeypatch.setattr(retention, "_open_directory", tracking_open_directory)
+    with pytest.raises(FileNotFoundError):
+        retention.create_recovery_copy(source, recovery)
+    assert source_parent_fd >= 0
+    with pytest.raises(OSError):
+        os.fstat(source_parent_fd)
+
+
 def test_recovery_copy_surfaces_partial_cleanup_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -504,6 +531,99 @@ def test_quarantine_symlink_component_is_rejected_without_external_write(
         )
 
     assert not list(outside.iterdir())
+
+
+def test_deployment_upload_contract_keeps_recovery_private(tmp_path: Path) -> None:
+    upload_dir = tmp_path / "uploads"
+    upload_dir.mkdir(mode=0o700)
+    upload_dir.chmod(0o2750)
+    group_gid = os.getgid()
+    source = upload_dir / "object.wse"
+    source.write_bytes(b"encrypted-object")
+    source.chmod(0o640)
+    metadata = upload_dir.stat(follow_symlinks=False)
+
+    quarantine, upload_fd, root_fd, run_fd = retention.prepare_private_quarantine(
+        upload_dir,
+        "a" * 32,
+        expected_upload_identity=(
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_uid,
+            metadata.st_mode,
+        ),
+        expected_upload_group_gid=group_gid,
+    )
+    try:
+        recovery = quarantine / "object.wse.recovery"
+        retention.create_recovery_copy(
+            source,
+            recovery,
+            source_parent_fd=upload_fd,
+            recovery_parent_fd=run_fd,
+            expected_source_mode=0o640,
+            expected_source_gid=group_gid,
+        )
+        assert stat.S_IMODE((upload_dir / ".retention-quarantine").stat().st_mode) == 0o700
+        assert stat.S_IMODE(quarantine.stat().st_mode) == 0o700
+        assert stat.S_IMODE(recovery.stat().st_mode) == 0o600
+    finally:
+        os.close(run_fd)
+        os.close(root_fd)
+        os.close(upload_fd)
+
+
+def test_retention_rejects_upload_root_and_source_object_acls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    upload_dir = tmp_path / "uploads"
+    upload_dir.mkdir(mode=0o700)
+    metadata = upload_dir.stat(follow_symlinks=False)
+    root_identity = (metadata.st_dev, metadata.st_ino)
+
+    monkeypatch.setattr(
+        retention.os,
+        "listxattr",
+        lambda descriptor: (
+            [b"system.posix_acl_default"]
+            if (os.fstat(descriptor).st_dev, os.fstat(descriptor).st_ino)
+            == root_identity
+            else []
+        ),
+    )
+    with pytest.raises(ValueError, match="ACL"):
+        retention.prepare_private_quarantine(
+            upload_dir,
+            "a" * 32,
+            expected_upload_identity=(
+                metadata.st_dev,
+                metadata.st_ino,
+                metadata.st_uid,
+                metadata.st_mode,
+            ),
+        )
+    assert not (upload_dir / ".retention-quarantine").exists()
+
+    source = tmp_path / "source.wse"
+    source.write_bytes(b"encrypted-object")
+    recovery = tmp_path / "recovery" / "source.wse.recovery"
+    recovery.parent.mkdir(mode=0o700)
+    source_identity = (source.stat().st_dev, source.stat().st_ino)
+    monkeypatch.setattr(
+        retention.os,
+        "listxattr",
+        lambda descriptor: (
+            [b"system.posix_acl_access"]
+            if (os.fstat(descriptor).st_dev, os.fstat(descriptor).st_ino)
+            == source_identity
+            else []
+        ),
+    )
+    with pytest.raises(ValueError, match="changed while opening"):
+        retention.create_recovery_copy(source, recovery)
+    assert source.read_bytes() == b"encrypted-object"
+    assert not recovery.exists()
 
 
 def test_partial_quarantine_acquisition_removes_directories_it_created(
@@ -1094,7 +1214,7 @@ def test_apply_quarantines_image_commits_database_and_writes_manifest(
     assert persisted_manifest["predelete_backup_run_id"] == "backup-before-retention"
     assert persisted_manifest["maintenance_lock_identity_sha256"] == retention.path_identity_sha256(lock_path)
     assert persisted_manifest["maintenance_lock_device_inode"] == (
-        f"{lock_path.parent.stat().st_dev}:{lock_path.parent.stat().st_ino}"
+        f"{lock_path.stat().st_dev}:{lock_path.stat().st_ino}"
     )
     assert persisted_manifest["predelete_restore_receipt_sha256"] == retention.sha256_file(restore_receipt)
     assert persisted_manifest["images"] == [

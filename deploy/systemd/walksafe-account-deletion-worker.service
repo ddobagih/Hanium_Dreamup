@@ -1,0 +1,43 @@
+[Unit]
+Description=WalkSafe manual account-deletion worker one-shot
+BindsTo=walksafe-backend.service
+After=network-online.target walksafe-backend.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=walksafe-backend
+Group=walksafe-backend
+SupplementaryGroups=walksafe-maintenance-lock
+WorkingDirectory=/srv/walksafe/backend
+Environment=PYTHONPATH=/srv/walksafe/backend
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/walksafe/account-deletion-worker.env
+StateDirectory=walksafe/account-deletion-worker walksafe/account-deletion-worker/journals walksafe/account-deletion-worker/quarantine walksafe/account-deletion-worker/manifests
+StateDirectoryMode=0700
+UMask=0077
+ExecStart=/srv/walksafe/backend/.venv/bin/python /srv/walksafe/backend/scripts/account_deletion_worker.py --manual-one-shot --environment-file /etc/walksafe/account-deletion-worker.env --upload-dir /var/lib/walksafe/uploads --journal-root /var/lib/walksafe/account-deletion-worker --maintenance-lock-path /run/walksafe-maintenance-lock/maintenance.lock --batch-size 10 --lock-timeout-seconds 30
+TimeoutStartSec=15min
+TimeoutStopSec=30s
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+LockPersonality=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/etc/walksafe/account-deletion-worker.env /run/walksafe-maintenance-lock
+InaccessiblePaths=/etc/walksafe/backend-runtime.env /etc/walksafe/backend-migration.env /etc/walksafe/backend.env /etc/walksafe/admin-credential-issuer.key /etc/walksafe/report-image-keyring.json /etc/walksafe/backup.env /etc/walksafe/backup-key-control.json /etc/walksafe/backup-key-control.json.sig /etc/walksafe/backup-key-control.lock -/var/lib/walksafe-backup -/var/lib/walksafe-backup-gnupg -/run/walksafe-backup
+ReadWritePaths=/var/lib/walksafe/uploads /var/lib/walksafe/account-deletion-worker

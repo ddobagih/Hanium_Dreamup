@@ -1,0 +1,12 @@
+# DRAFT / NOT_APPLIED. The schedule is a reviewable placeholder, not approval.
+[Unit]
+Description=Draft WalkSafe encrypted backup timer
+ConditionPathExists=/etc/walksafe/backup-timer.approved
+ConditionPathExists=/etc/walksafe/backup-writes-quiesced.approved
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=false
+RandomizedDelaySec=30m
+AccuracySec=1m
+Unit=walksafe-backup.service

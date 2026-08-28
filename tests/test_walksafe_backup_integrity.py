@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 import fcntl
 import hashlib
 import json
@@ -1385,6 +1386,9 @@ def test_fd_bundle_verifies_signature_and_signed_artifact_hashes(
             reports_fd=descriptors[2],
             uploads_fd=descriptors[3],
             trusted_signer_fingerprint=TRUSTED_SIGNER,
+            max_age_seconds=60,
+            future_skew_seconds=300,
+            now=datetime(2026, 7, 16, 0, 1, tzinfo=UTC),
         )
         authorization = integrity.resolve_manifest_backup_key(
             payload,
@@ -1396,9 +1400,84 @@ def test_fd_bundle_verifies_signature_and_signed_artifact_hashes(
             payload,
             key_authorization=authorization,
         )[0] == "backup-1"
+        with pytest.raises(ValueError, match="older than"):
+            integrity.verify_signed_backup_fd_bundle(
+                owner_pid=os.getpid(),
+                manifest_fd=descriptors[0],
+                signature_fd=descriptors[1],
+                reports_fd=descriptors[2],
+                uploads_fd=descriptors[3],
+                trusted_signer_fingerprint=TRUSTED_SIGNER,
+                max_age_seconds=60,
+                future_skew_seconds=300,
+                now=datetime(2026, 7, 16, 0, 1, 1, tzinfo=UTC),
+            )
     finally:
         for descriptor in descriptors:
             os.close(descriptor)
+
+
+def test_signed_manifest_age_rejects_stale_future_and_missing_created_at() -> None:
+    now = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
+    payload = {"created_at": (now - timedelta(seconds=60)).isoformat()}
+
+    assert integrity.require_backup_manifest_age(
+        payload,
+        max_age_seconds=60,
+        future_skew_seconds=300,
+        now=now,
+    ) == now - timedelta(seconds=60)
+
+    with pytest.raises(ValueError, match="older than"):
+        integrity.require_backup_manifest_age(
+            {"created_at": (now - timedelta(seconds=61)).isoformat()},
+            max_age_seconds=60,
+            future_skew_seconds=300,
+            now=now,
+        )
+    with pytest.raises(ValueError, match="future skew"):
+        integrity.require_backup_manifest_age(
+            {"created_at": (now + timedelta(seconds=301)).isoformat()},
+            max_age_seconds=60,
+            future_skew_seconds=300,
+            now=now,
+        )
+    with pytest.raises(ValueError, match="created_at"):
+        integrity.require_backup_manifest_age(
+            {},
+            max_age_seconds=60,
+            future_skew_seconds=300,
+            now=now,
+        )
+
+
+def test_restore_age_policy_is_kernel_sealed_and_cannot_be_relaxed() -> None:
+    descriptor = integrity._create_inheritable_age_policy_snapshot(
+        max_age_seconds=93600,
+        future_skew_seconds=300,
+    )
+    try:
+        integrity._require_inherited_age_policy(
+            owner_pid=os.getpid(),
+            policy_fd=descriptor,
+            max_age_seconds=93600,
+            future_skew_seconds=300,
+        )
+        with pytest.raises(ValueError, match="does not match"):
+            integrity._require_inherited_age_policy(
+                owner_pid=os.getpid(),
+                policy_fd=descriptor,
+                max_age_seconds=604800,
+                future_skew_seconds=300,
+            )
+    finally:
+        os.close(descriptor)
+
+
+def test_restore_age_policy_allows_the_canonical_35_day_retention_boundary() -> None:
+    assert integrity._validated_backup_age_policy(3024000, 300) == (3024000, 300)
+    with pytest.raises(ValueError, match="3024000"):
+        integrity._validated_backup_age_policy(3024001, 300)
 
 
 def test_restore_handoff_scrubs_shell_injection_and_seals_all_inputs(
@@ -1460,7 +1539,7 @@ def test_restore_handoff_scrubs_shell_injection_and_seals_all_inputs(
             authority_lock.stat().st_ino,
         )
         descriptors = [int(value) for value in environment[integrity.VERIFIED_BACKUP_FDS_ENV].split(":")]
-        assert len(descriptors) == 8
+        assert len(descriptors) == 9
         for descriptor in descriptors:
             seals = fcntl.fcntl(descriptor, fcntl.F_GET_SEALS)
             assert seals & integrity.REQUIRED_SNAPSHOT_SEALS == integrity.REQUIRED_SNAPSHOT_SEALS
@@ -1493,6 +1572,8 @@ def test_restore_handoff_scrubs_shell_injection_and_seals_all_inputs(
             before_rekey_root=None,
             after_rekey_root=None,
             trusted_rekey_manifest_signer_fingerprint=None,
+            max_age_seconds=93600,
+            future_skew_seconds=300,
             restore_arguments=["--", "--backup-dir", str(backup_dir)],
         )
 
@@ -1562,6 +1643,8 @@ def test_restore_blocks_compromised_key_before_any_decrypt(
             before_rekey_root=None,
             after_rekey_root=None,
             trusted_rekey_manifest_signer_fingerprint=None,
+            max_age_seconds=93600,
+            future_skew_seconds=300,
             restore_arguments=[],
         )
 
@@ -1627,6 +1710,8 @@ def test_restore_snapshot_rejects_backup_directory_swap(
             before_rekey_root=None,
             after_rekey_root=None,
             trusted_rekey_manifest_signer_fingerprint=None,
+            max_age_seconds=93600,
+            future_skew_seconds=300,
             restore_arguments=[],
         )
 
@@ -2038,6 +2123,9 @@ def test_restore_drill_uses_signed_hashes_and_signs_its_receipt() -> None:
     assert '"compromised_key_decrypt_block_enforced": true' in script
     assert '--decrypted-reports-fd "${DECRYPTED_REPORTS_FD}"' in script
     assert '--decrypted-uploads-fd "${DECRYPTED_UPLOADS_FD}"' in script
+    assert '--age-policy-fd "${BACKUP_AGE_POLICY_FD}"' in script
+    assert '--max-age-seconds "${MAX_BACKUP_AGE_SECONDS}"' in script
+    assert '--future-skew-seconds "${BACKUP_FUTURE_SKEW_SECONDS}"' in script
     assert 'REPORTS_RESTORE_PATH="/proc/self/fd/${DECRYPTED_REPORTS_FD}"' in script
     assert 'UPLOADS_RESTORE_PATH="/proc/self/fd/${DECRYPTED_UPLOADS_FD}"' in script
     assert '${BACKUP_DIR}/reports.dump.gpg' not in script
@@ -2240,9 +2328,12 @@ def test_lock_parent_state_detects_path_swap_even_after_original_is_restored(
     lock = parent / "walksafe.lock"
     lock.touch(mode=0o600)
     parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
-    lock_fd = os.open(lock, os.O_RDWR)
+    lock_fd = os.open(lock, os.O_RDONLY)
+    contender_fd = os.open(lock, os.O_RDONLY)
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        with pytest.raises(BlockingIOError):
+            fcntl.flock(contender_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         before = os.fstat(parent_fd)
         displaced = parent / "original.lock"
         lock.rename(displaced)
@@ -2255,6 +2346,7 @@ def test_lock_parent_state_detects_path_swap_even_after_original_is_restored(
         assert os.fstat(parent_fd).st_ctime_ns != before.st_ctime_ns
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(contender_fd)
         os.close(lock_fd)
         os.close(parent_fd)
 
@@ -2320,7 +2412,7 @@ def test_backup_lock_authority_rejects_user_owned_higher_ancestor(
     monkeypatch.setattr(
         sys,
         "argv",
-        ["embedded-backup", str(parent_fd), "walksafe.lock", str(lock_parent)],
+        ["embedded-backup", str(parent_fd), "walksafe.lock", str(lock_parent), "-1"],
     )
     try:
         with pytest.raises(SystemExit, match="authority ancestors"):
@@ -2333,6 +2425,92 @@ def test_backup_lock_authority_rejects_user_owned_higher_ancestor(
                 {},
             )
         assert higher_ancestor_identity in visited_identities
+    finally:
+        os.close(parent_fd)
+
+
+def test_backup_lock_authority_accepts_provisioned_read_only_group_leaf(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected_gid = os.getegid()
+    if os.geteuid() == 0 or expected_gid == 0:
+        pytest.skip("requires a non-root service user and group")
+    lock_parent = tmp_path / "maintenance"
+    lock_parent.mkdir(mode=0o750)
+    lock = lock_parent / "walksafe.lock"
+    lock.touch(mode=0o440)
+    authority_paths = [Path("/")]
+    for component in lock_parent.parent.relative_to("/").parts:
+        authority_paths.append(authority_paths[-1] / component)
+    authority_identities = {
+        (path.stat().st_dev, path.stat().st_ino) for path in authority_paths
+    }
+    parent_identity = (lock_parent.stat().st_dev, lock_parent.stat().st_ino)
+    leaf_identity = (lock.stat().st_dev, lock.stat().st_ino)
+    real_fstat = os.fstat
+    real_stat = os.stat
+    real_listxattr = os.listxattr
+
+    def provisioned(metadata: os.stat_result) -> os.stat_result:
+        identity = (metadata.st_dev, metadata.st_ino)
+        if identity not in authority_identities | {parent_identity, leaf_identity}:
+            return metadata
+        fields = list(metadata)
+        fields[4] = 0
+        if identity in authority_identities:
+            fields[0] = (fields[0] & ~0o7777) | 0o755
+        return os.stat_result(fields)
+
+    def provisioned_fstat(descriptor: int) -> os.stat_result:
+        return provisioned(real_fstat(descriptor))
+
+    def provisioned_stat(
+        path: os.PathLike[str] | str,
+        *args: object,
+        **kwargs: object,
+    ) -> os.stat_result:
+        return provisioned(real_stat(path, *args, **kwargs))
+
+    parent_fd = os.open(lock_parent, os.O_RDONLY | os.O_DIRECTORY)
+    monkeypatch.setattr(os, "fstat", provisioned_fstat)
+    monkeypatch.setattr(os, "stat", provisioned_stat)
+    monkeypatch.setattr(os, "access", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "embedded-backup",
+            str(parent_fd),
+            lock.name,
+            str(lock_parent),
+            str(expected_gid),
+        ],
+    )
+    code = compile(
+        _backup_embedded_python("authority_fds = []"),
+        "<backup>",
+        "exec",
+    )
+    try:
+        exec(code, {})
+        monkeypatch.setattr(
+            os,
+            "listxattr",
+            lambda descriptor: (
+                [b"system.posix_acl_access"]
+                if (real_fstat(descriptor).st_dev, real_fstat(descriptor).st_ino)
+                == leaf_identity
+                else []
+            ),
+        )
+        with pytest.raises(SystemExit, match="owner/group/mode contract"):
+            exec(code, {})
+        monkeypatch.setattr(os, "listxattr", real_listxattr)
+        lock.unlink()
+        with pytest.raises(FileNotFoundError):
+            exec(code, {})
+        assert not lock.exists()
     finally:
         os.close(parent_fd)
 
@@ -2352,11 +2530,12 @@ def test_backup_lock_authority_accepts_standard_user_runtime(
     lock_path = runtime_parent / lock_name
     if lock_path.exists() or lock_path.is_symlink():
         pytest.skip("runtime lock test path is already occupied")
+    lock_path.touch(mode=0o600)
     parent_fd = os.open(runtime_parent, os.O_RDONLY | os.O_DIRECTORY)
     monkeypatch.setattr(
         sys,
         "argv",
-        ["embedded-backup", str(parent_fd), lock_name, str(runtime_parent)],
+        ["embedded-backup", str(parent_fd), lock_name, str(runtime_parent), "-1"],
     )
     try:
         exec(
@@ -2392,7 +2571,7 @@ def test_backup_lock_authority_rejects_mismatched_parent_descriptor(
     monkeypatch.setattr(
         sys,
         "argv",
-        ["embedded-backup", str(parent_fd), "walksafe.lock", str(runtime_parent)],
+        ["embedded-backup", str(parent_fd), "walksafe.lock", str(runtime_parent), "-1"],
     )
     try:
         with pytest.raises(SystemExit, match="ancestry changed"):
@@ -2430,15 +2609,36 @@ def test_backup_script_rejects_nested_output_and_fsyncs_completed_artifacts() ->
     assert "os.fsync(output_fd)" in script
     assert "LOCK_PARENT_STABLE_STATE" in script
     assert script.count('LOCK_PARENT_STABLE_STATE="$(stat -Lc') == 1
+    assert "LOCK_STABLE_STATE" in script
+    assert script.count('LOCK_STABLE_STATE="$(stat -Lc') == 1
     assert "opened_authority.st_uid != 0" in script
     assert 'authority_fds.append(os.open("/", flags))' in script
     assert 'for component in parent.parent.relative_to("/").parts:' in script
     assert "dir_fd=authority_fd" in script
     assert "opened_parent.st_uid != os.geteuid()" in script
     assert "stat.S_IMODE(opened_parent.st_mode) != 0o700" in script
+    assert "opened_parent.st_uid != 0" in script
+    assert "opened_parent.st_gid != expected_gid" in script
+    assert "stat.S_IMODE(opened_parent.st_mode) != 0o750" in script
+    assert "stat.S_IMODE(metadata.st_mode) != expected_mode" in script
+    assert "descriptor_acl_is_absent" in script
+    assert "validate_lock_descriptor_acls" in script
+    assert "os.listxattr" in script
     assert "if os.geteuid() == 0:" in script
-    assert 'flock --exclusive --timeout "${LOCK_TIMEOUT_SECONDS}" "${LOCK_PARENT_FD}"' in script
+    assert 'exec {LOCK_FD}<"${LOCK_PATH}"' in script
+    assert "os.O_CREAT" not in script
+    assert 'flock --exclusive --timeout "${LOCK_TIMEOUT_SECONDS}" "${LOCK_FD}"' in script
+    assert 'flock --exclusive --timeout "${LOCK_TIMEOUT_SECONDS}" "${LOCK_PARENT_FD}"' not in script
+    assert 'LOCK_AUTHORITY_DEVICE_INODE="${LOCK_DEVICE_INODE}"' in script
     assert '"maintenance_lock_device_inode": "${LOCK_AUTHORITY_DEVICE_INODE}"' in script
+    assert 'MAINTENANCE_LOCK_GROUP="${WALKSAFE_MAINTENANCE_LOCK_GROUP:-}"' in script
+    assert 'UPLOAD_BACKUP_READER_GROUP="${WALKSAFE_UPLOAD_BACKUP_READER_GROUP:-}"' in script
+    assert "grp.getgrnam" in script
+    assert 'pwd.getpwnam("walksafe-backup")' in script
+    assert 'os.geteuid() != backup_account.pw_uid' in script
+    assert 'effective_groups != {primary_gid, lock_gid, reader_gid}' in script
+    assert "issubset(effective_groups)" not in script
+    assert 'SOURCE_GROUP_ARGUMENTS+=(--upload-reader-gid "${UPLOAD_BACKUP_READER_GID}")' in script
     assert "--authorize-backup-key" in script
     assert 'flock --shared --timeout "${LOCK_TIMEOUT_SECONDS}" "${KEY_CONTROL_AUTHORITY_LOCK_FD}"' in script
     assert script.count('[[ "$(authorize_backup_key)" == "${KEY_AUTHORIZATION_FIELDS}" ]]') == 2
@@ -2448,12 +2648,12 @@ def test_backup_script_rejects_nested_output_and_fsyncs_completed_artifacts() ->
     assert '"control_sha256": "${KEY_CONTROL_SHA256}"' in script
     assert '"authority_lock_identity_sha256": "${KEY_CONTROL_AUTHORITY_LOCK_IDENTITY_SHA256}"' in script
     assert "backup key control must be stored outside backup data boundaries" in script
-    assert "stat -Lc '%d:%i:%y:%z'" in script
+    assert "stat -Lc '%d:%i:%u:%g:%a:%h:%y:%z'" in script
     acquired = script.index('flock --exclusive --timeout "${LOCK_TIMEOUT_SECONDS}"')
     before_snapshot = script.index('verify_lock_binding || { echo "maintenance lock changed before snapshot"')
     source_check = script.index('SOURCE_CONSISTENCY_JSON="$(check_source_consistency)"')
     post_snapshot = script.index(
         'verify_lock_binding || { echo "maintenance lock changed while creating the snapshot"'
     )
-    unlock = script.index('flock --unlock "${LOCK_PARENT_FD}"')
+    unlock = script.index('flock --unlock "${LOCK_FD}"')
     assert acquired < before_snapshot < source_check < post_snapshot < unlock

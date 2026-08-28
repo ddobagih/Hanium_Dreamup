@@ -26,6 +26,9 @@
 | 모델·데이터 반입과 provenance | [데이터·AI 가이드](data-ai-guide.md) |
 | 보안·개인정보 처리 | [보안·개인정보 가이드](security-privacy-guide.md) |
 | 릴리스·운영·복구 | [릴리스·운영 가이드](release-operations-guide.md) |
+| 보안·서버 운영의 다음 구현 순서 | [2026-08-25 다음 실행 계획](../planning/walksafe-security-server-operations-next-plan-20260825.html) |
+| 로컬 기능 완성의 세부 구현 순서 | [2026-08-26 로컬 기능 실행 계획](../planning/walksafe-local-feature-execution-plan-20260826.html) |
+| Wave 5 시작 전에 답할 운영 결정 | [Wave 5 사전 결정 질문지](../planning/walksafe-wave5-decision-questionnaire-20260826.html) |
 | 기능 분담, 브랜치, 검토, 인수인계 | [팀 작업 흐름](team-workflow.md) |
 | 기여·PR / 보안 신고 | [CONTRIBUTING](../../CONTRIBUTING.md) · [SECURITY](../../SECURITY.md) |
 | 개발 도구, 로컬 실행, 기본 검사 | [개발 환경 가이드](development-environment-guide.md) |

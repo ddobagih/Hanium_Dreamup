@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f6fa">
+  <title>WalkSafe 보안·서버 운영 기능 우선 구현 계획</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #152235;
+      --muted: #5c6878;
+      --line: #d7dee8;
+      --surface: #ffffff;
+      --soft: #f3f6fa;
+      --navy: #153b62;
+      --blue: #1769aa;
+      --teal: #08776e;
+      --green: #176b50;
+      --amber: #8c5700;
+      --red: #a02d2d;
+      --blue-soft: #e9f2fb;
+      --green-soft: #e8f6ef;
+      --amber-soft: #fff3d6;
+      --red-soft: #fdecec;
+      --shadow: 0 14px 34px rgba(24, 48, 78, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--soft);
+      color: var(--ink);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+      line-height: 1.66;
+    }
+
+    a {
+      color: var(--blue);
+      overflow-wrap: anywhere;
+      text-underline-offset: 0.18em;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(23, 105, 170, 0.22);
+    }
+
+    a:hover { color: var(--navy); }
+
+    a:focus-visible,
+    button:focus-visible,
+    [tabindex="0"]:focus-visible,
+    summary:focus-visible {
+      outline: 3px solid #0b5cab;
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: fixed;
+      z-index: 20;
+      top: 10px;
+      left: 10px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--navy);
+      font-weight: 800;
+      transform: translateY(-160%);
+    }
+
+    .skip-link:focus { transform: translateY(0); }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 30px 0 72px;
+    }
+
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: 42px;
+      border-radius: 22px;
+      color: #fff;
+      background: linear-gradient(132deg, #102c4c 0%, #175a7d 58%, #08776e 100%);
+      box-shadow: var(--shadow);
+    }
+
+    header::after {
+      position: absolute;
+      right: -92px;
+      bottom: -142px;
+      width: 350px;
+      height: 350px;
+      border: 58px solid rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+      content: "";
+    }
+
+    .eyebrow {
+      position: relative;
+      z-index: 1;
+      margin: 0 0 8px;
+      font-size: 0.8rem;
+      font-weight: 850;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+      opacity: 0.85;
+    }
+
+    h1 {
+      position: relative;
+      z-index: 1;
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 3.35rem);
+      line-height: 1.18;
+      letter-spacing: -0.045em;
+    }
+
+    header .lead {
+      position: relative;
+      z-index: 1;
+      max-width: 820px;
+      margin: 18px 0 0;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 1.04rem;
+    }
+
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 24px;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 0.87rem;
+    }
+
+    nav {
+      position: sticky;
+      z-index: 10;
+      top: 10px;
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      margin: 18px 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 8px 24px rgba(30, 55, 90, 0.08);
+      backdrop-filter: blur(10px);
+    }
+
+    nav a {
+      flex: 0 0 auto;
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      padding: 7px 11px;
+      border-radius: 9px;
+      color: var(--navy);
+      font-size: 0.86rem;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    nav a:hover,
+    nav a:focus-visible { background: var(--blue-soft); }
+
+    main {
+      display: grid;
+      min-width: 0;
+      gap: 18px;
+      scroll-margin-top: 92px;
+    }
+
+    section,
+    .notice {
+      min-width: 0;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    section[id] { scroll-margin-top: 92px; }
+
+    .notice {
+      border-left: 5px solid var(--amber);
+      background: var(--amber-soft);
+      box-shadow: none;
+    }
+
+    .notice.decision {
+      border-left-color: var(--teal);
+      background: var(--green-soft);
+    }
+
+    .notice.danger {
+      border-left-color: var(--red);
+      background: var(--red-soft);
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      color: var(--navy);
+      font-size: clamp(1.45rem, 3vw, 2rem);
+      line-height: 1.3;
+      letter-spacing: -0.025em;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      color: var(--navy);
+      font-size: 1.16rem;
+    }
+
+    h4 {
+      margin: 20px 0 8px;
+      color: var(--navy);
+      font-size: 1rem;
+    }
+
+    h1, h2, h3, h4 {
+      overflow-wrap: break-word;
+      word-break: keep-all;
+      text-wrap: balance;
+    }
+
+    p { margin: 0.68em 0; text-wrap: pretty; }
+    ul, ol { padding-left: 1.35rem; }
+    li + li { margin-top: 0.38rem; }
+
+    code {
+      padding: 0.1em 0.35em;
+      border-radius: 5px;
+      background: #edf1f6;
+      color: #243b57;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.9em;
+      overflow-wrap: anywhere;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--soft);
+    }
+
+    .card .value {
+      display: block;
+      color: var(--navy);
+      font-size: 1.52rem;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .card .label {
+      color: var(--muted);
+      font-size: 0.87rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 850;
+      letter-spacing: 0.015em;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .badge.fix { color: var(--red); background: var(--red-soft); }
+    .badge.build { color: #785000; background: var(--amber-soft); }
+    .badge.verify { color: var(--green); background: var(--green-soft); }
+    .badge.shared { color: var(--navy); background: var(--blue-soft); }
+
+    .table-wrap {
+      max-width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.91rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    caption {
+      padding: 12px 14px;
+      color: var(--navy);
+      background: var(--blue-soft);
+      font-weight: 850;
+      text-align: left;
+    }
+
+    th,
+    td {
+      padding: 12px 13px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+      overflow-wrap: break-word;
+      word-break: keep-all;
+    }
+
+    th {
+      color: var(--navy);
+      background: #f5f8fb;
+      font-size: 0.82rem;
+      letter-spacing: 0.01em;
+    }
+
+    tbody tr:last-child > * { border-bottom: 0; }
+
+    .schedule-table th:nth-child(2),
+    .schedule-table td:nth-child(2) { white-space: nowrap; }
+
+    .work-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .work {
+      min-width: 0;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--blue);
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .work.urgent { border-top-color: var(--red); }
+    .work.new { border-top-color: var(--amber); }
+    .work.verify { border-top-color: var(--teal); }
+
+    .work h3 { margin-top: 0; }
+
+    .work .outcome {
+      padding: 10px 12px;
+      border-radius: 9px;
+      background: var(--soft);
+      font-weight: 750;
+    }
+
+    .lane {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .lane:last-child { border-bottom: 0; }
+
+    .lane strong { color: var(--navy); }
+
+    .queue {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      counter-reset: queue;
+      list-style: none;
+    }
+
+    .queue li {
+      position: relative;
+      min-height: 68px;
+      margin: 0;
+      padding: 14px 14px 14px 60px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .queue li::before {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      display: grid;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--navy);
+      color: #fff;
+      font-weight: 850;
+      counter-increment: queue;
+      content: counter(queue);
+    }
+
+    .small { color: var(--muted); font-size: 0.86rem; }
+    .tight { margin-top: 0.35rem; margin-bottom: 0.35rem; }
+
+    details {
+      margin-top: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    summary {
+      padding: 12px 14px;
+      color: var(--navy);
+      cursor: pointer;
+      font-weight: 800;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(23, 105, 170, 0.22);
+    }
+
+    .core-stop th,
+    .core-stop td { border-bottom: 4px solid var(--teal); }
+
+    .after-core th,
+    .after-core td { background: #fafbfd; }
+
+    details > div { padding: 0 14px 14px; }
+
+    footer {
+      padding: 24px 4px 0;
+      color: var(--muted);
+      font-size: 0.83rem;
+      text-align: center;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 900px) {
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .work-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    @media (max-width: 620px) {
+      .page { width: min(100% - 20px, 1180px); padding-top: 12px; }
+      header { padding: 28px 22px; border-radius: 16px; }
+      section, .notice { padding: 20px; border-radius: 14px; }
+      .cards { grid-template-columns: minmax(0, 1fr); }
+      .lane { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+      nav { top: 4px; margin: 10px 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      nav, .skip-link { display: none; }
+      header, section, .notice { box-shadow: none; break-inside: avoid; }
+      header { color: #111; background: #fff; border: 2px solid #333; }
+      header .lead, .meta { color: #333; }
+      a { color: #111; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">본문으로 건너뛰기</a>
+  <div class="page">
+    <header>
+      <p class="eyebrow">WalkSafe · 기능 우선 · 2026-08-25 실행 결과 반영</p>
+      <h1>보안·서버 운영 기능 우선 구현 계획</h1>
+      <p class="lead">
+        개인정보 요청의 서버 오류(503)와 계정 삭제 경로 없음(404)을 먼저 고쳤고,
+        격리 환경에서 데이터를 실제로 지우는 서버 작업과 시험용 용량 상태 전달 기능을 구현했다. 2026-08-25에 Wave 1·2 로컬 핵심 기능과 집중 시험을 완료했다.
+      </p>
+      <div class="meta">
+        <span>상태: Wave 1·2 로컬 핵심 기능 완료</span>
+        <span>현재 제품 수정: 승인된 범위의 구현·집중 검증 완료</span>
+        <span>핵심 완료선: INTERNAL_TARGETED_VERIFIED</span>
+        <span>실제 운영 배포·출시 승인: 아직 안 함</span>
+      </div>
+    </header>
+
+    <nav aria-label="문서 목차">
+      <a href="#today">오류 복구</a>
+      <a href="#core">핵심 구현</a>
+      <a href="#schedule">소요시간</a>
+      <a href="#scope">담당 범위</a>
+      <a href="#map">기능 지도</a>
+      <a href="#verification">검증</a>
+      <a href="#operations">후속 운영</a>
+      <a href="#done">완료 기준</a>
+    </nav>
+
+    <main id="content" tabindex="-1">
+      <section aria-labelledby="snapshot-title">
+        <h2 id="snapshot-title">먼저 볼 결론</h2>
+        <div class="cards">
+          <div class="card"><span class="value">2건 + 2개</span><span class="label">접근 결함 복구 + 새 로컬 핵심 기능</span></div>
+          <div class="card"><span class="value">1.5–2일</span><span class="label">3개 작업조 병렬 시 로컬 핵심 완료</span></div>
+          <div class="card"><span class="value">2.5–3일</span><span class="label">1명이 순서대로 할 때 로컬 핵심 완료</span></div>
+          <div class="card"><span class="value">4–6시간 / 1–2일</span><span class="label">후속 기능 점검 / 별도 운영 준비</span></div>
+        </div>
+        <p class="small">
+          핵심 1.5–2일에는 긴급 오류 복구, 격리 삭제 범위와 합성 용량 상태 전달이 포함된다.
+          기존 세션·키·상태 확인 점검과 로그·경보·백업 준비는 핵심 완료를 막지 않는 별도 작업이다.
+          현재 작업의 제품 수정 허용 절차, 자동 검사 대기와 실제 운영 환경·인증서·KMS·외부 알림망·출시 승인은 위 시간에 포함하지 않는다.
+        </p>
+      </section>
+
+      <aside id="decision" class="notice decision" aria-label="기능 우선 결정">
+        <strong>결정: 핵심 기능과 그 기능을 확인하는 집중 시험까지만 먼저 끝낸다.</strong>
+        <p>
+          기존 복구 작업은 그대로 둔다. 현재 작업에 결속된 시작 계약을 통과한 범위에서 핵심 기능과 집중 시험을 먼저 완료했다.
+          전체 정식시험, 출시 승인 자료, 운영 상태 화면과 복원 훈련은 핵심 기능 확인 뒤 별도로 수행한다.
+        </p>
+        <p class="small">현재 작업공간: <code>recovery/fp046-r008-wip-20260822</code>. 로컬 구현 완료는 실제 운영 배포·scheduler 활성화·출시 승인을 뜻하지 않는다.</p>
+      </aside>
+
+      <section id="scope">
+        <h2>1. 보안·서버 운영 담당 기능 분류</h2>
+        <p>
+          기능 카탈로그의 담당 역할을 사람이 이해할 수 있는 기능명으로 다시 묶었다.
+          저장소에는 실제 담당자 이름을 확정한 자료가 없으므로 아래는 역할 분담안이다.
+          내부 번호와 정식 판정은 기존 통제 문서에서 유지하며 이 계획의 실행 순서에는 사용하지 않는다.
+        </p>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="보안 서버 운영 담당 기능 분류 표">
+          <table>
+            <caption>직접 주도·공동 구현·인접 검증 범위</caption>
+            <thead>
+              <tr>
+                <th scope="col">구분</th>
+                <th scope="col">실제 기능</th>
+                <th scope="col">이번 계획에서 할 일</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><span class="badge fix">직접 주도</span></th>
+                <td>Gateway 요청 중계, 계정 삭제 경로, 개인정보 기록 무결성, DB 변경, 서버 AI 작업, 상태 확인, 관측·배포</td>
+                <td>결함 수정, 운영 경계 구현, 변경 기능 집중 시험과 사전 운영 환경 인계</td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="badge shared">공동 구현</span></th>
+                <td>장기 세션·기기 관리, PostgreSQL/PostGIS 모델, 서버 용량 상태</td>
+                <td>Gateway·Backend·Android·DBA와 계약을 한 번 정하고 병렬 구현</td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="badge verify">인접 검증</span></th>
+                <td>한 기기 보행 세션, 이미지 검증·메타데이터 제거</td>
+                <td>기존 구현을 재작성하지 않고 운영 조건과 회귀만 확인</td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="badge build">개인정보 협업</span></th>
+                <td>실제 계정 데이터 삭제, 보존·백업에서의 삭제, 동의 철회 집행</td>
+                <td>서버 소유 데이터는 직접 구현하고 외부 저장소는 증거가 올 때까지 확인 대기로 유지</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="map">
+        <h2>2. 기능 지도: 고칠 것, 만들 것, 확인할 것</h2>
+        <p class="small">표의 배지는 이번 개발 행동만 뜻한다. 정식 검증, 배포, 출시 상태와는 별개다.</p>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="기능별 현재 상태와 다음 작업 표">
+          <table>
+            <caption>현재 코드와 문서를 다시 확인한 기능별 판정</caption>
+            <thead>
+              <tr>
+                <th scope="col">우선</th>
+                <th scope="col">기능</th>
+                <th scope="col">현재 사실</th>
+                <th scope="col">다음 최소 작업</th>
+                <th scope="col">판정</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">지금 먼저</th>
+                <td><strong>개인정보 요청 정상 처리</strong></td>
+                <td><code>privacy</code> rate group migration과 readiness head를 적용해 첫 요청 503 원인을 제거함</td>
+                <td>격리 PostgreSQL에서 허용·한도·downgrade 경계를 확인함</td>
+                <td><span class="badge verify">집중 검증 완료</span></td>
+              </tr>
+              <tr>
+                <th scope="row">지금 먼저</th>
+                <td><strong>계정 삭제 경로 외부 도달</strong></td>
+                <td>Nginx allowlist에 요청·상태·기기증거 3경로와 경로별 body limit를 적용함</td>
+                <td>유사 경로 404와 Gateway 전달 계약을 current test로 고정함</td>
+                <td><span class="badge verify">집중 검증 완료</span></td>
+              </tr>
+              <tr>
+                <th scope="row">지금 먼저</th>
+                <td><strong>서버 신고 데이터 실제 삭제</strong></td>
+                <td>전용 최소권한 역할의 one-shot 워커가 신고 행·종속 정보·암호화 파일을 실제 삭제함</td>
+                <td>crash journal·create-only manifest·ledger 보존·권한 우회 거부를 실제 DB에서 확인함</td>
+                <td><span class="badge verify">집중 검증 완료</span></td>
+              </tr>
+              <tr>
+                <th scope="row">지금 먼저</th>
+                <td><strong>서버 용량 상태 동기화</strong></td>
+                <td>5필드 snapshot과 70·85·95·100% 판정을 Backend→Gateway→Android에 연결함</td>
+                <td>TTL·rollback·암호화 cache·실패 격리·startup/reconnect·안전 기능 유지를 확인함</td>
+                <td><span class="badge verify">집중 검증 완료</span></td>
+              </tr>
+              <tr>
+                <th scope="row">핵심 뒤</th>
+                <td><strong>장기 세션·기기·토큰 재사용 탐지</strong></td>
+                <td>코드는 있으나 Android release에서 꺼져 있고 단일 host 파일 저장만 지원</td>
+                <td>1 replica 로컬 fixture에서 활성화·재시작·키 회전 확인</td>
+                <td><span class="badge verify">후속 점검</span></td>
+              </tr>
+              <tr>
+                <th scope="row">핵심 뒤</th>
+                <td><strong>개인정보 기록·키 무결성</strong></td>
+                <td>AES-GCM, AAD, hash chain은 구현됨; 실제 KMS·회전·복원훈련은 없음</td>
+                <td>목적별 secret 분리와 key rotation/recovery drill</td>
+                <td><span class="badge verify">후속 점검</span></td>
+              </tr>
+              <tr>
+                <th scope="row">핵심 뒤</th>
+                <td><strong>DB·업로드·AI 격리</strong></td>
+                <td>PostGIS 모델, 이미지 재인코딩, AI subprocess timeout/restart가 이미 구현됨</td>
+                <td>운영형 DB·악성 파일·승인 모델로 targeted 검증</td>
+                <td><span class="badge verify">재작성 금지</span></td>
+              </tr>
+              <tr>
+                <th scope="row">별도 운영</th>
+                <td><strong>상태 확인·로그·경보</strong></td>
+                <td>Backend readiness와 일부 감사/실패 로그는 있음; Gateway health와 공통 metric·dashboard 없음</td>
+                <td>내부 probe, correlation, 최소 metric, 단일 dashboard·alert</td>
+                <td><span class="badge build">별도 운영</span></td>
+              </tr>
+              <tr>
+                <th scope="row">별도 운영</th>
+                <td><strong>백업·복원</strong></td>
+                <td>암호화 백업·격리 복원 도구는 강함; timer, offsite, 실제 restore receipt 없음</td>
+                <td>scheduler·stale alert·격리 restore drill</td>
+                <td><span class="badge verify">별도 운영</span></td>
+              </tr>
+              <tr>
+                <th scope="row">후속</th>
+                <td><strong>관리자 초기 보안 등록·복구훈련</strong></td>
+                <td>인증·step-up·복구 서비스는 있으나 안전한 production CLI와 실훈련이 없음</td>
+                <td>credential FD 기반 CLI와 분실 기기 훈련</td>
+                <td><span class="badge build">후속</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="today">
+        <h2>3. 긴급 오류 복구 (Wave 1): 허용 후 4–6시간</h2>
+        <p>
+          서버·데이터 작업조와 외부 요청 경로 작업조가 동시에 진행한다.
+          각 변경과 집중 시험은 약 2–3시간, 합류 뒤 기본 연결 확인은 약 1–2시간이며 자동 검사 대기는 별도다.
+        </p>
+        <div class="work-grid">
+          <article class="work urgent">
+            <span class="badge fix">서버·DB · 변경 기능 집중</span>
+            <h3>개인정보 요청의 첫 INSERT 503 제거</h3>
+            <p class="outcome">결과: 동의·삭제 요청이 저장소 오류(503)가 아니라 정상 처리되고, 요청 한도 초과만 429가 된다.</p>
+            <ul>
+              <li>기존 migration은 고치지 않고 현재 head <code>202608150002</code> 뒤 successor를 추가한다.</li>
+              <li><code>ck_actor_rate_limit_events_group</code>을 다시 만들며 기존 5개 값과 <code>privacy</code>를 모두 허용한다.</li>
+              <li>Backend의 expected Alembic head와 migration 안내를 함께 갱신한다.</li>
+              <li>빈 DB upgrade와 기존 행이 있는 DB upgrade를 모두 검증한다.</li>
+            </ul>
+            <p class="small">핵심 파일: <a href="../../backend/alembic/versions/202607130004_shared_actor_rate_limits.py">기존 rate-limit migration</a>, <a href="../../backend/app/api/health.py">readiness</a>, <a href="../../backend/tests/test_actor_rate_limit_store.py">PostgreSQL rate-limit test</a></p>
+            <h4>수용 기준</h4>
+            <ul>
+              <li><code>privacy</code> 12회까지 저장되고 13회째 429</li>
+              <li>PostgreSQL store를 실제 켠 동의·삭제 API가 503을 내지 않음</li>
+              <li>저장소 장애 시 기존 fail-closed 503은 유지</li>
+            </ul>
+          </article>
+
+          <article class="work urgent">
+            <span class="badge fix">요청 중계·외부 경로 · 변경 기능 집중</span>
+            <h3>계정 삭제 3경로를 Nginx에서 Gateway까지 연결</h3>
+            <p class="outcome">결과: 요청·상태·기기증거가 외부 ingress를 통과하고, 닮은 경로나 잘못된 ID는 계속 404다.</p>
+            <ul>
+              <li>base exact location 1개와 anchored request-ID regex location 2개를 추가한다.</li>
+              <li>본문 상한은 요청 4 KiB, 상태 GET의 edge 방어 상한 1 KiB, 기기증거 16 KiB로 둔다. Gateway는 status GET의 실제 body를 계속 거부한다.</li>
+              <li>product boundary를 기존 5개 API에서 8개 API로 맞추고 <code>/privacy/rights</code>는 별도 유지한다.</li>
+              <li>날짜가 붙은 과거 5-route checker는 고치지 않고 신규 current ingress test를 추가한다.</li>
+            </ul>
+            <p class="small">핵심 파일: <a href="../../deploy/nginx/walksafe-android-gateway.conf.example">Nginx 예시</a>, <a href="../../configs/walksafe_product_boundary_20260722.json">제품 경계</a>, 신규 <code>test_walksafe_android_gateway_ingress_current.py</code></p>
+            <h4>수용 기준</h4>
+            <ul>
+              <li>16·128자 ID는 전달, 15·129자·잘못된 문자·후행 slash·추가 segment는 404</li>
+              <li>허용된 8개 API와 rights만 loopback Gateway로 전달</li>
+              <li>catch-all 404, no-store, access-log 차단 경계 유지</li>
+            </ul>
+          </article>
+        </div>
+
+        <h3>두 작업조가 합쳐진 뒤</h3>
+        <ol class="queue">
+          <li><strong>현재 결함을 의도적으로 고정한 진단 test를 historical 판정으로 옮긴다.</strong> 기능을 다시 깨뜨리는 assertion만 successor remediation test로 교체한다.</li>
+          <li><strong>실패·성공 smoke를 분리한다.</strong> 잘못된 capability로 Nginx 기본 404와 Gateway JSON 오류를 구분하고, 격리 DB의 유효한 actor/capability로 Backend·PostgreSQL까지 도달해 503·404가 사라졌는지 본다.</li>
+          <li><strong>기술 시험을 먼저 통과시킨다.</strong> 변경 기능 집중 시험 후 서버 기능 자동 검사를 실행하고, 긴 통제 검사는 별도 작업으로 보낸다.</li>
+        </ol>
+      </section>
+
+      <section id="core">
+        <h2>4. 로컬 핵심 기능 구현 (Wave 2): 병렬 1–1.5일</h2>
+        <p>
+          실제 데이터 삭제와 용량 상태 전달을 서로 다른 작업조가 동시에 만든다.
+          Wave 1 후반부터 준비를 겹치면 Wave 1·2 전체 경과는 1.5–2일이며, 1명이 순서대로 하면 2.5–3일이다.
+        </p>
+        <div class="work-grid">
+          <article class="work new">
+            <span class="badge build">서버 신고 데이터 격리 삭제 · Wave 2</span>
+            <h3>상태 표시가 아니라 실제 서버 데이터 삭제</h3>
+            <p class="outcome">결과: 해당 계정 세대의 신고 기록·종속 정보·암호화 파일을 격리 환경에서 실제로 지우고, 삭제 요청과 감사 기록은 보존한다. 이를 계정 전체 삭제 완료로 부르지 않는다.</p>
+            <ul>
+              <li>신규 <code>account_deletion_worker.py</code>를 수동 one-shot·단일 host·제한 batch로 실행해 pending server-owned 항목을 조회한다.</li>
+              <li>기존 subject-generation fence를 잡아 동시 ingest와 삭제를 직렬화한다.</li>
+              <li>일반 API 역할의 server-owned terminal 전이 권한을 회수하고, 전용 최소권한 역할만 검증된 물리 삭제 manifest와 결속해 상태를 바꾸게 한다.</li>
+              <li>DB 변경에는 전용 역할의 삭제·상태전이 권한과 별도 DSN 설정 계약을 넣는다. 실제 계정 비밀 배치와 예약 실행은 Wave 4 이후다.</li>
+              <li>기존 retention의 maintenance lock, backup 확인, row lock, 파일 identity/hash, recovery journal·재시작 reconcile primitive를 재사용한다.</li>
+              <li>하나의 crash-safe deletion manifest를 서버 inventory evidence로 매핑하고, 실제 저장 위치가 없는 항목은 근거와 함께 <code>NOT_APPLICABLE</code>로 둔다.</li>
+              <li>신규 maintenance script로 실행하며 API process와 runtime DB role에서 분리한다.</li>
+              <li>학습·백업·기기 등 외부 증거가 필요한 항목은 임의 완료하지 않고 <code>EXTERNAL_PENDING</code>을 유지한다.</li>
+              <li>tombstone, 삭제 request·item·event, consent ledger와 3년 보존 completion receipt는 삭제하지 않는다.</li>
+            </ul>
+            <h4>수용 기준</h4>
+            <ul>
+              <li><code>reports</code>·종속 <code>report_image_objects</code>·저장 객체 삭제와 보존 ledger 유지</li>
+              <li>동시 ingest 차단, 부분 실패, 재시작, 중복 실행과 최소권한 role 거부를 테스트</li>
+              <li>일부 저장소 실패 시 completion receipt 미발급</li>
+              <li>서버 삭제 뒤에는 overall <code>PARTIAL</code>·receipt 없음, 외부 항목까지 terminal인 경우에만 전체 완료</li>
+            </ul>
+            <p class="small">근거: <a href="../../backend/app/services/privacy_lifecycle.py">현재 삭제 상태 머신</a>, <a href="../../backend/tests/test_fp046_postgres_integration.py">기존 통합 test</a></p>
+          </article>
+
+          <article class="work new">
+            <span class="badge build">용량 상태 전달·집행 · Wave 2</span>
+            <h3>70·85·95·100% 서버 용량 상태</h3>
+            <p class="outcome">결과: 시험용 용량 정보를 서버에서 앱까지 전달하고 단계별 제한을 확인한다. 상태가 없거나 만료되면 새 원본·자동 생성은 안전하게 보류한다.</p>
+            <ul>
+              <li>Backend 내부 상태 producer·endpoint에 <code>version</code>, <code>observed_at</code>, <code>expires_at</code>, <code>level</code>, coarse <code>reason</code>을 둔다.</li>
+              <li>Gateway는 기계 자격증명으로 제한시간이 있는 내부 조회를 수행하고 암호화된 last-known snapshot을 보관한다. 조회 실패는 세션 상태 전체를 5xx로 만들지 않고 capacity만 만료·부재로 표시한다.</li>
+              <li>새 공개 route 대신 query 없는 <code>GET /api/field-session</code>에 공개 가능한 coarse snapshot만 넣고 OpenAPI를 갱신한다. <code>?devices=true</code> 응답은 건드리지 않는다.</li>
+              <li>Android에 별도 capacity 모델·인메모리 admission과 앱 시작·네트워크 재연결 조회를 연결한다. 실측 전 임의 polling 주기는 만들지 않는다.</li>
+              <li>이번에는 70% 경고 event와 85·95·100% 정책 판정 결과까지 구현한다. 실제 참가자 등록·원본 session·학습/자동신고 pipeline에 대한 운영 집행은 각 소유 기능과 합쳐질 때 별도 완료한다.</li>
+              <li>만료되지 않은 기존 자료와 단말 안전 기능은 용량 때문에 삭제·중단하지 않는다.</li>
+              <li>정식 만료 대응은 단말 byte 상한 안에서 암호화 보관 후 재연결 시 재판정하는 것이다. 현재 persistent queue는 비활성이므로 이번 최소 기능은 신규 raw·automatic 생성만 fail-closed 보류하고 정책 완료를 주장하지 않는다.</li>
+            </ul>
+            <div class="notice">
+              <strong>이번 최소 기능과 실제 운영 수집기의 경계</strong>
+              <p class="tight">이번 범위는 상태 형식·시험용 수집기·전달·Android 해석과 인메모리 제한까지다. 실제 GCS 주·백업 수집기, 영속 암호화 queue·30일 retry, 유효 시간은 cloud·단말 부하·offline 실측 뒤 별도 완료한다.</p>
+            </div>
+            <h4>수용 기준</h4>
+            <ul>
+              <li>합성 collector로 69→70→85→95→100과 하향 복구 상태 전이</li>
+              <li>전달 E2E와 70 경고 event·85/95/100 정책 판정 시험을 분리해 확인</li>
+              <li>앱 시작·재연결 조회와 오래된 버전·주입한 TTL 만료·수집기 장애에서 인메모리 fail-closed 동작</li>
+              <li>서버 임계값을 휴대전화 queue 임계값으로 복사하지 않음</li>
+            </ul>
+            <p class="small">정책 근거: <a href="../deliverables/04-design/security-and-operations-design.md">보안·운영 설계</a></p>
+          </article>
+        </div>
+
+        <aside class="notice decision" aria-label="핵심 기능 완료선">
+          <strong>여기까지가 로컬 핵심 기능 완료선이다.</strong>
+          <p class="tight">기존 세션·키·DB·업로드·AI·서비스 준비 상태는 새로 만들지 않는다. 필요한 활성화와 집중 시험만 Wave 3에서 4–6시간 동안 진행하며 Wave 2 완료를 막지 않는다.</p>
+        </aside>
+      </section>
+
+      <section id="team">
+        <h2>5. 병렬 팀 구성과 파일 충돌 방지</h2>
+        <div class="lane">
+          <strong>작업조 A<br>서버·데이터</strong>
+          <span>개인정보 DB 변경 → 삭제 작업 프로그램 → rate-limit 준비 상태. Privacy service·migration·PostgreSQL 시험 경로만 소유한다.</span>
+        </div>
+        <div class="lane">
+          <strong>작업조 B<br>외부 요청 경로</strong>
+          <span>Nginx 삭제 경로 → 제품 경계 → 현행 진입 경로 시험만 맡는다. Gateway/OpenAPI는 필요 없이 고치지 않는다.</span>
+        </div>
+        <div class="lane">
+          <strong>작업조 C<br>용량·앱</strong>
+          <span>용량 상태 모듈·내부 endpoint, Gateway cache·OpenAPI, Android 해석과 시험을 맡는다. 작업조 B의 변경이 합쳐진 뒤 Gateway 파일을 편집한다.</span>
+        </div>
+        <div class="lane">
+          <strong>작업조 D<br>운영·품질</strong>
+          <span>Wave 1·2에서는 계약 읽기 전용 검토와 합류 뒤 실패·성공 연결 시험만 맡는다. 지표·경보·백업 훈련은 핵심 완료 뒤 별도 운영 작업으로 진행한다.</span>
+        </div>
+        <div class="notice">
+          <strong>병합 규칙</strong>
+          <p class="tight">제품 수정 허용 뒤 승인된 SHA에서 각 작업조의 별도 작업 폴더를 만든다. <code>backend/app/main.py</code>, OpenAPI 생성물, 공용 test runner·catalog·checkpoint는 통합 담당만 합친다. DB 통합시험과 Gradle 작업은 작업조별 격리 환경이 없으면 직렬 실행한다. 변경 기능 집중 시험이 통과한 commit만 통합 브랜치에 차례로 합친다.</p>
+        </div>
+        <p class="small">시간 추정은 Wave 1의 작업조 A·B, Wave 2의 작업조 A·C에 각각 1명 이상 배정되는 조건이다. 1명이 순서대로 하면 핵심 기능에 2.5–3일이 걸린다.</p>
+      </section>
+
+      <section id="schedule">
+        <h2>6. 핵심 기능 일정과 별도 운영 일정</h2>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="기능 우선 구현 일정 표">
+          <table class="schedule-table">
+            <caption>기능 경로와 후속 작업을 분리한 예상 경과시간</caption>
+            <thead>
+              <tr><th scope="col">구현 내용</th><th scope="col">예상 경과</th><th scope="col">병렬 작업</th><th scope="col">완료 기준</th><th scope="col">단계 참고</th></tr>
+            </thead>
+            <tbody>
+              <tr class="after-core">
+                <th scope="row">제품 수정 허용·기준 SHA 확정</th>
+                <td>별도 선행조건</td>
+                <td>통제 담당이 현재 시작 계약을 완료하며 제품 코드는 건드리지 않음</td>
+                <td>event-scoped gate 통과, 승인된 durable base SHA 기록</td>
+                <td>준비</td>
+              </tr>
+              <tr>
+                <th scope="row">개인정보 503·삭제 경로 404 복구</th>
+                <td>4–6시간</td>
+                <td>작업조 A·B가 실패 재현과 구현, D는 합류 연결 시험 준비</td>
+                <td>두 집중 시험과 실패·성공 연결 시험 통과</td>
+                <td>Wave 1</td>
+              </tr>
+              <tr class="core-stop">
+                <th scope="row">격리 삭제 범위·합성 용량 전달 계약</th>
+                <td>1–1.5일</td>
+                <td>작업조 A·C 동시, D가 합류 검증</td>
+                <td>서버 삭제 뒤 PARTIAL·receipt 없음, 합성 상태 전달·앱 해석·정책 판정 통과</td>
+                <td>Wave 2</td>
+              </tr>
+              <tr class="after-core">
+                <th scope="row">기존 세션·키·준비 상태 점검</th>
+                <td>4–6시간</td>
+                <td>작업조 B·D, 기존 구현의 로컬 집중 시험만 수행</td>
+                <td><code>LOCAL_INTERNAL_PASS</code>; 실제 운영화 주장은 하지 않음</td>
+                <td>Wave 3 · 후속</td>
+              </tr>
+              <tr class="after-core">
+                <th scope="row">저장소 측 운영 설정·사전 환경 인계</th>
+                <td>1–2일</td>
+                <td>기능 완료와 독립: 지표·로그·경보 설정, backup timer, 격리 restore dry-run</td>
+                <td>버전 고정 설정·로컬/사전 환경 dry-run·격리 복원 결과 기록</td>
+                <td>Wave 4 · 별도 운영</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <aside class="notice decision" aria-label="핵심 기능 일정 종료선">
+          <strong>핵심 기능 일정은 Wave 2에서 끝난다.</strong>
+          <p class="tight">Wave 1 후반부터 Wave 2 준비를 겹치면 제품 수정 허용 뒤 1.5–2일이다. 1명이 순서대로 하면 2.5–3일이다. Wave 3·4는 이 합계에 넣지 않는다.</p>
+        </aside>
+        <p>
+          <strong>왜 Wave 1이 4–6시간인가?</strong> 두 코드 변경은 병렬로 약 2–3시간, DB upgrade·잘못된 Nginx 경로 차단·두 컴포넌트 합류 시험이 약 1–2시간이다.
+          전체 정식시험과 통제 문서 재생성은 이 추정에 넣지 않았다.
+        </p>
+        <p class="small"><strong>재검토 반영:</strong> 종전의 3–4일 기능 MVP와 5–8일 운영화 합계는 기능 코드·운영 준비·출시 검증을 섞은 값이므로 철회했다. 위 1.5–2일은 기존 삭제 상태 머신·retention primitive를 재사용하고, 실제 GCS·영속 단말 queue·운영 계정/secret·실배포를 제외하는 로컬 기능 범위다. 전제가 깨지면 그 지점에서 다시 산정한다.</p>
+      </section>
+
+      <section id="verification">
+        <h2>7. 핵심 기능에 붙이는 최소 검증</h2>
+        <ol class="queue">
+          <li><strong>실패 재현 1개</strong><br>현재 결함 또는 누락을 정확히 보여주는 가장 작은 시험을 먼저 만든다.</li>
+          <li><strong>변경 기능 집중 시험</strong><br>바꾼 DB 변경·경로·삭제 작업·용량 상태와 직접 인접한 시험만 반복 실행한다.</li>
+          <li><strong>경계 연결 시험 2개</strong><br>차단되어야 할 실패 경로와 실제 DB까지 도달해야 할 성공 경로를 각각 한 번 확인한다.</li>
+          <li><strong>단계 종료 통합</strong><br>각 편집마다 긴 전체 검사를 돌리지 않고 단계가 합쳐질 때 서버 기능·보안 관찰 검사를 병렬 실행한다.</li>
+        </ol>
+
+        <div class="table-wrap" role="region" tabindex="0" aria-label="기능별 검증 묶음 표">
+          <table>
+            <caption>최소 회귀와 완료 판정</caption>
+            <thead><tr><th scope="col">기능</th><th scope="col">실패 재현</th><th scope="col">집중 시험</th><th scope="col">통합 확인</th></tr></thead>
+            <tbody>
+              <tr>
+                <th scope="row">개인정보 503</th>
+                <td>PostgreSQL에서 <code>privacy</code> INSERT CHECK 위반 재현</td>
+                <td>upgrade·기존 행·12/13회·store 장애</td>
+                <td>실제 store를 켠 동의·삭제 API</td>
+              </tr>
+              <tr>
+                <th scope="row">삭제 진입 경로</th>
+                <td>OpenAPI 9경로와 Nginx 공개면 불일치</td>
+                <td>ID 경계, body limit, catch-all, no-store</td>
+                <td>잘못된 capability는 Gateway JSON, 유효한 actor/capability는 Backend·DB까지 도달</td>
+              </tr>
+              <tr>
+                <th scope="row">삭제 작업 프로그램</th>
+                <td>server item이 완료됐지만 신고 행·객체가 남는 거짓 완료 사례</td>
+                <td>일반 API terminal 전이 거부, manifest provenance, ledger 보존, 최소권한, 부분 실패·journal 재시작·멱등성·동시 ingest</td>
+                <td>접수→차단→server delete 뒤 PARTIAL·receipt 없음; 외부 terminal 뒤 receipt</td>
+              </tr>
+              <tr>
+                <th scope="row">용량 상태</th>
+                <td>상태 부재와 TTL 만료에서 잘못된 수집 계속</td>
+                <td>전달: 버전·하향 복구·역행·만료 / 판정: 70·85·95·100 단계 결과</td>
+                <td>합성 서버 snapshot→Gateway cache→Android parser, 상태 실패 격리와 안전 기능 유지</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <details>
+          <summary>시험 작업 운영 원칙</summary>
+          <div>
+            <ul>
+              <li>기술 필수: Backend unit/functional, migration 두 경로, Gateway build/test, 신규 현행 Nginx 계약, 실패·성공 live proxy 연결 시험.</li>
+              <li>보안 병렬: Gitleaks와 변경 finding 확인. 비밀·좌표·원문·capability를 test log에 넣지 않는다.</li>
+              <li>시작 전 현재 event-scoped 계약은 반드시 통과한다. 정식 279개·release evidence는 로컬 핵심 기능 뒤 별도 수행한다.</li>
+              <li>현재 결함을 기록한 과거 시험은 감사 이력으로 보존하고 신규 현행 시험만 고친 상태를 보호한다.</li>
+            </ul>
+          </div>
+        </details>
+      </section>
+
+      <section id="operations">
+        <h2>8. 후속 기능 점검과 별도 운영 준비 (Wave 3·4)</h2>
+        <div class="work-grid">
+          <article class="work verify">
+            <span class="badge verify">Wave 3 · 4–6시간</span>
+            <h3>기존 보안 기능의 로컬 집중 점검</h3>
+            <ul>
+              <li>장기 세션·기기·refresh 재사용 탐지를 1 replica 전제에서 활성화하고 재시작 시험</li>
+              <li>개인정보 key rotation·recovery를 실제 KMS가 아닌 격리 fixture로 확인</li>
+              <li>DB·업로드·AI 격리를 큰 입력·악성 corpus·장애 복구로 집중 확인</li>
+              <li>서비스 준비 상태에 새 rate-limit DB 제약 drift 확인을 연결</li>
+            </ul>
+            <p class="small">완료 표시는 <code>LOCAL_INTERNAL_PASS</code>다. 실제 운영 활성화·키 회전·복구 완료를 뜻하지 않는다.</p>
+          </article>
+          <article class="work verify">
+            <span class="badge shared">Wave 4 · 저장소 작업 1–2일</span>
+            <h3>운영 설정과 사전 환경 인계</h3>
+            <ul>
+              <li>Gateway·Backend 상태 확인, request ID 전파, route·status·latency·5xx 지표 설정</li>
+              <li>준비 상태·지속 5xx·용량·감사 기록·백업 age의 dashboard·경보 설정</li>
+              <li>암호화 backup timer와 격리 restore dry-run 결과 기록</li>
+              <li>삭제 작업의 unit/timer/env·OS ACL·claim lease 설정 초안과 사전 환경 점검</li>
+            </ul>
+            <p class="small">실제 secret 배치, on-call 경보 수신, 생산 backup·restore, 삭제 scheduler 실행은 환경 권한이 있어야 하며 1–2일 저장소 작업의 완료 주장에 넣지 않는다.</p>
+          </article>
+        </div>
+        <details>
+          <summary>사전 운영 환경에서만 따를 직렬 전환 순서</summary>
+          <div>
+            <ol>
+              <li>후보 code·artifact·migration·Nginx를 설치하고 hash 고정</li>
+              <li>실제 사전 backup을 만들고 검증하며 현 DB head 확인</li>
+              <li>외부 요청을 닫아 drain하고 Gateway·Backend 쓰기를 정지</li>
+              <li>migration 사전 확인 후 적용하고 새 head·CHECK 확인</li>
+              <li>필요 시 issuer bind 또는 기존 binding 확인 후 Backend 시작·ready 확인</li>
+              <li>Gateway 시작 후 내부 실패·성공 연결 시험</li>
+              <li><code>nginx -t</code> 후 외부 삭제 경로 활성화</li>
+              <li>15–30분 404·429·5xx·준비 상태 관찰</li>
+            </ol>
+          </div>
+        </details>
+        <aside class="notice danger" aria-label="운영 배포 경계">
+          <strong>현재 deploy 파일은 예시이며 실제 적용 증거가 아니다.</strong>
+          <p>
+            운영 반영에는 별도 사전/실제 운영 host, TLS·DNS, Secret Manager/KMS, 중앙 로그·경보, offsite backup,
+            Android 서명·배포 권한이 필요하다. migration 뒤 <code>privacy</code> 행이 생성되면 구 CHECK로 downgrade하지 않고 ingress를 닫은 뒤 roll-forward한다.
+          </p>
+        </aside>
+      </section>
+
+      <section id="done">
+        <h2>9. 로컬 핵심 기능 완료 기준 (Wave 2 종료)</h2>
+        <p class="outcome">2026-08-25 완료 표시는 <code>INTERNAL_TARGETED_VERIFIED</code>다. 배포·실제 삭제 운영·정식시험·출시 승인을 뜻하지 않는다.</p>
+        <div class="notice">
+          <strong>집중 검증 결과</strong>
+          <p class="tight">Backend 단위·계약 96개, 실제 PostgreSQL 통합 47개, Gateway 전체 97개, Android 전체 1,016개, repository·제품 경계 29개가 모두 통과했다. 삭제·용량 구현은 독립 재감사에서 P0/P1 잔여 없음으로 판정됐다.</p>
+        </div>
+        <ul>
+          <li>개인정보 동의·삭제 첫 요청이 PostgreSQL rate limiter 때문에 503이 되지 않는다.</li>
+          <li>계정 삭제 3경로의 실패 probe는 Gateway에서, 유효한 성공 probe는 Backend·격리 DB까지 도달하며 유사 경로는 차단된다.</li>
+          <li>격리 DB·임시 암호화 저장소에서 대상 <code>reports</code>·cascade 종속 정보·대응 <code>.wse</code>가 실제 삭제되고 ledger는 보존된다. 일반 API는 물리 삭제 없이 server item을 완료할 수 없다.</li>
+          <li>서버 삭제 범위 뒤 전체 상태는 <code>PARTIAL</code>이며 외부 증거 전에는 완료 기록이 없다. 남은 서버 식별자료는 목록별 판정 전까지 계정 전체 삭제 완료에 포함하지 않는다.</li>
+          <li>합성 70·85·95·100% capacity snapshot이 Backend→Gateway cache→Android parser로 전달되고 단계별 정책 판정·만료 실패 격리가 작동한다.</li>
+        </ul>
+        <h3>후속 기능 점검·운영 준비의 별도 완료 기준</h3>
+        <ul>
+          <li>장기 세션·개인정보 ledger·DB·업로드·AI 격리는 재작성 없이 로컬 집중 시험을 통과하고 <code>LOCAL_INTERNAL_PASS</code>로 표시된다.</li>
+          <li>Backend/Gateway 상태 확인, 최소 지표·로그, 경보·backup timer 설정과 격리 restore dry-run 결과가 버전 고정된다.</li>
+          <li>합성 capacity 상태의 지표·경보 설정과 단계별 정책 판정 연결 시험이 통과한다.</li>
+        </ul>
+        <h3>이 완료 기준에 포함하지 않는 것</h3>
+        <ul>
+          <li>실제 cloud·production 자원 생성, 인증서·KMS·on-call 채널 provisioning</li>
+          <li>삭제 작업의 실제 운영 계정·secret, scheduler 실행, 생산 backup 정책과 전체 서버 inventory 판정</li>
+          <li>실제 GCS primary/backup collector·자동 갱신, Android persistent encrypted queue·30일 retry, 실측 전 TTL·polling 확정</li>
+          <li>85% 참가자 등록·95% 원본 session·100% 학습/자동신고 pipeline의 실제 운영 집행</li>
+          <li>외부 학습·백업·기기 저장소의 삭제 증거가 없는 항목을 임의 완료 처리</li>
+          <li>279개 정식시험, 외부 보안·개인정보 검토, release eligibility 승인</li>
+          <li>요구가 확인되지 않은 다중 replica shared store, 전면 tracing, 새 framework 도입</li>
+        </ul>
+      </section>
+
+      <section id="sources">
+        <h2>10. 참고한 현재 코드와 문서</h2>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="계획 근거 문서 표">
+          <table>
+            <caption>상태 판단과 구현 계획의 직접 근거</caption>
+            <thead><tr><th scope="col">종류</th><th scope="col">문서·코드</th><th scope="col">사용한 내용</th></tr></thead>
+            <tbody>
+              <tr>
+                <th scope="row">현재 작업 경계</th>
+                <td><a href="walksafe-fp046-r002-resumption-plan-20260824.html">재개 계획</a>, <a href="../control/walksafe-project-continuation-checkpoint.json">현재 checkpoint</a>, <a href="../control/audits/walksafe-implementation-gap-analysis-20260815-r029.json">현행 gap 분석</a></td>
+                <td>현재 복구 WIP 보존, 제품 수정 허용 선행조건, 승인 SHA 뒤 기능 브랜치 생성 경계</td>
+              </tr>
+              <tr>
+                <th scope="row">기능 분류</th>
+                <td><a href="walksafe_feature_implementation_catalog.html">기능 구현 카탈로그</a>, <a href="walksafe-security-server-operations-work-plan.html">기존 보안·서버 운영 계획</a></td>
+                <td>담당 역할과 기능 범위. 오래된 상태 표시는 현재 코드로 재판정</td>
+              </tr>
+              <tr>
+                <th scope="row">Gateway 현재 구조</th>
+                <td><a href="../guides/code/android-gateway.md">Android Gateway 코드 지도</a>, <a href="../../apps/android-gateway/openapi.json">Gateway OpenAPI</a>, <a href="../../apps/android-gateway/src/routes.ts">Gateway routes</a></td>
+                <td>9개 공개 경로와 구 배포 예시의 삭제 경로 누락</td>
+              </tr>
+              <tr>
+                <th scope="row">Privacy·DB</th>
+                <td><a href="../../backend/app/field_test_security.py">field security</a>, <a href="../../backend/app/services/actor_rate_limit.py">rate-limit store</a>, <a href="../../backend/app/services/privacy_lifecycle.py">privacy lifecycle</a>, <a href="../../scripts/check_report_retention_dry_run.py">retention primitive</a></td>
+                <td>503 원인, 삭제 상태 머신·보존 ledger, 실제 삭제 프로그램 부재와 crash-safe 재사용 경로</td>
+              </tr>
+              <tr>
+                <th scope="row">보안·운영 설계</th>
+                <td><a href="../deliverables/04-design/security-and-operations-design.md">보안·운영 설계</a>, <a href="../control/decision-interview/walksafe-feature-policy-review-resolution-rules.json">기능 정책 결정 규칙</a>, <a href="../guides/security-privacy-guide.md">보안·개인정보 가이드</a></td>
+                <td>capacity 네 단계·조회 event·stale queue 목표와 미확정 TTL, 비밀·개인정보 경계</td>
+              </tr>
+              <tr>
+                <th scope="row">관측·복구</th>
+                <td><a href="../deliverables/10-operations/operator-guide.md">운영자 가이드</a>, <a href="../deliverables/10-operations/recovery-plan.md">복구 계획</a>, <a href="../deliverables/07-security/security-response-and-monitoring.md">보안 대응·관제</a></td>
+                <td>health, dashboard, alert, backup, restore, incident의 구현·미실행 구분</td>
+              </tr>
+              <tr>
+                <th scope="row">개발·배포 경계</th>
+                <td><a href="../guides/team-workflow.md">팀 workflow</a>, <a href="../../deploy/README.md">배포 예시 안내</a>, <a href="../guides/release-operations-guide.md">release 운영 가이드</a></td>
+                <td>기능 worktree, 실패 재현, 배포 전 상태, 정식 출시 검증의 별도 작업 경계</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small">
+          기준일 2026-08-24. 이 문서는 기능 구현을 빠르게 진행하기 위한 비정본 계획이며 checkpoint·Goal·release 판정을 변경하지 않는다.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      WalkSafe · 보안·서버 운영 기능 우선 계획 · 관련 없는 control·catalog·제품 파일은 이 문서 작성 과정에서 수정하지 않음
+    </footer>
+  </div>
+</body>
+</html>

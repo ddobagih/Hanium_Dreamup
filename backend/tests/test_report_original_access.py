@@ -15,6 +15,8 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 
+import backend.app.services.report_original_access as report_original_access
+import backend.app.uploads as uploads
 from backend.app.database import SessionLocal
 from backend.app.main import report_image_key_manager
 from backend.app.models import (
@@ -31,11 +33,12 @@ from backend.app.services.admin_security import (
     AdminSessionIdentity,
     provision_admin_security,
 )
-from backend.app.services.report_image_crypto import encrypt_report_image
+from backend.app.services.report_image_crypto import ReportImageCryptoError, encrypt_report_image
 from backend.app.services.report_image_keys import ReportImageKeyUnavailable
 from backend.app.services.report_original_access import (
     ReportOriginalAccessError,
     _lock_and_revalidate_admin_session,
+    _read_envelope,
     access_report_original,
     issue_report_original_access_grant,
 )
@@ -46,6 +49,92 @@ ROOT = Path(__file__).resolve().parents[2]
 TEST_DATABASE_CONFIGURED = bool(os.environ.get("WALKSAFE_TEST_DATABASE_URL", "").strip())
 TEST_CREDENTIAL_ISSUER_KEY = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
 TEST_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+
+
+def test_envelope_reader_accepts_read_only_backup_group_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tmp_path.chmod(0o2750)
+    monkeypatch.setattr(
+        uploads.grp,
+        "getgrnam",
+        lambda _name: type("Group", (), {"gr_gid": tmp_path.stat().st_gid})(),
+    )
+    path = tmp_path / "report.wse"
+    write_image_file(path, b"encrypted-envelope")
+
+    assert _read_envelope(path, len(b"encrypted-envelope")) == b"encrypted-envelope"
+    assert path.stat().st_mode & 0o777 == 0o640
+
+
+def test_envelope_reader_rejects_object_acl(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "report.wse"
+    write_image_file(path, b"encrypted-envelope")
+    identity = (path.stat().st_dev, path.stat().st_ino)
+    monkeypatch.setattr(
+        report_original_access.os,
+        "listxattr",
+        lambda descriptor: (
+            [b"system.posix_acl_access"]
+            if (os.fstat(descriptor).st_dev, os.fstat(descriptor).st_ino)
+            == identity
+            else []
+        ),
+    )
+
+    with pytest.raises(ReportImageCryptoError, match="metadata changed"):
+        _read_envelope(path, len(b"encrypted-envelope"))
+
+
+def test_envelope_reader_rejects_upload_root_acl(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "report.wse"
+    write_image_file(path, b"encrypted-envelope")
+    identity = (tmp_path.stat().st_dev, tmp_path.stat().st_ino)
+    monkeypatch.setattr(
+        report_original_access.os,
+        "listxattr",
+        lambda descriptor: (
+            [b"system.posix_acl_default"]
+            if (os.fstat(descriptor).st_dev, os.fstat(descriptor).st_ino)
+            == identity
+            else []
+        ),
+    )
+
+    with pytest.raises(ReportImageCryptoError, match="upload root"):
+        _read_envelope(path, len(b"encrypted-envelope"))
+
+
+def test_envelope_reader_revalidates_upload_root_after_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "report.wse"
+    write_image_file(path, b"encrypted-envelope")
+    real_read = report_original_access.os.read
+    drifted = False
+
+    def read_and_drift(descriptor: int, size: int) -> bytes:
+        nonlocal drifted
+        content = real_read(descriptor, size)
+        if not drifted:
+            drifted = True
+            tmp_path.chmod(0o755)
+        return content
+
+    monkeypatch.setattr(report_original_access.os, "read", read_and_drift)
+
+    with pytest.raises(ReportImageCryptoError, match="upload root"):
+        _read_envelope(path, len(b"encrypted-envelope"))
+
+    assert drifted is True
 
 
 @pytest.fixture(scope="module", autouse=True)

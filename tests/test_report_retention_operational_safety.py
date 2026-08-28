@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 import errno
+import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -341,17 +343,128 @@ def test_maintenance_lock_rejects_unsafe_existing_permissions(
     lock_path = tmp_path / "maintenance" / "walksafe.lock"
     lock_parent = lock_path.parent
     lock_parent.mkdir(mode=0o700)
+    lock_path.touch(mode=0o600)
     with exclusive_maintenance_lock(lock_path) as lock:
         assert lock["identity_sha256"]
         assert lock["device_inode"] == (
-            f"{lock_parent.stat().st_dev}:{lock_parent.stat().st_ino}"
+            f"{lock_path.stat().st_dev}:{lock_path.stat().st_ino}"
         )
         assert lock_path.stat().st_mode & 0o777 == 0o600
 
     lock_path.chmod(0o644)
-    with pytest.raises(ValueError, match="single-link 0600"):
+    with pytest.raises(ValueError, match="metadata is unsafe"):
         with exclusive_maintenance_lock(lock_path):
             pass
+
+
+def test_maintenance_lock_requires_preprovisioned_single_link_leaf(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(retention, "_validate_trusted_maintenance_lock_parent", lambda *_args: None)
+    lock_parent = tmp_path / "maintenance"
+    lock_parent.mkdir(mode=0o700)
+    lock_path = lock_parent / "walksafe.lock"
+
+    with pytest.raises(ValueError, match="must already exist"):
+        with exclusive_maintenance_lock(lock_path):
+            pytest.fail("missing maintenance lock must not be entered")
+    assert not lock_path.exists()
+
+    lock_path.touch(mode=0o600)
+    os.link(lock_path, lock_parent / "walksafe.alias")
+    with pytest.raises(ValueError, match="metadata is unsafe"):
+        with exclusive_maintenance_lock(lock_path):
+            pytest.fail("hard-linked maintenance lock must not be entered")
+
+
+def test_exclusive_maintenance_lock_contends_on_leaf_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(retention, "_validate_trusted_maintenance_lock_parent", lambda *_args: None)
+    lock_parent = tmp_path / "maintenance"
+    lock_parent.mkdir(mode=0o700)
+    lock_path = lock_parent / "walksafe.lock"
+    lock_path.touch(mode=0o600)
+    descriptor = os.open(lock_path, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        with pytest.raises(TimeoutError, match="timed out acquiring maintenance lock"):
+            with exclusive_maintenance_lock(lock_path, timeout_seconds=0):
+                pytest.fail("shared leaf lock must block retention")
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+
+
+def test_maintenance_lock_rejects_acl_inspection_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(retention, "_validate_trusted_maintenance_lock_parent", lambda *_args: None)
+    lock_parent = tmp_path / "maintenance"
+    lock_parent.mkdir(mode=0o700)
+    lock_path = lock_parent / "walksafe.lock"
+    lock_path.touch(mode=0o600)
+    monkeypatch.setattr(
+        retention.os,
+        "listxattr",
+        lambda _descriptor: (_ for _ in ()).throw(OSError(errno.EACCES, "denied")),
+    )
+
+    with pytest.raises(ValueError, match="metadata is unsafe"):
+        with exclusive_maintenance_lock(lock_path):
+            pytest.fail("uninspectable ACL state must not be entered")
+
+
+def test_maintenance_lock_group_name_resolves_to_gid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("WALKSAFE_MAINTENANCE_LOCK_GROUP", "walksafe-lock")
+    monkeypatch.setattr(
+        retention.grp,
+        "getgrnam",
+        lambda name: SimpleNamespace(gr_gid=1234) if name == "walksafe-lock" else None,
+    )
+
+    assert retention._maintenance_lock_group_gid_from_environment() == 1234
+
+
+def test_deployment_requires_maintenance_lock_group(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("WALKSAFE_ENVIRONMENT", "production")
+    monkeypatch.delenv("WALKSAFE_MAINTENANCE_LOCK_GROUP", raising=False)
+
+    with pytest.raises(ValueError, match="WALKSAFE_MAINTENANCE_LOCK_GROUP is required"):
+        retention._maintenance_lock_group_gid_from_environment()
+
+
+def test_deployment_upload_group_resolves_by_name_and_rejects_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("WALKSAFE_ENVIRONMENT", "production")
+    monkeypatch.setenv(
+        "WALKSAFE_UPLOAD_BACKUP_READER_GROUP",
+        "walksafe-backup-readers",
+    )
+    monkeypatch.setattr(
+        retention.grp,
+        "getgrnam",
+        lambda name: SimpleNamespace(gr_gid=1234)
+        if name == "walksafe-backup-readers"
+        else None,
+    )
+    assert retention._upload_backup_reader_group_gid_from_environment() == 1234
+
+    monkeypatch.setattr(
+        retention.grp,
+        "getgrnam",
+        lambda _name: SimpleNamespace(gr_gid=0),
+    )
+    with pytest.raises(ValueError, match="must not be root"):
+        retention._upload_backup_reader_group_gid_from_environment()
 
 
 def test_maintenance_lock_closes_parent_descriptor_when_initial_fstat_fails(
@@ -386,6 +499,7 @@ def test_maintenance_lock_detects_path_swap_after_original_is_restored(
     monkeypatch.setattr(retention, "_validate_trusted_maintenance_lock_parent", lambda *_args: None)
     lock_path = tmp_path / "maintenance" / "walksafe.lock"
     lock_path.parent.mkdir(mode=0o700)
+    lock_path.touch(mode=0o600)
     displaced = lock_path.with_suffix(".original")
     second_entered = False
 
@@ -393,12 +507,11 @@ def test_maintenance_lock_detects_path_swap_after_original_is_restored(
         with exclusive_maintenance_lock(lock_path):
             lock_path.rename(displaced)
             lock_path.touch(mode=0o600)
-            with pytest.raises(TimeoutError, match="timed out acquiring maintenance lock"):
-                with exclusive_maintenance_lock(lock_path, timeout_seconds=0):
-                    second_entered = True
+            with exclusive_maintenance_lock(lock_path, timeout_seconds=0):
+                second_entered = True
             lock_path.unlink()
             displaced.rename(lock_path)
-    assert second_entered is False
+    assert second_entered is True
 
 
 def test_maintenance_lock_rejects_replaceable_parent(tmp_path: Path) -> None:

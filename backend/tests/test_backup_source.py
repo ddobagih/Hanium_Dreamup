@@ -25,6 +25,14 @@ def _private_root(path: Path) -> None:
     path.chmod(0o700)
 
 
+def _replace_stat(metadata: os.stat_result, **changes: int) -> os.stat_result:
+    indexes = {"st_mode": 0, "st_nlink": 3, "st_uid": 4, "st_gid": 5}
+    fields = list(metadata)
+    for name, value in changes.items():
+        fields[indexes[name]] = value
+    return os.stat_result(fields)
+
+
 def _report_image(
     upload_dir: Path,
     report_id: uuid.UUID,
@@ -60,6 +68,21 @@ def _report_image(
         ),
         encrypted.envelope,
     )
+
+
+def _operational_report_image(
+    upload_dir: Path,
+) -> tuple[ReportImage, Path, int, int]:
+    report_id = uuid.UUID("11111111-1111-4111-8111-111111111111")
+    report_image, _envelope = _report_image(upload_dir, report_id)
+    image = upload_dir / f"{report_id}.wse"
+    reader_gid = upload_dir.stat().st_gid
+    backend_uid = upload_dir.stat().st_uid
+    if reader_gid == 0 or backend_uid == 0:
+        pytest.skip("requires a non-root test owner and group")
+    upload_dir.chmod(0o2750)
+    image.chmod(0o640)
+    return report_image, image, reader_gid, backend_uid
 
 
 def test_backup_source_uses_encrypted_objects_not_logical_image_paths(tmp_path: Path) -> None:
@@ -102,7 +125,63 @@ def test_backup_archive_contains_only_authoritative_wse_bytes(tmp_path: Path) ->
     output.seek(0)
     with tarfile.open(fileobj=output, mode="r:gz") as archive:
         assert archive.getnames() == [f"{report_id}.wse"]
+        assert archive.getmember(f"{report_id}.wse").mode == 0o600
         stream = archive.extractfile(f"{report_id}.wse")
+        assert stream is not None
+        assert stream.read() == envelope
+    assert result["image_hash_mismatch_count"] == 0
+
+
+def test_operational_backup_archive_normalizes_reader_source_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_id = uuid.UUID("11111111-1111-4111-8111-111111111111")
+    report_image, envelope = _report_image(tmp_path, report_id, plaintext=b"reader-source")
+    reader_gid = tmp_path.stat().st_gid
+    backend_uid = tmp_path.stat().st_uid
+    if reader_gid == 0 or backend_uid == 0:
+        pytest.skip("requires a non-root test owner and group")
+    tmp_path.chmod(0o2750)
+    (tmp_path / f"{report_id}.wse").chmod(0o640)
+    access_calls: list[tuple[str, int, int | None, bool, bool]] = []
+
+    def deny_backup_write(
+        path: str,
+        mode: int,
+        *,
+        dir_fd: int | None = None,
+        effective_ids: bool = False,
+        follow_symlinks: bool = True,
+    ) -> bool:
+        access_calls.append((path, mode, dir_fd, effective_ids, follow_symlinks))
+        return False
+
+    monkeypatch.setattr(backup_source.os, "geteuid", lambda: backend_uid + 1)
+    monkeypatch.setattr(backup_source.os, "access", deny_backup_write)
+    output = io.BytesIO()
+
+    result = write_validated_upload_archive(
+        [report_image],
+        tmp_path,
+        output,
+        expected_reader_gid=reader_gid,
+    )
+
+    assert access_calls
+    assert all(
+        path == "."
+        and mode == os.W_OK
+        and dir_fd is not None
+        and effective_ids
+        and not follow_symlinks
+        for path, mode, dir_fd, effective_ids, follow_symlinks in access_calls
+    )
+    output.seek(0)
+    with tarfile.open(fileobj=output, mode="r:gz") as archive:
+        member = archive.getmember(f"{report_id}.wse")
+        assert member.mode == 0o600
+        stream = archive.extractfile(member)
         assert stream is not None
         assert stream.read() == envelope
     assert result["image_hash_mismatch_count"] == 0
@@ -250,9 +329,10 @@ def test_backup_source_rejects_plaintext_unknown_and_mode_drift(tmp_path: Path) 
         validate_snapshot_consistency([report_image], tmp_path)
 
     encrypted_path.chmod(0o600)
-    tmp_path.chmod(0o750)
-    with pytest.raises(ValueError, match="service-owned private"):
-        validate_snapshot_consistency([report_image], tmp_path)
+    for unsafe_mode in (0o500, 0o750, 0o2700):
+        tmp_path.chmod(unsafe_mode)
+        with pytest.raises(ValueError, match="service-owned private"):
+            validate_snapshot_consistency([report_image], tmp_path)
 
 
 def test_backup_source_rejects_plaintext_renamed_to_wse(tmp_path: Path) -> None:
@@ -269,8 +349,132 @@ def test_backup_source_rejects_plaintext_renamed_to_wse(tmp_path: Path) -> None:
         validate_snapshot_consistency([ReportImage(**values)], tmp_path)
 
 
+@pytest.mark.parametrize(
+    "drift",
+    [
+        "missing_membership",
+        "root_reader_group",
+        "reader_gid",
+        "directory_mode",
+        "backup_write",
+        "backup_owner",
+        "root_owner",
+    ],
+)
+def test_operational_backup_rejects_upload_root_contract_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift: str,
+) -> None:
+    report_image, _image, reader_gid, backend_uid = _operational_report_image(tmp_path)
+    expected_gid = reader_gid
+    backup_uid = backend_uid + 1
+    monkeypatch.setattr(backup_source.os, "geteuid", lambda: backup_uid)
+    monkeypatch.setattr(backup_source.os, "access", lambda *_args, **_kwargs: False)
+
+    if drift == "missing_membership":
+        monkeypatch.setattr(backup_source.os, "getegid", lambda: reader_gid + 1)
+        monkeypatch.setattr(backup_source.os, "getgroups", lambda: [])
+    elif drift == "root_reader_group":
+        expected_gid = 0
+        monkeypatch.setattr(backup_source.os, "getegid", lambda: 0)
+        monkeypatch.setattr(backup_source.os, "getgroups", lambda: [])
+    elif drift == "reader_gid":
+        expected_gid = reader_gid + 1
+        monkeypatch.setattr(backup_source.os, "getgroups", lambda: [expected_gid])
+    elif drift == "directory_mode":
+        tmp_path.chmod(0o750)
+    elif drift == "backup_write":
+        monkeypatch.setattr(backup_source.os, "access", lambda *_args, **_kwargs: True)
+    elif drift == "backup_owner":
+        monkeypatch.setattr(backup_source.os, "geteuid", lambda: backend_uid)
+    elif drift == "root_owner":
+        root_identity = (tmp_path.stat().st_dev, tmp_path.stat().st_ino)
+        real_fstat = os.fstat
+
+        def root_owned_directory(descriptor: int) -> os.stat_result:
+            metadata = real_fstat(descriptor)
+            if (metadata.st_dev, metadata.st_ino) == root_identity:
+                return _replace_stat(metadata, st_uid=0)
+            return metadata
+
+        monkeypatch.setattr(backup_source.os, "fstat", root_owned_directory)
+
+    with pytest.raises(ValueError, match="upload reader group|operational upload root"):
+        validate_snapshot_consistency(
+            [report_image],
+            tmp_path,
+            expected_reader_gid=expected_gid,
+        )
+
+
+@pytest.mark.parametrize("drift", ["owner", "reader_gid", "mode", "hardlink"])
+def test_operational_backup_rejects_encrypted_file_contract_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift: str,
+) -> None:
+    report_image, image, reader_gid, backend_uid = _operational_report_image(tmp_path)
+    monkeypatch.setattr(backup_source.os, "geteuid", lambda: backend_uid + 1)
+    monkeypatch.setattr(backup_source.os, "access", lambda *_args, **_kwargs: False)
+    real_stat = os.stat
+
+    def drifted_entry(path: os.PathLike[str] | str, *args: Any, **kwargs: Any) -> os.stat_result:
+        metadata = real_stat(path, *args, **kwargs)
+        if kwargs.get("dir_fd") is None or os.fspath(path) != image.name:
+            return metadata
+        if drift == "owner":
+            return _replace_stat(metadata, st_uid=backend_uid + 1)
+        if drift == "reader_gid":
+            return _replace_stat(metadata, st_gid=reader_gid + 1)
+        if drift == "mode":
+            return _replace_stat(
+                metadata,
+                st_mode=(metadata.st_mode & ~0o7777) | 0o600,
+            )
+        return _replace_stat(metadata, st_nlink=2)
+
+    monkeypatch.setattr(backup_source.os, "stat", drifted_entry)
+
+    with pytest.raises(ValueError, match="non-flat or unsafe"):
+        validate_snapshot_consistency(
+            [report_image],
+            tmp_path,
+            expected_reader_gid=reader_gid,
+        )
+
+
+@pytest.mark.parametrize("target", ["root", "file"])
+def test_operational_backup_rejects_upload_acls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target: str,
+) -> None:
+    report_image, image, reader_gid, backend_uid = _operational_report_image(tmp_path)
+    root_identity = (tmp_path.stat().st_dev, tmp_path.stat().st_ino)
+    file_identity = (image.stat().st_dev, image.stat().st_ino)
+    real_fstat = os.fstat
+    monkeypatch.setattr(backup_source.os, "geteuid", lambda: backend_uid + 1)
+    monkeypatch.setattr(backup_source.os, "access", lambda *_args, **_kwargs: False)
+
+    def simulated_acl(descriptor: int) -> list[bytes]:
+        metadata = real_fstat(descriptor)
+        identity = (metadata.st_dev, metadata.st_ino)
+        expected = root_identity if target == "root" else file_identity
+        return [b"system.posix_acl_access"] if identity == expected else []
+
+    monkeypatch.setattr(backup_source.os, "listxattr", simulated_acl)
+
+    with pytest.raises(ValueError, match="operational upload root|ACL"):
+        validate_snapshot_consistency(
+            [report_image],
+            tmp_path,
+            expected_reader_gid=reader_gid,
+        )
+
+
 @pytest.mark.parametrize("directory_name", sorted(backup_source.OPERATIONAL_DIRECTORIES))
-def test_backup_source_allows_only_empty_private_operational_directories(
+def test_backup_source_rejects_remaining_operational_directories(
     tmp_path: Path,
     directory_name: str,
 ) -> None:
@@ -279,18 +483,13 @@ def test_backup_source_allows_only_empty_private_operational_directories(
     operational = tmp_path / directory_name
     _private_root(operational)
 
-    result = validate_snapshot_consistency([report_image], tmp_path)
-    assert result["upload_file_count"] == 1
-
-    operational.chmod(0o750)
-    with pytest.raises(ValueError, match="operational directory is unsafe"):
+    with pytest.raises(ValueError, match="operational directory remains"):
         validate_snapshot_consistency([report_image], tmp_path)
-    operational.chmod(0o700)
 
     evidence = operational / "pending.json"
     evidence.write_text("{}", encoding="utf-8")
     evidence.chmod(0o600)
-    with pytest.raises(ValueError, match="nonempty or nonterminal"):
+    with pytest.raises(ValueError, match="operational directory remains"):
         validate_snapshot_consistency([report_image], tmp_path)
     assert evidence.exists()
 
@@ -305,7 +504,7 @@ def test_backup_source_rejects_operational_directory_symlinks(
     _private_root(outside)
     (tmp_path / directory_name).symlink_to(outside, target_is_directory=True)
 
-    with pytest.raises(ValueError, match="operational directory is unsafe"):
+    with pytest.raises(ValueError, match="operational directory remains"):
         validate_snapshot_consistency([], tmp_path)
 
 

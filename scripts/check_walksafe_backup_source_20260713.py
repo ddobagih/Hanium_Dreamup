@@ -93,6 +93,7 @@ def _stat_identity(metadata: os.stat_result) -> tuple[int, ...]:
         metadata.st_ino,
         metadata.st_mode,
         metadata.st_uid,
+        metadata.st_gid,
         metadata.st_nlink,
         metadata.st_size,
         metadata.st_mtime_ns,
@@ -100,43 +101,21 @@ def _stat_identity(metadata: os.stat_result) -> tuple[int, ...]:
     )
 
 
-def _validate_empty_operational_directory(
-    root_fd: int,
-    name: str,
-    anchored: os.stat_result,
-) -> None:
-    if (
-        not stat.S_ISDIR(anchored.st_mode)
-        or stat.S_ISLNK(anchored.st_mode)
-        or anchored.st_uid != os.geteuid()
-        or stat.S_IMODE(anchored.st_mode) != 0o700
-    ):
-        raise ValueError(f"backup operational directory is unsafe: {name}")
-    descriptor = os.open(
-        name,
-        os.O_RDONLY
-        | getattr(os, "O_CLOEXEC", 0)
-        | getattr(os, "O_DIRECTORY", 0)
-        | getattr(os, "O_NOFOLLOW", 0),
-        dir_fd=root_fd,
-    )
+def _descriptor_acl_is_absent(descriptor: int) -> bool:
     try:
-        opened = os.fstat(descriptor)
-        if _stat_identity(opened) != _stat_identity(anchored):
-            raise ValueError(f"backup operational directory changed while opening: {name}")
-        if os.listdir(descriptor):
-            raise ValueError(
-                f"backup operational directory is nonempty or nonterminal: {name}"
-            )
-        if _stat_identity(os.fstat(descriptor)) != _stat_identity(opened):
-            raise ValueError(f"backup operational directory changed while reading: {name}")
-    finally:
-        os.close(descriptor)
+        return not any(
+            "acl" in os.fsdecode(name).casefold()
+            for name in os.listxattr(descriptor)
+        )
+    except (AttributeError, OSError):
+        return False
 
 
 @contextmanager
 def opened_upload_snapshot(
     upload_dir: Path | int,
+    *,
+    expected_reader_gid: int | None = None,
 ) -> Iterator[tuple[int, dict[str, UploadEntry]]]:
     if isinstance(upload_dir, int):
         directory_fd = os.dup(upload_dir)
@@ -151,26 +130,53 @@ def opened_upload_snapshot(
     files: dict[str, UploadEntry] = {}
     try:
         root_before = os.fstat(directory_fd)
-        if (
-            not stat.S_ISDIR(root_before.st_mode)
-            or root_before.st_uid != os.geteuid()
-            or (stat.S_IMODE(root_before.st_mode) & 0o077)
-            or (stat.S_IMODE(root_before.st_mode) & 0o500) != 0o500
-        ):
-            raise ValueError("upload root must be a service-owned private real directory")
+        if expected_reader_gid is None:
+            if (
+                not stat.S_ISDIR(root_before.st_mode)
+                or root_before.st_uid != os.geteuid()
+                or stat.S_IMODE(root_before.st_mode) != 0o700
+                or not _descriptor_acl_is_absent(directory_fd)
+            ):
+                raise ValueError("upload root must be a service-owned private real directory")
+        else:
+            effective_groups = {os.getegid(), *os.getgroups()}
+            if expected_reader_gid <= 0 or expected_reader_gid not in effective_groups:
+                raise ValueError("backup process is not a member of the upload reader group")
+            if (
+                not stat.S_ISDIR(root_before.st_mode)
+                or root_before.st_uid in {0, os.geteuid()}
+                or root_before.st_gid != expected_reader_gid
+                or stat.S_IMODE(root_before.st_mode) != 0o2750
+                or not _descriptor_acl_is_absent(directory_fd)
+                or os.access(
+                    ".",
+                    os.W_OK,
+                    dir_fd=directory_fd,
+                    effective_ids=True,
+                    follow_symlinks=False,
+                )
+            ):
+                raise ValueError(
+                    "operational upload root must be backend-owned, reader-group 2750, and not writable by backup"
+                )
         for filename in sorted(os.listdir(directory_fd)):
             entry = os.stat(filename, dir_fd=directory_fd, follow_symlinks=False)
             if filename in OPERATIONAL_DIRECTORIES:
-                _validate_empty_operational_directory(directory_fd, filename, entry)
-                continue
+                raise ValueError(f"backup operational directory remains in upload root: {filename}")
             if STORAGE_NAME_PATTERN.fullmatch(filename) is None:
                 raise ValueError(
                     f"upload snapshot contains a legacy, plaintext, orphan, or unknown entry: {filename}"
                 )
+            expected_uid = os.geteuid() if expected_reader_gid is None else root_before.st_uid
+            expected_mode = 0o600 if expected_reader_gid is None else 0o640
             if (
                 not stat.S_ISREG(entry.st_mode)
-                or entry.st_uid != os.geteuid()
-                or stat.S_IMODE(entry.st_mode) != 0o600
+                or entry.st_uid != expected_uid
+                or (
+                    expected_reader_gid is not None
+                    and entry.st_gid != expected_reader_gid
+                )
+                or stat.S_IMODE(entry.st_mode) != expected_mode
                 or entry.st_nlink != 1
                 or not 0 < entry.st_size <= MAX_ENVELOPE_BYTES
             ):
@@ -183,15 +189,24 @@ def opened_upload_snapshot(
                 dir_fd=directory_fd,
             )
             opened_before = os.fstat(descriptor)
-            if _stat_identity(opened_before) != _stat_identity(entry):
+            if (
+                _stat_identity(opened_before) != _stat_identity(entry)
+                or not _descriptor_acl_is_absent(descriptor)
+            ):
                 os.close(descriptor)
-                raise ValueError(f"upload file changed while opening: {filename}")
+                raise ValueError(f"upload file changed or has an ACL while opening: {filename}")
             files[filename] = (descriptor, opened_before)
         yield directory_fd, files
-        if _stat_identity(os.fstat(directory_fd)) != _stat_identity(root_before):
+        if (
+            _stat_identity(os.fstat(directory_fd)) != _stat_identity(root_before)
+            or not _descriptor_acl_is_absent(directory_fd)
+        ):
             raise ValueError("upload root changed while reading the snapshot")
         for filename, (descriptor, opened_before) in files.items():
-            if _stat_identity(os.fstat(descriptor)) != _stat_identity(opened_before):
+            if (
+                _stat_identity(os.fstat(descriptor)) != _stat_identity(opened_before)
+                or not _descriptor_acl_is_absent(descriptor)
+            ):
                 raise ValueError(f"upload file changed while reading: {filename}")
     finally:
         for descriptor, _metadata in files.values():
@@ -245,8 +260,15 @@ def _actual_uploads(files: dict[str, UploadEntry]) -> dict[str, ActualUpload]:
     }
 
 
-def upload_hashes(upload_dir: Path | int) -> dict[str, str]:
-    with opened_upload_snapshot(upload_dir) as (_directory_fd, files):
+def upload_hashes(
+    upload_dir: Path | int,
+    *,
+    expected_reader_gid: int | None = None,
+) -> dict[str, str]:
+    with opened_upload_snapshot(
+        upload_dir,
+        expected_reader_gid=expected_reader_gid,
+    ) as (_directory_fd, files):
         return {
             filename: actual.envelope_sha256
             for filename, actual in _actual_uploads(files).items()
@@ -359,9 +381,14 @@ def snapshot_consistency_result(
 def validate_snapshot_consistency(
     report_images: Iterable[ReportImage],
     upload_dir: Path | int,
+    *,
+    expected_reader_gid: int | None = None,
 ) -> dict[str, int | str]:
     referenced = expected_uploads(report_images)
-    with opened_upload_snapshot(upload_dir) as (_directory_fd, files):
+    with opened_upload_snapshot(
+        upload_dir,
+        expected_reader_gid=expected_reader_gid,
+    ) as (_directory_fd, files):
         return snapshot_consistency_result(referenced, _actual_uploads(files))
 
 
@@ -380,9 +407,14 @@ def write_validated_upload_archive(
     report_images: Iterable[ReportImage],
     upload_dir: Path | int,
     output: BinaryIO,
+    *,
+    expected_reader_gid: int | None = None,
 ) -> dict[str, int | str]:
     referenced = expected_uploads(report_images)
-    with opened_upload_snapshot(upload_dir) as (_directory_fd, files):
+    with opened_upload_snapshot(
+        upload_dir,
+        expected_reader_gid=expected_reader_gid,
+    ) as (_directory_fd, files):
         file_names = set(files)
         missing = sorted(set(referenced) - file_names)
         orphan = sorted(file_names - set(referenced))
@@ -398,7 +430,7 @@ def write_validated_upload_archive(
                 for filename, (descriptor, metadata) in files.items():
                     info = tarfile.TarInfo(filename)
                     info.size = metadata.st_size
-                    info.mode = stat.S_IMODE(metadata.st_mode)
+                    info.mode = 0o600
                     info.mtime = int(metadata.st_mtime)
                     info.uid = 0
                     info.gid = 0
@@ -453,6 +485,7 @@ def main() -> int:
     upload_source = parser.add_mutually_exclusive_group(required=True)
     upload_source.add_argument("--upload-dir", type=Path)
     upload_source.add_argument("--upload-dir-fd", type=int)
+    parser.add_argument("--upload-reader-gid", type=int)
     parser.add_argument("--archive-output", action="store_true")
     parser.add_argument("--result-fd", type=int)
     args = parser.parse_args()
@@ -469,7 +502,12 @@ def main() -> int:
         if args.archive_output:
             if args.result_fd is None:
                 raise ValueError("--archive-output requires --result-fd")
-            result = write_validated_upload_archive(report_images, upload_dir, sys.stdout.buffer)
+            result = write_validated_upload_archive(
+                report_images,
+                upload_dir,
+                sys.stdout.buffer,
+                expected_reader_gid=args.upload_reader_gid,
+            )
             result_metadata = os.fstat(args.result_fd)
             if (
                 not stat.S_ISREG(result_metadata.st_mode)
@@ -486,7 +524,11 @@ def main() -> int:
             return 0
         if args.result_fd is not None:
             raise ValueError("--result-fd requires --archive-output")
-        result = validate_snapshot_consistency(report_images, upload_dir)
+        result = validate_snapshot_consistency(
+            report_images,
+            upload_dir,
+            expected_reader_gid=args.upload_reader_gid,
+        )
     except (OSError, ValueError, psycopg.Error) as exc:
         print(
             json.dumps({"ready": False, "error": str(exc)}, ensure_ascii=False),

@@ -19,7 +19,7 @@ if __name__ == "__main__":
         )
 
 import argparse
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import fcntl
 import hashlib
 import json
@@ -102,6 +102,9 @@ BACKUP_AUTHORITY_LOCK_SCHEMA = "walksafe.backup-key-control-authority-lock.v1"
 TRUSTED_GPG_PATH = Path("/usr/bin/gpg")
 VERIFIED_BACKUP_FDS_ENV = "WALKSAFE_VERIFIED_BACKUP_FDS"
 VERIFIED_AUTHORITY_LOCK_FD_ENV = "WALKSAFE_VERIFIED_BACKUP_AUTHORITY_LOCK_FD"
+BACKUP_AGE_POLICY_SCHEMA = "walksafe.backup-age-policy.v1"
+MAX_BACKUP_AGE_SECONDS = 35 * 24 * 60 * 60
+MAX_BACKUP_FUTURE_SKEW_SECONDS = 60 * 60
 
 
 def _linux_fcntl_constant(name: str, uapi_value: int) -> int:
@@ -540,6 +543,51 @@ def _required_timestamp(value: Any, *, context: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError(f"{context} must include a timezone")
     return parsed.astimezone(UTC)
+
+
+def _validated_backup_age_policy(
+    max_age_seconds: Any,
+    future_skew_seconds: Any,
+) -> tuple[int, int]:
+    if (
+        type(max_age_seconds) is not int
+        or max_age_seconds < 1
+        or max_age_seconds > MAX_BACKUP_AGE_SECONDS
+    ):
+        raise ValueError("backup max age must be between 1 and 3024000 seconds")
+    if (
+        type(future_skew_seconds) is not int
+        or future_skew_seconds < 0
+        or future_skew_seconds > MAX_BACKUP_FUTURE_SKEW_SECONDS
+    ):
+        raise ValueError("backup future skew must be between 0 and 3600 seconds")
+    return max_age_seconds, future_skew_seconds
+
+
+def require_backup_manifest_age(
+    payload: dict[str, Any],
+    *,
+    max_age_seconds: int,
+    future_skew_seconds: int,
+    now: datetime | None = None,
+) -> datetime:
+    maximum_age, allowed_future_skew = _validated_backup_age_policy(
+        max_age_seconds,
+        future_skew_seconds,
+    )
+    created_at = _required_timestamp(
+        payload.get("created_at"),
+        context="signed backup manifest created_at",
+    )
+    reference = datetime.now(UTC) if now is None else now
+    if reference.tzinfo is None:
+        raise ValueError("backup age reference time must include a timezone")
+    reference = reference.astimezone(UTC)
+    if created_at > reference + timedelta(seconds=allowed_future_skew):
+        raise ValueError("signed backup manifest created_at exceeds the allowed future skew")
+    if reference - created_at > timedelta(seconds=maximum_age):
+        raise ValueError("signed backup manifest is older than the explicit maximum age")
+    return created_at
 
 
 def validate_backup_key_control(
@@ -2723,6 +2771,9 @@ def _validate_signed_backup_payload(
     artifact_hashes: dict[str, str],
     *,
     require_security_extensions: bool = False,
+    max_age_seconds: int | None = None,
+    future_skew_seconds: int | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     if payload.get("schema_version") != "walksafe.backup.v1":
         raise ValueError("backup manifest schema is invalid")
@@ -2744,6 +2795,15 @@ def _validate_signed_backup_payload(
         payload,
         required=require_security_extensions,
     )
+    if (max_age_seconds is None) != (future_skew_seconds is None):
+        raise ValueError("backup max age and future skew must be supplied together")
+    if max_age_seconds is not None and future_skew_seconds is not None:
+        require_backup_manifest_age(
+            payload,
+            max_age_seconds=max_age_seconds,
+            future_skew_seconds=future_skew_seconds,
+            now=now,
+        )
     return payload
 
 
@@ -2828,6 +2888,9 @@ def verify_signed_backup_fd_bundle(
     uploads_fd: int,
     trusted_signer_fingerprint: str,
     require_security_extensions: bool = False,
+    max_age_seconds: int | None = None,
+    future_skew_seconds: int | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     snapshots = {
         "manifest": _snapshot_from_owner_fd(
@@ -2874,6 +2937,9 @@ def verify_signed_backup_fd_bundle(
                 for name in BACKUP_ARTIFACT_NAMES
             },
             require_security_extensions=require_security_extensions,
+            max_age_seconds=max_age_seconds,
+            future_skew_seconds=future_skew_seconds,
+            now=now,
         )
         if not all(_snapshot_fd_matches(snapshot) for snapshot in snapshots.values()):
             raise ValueError("inherited backup snapshot changed during verification")
@@ -3054,6 +3120,87 @@ def _capture_inheritable_snapshot(
             os.close(snapshot_descriptor)
 
 
+def _create_inheritable_age_policy_snapshot(
+    *,
+    max_age_seconds: int,
+    future_skew_seconds: int,
+) -> int:
+    maximum_age, allowed_future_skew = _validated_backup_age_policy(
+        max_age_seconds,
+        future_skew_seconds,
+    )
+    policy = json.dumps(
+        {
+            "schema_version": BACKUP_AGE_POLICY_SCHEMA,
+            "max_age_seconds": maximum_age,
+            "future_skew_seconds": allowed_future_skew,
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("ascii")
+    descriptor = os.memfd_create(
+        "walksafe-backup-age-policy",
+        getattr(os, "MFD_CLOEXEC", 0) | os.MFD_ALLOW_SEALING,
+    )
+    keep_snapshot = False
+    try:
+        if os.write(descriptor, policy) != len(policy):
+            raise ValueError("backup age policy snapshot write was incomplete")
+        os.fchmod(descriptor, 0o400)
+        fcntl.fcntl(descriptor, F_ADD_SEALS, REQUIRED_SNAPSHOT_SEALS)
+        if (
+            fcntl.fcntl(descriptor, F_GET_SEALS) & REQUIRED_SNAPSHOT_SEALS
+            != REQUIRED_SNAPSHOT_SEALS
+        ):
+            raise ValueError("backup age policy snapshot was not sealed")
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        os.set_inheritable(descriptor, True)
+        keep_snapshot = True
+        return descriptor
+    except OSError as exc:
+        raise ValueError("backup age policy cannot be kernel-sealed") from exc
+    finally:
+        if not keep_snapshot:
+            os.close(descriptor)
+
+
+def _require_inherited_age_policy(
+    *,
+    owner_pid: int,
+    policy_fd: int,
+    max_age_seconds: int,
+    future_skew_seconds: int,
+) -> None:
+    expected = _validated_backup_age_policy(max_age_seconds, future_skew_seconds)
+    snapshot = _snapshot_from_owner_fd(
+        owner_pid,
+        policy_fd,
+        context="backup age policy",
+        max_bytes=1024,
+    )
+    try:
+        try:
+            payload = strict_json_bytes(snapshot.read_bytes(), context="backup age policy")
+        except ReleaseIntegrityError as exc:
+            raise ValueError("backup age policy is not unambiguous UTF-8 JSON") from exc
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != {"schema_version", "max_age_seconds", "future_skew_seconds"}
+            or payload.get("schema_version") != BACKUP_AGE_POLICY_SCHEMA
+            or _validated_backup_age_policy(
+                payload.get("max_age_seconds"),
+                payload.get("future_skew_seconds"),
+            )
+            != expected
+        ):
+            raise ValueError("inherited backup age policy does not match the requested policy")
+        if not _snapshot_fd_matches(snapshot):
+            raise ValueError("inherited backup age policy changed during verification")
+    finally:
+        snapshot.close()
+
+
 def _decrypt_to_inheritable_snapshot(
     encrypted_fd: int,
     *,
@@ -3204,8 +3351,14 @@ def _seal_and_exec_restore(
     before_rekey_root: Path | None,
     after_rekey_root: Path | None,
     trusted_rekey_manifest_signer_fingerprint: str | None,
+    max_age_seconds: int,
+    future_skew_seconds: int,
     restore_arguments: list[str],
 ) -> None:
+    maximum_age, allowed_future_skew = _validated_backup_age_policy(
+        max_age_seconds,
+        future_skew_seconds,
+    )
     source = backup_dir.expanduser().absolute()
     script = restore_script.expanduser().absolute()
     control_document = key_control_document.expanduser().absolute()
@@ -3373,6 +3526,8 @@ def _seal_and_exec_restore(
             uploads_fd=descriptors[3],
             trusted_signer_fingerprint=trusted_signer_fingerprint,
             require_security_extensions=True,
+            max_age_seconds=maximum_age,
+            future_skew_seconds=allowed_future_skew,
         )
         key_control, key_control_sha256 = verify_signed_backup_key_control_fd_bundle(
             owner_pid=os.getpid(),
@@ -3418,6 +3573,12 @@ def _seal_and_exec_restore(
                 expected_recipient_fingerprint=str(
                     key_authorization["recipient_fingerprint"]
                 ),
+            )
+        )
+        descriptors.append(
+            _create_inheritable_age_policy_snapshot(
+                max_age_seconds=maximum_age,
+                future_skew_seconds=allowed_future_skew,
             )
         )
         environment = {
@@ -3487,6 +3648,9 @@ def verify_signed_backup_manifest(
     trusted_signer_fingerprint: str,
     signature_path: Path | None = None,
     require_security_extensions: bool = False,
+    max_age_seconds: int | None = None,
+    future_skew_seconds: int | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     signature = signature_path or manifest_path.with_name(f"{manifest_path.name}.sig")
     payload, verified_signer = verify_signed_json_document(
@@ -3502,6 +3666,9 @@ def verify_signed_backup_manifest(
             for name in BACKUP_ARTIFACT_NAMES
         },
         require_security_extensions=require_security_extensions,
+        max_age_seconds=max_age_seconds,
+        future_skew_seconds=future_skew_seconds,
+        now=now,
     )
 
 
@@ -3568,6 +3735,9 @@ def main() -> int:
     parser.add_argument("--recipient-fingerprint")
     parser.add_argument("--decrypted-reports-fd", type=int)
     parser.add_argument("--decrypted-uploads-fd", type=int)
+    parser.add_argument("--age-policy-fd", type=int)
+    parser.add_argument("--max-age-seconds", type=int)
+    parser.add_argument("--future-skew-seconds", type=int)
     parser.add_argument("restore_arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
@@ -3615,6 +3785,9 @@ def main() -> int:
                 )
             )
             or args.restore_arguments
+            or args.age_policy_fd is not None
+            or args.max_age_seconds is not None
+            or args.future_skew_seconds is not None
         ):
             parser.error("key-control transition validation arguments are incomplete or mixed")
         authority_lock_descriptor: int | None = None
@@ -3698,6 +3871,9 @@ def main() -> int:
                 )
             )
             or args.restore_arguments
+            or args.age_policy_fd is not None
+            or args.max_age_seconds is not None
+            or args.future_skew_seconds is not None
         ):
             parser.error("backup key authorization arguments are incomplete or mixed")
         authority_lock_descriptor: int | None = None
@@ -3756,6 +3932,9 @@ def main() -> int:
             or args.key_control_authority_lock is None
             or args.trusted_key_control_signer_fingerprint is None
             or args.expected_key_control_sha256 is None
+            or args.max_age_seconds is None
+            or args.future_skew_seconds is None
+            or args.age_policy_fd is not None
             or args.recipient_fingerprint is not None
             or args.manifest is not None
             or args.signature is not None
@@ -3793,6 +3972,8 @@ def main() -> int:
                 before_rekey_root=args.before_rekey_root,
                 after_rekey_root=args.after_rekey_root,
                 trusted_rekey_manifest_signer_fingerprint=args.trusted_signer_fingerprint,
+                max_age_seconds=args.max_age_seconds,
+                future_skew_seconds=args.future_skew_seconds,
                 restore_arguments=args.restore_arguments,
             )
         except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -3810,6 +3991,7 @@ def main() -> int:
             args.key_control_signature_fd,
             args.decrypted_reports_fd,
             args.decrypted_uploads_fd,
+            args.age_policy_fd,
         )
         if (
             any(value is None for value in descriptors)
@@ -3822,6 +4004,8 @@ def main() -> int:
             or args.key_control_authority_lock is None
             or args.trusted_key_control_signer_fingerprint is None
             or args.expected_key_control_sha256 is None
+            or args.max_age_seconds is None
+            or args.future_skew_seconds is None
             or args.recipient_fingerprint is not None
             or args.restore_arguments
         ):
@@ -3834,6 +4018,12 @@ def main() -> int:
                     exclusive=False,
                 )
             )
+            _require_inherited_age_policy(
+                owner_pid=os.getpid(),
+                policy_fd=args.age_policy_fd,
+                max_age_seconds=args.max_age_seconds,
+                future_skew_seconds=args.future_skew_seconds,
+            )
             payload = verify_signed_backup_fd_bundle(
                 owner_pid=os.getpid(),
                 manifest_fd=args.manifest_fd,
@@ -3842,6 +4032,8 @@ def main() -> int:
                 uploads_fd=args.uploads_fd,
                 trusted_signer_fingerprint=args.trusted_signer_fingerprint,
                 require_security_extensions=True,
+                max_age_seconds=args.max_age_seconds,
+                future_skew_seconds=args.future_skew_seconds,
             )
             key_control, key_control_sha256 = verify_signed_backup_key_control_fd_bundle(
                 owner_pid=os.getpid(),
@@ -3931,6 +4123,9 @@ def main() -> int:
         or args.trusted_key_control_signer_fingerprint is not None
         or args.expected_key_control_sha256 is not None
         or args.recipient_fingerprint is not None
+        or args.age_policy_fd is not None
+        or args.max_age_seconds is None
+        or args.future_skew_seconds is None
         or any(
             value is not None
             for value in (
@@ -3952,6 +4147,8 @@ def main() -> int:
             args.manifest,
             signature_path=args.signature,
             trusted_signer_fingerprint=args.trusted_signer_fingerprint,
+            max_age_seconds=args.max_age_seconds,
+            future_skew_seconds=args.future_skew_seconds,
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(json.dumps({"verified": False, "error": str(exc)}, ensure_ascii=False))
@@ -3961,8 +4158,11 @@ def main() -> int:
             {
                 "verified": True,
                 "run_id": payload.get("run_id"),
+                "created_at": payload.get("created_at"),
                 "signer_fingerprint": str(payload.get("signer_fingerprint", "")).lower(),
                 "artifacts_sha256": payload.get("artifacts_sha256"),
+                "max_age_seconds": args.max_age_seconds,
+                "future_skew_seconds": args.future_skew_seconds,
             },
             ensure_ascii=False,
         )

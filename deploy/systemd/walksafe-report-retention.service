@@ -8,6 +8,7 @@ Wants=network-online.target
 Type=oneshot
 User=walksafe-backend
 Group=walksafe-backend
+SupplementaryGroups=walksafe-maintenance-lock
 WorkingDirectory=/srv/walksafe/backend
 Environment=PYTHONPATH=/srv/walksafe/backend
 Environment=PYTHONDONTWRITEBYTECODE=1
@@ -27,4 +28,6 @@ ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-ReadWritePaths=/var/lib/walksafe/uploads /var/lib/walksafe/report-retention /run/walksafe-backend
+ReadOnlyPaths=/run/walksafe-maintenance-lock
+InaccessiblePaths=/etc/walksafe/backup.env /etc/walksafe/backup-key-control.lock -/var/lib/walksafe-backup -/var/lib/walksafe-backup-gnupg -/run/walksafe-backup
+ReadWritePaths=/var/lib/walksafe/uploads /var/lib/walksafe/report-retention

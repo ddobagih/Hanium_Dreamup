@@ -43,6 +43,11 @@ from backend.app.services.report_image_keys import (
     ReportImageKeyError,
     ReportImageKeyManager,
 )
+from backend.app.uploads import (
+    descriptor_acl_is_absent,
+    upload_file_metadata_is_safe,
+    validate_upload_directory_descriptor,
+)
 
 
 _LOGICAL_IMAGE_PATTERN = re.compile(
@@ -408,31 +413,61 @@ def _lock_and_revalidate_admin_session(
 def _read_envelope(path: Path, expected_size: int) -> bytes:
     if expected_size <= 0 or expected_size > MAX_ENVELOPE_BYTES:
         raise ReportImageCryptoError("report image object size is invalid")
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(path, flags)
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    directory_descriptor = os.open(path.parent, directory_flags)
     try:
-        metadata = os.fstat(descriptor)
-        path_metadata = path.stat(follow_symlinks=False)
-        if (
-            not stat.S_ISREG(metadata.st_mode)
-            or metadata.st_nlink != 1
-            or metadata.st_uid != os.geteuid()
-            or stat.S_IMODE(metadata.st_mode) != 0o600
-            or (metadata.st_dev, metadata.st_ino) != (path_metadata.st_dev, path_metadata.st_ino)
-            or metadata.st_size != expected_size
-        ):
-            raise ReportImageCryptoError("report image object metadata changed")
-        chunks: list[bytes] = []
-        remaining = metadata.st_size
-        while remaining:
-            chunk = os.read(descriptor, min(1024 * 1024, remaining))
-            if not chunk:
-                raise ReportImageCryptoError("report image object is truncated")
-            chunks.append(chunk)
-            remaining -= len(chunk)
+        try:
+            directory_metadata = validate_upload_directory_descriptor(
+                path.parent,
+                directory_descriptor,
+            )
+        except (OSError, ValueError) as exc:
+            raise ReportImageCryptoError("report upload root metadata changed") from exc
+        flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path.name, flags, dir_fd=directory_descriptor)
+        try:
+            metadata = os.fstat(descriptor)
+            path_metadata = os.stat(
+                path.name,
+                dir_fd=directory_descriptor,
+                follow_symlinks=False,
+            )
+            if (
+                not upload_file_metadata_is_safe(metadata, directory_metadata)
+                or not descriptor_acl_is_absent(descriptor)
+                or (metadata.st_dev, metadata.st_ino)
+                != (path_metadata.st_dev, path_metadata.st_ino)
+                or metadata.st_size != expected_size
+            ):
+                raise ReportImageCryptoError("report image object metadata changed")
+            chunks: list[bytes] = []
+            remaining = metadata.st_size
+            while remaining:
+                chunk = os.read(descriptor, min(1024 * 1024, remaining))
+                if not chunk:
+                    raise ReportImageCryptoError("report image object is truncated")
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            if not descriptor_acl_is_absent(descriptor):
+                raise ReportImageCryptoError("report image object ACL changed")
+        finally:
+            os.close(descriptor)
+        try:
+            validate_upload_directory_descriptor(
+                path.parent,
+                directory_descriptor,
+                expected_metadata=directory_metadata,
+            )
+        except (OSError, ValueError) as exc:
+            raise ReportImageCryptoError("report upload root metadata changed") from exc
         return b"".join(chunks)
     finally:
-        os.close(descriptor)
+        os.close(directory_descriptor)
 
 
 def _validated_report_id(filename: str) -> uuid.UUID | None:

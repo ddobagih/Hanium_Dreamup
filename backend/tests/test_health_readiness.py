@@ -41,6 +41,139 @@ async def _navigation_ready(_settings) -> dict[str, object]:
     return {"ready": True, "provider": "tmap_pedestrian", "evidence": "recent_success"}
 
 
+_EXACT_RATE_GROUP_EXPRESSION = (
+    "((rate_group)::text = ANY ((ARRAY["
+    "'report'::character varying, 'navigation'::character varying, "
+    "'detect'::character varying, 'export'::character varying, "
+    "'admin_read'::character varying, 'privacy'::character varying"
+    "])::text[]))"
+)
+
+
+def _rate_group_constraint_row(
+    *,
+    expression: str = _EXACT_RATE_GROUP_EXPRESSION,
+    validated: bool = True,
+) -> dict[str, object]:
+    return {
+        "schema_name": "public",
+        "table_name": "actor_rate_limit_events",
+        "constraint_name": "ck_actor_rate_limit_events_group",
+        "constraint_type": "c",
+        "validated": validated,
+        "expression": expression,
+    }
+
+
+def test_rate_limit_group_constraint_catalog_contract_is_exact() -> None:
+    assert health_api._actor_rate_limit_group_constraint_ready(
+        [_rate_group_constraint_row()]
+    )
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [],
+        [_rate_group_constraint_row(validated=False)],
+        [
+            _rate_group_constraint_row(
+                expression=_EXACT_RATE_GROUP_EXPRESSION.replace(
+                    ", 'privacy'::character varying",
+                    "",
+                )
+            )
+        ],
+        [
+            _rate_group_constraint_row(
+                expression=_EXACT_RATE_GROUP_EXPRESSION.replace(
+                    "])::text[]))",
+                    ", 'unexpected'::character varying])::text[]))",
+                )
+            )
+        ],
+        [_rate_group_constraint_row(), _rate_group_constraint_row()],
+    ],
+    ids=["missing", "not-validated", "old-groups", "extra-group", "duplicate"],
+)
+def test_rate_limit_group_constraint_catalog_drift_is_rejected(
+    rows: list[dict[str, object]],
+) -> None:
+    assert not health_api._actor_rate_limit_group_constraint_ready(rows)
+
+
+@pytest.mark.parametrize(
+    ("rows", "expected"),
+    [
+        (
+            [_rate_group_constraint_row()],
+            {
+                "ready": True,
+                "current_revision": health_api.EXPECTED_ALEMBIC_HEAD,
+            },
+        ),
+        (
+            [],
+            {
+                "ready": False,
+                "reason": "actor_rate_limit_group_constraint_invalid",
+                "current_revision": health_api.EXPECTED_ALEMBIC_HEAD,
+            },
+        ),
+    ],
+    ids=["exact", "missing"],
+)
+def test_database_readiness_wires_the_rate_limit_catalog_result(
+    monkeypatch: pytest.MonkeyPatch,
+    rows: list[dict[str, object]],
+    expected: dict[str, object],
+) -> None:
+    statements: list[str] = []
+    disposed = False
+
+    class FakeResult:
+        def __init__(self, *, scalar: object = None) -> None:
+            self.scalar = scalar
+
+        def scalar_one_or_none(self) -> object:
+            return self.scalar
+
+        def mappings(self) -> FakeResult:
+            return self
+
+        def all(self) -> list[dict[str, object]]:
+            return rows
+
+    class FakeConnection:
+        def execute(self, statement) -> FakeResult:
+            rendered = str(statement)
+            statements.append(rendered)
+            if "SELECT version_num FROM alembic_version" in rendered:
+                return FakeResult(scalar=health_api.EXPECTED_ALEMBIC_HEAD)
+            return FakeResult()
+
+    class FakeTransaction:
+        def __enter__(self) -> FakeConnection:
+            return FakeConnection()
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+    class FakeEngine:
+        def begin(self) -> FakeTransaction:
+            return FakeTransaction()
+
+        def dispose(self) -> None:
+            nonlocal disposed
+            disposed = True
+
+    monkeypatch.setattr(health_api, "create_engine", lambda *_args, **_kwargs: FakeEngine())
+
+    assert health_api._database_readiness("postgresql://readiness.invalid/test") == expected
+    assert any("FROM pg_constraint" in statement for statement in statements)
+    assert disposed
+
+
 def test_readiness_expected_migration_matches_the_single_alembic_head() -> None:
     repository_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(
@@ -128,6 +261,41 @@ def test_readiness_returns_503_when_database_or_detector_is_unavailable(monkeypa
     assert response.json()["status"] == "not_ready"
     assert response.json()["checks"]["database"]["ready"] is False
     assert response.json()["checks"]["detector"]["ready"] is False
+
+
+def test_readiness_returns_503_for_rate_limit_group_constraint_drift(monkeypatch) -> None:
+    monkeypatch.setattr(app_settings, "tmap_app_key", "test-tmap-key")
+    monkeypatch.setattr(app_settings, "walking_route_provider", "tmap_pedestrian")
+    monkeypatch.setattr(
+        health_api,
+        "_database_readiness",
+        lambda _url: {
+            "ready": False,
+            "reason": "actor_rate_limit_group_constraint_invalid",
+            "current_revision": health_api.EXPECTED_ALEMBIC_HEAD,
+        },
+    )
+    monkeypatch.setattr(health_api, "_upload_readiness", lambda _path: {"ready": True})
+    monkeypatch.setattr(health_api, "_navigation_readiness", _navigation_ready)
+    monkeypatch.setattr(
+        health_api,
+        "detect_v2_health",
+        lambda _settings: {
+            "status": "ready",
+            "mode": "fake",
+            "reason": None,
+            "configured_runtime": None,
+        },
+    )
+
+    response = ASGITestClient(app).get("/ready")
+
+    assert response.status_code == 503
+    assert response.json()["checks"]["database"] == {
+        "ready": False,
+        "reason": "actor_rate_limit_group_constraint_invalid",
+        "current_revision": health_api.EXPECTED_ALEMBIC_HEAD,
+    }
 
 
 def test_slow_readiness_probe_does_not_block_liveness(monkeypatch) -> None:

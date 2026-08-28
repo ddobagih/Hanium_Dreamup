@@ -18,6 +18,8 @@ from alembic.config import Config
 from sqlalchemy import select
 
 import backend.app.main as main_app
+import backend.app.services.report_storage as report_storage
+import backend.app.uploads as uploads
 from backend.app.database import SessionLocal
 from backend.app.api.reports import _commit_new_report_with_image
 from backend.app.models import Report, ReportImageObject
@@ -258,6 +260,56 @@ def test_corrupt_journal_fails_startup_without_deleting_evidence(tmp_path: Path)
     assert corrupt.exists()
 
 
+def test_reconciliation_validates_upload_root_before_deleting_orphan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_id = uuid.uuid4()
+    encrypted = _encrypted(report_id)
+    destination = tmp_path / f"{report_id}.wse"
+    pending = stage_report_image(destination, encrypted)
+    root_identity = (tmp_path.stat().st_dev, tmp_path.stat().st_ino)
+    commit_state_called = False
+
+    def root_acl(descriptor: int) -> list[bytes]:
+        metadata = os.fstat(descriptor)
+        return (
+            [b"system.posix_acl_default"]
+            if (metadata.st_dev, metadata.st_ino) == root_identity
+            else []
+        )
+
+    def unexpected_commit_state(_report_id: uuid.UUID) -> ReportStorageCommitState:
+        nonlocal commit_state_called
+        commit_state_called = True
+        return _absent(_report_id)
+
+    monkeypatch.setattr(report_storage.os, "listxattr", root_acl)
+
+    with pytest.raises(RuntimeError, match="upload root"):
+        reconcile_pending_report_writes(tmp_path, unexpected_commit_state)
+
+    assert commit_state_called is False
+    assert destination.exists()
+    assert pending.journal_path.exists()
+
+
+def test_reconciliation_rejects_wrong_upload_root_mode_before_deletion(
+    tmp_path: Path,
+) -> None:
+    report_id = uuid.uuid4()
+    encrypted = _encrypted(report_id)
+    destination = tmp_path / f"{report_id}.wse"
+    pending = stage_report_image(destination, encrypted)
+    tmp_path.chmod(0o755)
+
+    with pytest.raises(RuntimeError, match="upload root"):
+        reconcile_pending_report_writes(tmp_path, _absent)
+
+    assert destination.exists()
+    assert pending.journal_path.exists()
+
+
 def test_startup_inventory_accepts_only_exact_encrypted_database_mapping(
     tmp_path: Path,
 ) -> None:
@@ -296,6 +348,100 @@ def test_startup_inventory_accepts_only_exact_encrypted_database_mapping(
                 [entry],
                 known_key_states={"test-key-v1": unavailable_state},
             )
+
+
+def test_startup_inventory_accepts_backup_reader_group_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tmp_path.chmod(0o2750)
+    monkeypatch.setattr(
+        uploads.grp,
+        "getgrnam",
+        lambda _name: type("Group", (), {"gr_gid": tmp_path.stat().st_gid})(),
+    )
+    report_id = uuid.uuid4()
+    encrypted = _encrypted(report_id)
+    destination = tmp_path / f"{report_id}.wse"
+    pending = stage_report_image(destination, encrypted)
+    metadata = _committed_metadata(encrypted)
+    reconcile_pending_report_writes(
+        tmp_path,
+        lambda _report_id: ReportStorageCommitState(True, metadata),
+    )
+    entry = ReportStorageInventoryEntry(
+        report_id=report_id,
+        logical_image_path=f"/uploads/{report_id}.jpg",
+        report_content_type="image/jpeg",
+        image_object=metadata,
+    )
+
+    validate_report_storage_inventory(
+        tmp_path,
+        [entry],
+        known_key_states={"test-key-v1": "active"},
+    )
+
+    assert destination.stat().st_mode & 0o777 == 0o640
+    assert destination.stat().st_gid == tmp_path.stat().st_gid
+    assert not pending.journal_path.parent.exists()
+
+
+def test_startup_inventory_rejects_upload_root_and_object_acls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_id = uuid.uuid4()
+    encrypted = _encrypted(report_id)
+    destination = tmp_path / f"{report_id}.wse"
+    stage_report_image(destination, encrypted)
+    metadata = _committed_metadata(encrypted)
+    reconcile_pending_report_writes(
+        tmp_path,
+        lambda _report_id: ReportStorageCommitState(True, metadata),
+    )
+    entry = ReportStorageInventoryEntry(
+        report_id=report_id,
+        logical_image_path=f"/uploads/{report_id}.jpg",
+        report_content_type="image/jpeg",
+        image_object=metadata,
+    )
+    root_identity = (tmp_path.stat().st_dev, tmp_path.stat().st_ino)
+    object_identity = (destination.stat().st_dev, destination.stat().st_ino)
+
+    monkeypatch.setattr(
+        report_storage.os,
+        "listxattr",
+        lambda descriptor: (
+            [b"system.posix_acl_default"]
+            if (os.fstat(descriptor).st_dev, os.fstat(descriptor).st_ino)
+            == root_identity
+            else []
+        ),
+    )
+    with pytest.raises(RuntimeError, match="private real directory"):
+        validate_report_storage_inventory(
+            tmp_path,
+            [entry],
+            known_key_states={"test-key-v1": "active"},
+        )
+
+    monkeypatch.setattr(
+        report_storage.os,
+        "listxattr",
+        lambda descriptor: (
+            [b"system.posix_acl_access"]
+            if (os.fstat(descriptor).st_dev, os.fstat(descriptor).st_ino)
+            == object_identity
+            else []
+        ),
+    )
+    with pytest.raises(RuntimeError, match="ACL-bearing"):
+        validate_report_storage_inventory(
+            tmp_path,
+            [entry],
+            known_key_states={"test-key-v1": "active"},
+        )
 
 
 @pytest.mark.parametrize("directory_name", [".report-write-journal", ".retention-quarantine"])
@@ -377,6 +523,16 @@ def test_backend_lifespan_runs_storage_reconciliation_before_serving(monkeypatch
 def test_backend_serializes_reconciliation_across_replicas(monkeypatch) -> None:
     calls: list[str] = []
 
+    @contextmanager
+    def maintenance_lock(path, *, expected_group_gid):
+        assert path == main_app.settings.maintenance_lock_path
+        assert expected_group_gid == main_app.settings.maintenance_lock_group_gid
+        calls.append("maintenance-lock")
+        try:
+            yield
+        finally:
+            calls.append("maintenance-unlock")
+
     class FakeDatabaseSession:
         def execute(self, statement, parameters) -> None:
             assert "pg_advisory_xact_lock" in str(statement)
@@ -410,6 +566,11 @@ def test_backend_serializes_reconciliation_across_replicas(monkeypatch) -> None:
         calls.append("preflight")
 
     monkeypatch.setattr(main_app, "SessionLocal", FakeSessionFactory)
+    monkeypatch.setattr(
+        main_app.reports,
+        "_shared_report_write_lock",
+        maintenance_lock,
+    )
     monkeypatch.setattr(main_app.report_image_key_manager, "synchronize", lambda _db: None)
     monkeypatch.setattr(main_app, "reconcile_pending_report_writes", reconcile)
     monkeypatch.setattr(
@@ -420,7 +581,13 @@ def test_backend_serializes_reconciliation_across_replicas(monkeypatch) -> None:
 
     main_app.reconcile_report_storage()
 
-    assert calls == ["lock", "reconcile", "preflight"]
+    assert calls == [
+        "maintenance-lock",
+        "lock",
+        "reconcile",
+        "preflight",
+        "maintenance-unlock",
+    ]
 
 
 def test_reconciliation_waits_for_inflight_encrypted_report_commit(

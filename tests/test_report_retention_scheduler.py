@@ -98,19 +98,18 @@ payload = {
     "candidates": [],
     "candidate_ids_sha256": hashlib.sha256(b"[]").hexdigest(),
     "images": [],
+    "reconciled_runs": [],
 }
 if status not in {"planning", "failed_planning"}:
     payload["batch_limit_reached"] = False
 if status in {
     "database_committed",
     "completed",
-    "completed_with_cleanup_errors",
     "failed_after_database_commit",
 }:
     payload["deleted_count"] = 0
 if status in {
     "completed",
-    "completed_with_cleanup_errors",
     "failed_planning",
     "failed_before_commit",
     "failed_after_database_commit",
@@ -119,18 +118,21 @@ if status in {
     payload["finished_at"] = timestamp(now)
 if status == "completed":
     payload["cleanup_errors"] = []
-elif status == "completed_with_cleanup_errors":
-    payload["cleanup_errors"] = ["report.jpg:PermissionError"]
-elif status == "failed_before_commit":
-    payload["restore_errors"] = []
-elif status in {"failed_planning", "failed_after_database_commit", "failed"}:
+elif status in {
+    "failed_planning",
+    "failed_before_commit",
+    "failed_after_database_commit",
+    "failed",
+}:
     payload["error_type"] = "RuntimeError"
+    payload["restore_errors"] = []
 candidate_mutation = os.environ.get("FAKE_RETENTION_CANDIDATE_MUTATION")
 if os.environ.get("FAKE_RETENTION_INVALID_CANDIDATE_POLICY") == "1":
     candidate_mutation = "reason"
 if candidate_mutation:
+    report_id = "11111111-2222-4333-8444-555555555555"
     payload["candidates"] = [{
-        "id": "report-1",
+        "id": report_id,
         "status": "new",
         "source": "server",
         "created_at": timestamp(as_of - timedelta(days=197)),
@@ -140,10 +142,15 @@ if candidate_mutation:
         "image_path_present": True,
         "would_delete": True,
     }]
-    payload["candidate_ids_sha256"] = hashlib.sha256(b'["report-1"]').hexdigest()
+    payload["candidate_ids_sha256"] = hashlib.sha256(
+        json.dumps([report_id], separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     payload["images"] = [{
-        "report_id": "report-1",
-        "filename": "report.jpg",
+        "report_id": report_id,
+        "storage_name": f"{report_id}.wse",
+        "envelope_sha256": "7" * 64,
+        "envelope_size": 4096,
+        "key_id": "reports-active",
         "state": "recovery_copy_created",
     }]
     if "deleted_count" in payload:
@@ -164,7 +171,18 @@ if candidate_mutation:
     elif candidate_mutation == "resolved_reason":
         candidate["status"] = "resolved"
     elif candidate_mutation == "state_extra":
-        payload["error_type"] = "RuntimeError"
+        payload["images"][0]["unexpected"] = True
+reconciled_run = os.environ.get("FAKE_RETENTION_RECONCILED_RUN")
+if reconciled_run:
+    payload["reconciled_runs"] = [{
+        "run_id": ("a" if reconciled_run == "current" else "b") * 32,
+        "status": (
+            "RECONCILED_PRECOMMIT_ABORTED"
+            if status == "failed_before_commit"
+            else "RECONCILED_POSTCOMMIT_COMPLETED"
+        ),
+        "report_ids": ["11111111-2222-4333-8444-555555555555"],
+    }]
 omitted_field = os.environ.get("FAKE_RETENTION_OMIT_FIELD")
 if omitted_field:
     payload.pop(omitted_field, None)
@@ -309,7 +327,9 @@ def _runner_environment(tmp_path: Path) -> tuple[dict[str, str], Path, Path]:
         "DATABASE_STATEMENT_TIMEOUT_MS": "10000",
         "GNUPGHOME": str(gnupg_home),
         "UPLOAD_DIR": str(upload_dir),
+        "WALKSAFE_UPLOAD_BACKUP_READER_GROUP": "walksafe-backup-readers",
         "WALKSAFE_MAINTENANCE_LOCK_PATH": str(runtime_dir / "maintenance.lock"),
+        "WALKSAFE_MAINTENANCE_LOCK_GROUP": "walksafe-maintenance-lock",
         "WALKSAFE_RETENTION_PYTHON": str(fake_python),
         "WALKSAFE_REPORT_RETENTION_MANIFEST_DIR": str(manifest_dir),
         "WALKSAFE_REPORT_RETENTION_BACKUP_MANIFEST": str(backup_manifest),
@@ -378,7 +398,9 @@ def test_process_identity_lookup_race_is_treated_as_exit(
         "DATABASE_STATEMENT_TIMEOUT_MS",
         "GNUPGHOME",
         "UPLOAD_DIR",
+        "WALKSAFE_UPLOAD_BACKUP_READER_GROUP",
         "WALKSAFE_MAINTENANCE_LOCK_PATH",
+        "WALKSAFE_MAINTENANCE_LOCK_GROUP",
         "WALKSAFE_RETENTION_PYTHON",
         "WALKSAFE_REPORT_RETENTION_MANIFEST_DIR",
         "WALKSAFE_REPORT_RETENTION_BACKUP_MANIFEST",
@@ -470,6 +492,94 @@ def test_runner_calls_guarded_apply_without_database_url_argv_and_publishes_0600
     assert payload["status"] == "completed"
     assert payload["destructive_action"] is True
     assert not list(manifest_dir.glob(".*"))
+
+
+def test_runner_publishes_exact_producer_manifest_with_encrypted_object_and_reconciliation(
+    tmp_path: Path,
+) -> None:
+    environment, manifest_dir, _capture = _runner_environment(tmp_path)
+    environment["FAKE_RETENTION_CANDIDATE_MUTATION"] = "valid"
+    environment["FAKE_RETENTION_RECONCILED_RUN"] = "current"
+
+    result = _run_runner(environment)
+
+    assert result.returncode == 0, result.stderr
+    manifests = list(manifest_dir.glob("report-retention-*.json"))
+    assert len(manifests) == 1
+    payload = json.loads(manifests[0].read_text(encoding="utf-8"))
+    report_id = "11111111-2222-4333-8444-555555555555"
+    assert payload["images"] == [
+        {
+            "report_id": report_id,
+            "storage_name": f"{report_id}.wse",
+            "envelope_sha256": "7" * 64,
+            "envelope_size": 4096,
+            "key_id": "reports-active",
+            "state": "recovery_copy_created",
+        }
+    ]
+    assert payload["reconciled_runs"] == [
+        {
+            "run_id": "a" * 32,
+            "status": "RECONCILED_POSTCOMMIT_COMPLETED",
+            "report_ids": [report_id],
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "environment_override",
+    [
+        {"FAKE_RETENTION_CANDIDATE_MUTATION": "valid"},
+        {
+            "FAKE_RETENTION_CANDIDATE_MUTATION": "valid",
+            "FAKE_RETENTION_RECONCILED_RUN": "other",
+        },
+        {"FAKE_RETENTION_STATUS": "recovery_copied"},
+        {
+            "FAKE_RETENTION_STATUS": "failed_before_commit",
+            "FAKE_RETENTION_CANDIDATE_MUTATION": "valid",
+        },
+    ],
+)
+def test_runner_rejects_manifest_without_current_run_reconciliation_binding(
+    tmp_path: Path,
+    environment_override: dict[str, str],
+) -> None:
+    environment, manifest_dir, _capture = _runner_environment(tmp_path)
+    environment.update(environment_override)
+
+    result = _run_runner(environment)
+
+    assert result.returncode != 0
+    assert "invalid audit manifest" in result.stderr
+    assert not list(manifest_dir.glob("report-retention-*.json"))
+    assert len(list(manifest_dir.glob(".report-retention-*.json"))) == 1
+
+
+def test_runner_publishes_failed_before_commit_with_current_precommit_reconciliation(
+    tmp_path: Path,
+) -> None:
+    environment, manifest_dir, _capture = _runner_environment(tmp_path)
+    environment.update(
+        {
+            "FAKE_RETENTION_STATUS": "failed_before_commit",
+            "FAKE_RETENTION_CANDIDATE_MUTATION": "valid",
+            "FAKE_RETENTION_RECONCILED_RUN": "current",
+            "FAKE_RETENTION_EXIT": "9",
+        }
+    )
+
+    result = _run_runner(environment)
+
+    assert result.returncode != 0
+    manifests = list(manifest_dir.glob("report-retention-*.json"))
+    assert len(manifests) == 1
+    payload = json.loads(manifests[0].read_text(encoding="utf-8"))
+    assert payload["status"] == "failed_before_commit"
+    assert payload["reconciled_runs"][0]["status"] == (
+        "RECONCILED_PRECOMMIT_ABORTED"
+    )
 
 
 @pytest.mark.parametrize("unsafe_kind", ["mode", "symlink", "outside"])
@@ -958,7 +1068,9 @@ def test_retention_config_is_dedicated_and_minimal() -> None:
         "DATABASE_CONNECT_TIMEOUT_SECONDS",
         "DATABASE_STATEMENT_TIMEOUT_MS",
         "UPLOAD_DIR",
+        "WALKSAFE_UPLOAD_BACKUP_READER_GROUP",
         "WALKSAFE_MAINTENANCE_LOCK_PATH",
+        "WALKSAFE_MAINTENANCE_LOCK_GROUP",
         "WALKSAFE_RETENTION_PYTHON",
         "WALKSAFE_REPORT_RETENTION_MANIFEST_DIR",
         "GNUPGHOME",
@@ -984,6 +1096,7 @@ def test_systemd_retention_template_is_oneshot_and_timer_is_daily_persistent() -
 
     assert "Type=oneshot" in service
     assert "User=walksafe-backend" in service
+    assert "SupplementaryGroups=walksafe-maintenance-lock" in service
     assert "EnvironmentFile=/etc/walksafe/backend.env" not in service
     assert "EnvironmentFile=/etc/walksafe/report-retention.env" in service
     assert (
@@ -997,6 +1110,8 @@ def test_systemd_retention_template_is_oneshot_and_timer_is_daily_persistent() -
     assert "LimitCORE=0" in service
     assert "ProtectHome=true" in service
     assert "/var/lib/walksafe/report-retention" in service
+    assert "/run/walksafe-maintenance-lock" in service
+    assert "/run/walksafe-backend" not in service
     assert "OnCalendar=*-*-* 03:30:00" in timer
     assert "Persistent=true" in timer
     assert "Unit=walksafe-report-retention.service" in timer

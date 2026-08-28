@@ -8,13 +8,14 @@ Wants=network-online.target
 Type=simple
 User=walksafe-backend
 Group=walksafe-backend
+SupplementaryGroups=walksafe-maintenance-lock
 WorkingDirectory=/srv/walksafe/backend
 Environment=PYTHONPATH=/srv/walksafe/backend
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=/etc/walksafe/backend-runtime.env
 RuntimeDirectory=walksafe-backend
 RuntimeDirectoryMode=0700
-StateDirectory=walksafe/uploads walksafe/android-debug-logs
+StateDirectory=walksafe/android-debug-logs walksafe/capacity
 StateDirectoryMode=0700
 ExecStart=/srv/walksafe/backend/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=on-failure
@@ -28,9 +29,9 @@ ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-ReadOnlyPaths=/etc/walksafe/report-image-keyring.json /etc/walksafe/admin-credential-issuer.key
-InaccessiblePaths=/etc/walksafe/backend-migration.env /etc/walksafe/backend.env
-ReadWritePaths=/var/lib/walksafe/uploads /var/lib/walksafe/android-debug-logs /run/walksafe-backend
+ReadOnlyPaths=/etc/walksafe/report-image-keyring.json /etc/walksafe/admin-credential-issuer.key /run/walksafe-maintenance-lock
+InaccessiblePaths=/etc/walksafe/backend-migration.env /etc/walksafe/backend.env /etc/walksafe/backup.env /etc/walksafe/backup-key-control.json /etc/walksafe/backup-key-control.json.sig /etc/walksafe/backup-key-control.lock -/var/lib/walksafe-backup -/var/lib/walksafe-backup-gnupg -/run/walksafe-backup
+ReadWritePaths=/var/lib/walksafe/uploads /var/lib/walksafe/android-debug-logs /var/lib/walksafe/capacity /run/walksafe-backend
 
 [Install]
 WantedBy=multi-user.target

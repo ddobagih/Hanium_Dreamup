@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="WalkSafe Wave 2 이후 보안·서버 운영 기능 구현부터 실운영 전환까지의 실행 계획">
+  <title>WalkSafe 보안·서버 운영 다음 실행 계획</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18211e;
+      --muted: #596660;
+      --paper: #f4f0e8;
+      --surface: #fffdf8;
+      --line: #d8d5cb;
+      --green: #16624a;
+      --green-soft: #e2f2e9;
+      --blue: #245b7a;
+      --blue-soft: #e6f0f6;
+      --amber: #8a5a09;
+      --amber-soft: #fff2ce;
+      --red: #9a3c35;
+      --red-soft: #fae8e4;
+      --shadow: 0 16px 42px rgb(31 42 36 / 10%);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 2%, rgb(33 112 81 / 12%), transparent 28rem),
+        radial-gradient(circle at 96% 12%, rgb(36 91 122 / 10%), transparent 30rem),
+        var(--paper);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+      line-height: 1.65;
+      word-break: keep-all;
+    }
+
+    a { color: var(--blue); text-underline-offset: 3px; }
+    code {
+      padding: .1em .35em;
+      border-radius: 5px;
+      background: #f0eee8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .9em;
+      word-break: break-all;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      z-index: 10;
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: #fff;
+      background: var(--ink);
+      transform: translateY(-160%);
+    }
+    .skip-link:focus { transform: translateY(0); }
+
+    .page { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 64px; }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 6vw, 64px);
+      border: 1px solid rgb(255 255 255 / 28%);
+      border-radius: 26px;
+      color: #fff;
+      background: linear-gradient(135deg, #143d32 0%, #175b48 52%, #183e52 100%);
+      box-shadow: var(--shadow);
+    }
+    header::after {
+      position: absolute;
+      right: -90px;
+      bottom: -160px;
+      width: 360px;
+      height: 360px;
+      border: 60px solid rgb(255 255 255 / 7%);
+      border-radius: 50%;
+      content: "";
+    }
+    .eyebrow { margin: 0 0 8px; font-size: .82rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { max-width: 800px; margin: 0; font-size: clamp(2rem, 5vw, 4rem); line-height: 1.12; letter-spacing: -.04em; }
+    header .lead { position: relative; z-index: 1; max-width: 830px; margin: 22px 0 0; color: #e8f4ef; font-size: clamp(1rem, 2vw, 1.2rem); }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+    .meta span { padding: 7px 11px; border: 1px solid rgb(255 255 255 / 24%); border-radius: 999px; background: rgb(255 255 255 / 10%); font-size: .82rem; }
+
+    nav {
+      position: sticky;
+      top: 8px;
+      z-index: 5;
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      margin: 14px 0;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgb(255 253 248 / 93%);
+      box-shadow: 0 8px 24px rgb(31 42 36 / 8%);
+      backdrop-filter: blur(10px);
+      scrollbar-width: thin;
+    }
+    nav a { flex: 0 0 auto; padding: 7px 10px; border-radius: 8px; color: var(--ink); font-size: .84rem; font-weight: 700; text-decoration: none; }
+    nav a:hover, nav a:focus-visible { background: var(--green-soft); outline: none; }
+
+    main { display: grid; gap: 16px; }
+    section, .notice {
+      padding: clamp(22px, 4vw, 38px);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--surface);
+      box-shadow: 0 9px 30px rgb(31 42 36 / 6%);
+    }
+    section h2 { margin: 0 0 14px; font-size: clamp(1.35rem, 2.7vw, 2rem); line-height: 1.28; letter-spacing: -.02em; }
+    section h3 { margin: 24px 0 8px; font-size: 1.08rem; }
+    section > p:first-of-type { margin-top: 0; }
+    p { margin: .7em 0; }
+    ul, ol { margin: .65em 0; padding-left: 1.35em; }
+    li + li { margin-top: .32em; }
+    .small { color: var(--muted); font-size: .88rem; }
+    .tight { margin: 0; }
+
+    .cards, .work-grid, .lane-grid { display: grid; gap: 12px; }
+    .cards { grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); }
+    .card, .work, .lane {
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: #fff;
+    }
+    .card .value { display: block; color: var(--green); font-size: 1.5rem; font-weight: 900; letter-spacing: -.03em; }
+    .card .label { display: block; margin-top: 4px; color: var(--muted); font-size: .84rem; }
+    .work-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .work h3, .lane h3 { margin-top: 8px; }
+    .lane-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+    .lane { border-top: 4px solid var(--green); }
+    .lane:nth-child(2) { border-top-color: var(--blue); }
+    .lane:nth-child(3) { border-top-color: var(--amber); }
+    .lane:nth-child(4) { border-top-color: var(--red); }
+    .lane:nth-child(5) { border-top-color: #6d4c86; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 9px;
+      border-radius: 999px;
+      color: var(--green);
+      background: var(--green-soft);
+      font-size: .76rem;
+      font-weight: 800;
+    }
+    .badge.blue { color: var(--blue); background: var(--blue-soft); }
+    .badge.amber { color: var(--amber); background: var(--amber-soft); }
+    .badge.red { color: var(--red); background: var(--red-soft); }
+
+    .notice { box-shadow: none; }
+    .notice strong { font-size: 1.05rem; }
+    .decision { border-color: #aacbbb; background: var(--green-soft); }
+    .boundary { border-color: #e7c778; background: var(--amber-soft); }
+    .danger { border-color: #deb0a9; background: var(--red-soft); }
+
+    .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0; list-style: none; counter-reset: step; }
+    .flow li { position: relative; min-height: 130px; margin: 0; padding: 46px 15px 15px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    .flow li::before { position: absolute; top: 14px; left: 15px; display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; color: #fff; background: var(--green); counter-increment: step; content: counter(step); font-weight: 900; }
+    .flow strong { display: block; margin-bottom: 4px; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    caption { padding: 12px 14px; color: var(--muted); font-weight: 700; text-align: left; }
+    th, td { padding: 13px 14px; border-top: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: #31443c; background: #f3f5f2; font-size: .8rem; letter-spacing: .02em; }
+    tbody tr:hover { background: #fbfaf6; }
+    .now { color: var(--green); font-weight: 800; }
+    .later { color: var(--amber); font-weight: 800; }
+
+    details { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+    summary { cursor: pointer; padding: 13px 15px; font-weight: 800; }
+    details > div { padding: 0 15px 15px; }
+    footer { padding: 24px 4px 0; color: var(--muted); font-size: .82rem; text-align: center; }
+
+    @media (max-width: 900px) {
+      .cards, .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .lane-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .page { width: min(100% - 18px, 1180px); padding-top: 10px; }
+      header, section, .notice { padding: 21px; border-radius: 16px; }
+      .cards, .work-grid, .flow { grid-template-columns: minmax(0, 1fr); }
+      nav { top: 4px; }
+      th, td { min-width: 150px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      nav, .skip-link { display: none; }
+      header, section, .notice { box-shadow: none; break-inside: avoid; }
+      header { color: #111; background: #fff; border: 2px solid #333; }
+      header .lead, .meta { color: #333; }
+      a { color: #111; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">본문으로 건너뛰기</a>
+  <div class="page">
+    <header>
+      <p class="eyebrow">WalkSafe · Security &amp; Server Operations · 2026-08-25</p>
+      <h1>다음 실행 계획<br>Wave 3 · Wave 4 · Wave 5</h1>
+      <p class="lead">
+        다음 순서는 현재 기능 후보의 종료 경계를 별도 작업조에서 정리하는 동안 재시작 회귀를 짧게 확인하고,
+        합성 입력뿐인 용량 상태를 실제 서버 측정으로 연결하며 로컬 전용 삭제 워커를 검토 가능한 one-shot 운영 단위로 전환하는 것이다.
+        그 뒤 실제 환경·정식시험·승인·staging·production 전환을 Wave 5에서 다룬다.
+        현재 정식시험은 0/279, 출시 gate는 0/5이며 출시는 아직 불가하다. 계획서 작성 자체는 배포·승인·실운영 증거가 아니다.
+      </p>
+      <div class="meta">
+        <span>출발점: 기능 후보·집중시험 통과</span>
+        <span>현재 통제 상태: 작업 진행 중·종료 정합화 필요</span>
+        <span>정식시험: 0/279 · gate: 0/5 · 면제 없음</span>
+        <span>실제 배포 사건: 0 · 출시: NOT_ELIGIBLE</span>
+      </div>
+    </header>
+
+    <nav aria-label="문서 목차">
+      <a href="#answer">결론</a>
+      <a href="#sequence">순서</a>
+      <a href="#wave3">Wave 3</a>
+      <a href="#wave4">Wave 4</a>
+      <a href="#wave5">Wave 5</a>
+      <a href="#team">병렬 작업</a>
+      <a href="#time">시간</a>
+      <a href="#rules">진행 규칙</a>
+      <a href="#done">완료 기준</a>
+      <a href="#sources">근거</a>
+    </nav>
+
+    <main id="content" tabindex="-1">
+      <section id="answer" aria-labelledby="answer-title">
+        <h2 id="answer-title">먼저 볼 결론</h2>
+        <div class="cards">
+          <div class="card"><span class="value">2–4시간</span><span class="label">현재 기능 후보 종료·다음 수정 권한 정합화. 기능 작업과 별도 작업조가 담당한다.</span></div>
+          <div class="card"><span class="value">2–3시간</span><span class="label">Wave 3 빠른 회귀. 재시작·refresh 재사용·용량 cache 회전만 확인한다.</span></div>
+          <div class="card"><span class="value">1.5–2.5일</span><span class="label">Wave 4 저장소 구현. 3개 작업조와 합류 검토자 병렬 기준이다.</span></div>
+          <div class="card"><span class="value">5–12일*</span><span class="label">Wave 5 환경·사전운영 실증. 계정·권한·대상 구조가 준비된 뒤의 참고 범위다.</span></div>
+          <div class="card"><span class="value">2–4주+*</span><span class="label">정식 279건과 승인. 실기기·현장·독립검토 인력이 준비된 병렬 팀의 참고 범위다.</span></div>
+        </div>
+        <p class="small">
+          Wave 4에는 실제 용량 측정기, 삭제 워커 운영 실행 단위, 관측성, 백업·복원 실행 단위가 포함된다.
+          순수 구현은 약 10–16 인시, 집중 시험·합류는 약 5–8 인시이며 한 사람이 순서대로 하면 3.5–5일 분량이다.
+          * Wave 5 시간은 일정 약속이 아니다. cloud 계정·도메인·인증서·기기·참여자·독립검토자 확보 전에는 확정할 수 없고,
+          결함으로 후보가 바뀌면 영향 범위 시험을 다시 실행한다.
+        </p>
+      </section>
+
+      <aside class="notice decision" aria-label="다음 결정">
+        <strong>다음 한 가지 행동: 종료 정합화와 좁은 재시작 회귀를 서로 다른 작업조에서 동시에 시작한다.</strong>
+        <p class="tight">
+          회귀 작업조는 읽기·실행만 하고 결함을 재현한다. 통제 작업조는 현재 진행 중인 작업의 종료와 다음 수정 범위를 정합화한다.
+          다음 범위의 수정 권한이 확인되면 실제 용량 측정기와 삭제 one-shot 운영화를 즉시 병렬 착수한다.
+        </p>
+      </aside>
+
+      <section id="sequence">
+        <h2>1. 진행 순서</h2>
+        <ol class="flow">
+          <li><strong>두 트랙 동시 시작</strong>현재 작업 종료 정합화와 읽기 전용 재시작 회귀를 분리한다.</li>
+          <li><strong>저장소 후보 완성</strong>좁은 회귀 뒤 실제 용량 측정기, 삭제 one-shot, 관측성·백업 실행 단위를 만든다.</li>
+          <li><strong>사전운영·정식 검증</strong>실제 환경과 단일 후보를 준비하고 정식 279건·gate 판정·출시 심사를 수행한다.</li>
+          <li><strong>승인된 운영 전환</strong>GO일 때만 staging→production canary→scheduler·on-call→인계 순서로 연다.</li>
+        </ol>
+        <aside class="notice boundary">
+          <strong>통제 실패를 기능 구현 시간으로 숨기지 않는다.</strong>
+          <p class="tight">
+            첫 30분에 단순 snapshot 차이인지 확인하고, 아니면 별도의 통제 정합화 작업 흐름으로 분리한다.
+            현재 checkpoint는 작업 진행 중이며 HTML 계획서가 다음 제품 수정 권한이나 출시 승인을 대신할 수 없다.
+            다음 수정 권한이 확인되지 않은 동안 다른 작업조는 읽기 전용 재현·시험 준비까지만 한다.
+          </p>
+        </aside>
+      </section>
+
+      <section id="wave3">
+        <span class="badge">Wave 3 · 빠른 잔여 회귀</span>
+        <h2>2. 이미 통과한 시험을 반복하지 않고 빈틈만 확인한다</h2>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="Wave 3 실행표">
+          <table>
+            <caption>빠른 경로에 남길 회귀와 후속으로 분리할 시험</caption>
+            <thead>
+              <tr><th scope="col">분류</th><th scope="col">정확히 확인할 것</th><th scope="col">검증</th><th scope="col">예상</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="now">이번에 실행</td>
+                <td><strong>1 replica 실제 재시작</strong><br>로그인 → 프로세스 종료 → 같은 암호화 state로 재시작 → refresh 성공 → 이전 refresh 재사용 탐지 → 다른 기기 생존</td>
+                <td>기존 장기 세션 fixture를 실제 stop/start 경로로 좁게 확장</td>
+                <td>1–1.5시간</td>
+              </tr>
+              <tr>
+                <td class="now">이번에 실행</td>
+                <td><strong>용량 cache 포함 7종 state 회전</strong><br>old active → decrypt-only/new active → rotate → 재시작 사전검사 → 기존 state 읽기, unknown/compromised key 거부</td>
+                <td>기존 encryption maintenance 시험에 새 server-capacity state 포함 확인</td>
+                <td>1–1.5시간</td>
+              </tr>
+              <tr>
+                <td class="now">잔여 P0</td>
+                <td><strong>Nginx container smoke</strong><br><code>nginx -t</code>, 세 계정 삭제 경로의 local upstream routing, 유사 경로 차단, 본문 상한</td>
+                <td>host에 nginx가 없었던 기존 NOT_RUN을 컨테이너에서 보완</td>
+                <td>30–60분</td>
+              </tr>
+              <tr>
+                <td class="later">후속 위험 작업</td>
+                <td><strong>일반 악성 업로드·실모델 장애 corpus</strong><br>polyglot, pixel bomb, 실제 model crash/timeout·정확도 검증</td>
+                <td>모델은 candidate이며 승인되지 않았다. 현재 수정 경로와 무관한 광범위 corpus는 critical path에서 제외</td>
+                <td>별도 산정</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small">
+          빠른 Wave 3는 2–3시간을 목표로 한다. readiness의 Alembic head 검사는 이미 있으므로 반복 구현하지 않는다.
+          다만 현재 privacy rate-limit CHECK의 정확한 catalog·validated 상태까지 확인하지 않는 빈틈은 Wave 4 첫 Backend 변경에 포함한다.
+          완료 표시는 “좁은 로컬 회귀 통과”이며 실제 KMS, 다중 replica, 모델 승인이나 운영 복구를 뜻하지 않는다.
+        </p>
+      </section>
+
+      <section id="wave4">
+        <span class="badge blue">Wave 4 · 배포 가능한 저장소 후보 만들기</span>
+        <h2>3. 설정 파일만 만드는 것이 아니라 남은 서버 기능을 운영형으로 전환한다</h2>
+        <div class="work-grid">
+          <article class="work">
+            <span class="badge">A. 실제 용량 측정기</span>
+            <h3>합성 주입을 현재 서버의 실제 저장공간 측정으로 연결한다</h3>
+            <ul>
+              <li>현재 배치 계약의 <code>UPLOAD_DIR</code> filesystem 사용률을 읽는 Backend 측정기 추가</li>
+              <li>측정 주기와 TTL은 환경값으로 명시하고, 값이 없으면 자동 실행하지 않음</li>
+              <li>재시작 뒤에도 뒤로 가지 않는 version을 전용 private state에 원자적으로 보존</li>
+              <li>측정 실패 시 마지막 성공 상태를 기존 TTL까지만 유지하고 이후 503</li>
+              <li>실제 percent·GiB·경로는 내부 API와 로그에 노출하지 않음</li>
+            </ul>
+            <p class="small">이 측정기는 현재 단일 host·local filesystem 후보용이다. 실제 object storage primary/backup capacity gate를 닫지 않는다.</p>
+          </article>
+
+          <article class="work">
+            <span class="badge blue">B. 삭제 워커 운영 실행 단위</span>
+            <h3>로컬 전용 도구를 안전한 수동 one-shot 후보로 만든다</h3>
+            <ul>
+              <li>staging/production에서 무조건 종료하는 현재 조건을 보안 사전검사와 명시적 실행 모드로 교체</li>
+              <li>워커 전용 env 예제와 hardened one-shot service 추가</li>
+              <li>전용 DB 로그인·최소 역할, <code>0600</code> env, <code>0700</code> journal/quarantine 계약 고정</li>
+              <li>단일 host·같은 filesystem·maintenance lock 전제를 시작 시 검증</li>
+              <li>batch 상한, timeout, crash reconciliation, 동일 요청 멱등성을 service 명령과 동일하게 시험</li>
+            </ul>
+            <p class="small">자동 timer와 distributed lease는 만들지 않는다. one-shot 후보 검증 뒤 timer는 별도 승인으로 추가하며 실제 자격증명·삭제 실행도 하지 않는다.</p>
+          </article>
+
+          <article class="work">
+            <span class="badge amber">C. readiness·health·안전한 관측성</span>
+            <h3>살아 있음, 받을 준비, 실패 추적을 서로 구분한다</h3>
+            <ul>
+              <li>privacy rate-limit CHECK가 존재·validated 상태이고 정확한 group 집합인지 readiness에 추가</li>
+              <li>외부 Nginx에는 열지 않는 Gateway 내부 health endpoint 추가</li>
+              <li>모든 허용 route의 request ID 응답 전파와 완료 이벤트 추가</li>
+              <li>route template·status·latency·5xx·capacity level만 bounded-cardinality로 기록</li>
+              <li>query, 좌표, 본문, token, 계정·삭제 ID는 기록하지 않음</li>
+            </ul>
+            <p class="small">기존 Backend health와 Gateway <code>telemetry.ts</code>를 확장한다. 새 모니터링 framework는 도입하지 않는다.</p>
+          </article>
+
+          <article class="work">
+            <span class="badge amber">D. 백업·복원 실행 단위</span>
+            <h3>기존 도구를 재작성하지 않고 반복 실행 가능한 단위로 묶는다</h3>
+            <ul>
+              <li>기존 암호화 backup/restore 스크립트의 env, one-shot service, 기본 비활성 timer 초안 추가</li>
+              <li>manifest·서명·무결성·backup age 실패 시 문제를 숨기지 않고 안전하게 중단</li>
+              <li>격리 PostgreSQL·새 임시 upload dir에서 backup → restore를 실제 1회 실행</li>
+              <li>count·hash·참조·권한만 담은 민감정보 없는 local 실행 기록 생성</li>
+              <li>not-ready·지속 5xx·capacity stale·backup age의 signal→대응 연결표 작성</li>
+            </ul>
+            <p class="small">실제 offsite 저장소·운영 암호키·dashboard 제품·on-call 연결은 대상 환경이 정해진 뒤 한다.</p>
+          </article>
+        </div>
+
+        <h3>용량 단계는 현재 실제 연결 상태대로 구현한다</h3>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="용량 단계 집행표">
+          <table>
+            <caption>snapshot 전달과 실제 소비 동작을 구분</caption>
+            <thead><tr><th scope="col">사용률 단계</th><th scope="col">현재 연결</th><th scope="col">이번 Wave 4</th></tr></thead>
+            <tbody>
+              <tr><td>70% 경고</td><td>상태 signal</td><td>안전한 운영 로그·경보 입력으로 연결</td></tr>
+              <tr><td>85% 신규 참가자 중지</td><td>signal-only; 등록 pipeline 미연결</td><td>신호·runbook까지만. 없는 등록 pipeline을 완료로 주장하지 않음</td></tr>
+              <tr><td>95% 신규 raw session 보류</td><td class="now">Android에서 집행</td><td>실제 측정기의 만료·하향복구·재시작 E2E 확인</td></tr>
+              <tr><td>100% 자동신고 후보 보류</td><td class="now">자동신고는 집행, 학습 후보는 미연결</td><td>자동신고 회귀 확인. 학습 pipeline은 후속 범위</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="wave5">
+        <span class="badge red">Wave 5 · 사전운영 검증에서 실운영 전환까지</span>
+        <h2>4. 모든 검증이 성공하고 승인된 경우에만 실제 서비스를 연다</h2>
+
+        <aside class="notice decision" aria-label="Wave 5 결과 분기">
+          <strong>Wave 5가 끝났다는 말과 실운영 전환 완료는 같은 뜻이 아니다.</strong>
+          <p class="tight">
+            검증 결과가 <code>NO-GO</code>이면 배포하지 않는다. 조건부 승인이라면 승인된 조건 범위만 수행한다.
+            같은 후보가 사람의 승인을 받고 production 배포·DB 변경·기본 동작·소규모 공개·복귀·경보·삭제 scheduler·인계까지 실제로 통과한 경우에만 실운영 전환 완료로 기록한다.
+          </p>
+        </aside>
+
+        <h3>Wave 5 진입 전에 먼저 고정할 것</h3>
+        <div class="work-grid">
+          <article class="work">
+            <span class="badge">운영 대상과 책임</span>
+            <ul>
+              <li>cloud 계정·리전·도메인·예산·운영 범위와 공개 대상을 확정</li>
+              <li>서비스 책임자, 운영 담당자, QA, 보안·개인정보 검토자, 비상 대응자와 대체 연락처 지정</li>
+              <li>현재 미지정인 독립 검토자를 임의 이름으로 채우지 않음</li>
+              <li>Wave 4와 현재 작업의 종료·변경 권한이 정합한지 확인</li>
+            </ul>
+          </article>
+          <article class="work">
+            <span class="badge blue">저장소 구조 결정</span>
+            <ul>
+              <li>Wave 4의 단일 host local 저장소를 운영 승인할지, 실제 object storage로 바꿀지 결정</li>
+              <li>object storage를 선택하면 primary·backup 측정기와 삭제 범위를 별도 구현·시험</li>
+              <li>결정 전에는 local 측정 결과로 server-capacity gate를 닫지 않음</li>
+            </ul>
+            <p class="small">object storage 전환을 택하면 추가 개발 3–10영업일 이상이 생길 수 있으며 Wave 5 일정에 별도로 반영한다.</p>
+          </article>
+        </div>
+
+        <h3>실행 순서와 증거</h3>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="Wave 5 단계별 실행표">
+          <table>
+            <caption>승인되지 않은 단계는 다음 단계로 넘어가지 않음</caption>
+            <thead>
+              <tr><th scope="col">단계</th><th scope="col">쉬운 설명</th><th scope="col">해야 할 일</th><th scope="col">완료 증거</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>5A</strong><br>운영 집 마련</td>
+                <td>실제 서버와 안전한 열쇠 보관소를 준비한다.</td>
+                <td>
+                  server, Postgres/PostGIS, 실제 저장소와 offsite backup, DNS·HTTPS, firewall을 구성한다.
+                  일반 runtime·DB 변경·삭제 worker의 OS/DB 역할을 분리하고 비밀값·암호화 키는 Git 밖의 Secret Manager/KMS에 둔다.
+                </td>
+                <td>자원·역할 ID, TLS hostname·chain·만료 검사, 최소권한·파일 권한, 비밀 원문 없는 key rotation·접속 시험</td>
+              </tr>
+              <tr>
+                <td><strong>5B</strong><br>한 후보로 잠그기</td>
+                <td>시험하고 배포할 물건을 하나로 고정한다.</td>
+                <td>
+                  source, 사용자 앱, 관리자 앱, Gateway, Backend, model, config, OpenAPI, migration, unit 파일을 하나의 release candidate로 묶고 hash·서명·SBOM을 고정한다.
+                  정식 시험계획·279개 case·환경·지원 기기표를 지정 검토·승인하고 비공개 정식 시험환경을 만들되 public ingress와 production scheduler는 계속 끈다.
+                </td>
+                <td>후보 ID, 구성요소 hash·서명, 환경 ID·지원 기기표, 정식 시험환경 사전검사. 후보가 바뀌면 새 세대로 다시 고정</td>
+              </tr>
+              <tr>
+                <td><strong>5C</strong><br>되살리기·운영 연습</td>
+                <td>고장과 실수를 실제와 비슷한 환경에서 연습한다.</td>
+                <td>
+                  비공개 환경에 후보를 설치하고 backup → DB 변경 dry-run → 적용 → 검증 → 격리 restore → rollback을 수행한다.
+                  중앙 dashboard, 경보 전달, 장애 채널, 기존 report retention timer와 별개인 계정 삭제 전용 scheduler를 합성 계정으로 여러 주기 시험한다.
+                  이 단계의 설치는 정식 시험 준비이며 출시 후 smoke/canary 완료로 부르지 않는다.
+                </td>
+                <td>실제 backup ID/hash, 격리 restore count·bytes·hash·권한·시간, RTO/RPO 실측, alert fire→주담당/대체채널 전달→clear, scheduler crash·retry·멱등 기록</td>
+              </tr>
+              <tr>
+                <td><strong>5D</strong><br>정식 279건</td>
+                <td>개발자 시험이 아니라 승인된 후보·환경·기기로 정식 검증한다.</td>
+                <td>
+                  279건의 적용 대상 전체를 실행한다. 여기에는 기능 123, 장애·복구 46, 실기기·현장 54, API·통합 32, 접근성·사용성 15와 기타 9건이 포함된다.
+                  실패는 결함으로 남기고 수정된 새 후보에서 영향 시험을 다시 한다.
+                </td>
+                <td>각 case의 후보·build·model·config·migration·환경·기기·수행자·시각·원자료 hash와 PASS/FAIL/N/A 근거, 결함·재시험·잔여위험 승인</td>
+              </tr>
+              <tr>
+                <td><strong>5E</strong><br>출시 판단</td>
+                <td>권한 있는 사람이 공개해도 되는지 결정한다.</td>
+                <td>
+                  279건에 포함된 5개 gate 시험과 gate별 독립 판정을 확인한다.
+                  시험 결과보고, 미해결 결함·잔여위험, 정적·의존성·비밀 검사와 승인된 환경의 동적·침투시험, 취약점 신고 채널, 실제 휴대전화 E2E, 이전 버전 복귀, 현장 안전계획을 함께 검토해 <code>GO</code>·조건부 <code>GO</code>·<code>NO-GO</code> 중 하나를 승인한다.
+                </td>
+                <td>같은 후보에 결속된 출시 준비도 판단과 승인 체크리스트의 실제 서명·시각·증거 참조. gate는 모두 종결되고 <code>waived=false</code></td>
+              </tr>
+              <tr>
+                <td><strong>5F</strong><br>staging 승격</td>
+                <td>GO를 받은 후보를 정식 사전운영 환경에 올린다.</td>
+                <td>
+                  새 backup을 확인하고 migration, issuer 결속, Backend, Gateway, Nginx/TLS 순서로 올린다.
+                  모든 active 관리자 앱의 호환 version을 먼저 확인하고 미갱신 session·device key를 폐기한다.
+                  그 뒤 health·로그인·권한·길안내·신고·삭제의 짧은 smoke와 제한 canary, rollback을 실행한다.
+                </td>
+                <td>배포 대상·명령·시간·hash, migration 결과, smoke·canary 지표, rollback 결과를 담은 추가 전용 실행 기록</td>
+              </tr>
+              <tr>
+                <td><strong>5G</strong><br>production 전환</td>
+                <td>작게 열고 관찰한 뒤 안정적일 때만 확대한다.</td>
+                <td>
+                  승인된 배포 시간대에 fresh backup, 쓰기 중단, migration, service/TLS 검증 후 제한 사용자 canary를 연다.
+                  오류·지연·용량·backup·보안·삭제 지표를 확인한 뒤 계정 삭제 전용 timer를 낮은 batch로 마지막에 활성화한다.
+                  주담당·대체당직 호출과 지원·장애·복구 인계를 끝낸다.
+                </td>
+                <td>production smoke·canary·경보 전달·scheduler 승인/활성화·운영 인계 기록과 3–7일 안정화 관찰. 모두 성공해야 실운영으로 표시</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>279건 안에 포함된 5개 출시 gate</h3>
+        <p class="small">아래 검증 case 5건은 279건에 포함돼 있으므로 284건으로 더하지 않는다. 다만 case PASS만으로 gate가 자동 종결되지는 않으며, 실제 원자료·전문 검토·제품책임자의 별도 판정이 필요하다.</p>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="출시 gate 설명표">
+          <table>
+            <caption>실제 운영 전에 반드시 종결할 다섯 질문</caption>
+            <thead><tr><th scope="col">질문</th><th scope="col">실제로 확인할 것</th><th scope="col">현재</th></tr></thead>
+            <tbody>
+              <tr><td>휴대전화 자료가 무한히 쌓이지 않는가?</td><td>실제 기기에서 암호화 대기자료 byte 상한·삭제·재연결 동작 실측</td><td class="later">NOT_RUN</td></tr>
+              <tr><td>서버 용량 부족이 휴대전화까지 정확히 전달되는가?</td><td>실제 대상 저장소의 version·TTL·오프라인·70/85/95/100 단계와 복구 E2E</td><td class="later">NOT_RUN</td></tr>
+              <tr><td>가리지 않은 원본을 수집해도 되는가?</td><td>고지·동의·권리행사·보존·삭제 범위의 독립 개인정보·보안 검토</td><td class="later">NOT_RUN</td></tr>
+              <tr><td>실제 cloud 비용을 감당할 수 있는가?</td><td>실제 저장량·요청·복원 비용을 측정해 월 30,000원 정책 상한과 비교</td><td class="later">NOT_RUN</td></tr>
+              <tr><td>관리자 휴대전화 분실 뒤 복구할 수 있는가?</td><td>단일 관리자 분실을 가정해 기존 자격증명을 폐기하고 새 기기에서 같은 단일 관리자를 복구하는 훈련</td><td class="later">NOT_RUN</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>운영을 멈추거나 되돌리는 조건</h3>
+        <div class="work-grid">
+          <article class="work">
+            <span class="badge red">즉시 중단</span>
+            <ul>
+              <li>후보 hash·환경·설정이 승인본과 다름</li>
+              <li>정식 시험·gate 미실행/실패, P0/P1 또는 미수용 안전·보안·개인정보 위험</li>
+              <li>backup·격리 restore·migration·smoke·canary·경보 전달 중 하나라도 실패</li>
+              <li>비밀값·개인정보 로그 노출, 삭제 중복·오삭제·복구 불명확</li>
+              <li>주담당·대체당직·지원 채널이 실제 호출되지 않음</li>
+            </ul>
+          </article>
+          <article class="work">
+            <span class="badge amber">안전한 복귀</span>
+            <ul>
+              <li>신규 public traffic과 삭제 timer를 먼저 중단하고 journal·quarantine을 보존</li>
+              <li>DB와 호환성이 입증된 구성요소만 이전 승인판으로 되돌림</li>
+              <li>DB 변경이 비가역이거나 미검증이면 구 앱만 억지로 올리지 않고 ingress를 닫아 안전정지 후 restore 또는 수정판 적용</li>
+              <li>복원 전 삭제 tombstone·영수증을 먼저 재적용하고 이미 유효하게 삭제한 개인정보가 되살아나지 않았는지 확인</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="team">
+        <h2>5. 팀을 이렇게 병렬로 운용한다</h2>
+        <aside class="notice boundary">
+          <strong>현재 작업 정리 담당 — 제품 파일을 수정하지 않는 독립 작업 흐름</strong>
+          <p class="tight">현재 기능 후보의 종료 기록, 변경 snapshot, 다음 수정 범위와 권한을 정합화한다. 예상 2–4시간이며 제품 구현 작업조의 인시와 섞어 보고하지 않는다.</p>
+        </aside>
+        <h3>Wave 3·4 기능 구현팀</h3>
+        <div class="lane-grid">
+          <article class="lane">
+            <span class="badge">작업조 A</span>
+            <h3>local 용량 상태</h3>
+            <p>Wave 3의 용량 cache 회전 회귀 뒤 filesystem 측정기, 재시작해도 증가하는 version, TTL·실패·복구 E2E를 구현한다.</p>
+            <p class="small"><strong>인계물:</strong> 측정기, 명시적 설정, restart/expiry/down/recovery 시험</p>
+          </article>
+          <article class="lane">
+            <span class="badge blue">작업조 B</span>
+            <h3>삭제 one-shot</h3>
+            <p>현재 로컬 전용 중단 조건을 보안 사전검사 기반 수동 실행 모드로 전환하고 hardened unit/env를 만든다.</p>
+            <p class="small"><strong>인계물:</strong> 운영 실행 단위, unit/env, single-host·role·ACL·crash 회귀</p>
+          </article>
+          <article class="lane">
+            <span class="badge amber">작업조 C</span>
+            <h3>상태·관측성·복원</h3>
+            <p>Gateway health와 안전한 request telemetry를 구현하고, 기존 backup/restore를 실행 단위와 대응표로 묶는다.</p>
+            <p class="small"><strong>인계물:</strong> health/telemetry, backup unit/timer, 격리 restore 실행 기록</p>
+          </article>
+        </div>
+        <h3>합류 검토자</h3>
+        <p class="tight">세 작업조 파일이 합쳐진 뒤 capacity 단계의 실제 집행 범위, Nginx 비노출, systemd 권한, 로그 민감정보, 삭제 멱등성, 문서 상태 표현을 독립 검토한다. 작업조와 같은 영역을 동시에 수정하지 않는다.</p>
+
+        <h3>Wave 5 실운영 전환팀</h3>
+        <div class="lane-grid">
+          <article class="lane">
+            <span class="badge">릴리스·통제</span>
+            <h3>후보와 승인</h3>
+            <p>릴리스책임자와 제품책임자가 후보 manifest·hash·SBOM, 변경 동결, 출시 판단, 배포 실행 기록을 관리한다.</p>
+          </article>
+          <article class="lane">
+            <span class="badge blue">플랫폼·보안</span>
+            <h3>운영 집과 열쇠</h3>
+            <p>기술책임자와 보안·개인정보책임자가 cloud·DB·storage·TLS·DNS·KMS·secret·최소권한과 key rotation을 맡는다.</p>
+          </article>
+          <article class="lane">
+            <span class="badge amber">배포·데이터</span>
+            <h3>DB 변경과 복귀</h3>
+            <p>릴리스·운영책임자가 설치, migration, backup·격리 restore·rollback, 삭제 timer의 staging 시험과 승인 활성화를 맡는다.</p>
+          </article>
+          <article class="lane">
+            <span class="badge red">관측·당직</span>
+            <h3>문제 발견과 연락</h3>
+            <p>운영·지원책임자가 live dashboard, 실제 경보 전달, SLI/SLO·error budget, 주담당·대체 연락과 runbook을 맡는다.</p>
+          </article>
+          <article class="lane">
+            <span class="badge">정식 QA·안전</span>
+            <h3>279건과 독립검토</h3>
+            <p>QA·기기 QA·접근성·안전 담당과 독립 보안·개인정보 검토자가 정식시험, 현장 안전, 5개 gate와 잔여위험을 판정한다.</p>
+            <p class="small"><strong>현재:</strong> 독립 검토자 미지정 — 지정 전에는 출시 차단</p>
+          </article>
+        </div>
+        <p class="small">제품책임자가 최종 합류 판정을 한다. GO 전에는 production 쓰기, public traffic, production 삭제 scheduler를 켜지 않는다.</p>
+      </section>
+
+      <section id="time">
+        <h2>6. 시간 산정 — 코딩, 실제 환경, 사람 검토를 분리</h2>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="시간 산정표">
+          <table>
+            <caption>준비된 병렬팀 기준의 참고 범위이며 일정 약속이 아님</caption>
+            <thead><tr><th scope="col">구간</th><th scope="col">무슨 시간인가</th><th scope="col">참고 범위</th><th scope="col">주요 변동 요인</th></tr></thead>
+            <tbody>
+              <tr><td>현재 작업 정리</td><td>제품 구현과 별도인 종료 기록·다음 권한</td><td><strong>2–4시간</strong></td><td>기존 통제 불일치</td></tr>
+              <tr><td>Wave 3</td><td>재시작·회전·Nginx container 회귀</td><td><strong>2–3시간</strong></td><td>결함 발견 여부</td></tr>
+              <tr><td>Wave 4</td><td>저장소 기능 10–16 인시 + 집중 검증 5–8 인시</td><td><strong>1.5–2.5일</strong></td><td>3개 작업조 병렬 기준</td></tr>
+              <tr><td>Wave 5A–C</td><td>운영 대상 결정, 인프라·보안, 후보 고정, backup·복원·경보·scheduler 사전 실증</td><td><strong>5–12영업일</strong><br><span class="small">계정·권한 확보 뒤</span></td><td>cloud 계정, DNS/TLS, 저장소 선택; object storage 전환 시 추가 개발</td></tr>
+              <tr><td>Wave 5D–E</td><td>정식 279건과 독립검토·gate 판정·출시 심사</td><td><strong>2–4주 이상</strong><br><span class="small">5개 이상 역할 병렬 참고</span></td><td>54개 실기기·현장, 15개 접근성·사용성, 참여자·안전요원·독립 검토자 일정, 결함 재시험</td></tr>
+              <tr><td>Wave 5F–G</td><td>승인된 staging·production 배포와 canary</td><td><strong>1–3영업일 + 3–7일 관찰</strong></td><td>승인된 배포창, migration·canary 결과, 지원·당직 준비</td></tr>
+              <tr><td>외부 대기</td><td>계정 발급, 인증서, 참가자·검토자·승인자 섭외</td><td class="later">확보 전 산정 불가</td><td>프로젝트가 직접 통제할 수 없는 일정</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small">
+          Wave 3·4의 코딩 시간과 Wave 5의 운영·현장·사람 승인 시간을 한 숫자로 합치지 않는다.
+          Wave 5는 준비된 병렬팀이면 최소 4–7주 수준의 계획 범위지만, 한 사람과 외부 참여자 섭외까지 포함하면 6–10주 이상이 될 수 있다.
+          실제 일정은 대상 환경과 담당자가 확정된 뒤 다시 산정한다.
+        </p>
+      </section>
+
+      <section id="rules">
+        <h2>7. 오래 끌지 않으면서 증거를 잃지 않는 실행 규칙</h2>
+        <div class="work-grid">
+          <div class="work">
+            <h3>계속 진행</h3>
+            <ul>
+              <li>기존 코드·스크립트·시험을 우선 재사용</li>
+              <li>현재 종료 정합화와 다음 기능 개발은 담당·시간을 분리해 기록</li>
+              <li>작업조별 집중 시험만 개발 중 실행</li>
+              <li>결함은 재현 → 최소 수정 → 같은 시험 통과 순서</li>
+              <li>문서·카탈로그·전체 묶음은 코드가 안정된 뒤 한 번 갱신</li>
+              <li>후보가 바뀌면 새 후보 세대로 다시 고정하고 승인된 영향 시험과 필수 회귀를 재실행하며, 여러 후보의 부분 성공을 합쳐 GO로 만들지 않음</li>
+              <li>N/A는 승인된 적용성 근거와 서명이 있을 때만 허용</li>
+              <li>실제 실행 결과는 기존 template을 덮어쓰지 않고 후보·환경·수행자·시각과 함께 추가 기록</li>
+            </ul>
+          </div>
+          <div class="work">
+            <h3>Wave 4에서는 하지 않고 Wave 5 승인 뒤 수행</h3>
+            <ul>
+              <li>cloud 자원·실제 storage·DNS·TLS·Secret Manager/KMS 구성</li>
+              <li>중앙 dashboard, 실제 경보 전달, on-call·대체 연락망 활성화</li>
+              <li>계정 삭제 전용 scheduler 작성·검토·합성계정 시험·production 제한 활성화</li>
+              <li>실제 backup을 운영 DB와 분리된 새 환경에 복원하고 재해복구 실측</li>
+              <li>정식 279건과 gate별 판정, 출시 심사, staging·production 배포</li>
+            </ul>
+          </div>
+        </div>
+        <aside class="notice danger">
+          <strong>즉시 멈추고 별도로 판단할 조건</strong>
+          <p class="tight">
+            비밀값 또는 개인정보가 로그에 나타남, 삭제 작업이 멱등하지 않음, 복원할 수 없는 변경,
+            Gateway health가 외부 ingress에 노출됨, 일반 Backend 역할이 삭제 권한을 얻음,
+            기존 기능에 P0/P1 회귀가 생긴 경우에는 다음 단계로 넘어가지 않는다.
+          </p>
+        </aside>
+      </section>
+
+      <section id="done">
+        <h2>8. 완료 기준</h2>
+        <h3>Wave 3 완료</h3>
+        <ul>
+          <li>실제 Gateway stop/start 뒤 refresh 회전·이전 refresh 재사용 탐지·다른 기기 생존 시험이 통과한다.</li>
+          <li>server-capacity를 포함한 7종 암호화 state가 key 회전·재시작 뒤 복호화되고 unknown/compromised key는 거부된다.</li>
+          <li>컨테이너 <code>nginx -t</code>와 local upstream smoke에서 계정 삭제 세 경로만 도달하고 유사 경로는 차단된다.</li>
+          <li>현재 작업 종료와 다음 수정 범위가 정합화되기 전에는 Wave 4 제품 파일을 수정하지 않는다.</li>
+        </ul>
+        <h3>Wave 4 저장소 완료</h3>
+        <ul>
+          <li>명시적으로 설정한 local filesystem 측정기가 실제 상태를 만들고 version은 재시작 뒤 증가하며 failure·expiry 시 문제를 숨기지 않고 안전하게 중단한다.</li>
+          <li>70·85·95·100 단계에서 signal-only와 실제 집행 범위가 표와 동일하고, 없는 참가자·학습 pipeline 완료를 주장하지 않는다.</li>
+          <li>privacy rate-limit CHECK의 부재·구형 정의·unvalidated 상태가 readiness 503을 만든다.</li>
+          <li>Gateway 내부 health는 loopback에서만 성공하고 외부 Nginx 경로는 계속 차단된다.</li>
+          <li>request ID·route template·status·latency·5xx 이벤트가 나오며 query·본문·token·식별자는 나오지 않는다.</li>
+          <li>삭제 워커의 운영 후보 수동 one-shot과 전용 env/service가 single-host·최소권한 사전검사, crash recovery, 멱등 시험을 통과한다.</li>
+          <li>삭제 timer는 없거나 비활성 초안이며 실제 자격증명·삭제 실행 없이 멈춘다.</li>
+          <li>backup env/service/timer가 정적 검사를 통과하고 격리 backup→restore 실행 기록은 로컬 범위로 표시된다.</li>
+          <li>관련 Backend·Gateway·PostgreSQL 시험, 설정 검사, 링크 검사, <code>git diff --check</code>가 통과한다.</li>
+        </ul>
+        <p class="small">
+          이 완료는 “배포 가능한 저장소 후보지만 아직 적용하지 않음”이라는 뜻이다. 실제 host 적용, 운영 복원 성공,
+          정식 검증 완료, 출시 가능을 뜻하지 않는다.
+        </p>
+
+        <h3>Wave 5 사전운영·검증 절차 종료</h3>
+        <ul>
+          <li>실제 대상·권한·담당자가 지정되고 하나의 release candidate와 전체 hash가 고정된다.</li>
+          <li>비공개 정식 시험환경에서 실제 backup의 격리 restore, DB 변경·복귀, 중앙 경보 전달, 합성계정 삭제 scheduler 시험이 통과한다.</li>
+          <li>정식 279건의 적용 대상에 설명 없는 <code>NOT_RUN</code>이 없고, 실패·N/A·재시험·잔여위험이 모두 승인 근거에 연결된다.</li>
+          <li>279건에 포함된 5개 gate 시험과 별도 gate 판정이 모두 종결되고 <code>waived=false</code>다.</li>
+          <li>시험 결과보고, 결함·잔여위험, 적용 보안시험, 실제 휴대전화 E2E, 이전 버전 복귀, 현장 안전 선행조건이 같은 후보에 결속된다.</li>
+          <li>권한 있는 사람이 <code>GO</code>·조건부 <code>GO</code>·<code>NO-GO</code> 중 하나를 실제로 승인한다.</li>
+        </ul>
+        <p class="small"><code>NO-GO</code>도 정상적인 검증 결과다. 이 경우 Wave 5 검증 절차는 끝날 수 있지만 실운영으로 전환하지 않는다.</p>
+
+        <h3>실운영 전환 완료</h3>
+        <ul>
+          <li><code>GO</code> 또는 허용 범위가 분명한 조건부 <code>GO</code>를 받은 동일 후보만 staging과 production에 배포한다.</li>
+          <li>모든 active 관리자 앱의 호환 version을 먼저 확인하고, 미갱신 session·device key를 폐기한 뒤 ingress drain → Backend 정지 → migration → issuer 결속 → Backend/Gateway → readiness → ingress 순서를 통과한다.</li>
+          <li>production backup·migration·smoke·제한 canary·rollback 판정이 실제 대상과 시간에 결속된 실행 기록으로 남는다.</li>
+          <li>dashboard 접근권한·데이터 최신성·SLI/SLO·error budget과 주담당·대체채널의 실제 alert fire→delivery→clear가 확인된다.</li>
+          <li>계정 삭제 전용 timer가 one-shot·합성계정 시험과 별도 승인을 거쳐 낮은 batch로 활성화되고 중복·오삭제·실패 경보가 없다.</li>
+          <li>3–7일 안정화 관찰과 운영·지원·장애·복구 인계를 승인하고, 실제 상태 원장에 append-only 실행 기록을 연결한다.</li>
+        </ul>
+        <aside class="notice decision">
+          <strong>위 조건이 전부 실제 증거로 충족되면 그때 외부 사용자 대상 실운영 전환이다.</strong>
+          <p class="tight">사전운영 환경만 준비됐거나 정식시험·승인·production canary·당직·scheduler·인계 중 하나라도 남으면 아직 실운영 완료가 아니다.</p>
+        </aside>
+      </section>
+
+      <section id="sources">
+        <h2>9. 확인한 현재 자료</h2>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="근거 자료 표">
+          <table>
+            <caption>계획 범위와 상태의 직접 근거</caption>
+            <thead><tr><th scope="col">자료</th><th scope="col">계획에 반영한 내용</th></tr></thead>
+            <tbody>
+              <tr><td><a href="walksafe-security-server-operations-feature-first-plan-20260824.html">기능 우선 구현 계획</a></td><td>Wave 1·2 결과와 Wave 3·4의 기존 경계</td></tr>
+              <tr><td><a href="../../backend/app/api/health.py">Backend health/readiness</a></td><td>이미 있는 liveness·readiness를 재사용</td></tr>
+              <tr><td><a href="../../backend/app/services/capacity_state.py">Backend capacity state</a></td><td>현재 합성·dev/test 상태에서 실제 local 측정기가 빠져 있음을 반영</td></tr>
+              <tr><td><a href="../../apps/android-gateway/src/telemetry.ts">Gateway telemetry</a></td><td>실패 이벤트 기반을 최소 확장</td></tr>
+              <tr><td><a href="../../scripts/account_deletion_worker.py">계정 삭제 워커</a></td><td>dev/test local-only 중단 조건과 single-host filesystem lock 전제를 반영</td></tr>
+              <tr><td><a href="../../scripts/backup_walksafe_data_20260711.sh">백업 스크립트</a> · <a href="../../scripts/restore_walksafe_backup_drill_20260711.sh">복원 훈련 스크립트</a></td><td>재작성 대신 실행 단위와 격리 훈련에 재사용</td></tr>
+              <tr><td><a href="../../deploy/README.md">배포 파일 분류</a></td><td>모든 deploy 예시는 DRAFT / NOT_APPLIED</td></tr>
+              <tr><td><a href="../deliverables/10-operations/registers/operations-registers.json">운영 register</a></td><td>dashboard·복원·backup 실증 debt가 아직 열려 있음</td></tr>
+              <tr><td><a href="../guides/release-operations-guide.md">릴리스·운영 가이드</a></td><td>정식시험·5개 gate·출시 상태는 계속 미완료</td></tr>
+              <tr><td><a href="../deliverables/06-testing/test-plan.md">마스터 시험계획</a> · <a href="../deliverables/06-testing/registers/test-cases.json">279개 시험 원장</a></td><td>정식시험 구성, 환경·증거·진입·종료 기준과 gate case 포함 관계</td></tr>
+              <tr><td><a href="../deliverables/06-testing/release-readiness-decision.md">출시 준비도 판단</a> · <a href="../deliverables/09-release/release-control.md">릴리스 통제</a></td><td>GO·조건부 GO·NO-GO와 승인 선행조건</td></tr>
+              <tr><td><a href="../deliverables/09-release/deployment-evidence.md">배포·복귀 절차</a></td><td>GO 뒤 staging·production smoke·canary·rollback과 실행 증거</td></tr>
+              <tr><td><a href="../deliverables/10-operations/operator-guide.md">운영자 안내</a> · <a href="../deliverables/10-operations/recovery-plan.md">복구 계획</a></td><td>dashboard·경보·당직·복원·재해복구·인계 경계</td></tr>
+              <tr><td><a href="../../backend/README.md">Backend 운영 순서</a></td><td>관리자 호환, issuer 결속, migration, ready 확인 순서</td></tr>
+              <tr><td><a href="../control/walksafe-project-continuation-checkpoint.json">현재 체크포인트</a></td><td>현재 작업은 진행 중이며 다음 제품 수정에는 현재 작업 종료와 정확한 수정 권한 확인이 필요</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      이 문서는 실행 순서를 설명하는 비정본 계획서다. 정책·승인·정식 시험 상태는 링크된 정본 자료를 따른다.
+    </footer>
+  </div>
+</body>
+</html>

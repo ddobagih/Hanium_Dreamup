@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import importlib
 
+import pytest
 from sqlalchemy import text
 
 from backend.app.database import SessionLocal
@@ -13,6 +15,91 @@ from backend.app.services.actor_rate_limit import PostgresActorRateLimiter
 def _clear_rate_limit_events() -> None:
     with SessionLocal.begin() as db:
         db.execute(text("TRUNCATE TABLE actor_rate_limit_events"))
+
+
+def test_privacy_group_migration_replaces_only_the_named_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    migration = importlib.import_module(
+        "backend.alembic.versions.202608250001_actor_rate_limit_privacy_group"
+    )
+    dropped: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    created: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    monkeypatch.setattr(
+        migration.op,
+        "drop_constraint",
+        lambda *args, **kwargs: dropped.append((args, kwargs)),
+    )
+    monkeypatch.setattr(
+        migration.op,
+        "create_check_constraint",
+        lambda *args, **kwargs: created.append((args, kwargs)),
+    )
+
+    migration.upgrade()
+
+    assert migration.revision == "202608250001"
+    assert migration.down_revision == "202608150002"
+    assert dropped == [
+        (
+            ("ck_actor_rate_limit_events_group", "actor_rate_limit_events"),
+            {"type_": "check"},
+        )
+    ]
+    assert created == [
+        (
+            (
+                "ck_actor_rate_limit_events_group",
+                "actor_rate_limit_events",
+                "rate_group IN ('report', 'navigation', 'detect', 'export', "
+                "'admin_read', 'privacy')",
+            ),
+            {},
+        )
+    ]
+
+    dropped.clear()
+    created.clear()
+    migration.downgrade()
+
+    assert dropped == [
+        (
+            ("ck_actor_rate_limit_events_group", "actor_rate_limit_events"),
+            {"type_": "check"},
+        )
+    ]
+    assert created == [
+        (
+            (
+                "ck_actor_rate_limit_events_group",
+                "actor_rate_limit_events",
+                "rate_group IN ('report', 'navigation', 'detect', 'export', "
+                "'admin_read')",
+            ),
+            {},
+        )
+    ]
+
+
+def test_postgres_privacy_rate_limit_allows_twelve_then_blocks_thirteenth() -> None:
+    _clear_rate_limit_events()
+    actor_id = "privacy-rate-limit@example.com"
+    limiter = PostgresActorRateLimiter(ACTOR_RATE_LIMITS)
+
+    for _index in range(ACTOR_RATE_LIMITS["privacy"]):
+        assert limiter.check(actor_id, "privacy") is None
+
+    assert limiter.check(actor_id, "privacy") is not None
+    actor_digest = hashlib.sha256(actor_id.encode("utf-8")).hexdigest()
+    with SessionLocal.begin() as db:
+        stored_count = db.execute(
+            text(
+                "SELECT count(*) FROM actor_rate_limit_events "
+                "WHERE actor_digest = :actor_digest AND rate_group = 'privacy'"
+            ),
+            {"actor_digest": actor_digest},
+        ).scalar_one()
+    assert stored_count == ACTOR_RATE_LIMITS["privacy"]
 
 
 def test_postgres_rate_limit_is_shared_by_independent_instances() -> None:

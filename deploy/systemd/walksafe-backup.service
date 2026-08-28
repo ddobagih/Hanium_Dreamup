@@ -1,0 +1,48 @@
+# DRAFT / NOT_APPLIED. Do not install or start without a reviewed local-host run.
+[Unit]
+Description=WalkSafe encrypted backup manual one-shot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=walksafe-backup
+Group=walksafe-backup
+SupplementaryGroups=walksafe-maintenance-lock walksafe-backup-readers
+WorkingDirectory=/srv/walksafe/backend
+EnvironmentFile=/etc/walksafe/backup.env
+StateDirectory=walksafe-backup walksafe-backup-gnupg
+StateDirectoryMode=0700
+RuntimeDirectory=walksafe-backup
+RuntimeDirectoryMode=0700
+UMask=0077
+ExecStart=/bin/bash -p /srv/walksafe/backend/scripts/run_walksafe_backup_oneshot_20260825.sh
+TimeoutStartSec=2h
+TimeoutStopSec=130s
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+RestrictRealtime=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+ReadOnlyPaths=/var/lib/walksafe/uploads /run/walksafe-maintenance-lock /etc/walksafe/backup.env /etc/walksafe/backup-key-control.json /etc/walksafe/backup-key-control.json.sig /etc/walksafe/backup-writes-quiesced.approved
+ReadWritePaths=/var/lib/walksafe-backup /var/lib/walksafe-backup-gnupg /etc/walksafe/backup-key-control.lock
+InaccessiblePaths=/etc/walksafe/backend-runtime.env /etc/walksafe/backend-migration.env /etc/walksafe/backend.env /etc/walksafe/account-deletion-worker.env /etc/walksafe/report-retention.env /etc/walksafe/admin-credential-issuer.key /etc/walksafe/report-image-keyring.json -/var/lib/walksafe/account-deletion-worker -/var/lib/walksafe/report-retention

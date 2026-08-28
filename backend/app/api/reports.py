@@ -1085,9 +1085,13 @@ def _commit_new_report_with_image(
     content_type: str,
     key_manager: ReportImageKeyManager,
     maintenance_lock_path: Path | None = None,
+    maintenance_lock_group_gid: int | None = None,
     precommit_check: Callable[[], None] | None = None,
 ) -> None:
-    with _shared_report_write_lock(maintenance_lock_path):
+    with _shared_report_write_lock(
+        maintenance_lock_path,
+        expected_group_gid=maintenance_lock_group_gid,
+    ):
         lock_report_storage_write_transaction(db)
         try:
             key_manager.synchronize(db)
@@ -1141,6 +1145,16 @@ def _commit_new_report_with_image(
             raise
         db.refresh(report)
         complete_report_image_write(pending)
+
+
+def _descriptor_acl_is_absent(descriptor: int) -> bool:
+    try:
+        return not any(
+            "acl" in os.fsdecode(name).casefold()
+            for name in os.listxattr(descriptor)
+        )
+    except (AttributeError, OSError):
+        return False
 
 
 def _trusted_maintenance_lock_parent(parent: Path, parent_descriptor: int) -> bool:
@@ -1214,7 +1228,11 @@ def _trusted_maintenance_lock_parent(parent: Path, parent_descriptor: int) -> bo
 
 
 @contextmanager
-def _shared_report_write_lock(path: Path | None):
+def _shared_report_write_lock(
+    path: Path | None,
+    *,
+    expected_group_gid: int | None = None,
+):
     if path is None:
         yield
         return
@@ -1236,10 +1254,27 @@ def _shared_report_write_lock(path: Path | None):
     try:
         parent_stat = os.fstat(parent_descriptor)
         path_parent_stat = parent.stat(follow_symlinks=False)
+        expected_parent_owner = 0 if expected_group_gid is not None else os.geteuid()
+        expected_parent_mode = 0o750 if expected_group_gid is not None else 0o700
         if (
             not stat.S_ISDIR(parent_stat.st_mode)
-            or parent_stat.st_uid != os.geteuid()
-            or stat.S_IMODE(parent_stat.st_mode) != 0o700
+            or parent_stat.st_uid != expected_parent_owner
+            or (
+                expected_group_gid is not None
+                and parent_stat.st_gid != expected_group_gid
+            )
+            or stat.S_IMODE(parent_stat.st_mode) != expected_parent_mode
+            or not _descriptor_acl_is_absent(parent_descriptor)
+            or (
+                expected_group_gid is not None
+                and os.access(
+                    ".",
+                    os.W_OK,
+                    dir_fd=parent_descriptor,
+                    effective_ids=True,
+                    follow_symlinks=False,
+                )
+            )
             or (path_parent_stat.st_dev, path_parent_stat.st_ino)
             != (parent_stat.st_dev, parent_stat.st_ino)
             or not _trusted_maintenance_lock_parent(parent, parent_descriptor)
@@ -1248,78 +1283,132 @@ def _shared_report_write_lock(path: Path | None):
                 status_code=503,
                 detail={"code": "maintenance_lock_unavailable"},
             )
+        parent_state = (
+            parent_stat.st_dev,
+            parent_stat.st_ino,
+            parent_stat.st_mode,
+            parent_stat.st_uid,
+            parent_stat.st_gid,
+            parent_stat.st_nlink,
+            parent_stat.st_ctime_ns,
+        )
         try:
-            fcntl.flock(parent_descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)
-        except OSError as exc:
-            if exc.errno not in {errno.EACCES, errno.EAGAIN}:
-                raise
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "code": "maintenance_in_progress",
-                    "message": "report writes are temporarily paused for a consistent backup",
-                },
-                headers={"Retry-After": "5"},
-            ) from exc
-        try:
-            path_parent_stat = parent.stat(follow_symlinks=False)
-            if (path_parent_stat.st_dev, path_parent_stat.st_ino) != (
-                parent_stat.st_dev,
-                parent_stat.st_ino,
-            ):
-                raise HTTPException(
-                    status_code=503,
-                    detail={"code": "maintenance_lock_unavailable"},
-                )
-            flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+            flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
             try:
-                try:
-                    descriptor = os.open(path.name, flags, dir_fd=parent_descriptor)
-                except FileNotFoundError:
-                    descriptor = os.open(
-                        path.name,
-                        flags | os.O_CREAT | os.O_EXCL,
-                        0o600,
-                        dir_fd=parent_descriptor,
-                    )
+                descriptor = os.open(path.name, flags, dir_fd=parent_descriptor)
             except OSError as exc:
                 raise HTTPException(
                     status_code=503,
                     detail={"code": "maintenance_lock_unavailable"},
                 ) from exc
             try:
+                expected_file_owner = 0 if expected_group_gid is not None else os.geteuid()
+                expected_file_mode = 0o440 if expected_group_gid is not None else 0o600
+
+                def verified_file_state() -> tuple[int, ...]:
+                    try:
+                        current_parent = os.fstat(parent_descriptor)
+                        current_path_parent = parent.stat(follow_symlinks=False)
+                        current_file = os.fstat(descriptor)
+                        current_entry = os.stat(
+                            path.name,
+                            dir_fd=parent_descriptor,
+                            follow_symlinks=False,
+                        )
+                        current_path_file = path.stat(follow_symlinks=False)
+                    except OSError as exc:
+                        raise HTTPException(
+                            status_code=503,
+                            detail={"code": "maintenance_lock_unavailable"},
+                        ) from exc
+                    current_parent_state = (
+                        current_parent.st_dev,
+                        current_parent.st_ino,
+                        current_parent.st_mode,
+                        current_parent.st_uid,
+                        current_parent.st_gid,
+                        current_parent.st_nlink,
+                        current_parent.st_ctime_ns,
+                    )
+                    current_file_state = (
+                        current_file.st_dev,
+                        current_file.st_ino,
+                        current_file.st_mode,
+                        current_file.st_uid,
+                        current_file.st_gid,
+                        current_file.st_nlink,
+                        current_file.st_ctime_ns,
+                    )
+                    if (
+                        current_parent_state != parent_state
+                        or (current_path_parent.st_dev, current_path_parent.st_ino)
+                        != (current_parent.st_dev, current_parent.st_ino)
+                        or not _trusted_maintenance_lock_parent(parent, parent_descriptor)
+                        or not _descriptor_acl_is_absent(parent_descriptor)
+                        or not _descriptor_acl_is_absent(descriptor)
+                        or (
+                            expected_group_gid is not None
+                            and os.access(
+                                ".",
+                                os.W_OK,
+                                dir_fd=parent_descriptor,
+                                effective_ids=True,
+                                follow_symlinks=False,
+                            )
+                        )
+                        or not stat.S_ISREG(current_file.st_mode)
+                        or current_file.st_uid != expected_file_owner
+                        or (
+                            expected_group_gid is not None
+                            and current_file.st_gid != expected_group_gid
+                        )
+                        or stat.S_IMODE(current_file.st_mode) != expected_file_mode
+                        or current_file.st_nlink != 1
+                        or (current_entry.st_dev, current_entry.st_ino)
+                        != (current_file.st_dev, current_file.st_ino)
+                        or (current_path_file.st_dev, current_path_file.st_ino)
+                        != (current_file.st_dev, current_file.st_ino)
+                    ):
+                        raise HTTPException(
+                            status_code=503,
+                            detail={"code": "maintenance_lock_unavailable"},
+                        )
+                    return current_file_state
+
+                file_state = verified_file_state()
                 try:
-                    file_stat = os.fstat(descriptor)
-                    current_stat = os.stat(
-                        path.name,
-                        dir_fd=parent_descriptor,
-                        follow_symlinks=False,
-                    )
-                    path_file_stat = path.stat(follow_symlinks=False)
+                    fcntl.flock(descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)
                 except OSError as exc:
+                    if exc.errno not in {errno.EACCES, errno.EAGAIN}:
+                        raise
                     raise HTTPException(
                         status_code=503,
-                        detail={"code": "maintenance_lock_unavailable"},
+                        detail={
+                            "code": "maintenance_in_progress",
+                            "message": "report writes are temporarily paused for a consistent backup",
+                        },
+                        headers={"Retry-After": "5"},
                     ) from exc
-                if (
-                    not stat.S_ISREG(file_stat.st_mode)
-                    or file_stat.st_uid != os.geteuid()
-                    or stat.S_IMODE(file_stat.st_mode) != 0o600
-                    or file_stat.st_nlink != 1
-                    or (current_stat.st_dev, current_stat.st_ino)
-                    != (file_stat.st_dev, file_stat.st_ino)
-                    or (path_file_stat.st_dev, path_file_stat.st_ino)
-                    != (file_stat.st_dev, file_stat.st_ino)
-                ):
-                    raise HTTPException(
-                        status_code=503,
-                        detail={"code": "maintenance_lock_unavailable"},
-                    )
-                yield
+                try:
+                    if verified_file_state() != file_state:
+                        raise HTTPException(
+                            status_code=503,
+                            detail={"code": "maintenance_lock_unavailable"},
+                        )
+                    yield
+                finally:
+                    try:
+                        if verified_file_state() != file_state:
+                            raise HTTPException(
+                                status_code=503,
+                                detail={"code": "maintenance_lock_unavailable"},
+                            )
+                    finally:
+                        fcntl.flock(descriptor, fcntl.LOCK_UN)
             finally:
                 os.close(descriptor)
-        finally:
-            fcntl.flock(parent_descriptor, fcntl.LOCK_UN)
+        except HTTPException:
+            raise
     finally:
         os.close(parent_descriptor)
 
@@ -1557,6 +1646,7 @@ def _persist_legacy_report(
         content_type=content_type,
         key_manager=key_manager,
         maintenance_lock_path=settings.maintenance_lock_path,
+        maintenance_lock_group_gid=settings.maintenance_lock_group_gid,
         precommit_check=(
             lambda: _assert_report_precommit_active(
                 db,
@@ -1692,6 +1782,7 @@ def _persist_v2_report(
         content_type=content_type,
         key_manager=key_manager,
         maintenance_lock_path=settings.maintenance_lock_path,
+        maintenance_lock_group_gid=settings.maintenance_lock_group_gid,
         precommit_check=(
             lambda: _assert_report_precommit_active(
                 db,
@@ -2522,7 +2613,10 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         db: Session = Depends(get_db),
     ) -> ReportResponse:
         actor_id = _resolved_actor_id(x_walksafe_actor_id, required=settings.field_test_security_enabled)
-        with _shared_report_write_lock(settings.maintenance_lock_path):
+        with _shared_report_write_lock(
+            settings.maintenance_lock_path,
+            expected_group_gid=settings.maintenance_lock_group_gid,
+        ):
             _reauthorize_admin_high_risk_in_transaction(
                 request,
                 db,
