@@ -461,13 +461,19 @@ class MainActivityAccessibilityStaticTest {
         // 온보딩 중에는 설정·동의·계정 섹션을 접근성 트리에서 제거한다. 단계와 무관한
         // 컨트롤이 낭독 순서를 채우고, 안전 고지를 읽기 전에 동의 초안이 기록되는 것을 막는다.
         // 계정 삭제 복구 로그인 화면은 온보딩 완료 전에도 필요하므로 예외로 둔다.
-        val update = source.substringAfter("private fun updateFirstRunOnboardingUi")
-            .substringBefore("private fun linkFirstRunAccessibilityTraversal")
+        val update = functionBlock("private fun updateFirstRunOnboardingUi")
 
-        assertTrue(update.contains("privacyControls.visibility"))
-        assertTrue(update.contains("firstRunOnboardingComplete()"))
-        assertTrue(update.contains("accountDeletionRecoveryLoginRequired()"))
-        assertTrue(update.contains("View.GONE"))
+        assertTrue(update.contains("updatePrivacySectionVisibility()"))
+
+        val visibility = functionBlock("private fun updatePrivacySectionVisibility")
+        assertTrue(visibility.contains("privacySettingsControls.visibility"))
+        assertTrue(visibility.contains("accountDeletionControls.visibility"))
+        assertTrue(visibility.contains("gatewaySessionControls.visibility"))
+        assertTrue(visibility.contains("firstRunOnboardingComplete()"))
+        assertTrue(visibility.contains("accountDeletionRecoveryLoginRequired()"))
+        assertTrue(visibility.contains("BuildConfig.DEBUG"))
+        assertTrue(visibility.contains("View.GONE"))
+        assertFalse(visibility.contains("privacyControls.visibility =\n                if"))
     }
     @Test
     fun controlsCarryTheMeasuredDesignTokensInsteadOfPlatformDefaults() {
@@ -480,7 +486,10 @@ class MainActivityAccessibilityStaticTest {
 
         val factory = source.substringAfter("fun accessiblePriorityUserButton(")
             .substringBefore("productPurposeText =")
-        assertTrue(factory.contains("GradientDrawable()"))
+        assertTrue(factory.contains("backgroundTintList = ColorStateList("))
+        assertTrue(factory.contains("android.R.attr.state_enabled"))
+        assertTrue(factory.contains("android.R.attr.state_pressed"))
+        assertTrue(factory.contains("android.R.attr.state_focused"))
         assertTrue(factory.contains("bottomMargin"))
         // 기존 접근성 계약은 그대로 유지한다.
         assertTrue(factory.contains("setSingleLine(false)"))
@@ -500,7 +509,7 @@ class MainActivityAccessibilityStaticTest {
         // 단계 문장은 본문 크기가 아니라 제목으로 보인다.
         val title = source.substringAfter("firstRunOnboardingStatusText = TextView(this).apply")
             .substringBefore("ViewCompat.setAccessibilityHeading(firstRunOnboardingStatusText")
-        assertTrue(title.contains("Typeface.BOLD"))
+        assertTrue(title.contains("Typeface.NORMAL"))
         assertTrue(title.contains("textSize = 22f"))
     }
     @Test
@@ -634,5 +643,52 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(clause.contains("INTEGRATED_CONSENT_DISCLOSURE_KO"))
 
         assertTrue(source.contains("firstRunConsentCountText"))
+    }
+
+    @Test
+    fun consentTraversalIncludesToggleDisclosureCountClauseAndAction() {
+        assertTrue(source.contains("firstRunConsentClauseTexts"))
+        val traversal = functionBlock("private fun linkFirstRunAccessibilityTraversal")
+        assertInOrder(
+            traversal,
+            "add(firstRunOnboardingStatusText)",
+            "add(firstRunDisclosureToggleButton)",
+            "add(firstRunIntegratedConsentDisclosureText)",
+            "add(firstRunConsentCountText)",
+            "add(firstRunConsentClauseTexts.getValue(item))",
+            "add(firstRunIntegratedConsentButtons.getValue(item))",
+            "add(firstRunIntegratedConsentSaveButton)",
+        )
+
+        val clause = source.substringAfter("firstRunConsentClauseTexts[item] = TextView")
+            .substringBefore("addView(firstRunConsentClauseTexts.getValue(item))")
+        assertTrue(clause.contains("View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
+    }
+
+    @Test
+    fun expandedNoticesReceiveAccessibilityFocus() {
+        val build = source.substringAfter("firstRunNoticeToggleButton =")
+            .substringBefore("firstRunOnboardingControls =")
+        assertTrue(build.contains("productPurposeText.requestFocus()"))
+        assertTrue(build.contains("firstRunIntegratedConsentDisclosureText.requestFocus()"))
+        assertTrue(build.contains("ACTION_ACCESSIBILITY_FOCUS"))
+    }
+
+    @Test
+    fun onboardingBodyAndButtonsMeetLowVisionTextBaseline() {
+        val build = source.substringAfter("fun accessiblePriorityUserButton(")
+            .substringBefore("firstRunOnboardingControls =")
+        assertFalse(build.contains("textSize = 16f"))
+        assertFalse(build.contains("textSize = 17f"))
+        assertTrue(build.contains("textSize = 18f"))
+    }
+
+    private fun assertInOrder(section: String, vararg tokens: String) {
+        var previous = -1
+        tokens.forEach { token ->
+            val current = section.indexOf(token, previous + 1)
+            assertTrue("missing or out-of-order token: $token", current > previous)
+            previous = current
+        }
     }
 }

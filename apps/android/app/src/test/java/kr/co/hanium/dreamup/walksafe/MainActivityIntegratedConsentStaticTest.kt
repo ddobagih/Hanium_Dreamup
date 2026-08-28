@@ -83,6 +83,37 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(integrated.contains("button.text = \"\$label: \$syncState\""))
     }
 
+    @Test
+    fun draftSummaryDoesNotMasqueradeAsServerConfirmation() {
+        val summary = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun updateFirstRunConsentSummaryUi",
+        )
+        assertTrue(summary.contains("선택 초안:"))
+        assertTrue(summary.contains("서버 미확인"))
+        assertTrue(summary.contains("서버 확인 중"))
+        assertTrue(summary.contains("서버 확인 완료:"))
+        assertTrue(summary.contains("서버 철회 재시도 대기"))
+        assertTrue(summary.contains("서버 처리 잠김"))
+        assertTrue(
+            summary.indexOf("PurposeConsentSyncState.FAIL_CLOSED in states") <
+                summary.indexOf("integratedConsentRequestInFlight"),
+        )
+        assertTrue(
+            summary.indexOf("integratedConsentRequestInFlight") <
+                summary.indexOf("PurposeConsentSyncState.WITHDRAWAL_RETRY in states"),
+        )
+    }
+
+    @Test
+    fun draftSummaryRefreshesOnEveryConsentUiRefresh() {
+        val update = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun updateIntegratedConsentUi",
+        )
+        assertTrue(update.contains("updateFirstRunConsentSummaryUi()"))
+    }
+
     private fun assertReleaseBeforeBlockedReturn(marker: String, status: String) {
         val markerIndex = source.indexOf(marker)
         val returnIndex = source.indexOf(status, markerIndex)

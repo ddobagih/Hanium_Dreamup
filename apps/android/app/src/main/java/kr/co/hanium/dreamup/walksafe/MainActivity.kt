@@ -8,6 +8,7 @@ import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.RectF
@@ -459,6 +460,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var reportPrivacyDisclosureText: TextView
     private lateinit var privacyConsentStatusText: TextView
     private val firstRunConsentCards = mutableMapOf<IntegratedConsentItem, LinearLayout>()
+    private val firstRunConsentClauseTexts = mutableMapOf<IntegratedConsentItem, TextView>()
     private lateinit var firstRunConsentCountText: TextView
     private lateinit var firstRunDisclosureToggleButton: Button
     private var firstRunDisclosureExpanded = false
@@ -467,6 +469,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var firstRunProgressBar: LinearLayout
     private val firstRunProgressSegments = mutableListOf<View>()
     private lateinit var privacyControls: LinearLayout
+    private lateinit var privacySettingsControls: LinearLayout
+    private lateinit var accountDeletionControls: LinearLayout
+    private lateinit var gatewaySessionControls: LinearLayout
     private lateinit var reportPrivacyConsentButton: Button
     private lateinit var automaticReportConsentButton: Button
     private lateinit var mobileNetworkPreferenceButton: Button
@@ -8815,21 +8820,37 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             minimumHeight = (48f * resources.displayMetrics.density).roundToInt()
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             val density = resources.displayMetrics.density
-            textSize = 17f
-            setTextColor(WS_COLOR_BUTTON_TEXT)
+            val states = arrayOf(
+                intArrayOf(-android.R.attr.state_enabled),
+                intArrayOf(android.R.attr.state_pressed),
+                intArrayOf(android.R.attr.state_focused),
+                intArrayOf(),
+            )
+            textSize = 18f
+            backgroundTintList = ColorStateList(
+                states,
+                intArrayOf(
+                    WS_COLOR_BUTTON_DISABLED_FILL,
+                    WS_COLOR_BUTTON_PRESSED_FILL,
+                    WS_COLOR_BUTTON_FOCUSED_FILL,
+                    WS_COLOR_BUTTON_FILL,
+                ),
+            )
+            setTextColor(
+                ColorStateList(
+                    states,
+                    intArrayOf(
+                        WS_COLOR_BUTTON_DISABLED_TEXT,
+                        WS_COLOR_BUTTON_TEXT,
+                        WS_COLOR_BUTTON_TEXT,
+                        WS_COLOR_BUTTON_TEXT,
+                    ),
+                ),
+            )
             if (emphasis) {
-                // 이 단계의 주 행동. 더 큰 터치 영역과 강조 테두리로 구분한다.
+                // 이 단계의 주 행동은 더 큰 터치 영역과 굵기로 구분한다.
                 minimumHeight = (WS_TOUCH_PRIMARY_DP * density).roundToInt()
                 setTypeface(typeface, Typeface.BOLD)
-            }
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = WS_CORNER_RADIUS_DP * density
-                setColor(WS_COLOR_BUTTON_FILL)
-                setStroke(
-                    ((if (emphasis) 2f else 1f) * density).roundToInt(),
-                    if (emphasis) WS_COLOR_EMPHASIS else WS_COLOR_LINE,
-                )
             }
             setPadding(
                 (20f * density).roundToInt(),
@@ -8879,6 +8900,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             onClick = {
                 firstRunNoticeExpandedByUser = !firstRunNoticeExpandedByUser
                 refreshFirstRunNoticeUi()
+                if (firstRunNoticeExpandedByUser) {
+                    productPurposeText.post {
+                        productPurposeText.requestFocus()
+                        productPurposeText.performAccessibilityAction(
+                            android.view.accessibility.AccessibilityNodeInfo
+                                .ACTION_ACCESSIBILITY_FOCUS,
+                            null,
+                        )
+                    }
+                }
             },
         )
         firstRunProgressSegments.clear()
@@ -8891,7 +8922,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply { topMargin = (WS_SECTION_GAP_DP * density).roundToInt() }
-            repeat(FIRST_RUN_VISIBLE_STAGE_COUNT) { index ->
+            repeat(FIRST_RUN_STAGE_COUNT) { index ->
                 val segment = View(this@MainActivity).apply {
                     layoutParams = LinearLayout.LayoutParams(
                         0,
@@ -8910,7 +8941,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             id = View.generateViewId()
             text = "첫 실행 등록 상태를 확인하는 중입니다."
             textSize = 22f
-            setTypeface(typeface, Typeface.BOLD)
+            setTypeface(typeface, Typeface.NORMAL)
             setTextColor(0xffffe8bd.toInt())
             letterSpacing = 0.0f
             setLineSpacing(0f, 1.35f)
@@ -8951,7 +8982,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         firstRunIntegratedConsentDisclosureText = TextView(this).apply {
             id = View.generateViewId()
             text = INTEGRATED_CONSENT_DISCLOSURE_KO
-            textSize = 16f
+            textSize = 18f
             setTextColor(0xffffffff.toInt())
             setLineSpacing(0f, 1.45f)
             layoutParams = LinearLayout.LayoutParams(
@@ -8968,11 +8999,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             onClick = {
                 firstRunDisclosureExpanded = !firstRunDisclosureExpanded
                 updateFirstRunOnboardingUi()
+                if (firstRunDisclosureExpanded) {
+                    firstRunIntegratedConsentDisclosureText.post {
+                        firstRunIntegratedConsentDisclosureText.requestFocus()
+                        firstRunIntegratedConsentDisclosureText.performAccessibilityAction(
+                            android.view.accessibility.AccessibilityNodeInfo
+                                .ACTION_ACCESSIBILITY_FOCUS,
+                            null,
+                        )
+                    }
+                }
             },
         )
         firstRunConsentCountText = TextView(this).apply {
             id = View.generateViewId()
-            textSize = 16f
+            textSize = 18f
             setTextColor(WS_COLOR_NOTICE_TEXT)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             layoutParams = LinearLayout.LayoutParams(
@@ -8984,6 +9025,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         firstRunIntegratedConsentButtons.clear()
         firstRunConsentCards.clear()
+        firstRunConsentClauseTexts.clear()
         IntegratedConsentItem.entries.forEach { item ->
             val button = accessiblePriorityUserButton(
                 label = item.name,
@@ -9023,26 +9065,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         IntegratedConsentItem.MOBILE_NETWORK_TRANSFER -> "이동통신 전송"
                         IntegratedConsentItem.TRAINING_REUSE -> "학습 재사용"
                     },
-                )
-                if (clause != null) {
-                    addView(
-                        TextView(this@MainActivity).apply {
-                            text = clause
-                            textSize = 16f
-                            setTextColor(WS_COLOR_NOTICE_TEXT)
-                            setLineSpacing(0f, 1.45f)
-                            // 아래 버튼이 항목명과 상태를 모두 낭독하므로 중복을 피한다.
-                            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-                            layoutParams = LinearLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT,
-                            ).apply {
-                                bottomMargin =
-                                    (WS_GROUP_GAP_DP * resources.displayMetrics.density).roundToInt()
-                            }
-                        },
-                    )
+                ) ?: INTEGRATED_CONSENT_DISCLOSURE_KO
+                firstRunConsentClauseTexts[item] = TextView(this@MainActivity).apply {
+                    id = View.generateViewId()
+                    text = clause
+                    textSize = 18f
+                    setTextColor(WS_COLOR_NOTICE_TEXT)
+                    setLineSpacing(0f, 1.45f)
+                    contentDescription = clause
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply {
+                        bottomMargin =
+                            (WS_GROUP_GAP_DP * resources.displayMetrics.density).roundToInt()
+                    }
                 }
+                addView(firstRunConsentClauseTexts.getValue(item))
                 addView(button)
             }
         }
@@ -9062,8 +9102,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 FirstRunAgeBand.AGE_14_TO_17,
                 FirstRunAgeBand.UNDER_14,
             ).forEach { ageBand -> addView(firstRunAgeButtons.getValue(ageBand)) }
-            addView(firstRunIntegratedConsentDisclosureText)
             addView(firstRunDisclosureToggleButton)
+            addView(firstRunIntegratedConsentDisclosureText)
             addView(firstRunConsentCountText)
             IntegratedConsentItem.entries.forEach { item ->
                 addView(firstRunConsentCards.getValue(item))
@@ -9529,23 +9569,38 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
         privacyControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(privacyConsentStatusText)
-            addView(reportPrivacyDisclosureText)
-            addView(reportPrivacyConsentButton)
-            addView(automaticReportConsentButton)
-            addView(mobileNetworkPreferenceButton)
-            addView(trainingReuseConsentButton)
-            addView(privacyRightsButton)
-            addView(accountDeletionStatusText)
-            addView(accountDeletionRequestButton)
-            addView(accountDeletionConfirmButton)
-            addView(accountDeletionCancelButton)
-            addView(accountDeletionRefreshButton)
-            addView(backendFieldTokenInput)
-            addView(backendAuthApplyButton)
-            DeletionInventoryItem.entries.forEach { item ->
-                addView(accountDeletionItemTexts.getValue(item))
+            privacySettingsControls = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(privacyConsentStatusText)
+                addView(reportPrivacyDisclosureText)
+                addView(reportPrivacyConsentButton)
+                addView(automaticReportConsentButton)
+                addView(mobileNetworkPreferenceButton)
+                addView(trainingReuseConsentButton)
+                addView(privacyRightsButton)
             }
+            accountDeletionControls = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(accountDeletionStatusText)
+                addView(accountDeletionRequestButton)
+                addView(accountDeletionConfirmButton)
+                addView(accountDeletionCancelButton)
+                addView(accountDeletionRefreshButton)
+                DeletionInventoryItem.entries.forEach { item ->
+                    addView(accountDeletionItemTexts.getValue(item))
+                }
+            }
+            gatewaySessionControls = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                if (BuildConfig.DEBUG) {
+                    addView(backendUrlInput)
+                }
+                addView(backendFieldTokenInput)
+                addView(backendAuthApplyButton)
+            }
+            addView(privacySettingsControls)
+            addView(accountDeletionControls)
+            addView(gatewaySessionControls)
         }
         runtimeControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -9560,9 +9615,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             addView(explicitReportButton)
             addView(voiceReportButton)
-            if (BuildConfig.DEBUG) {
-                addView(backendUrlInput)
-            }
             addView(destinationQueryInput)
             addView(destinationSearchButton)
             addView(destinationCancelButton)
@@ -9735,6 +9787,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun linkFirstRunAccessibilityTraversal() {
         val controls = buildList<View> {
+            add(productPurposeText)
+            add(firstRunNoticeToggleButton)
             add(firstRunOnboardingStatusText)
             add(firstRunPurposeButton)
             listOf(
@@ -9742,8 +9796,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 FirstRunAgeBand.AGE_14_TO_17,
                 FirstRunAgeBand.UNDER_14,
             ).forEach { ageBand -> add(firstRunAgeButtons.getValue(ageBand)) }
+            add(firstRunDisclosureToggleButton)
             add(firstRunIntegratedConsentDisclosureText)
+            add(firstRunConsentCountText)
             IntegratedConsentItem.entries.forEach { item ->
+                add(firstRunConsentClauseTexts.getValue(item))
                 add(firstRunIntegratedConsentButtons.getValue(item))
             }
             add(firstRunIntegratedConsentSaveButton)
@@ -9765,6 +9822,51 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ::firstRunOnboardingSnapshot.isInitialized &&
             firstRunOnboardingSnapshot.mayEnterWalk &&
             !accountDeletionStateMachine.processingBlocked()
+
+    private fun firstRunStageNumber(stage: FirstRunOnboardingStage): Int = when (stage) {
+        FirstRunOnboardingStage.PURPOSE_AND_SAFETY -> 1
+        FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED -> 2
+        FirstRunOnboardingStage.INTEGRATED_CONSENT -> 3
+        FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION -> 4
+        FirstRunOnboardingStage.VERIFIED_SMS -> 5
+        FirstRunOnboardingStage.GUARDIAN_APPROVAL -> 6
+        FirstRunOnboardingStage.ACCOUNT_ACTIVATION -> 7
+        FirstRunOnboardingStage.VERIFIED_LOGIN -> 8
+        FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION -> 9
+        FirstRunOnboardingStage.DEVICE_CHECK -> 10
+        FirstRunOnboardingStage.FP004_TRAINING -> 11
+        FirstRunOnboardingStage.COMPLETE -> 12
+        FirstRunOnboardingStage.BLOCKED_UNDER_14 -> 2
+    }
+
+    private fun updatePrivacySectionVisibility() {
+        if (
+            !::privacyControls.isInitialized ||
+            !::privacySettingsControls.isInitialized ||
+            !::accountDeletionControls.isInitialized ||
+            !::gatewaySessionControls.isInitialized
+        ) return
+        val deletionRecoverySurface =
+            accountDeletionRecoveryLoginRequired() ||
+                GatewaySessionProcessCoordinator.snapshot().deletionRecoveryOnly
+        val onboardingCompleted =
+            ::firstRunOnboardingSnapshot.isInitialized && firstRunOnboardingSnapshot.isComplete
+        privacyControls.visibility = View.VISIBLE
+        privacySettingsControls.visibility =
+            if (firstRunOnboardingComplete()) View.VISIBLE else View.GONE
+        accountDeletionControls.visibility =
+            if (
+                onboardingCompleted ||
+                accountDeletionStateMachine.processingBlocked() ||
+                deletionRecoverySurface
+            ) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
+        gatewaySessionControls.visibility =
+            if (BuildConfig.DEBUG || deletionRecoverySurface) View.VISIBLE else View.GONE
+    }
 
     private fun firstRunDeviceCheckAllowsPreflight(): Boolean =
         ::firstRunOnboardingSnapshot.isInitialized &&
@@ -9981,33 +10083,34 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             !::firstRunOnboardingStatusText.isInitialized
         ) return
         val snapshot = firstRunOnboardingSnapshot
+        val stageNumber = firstRunStageNumber(snapshot.stage)
         val message = when (snapshot.stage) {
             FirstRunOnboardingStage.PURPOSE_AND_SAFETY ->
-                "첫 실행 1단계. WalkSafe의 목적과 안전 한계를 읽고 확인하세요."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. WalkSafe의 목적과 안전 한계를 읽고 확인하세요."
             FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED ->
-                "첫 실행 2단계. 정확한 생년월일을 저장하지 않고 연령 구간만 확인합니다."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 정확한 생년월일을 저장하지 않고 연령 구간만 확인합니다."
             FirstRunOnboardingStage.INTEGRATED_CONSENT ->
-                "첫 실행 3단계. 네 가지 동의 항목을 각각 허용하거나 거부한 뒤 서버 저장 확인을 완료하세요."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 네 가지 동의 항목을 각각 허용하거나 거부한 뒤 서버 저장 확인을 완료하세요."
             FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION ->
-                "첫 실행 4단계. 비밀번호나 전화번호를 앱에 저장하지 않고 운영 공급자의 불투명 제출 증거만 허용합니다."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 비밀번호나 전화번호를 앱에 저장하지 않고 운영 공급자의 불투명 제출 증거만 허용합니다."
             FirstRunOnboardingStage.VERIFIED_SMS ->
-                "첫 실행 5단계. 운영 SMS 검증 증거를 기다립니다."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 운영 SMS 검증 증거를 기다립니다."
             FirstRunOnboardingStage.GUARDIAN_APPROVAL ->
-                "첫 실행 6단계. 미성년 사용자에게 필요한 보호자 확인 증거를 기다립니다."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 미성년 사용자에게 필요한 보호자 확인 증거를 기다립니다."
             FirstRunOnboardingStage.ACCOUNT_ACTIVATION ->
-                "첫 실행 7단계. 운영 계정 활성화 증거를 기다립니다."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 운영 계정 활성화 증거를 기다립니다."
             FirstRunOnboardingStage.VERIFIED_LOGIN ->
-                "첫 실행 8단계. 검증된 로그인 증거를 기다립니다."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 검증된 로그인 증거를 기다립니다."
             FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION ->
-                "첫 실행 9단계. 기능 사용 직전에 현재 운영체제 권한 상태를 확인합니다."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 기능 사용 직전에 현재 운영체제 권한 상태를 확인합니다."
             FirstRunOnboardingStage.DEVICE_CHECK ->
-                "첫 실행 10단계. 보행 출력 없이 격리된 기기 기능 점검만 진행할 수 있습니다."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 보행 출력 없이 격리된 기기 기능 점검만 진행할 수 있습니다."
             FirstRunOnboardingStage.FP004_TRAINING ->
-                "첫 실행 11단계. 기존 최초 보행 전 안전교육과 네 가지 조작 연습을 완료하세요."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 기존 최초 보행 전 안전교육과 네 가지 조작 연습을 완료하세요."
             FirstRunOnboardingStage.COMPLETE ->
-                "첫 실행 12단계 완료. 현재 권한과 안전 상태를 다시 확인한 뒤 보행 기능을 사용할 수 있습니다."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계 완료. 현재 권한과 안전 상태를 다시 확인한 뒤 보행 기능을 사용할 수 있습니다."
             FirstRunOnboardingStage.BLOCKED_UNDER_14 ->
-                "가입 차단. 만 14세 미만은 계정을 만들거나 WalkSafe 보행 기능을 사용할 수 없습니다."
+                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 가입 차단. 만 14세 미만은 계정을 만들거나 WalkSafe 보행 기능을 사용할 수 없습니다."
         }
         firstRunOnboardingStatusText.text = message
         firstRunOnboardingStatusText.contentDescription = message
@@ -10059,12 +10162,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (::firstRunConsentCountText.isInitialized) {
             firstRunConsentCountText.visibility =
                 if (integratedConsentVisible) View.VISIBLE else View.GONE
-            val granted = IntegratedConsentItem.entries.count {
-                integratedConsentDraft.isGranted(it)
-            }
-            firstRunConsentCountText.text =
-                "${IntegratedConsentItem.entries.size}개 중 ${granted}개 허용"
-            firstRunConsentCountText.contentDescription = firstRunConsentCountText.text
         }
         if (::firstRunIntegratedConsentSaveButton.isInitialized) {
             firstRunIntegratedConsentSaveButton.visibility =
@@ -10120,31 +10217,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         refreshFirstRunNoticeUi()
         if (::firstRunProgressBar.isInitialized) {
-            val completedStages = when (snapshot.stage) {
-                FirstRunOnboardingStage.PURPOSE_AND_SAFETY -> 1
-                FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED -> 2
-                FirstRunOnboardingStage.INTEGRATED_CONSENT -> 3
-                else -> FIRST_RUN_VISIBLE_STAGE_COUNT
-            }
             firstRunProgressSegments.forEachIndexed { index, segment ->
                 segment.setBackgroundColor(
-                    if (index < completedStages) 0xffffe8bd.toInt() else WS_COLOR_LINE,
+                    if (index < stageNumber) WS_COLOR_EMPHASIS else WS_COLOR_LINE,
                 )
             }
             firstRunProgressBar.visibility =
                 if (firstRunOnboardingComplete()) View.GONE else View.VISIBLE
         }
-        if (::privacyControls.isInitialized) {
-            // 온보딩 중에는 설정·동의·계정 섹션을 접근성 트리에서 제거한다. 단계와 무관한
-            // 컨트롤이 낭독 순서를 채우고, 안전 고지를 읽기 전에 동의 초안이 기록되는 것을 막는다.
-            // 계정 삭제 복구 로그인은 온보딩 완료 전에도 필요하므로 예외로 둔다.
-            privacyControls.visibility =
-                if (firstRunOnboardingComplete() || accountDeletionRecoveryLoginRequired()) {
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
-        }
+        updatePrivacySectionVisibility()
     }
 
     private fun linkPriorityUserAccessibilityTraversal() {
@@ -19997,6 +20078,34 @@ generation != cameraFallbackGeneration
                 )
     }
 
+    private fun updateFirstRunConsentSummaryUi() {
+        if (!::firstRunConsentCountText.isInitialized) return
+        val items = IntegratedConsentItem.entries
+        val draftGranted = items.count(integratedConsentDraft::isGranted)
+        val states = items.map(integratedConsentSession::status)
+        val serverSummary = when {
+            PurposeConsentSyncState.FAIL_CLOSED in states -> "서버 처리 잠김"
+            integratedConsentRequestInFlight || states.any {
+                it == PurposeConsentSyncState.GRANT_PENDING ||
+                    it == PurposeConsentSyncState.WITHDRAWAL_PENDING
+            } -> "서버 확인 중"
+            PurposeConsentSyncState.WITHDRAWAL_RETRY in states -> "서버 철회 재시도 대기"
+            states.all {
+                it == PurposeConsentSyncState.CONFIRMED_GRANTED ||
+                    it == PurposeConsentSyncState.CONFIRMED_DENIED
+            } -> {
+                val serverGranted = states.count {
+                    it == PurposeConsentSyncState.CONFIRMED_GRANTED
+                }
+                "서버 확인 완료: ${items.size}개 중 ${serverGranted}개 허용"
+            }
+            else -> "서버 미확인"
+        }
+        firstRunConsentCountText.text =
+            "선택 초안: ${items.size}개 중 ${draftGranted}개 허용 · $serverSummary"
+        firstRunConsentCountText.contentDescription = firstRunConsentCountText.text
+    }
+
     private fun updateIntegratedConsentUi() {
         updateReportPrivacyConsentUi()
         updateAutomaticReportConsentUi()
@@ -20081,6 +20190,7 @@ generation != cameraFallbackGeneration
                     firstRunOnboardingSnapshot.stage ==
                     FirstRunOnboardingStage.INTEGRATED_CONSENT
         }
+        updateFirstRunConsentSummaryUi()
         if (::debugUploadButton.isInitialized) updateDebugUploadButton()
         if (::debugFrameCaptureButton.isInitialized) updateFrameCaptureButton()
     }
@@ -20233,6 +20343,7 @@ generation != cameraFallbackGeneration
         if (::backendAuthApplyButton.isInitialized) {
             updateBackendAuthButtonText()
         }
+        updatePrivacySectionVisibility()
     }
 
     private fun updateBackendAuthButtonText() {
@@ -20271,6 +20382,7 @@ generation != cameraFallbackGeneration
                 !deletionRecoverySessionReady &&
                 !deletionRecoverySessionReserved
         backendFieldTokenInput.isEnabled = backendAuthApplyButton.isEnabled
+        updatePrivacySectionVisibility()
     }
 
     private fun nextProgressBeepVolume(current: Int): Int {
@@ -20995,15 +21107,19 @@ generation != cameraFallbackGeneration
         /** 실측 대비 기준 디자인 토큰. 흰 글자/회색 면 6.97:1, 테두리 4.08:1. */
         const val WS_COLOR_BUTTON_FILL = 0xff5a595b.toInt()
         const val WS_COLOR_BUTTON_TEXT = 0xffffffff.toInt()
+        const val WS_COLOR_BUTTON_PRESSED_FILL = 0xff3f3e41.toInt()
+        const val WS_COLOR_BUTTON_FOCUSED_FILL = 0xff765d00.toInt()
+        const val WS_COLOR_BUTTON_DISABLED_FILL = 0xff2f2e31.toInt()
+        const val WS_COLOR_BUTTON_DISABLED_TEXT = 0xffaaa7a2.toInt()
         /** 상시 안전 고지. 카드 위 10.81:1 로 AAA 를 유지하면서 순백보다 한 단계 뒤로 물린다. */
         const val WS_COLOR_NOTICE_TEXT = 0xffc9c6c0.toInt()
         const val WS_COLOR_NOTICE_FILL = 0xff141414.toInt()
         const val WS_COLOR_LINE = 0xff6e6d70.toInt()
-        const val SAFETY_NOTICE_HEADING = "안전 고지 · FP-001/FP-009 1.0.1"
+        const val SAFETY_NOTICE_HEADING = "안전 고지"
         const val WS_COLOR_EMPHASIS = 0xffffe8bd.toInt()
         const val WS_TOUCH_PRIMARY_DP = 56f
         const val WS_CORNER_RADIUS_DP = 10f
-        const val FIRST_RUN_VISIBLE_STAGE_COUNT = 3
+        const val FIRST_RUN_STAGE_COUNT = 12
         const val WS_SECTION_GAP_DP = 24f
         /** 같은 그룹의 버튼 사이. 섹션 간격보다 좁아야 덩어리로 읽힌다. */
         const val WS_GROUP_GAP_DP = 8f

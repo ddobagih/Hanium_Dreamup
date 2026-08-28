@@ -739,6 +739,9 @@ class MainActivityAccountDeletionStaticTest {
         assertTrue(privacy.contains("addView(accountDeletionRequestButton)"))
         assertTrue(privacy.contains("addView(backendFieldTokenInput)"))
         assertTrue(privacy.contains("addView(backendAuthApplyButton)"))
+        assertTrue(privacy.contains("privacySettingsControls = LinearLayout(this@MainActivity).apply"))
+        assertTrue(privacy.contains("accountDeletionControls = LinearLayout(this@MainActivity).apply"))
+        assertTrue(privacy.contains("gatewaySessionControls = LinearLayout(this@MainActivity).apply"))
         assertFalse(runtime.contains("addView(accountDeletionRequestButton)"))
         assertTrue(
             appearsInOrder(
@@ -746,6 +749,27 @@ class MainActivityAccountDeletionStaticTest {
                 "addView(privacyControls)",
                 "addView(runtimeControls)",
             ),
+        )
+
+        val visibility = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun updatePrivacySectionVisibility",
+        )
+        assertTrue(visibility.contains("GatewaySessionProcessCoordinator.snapshot()"))
+        assertTrue(visibility.contains("deletionRecoveryOnly"))
+        assertTrue(visibility.contains("firstRunOnboardingSnapshot.isComplete"))
+        assertTrue(visibility.contains("accountDeletionStateMachine.processingBlocked()"))
+        assertTrue(
+            ReportStaticSourceInspector.functionBlock(
+                source,
+                "private fun updateAccountDeletionUi",
+            ).contains("updatePrivacySectionVisibility()"),
+        )
+        assertTrue(
+            ReportStaticSourceInspector.functionBlock(
+                source,
+                "private fun updateBackendAuthButtonText",
+            ).contains("updatePrivacySectionVisibility()"),
         )
     }
 

@@ -11,6 +11,32 @@ class MainActivityFirstRunRegistrationStaticTest {
     ).readText()
 
     @Test
+    fun progressReflectsAllTwelveStages() {
+        assertTrue(source.contains("const val FIRST_RUN_STAGE_COUNT = 12"))
+        val progress = sourceSection(
+            "firstRunProgressBar = LinearLayout(this).apply",
+            "firstRunOnboardingStatusText = TextView(this).apply",
+        )
+        assertTrue(progress.contains("repeat(FIRST_RUN_STAGE_COUNT)"))
+
+        val mapping = functionBlock("private fun firstRunStageNumber(")
+        assertInOrder(
+            mapping,
+            "FirstRunOnboardingStage.PURPOSE_AND_SAFETY -> 1",
+            "FirstRunOnboardingStage.INTEGRATED_CONSENT -> 3",
+            "FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION -> 4",
+            "FirstRunOnboardingStage.FP004_TRAINING -> 11",
+            "FirstRunOnboardingStage.COMPLETE -> 12",
+            "FirstRunOnboardingStage.BLOCKED_UNDER_14 -> 2",
+        )
+
+        val update = functionBlock("private fun updateFirstRunOnboardingUi()")
+        assertTrue(update.contains("val stageNumber = firstRunStageNumber(snapshot.stage)"))
+        assertTrue(update.contains("FIRST_RUN_STAGE_COUNT"))
+        assertTrue(update.contains("if (index < stageNumber)"))
+    }
+
+    @Test
     fun freshProcessAndLegacyReporterIdentityFailClosedUntilFirstRunCompletes() {
         val create = functionBlock("override fun onCreate(savedInstanceState: Bundle?)")
         assertInOrder(
