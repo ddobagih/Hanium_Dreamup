@@ -6570,7 +6570,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     if (claimIntegratedConsentCallCompletion(generation, call)) {
                         postIntegratedConsentUiRefresh()
                     }
-                } catch (_: RuntimeException) {
+                } catch (_: Exception) {
                     val current = claimIntegratedConsentCallCompletion(generation, call)
                     if (!current) return@execute
                     if (pendingIntegratedConsentMutation != null) {
@@ -7127,7 +7127,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             speakInteraction("현장 게이트웨이 로그인에 실패했습니다.")
                         }
                     }
-                } catch (_: RuntimeException) {
+                } catch (_: Exception) {
                     val attemptCurrent =
                         gatewayActivityCallbackAllowed(expectedActivityLease) &&
                             GatewaySessionProcessCoordinator.snapshot()
