@@ -206,6 +206,19 @@ class RouteNavigatorTest {
     }
 
     @Test
+    fun confirmedOffRouteInstructionOffersAllThreeApprovedChoices() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
+        navigator.setRoute(route())
+
+        val update = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+
+        val instruction = update.instruction ?: ""
+        assertTrue(instruction.contains("새 경로"))
+        assertTrue(instruction.contains("위치 다시 확인"))
+        assertTrue(instruction.contains("길안내 종료"))
+    }
+
+    @Test
     fun confirmedLocationRecheckInvalidatesThePreviousDecisionToken() {
         val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
         navigator.setRoute(route())
@@ -442,6 +455,33 @@ class RouteNavigatorTest {
     }
 
     @Test
+    fun stepProgressOnlyReportsConsistencyAndNeverChangesTheRouteDecision() {
+        fun decisionWith(stepProgressM: Double?): RouteNavigatorUpdate {
+            val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+            navigator.setRoute(route())
+            return navigator.update(
+                location = locationNearStart(),
+                nowMs = 1_000L,
+                requestInFlight = false,
+                stepProgressM = stepProgressM,
+            )
+        }
+
+        val withoutSteps = decisionWith(null)
+        val consistent = decisionWith(5.0)
+        val wildlyOff = decisionWith(100_000.0)
+
+        listOf(consistent, wildlyOff).forEach { update ->
+            assertEquals(withoutSteps.instruction, update.instruction)
+            assertEquals(withoutSteps.arrived, update.arrived)
+            assertEquals(withoutSteps.offRoute, update.offRoute)
+            assertEquals(withoutSteps.shouldReroute, update.shouldReroute)
+            assertEquals(withoutSteps.reason, update.reason)
+        }
+        assertEquals(false, wildlyOff.stepProgressConsistent)
+    }
+
+    @Test
     fun pendingDecisionTokenChangesWhenTheSameRouteIsReinstalled() {
         val navigator = RouteNavigator(RouteNavigatorConfig(arrivalConfirmSamples = 1))
         val nearEnd = TrustedLocation(37.0009, 127.0, 5f, 1_000L)
@@ -616,6 +656,26 @@ class RouteNavigatorTest {
         )
 
         assertEquals(90f, navigator.currentBearingDeg()!!, 1f)
+    }
+
+    @Test
+    fun targetDirectionComesFromTheStoredRouteAndNotFromStepProgress() {
+        fun bearingWith(stepProgressM: Double?): Float {
+            val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+            navigator.setRoute(route(bearingDeg = 42.5f))
+            navigator.update(
+                location = locationNearStart(),
+                nowMs = 1_000L,
+                requestInFlight = false,
+                stepProgressM = stepProgressM,
+            )
+            return navigator.currentBearingDeg()!!
+        }
+
+        // 저장된 경로 폴리라인이 정북이므로 투영 방위는 0도다. 가이드 포인트의 42.5도는
+        // 투영 전에만 쓰이는 대체값이고, 보폭 진행량은 어느 쪽에도 관여하지 않는다.
+        assertEquals(0f, bearingWith(null), 0.001f)
+        assertEquals(bearingWith(null), bearingWith(99_999.0), 0.001f)
     }
 
     @Test

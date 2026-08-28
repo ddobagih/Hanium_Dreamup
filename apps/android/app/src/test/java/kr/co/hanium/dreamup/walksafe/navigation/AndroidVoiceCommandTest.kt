@@ -53,6 +53,7 @@ class AndroidVoiceCommandTest {
         assertEquals(AndroidVoiceCommand.NextNavigationInstruction, parseAndroidVoiceCommand("다음 경로 뭐야?"))
         assertEquals(AndroidVoiceCommand.NextNavigationInstruction, parseAndroidVoiceCommand("다음 안내 알려줘"))
         assertEquals(AndroidVoiceCommand.RequestReroute, parseAndroidVoiceCommand("경로 다시 찾아줘"))
+        assertEquals(AndroidVoiceCommand.RecheckLocation, parseAndroidVoiceCommand("위치 확인해줘"))
         assertEquals(AndroidVoiceCommand.RecheckLocation, parseAndroidVoiceCommand("현재 위치 다시 확인해줘"))
         assertEquals(AndroidVoiceCommand.ConfirmArrival, parseAndroidVoiceCommand("도착 확인"))
         assertEquals(AndroidVoiceCommand.RejectArrival, parseAndroidVoiceCommand("아직 도착 아니야"))

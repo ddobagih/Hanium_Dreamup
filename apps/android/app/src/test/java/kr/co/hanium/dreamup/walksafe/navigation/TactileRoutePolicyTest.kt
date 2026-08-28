@@ -151,6 +151,18 @@ class TactileRoutePolicyTest {
         assertTrue(source.contains("navigation=route_waiting trusted_gps_missing"))
     }
 
+    @Test
+    fun cameraDirectionComesFromTheRotationSensorAndNotFromLocationHeading() {
+        val guidance = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileRouteGuidance.kt",
+        ).readText()
+
+        assertTrue(guidance.contains("val cameraBearingTrue = normalizeBearing(cameraBearingMagnetic + declinationDeg)"))
+        assertTrue(guidance.contains("routeHeadingDeltaDegrees(cameraBearingTrue, route.bearingDeg)"))
+        assertFalse(guidance.contains("routeHeadingDeltaDegrees(latestHeadingDeg"))
+        assertFalse(guidance.contains("cameraBearingTrue = latestHeadingDeg"))
+    }
+
     private fun stableObservation(
         id: String,
         className: String,

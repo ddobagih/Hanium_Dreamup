@@ -295,6 +295,7 @@ private val REROUTE_COMMANDS = setOf(
 )
 private val LOCATION_RECHECK_COMMANDS = setOf(
     "위치다시확인",
+    "위치확인해줘",
     "위치다시확인해줘",
     "현재위치다시확인",
     "현재위치다시확인해줘",
