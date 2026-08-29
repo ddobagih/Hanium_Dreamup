@@ -96,16 +96,20 @@ import {
   mergeServerCapacityIntoFieldSessionResponse
 } from "./server-capacity.js";
 import {
-  DEV_FIRST_RUN_EVIDENCE_PATH,
-  handleDevFirstRunEvidenceRequest
-} from "./dev-first-run-evidence.js";
+  FIRST_RUN_ROUTE_PATHS,
+  isFirstRunRoute,
+  proxyFirstRunRequest
+} from "./first-run.js";
 
 const ALLOWED_METHODS = new Map<string, readonly string[]>([
   ["/api/field-session", ["GET", "POST", "DELETE"]],
   ["/api/field-walk", ["GET", "POST"]],
   ["/api/navigation/walking", ["POST"]],
   ["/api/navigation/destinations/search", ["GET"]],
-  ["/api/reports/v2", ["POST"]]
+  ["/api/reports/v2", ["POST"]],
+  ...FIRST_RUN_ROUTE_PATHS.map(
+    (path) => [path, ["POST"]] as [string, readonly string[]]
+  )
 ]);
 
 export const PUBLIC_GATEWAY_ROUTES = Object.freeze([
@@ -1087,10 +1091,9 @@ async function dispatchGatewayRequest(
       request.method === "HEAD"
     );
   }
-  // 개발 전용. 운영에서는 스스로 404를 돌려주므로 세션 검사 앞에 두어도 경로가 열리지 않는다.
-  // 4~8단계는 로그인 전이라 여기서 세션을 요구하면 목적을 잃는다.
-  if (pathname === DEV_FIRST_RUN_EVIDENCE_PATH) {
-    return noStore(await handleDevFirstRunEvidenceRequest(request));
+  // 4·5·7·8단계는 계정이 생기기 전이라 세션을 요구하지 않는다. 배포 환경 차단은 Backend 가 한다.
+  if (isFirstRunRoute(pathname)) {
+    return noStore(await proxyFirstRunRequest(request, dependencies.fetchImpl));
   }
   const methods = ALLOWED_METHODS.get(pathname);
   if (!methods) return routeNotFound();
