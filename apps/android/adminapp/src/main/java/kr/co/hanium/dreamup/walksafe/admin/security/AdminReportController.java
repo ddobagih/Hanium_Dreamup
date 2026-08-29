@@ -213,6 +213,22 @@ public final class AdminReportController {
         }
     }
 
+    public synchronized void clearSessionState() {
+        generation += 1;
+        retryRequest = null;
+        AdminReportModels.Filters empty =
+            new AdminReportModels.Filters(null, null, null, null, null);
+        state = new State(
+            Phase.IDLE,
+            empty,
+            AdminJava8Collections.list(),
+            null,
+            null,
+            null,
+            null
+        );
+    }
+
     public synchronized void replaceDetail(AdminReportModels.Detail detail) {
         if (detail == null) throw new IllegalArgumentException("report detail is required");
         generation += 1;

@@ -7,10 +7,12 @@ import android.os.Build;
 import android.text.InputType;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import java.util.ArrayList;
@@ -93,6 +95,9 @@ public final class AdminReportPanel extends LinearLayout {
     private final EditText createdFromInput;
     private final EditText createdToInput;
     private final TextView stateText;
+    private final TextView summaryText;
+    private final TextView priorityText;
+    private final ProgressBar loadingIndicator;
     private final LinearLayout listContainer;
     private final LinearLayout detailContainer;
     private final Button loadMoreButton;
@@ -106,6 +111,7 @@ public final class AdminReportPanel extends LinearLayout {
     private AdminReportModels.Detail displayedDetail;
     private String pendingStatus;
     private boolean pendingPackage;
+    private boolean sessionBoundDraftsCleared;
     private String selectedReportId;
 
     public AdminReportPanel(Context context, Listener listener) {
@@ -115,13 +121,21 @@ public final class AdminReportPanel extends LinearLayout {
         setOrientation(VERTICAL);
         setPadding(0, dp(24), 0, dp(16));
 
-        TextView heading = text("신고 목록과 상세", 21);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) heading.setAccessibilityHeading(true);
+        TextView heading = text("1. 업무 요약과 신고 선택", 21);
+        markAccessibilityHeading(heading);
         addView(heading, matchWrap());
         addView(text(
-            "목록에는 위치 등급 등 최소 정보만 표시됩니다. 조건을 바꾸면 이전 응답은 자동으로 폐기됩니다.",
+            "먼저 '새 신고'를 확인하세요. 목록은 현재 불러온 범위만 요약하며, 상세에서 검수와 제출 준비로 이어갈 수 있습니다.",
             15
         ), matchWrap());
+
+        summaryText = text("현재 불러온 목록: 아직 조회하지 않음", 18);
+        summaryText.setPadding(0, dp(14), 0, dp(2));
+        markAccessibilityHeading(summaryText);
+        addView(summaryText, matchWrap());
+        priorityText = text("우선 업무: 신고를 조회하세요.", 15);
+        priorityText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        addView(priorityText, matchWrap());
 
         reportIdInput = input("정확한 신고 UUID (선택)");
         reportIdInput.setContentDescription("신고 UUID 필터");
@@ -130,8 +144,8 @@ public final class AdminReportPanel extends LinearLayout {
         classInput = spinner(CLASS_LABELS, "신고 유형 필터");
         addView(statusInput, matchWrap());
         addView(classInput, matchWrap());
-        createdFromInput = input("생성 시작시각 RFC3339 (선택)");
-        createdToInput = input("생성 종료시각 RFC3339 (선택)");
+        createdFromInput = input("시작 시각 (예: 2026-08-29T00:00:00Z, 선택)");
+        createdToInput = input("종료 시각 (예: 2026-08-29T23:59:59Z, 선택)");
         createdFromInput.setInputType(InputType.TYPE_CLASS_DATETIME);
         createdToInput.setInputType(InputType.TYPE_CLASS_DATETIME);
         createdFromInput.setContentDescription("신고 생성 시작시각 필터");
@@ -147,6 +161,11 @@ public final class AdminReportPanel extends LinearLayout {
         stateText.setPadding(0, dp(12), 0, dp(8));
         stateText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         addView(stateText, matchWrap());
+        loadingIndicator = new ProgressBar(context);
+        loadingIndicator.setIndeterminate(true);
+        loadingIndicator.setContentDescription("신고 정보를 불러오는 중");
+        loadingIndicator.setVisibility(GONE);
+        addView(loadingIndicator, wrapCentered());
 
         listContainer = verticalGroup();
         addView(listContainer, matchWrap());
@@ -217,6 +236,9 @@ public final class AdminReportPanel extends LinearLayout {
     public void render(AdminReportController.State state) {
         selectedReportId = state.selectedReportId();
         stateText.setText(stateMessage(state));
+        summaryText.setText(workSummary(state.items()));
+        priorityText.setText(priorityMessage(state.items()));
+        loadingIndicator.setVisibility(isLoading(state.phase()) ? VISIBLE : GONE);
         retryButton.setVisibility(state.phase() == AdminReportController.Phase.ERROR ? VISIBLE : GONE);
         loadMoreButton.setVisibility(state.canLoadMore() ? VISIBLE : GONE);
         loadMoreButton.setEnabled(state.phase() != AdminReportController.Phase.LOADING_MORE);
@@ -225,6 +247,10 @@ public final class AdminReportPanel extends LinearLayout {
     }
 
     public void renderWorkflow(AdminReportWorkflowController.State state) {
+        if (sessionBoundDraftsCleared) {
+            workflowActions.setVisibility(GONE);
+            return;
+        }
         if (state.message() != null) workflowText.setText(state.message());
         if (state.phase() != AdminReportWorkflowController.Phase.IDLE) {
             workflowActions.setVisibility(VISIBLE);
@@ -239,6 +265,14 @@ public final class AdminReportPanel extends LinearLayout {
     public void clearHighRiskInputs() {
         highRiskPassword.getText().clear();
         highRiskTotp.getText().clear();
+    }
+
+    public void clearSessionBoundDrafts() {
+        sessionBoundDraftsCleared = true;
+        pendingStatus = null;
+        pendingPackage = false;
+        clearHighRiskInputs();
+        workflowActions.setVisibility(GONE);
     }
 
     private void renderList(AdminReportController.State state) {
@@ -281,9 +315,14 @@ public final class AdminReportPanel extends LinearLayout {
         if (detail == null) return;
         TextView heading = text("선택 신고 상세", 20);
         heading.setPadding(0, dp(22), 0, dp(6));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) heading.setAccessibilityHeading(true);
+        markAccessibilityHeading(heading);
         detailContainer.addView(heading, matchWrap());
         AdminReportModels.Summary summary = detail.summary();
+        detailContainer.addView(text(
+            "처리 순서\n1) 상세 확인  →  2) 검수 폼에 연결·결정 기록  →  "
+                + "3) 승인 후 제출본 저장  →  4) 앱 밖 수동 제출  →  5) 접수번호 기록",
+            15
+        ), matchWrap());
         LinearLayout card = verticalGroup();
         card.setPadding(dp(16), dp(14), dp(16), dp(14));
         card.setBackground(cardBackground(statusColor(summary.status())));
@@ -319,8 +358,8 @@ public final class AdminReportPanel extends LinearLayout {
             card.addView(packageButton, matchWrap());
         }
         Button use = button(
-            "이 신고를 검수·수동전달 폼에 연결",
-            "선택 신고를 아래 검수와 수동 기관 전달 기록 폼에 연결"
+            "검수·수동 제출 준비로 이어가기",
+            "선택 신고를 아래 검수 결정과 수동 기관 제출 기록 폼에 연결"
         );
         use.setOnClickListener(view -> listener.onUseInOperations(detail));
         card.addView(use, matchWrap());
@@ -329,15 +368,48 @@ public final class AdminReportPanel extends LinearLayout {
 
     private static String stateMessage(AdminReportController.State state) {
         return switch (state.phase()) {
-            case IDLE -> "조회 전입니다.";
-            case LOADING_LIST -> "신고 목록을 불러오는 중입니다.";
-            case LOADING_MORE -> "다음 신고를 불러오는 중입니다. 현재 " + state.items().size() + "건";
-            case LOADING_DETAIL -> "선택한 신고 상세를 불러오는 중입니다.";
+            case IDLE -> "조회 전입니다. 필요하면 조건을 선택한 뒤 신고를 조회하세요.";
+            case LOADING_LIST -> "신고 목록을 불러오는 중입니다…";
+            case LOADING_MORE -> "다음 신고를 불러오는 중입니다… 현재 " + state.items().size() + "건";
+            case LOADING_DETAIL -> "선택한 신고 상세를 불러오는 중입니다…";
             case CONTENT -> "신고 " + state.items().size() + "건을 표시합니다."
                 + (state.detail() == null ? "" : " 선택 신고 상세도 표시합니다.");
-            case EMPTY -> "조건에 맞는 신고가 없습니다.";
-            case ERROR -> "오류: " + state.errorMessage();
+            case EMPTY -> "조건에 맞는 신고가 없습니다. 조건을 줄이거나 '모든 상태'로 다시 조회하세요.";
+            case ERROR -> "신고를 불러오지 못했습니다. 서버 상태를 확인한 뒤 '다시 시도'를 누르세요. "
+                + state.errorMessage();
         };
+    }
+
+    private static String workSummary(List<AdminReportModels.Summary> items) {
+        int fresh = 0;
+        int reviewed = 0;
+        int resolved = 0;
+        for (AdminReportModels.Summary item : items) {
+            if ("new".equals(item.status())) fresh += 1;
+            else if ("reviewed".equals(item.status())) reviewed += 1;
+            else if ("resolved".equals(item.status())) resolved += 1;
+        }
+        return "현재 불러온 목록 " + items.size() + "건 · 새 신고 " + fresh
+            + "건 · 검토됨 " + reviewed + "건 · 처리 완료 " + resolved + "건";
+    }
+
+    private static String priorityMessage(List<AdminReportModels.Summary> items) {
+        int fresh = 0;
+        int reviewed = 0;
+        for (AdminReportModels.Summary item : items) {
+            if ("new".equals(item.status())) fresh += 1;
+            else if ("reviewed".equals(item.status())) reviewed += 1;
+        }
+        if (fresh > 0) return "우선 업무: 새 신고 " + fresh + "건의 상세와 중복 가능성을 먼저 확인하세요.";
+        if (reviewed > 0) return "다음 업무: 검토된 신고 " + reviewed + "건의 수동 제출·접수 기록을 확인하세요.";
+        if (items.isEmpty()) return "우선 업무: 신고를 조회하세요.";
+        return "현재 불러온 목록에 새 검토 대상이 없습니다.";
+    }
+
+    private static boolean isLoading(AdminReportController.Phase phase) {
+        return phase == AdminReportController.Phase.LOADING_LIST
+            || phase == AdminReportController.Phase.LOADING_MORE
+            || phase == AdminReportController.Phase.LOADING_DETAIL;
     }
 
     private static String reviewText(AdminReportModels.ReviewSummary review) {
@@ -363,6 +435,7 @@ public final class AdminReportPanel extends LinearLayout {
     }
 
     private void prepareStatus(String nextStatus) {
+        sessionBoundDraftsCleared = false;
         pendingStatus = nextStatus;
         pendingPackage = false;
         workflowText.setText("선택 작업: 상태를 " + statusLabel(nextStatus) + "(으)로 변경 · 자동 재제출 없음");
@@ -371,6 +444,7 @@ public final class AdminReportPanel extends LinearLayout {
     }
 
     private void preparePackage() {
+        sessionBoundDraftsCleared = false;
         pendingStatus = null;
         pendingPackage = true;
         workflowText.setText("선택 작업: ZIP 생성 · 저장과 실제 기관 전달 기록은 별도 사건입니다.");
@@ -407,6 +481,26 @@ public final class AdminReportPanel extends LinearLayout {
             && review.photoReviewed()
             && review.privacyReviewed()
             && review.duplicateOfReportId() == null;
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void markAccessibilityHeading(TextView view) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            view.setAccessibilityHeading(true);
+            return;
+        }
+        view.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(
+                View host,
+                AccessibilityNodeInfo info
+            ) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.setCollectionItemInfo(AccessibilityNodeInfo.CollectionItemInfo.obtain(
+                    0, 1, 0, 1, true, false
+                ));
+            }
+        });
     }
 
     private TextView text(String value, int sp) {
@@ -472,6 +566,15 @@ public final class AdminReportPanel extends LinearLayout {
 
     private static LayoutParams matchWrap() {
         return new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    private LayoutParams wrapCentered() {
+        LayoutParams parameters = new LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        parameters.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        return parameters;
     }
 
     private static String selectedValue(Spinner spinner, String[] values) {

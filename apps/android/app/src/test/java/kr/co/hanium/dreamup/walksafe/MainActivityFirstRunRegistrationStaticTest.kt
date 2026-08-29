@@ -11,13 +11,18 @@ class MainActivityFirstRunRegistrationStaticTest {
     ).readText()
 
     @Test
-    fun progressReflectsAllTwelveStages() {
+    fun progressReflectsTheActiveFlowWhileLegacyMappingKeepsTwelveStages() {
         assertTrue(source.contains("const val FIRST_RUN_STAGE_COUNT = 12"))
+        assertTrue(source.contains("const val EMAIL_FIRST_RUN_STAGE_COUNT = 6"))
         val progress = sourceSection(
             "firstRunProgressBar = LinearLayout(this).apply",
             "firstRunOnboardingStatusText = TextView(this).apply",
         )
-        assertTrue(progress.contains("repeat(FIRST_RUN_STAGE_COUNT)"))
+        assertTrue(
+            progress.contains(
+                "repeat(firstRunStageCount(firstRunOnboardingSnapshot))",
+            ),
+        )
 
         val mapping = functionBlock("private fun firstRunStageNumber(")
         assertInOrder(
@@ -32,7 +37,7 @@ class MainActivityFirstRunRegistrationStaticTest {
 
         val update = functionBlock("private fun updateFirstRunOnboardingUi()")
         assertTrue(update.contains("val stageNumber = firstRunStageNumber(snapshot)"))
-        assertTrue(update.contains("FIRST_RUN_STAGE_COUNT"))
+        assertTrue(update.contains("val stageCount = firstRunStageCount(snapshot)"))
         assertTrue(update.contains("if (index < stageNumber)"))
     }
 

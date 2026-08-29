@@ -6,10 +6,12 @@ import android.os.Build;
 import android.text.InputType;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import java.util.List;
@@ -44,6 +46,7 @@ public final class AdminIncidentPanel extends LinearLayout {
     private final Listener listener;
     private final Spinner statusInput;
     private final TextView stateText;
+    private final ProgressBar loadingIndicator;
     private final LinearLayout items;
     private final Button moreButton;
     private final Button retryButton;
@@ -66,7 +69,7 @@ public final class AdminIncidentPanel extends LinearLayout {
         setPadding(0, dp(30), 0, dp(16));
 
         TextView heading = text("중대 사고 기록", 21);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) heading.setAccessibilityHeading(true);
+        markAccessibilityHeading(heading);
         addView(heading, matchWrap());
         addView(text(
             "실제 CRITICAL 사고의 기록과 확인 상태만 표시합니다. 해결은 기록이며 자동 복구나 자동 제어를 수행하지 않습니다.",
@@ -91,6 +94,11 @@ public final class AdminIncidentPanel extends LinearLayout {
         stateText = text("조회 전입니다.", 16);
         stateText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         addView(stateText, matchWrap());
+        loadingIndicator = new ProgressBar(context);
+        loadingIndicator.setIndeterminate(true);
+        loadingIndicator.setContentDescription("중대 사고 기록을 불러오는 중");
+        loadingIndicator.setVisibility(GONE);
+        addView(loadingIndicator, wrapCentered());
         items = vertical();
         addView(items, matchWrap());
 
@@ -103,7 +111,7 @@ public final class AdminIncidentPanel extends LinearLayout {
 
         detailGroup = vertical();
         TextView detailHeading = text("선택한 중대 사고 상세와 상태 이력", 19);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) detailHeading.setAccessibilityHeading(true);
+        markAccessibilityHeading(detailHeading);
         detailGroup.addView(detailHeading, matchWrap());
         detailText = text("", 15);
         detailGroup.addView(detailText, matchWrap());
@@ -153,13 +161,14 @@ public final class AdminIncidentPanel extends LinearLayout {
     public void render(AdminIncidentController.State state) {
         stateText.setText(switch (state.phase()) {
             case IDLE -> "조회 전입니다.";
-            case LOADING_LIST -> "중대 사고 기록을 불러오는 중입니다.";
-            case LOADING_MORE -> "다음 중대 사고 기록을 불러오는 중입니다.";
-            case LOADING_DETAIL -> "중대 사고 상세 이력을 불러오는 중입니다.";
+            case LOADING_LIST -> "중대 사고 기록을 불러오는 중입니다…";
+            case LOADING_MORE -> "다음 중대 사고 기록을 불러오는 중입니다…";
+            case LOADING_DETAIL -> "중대 사고 상세 이력을 불러오는 중입니다…";
             case CONTENT -> "중대 사고 " + state.items().size() + "건을 표시합니다.";
-            case EMPTY -> "조건에 맞는 실제 중대 사고 기록이 없습니다.";
-            case ERROR -> "오류: " + state.errorMessage();
+            case EMPTY -> "조건에 맞는 실제 중대 사고 기록이 없습니다. '모든 상태'로 다시 조회해 보세요.";
+            case ERROR -> "중대 사고 기록을 불러오지 못했습니다. '중대 사고 조회 다시 시도'를 누르세요. " + state.errorMessage();
         });
+        loadingIndicator.setVisibility(isLoading(state.phase()) ? VISIBLE : GONE);
         moreButton.setVisibility(state.canLoadMore() ? VISIBLE : GONE);
         retryButton.setVisibility(state.phase() == AdminIncidentController.Phase.ERROR ? VISIBLE : GONE);
         renderItems(state.items());
@@ -282,6 +291,26 @@ public final class AdminIncidentPanel extends LinearLayout {
         return button;
     }
 
+    @SuppressWarnings("deprecation")
+    private static void markAccessibilityHeading(TextView view) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            view.setAccessibilityHeading(true);
+            return;
+        }
+        view.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(
+                View host,
+                AccessibilityNodeInfo info
+            ) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.setCollectionItemInfo(AccessibilityNodeInfo.CollectionItemInfo.obtain(
+                    0, 1, 0, 1, true, false
+                ));
+            }
+        });
+    }
+
     private TextView text(String value, int sp) {
         TextView text = new TextView(getContext());
         text.setText(value);
@@ -338,6 +367,21 @@ public final class AdminIncidentPanel extends LinearLayout {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private static boolean isLoading(AdminIncidentController.Phase phase) {
+        return phase == AdminIncidentController.Phase.LOADING_LIST
+            || phase == AdminIncidentController.Phase.LOADING_MORE
+            || phase == AdminIncidentController.Phase.LOADING_DETAIL;
+    }
+
+    private LayoutParams wrapCentered() {
+        LayoutParams parameters = new LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        parameters.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        return parameters;
     }
 
     private static LayoutParams matchWrap() {

@@ -262,6 +262,27 @@ public final class AdminSecurityController implements AutoCloseable {
         }
     }
 
+    public synchronized boolean refreshAndValidateSafSaveSession(String expectedSessionId)
+        throws IOException {
+        try {
+            requireCanonicalSessionId(expectedSessionId, "invalid_expected_session_id");
+            refresh();
+            boolean valid = securityState == AdminSecurityState.NORMAL
+                && recoveryCustodyState == AdminRecoveryCustodyState.ATTESTED
+                && expectedSessionId.equals(currentSessionId)
+                && sessions.stream().filter(item ->
+                    item.isCurrent()
+                        && !item.isRevoked()
+                        && expectedSessionId.equals(item.sessionId())
+                ).count() == 1L;
+            if (!valid) failClosed();
+            return valid;
+        } catch (IOException | RuntimeException error) {
+            failClosed();
+            throw error;
+        }
+    }
+
     public synchronized void reauthenticate(String password, String totpCode, long nowEpochMs) throws IOException {
         clearReconfirmation();
         throw new IllegalArgumentException("exact reauthentication binding is required");

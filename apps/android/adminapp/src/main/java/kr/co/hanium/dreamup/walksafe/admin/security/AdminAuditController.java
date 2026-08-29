@@ -111,6 +111,18 @@ public final class AdminAuditController {
 
     public synchronized void invalidate() { generation += 1; }
 
+    public synchronized void clearSessionState() {
+        generation += 1;
+        retry = null;
+        state = new State(
+            Phase.IDLE,
+            new AdminAuditModels.Filters(null, null),
+            AdminJava8Collections.list(),
+            null,
+            null
+        );
+    }
+
     private synchronized boolean apply(Request request, AdminAuditModels.Page page) {
         if (request.generation != generation) return false;
         List<AdminAuditModels.Event> combined = new ArrayList<>();

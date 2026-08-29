@@ -192,6 +192,10 @@ public final class AdminReportWave5Test {
             "long-test-password".toCharArray(), "123456".toCharArray()
         );
         staleStatus.invalidate();
+        assertCredentialCloneZeroized(staleStatusRequest, "password");
+        assertCredentialCloneZeroized(staleStatusRequest, "totp");
+        assertEquals(AdminReportWorkflowController.Phase.IDLE, staleStatus.snapshot().phase());
+        assertEquals(null, staleStatus.snapshot().reportId());
         assertFalse(staleStatus.execute(staleStatusRequest));
         assertEquals(0, staleStatusLoader.statusMutations);
 
@@ -201,8 +205,52 @@ public final class AdminReportWave5Test {
             REPORT_ID, "long-test-password".toCharArray(), "123456".toCharArray()
         );
         stalePackage.invalidate();
+        assertCredentialCloneZeroized(stalePackageRequest, "password");
+        assertCredentialCloneZeroized(stalePackageRequest, "totp");
+        assertEquals(AdminReportWorkflowController.Phase.IDLE, stalePackage.snapshot().phase());
+        assertEquals(null, stalePackage.snapshot().message());
         assertFalse(stalePackage.execute(stalePackageRequest));
         assertEquals(0, stalePackageLoader.packageMutations);
+    }
+
+    @Test
+    public void sessionClearInvalidatesOutstandingCredentialsAndSafCompletionToken() throws Exception {
+        CountingLoader pendingLoader = new CountingLoader();
+        AdminReportWorkflowController pending = new AdminReportWorkflowController(pendingLoader);
+        var outstanding = pending.beginStatus(
+            REPORT_ID, "resolved", 1,
+            "long-test-password".toCharArray(), "123456".toCharArray()
+        );
+        long outstandingGeneration = pending.generationToken();
+        pending.clearSessionState();
+        assertCredentialCloneZeroized(outstanding, "password");
+        assertCredentialCloneZeroized(outstanding, "totp");
+        assertTrue(pending.generationToken() > outstandingGeneration);
+        assertEquals(AdminReportWorkflowController.Phase.IDLE, pending.snapshot().phase());
+        assertFalse(pending.execute(outstanding));
+        assertEquals(0, pendingLoader.statusMutations);
+
+        CountingLoader packageLoader = new CountingLoader();
+        AdminReportWorkflowController saved = new AdminReportWorkflowController(packageLoader);
+        var packageRequest = saved.beginPackage(
+            REPORT_ID, "long-test-password".toCharArray(), "123456".toCharArray()
+        );
+        assertTrue(saved.execute(packageRequest));
+        long packageGeneration = saved.generationToken();
+        AdminDeliveryPackage packageValue = saved.consumePackage();
+        assertTrue(packageValue != null);
+        packageValue.destroy();
+        saved.clearSessionState();
+        assertFalse(saved.markSaved(packageGeneration, 1));
+        assertFalse(saved.markSaveFailed(packageGeneration, false));
+        assertEquals(AdminReportWorkflowController.Phase.IDLE, saved.snapshot().phase());
+    }
+
+    private static void assertCredentialCloneZeroized(Object request, String fieldName)
+        throws Exception {
+        var field = request.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        for (char value : (char[]) field.get(request)) assertEquals('\0', value);
     }
 
     private static String conflictJson() {

@@ -12,6 +12,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Button;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
@@ -75,6 +76,27 @@ public final class AdminBoundaryActivity extends Activity {
     private static final String INCIDENT_FILTER_STATUS_STATE = "admin_incident_filter_status";
     private static final String INCIDENT_SELECTED_ID_STATE = "admin_incident_selected_id";
     private static final int CREATE_DELIVERY_PACKAGE_DOCUMENT = 7_301;
+    private static final int LAST_DELIVERY_PACKAGE_DOCUMENT_REQUEST = 65_534;
+    private static final String[] REVIEW_DECISION_LABELS = {
+        "승인 (APPROVED)", "거절 (REJECTED)", "중복 신고 (DUPLICATE)"
+    };
+    private static final AdminReportDecision.Decision[] REVIEW_DECISIONS = {
+        AdminReportDecision.Decision.APPROVED,
+        AdminReportDecision.Decision.REJECTED,
+        AdminReportDecision.Decision.DUPLICATE
+    };
+    private static final String[] DELIVERY_STATUS_LABELS = {
+        "수동 제출 완료 (SUBMITTED)",
+        "기관 접수 확인 (ACKNOWLEDGED)",
+        "기관 처리 완료 (RESOLVED)",
+        "수동 제출 실패 (FAILED)"
+    };
+    private static final AdminInstitutionDelivery.Status[] DELIVERY_STATUSES = {
+        AdminInstitutionDelivery.Status.SUBMITTED,
+        AdminInstitutionDelivery.Status.ACKNOWLEDGED,
+        AdminInstitutionDelivery.Status.RESOLVED,
+        AdminInstitutionDelivery.Status.FAILED
+    };
 
     private final ExecutorService networkExecutor = Executors.newSingleThreadExecutor();
     private AdminSecurityController controller;
@@ -102,6 +124,8 @@ public final class AdminBoundaryActivity extends Activity {
     private EditText newPasswordInput;
     private EditText newTotpInput;
     private Button loginButton;
+    private LinearLayout loginGroup;
+    private LinearLayout securityDetailsGroup;
     private LinearLayout recoveryStartGroup;
     private LinearLayout recoveryCompleteGroup;
     private LinearLayout sessionGroup;
@@ -110,6 +134,7 @@ public final class AdminBoundaryActivity extends Activity {
     private Spinner custodyMaterialKindInput;
     private CheckBox custodyConfirmationInput;
     private LinearLayout operationsGroup;
+    private LinearLayout reportOperationsFormGroup;
     private AdminReportPanel reportPanel;
     private AdminReportRequestPanel reportRequestPanel;
     private AdminAuditPanel auditPanel;
@@ -133,11 +158,25 @@ public final class AdminBoundaryActivity extends Activity {
     private EditText expectedRevisionInput;
     private EditText packageRevisionInput;
     private EditText idempotencyKeyInput;
+    private CheckBox manualDeliveryCompletedInput;
     private Button revokeCurrentButton;
     private LinearLayout contentRoot;
     private boolean operationInFlight;
+    private boolean recordingDelivery;
     private AdminDeliveryPackage pendingDeliveryPackage;
     private AdminDeliveryPackageSaver.Saved verifiedDeliveryPackage;
+    private String connectedOperationsReportId;
+    private volatile String boundOperationsSessionId;
+    private boolean operationsAccessBindingInitialized;
+    private volatile boolean boundOperationsAccessActive;
+    private volatile long operationsSessionGeneration;
+    private volatile long safSaveGeneration;
+    private long pendingSafSaveGeneration = -1L;
+    private long pendingSafWorkflowGeneration = -1L;
+    private long pendingSafSessionGeneration = -1L;
+    private String pendingSafSessionId;
+    private int nextSafRequestCode = CREATE_DELIVERY_PACKAGE_DOCUMENT;
+    private int pendingSafRequestCode = -1;
     private boolean awaitingSafResult;
 
     @Override
@@ -400,19 +439,48 @@ public final class AdminBoundaryActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != CREATE_DELIVERY_PACKAGE_DOCUMENT) return;
-        awaitingSafResult = false;
+        if (!isSafSaveRequestCode(requestCode)) return;
         Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
+        if (requestCode != pendingSafRequestCode) {
+            if (uri != null) deleteSafDocument(uri);
+            return;
+        }
+        awaitingSafResult = false;
         AdminDeliveryPackage packageValue = pendingDeliveryPackage;
         pendingDeliveryPackage = null;
+        long saveGeneration = pendingSafSaveGeneration;
+        long workflowGeneration = pendingSafWorkflowGeneration;
+        long sessionGeneration = pendingSafSessionGeneration;
+        String sessionId = pendingSafSessionId;
+        clearPendingSafBinding();
+        if (!isCurrentSafSaveBinding(
+            saveGeneration, workflowGeneration, sessionGeneration, sessionId
+        )) {
+            if (packageValue != null) packageValue.destroy();
+            if (uri != null) deleteSafDocument(uri);
+            return;
+        }
         if (uri == null || packageValue == null) {
             if (packageValue != null) packageValue.destroy();
             if (uri != null) deleteSafDocument(uri);
-            reportWorkflowController.markSaveFailed(true);
+            reportWorkflowController.markSaveFailed(workflowGeneration, true);
             reportPanel.renderWorkflow(reportWorkflowController.snapshot());
             return;
         }
         networkExecutor.execute(() -> {
+            try {
+                boolean serverSessionValid =
+                    controller.refreshAndValidateSafSaveSession(sessionId);
+                if (!serverSessionValid || !isCurrentSafSaveBinding(
+                    saveGeneration, workflowGeneration, sessionGeneration, sessionId
+                )) {
+                    rejectSafSaveBeforeWrite(packageValue, uri);
+                    return;
+                }
+            } catch (Exception error) {
+                rejectSafSaveBeforeWrite(packageValue, uri);
+                return;
+            }
             try {
                 AdminDeliveryPackageSaver.Saved saved = AdminDeliveryPackageSaver.save(
                     packageValue,
@@ -420,18 +488,39 @@ public final class AdminBoundaryActivity extends Activity {
                 );
                 runOnUiThread(() -> {
                     if (isDestroyed()) return;
+                    if (!isCurrentSafSaveBinding(
+                        saveGeneration, workflowGeneration, sessionGeneration, sessionId
+                    ) || !reportWorkflowController.markSaved(workflowGeneration, saved.revision())) {
+                        deleteSafDocument(uri);
+                        return;
+                    }
                     verifiedDeliveryPackage = saved;
                     packageRevisionInput.setText(Integer.toString(saved.revision()));
-                    reportWorkflowController.markSaved(saved.revision());
                     reportPanel.renderWorkflow(reportWorkflowController.snapshot());
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> {
                     if (isDestroyed()) return;
-                    reportWorkflowController.markSaveFailed(false);
-                    reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+                    if (isCurrentSafSaveBinding(
+                        saveGeneration, workflowGeneration, sessionGeneration, sessionId
+                    ) && reportWorkflowController.markSaveFailed(workflowGeneration, false)) {
+                        reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+                    }
                 });
             }
+        });
+    }
+
+    private void rejectSafSaveBeforeWrite(AdminDeliveryPackage packageValue, Uri uri) {
+        packageValue.destroy();
+        deleteSafDocument(uri);
+        runOnUiThread(() -> {
+            if (isDestroyed()) return;
+            resetSessionBoundReportState();
+            render();
+            resultText.setText(
+                "현재 관리자 세션을 서버에서 재확인하지 못해 제출본을 저장하지 않았습니다."
+            );
         });
     }
 
@@ -439,13 +528,19 @@ public final class AdminBoundaryActivity extends Activity {
         LinearLayout content = new LinearLayout(this);
         contentRoot = content;
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(48, 48, 48, 48);
+        content.setPadding(dp(20), dp(20), dp(20), dp(32));
         content.setBackgroundColor(Color.WHITE);
         content.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);
 
-        TextView title = text("워크세이프 관리자", 24);
-        title.setGravity(Gravity.CENTER);
+        TextView title = text("워크세이프 관리자", 28);
+        markAccessibilityHeading(title);
         content.addView(title, matchWrap());
+        TextView introduction = text(
+            "신고 검수와 수동 기관 제출 기록을 관리합니다.",
+            16
+        );
+        introduction.setPadding(0, dp(6), 0, dp(10));
+        content.addView(introduction, matchWrap());
 
         statusText = text("", 19);
         statusText.setGravity(Gravity.CENTER);
@@ -453,30 +548,48 @@ public final class AdminBoundaryActivity extends Activity {
         statusText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         content.addView(statusText, matchWrap());
 
+        loginGroup = group();
+        content.addView(loginGroup, matchWrap());
+
+        securityDetailsGroup = group();
+        Button securityDetailsToggle = button("서버·기기 보안 정보 펼치기");
+        securityDetailsToggle.setOnClickListener(view -> {
+            boolean opening = securityDetailsGroup.getVisibility() != View.VISIBLE;
+            securityDetailsGroup.setVisibility(opening ? View.VISIBLE : View.GONE);
+            securityDetailsToggle.setText(
+                opening ? "서버·기기 보안 정보 접기" : "서버·기기 보안 정보 펼치기"
+            );
+            securityDetailsToggle.setContentDescription(securityDetailsToggle.getText());
+            if (opening) metadataText.requestFocus();
+        });
+        content.addView(securityDetailsToggle, matchWrap());
+        securityDetailsGroup.setVisibility(View.GONE);
+        content.addView(securityDetailsGroup, matchWrap());
+
         metadataText = text("", 14);
         metadataText.setGravity(Gravity.CENTER);
-        content.addView(metadataText, matchWrap());
+        securityDetailsGroup.addView(metadataText, matchWrap());
 
         custodyText = text("", 15);
         custodyText.setGravity(Gravity.CENTER);
         custodyText.setPadding(0, 8, 0, 0);
         custodyText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-        content.addView(custodyText, matchWrap());
+        securityDetailsGroup.addView(custodyText, matchWrap());
 
         deviceKeyText = text("", 13);
         deviceKeyText.setGravity(Gravity.CENTER);
         deviceKeyText.setPadding(0, 8, 0, 0);
         deviceKeyText.setTextIsSelectable(true);
-        content.addView(deviceKeyText, matchWrap());
+        securityDetailsGroup.addView(deviceKeyText, matchWrap());
 
         resultText = text("", 16);
         resultText.setPadding(0, 20, 0, 20);
-        resultText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE);
+        resultText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         content.addView(resultText, matchWrap());
 
         deviceLabelInput = input("이 기기의 알아보기 쉬운 이름", InputType.TYPE_CLASS_TEXT, false);
         deviceLabelInput.setText(defaultDeviceLabel());
-        content.addView(deviceLabelInput, matchWrap());
+        loginGroup.addView(deviceLabelInput, matchWrap());
 
         adminIdInput = input("관리자 ID", InputType.TYPE_CLASS_TEXT, false);
         passwordInput = input(
@@ -489,13 +602,13 @@ public final class AdminBoundaryActivity extends Activity {
             InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD,
             true
         );
-        content.addView(adminIdInput, matchWrap());
-        content.addView(passwordInput, matchWrap());
-        content.addView(totpInput, matchWrap());
+        loginGroup.addView(adminIdInput, matchWrap());
+        loginGroup.addView(passwordInput, matchWrap());
+        loginGroup.addView(totpInput, matchWrap());
 
         loginButton = button("비밀번호와 추가 인증으로 로그인");
         loginButton.setOnClickListener(view -> login());
-        content.addView(loginButton, matchWrap());
+        loginGroup.addView(loginButton, matchWrap());
 
         recoveryStartGroup = group();
         recoveryStartGroup.addView(text("휴대전화 밖에 보관한 복구코드만 사용합니다.", 16), matchWrap());
@@ -535,6 +648,7 @@ public final class AdminBoundaryActivity extends Activity {
             16
         ), matchWrap());
         custodyMaterialKindInput = enumSpinner(AdminSecurityApi.RecoveryMaterialKind.values());
+        custodyMaterialKindInput.setContentDescription("휴대전화 밖에 보관한 복구자료 유형");
         custodyGroup.addView(custodyMaterialKindInput, matchWrap());
         custodyConfirmationInput = checkBox(
             "서버 키·앱 서명 키·관리자 복구자료를 서로 분리해 각각 암호화 백업했고, 같은 저장공간이나 계정에 키를 함께 두지 않았음을 직접 확인했습니다."
@@ -571,13 +685,22 @@ public final class AdminBoundaryActivity extends Activity {
 
     private LinearLayout buildOperationsGroup() {
         LinearLayout group = group();
-        TextView heading = text("신고 검토 및 수동 기관 전달 기록", 20);
+        TextView heading = text("오늘의 운영 업무", 23);
         heading.setPadding(0, 36, 0, 8);
+        markAccessibilityHeading(heading);
         group.addView(heading, matchWrap());
         group.addView(text(
-            "이 화면은 이미 사람이 수행한 기관 전달 사실만 내부 서버에 기록합니다. 기관으로 직접 전송하지 않습니다.",
-            15
+            "1. 신고 상세 확인  →  2. 위치·사진·개인정보 검수  →  3. 제출본 저장  →  "
+                + "4. 앱 밖에서 기관에 수동 제출  →  5. 외부 접수번호 기록",
+            16
         ), matchWrap());
+        TextView manualPolicy = text(
+            "중요: 이 앱은 기관으로 자료를 전송하지 않습니다. 성공 상태는 앱 밖 수동 제출을 실제로 완료한 뒤 기록하고, 실패 상태는 완료 확인 없이 실패 사실만 기록하세요.",
+            15
+        );
+        manualPolicy.setPadding(dp(12), dp(12), dp(12), dp(12));
+        manualPolicy.setBackgroundColor(Color.rgb(255, 247, 220));
+        group.addView(manualPolicy, matchWrap());
 
         reportPanel = new AdminReportPanel(this, new AdminReportPanel.Listener() {
             @Override
@@ -626,6 +749,7 @@ public final class AdminBoundaryActivity extends Activity {
         });
         group.addView(reportPanel, matchWrap());
 
+        LinearLayout requiredParallelOperationsGroup = group();
         reportRequestPanel = new AdminReportRequestPanel(
             this,
             new AdminReportRequestPanel.Listener() {
@@ -669,7 +793,7 @@ public final class AdminBoundaryActivity extends Activity {
                 }
             }
         );
-        group.addView(reportRequestPanel, matchWrap());
+        requiredParallelOperationsGroup.addView(reportRequestPanel, matchWrap());
 
         incidentPanel = new AdminIncidentPanel(this, new AdminIncidentPanel.Listener() {
             @Override
@@ -713,8 +837,9 @@ public final class AdminBoundaryActivity extends Activity {
                 );
             }
         });
-        group.addView(incidentPanel, matchWrap());
+        requiredParallelOperationsGroup.addView(incidentPanel, matchWrap());
 
+        LinearLayout auditSupplementGroup = group();
         auditPanel = new AdminAuditPanel(this, new AdminAuditPanel.Listener() {
             @Override
             public void onLoad(String eventType, String actorId) {
@@ -731,16 +856,27 @@ public final class AdminBoundaryActivity extends Activity {
                 retryAudits();
             }
         });
-        group.addView(auditPanel, matchWrap());
+        auditSupplementGroup.addView(auditPanel, matchWrap());
 
+        reportOperationsFormGroup = group();
+        reportOperationsFormGroup.setVisibility(View.GONE);
         reportIdInput = input("신고 UUID", InputType.TYPE_CLASS_TEXT, false);
-        group.addView(reportIdInput, matchWrap());
+        makeReadOnly(reportIdInput, "상세에서 연결한 신고 식별자");
 
-        TextView reviewHeading = text("검토 결정 (세 검토 항목을 모두 확인해야 저장됩니다)", 17);
+        TextView reviewHeading = text("2. 선택한 신고 검수 결정", 20);
         reviewHeading.setPadding(0, 24, 0, 4);
-        group.addView(reviewHeading, matchWrap());
-        reviewDecisionInput = enumSpinner(AdminReportDecision.Decision.values());
-        group.addView(reviewDecisionInput, matchWrap());
+        markAccessibilityHeading(reviewHeading);
+        reportOperationsFormGroup.addView(reviewHeading, matchWrap());
+        reportOperationsFormGroup.addView(text(
+            "신고 상세의 '검수·수동 제출 준비로 이어가기'를 누르면 신고 ID가 연결됩니다. 위치·사진·개인정보를 모두 확인한 뒤 결정을 기록하세요.",
+            15
+        ), matchWrap());
+        reportOperationsFormGroup.addView(reportIdInput, matchWrap());
+        reviewDecisionInput = labeledSpinner(
+            REVIEW_DECISION_LABELS,
+            "신고 검수 결정"
+        );
+        reportOperationsFormGroup.addView(reviewDecisionInput, matchWrap());
         reviewReasonInput = input("내부 검토 사유 (사용자 비공개)", InputType.TYPE_CLASS_TEXT, false);
         reviewUserVisibleReasonInput = input(
             "사용자에게 보여줄 사유 (REJECTED/DUPLICATE 필수)",
@@ -748,33 +884,41 @@ public final class AdminBoundaryActivity extends Activity {
             false
         );
         duplicateReportIdInput = input("중복 대상 신고 UUID (DUPLICATE일 때만)", InputType.TYPE_CLASS_TEXT, false);
-        group.addView(reviewReasonInput, matchWrap());
-        group.addView(reviewUserVisibleReasonInput, matchWrap());
-        group.addView(duplicateReportIdInput, matchWrap());
+        reportOperationsFormGroup.addView(reviewReasonInput, matchWrap());
+        reportOperationsFormGroup.addView(reviewUserVisibleReasonInput, matchWrap());
+        reportOperationsFormGroup.addView(duplicateReportIdInput, matchWrap());
         locationReviewedInput = checkBox("위치 검토 완료");
         photoReviewedInput = checkBox("사진 검토 완료");
         privacyReviewedInput = checkBox("개인정보 검토 완료");
-        group.addView(locationReviewedInput, matchWrap());
-        group.addView(photoReviewedInput, matchWrap());
-        group.addView(privacyReviewedInput, matchWrap());
+        reportOperationsFormGroup.addView(locationReviewedInput, matchWrap());
+        reportOperationsFormGroup.addView(photoReviewedInput, matchWrap());
+        reportOperationsFormGroup.addView(privacyReviewedInput, matchWrap());
         Button reviewButton = button("검토 결정 기록");
         reviewButton.setOnClickListener(view -> recordReviewDecision());
-        group.addView(reviewButton, matchWrap());
+        reportOperationsFormGroup.addView(reviewButton, matchWrap());
         Button reviewHistoryButton = button("검토 결정 이력 확인");
         reviewHistoryButton.setOnClickListener(view -> readReviewDecisions());
-        group.addView(reviewHistoryButton, matchWrap());
+        reportOperationsFormGroup.addView(reviewHistoryButton, matchWrap());
 
-        TextView deliveryHeading = text("수동 기관 전달 기록", 17);
+        TextView deliveryHeading = text("3. 기관 수동 제출·접수 기록", 20);
         deliveryHeading.setPadding(0, 28, 0, 4);
-        group.addView(deliveryHeading, matchWrap());
+        markAccessibilityHeading(deliveryHeading);
+        reportOperationsFormGroup.addView(deliveryHeading, matchWrap());
+        reportOperationsFormGroup.addView(text(
+            "승인된 신고의 제출본을 저장하고 앱 밖에서 기관에 직접 제출하세요. 이 영역은 앱 밖에서 시도한 제출의 성공·접수·처리·실패 결과만 기록합니다.",
+            15
+        ), matchWrap());
         institutionInput = input("기관", InputType.TYPE_CLASS_TEXT, false);
         deliveryChannelInput = input("수동 전달 채널 (예: 전화, 공문)", InputType.TYPE_CLASS_TEXT, false);
         deliveryRecipientInput = input("수신 부서 또는 담당자", InputType.TYPE_CLASS_TEXT, false);
-        group.addView(institutionInput, matchWrap());
-        group.addView(deliveryChannelInput, matchWrap());
-        group.addView(deliveryRecipientInput, matchWrap());
-        deliveryStatusInput = enumSpinner(AdminInstitutionDelivery.Status.values());
-        group.addView(deliveryStatusInput, matchWrap());
+        reportOperationsFormGroup.addView(institutionInput, matchWrap());
+        reportOperationsFormGroup.addView(deliveryChannelInput, matchWrap());
+        reportOperationsFormGroup.addView(deliveryRecipientInput, matchWrap());
+        deliveryStatusInput = labeledSpinner(
+            DELIVERY_STATUS_LABELS,
+            "기관 수동 제출 기록 상태"
+        );
+        reportOperationsFormGroup.addView(deliveryStatusInput, matchWrap());
         externalReceiptInput = input(
             "외부 접수번호 (ACKNOWLEDGED/RESOLVED 필수)",
             InputType.TYPE_CLASS_TEXT,
@@ -789,27 +933,65 @@ public final class AdminBoundaryActivity extends Activity {
         packageRevisionInput = input("저장 검증된 제출본 revision", InputType.TYPE_CLASS_NUMBER, false);
         idempotencyKeyInput = input("멱등 UUID", InputType.TYPE_CLASS_TEXT, false);
         idempotencyKeyInput.setText(UUID.randomUUID().toString());
-        group.addView(externalReceiptInput, matchWrap());
-        group.addView(deliveryReasonInput, matchWrap());
-        group.addView(evidenceSha256Input, matchWrap());
-        group.addView(observedAtInput, matchWrap());
-        group.addView(packageRevisionInput, matchWrap());
-        group.addView(expectedRevisionInput, matchWrap());
-        group.addView(idempotencyKeyInput, matchWrap());
-        Button deliveryButton = button("이미 수행한 수동 전달 사실 기록");
+        makeReadOnly(expectedRevisionInput, "앱이 관리하는 현재 전달 기록 버전");
+        makeReadOnly(packageRevisionInput, "앱이 검증한 기관 제출본 버전");
+        makeReadOnly(idempotencyKeyInput, "앱이 관리하는 중복 기록 방지 식별자");
+        reportOperationsFormGroup.addView(externalReceiptInput, matchWrap());
+        reportOperationsFormGroup.addView(deliveryReasonInput, matchWrap());
+        reportOperationsFormGroup.addView(evidenceSha256Input, matchWrap());
+        reportOperationsFormGroup.addView(observedAtInput, matchWrap());
+        reportOperationsFormGroup.addView(packageRevisionInput, matchWrap());
+        reportOperationsFormGroup.addView(expectedRevisionInput, matchWrap());
+        reportOperationsFormGroup.addView(idempotencyKeyInput, matchWrap());
+        manualDeliveryCompletedInput = checkBox(
+            "성공 상태 기록: 앱 밖에서 해당 기관으로 수동 제출을 실제로 수행한 사실을 확인했습니다."
+        );
+        reportOperationsFormGroup.addView(manualDeliveryCompletedInput, matchWrap());
+        Button deliveryButton = button("수동 전달 결과 기록");
         deliveryButton.setOnClickListener(view -> recordDelivery());
-        group.addView(deliveryButton, matchWrap());
+        reportOperationsFormGroup.addView(deliveryButton, matchWrap());
         Button deliveryHistoryButton = button("수동 전달 상태 이력 확인");
         deliveryHistoryButton.setOnClickListener(view -> readDeliveries());
-        group.addView(deliveryHistoryButton, matchWrap());
+        reportOperationsFormGroup.addView(deliveryHistoryButton, matchWrap());
+        group.addView(reportOperationsFormGroup, matchWrap());
+
+        TextView requiredParallelHeading = text("필수 병행 업무", 22);
+        requiredParallelHeading.setPadding(0, dp(32), 0, dp(4));
+        markAccessibilityHeading(requiredParallelHeading);
+        group.addView(requiredParallelHeading, matchWrap());
+        group.addView(text(
+            "사용자 정정·삭제 요청과 중대 사고 기록은 주 신고 검수와 함께 빠짐없이 확인합니다.",
+            15
+        ), matchWrap());
+        group.addView(requiredParallelOperationsGroup, matchWrap());
+
+        TextView auditSupplementHeading = text("보조 감사 기록", 20);
+        auditSupplementHeading.setPadding(0, dp(28), 0, dp(4));
+        markAccessibilityHeading(auditSupplementHeading);
+        group.addView(auditSupplementHeading, matchWrap());
+        group.addView(text(
+            "감사 이력은 필요할 때 펼쳐 확인하는 보조 기록입니다.",
+            15
+        ), matchWrap());
+        Button auditToggle = button("감사 기록 펼치기");
+        auditToggle.setOnClickListener(view -> {
+            boolean opening = auditSupplementGroup.getVisibility() != View.VISIBLE;
+            auditSupplementGroup.setVisibility(opening ? View.VISIBLE : View.GONE);
+            auditToggle.setText(opening ? "감사 기록 접기" : "감사 기록 펼치기");
+            auditToggle.setContentDescription(auditToggle.getText());
+            if (opening) auditSupplementGroup.requestFocus();
+        });
+        group.addView(auditToggle, matchWrap());
+        auditSupplementGroup.setVisibility(View.GONE);
+        group.addView(auditSupplementGroup, matchWrap());
         return group;
     }
 
     private void recordReviewDecision() {
         try {
-            String reportId = normalized(reportIdInput);
+            String reportId = requireConnectedOperationsReportId();
             AdminReportDecision decision = new AdminReportDecision(
-                AdminReportDecision.Decision.valueOf(reviewDecisionInput.getSelectedItem().toString()),
+                REVIEW_DECISIONS[reviewDecisionInput.getSelectedItemPosition()],
                 normalized(reviewReasonInput),
                 nullableNormalized(reviewUserVisibleReasonInput),
                 nullableNormalized(duplicateReportIdInput),
@@ -824,21 +1006,35 @@ public final class AdminBoundaryActivity extends Activity {
                     BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                 )
             );
+        } catch (IllegalStateException error) {
+            resultText.setText(error.getMessage());
         } catch (IllegalArgumentException error) {
             resultText.setText("검토 결정 입력값을 다시 확인해 주세요.");
         }
     }
 
     private void readReviewDecisions() {
-        String reportId = normalized(reportIdInput);
-        runOperationalOperation("검토 결정 이력을 확인하고 있습니다.", () ->
-            controller.readReviewDecisions(reportId, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED)
-        );
+        try {
+            String reportId = requireConnectedOperationsReportId();
+            runOperationalOperation("검토 결정 이력을 확인하고 있습니다.", () ->
+                controller.readReviewDecisions(reportId, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED)
+            );
+        } catch (IllegalStateException error) {
+            resultText.setText(error.getMessage());
+        }
     }
 
     private void recordDelivery() {
         try {
-            String reportId = normalized(reportIdInput);
+            String reportId = requireConnectedOperationsReportId();
+            AdminInstitutionDelivery.Status deliveryStatus =
+                DELIVERY_STATUSES[deliveryStatusInput.getSelectedItemPosition()];
+            if (deliveryStatus != AdminInstitutionDelivery.Status.FAILED
+                && !manualDeliveryCompletedInput.isChecked()) {
+                manualDeliveryCompletedInput.requestFocus();
+                resultText.setText("성공 상태는 앱 밖 수동 제출을 실제로 수행한 뒤 확인란을 선택하세요.");
+                return;
+            }
             String revision = normalized(expectedRevisionInput);
             String packageRevision = normalized(packageRevisionInput);
             if (!revision.matches("[0-9]{1,18}")) throw new IllegalArgumentException("invalid revision");
@@ -854,7 +1050,7 @@ public final class AdminBoundaryActivity extends Activity {
                 normalized(institutionInput),
                 normalized(deliveryChannelInput),
                 normalized(deliveryRecipientInput),
-                AdminInstitutionDelivery.Status.valueOf(deliveryStatusInput.getSelectedItem().toString()),
+                deliveryStatus,
                 nullableNormalized(externalReceiptInput),
                 normalized(deliveryReasonInput),
                 nullableNormalized(evidenceSha256Input),
@@ -863,23 +1059,30 @@ public final class AdminBoundaryActivity extends Activity {
                 Long.parseLong(revision),
                 normalized(idempotencyKeyInput)
             );
-            runOperationalOperation("수동 전달 사실을 내부 기록하고 있습니다.", () ->
+            recordingDelivery = true;
+            runOperationalOperation("수동 전달 결과를 내부 기록하고 있습니다.", () ->
                 controller.recordDelivery(
                     reportId,
                     delivery,
                     BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                 )
             );
+        } catch (IllegalStateException error) {
+            resultText.setText(error.getMessage());
         } catch (IllegalArgumentException error) {
             resultText.setText("수동 전달 기록 입력값을 다시 확인해 주세요.");
         }
     }
 
     private void readDeliveries() {
-        String reportId = normalized(reportIdInput);
-        runOperationalOperation("수동 전달 상태 이력을 확인하고 있습니다.", () ->
-            controller.readDeliveries(reportId, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED)
-        );
+        try {
+            String reportId = requireConnectedOperationsReportId();
+            runOperationalOperation("수동 전달 상태 이력을 확인하고 있습니다.", () ->
+                controller.readDeliveries(reportId, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED)
+            );
+        } catch (IllegalStateException error) {
+            resultText.setText(error.getMessage());
+        }
     }
 
     private void runOperationalOperation(String pendingMessage, OperationalOperation operation) {
@@ -895,6 +1098,10 @@ public final class AdminBoundaryActivity extends Activity {
                     operationInFlight = false;
                     setInteractiveEnabled(contentRoot, true);
                     resultText.setText(operationalResultMessage(result));
+                    if (recordingDelivery && result.kind() == AdminOperationsApi.ResultKind.MUTATION) {
+                        rotateDeliveryRecordInputsAfterSuccess();
+                    }
+                    recordingDelivery = false;
                     render();
                     if (result.kind() == AdminOperationsApi.ResultKind.MUTATION) {
                         refreshConnectedReportDetail();
@@ -906,6 +1113,7 @@ public final class AdminBoundaryActivity extends Activity {
                     operationInFlight = false;
                     setInteractiveEnabled(contentRoot, true);
                     resultText.setText("관리자 내부 업무를 완료하지 못했습니다. 입력과 서버 상태를 확인해 주세요.");
+                    recordingDelivery = false;
                     render();
                 });
             }
@@ -1083,6 +1291,7 @@ public final class AdminBoundaryActivity extends Activity {
             ));
         }
         if (controller == null) {
+            reconcileOperationsAccessBinding(false, null);
             statusText.setText("관리자 보안 기능은 잠겨 있습니다.");
             metadataText.setText(BuildConfig.ADMIN_WORKFLOW_STATE);
             custodyText.setText("복구자료 외부 보관 상태를 확인할 수 없습니다.");
@@ -1103,8 +1312,10 @@ public final class AdminBoundaryActivity extends Activity {
 
         boolean accessActive = snapshot.isAccessSessionActive();
         boolean recoveryActive = snapshot.isRecoveryActive();
+        reconcileOperationsAccessBinding(accessActive, snapshot.currentSessionId());
         boolean custodyAttested =
             snapshot.recoveryCustodyState() == AdminRecoveryCustodyState.ATTESTED;
+        loginGroup.setVisibility(!accessActive && !recoveryActive ? View.VISIBLE : View.GONE);
         loginButton.setVisibility(!accessActive && !recoveryActive ? View.VISIBLE : View.GONE);
         recoveryStartGroup.setVisibility(
             !recoveryActive && snapshot.securityState() != AdminSecurityState.NORMAL ? View.VISIBLE : View.GONE
@@ -1200,6 +1411,7 @@ public final class AdminBoundaryActivity extends Activity {
     }
 
     private void hideInteractiveGroups() {
+        loginGroup.setVisibility(View.GONE);
         loginButton.setVisibility(View.GONE);
         recoveryStartGroup.setVisibility(View.GONE);
         recoveryCompleteGroup.setVisibility(View.GONE);
@@ -1355,8 +1567,65 @@ public final class AdminBoundaryActivity extends Activity {
         }
     }
 
+    private void reconcileOperationsAccessBinding(boolean accessActive, String currentSessionId) {
+        if (!operationsAccessBindingInitialized
+            || boundOperationsAccessActive != accessActive
+            || !java.util.Objects.equals(boundOperationsSessionId, currentSessionId)) {
+            resetSessionBoundReportState();
+        }
+        operationsAccessBindingInitialized = true;
+        boundOperationsAccessActive = accessActive;
+        boundOperationsSessionId = currentSessionId;
+    }
+
+    private void resetSessionBoundReportState() {
+        operationsSessionGeneration += 1L;
+        safSaveGeneration += 1L;
+        clearPendingSafBinding();
+        connectedOperationsReportId = null;
+        if (reportOperationsFormGroup != null) {
+            reportOperationsFormGroup.setVisibility(View.GONE);
+        }
+        if (pendingDeliveryPackage != null) pendingDeliveryPackage.destroy();
+        pendingDeliveryPackage = null;
+        verifiedDeliveryPackage = null;
+        awaitingSafResult = false;
+        recordingDelivery = false;
+        clear(reportIdInput);
+        if (expectedRevisionInput != null) expectedRevisionInput.setText("0");
+        clear(packageRevisionInput);
+        resetOperationsInputsForDifferentReport();
+        if (reportPanel != null) reportPanel.clearSessionBoundDrafts();
+        if (reportRequestPanel != null) reportRequestPanel.clearSessionBoundDrafts();
+        if (incidentPanel != null) {
+            incidentPanel.clearSensitiveInputs();
+            incidentPanel.clearSubmittedEvidence();
+        }
+        if (reportController != null) reportController.clearSessionState();
+        if (reportRequestController != null) reportRequestController.clearSessionState();
+        if (reportWorkflowController != null) reportWorkflowController.clearSessionState();
+        if (auditController != null) auditController.clearSessionState();
+        if (incidentController != null) incidentController.clearSessionState();
+    }
+
+    private String requireConnectedOperationsReportId() {
+        String reportId = normalized(reportIdInput);
+        if (connectedOperationsReportId == null
+            || !connectedOperationsReportId.equals(reportId)) {
+            throw new IllegalStateException(
+                "연결된 신고가 유효하지 않습니다. 신고 상세에서 작업을 다시 연결해 주세요."
+            );
+        }
+        return reportId;
+    }
+
     private void connectReportToOperations(AdminReportModels.Detail detail) {
         String reportId = detail.summary().id();
+        boolean reportChanged = !reportId.equals(connectedOperationsReportId);
+        if (reportChanged) {
+            resetOperationsInputsForDifferentReport();
+        }
+        connectedOperationsReportId = reportId;
         reportIdInput.setText(reportId);
         int currentDeliveryRevision = detail.delivery() == null ? 0 : detail.delivery().revision();
         expectedRevisionInput.setText(Integer.toString(currentDeliveryRevision));
@@ -1369,7 +1638,29 @@ public final class AdminBoundaryActivity extends Activity {
         resultText.setText(
             "선택한 신고를 아래 폼에 연결했습니다. 기관 전달은 앱 밖에서 수행한 사실만 기록하세요."
         );
-        reportIdInput.requestFocus();
+        reportOperationsFormGroup.setVisibility(View.VISIBLE);
+        reviewDecisionInput.requestFocus();
+    }
+
+    private void resetOperationsInputsForDifferentReport() {
+        if (reviewDecisionInput != null) reviewDecisionInput.setSelection(0);
+        clear(reviewReasonInput);
+        clear(reviewUserVisibleReasonInput);
+        clear(duplicateReportIdInput);
+        if (locationReviewedInput != null) locationReviewedInput.setChecked(false);
+        if (photoReviewedInput != null) photoReviewedInput.setChecked(false);
+        if (privacyReviewedInput != null) privacyReviewedInput.setChecked(false);
+
+        clear(institutionInput);
+        clear(deliveryChannelInput);
+        clear(deliveryRecipientInput);
+        if (deliveryStatusInput != null) deliveryStatusInput.setSelection(0);
+        clear(externalReceiptInput);
+        clear(deliveryReasonInput);
+        clear(evidenceSha256Input);
+        if (observedAtInput != null) observedAtInput.setText(Instant.now().toString());
+        if (manualDeliveryCompletedInput != null) manualDeliveryCompletedInput.setChecked(false);
+        if (idempotencyKeyInput != null) idempotencyKeyInput.setText(UUID.randomUUID().toString());
     }
 
     private void refreshConnectedReportDetail() {
@@ -1472,14 +1763,20 @@ public final class AdminBoundaryActivity extends Activity {
     }
 
     private void launchPackageDocumentPicker() {
+        long workflowGeneration = reportWorkflowController.generationToken();
         AdminDeliveryPackage packageValue = reportWorkflowController.consumePackage();
         if (packageValue == null) {
-            reportWorkflowController.markSaveFailed(false);
+            reportWorkflowController.markSaveFailed(workflowGeneration, false);
             reportPanel.renderWorkflow(reportWorkflowController.snapshot());
             return;
         }
         if (pendingDeliveryPackage != null) pendingDeliveryPackage.destroy();
         pendingDeliveryPackage = packageValue;
+        pendingSafSaveGeneration = ++safSaveGeneration;
+        pendingSafWorkflowGeneration = workflowGeneration;
+        pendingSafSessionGeneration = operationsSessionGeneration;
+        pendingSafSessionId = boundOperationsSessionId;
+        pendingSafRequestCode = allocateSafRequestCode();
         awaitingSafResult = true;
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
             .addCategory(Intent.CATEGORY_OPENABLE)
@@ -1490,14 +1787,66 @@ public final class AdminBoundaryActivity extends Activity {
                     + "-r" + packageValue.revision() + ".zip"
             );
         try {
-            startActivityForResult(intent, CREATE_DELIVERY_PACKAGE_DOCUMENT);
+            startActivityForResult(intent, pendingSafRequestCode);
         } catch (RuntimeException error) {
             awaitingSafResult = false;
             pendingDeliveryPackage.destroy();
             pendingDeliveryPackage = null;
-            reportWorkflowController.markSaveFailed(false);
-            reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+            long failedWorkflowGeneration = pendingSafWorkflowGeneration;
+            boolean current = isCurrentSafSaveBinding(
+                pendingSafSaveGeneration,
+                failedWorkflowGeneration,
+                pendingSafSessionGeneration,
+                pendingSafSessionId
+            );
+            clearPendingSafBinding();
+            if (current && reportWorkflowController.markSaveFailed(failedWorkflowGeneration, false)) {
+                reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+            }
         }
+    }
+
+    private boolean isCurrentSafSaveBinding(
+        long saveGeneration,
+        long workflowGeneration,
+        long sessionGeneration,
+        String sessionId
+    ) {
+        if (saveGeneration < 0L
+            || saveGeneration != safSaveGeneration
+            || workflowGeneration < 0L
+            || reportWorkflowController == null
+            || workflowGeneration != reportWorkflowController.generationToken()
+            || sessionGeneration != operationsSessionGeneration
+            || !boundOperationsAccessActive
+            || !java.util.Objects.equals(sessionId, boundOperationsSessionId)
+            || controller == null) {
+            return false;
+        }
+        AdminSecurityController.Snapshot snapshot = controller.snapshot();
+        return snapshot.isAccessSessionActive()
+            && java.util.Objects.equals(sessionId, snapshot.currentSessionId());
+    }
+
+    private void clearPendingSafBinding() {
+        pendingSafSaveGeneration = -1L;
+        pendingSafWorkflowGeneration = -1L;
+        pendingSafSessionGeneration = -1L;
+        pendingSafSessionId = null;
+        pendingSafRequestCode = -1;
+    }
+
+    private int allocateSafRequestCode() {
+        int allocated = nextSafRequestCode;
+        nextSafRequestCode = allocated == LAST_DELIVERY_PACKAGE_DOCUMENT_REQUEST
+            ? CREATE_DELIVERY_PACKAGE_DOCUMENT
+            : allocated + 1;
+        return allocated;
+    }
+
+    private static boolean isSafSaveRequestCode(int requestCode) {
+        return requestCode >= CREATE_DELIVERY_PACKAGE_DOCUMENT
+            && requestCode <= LAST_DELIVERY_PACKAGE_DOCUMENT_REQUEST;
     }
 
     private AdminDeliveryPackageSaver.Destination safDestination(Uri uri) {
@@ -1699,12 +2048,26 @@ public final class AdminBoundaryActivity extends Activity {
     }
 
     private static void setInteractiveEnabled(View view, boolean enabled) {
-        if (view instanceof Button || view instanceof EditText) view.setEnabled(enabled);
+        if (view instanceof Button || view instanceof EditText || view instanceof Spinner || view instanceof CheckBox) {
+            view.setEnabled(enabled);
+        }
         if (view instanceof ViewGroup group) {
             for (int index = 0; index < group.getChildCount(); index++) {
                 setInteractiveEnabled(group.getChildAt(index), enabled);
             }
         }
+    }
+
+    private void rotateDeliveryRecordInputsAfterSuccess() {
+        try {
+            long nextRevision = Long.parseLong(normalized(expectedRevisionInput)) + 1L;
+            expectedRevisionInput.setText(Long.toString(nextRevision));
+        } catch (NumberFormatException ignored) {
+            expectedRevisionInput.setText("0");
+        }
+        idempotencyKeyInput.setText(UUID.randomUUID().toString());
+        observedAtInput.setText(Instant.now().toString());
+        manualDeliveryCompletedInput.setChecked(false);
     }
 
     private String loadOrCreateDeviceId() {
@@ -1721,6 +2084,26 @@ public final class AdminBoundaryActivity extends Activity {
         return label.isEmpty() ? "Android 관리자 기기" : label;
     }
 
+    @SuppressWarnings("deprecation")
+    private static void markAccessibilityHeading(TextView view) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            view.setAccessibilityHeading(true);
+            return;
+        }
+        view.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(
+                View host,
+                AccessibilityNodeInfo info
+            ) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.setCollectionItemInfo(AccessibilityNodeInfo.CollectionItemInfo.obtain(
+                    0, 1, 0, 1, true, false
+                ));
+            }
+        });
+    }
+
     private TextView text(String value, int sizeSp) {
         TextView view = new TextView(this);
         view.setText(value);
@@ -1732,8 +2115,10 @@ public final class AdminBoundaryActivity extends Activity {
     private EditText input(String hint, int inputType, boolean sensitive) {
         EditText view = new EditText(this);
         view.setHint(hint);
+        view.setContentDescription(hint);
         view.setInputType(inputType);
         view.setSingleLine(true);
+        view.setMinHeight(dp(48));
         view.setSaveEnabled(false);
         view.setId(View.NO_ID);
         if (sensitive) view.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
@@ -1744,6 +2129,9 @@ public final class AdminBoundaryActivity extends Activity {
         Button button = new Button(this);
         button.setText(label);
         button.setAllCaps(false);
+        button.setMinHeight(dp(48));
+        button.setMinWidth(dp(48));
+        button.setContentDescription(label);
         return button;
     }
 
@@ -1764,6 +2152,23 @@ public final class AdminBoundaryActivity extends Activity {
         );
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
+        spinner.setMinimumHeight(dp(48));
+        spinner.setContentDescription("선택 항목");
+        spinner.setSaveEnabled(false);
+        return spinner;
+    }
+
+    private Spinner labeledSpinner(String[] labels, String description) {
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+            this,
+            android.R.layout.simple_spinner_item,
+            labels
+        );
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setMinimumHeight(dp(48));
+        spinner.setContentDescription(description);
         spinner.setSaveEnabled(false);
         return spinner;
     }
@@ -1772,8 +2177,21 @@ public final class AdminBoundaryActivity extends Activity {
         CheckBox checkBox = new CheckBox(this);
         checkBox.setText(label);
         checkBox.setTextColor(Color.BLACK);
+        checkBox.setMinHeight(dp(48));
+        checkBox.setContentDescription(label);
         checkBox.setSaveEnabled(false);
         return checkBox;
+    }
+
+    private static void makeReadOnly(EditText input, String description) {
+        input.setKeyListener(null);
+        input.setFocusable(false);
+        input.setLongClickable(false);
+        input.setContentDescription(description);
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private static String normalized(EditText input) {

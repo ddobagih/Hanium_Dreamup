@@ -5,10 +5,12 @@ import android.graphics.Color;
 import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminAuditController;
@@ -32,6 +34,7 @@ public final class AdminAuditPanel extends LinearLayout {
     private final Spinner typeInput;
     private final EditText actorInput;
     private final TextView stateText;
+    private final ProgressBar loadingIndicator;
     private final LinearLayout events;
     private final Button more;
     private final Button retry;
@@ -42,7 +45,7 @@ public final class AdminAuditPanel extends LinearLayout {
         setOrientation(VERTICAL);
         setPadding(0, dp(28), 0, dp(16));
         TextView heading = text("관리자 감사 기록", 21);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) heading.setAccessibilityHeading(true);
+        markAccessibilityHeading(heading);
         addView(heading, matchWrap());
         addView(text("허용된 사건·행위·결과·행위자·리소스·시각·상관 ID만 표시합니다.", 15), matchWrap());
         typeInput = new Spinner(context);
@@ -67,6 +70,11 @@ public final class AdminAuditPanel extends LinearLayout {
         stateText = text("조회 전입니다.", 16);
         stateText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         addView(stateText, matchWrap());
+        loadingIndicator = new ProgressBar(context);
+        loadingIndicator.setIndeterminate(true);
+        loadingIndicator.setContentDescription("감사 기록을 불러오는 중");
+        loadingIndicator.setVisibility(GONE);
+        addView(loadingIndicator, wrapCentered());
         events = new LinearLayout(context);
         events.setOrientation(VERTICAL);
         addView(events, matchWrap());
@@ -95,12 +103,18 @@ public final class AdminAuditPanel extends LinearLayout {
     public void render(AdminAuditController.State state) {
         stateText.setText(switch (state.phase()) {
             case IDLE -> "조회 전입니다.";
-            case LOADING -> "감사 기록을 불러오는 중입니다.";
-            case LOADING_MORE -> "다음 감사 기록을 불러오는 중입니다.";
+            case LOADING -> "감사 기록을 불러오는 중입니다…";
+            case LOADING_MORE -> "다음 감사 기록을 불러오는 중입니다…";
             case CONTENT -> "감사 기록 " + state.items().size() + "건을 표시합니다.";
-            case EMPTY -> "조건에 맞는 감사 기록이 없습니다.";
-            case ERROR -> "오류: " + state.errorMessage();
+            case EMPTY -> "조건에 맞는 감사 기록이 없습니다. 유형을 '모든 감사 유형'으로 바꿔 다시 조회해 보세요.";
+            case ERROR -> "감사 기록을 불러오지 못했습니다. '감사 기록 다시 시도'를 누르세요. " + state.errorMessage();
         });
+        loadingIndicator.setVisibility(
+            state.phase() == AdminAuditController.Phase.LOADING
+                || state.phase() == AdminAuditController.Phase.LOADING_MORE
+                ? VISIBLE
+                : GONE
+        );
         retry.setVisibility(state.phase() == AdminAuditController.Phase.ERROR ? VISIBLE : GONE);
         more.setVisibility(state.canLoadMore() ? VISIBLE : GONE);
         events.removeAllViews();
@@ -133,6 +147,26 @@ public final class AdminAuditPanel extends LinearLayout {
         return button;
     }
 
+    @SuppressWarnings("deprecation")
+    private static void markAccessibilityHeading(TextView view) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            view.setAccessibilityHeading(true);
+            return;
+        }
+        view.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(
+                View host,
+                AccessibilityNodeInfo info
+            ) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.setCollectionItemInfo(AccessibilityNodeInfo.CollectionItemInfo.obtain(
+                    0, 1, 0, 1, true, false
+                ));
+            }
+        });
+    }
+
     private TextView text(String value, int sp) {
         TextView text = new TextView(getContext());
         text.setText(value);
@@ -144,6 +178,15 @@ public final class AdminAuditPanel extends LinearLayout {
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private static LayoutParams matchWrap() {
         return new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    private LayoutParams wrapCentered() {
+        LayoutParams parameters = new LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        parameters.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        return parameters;
     }
 
     private static String typeIcon(String type) {

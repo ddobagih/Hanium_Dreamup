@@ -185,6 +185,20 @@ public final class AdminIncidentController {
         }
     }
 
+    public synchronized void clearSessionState() {
+        generation += 1;
+        retryRequest = null;
+        state = new State(
+            Phase.IDLE,
+            new AdminIncidentModels.Filters(null),
+            AdminJava8Collections.list(),
+            null,
+            null,
+            null,
+            null
+        );
+    }
+
     private synchronized boolean applyPage(Request request, AdminIncidentModels.Page page) {
         if (request.generation != generation) return false;
         if (page == null) return applyFailure(request, false);

@@ -46,6 +46,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import android.util.Size
+import android.util.TypedValue
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -465,6 +466,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var firstRunOnboardingControls: LinearLayout
     private lateinit var firstRunOnboardingStatusText: TextView
     private lateinit var accountAccessControls: LinearLayout
+    private lateinit var accountSignupControls: LinearLayout
     private lateinit var accountAccessStatusText: TextView
     private lateinit var accountEmailInput: EditText
     private lateinit var accountDateOfBirthInput: EditText
@@ -478,6 +480,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var accountCreateButton: Button
     private lateinit var accountLoginButton: Button
     private lateinit var accountSessionLogoutButton: Button
+    private lateinit var accountSignupToggleButton: Button
+    private lateinit var accountConsentDisclosureToggleButton: Button
+    private var accountSignupExpanded = false
+    private var accountConsentDisclosureExpanded = false
     private lateinit var firstRunPurposeButton: Button
     private val firstRunAgeButtons = mutableMapOf<FirstRunAgeBand, Button>()
     private lateinit var firstRunIntegratedConsentDisclosureText: TextView
@@ -551,10 +557,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var firstRunNoticeExpandedByUser = false
     private lateinit var firstRunProgressBar: LinearLayout
     private val firstRunProgressSegments = mutableListOf<View>()
+    private lateinit var privacySectionToggleButton: Button
+    private var privacySectionExpanded = false
     private lateinit var privacyControls: LinearLayout
     private lateinit var privacySettingsControls: LinearLayout
     private lateinit var accountDeletionControls: LinearLayout
+    private lateinit var gatewaySessionControlsToggleButton: Button
+    private var gatewaySessionControlsExpanded = false
     private lateinit var gatewaySessionControls: LinearLayout
+    private lateinit var runtimeDebugControlsToggleButton: Button
+    private lateinit var runtimeDebugControls: LinearLayout
+    private var runtimeDebugControlsExpanded = false
     private lateinit var reportPrivacyConsentButton: Button
     private lateinit var automaticReportConsentButton: Button
     private lateinit var mobileNetworkPreferenceButton: Button
@@ -5721,6 +5734,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 if (transition.accepted) {
                     emailEnrollmentPartial = restored.partial
                     firstRunOnboardingSnapshot = transition.current
+                    accountSignupExpanded = true
                 } else {
                     emailEnrollmentStorageBlocked = !emailEnrollmentStore.clear()
                 }
@@ -6624,6 +6638,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         }
                         emailEnrollmentPartial = partial
                         firstRunOnboardingSnapshot = transition.current
+                        accountSignupExpanded = true
                         accountDateOfBirthInput.text?.clear()
                         applyAccountConsentSelections(selections)
                         updateFirstRunOnboardingUi()
@@ -6704,7 +6719,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             AccountRemoteAction.CREATE_ACCOUNT,
             accountStateBinding(),
         ) ?: return
-        val rememberMe = accountRememberMeCheck.isChecked
+        val rememberMe = false
         updateFirstRunOnboardingUi()
         try {
             gatewaySessionExecutor.execute {
@@ -6981,6 +6996,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             },
         )
         accountAccessNotice = "로그아웃했습니다. 이메일과 비밀번호를 다시 입력해 로그인하세요."
+        accountSignupExpanded = false
+        accountConsentDisclosureExpanded = false
         if (::accountEmailInput.isInitialized) accountEmailInput.text?.clear()
         if (::accountDateOfBirthInput.isInitialized) accountDateOfBirthInput.text?.clear()
         if (::accountPasswordInput.isInitialized) accountPasswordInput.text?.clear()
@@ -10541,6 +10558,28 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun accessibilityTargetSizePx(): Int =
         (48f * resources.displayMetrics.density).roundToInt()
 
+    private fun applyAccessibleControlDefaults(root: View) {
+        if (root is Button || root is EditText || root is CheckBox) {
+            val targetSize = accessibilityTargetSizePx()
+            root.minimumHeight = maxOf(root.minimumHeight, targetSize)
+            root.minimumWidth = maxOf(root.minimumWidth, targetSize)
+            val minimumTextSizePx = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP,
+                MIN_INTERACTIVE_TEXT_SP,
+                resources.displayMetrics,
+            )
+            if (root.textSize < minimumTextSizePx) {
+                root.setTextSize(TypedValue.COMPLEX_UNIT_SP, MIN_INTERACTIVE_TEXT_SP)
+            }
+            root.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
+        if (root is ViewGroup) {
+            for (index in 0 until root.childCount) {
+                applyAccessibleControlDefaults(root.getChildAt(index))
+            }
+        }
+    }
+
     private fun buildContentView(): FrameLayout {
         surfaceView = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
@@ -10673,8 +10712,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = (WS_SECTION_GAP_DP * density).roundToInt() }
-            repeat(FIRST_RUN_STAGE_COUNT) { index ->
+            ).apply { topMargin = (WS_TITLE_GAP_DP * density).roundToInt() }
+            repeat(firstRunStageCount(firstRunOnboardingSnapshot)) { index ->
                 val segment = View(this@MainActivity).apply {
                     layoutParams = LinearLayout.LayoutParams(
                         0,
@@ -10692,17 +10731,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         firstRunOnboardingStatusText = TextView(this).apply {
             id = View.generateViewId()
             text = "첫 실행 등록 상태를 확인하는 중입니다."
-            textSize = 22f
+            textSize = 20f
             setTypeface(typeface, Typeface.NORMAL)
             setTextColor(0xffffe8bd.toInt())
             letterSpacing = 0.0f
-            setLineSpacing(0f, 1.35f)
+            setLineSpacing(0f, 1.2f)
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply {
-                topMargin = (WS_SECTION_GAP_DP * resources.displayMetrics.density).roundToInt()
-                bottomMargin = (WS_TITLE_GAP_DP * resources.displayMetrics.density).roundToInt()
+                topMargin = (WS_TITLE_GAP_DP * resources.displayMetrics.density).roundToInt()
+                bottomMargin = (WS_GROUP_GAP_DP * resources.displayMetrics.density).roundToInt()
             }
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -10970,23 +11009,77 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             label = "현재 계정 로그아웃",
             onClick = ::onAccountLogoutClicked,
         )
+        accountSignupToggleButton = accessiblePriorityUserButton(
+            label = "새 계정 만들기",
+            spokenLabel = "새 계정 만들기, 가입 입력 펼치기",
+            onClick = {
+                accountSignupExpanded = !accountSignupExpanded
+                accountRememberMeCheck.isChecked = false
+                updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
+                if (accountSignupExpanded) {
+                    val focusTarget =
+                        if (
+                            firstRunOnboardingSnapshot.stage ==
+                            FirstRunOnboardingStage.ACCOUNT_CREATED
+                        ) {
+                            accountPasswordInput
+                        } else {
+                            accountDateOfBirthInput
+                        }
+                    focusTarget.post {
+                        focusTarget.requestFocus()
+                        focusTarget.performAccessibilityAction(
+                            android.view.accessibility.AccessibilityNodeInfo
+                                .ACTION_ACCESSIBILITY_FOCUS,
+                            null,
+                        )
+                    }
+                }
+            },
+        )
+        accountConsentDisclosureToggleButton = accessiblePriorityUserButton(
+            label = "가입 동의 자세히 보기",
+            spokenLabel = "가입 동의 자세히 보기, 접힘",
+            onClick = {
+                accountConsentDisclosureExpanded = !accountConsentDisclosureExpanded
+                updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
+                if (accountConsentDisclosureExpanded) {
+                    accountConsentDisclosureText.post {
+                        accountConsentDisclosureText.requestFocus()
+                        accountConsentDisclosureText.performAccessibilityAction(
+                            android.view.accessibility.AccessibilityNodeInfo
+                                .ACTION_ACCESSIBILITY_FOCUS,
+                            null,
+                        )
+                    }
+                }
+            },
+        )
+        accountSignupControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(accountDateOfBirthInput)
+            addView(accountConsentDisclosureToggleButton)
+            addView(accountConsentDisclosureText)
+            SIGNUP_DOCUMENT_VERSIONS.keys.forEach { key ->
+                addView(accountConsentChecks.getValue(key))
+            }
+            addView(accountRequestOtpButton)
+            addView(accountPasswordConfirmationInput)
+            addView(accountOtpInput)
+            addView(accountCreateButton)
+        }
         accountAccessControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             addView(accountAccessStatusText)
             addView(accountEmailInput)
-            addView(accountDateOfBirthInput)
             addView(accountPasswordInput)
-            addView(accountPasswordConfirmationInput)
-            addView(accountOtpInput)
-            addView(accountConsentDisclosureText)
-            SIGNUP_DOCUMENT_VERSIONS.keys.forEach { key ->
-                addView(accountConsentChecks.getValue(key))
-            }
             addView(accountRememberMeCheck)
-            addView(accountRequestOtpButton)
-            addView(accountCreateButton)
             addView(accountLoginButton)
+            addView(accountSignupToggleButton)
+            addView(accountSignupControls)
             addView(accountSessionLogoutButton)
         }
         emailEnrollmentPartial?.selections?.let(::applyAccountConsentSelections)
@@ -11647,8 +11740,50 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         updateProgressBeepButtons()
 
+        privacySectionToggleButton = accessiblePriorityUserButton(
+            label = "설정과 개인정보 펼치기",
+            spokenLabel = "설정과 개인정보, 접힘. 두 번 탭하여 펼치기",
+            onClick = {
+                privacySectionExpanded = !privacySectionExpanded
+                updatePrivacySectionVisibility()
+                if (privacySectionExpanded && privacySettingsControls.visibility == View.VISIBLE) {
+                    privacyConsentStatusText.post {
+                        privacyConsentStatusText.requestFocus()
+                        privacyConsentStatusText.performAccessibilityAction(
+                            android.view.accessibility.AccessibilityNodeInfo
+                                .ACTION_ACCESSIBILITY_FOCUS,
+                            null,
+                        )
+                    }
+                }
+            },
+        )
+        ViewCompat.setAccessibilityHeading(privacySectionToggleButton, true)
+        gatewaySessionControlsToggleButton = accessiblePriorityUserButton(
+            label = "개발자용 Gateway 설정 펼치기",
+            spokenLabel = "개발자용 Gateway 설정, 접힘. 두 번 탭하여 펼치기",
+            onClick = {
+                gatewaySessionControlsExpanded = !gatewaySessionControlsExpanded
+                updatePrivacySectionVisibility()
+                if (
+                    gatewaySessionControlsExpanded &&
+                    BuildConfig.DEBUG &&
+                    ::backendUrlInput.isInitialized
+                ) {
+                    backendUrlInput.post {
+                        backendUrlInput.requestFocus()
+                        backendUrlInput.performAccessibilityAction(
+                            android.view.accessibility.AccessibilityNodeInfo
+                                .ACTION_ACCESSIBILITY_FOCUS,
+                            null,
+                        )
+                    }
+                }
+            },
+        )
         privacyControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
             privacySettingsControls = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(privacyConsentStatusText)
@@ -11673,6 +11808,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             gatewaySessionControls = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
+                visibility = View.GONE
                 if (BuildConfig.DEBUG) {
                     addView(backendUrlInput)
                 }
@@ -11681,7 +11817,26 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             addView(privacySettingsControls)
             addView(accountDeletionControls)
+            addView(gatewaySessionControlsToggleButton)
             addView(gatewaySessionControls)
+        }
+        runtimeDebugControlsToggleButton = accessiblePriorityUserButton(
+            label = "개발자 도구 펼치기",
+            spokenLabel = "개발자 도구, 접힘. 두 번 탭하여 펼치기",
+            onClick = {
+                runtimeDebugControlsExpanded = !runtimeDebugControlsExpanded
+                updateRuntimeDebugControlsVisibility()
+            },
+        )
+        runtimeDebugControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            if (BuildConfig.DEBUG) {
+                addView(debugUploadButton)
+                addView(debugFrameCaptureButton)
+                addView(destinationLatInput)
+                addView(destinationLngInput)
+            }
         }
         runtimeControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -11690,10 +11845,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(navigationStatusText)
             addView(routeDeviationActions)
             addView(actionButton)
-            if (BuildConfig.DEBUG) {
-                addView(debugUploadButton)
-                addView(debugFrameCaptureButton)
-            }
             addView(explicitReportButton)
             addView(gatewayVoiceStatusText)
             addView(voiceReportButton)
@@ -11703,8 +11854,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(destinationSearchResultsContainer)
             addView(destinationMoreButton)
             if (BuildConfig.DEBUG) {
-                addView(destinationLatInput)
-                addView(destinationLngInput)
+                addView(runtimeDebugControlsToggleButton)
+                addView(runtimeDebugControls)
             }
             addView(routeButton)
             addView(destinationResetButton)
@@ -11713,11 +11864,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val overlayBottomPaddingPx =
             (OVERLAY_BOTTOM_PADDING_DP * resources.displayMetrics.density).toInt()
+        val overlayHorizontalPaddingPx =
+            (OVERLAY_HORIZONTAL_PADDING_DP * resources.displayMetrics.density).roundToInt()
+        val overlayTopPaddingPx =
+            (OVERLAY_TOP_PADDING_DP * resources.displayMetrics.density).roundToInt()
         val overlay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.START
-            setPadding(32, 48, 32, overlayBottomPaddingPx)
-            setBackgroundColor(0x66000000)
+            setPadding(
+                overlayHorizontalPaddingPx,
+                overlayTopPaddingPx,
+                overlayHorizontalPaddingPx,
+                overlayBottomPaddingPx,
+            )
+            setBackgroundColor(WS_COLOR_OVERLAY_FILL)
             addView(productPurposeText)
             addView(firstRunNoticeToggleButton)
             addView(permissionDenialPanel)
@@ -11735,20 +11895,28 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (BuildConfig.DEBUG) {
                 addView(fieldSessionLogButton)
             }
+            addView(privacySectionToggleButton)
             addView(privacyControls)
             addView(runtimeControls)
         }
+        applyAccessibleControlDefaults(overlay)
         walkSafetyOverlay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.START
-            setPadding(32, 48, 32, overlayBottomPaddingPx)
-            setBackgroundColor(0x66000000)
+            setPadding(
+                overlayHorizontalPaddingPx,
+                overlayTopPaddingPx,
+                overlayHorizontalPaddingPx,
+                overlayBottomPaddingPx,
+            )
+            setBackgroundColor(WS_COLOR_WALK_OVERLAY_FILL)
             visibility = View.GONE
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             addView(safetySummaryText)
             addView(walkSafetyVoiceStatusText)
             addView(walkSafetyVoiceButton)
         }
+        applyAccessibleControlDefaults(walkSafetyOverlay)
         walkSafetyScroll = ScrollView(this).apply {
             isFillViewport = true
             isVerticalScrollBarEnabled = true
@@ -11790,9 +11958,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     /**
-     * 안전 고지는 1단계에서 전문이 펼쳐진 채로 확인 버튼보다 앞에 온다. 순서 자체가
-     * 게이트이므로 스크롤 위치 같은 시각 전용 조건은 걸지 않는다. 사용자가 확인한 뒤에는
-     * 접히되 삭제되지 않고, 접힌 줄은 정책 상수를 그대로 발췌한다.
+     * 안전 고지는 목적·안전 확인 단계에서 확인 버튼보다 앞에 전문으로 보인다.
+     * 확인 뒤에는 큰 글꼴에서 현재 행동을 가리지 않도록 카드를 숨기고, 정책 상수를
+     * TalkBack 설명에 그대로 담은 펼침 버튼만 남긴다.
      */
     /**
      * 단계 문장 앞머리("첫 실행 N단계.")는 eyebrow 로 작고 흐리게, 나머지는 제목으로
@@ -11870,17 +12038,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             firstRunOnboardingSnapshot.stage != FirstRunOnboardingStage.PURPOSE_AND_SAFETY
         val expanded = !acknowledged || firstRunNoticeExpandedByUser
         val version = "앱 버전: ${BuildConfig.VERSION_NAME}"
-        applyNoticeHeadingStyle(
-            if (expanded) {
-                "$WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO\n$version"
-            } else {
-                "안전 제한: $WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO"
-            },
-        )
+        if (expanded) applyNoticeHeadingStyle("$WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO\n$version")
+        productPurposeText.visibility = if (expanded) View.VISIBLE else View.GONE
         firstRunNoticeToggleButton.visibility = if (acknowledged) View.VISIBLE else View.GONE
         firstRunNoticeToggleButton.text =
-            if (expanded) "안전 고지 접기" else "안전 고지 다시 보기"
-        firstRunNoticeToggleButton.contentDescription = firstRunNoticeToggleButton.text
+            if (expanded) {
+                "안전 고지 접기"
+            } else {
+                "안전 보장·보조수단 대체 아님 · 자세히 보기"
+            }
+        firstRunNoticeToggleButton.contentDescription =
+            if (expanded) {
+                "안전 고지, 펼침. 두 번 탭하여 접기"
+            } else {
+                "안전 제한. $WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO 두 번 탭하여 전체 안전 고지 보기"
+            }
     }
 
     private fun linkFirstRunAccessibilityTraversal() {
@@ -11890,17 +12062,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             add(firstRunOnboardingStatusText)
             add(accountAccessStatusText)
             add(accountEmailInput)
-            add(accountDateOfBirthInput)
             add(accountPasswordInput)
-            add(accountPasswordConfirmationInput)
-            add(accountOtpInput)
+            add(accountRememberMeCheck)
+            add(accountLoginButton)
+            add(accountSignupToggleButton)
+            add(accountDateOfBirthInput)
+            add(accountConsentDisclosureToggleButton)
+            add(accountConsentDisclosureText)
             SIGNUP_DOCUMENT_VERSIONS.keys.forEach { key ->
                 add(accountConsentChecks.getValue(key))
             }
-            add(accountRememberMeCheck)
             add(accountRequestOtpButton)
+            add(accountPasswordConfirmationInput)
+            add(accountOtpInput)
             add(accountCreateButton)
-            add(accountLoginButton)
             add(accountSessionLogoutButton)
             add(firstRunPurposeButton)
             listOf(
@@ -11995,11 +12170,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         FirstRunOnboardingStage.BLOCKED_UNDER_14 -> 2
         }
 
+    private fun firstRunStageCount(snapshot: FirstRunOnboardingSnapshot): Int =
+        if (snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4) {
+            EMAIL_FIRST_RUN_STAGE_COUNT
+        } else {
+            FIRST_RUN_STAGE_COUNT
+        }
+
     private fun updatePrivacySectionVisibility() {
         if (
+            !::privacySectionToggleButton.isInitialized ||
             !::privacyControls.isInitialized ||
             !::privacySettingsControls.isInitialized ||
             !::accountDeletionControls.isInitialized ||
+            !::gatewaySessionControlsToggleButton.isInitialized ||
             !::gatewaySessionControls.isInitialized
         ) return
         val deletionRecoverySurface =
@@ -12007,9 +12191,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 GatewaySessionProcessCoordinator.snapshot().deletionRecoveryOnly
         val onboardingCompleted =
             ::firstRunOnboardingSnapshot.isInitialized && firstRunOnboardingSnapshot.isComplete
-        privacyControls.visibility = View.VISIBLE
+        val privacyAvailable = onboardingCompleted
+        val settingsAvailable = firstRunOnboardingComplete()
+        val forceExpanded = deletionRecoverySurface || accountDeletionStateMachine.processingBlocked()
+        val privacyExpanded = forceExpanded || (privacyAvailable && privacySectionExpanded)
+        privacySectionToggleButton.visibility =
+            if (privacyAvailable && !forceExpanded) View.VISIBLE else View.GONE
+        privacySectionToggleButton.text =
+            if (privacyExpanded) "설정과 개인정보 접기" else "설정과 개인정보 펼치기"
+        privacySectionToggleButton.contentDescription =
+            if (privacyExpanded) {
+                "설정과 개인정보, 펼침. 두 번 탭하여 접기"
+            } else {
+                "설정과 개인정보, 접힘. 두 번 탭하여 펼치기"
+            }
+        privacyControls.visibility = if (privacyExpanded) View.VISIBLE else View.GONE
         privacySettingsControls.visibility =
-            if (firstRunOnboardingComplete()) View.VISIBLE else View.GONE
+            if (settingsAvailable) View.VISIBLE else View.GONE
         accountDeletionControls.visibility =
             if (
                 onboardingCompleted ||
@@ -12020,8 +12218,60 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             } else {
                 View.GONE
             }
+        gatewaySessionControlsToggleButton.visibility =
+            if (BuildConfig.DEBUG && privacyExpanded && !deletionRecoverySurface) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
+        gatewaySessionControlsToggleButton.text =
+            if (gatewaySessionControlsExpanded) {
+                "개발자용 Gateway 설정 접기"
+            } else {
+                "개발자용 Gateway 설정 펼치기"
+            }
+        gatewaySessionControlsToggleButton.contentDescription =
+            if (gatewaySessionControlsExpanded) {
+                "개발자용 Gateway 설정, 펼침. 두 번 탭하여 접기"
+            } else {
+                "개발자용 Gateway 설정, 접힘. 두 번 탭하여 펼치기"
+            }
         gatewaySessionControls.visibility =
-            if (BuildConfig.DEBUG || deletionRecoverySurface) View.VISIBLE else View.GONE
+            if (
+                deletionRecoverySurface ||
+                (BuildConfig.DEBUG && privacyExpanded && gatewaySessionControlsExpanded)
+            ) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
+    }
+
+    private fun updateRuntimeDebugControlsVisibility() {
+        if (
+            !::runtimeDebugControlsToggleButton.isInitialized ||
+            !::runtimeDebugControls.isInitialized
+        ) return
+        val expanded = BuildConfig.DEBUG && runtimeDebugControlsExpanded
+        runtimeDebugControls.visibility = if (expanded) View.VISIBLE else View.GONE
+        runtimeDebugControlsToggleButton.text =
+            if (expanded) "개발자 도구 접기" else "개발자 도구 펼치기"
+        runtimeDebugControlsToggleButton.contentDescription =
+            if (expanded) {
+                "개발자 도구, 펼침. 두 번 탭하여 접기"
+            } else {
+                "개발자 도구, 접힘. 두 번 탭하여 펼치기"
+            }
+        if (expanded) {
+            debugUploadButton.post {
+                debugUploadButton.requestFocus()
+                debugUploadButton.performAccessibilityAction(
+                    android.view.accessibility.AccessibilityNodeInfo
+                        .ACTION_ACCESSIBILITY_FOCUS,
+                    null,
+                )
+            }
+        }
     }
 
     private fun firstRunDeviceCheckAllowsPreflight(): Boolean =
@@ -12861,7 +13111,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun updateEmailAccountAccessUi(snapshot: FirstRunOnboardingSnapshot) {
-        if (!::accountAccessControls.isInitialized) return
+        if (!::accountAccessControls.isInitialized || !::accountSignupControls.isInitialized) return
         val emailFlow = snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4
         val accountStage = snapshot.stage in setOf(
             FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT,
@@ -12876,44 +13126,82 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountSessionLogoutButton.visibility = if (authenticated) View.VISIBLE else View.GONE
         if (authenticated) {
             accountEmailInput.visibility = View.GONE
-            accountDateOfBirthInput.visibility = View.GONE
             accountPasswordInput.visibility = View.GONE
-            accountPasswordConfirmationInput.visibility = View.GONE
-            accountOtpInput.visibility = View.GONE
-            accountConsentDisclosureText.visibility = View.GONE
-            accountConsentChecks.values.forEach { it.visibility = View.GONE }
             accountRememberMeCheck.visibility = View.GONE
-            accountRequestOtpButton.visibility = View.GONE
-            accountCreateButton.visibility = View.GONE
             accountLoginButton.visibility = View.GONE
+            accountSignupToggleButton.visibility = View.GONE
+            accountSignupControls.visibility = View.GONE
             val authenticatedStatus =
-                "이메일 계정으로 로그인했습니다. 권한·기기점검·안전교육 완료 전에는 보행 기능이 열리지 않습니다."
+                "로그인했습니다. 다음 단계가 끝날 때까지 보행 기능은 잠깁니다."
             accountAccessStatusText.text = authenticatedStatus
             accountAccessStatusText.contentDescription = authenticatedStatus
             return
         }
         accountEmailInput.visibility = View.VISIBLE
         accountPasswordInput.visibility = View.VISIBLE
-        accountRememberMeCheck.visibility = View.VISIBLE
         val creating = snapshot.stage == FirstRunOnboardingStage.ACCOUNT_CREATED
+        val verifiedLogin = snapshot.stage == FirstRunOnboardingStage.VERIFIED_LOGIN
+        if (verifiedLogin) accountSignupExpanded = false
+        val signupVisible = accountSignupExpanded && !verifiedLogin
         val busy = accountRequestFence.isInFlight()
+        accountRememberMeCheck.visibility = if (signupVisible) View.GONE else View.VISIBLE
+        accountLoginButton.visibility = if (signupVisible) View.GONE else View.VISIBLE
+        accountSignupToggleButton.visibility =
+            if (verifiedLogin) View.GONE else View.VISIBLE
+        accountSignupToggleButton.text =
+            when {
+                signupVisible -> "로그인 화면으로 돌아가기"
+                creating -> "계정 만들기 계속"
+                else -> "새 계정 만들기"
+            }
+        accountSignupToggleButton.contentDescription =
+            when {
+                signupVisible ->
+                    "로그인 화면으로 돌아가기. 두 번 탭하여 가입 입력 접기"
+                creating ->
+                    "계정 만들기 계속, 가입 입력 접힘. 두 번 탭하여 펼치기"
+                else ->
+                    "새 계정 만들기, 가입 입력 접힘. 두 번 탭하여 펼치기"
+            }
+        accountSignupControls.visibility =
+            if (signupVisible && !verifiedLogin) View.VISIBLE else View.GONE
         accountDateOfBirthInput.visibility =
-            if (snapshot.stage == FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT) {
+            if (signupVisible && !creating && !verifiedLogin) {
                 View.VISIBLE
             } else {
                 View.GONE
             }
-        accountPasswordConfirmationInput.visibility = if (creating) View.VISIBLE else View.GONE
-        accountOtpInput.visibility = if (creating) View.VISIBLE else View.GONE
+        accountPasswordConfirmationInput.visibility =
+            if (creating && signupVisible) View.VISIBLE else View.GONE
+        accountOtpInput.visibility = if (creating && signupVisible) View.VISIBLE else View.GONE
+        accountConsentDisclosureToggleButton.visibility =
+            if (signupVisible && !creating && !verifiedLogin) View.VISIBLE else View.GONE
+        accountConsentDisclosureToggleButton.text =
+            if (accountConsentDisclosureExpanded) {
+                "가입 동의 자세히 접기"
+            } else {
+                "가입 동의 자세히 보기"
+            }
+        accountConsentDisclosureToggleButton.contentDescription =
+            if (accountConsentDisclosureExpanded) {
+                "가입 동의 자세히 보기, 펼침. 두 번 탭하여 접기"
+            } else {
+                "가입 동의 자세히 보기, 접힘. 두 번 탭하여 펼치기"
+            }
         accountConsentDisclosureText.visibility =
-            if (snapshot.stage != FirstRunOnboardingStage.VERIFIED_LOGIN) {
+            if (
+                signupVisible &&
+                !creating &&
+                !verifiedLogin &&
+                accountConsentDisclosureExpanded
+            ) {
                 View.VISIBLE
             } else {
                 View.GONE
             }
         accountConsentChecks.values.forEach { check ->
             check.visibility =
-                if (snapshot.stage != FirstRunOnboardingStage.VERIFIED_LOGIN) {
+                if (signupVisible && !creating && !verifiedLogin) {
                     View.VISIBLE
                 } else {
                     View.GONE
@@ -12921,13 +13209,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             check.isEnabled = !busy
         }
         accountRequestOtpButton.visibility =
-            if (snapshot.stage == FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT) {
+            if (
+                signupVisible &&
+                snapshot.stage == FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT
+            ) {
                 View.VISIBLE
             } else {
                 View.GONE
             }
-        accountCreateButton.visibility = if (creating) View.VISIBLE else View.GONE
-        accountLoginButton.visibility = View.VISIBLE
+        accountCreateButton.visibility =
+            if (creating && signupVisible) View.VISIBLE else View.GONE
         accountSessionLogoutButton.visibility = View.GONE
         accountRequestOtpButton.isEnabled = !busy && !emailEnrollmentStorageBlocked
         accountCreateButton.isEnabled = !busy && !emailEnrollmentStorageBlocked
@@ -12944,12 +13235,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             accountAccessNotice != null -> requireNotNull(accountAccessNotice)
             emailEnrollmentStorageBlocked ->
                 "가입 임시 상태를 안전하게 저장할 수 없습니다. 기존 계정 로그인만 가능합니다."
-            creating && partial != null ->
+            signupVisible && creating && partial != null ->
                 "인증번호가 발송되었습니다. 이메일·비밀번호·인증번호를 다시 확인하세요."
             snapshot.stage == FirstRunOnboardingStage.VERIFIED_LOGIN ->
                 "계정이 생성되었습니다. 같은 이메일과 비밀번호로 로그인하세요."
+            accountSignupExpanded ->
+                "가입 정보를 입력하고 인증번호를 받으세요."
             else ->
-                "새 계정은 필수 약관 세 가지를 확인한 뒤 인증번호를 받으세요. 기존 계정은 바로 로그인할 수 있습니다."
+                "이메일과 비밀번호를 입력하세요."
         }
         accountAccessStatusText.text = status
         accountAccessStatusText.contentDescription = status
@@ -12962,41 +13255,47 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ) return
         val snapshot = firstRunOnboardingSnapshot
         val stageNumber = firstRunStageNumber(snapshot)
+        val stageCount = firstRunStageCount(snapshot)
         val message = when (snapshot.stage) {
             FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT ->
-                "첫 실행 $stageNumber/6단계. 이메일과 생년월일로 가입하거나 기존 계정으로 로그인하세요."
+                "첫 실행 $stageNumber/${stageCount}단계. 로그인하거나 새 계정을 만드세요."
             FirstRunOnboardingStage.ACCOUNT_CREATED ->
-                "첫 실행 $stageNumber/6단계. 이메일 인증번호와 새 비밀번호를 입력해 계정을 만드세요."
+                "첫 실행 $stageNumber/${stageCount}단계. 인증번호를 입력해 계정을 만드세요."
             FirstRunOnboardingStage.PURPOSE_AND_SAFETY ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. WalkSafe의 목적과 안전 한계를 읽고 확인하세요."
+                "첫 실행 $stageNumber/${stageCount}단계. 서비스 목적과 안전 한계를 확인하세요."
             FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 정확한 생년월일을 저장하지 않고 연령 구간만 확인합니다."
+                "첫 실행 $stageNumber/${stageCount}단계. 연령 구간을 확인하세요."
             FirstRunOnboardingStage.INTEGRATED_CONSENT ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 네 가지 동의 항목을 각각 허용하거나 거부한 뒤 서버 저장 확인을 완료하세요."
+                "첫 실행 $stageNumber/${stageCount}단계. 필수·선택 동의를 확인하세요."
             FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 비밀번호나 전화번호를 앱에 저장하지 않고 운영 공급자의 불투명 제출 증거만 허용합니다."
+                "첫 실행 $stageNumber/${stageCount}단계. 본인 확인 제출 상태를 확인하세요."
             FirstRunOnboardingStage.VERIFIED_SMS ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 운영 SMS 검증 증거를 기다립니다."
+                "첫 실행 $stageNumber/${stageCount}단계. 인증 확인을 기다리는 중입니다."
             FirstRunOnboardingStage.GUARDIAN_APPROVAL ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 미성년 사용자에게 필요한 보호자 확인 증거를 기다립니다."
+                "첫 실행 $stageNumber/${stageCount}단계. 보호자 확인을 기다리는 중입니다."
             FirstRunOnboardingStage.ACCOUNT_ACTIVATION ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 운영 계정 활성화 증거를 기다립니다."
+                "첫 실행 $stageNumber/${stageCount}단계. 계정 활성화를 기다리는 중입니다."
             FirstRunOnboardingStage.VERIFIED_LOGIN ->
                 if (snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4) {
-                    "첫 실행 $stageNumber/6단계. 만든 계정의 이메일과 비밀번호로 로그인하세요."
+                    "첫 실행 $stageNumber/${stageCount}단계. 만든 계정으로 로그인하세요."
                 } else {
-                    "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 검증된 로그인 증거를 기다립니다."
+                    "첫 실행 $stageNumber/${stageCount}단계. 로그인 확인을 기다리는 중입니다."
                 }
             FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 기능 사용 직전에 현재 운영체제 권한 상태를 확인합니다."
+                "첫 실행 $stageNumber/${stageCount}단계. 필요한 권한을 확인하세요."
             FirstRunOnboardingStage.DEVICE_CHECK ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 보행 출력 없이 격리된 기기 기능 점검만 진행할 수 있습니다."
+                "첫 실행 $stageNumber/${stageCount}단계. 기기 기능을 점검하세요."
             FirstRunOnboardingStage.FP004_TRAINING ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 기존 최초 보행 전 안전교육과 네 가지 조작 연습을 완료하세요."
+                "첫 실행 $stageNumber/${stageCount}단계. 안전교육과 조작 연습을 완료하세요."
             FirstRunOnboardingStage.COMPLETE ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계 완료. 현재 권한과 안전 상태를 다시 확인한 뒤 보행 기능을 사용할 수 있습니다."
+                if (firstRunOnboardingComplete()) {
+                    "첫 실행 $stageNumber/${stageCount}단계 완료. 첫 설정을 완료했습니다."
+                } else {
+                    "첫 실행 $stageNumber/${stageCount}단계 완료 기록은 있으나 " +
+                        "현재 권한·안전 상태 재확인이 필요합니다. 기능은 잠겨 있습니다."
+                }
             FirstRunOnboardingStage.BLOCKED_UNDER_14 ->
-                "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. 가입 차단. 만 14세 미만은 계정을 만들거나 WalkSafe 보행 기능을 사용할 수 없습니다."
+                "첫 실행 $stageNumber/${stageCount}단계. 만 14세 미만은 가입할 수 없습니다."
         }
         firstRunOnboardingStatusText.text = message
         firstRunOnboardingStatusText.contentDescription = message
@@ -22970,7 +23269,7 @@ generation != cameraFallbackGeneration
             destinationSearchResultsContainer.addView(
                 TextView(this).apply {
                     text = if (destinationSearchQuery.isBlank()) "검색어를 입력하세요." else "검색 결과 없음"
-                    textSize = 12f
+                    textSize = MIN_INTERACTIVE_TEXT_SP
                     setTextColor(0xffd7d7ff.toInt())
                 },
             )
@@ -22981,7 +23280,9 @@ generation != cameraFallbackGeneration
             destinationSearchResultsContainer.addView(
                 Button(this).apply {
                     text = "${result.name} · ${result.address ?: "주소 없음"} · ${formatDestinationDistance(result.distanceM)}"
-                    textSize = 11f
+                    textSize = MIN_INTERACTIVE_TEXT_SP
+                    minimumHeight = accessibilityTargetSizePx()
+                    minimumWidth = accessibilityTargetSizePx()
                     setOnClickListener {
                         onDestinationSelected(result)
                     }
@@ -24695,7 +24996,7 @@ generation != cameraFallbackGeneration
         const val WS_COLOR_BUTTON_FOCUSED_FILL = 0xff765d00.toInt()
         const val WS_COLOR_BUTTON_DISABLED_FILL = 0xff2f2e31.toInt()
         const val WS_COLOR_BUTTON_DISABLED_TEXT = 0xffaaa7a2.toInt()
-        /** 상시 안전 고지. 카드 위 10.81:1 로 AAA 를 유지하면서 순백보다 한 단계 뒤로 물린다. */
+        /** 펼쳐진 안전 고지. 카드 위 10.81:1 로 AAA 를 유지한다. */
         const val WS_COLOR_NOTICE_TEXT = 0xffc9c6c0.toInt()
         const val WS_COLOR_NOTICE_FILL = 0xff141414.toInt()
         const val WS_COLOR_LINE = 0xff6e6d70.toInt()
@@ -24704,14 +25005,20 @@ generation != cameraFallbackGeneration
         const val WS_TOUCH_PRIMARY_DP = 56f
         const val WS_CORNER_RADIUS_DP = 10f
         const val FIRST_RUN_STAGE_COUNT = 12
+        const val EMAIL_FIRST_RUN_STAGE_COUNT = 6
         const val WS_SECTION_GAP_DP = 24f
         /** 같은 그룹의 버튼 사이. 섹션 간격보다 좁아야 덩어리로 읽힌다. */
         const val WS_GROUP_GAP_DP = 8f
         /** 제목과 첫 컨트롤 사이. */
         const val WS_TITLE_GAP_DP = 16f
         const val WS_CONTROL_GAP_DP = 12f
+        const val MIN_INTERACTIVE_TEXT_SP = 16f
 
         const val OVERLAY_BOTTOM_PADDING_DP = 24f
+        const val OVERLAY_HORIZONTAL_PADDING_DP = 20f
+        const val OVERLAY_TOP_PADDING_DP = 24f
+        const val WS_COLOR_OVERLAY_FILL = 0xee101010.toInt()
+        const val WS_COLOR_WALK_OVERLAY_FILL = 0xdd000000.toInt()
 
         val PRIVACY_STARTUP_PROCESS_LOCK = Any()
         var accountDeletionStartupResetHandoffPending = false

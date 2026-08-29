@@ -127,6 +127,22 @@ public final class AdminSecurityControllerTest {
     }
 
     @Test
+    public void safSaveRefreshRejectsRemotelyRevokedCurrentSession() throws Exception {
+        FakeApi api = new FakeApi();
+        AdminSecurityController controller = new AdminSecurityController(api);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertTrue(controller.refreshAndValidateSafSaveSession(CURRENT_SESSION_ID));
+
+        api.omitCurrentSession = true;
+        assertThrows(IOException.class, () ->
+            controller.refreshAndValidateSafSaveSession(CURRENT_SESSION_ID)
+        );
+        assertEquals(AdminSecurityState.FAIL_CLOSED, controller.snapshot().securityState());
+        assertTrue(controller.snapshot().sessions().isEmpty());
+    }
+
+    @Test
     public void malformedRemoteSecurityTimestampsFailClosedAtTheControllerBoundary() {
         FakeApi observedAt = new FakeApi();
         observedAt.observedAt = "2026-07-22T00:00:00";
@@ -504,6 +520,7 @@ public final class AdminSecurityControllerTest {
         RecoveryMaterialKind attestedMaterialKind;
         RecoveryStorageLocation attestedStorageLocation;
         boolean separateEncryptedBackupConfirmed;
+        boolean omitCurrentSession;
         int clearLocalBindingCount;
 
         @Override
@@ -524,11 +541,13 @@ public final class AdminSecurityControllerTest {
 
         @Override
         public DeviceInventory getDeviceInventory(String accessToken) {
+            List<SessionInfo> sessions = new ArrayList<>();
+            if (!omitCurrentSession) {
+                sessions.add(session(CURRENT_SESSION_ID, DEVICE_ID, true, sessionLastSeenAt));
+            }
+            sessions.add(session(OTHER_SESSION_ID, OTHER_DEVICE_ID, false, sessionLastSeenAt));
             return new DeviceInventory(
-                List.of(
-                    session(CURRENT_SESSION_ID, DEVICE_ID, true, sessionLastSeenAt),
-                    session(OTHER_SESSION_ID, OTHER_DEVICE_ID, false, sessionLastSeenAt)
-                ),
+                sessions,
                 List.of(
                     new DeviceInfo(DEVICE_ID, true),
                     new DeviceInfo(OTHER_DEVICE_ID, false),

@@ -7,10 +7,12 @@ import android.os.Build;
 import android.text.InputType;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import java.util.ArrayList;
@@ -70,6 +72,7 @@ public final class AdminReportRequestPanel extends LinearLayout {
     private final Spinner requestTypeInput;
     private final Spinner statusInput;
     private final TextView stateText;
+    private final ProgressBar loadingIndicator;
     private final LinearLayout listContainer;
     private final LinearLayout detailContainer;
     private final Button loadMoreButton;
@@ -94,7 +97,7 @@ public final class AdminReportRequestPanel extends LinearLayout {
         setPadding(0, dp(24), 0, dp(16));
 
         TextView heading = text("사용자 요청", 21);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) heading.setAccessibilityHeading(true);
+        markAccessibilityHeading(heading);
         addView(heading, matchWrap());
         addView(text(
             "사용자가 신고 내용 정정 또는 삭제를 요청한 내역입니다. 여기서 실제 신고를 즉시 수정·삭제하거나 기관에 자동 전송하지 않습니다.",
@@ -115,6 +118,11 @@ public final class AdminReportRequestPanel extends LinearLayout {
         stateText.setPadding(0, dp(12), 0, dp(8));
         stateText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         addView(stateText, matchWrap());
+        loadingIndicator = new ProgressBar(context);
+        loadingIndicator.setIndeterminate(true);
+        loadingIndicator.setContentDescription("사용자 요청을 불러오는 중");
+        loadingIndicator.setVisibility(GONE);
+        addView(loadingIndicator, wrapCentered());
         listContainer = verticalGroup();
         addView(listContainer, matchWrap());
         loadMoreButton = button(
@@ -206,6 +214,7 @@ public final class AdminReportRequestPanel extends LinearLayout {
                 || state.phase() == AdminReportRequestController.Phase.UPDATED_DETAIL_STALE
                 ? VISIBLE : GONE
         );
+        loadingIndicator.setVisibility(isLoading(state.phase()) ? VISIBLE : GONE);
         loadMoreButton.setVisibility(state.canLoadMore() ? VISIBLE : GONE);
         boolean mutating = state.phase() == AdminReportRequestController.Phase.MUTATING;
         loadMoreButton.setEnabled(!mutating);
@@ -231,6 +240,14 @@ public final class AdminReportRequestPanel extends LinearLayout {
     public void clearSensitiveInputs() {
         highRiskPassword.getText().clear();
         highRiskTotp.getText().clear();
+    }
+
+    public void clearSessionBoundDrafts() {
+        pendingStatus = null;
+        publicResponseInput.getText().clear();
+        internalNoteInput.getText().clear();
+        clearSensitiveInputs();
+        workflowActions.setVisibility(GONE);
     }
 
     private void renderList(AdminReportRequestController.State state) {
@@ -270,7 +287,7 @@ public final class AdminReportRequestPanel extends LinearLayout {
         if (detail == null) return;
         TextView heading = text("사용자 요청 상세", 20);
         heading.setPadding(0, dp(22), 0, dp(6));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) heading.setAccessibilityHeading(true);
+        markAccessibilityHeading(heading);
         detailContainer.addView(heading, matchWrap());
         AdminReportRequestModels.Summary summary = detail.summary();
         LinearLayout card = card(summary.status());
@@ -394,6 +411,26 @@ public final class AdminReportRequestPanel extends LinearLayout {
         return button;
     }
 
+    @SuppressWarnings("deprecation")
+    private static void markAccessibilityHeading(TextView view) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            view.setAccessibilityHeading(true);
+            return;
+        }
+        view.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(
+                View host,
+                AccessibilityNodeInfo info
+            ) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.setCollectionItemInfo(AccessibilityNodeInfo.CollectionItemInfo.obtain(
+                    0, 1, 0, 1, true, false
+                ));
+            }
+        });
+    }
+
     private TextView text(String value, int sp) {
         TextView view = new TextView(getContext());
         view.setText(value);
@@ -451,17 +488,33 @@ public final class AdminReportRequestPanel extends LinearLayout {
     private static String stateMessage(AdminReportRequestController.State state) {
         if (state.message() != null) return state.message();
         return switch (state.phase()) {
-            case IDLE -> "조회 전입니다.";
-            case LOADING_LIST -> "사용자 요청 목록을 불러오는 중입니다.";
-            case LOADING_MORE -> "다음 사용자 요청을 불러오는 중입니다.";
-            case LOADING_DETAIL -> "사용자 요청 상세를 불러오는 중입니다.";
-            case MUTATING -> "사용자 요청 상태를 변경하는 중입니다.";
+            case IDLE -> "조회 전입니다. 필요하면 요청 유형과 상태를 선택해 조회하세요.";
+            case LOADING_LIST -> "사용자 요청 목록을 불러오는 중입니다…";
+            case LOADING_MORE -> "다음 사용자 요청을 불러오는 중입니다…";
+            case LOADING_DETAIL -> "사용자 요청 상세를 불러오는 중입니다…";
+            case MUTATING -> "사용자 요청 상태를 변경하는 중입니다…";
             case CONTENT -> "사용자 요청 " + state.items().size() + "건을 표시합니다.";
-            case EMPTY -> "조건에 맞는 사용자 요청이 없습니다.";
+            case EMPTY -> "조건에 맞는 사용자 요청이 없습니다. 필터를 '모든 상태'로 바꿔 다시 조회해 보세요.";
             case UPDATED_DETAIL_STALE -> "변경 성공, 최신 상세 조회 실패";
             case CONFLICT -> "다른 관리자의 변경과 충돌해 최신 상태를 표시합니다.";
-            case ERROR -> "오류: 사용자 요청을 처리하지 못했습니다.";
+            case ERROR -> "사용자 요청을 처리하지 못했습니다. 서버 상태를 확인한 뒤 '다시 시도'를 누르세요.";
         };
+    }
+
+    private static boolean isLoading(AdminReportRequestController.Phase phase) {
+        return phase == AdminReportRequestController.Phase.LOADING_LIST
+            || phase == AdminReportRequestController.Phase.LOADING_MORE
+            || phase == AdminReportRequestController.Phase.LOADING_DETAIL
+            || phase == AdminReportRequestController.Phase.MUTATING;
+    }
+
+    private LayoutParams wrapCentered() {
+        LayoutParams parameters = new LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        parameters.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        return parameters;
     }
 
     private static String typeLabel(String type) {

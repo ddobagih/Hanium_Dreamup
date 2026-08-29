@@ -71,10 +71,15 @@ public final class AdminReportWorkflowController {
             this.totp = totp.clone();
         }
 
-        private void destroy() {
+        private synchronized void destroy() {
             Arrays.fill(password, '\0');
             Arrays.fill(totp, '\0');
         }
+
+        private synchronized char[] passwordCopy() { return password.clone(); }
+        private synchronized char[] totpCopy() { return totp.clone(); }
+        private synchronized String passwordString() { return new String(password); }
+        private synchronized String totpString() { return new String(totp); }
 
         private synchronized boolean claim() {
             if (claimed) return false;
@@ -87,6 +92,7 @@ public final class AdminReportWorkflowController {
     private long generation;
     private State state = new State(Phase.IDLE, null, null, null);
     private AdminDeliveryPackage packageValue;
+    private Request activeRequest;
 
     public AdminReportWorkflowController(Loader loader) {
         if (loader == null) throw new IllegalArgumentException("workflow loader is required");
@@ -96,6 +102,8 @@ public final class AdminReportWorkflowController {
     public synchronized State snapshot() {
         return new State(state.phase, state.reportId, state.message, state.refreshedDetail);
     }
+
+    public synchronized long generationToken() { return generation; }
 
     public synchronized Request beginStatus(
         String reportId,
@@ -111,6 +119,7 @@ public final class AdminReportWorkflowController {
         Request request = new Request(
             ++generation, Request.Kind.STATUS, safeId, nextStatus, expectedVersion, password, totp
         );
+        replaceActiveRequest(request);
         state = new State(Phase.LOADING, safeId, "상태 변경을 재인증하고 있습니다.", null);
         return request;
     }
@@ -123,6 +132,7 @@ public final class AdminReportWorkflowController {
         Request request = new Request(
             ++generation, Request.Kind.PACKAGE, safeId, null, 0, password, totp
         );
+        replaceActiveRequest(request);
         state = new State(Phase.LOADING, safeId, "제출본 생성을 재인증하고 있습니다.", null);
         return request;
     }
@@ -134,13 +144,13 @@ public final class AdminReportWorkflowController {
             if (request.kind == Request.Kind.PACKAGE) {
                 AdminDeliveryPackage created = loader.createPackage(
                     request.reportId,
-                    new String(request.password),
-                    new String(request.totp)
+                    request.passwordString(),
+                    request.totpString()
                 );
                 return applyPackage(request, created);
             }
-            char[] password = request.password.clone();
-            char[] totp = request.totp.clone();
+            char[] password = request.passwordCopy();
+            char[] totp = request.totpCopy();
             try {
                 loader.updateStatus(
                     request.reportId,
@@ -171,6 +181,7 @@ public final class AdminReportWorkflowController {
             return fail(request, "고위험 작업을 완료하지 못했습니다. 재인증 후 다시 시도해 주세요.");
         } finally {
             request.destroy();
+            clearActiveRequest(request);
         }
     }
 
@@ -181,16 +192,19 @@ public final class AdminReportWorkflowController {
         return result;
     }
 
-    public synchronized void markSaved(int revision) {
+    public synchronized boolean markSaved(long expectedGeneration, int revision) {
+        if (expectedGeneration != generation || state.phase != Phase.PACKAGE_READY) return false;
         state = new State(
             Phase.SAVED,
             state.reportId,
             "제출본 revision " + revision + "을 사용자가 선택한 문서에 검증하여 저장했습니다. 기관 전달은 아직 기록되지 않았습니다.",
             null
         );
+        return true;
     }
 
-    public synchronized void markSaveFailed(boolean cancelled) {
+    public synchronized boolean markSaveFailed(long expectedGeneration, boolean cancelled) {
+        if (expectedGeneration != generation || state.phase != Phase.PACKAGE_READY) return false;
         clearPackage();
         state = new State(
             cancelled ? Phase.CANCELLED : Phase.ERROR,
@@ -200,11 +214,35 @@ public final class AdminReportWorkflowController {
                 : "문서 저장 검증에 실패해 생성 문서 삭제를 시도하고 제출본 바이트를 폐기했습니다.",
             null
         );
+        return true;
     }
 
     public synchronized void invalidate() {
         generation += 1;
+        destroyActiveRequest();
         clearPackage();
+        state = new State(Phase.IDLE, null, null, null);
+    }
+
+    public synchronized void clearSessionState() {
+        generation += 1;
+        destroyActiveRequest();
+        clearPackage();
+        state = new State(Phase.IDLE, null, null, null);
+    }
+
+    private synchronized void clearActiveRequest(Request request) {
+        if (activeRequest == request) activeRequest = null;
+    }
+
+    private synchronized void replaceActiveRequest(Request request) {
+        if (activeRequest != null && activeRequest != request) activeRequest.destroy();
+        activeRequest = request;
+    }
+
+    private void destroyActiveRequest() {
+        if (activeRequest != null) activeRequest.destroy();
+        activeRequest = null;
     }
 
     private synchronized boolean applyPackage(Request request, AdminDeliveryPackage created) {

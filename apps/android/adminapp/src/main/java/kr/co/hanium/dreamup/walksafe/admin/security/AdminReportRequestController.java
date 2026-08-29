@@ -358,6 +358,25 @@ public final class AdminReportRequestController {
         }
     }
 
+    public synchronized void clearSessionState() {
+        generation += 1;
+        if (activeMutation != null) activeMutation.destroy();
+        if (retryRequest != null && retryRequest != activeMutation) retryRequest.destroy();
+        activeMutation = null;
+        retryRequest = null;
+        AdminReportRequestModels.Filters empty =
+            new AdminReportRequestModels.Filters(null, null, null);
+        state = new State(
+            Phase.IDLE,
+            empty,
+            Collections.emptyList(),
+            null,
+            null,
+            null,
+            null
+        );
+    }
+
     private boolean executeStatus(Request request) throws Exception {
         char[] password = request.password.clone();
         char[] totp = request.totp.clone();
