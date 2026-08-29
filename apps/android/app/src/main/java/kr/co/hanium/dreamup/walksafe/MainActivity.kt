@@ -6,6 +6,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
@@ -20,6 +21,7 @@ import android.text.style.StyleSpan
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.hardware.GeomagneticField
+import android.hardware.SensorManager
 import android.location.Location
 import android.net.ConnectivityManager
 import android.net.Network
@@ -89,6 +91,9 @@ import kr.co.hanium.dreamup.walksafe.device.AndroidWalkSessionResourceProbe
 import kr.co.hanium.dreamup.walksafe.device.CameraFrameQualityAssessment
 import kr.co.hanium.dreamup.walksafe.device.CameraFrameQualityObservation
 import kr.co.hanium.dreamup.walksafe.device.CameraFrameQualityPolicy
+import kr.co.hanium.dreamup.walksafe.device.CameraLumaStats
+import kr.co.hanium.dreamup.walksafe.device.DeviceMotionMonitor
+import kr.co.hanium.dreamup.walksafe.device.sampleCameraLumaStats
 import kr.co.hanium.dreamup.walksafe.device.PhoneMountingAssessment
 import kr.co.hanium.dreamup.walksafe.device.PhoneMountingAssessmentPhase
 import kr.co.hanium.dreamup.walksafe.device.PhoneMountingMethod
@@ -515,6 +520,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     @Volatile
     private var frameDetector: AndroidFrameDetector = NoopAndroidFrameDetector()
     private val detectorRuntimeSupervisor = DetectorRuntimeSupervisor()
+    /**
+     * A platform that will not hand over a sensor service leaves the monitor with none, so the
+     * FP-021 gate reads null shake and pitch and fails closed instead of guessing.
+     */
+    private val deviceMotionMonitor by lazy {
+        DeviceMotionMonitor(
+            runCatching { getSystemService(Context.SENSOR_SERVICE) as? SensorManager }.getOrNull(),
+        )
+    }
+
+    /** Latest FP-021 frame luma sample and when it was taken; null until a frame is measured. */
+    @Volatile
+    private var latestCameraLumaStats: CameraLumaStats? = null
+
+    @Volatile
+    private var latestCameraLumaStatsAtElapsedRealtimeMs: Long = 0L
     private val captureLog = MetadataCaptureLog()
     private val tactileOverlayStabilizer = TactileOverlayStabilizer()
     private var feedbackActuator: AndroidFeedbackActuator? = null
@@ -7704,6 +7725,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection() {
+        deviceMotionMonitor.start()
         if (permissionRecoveryGate.blocksAutomaticResourceStart) {
             permissionRecoveryGate = permissionRecoveryGate.recheckRequired()
             persistPermissionRecoveryGate()
@@ -7788,6 +7810,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     internal fun pauseWalkSafeRuntime() {
+        deviceMotionMonitor.stop()
+        latestCameraLumaStats = null
         cancelPendingPriorityUserTrainingFeedback()
         if (::walkSessionLifecycle.isInitialized) {
             transitionWalkSession(WalkSessionEvent.EnteredBackground)
@@ -11404,6 +11428,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
+    /**
+     * Records the FP-021 brightness and occlusion sample from a frame already held for detection,
+     * so the pre-detection gate costs no extra camera image.
+     */
+    private fun recordCameraLumaSample(image: android.media.Image, observedAtElapsedRealtimeMs: Long) {
+        val stats = runCatching { sampleCameraLumaStats(image) }.getOrNull()
+        latestCameraLumaStats = stats
+        latestCameraLumaStatsAtElapsedRealtimeMs = observedAtElapsedRealtimeMs
+    }
+
     private fun observeOfficialEnvironmentCameraFrame(
         epoch: WalkRuntimeEpoch,
         observedAtElapsedRealtimeMs: Long,
@@ -11412,6 +11446,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val observationGeneration = phoneMountingObservationGeneration
         if (walkSessionLifecycle.snapshot().epoch != epoch) return
         val previous = officialEnvironmentCameraEvidence
+        // A luma sample older than the frame it is meant to describe is dropped, so the gate sees
+        // null and fails closed instead of judging this frame by an earlier one.
+        val lumaStats = latestCameraLumaStats?.takeIf {
+            observedAtElapsedRealtimeMs - latestCameraLumaStatsAtElapsedRealtimeMs in
+                0L..MAX_CAMERA_LUMA_SAMPLE_AGE_MS
+        }
         val cameraAssessment = CameraFrameQualityPolicy.assess(
             currentEpoch = epoch,
             nowElapsedRealtimeMs = observedAtElapsedRealtimeMs,
@@ -11419,10 +11459,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 epoch = epoch,
                 observedAtElapsedRealtimeMs = observedAtElapsedRealtimeMs,
                 frameAvailable = frameAvailable,
-                normalizedBrightness = null,
-                occludedFraction = null,
-                angularShakeDegreesPerSecond = null,
-                mountPitchDegrees = null,
+                normalizedBrightness = lumaStats?.normalizedBrightness,
+                occludedFraction = lumaStats?.occludedFraction,
+                angularShakeDegreesPerSecond = deviceMotionMonitor.angularShakeDegreesPerSecond,
+                mountPitchDegrees = deviceMotionMonitor.mountPitchDegrees,
             ),
             approvedProfile = CameraFrameQualityPolicy.productionProfile,
         )
@@ -15210,6 +15250,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             val lifecycleGeneration = feedbackLifecycleGeneration
             val detectorFrameGeneration = detectorGeneration
             val mediaImage = imageProxy.image ?: return
+            recordCameraLumaSample(mediaImage, nowMs)
             observeOfficialEnvironmentCameraFrame(
                 epoch = expectedWalkEpoch,
                 observedAtElapsedRealtimeMs = nowMs,
@@ -15552,6 +15593,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             detectionInFlight.set(false)
             return
         }
+        recordCameraLumaSample(cameraImage, elapsedRealtimeMs)
         val generation = frameGeneration
         val imageWidth = cameraImage.width
         val imageHeight = cameraImage.height
@@ -21288,6 +21330,7 @@ generation != cameraFallbackGeneration
         const val OVERLAY_UPDATE_INTERVAL_MS = 100L
         const val DETECTION_INTERVAL_MS = 250L
         const val CAMERA_FALLBACK_ANALYSIS_INTERVAL_MS = 500L
+        const val MAX_CAMERA_LUMA_SAMPLE_AGE_MS = 750L
         const val CAMERA_FALLBACK_IMU_MAX_AGE_MS = 1_500L
         const val CAMERA_FALLBACK_WIDTH = 640
         const val CAMERA_FALLBACK_HEIGHT = 480
