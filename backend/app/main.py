@@ -9,7 +9,18 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
-from backend.app.api import admin_security, android_debug, capacity, detect, health, navigation, privacy, reports, uploads
+from backend.app.api import (
+    admin_security,
+    android_debug,
+    capacity,
+    detect,
+    first_run,
+    health,
+    navigation,
+    privacy,
+    reports,
+    uploads,
+)
 from backend.app.config import DEPLOYMENT_ENVIRONMENTS, get_settings
 from backend.app.field_test_security import FieldTestSecurityMiddleware
 from backend.app.request_limits import (
@@ -228,6 +239,7 @@ app.include_router(uploads.create_router(settings, report_image_key_manager))
 app.include_router(detect.create_router(settings, inference_runner=inference_runner))
 app.include_router(navigation.create_router(settings))
 app.include_router(privacy.create_router(settings))
+app.include_router(first_run.create_router(settings))
 app.include_router(reports.create_router(settings, report_image_key_manager))
 app.include_router(android_debug.create_router(settings))
 app.include_router(admin_security.create_router(settings))

@@ -791,3 +791,49 @@ class AccountDeletionStatusV2(BaseModel):
         if self.updated_at < self.accepted_at:
             raise ValueError("updated_at cannot precede accepted_at")
         return self
+
+
+SUBMISSION_HANDLE_PATTERN = r"^onb_[0-9a-f]{32}$"
+ACTOR_BINDING_PATTERN = r"^actor_[0-9a-f]{32}$"
+RECEIPT_SHA256_PATTERN = r"^[0-9a-f]{64}$"
+
+
+class FirstRunSubmitEmailRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(min_length=3, max_length=254)
+
+
+class FirstRunVerifyEmailRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    submission_handle: str = Field(pattern=SUBMISSION_HANDLE_PATTERN)
+    code: str = Field(min_length=1, max_length=16)
+
+
+class FirstRunActivationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    submission_handle: str = Field(pattern=SUBMISSION_HANDLE_PATTERN)
+
+
+class FirstRunLoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    submission_handle: str = Field(pattern=SUBMISSION_HANDLE_PATTERN)
+
+
+class FirstRunStageReceipt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    receipt_sha256: str = Field(pattern=RECEIPT_SHA256_PATTERN)
+
+
+class FirstRunSubmissionReceipt(FirstRunStageReceipt):
+    submission_handle: str = Field(pattern=SUBMISSION_HANDLE_PATTERN)
+    # 메일 발송 수단이 아직 없다. 운영 환경에서는 이 경로 자체가 503 으로 닫힌다.
+    verification_code: str = Field(min_length=1, max_length=16)
+
+
+class FirstRunLoginReceipt(FirstRunStageReceipt):
+    actor_binding: str = Field(pattern=ACTOR_BINDING_PATTERN)
