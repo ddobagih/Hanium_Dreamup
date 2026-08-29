@@ -41,6 +41,9 @@ class MainActivityIntegratedConsentStaticTest {
             assertTrue(
                 function.substring(save).contains("session = gatewaySession"),
             )
+            // Gateway는 이 제어면의 PUT에 인증된 field actor를 요구하므로 세션 부재는 조기 반환이다.
+            val sessionStatement = function.substring(session).substringBefore("val ")
+            assertTrue(sessionStatement.contains("?: run"))
         }
 
         val client = File(
@@ -49,7 +52,7 @@ class MainActivityIntegratedConsentStaticTest {
         ).readText()
         val saveCall = client.substringAfter("fun saveCall(")
             .substringBefore("private fun requestCall(")
-        assertTrue(saveCall.contains("session: GatewayFieldSession"))
+        assertTrue(saveCall.contains("session: GatewayFieldSession,"))
         assertTrue(saveCall.contains("gatewayBaseUrl == session.gatewayBaseUrl"))
         assertTrue(saveCall.contains("session = session"))
         assertTrue(client.contains("session?.requestHeaders()?.forEach(::setRequestProperty)"))

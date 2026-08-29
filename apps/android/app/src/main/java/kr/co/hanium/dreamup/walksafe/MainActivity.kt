@@ -6379,6 +6379,31 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             return
         }
+        // [조사 기록 2026-08-29] 첫 실행 온보딩이 3단계에서 진행 불가한 상태이며, 그 원인이 이 지점을
+        // 지난다. 아래 세션 요구 자체는 서버 계약과 일치하므로 그대로 둔다.
+        //
+        // 순환 구조:
+        //   3단계 INTEGRATED_CONSENT 이탈 → 서버 receipt 필요 (FirstRunOnboardingPolicy.kt:99)
+        //   receipt → 이 저장 요청의 응답에서만 발급
+        //   이 저장 요청 → 아래 세션 조회가 세션 요구
+        //   세션 판정 → currentReporterUserId() (MainActivity.kt:13943)
+        //   currentReporterUserId() → firstRunOnboardingComplete() = 12단계 COMPLETE 요구
+        // 수동 Gateway 로그인 버튼도 같은 currentReporterUserId()를 쓰므로(gatewayLoginActorIdOrNull)
+        // 우회 경로가 없다.
+        //
+        // 1차 조치로 이 세션 요구를 선택으로 완화해 실제로 시험했으나 해결되지 않아 되돌렸다. Gateway는
+        // 이 제어면의 GET만 무인증이고 PUT은 인증된 field actor를 요구하며 동의 기록을 그 actor에
+        // 결속한다(apps/android-gateway/src/routes.ts:1038-1044, integrated-consent.ts:1191
+        // `integrated_consent_field_session_required`). 완화한 빌드에서 실제 PUT은 401
+        // `gateway_auth_required`로 거부됐다. control secret은 쓰기에서 세션을 대체하지 않는다.
+        //
+        // 따라서 이 교착은 클라이언트 단독 결함이 아니라 온보딩 순서와 Gateway 쓰기 인증 계약 사이의
+        // 충돌이다. 해소는 다음 중 하나여야 하고 팀 합의가 필요하다.
+        //   (a) 온보딩 완료 전에도 Gateway 로그인을 허용하도록 actor 판정을 분리
+        //   (b) 동의 단계를 로그인(8단계 VERIFIED_LOGIN) 이후로 이동
+        //   (c) 설치 단위로 결속하는 로그인 전 동의 기록을 Gateway가 허용
+        // release 빌드에는 수동 Gateway 로그인 UI가 없어(MainActivity.kt:20407) 실기기에서도 같은
+        // 교착이 날 수 있으므로 (a)만으로는 부족할 수 있다.
         val gatewaySession = gatewaySessionOrNull(
             reason = "integrated_consent",
             speak = announce,

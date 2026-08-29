@@ -45,6 +45,11 @@ class AndroidIntegratedConsentClient {
         )
     }
 
+    /**
+     * FP013 통합 동의 저장. Gateway는 이 제어면의 GET만 무인증으로 열고 PUT은 인증된 field actor를
+     * 요구하며 기록을 그 actor에 결속하므로(routes.ts의 INTEGRATED_CONSENT_CONTROL 분기), 세션은
+     * 선택이 아니라 필수다. control secret은 그 위에 얹히는 추가 요소이지 세션의 대체재가 아니다.
+     */
     fun saveCall(
         gatewayBaseUrl: String,
         session: GatewayFieldSession,
