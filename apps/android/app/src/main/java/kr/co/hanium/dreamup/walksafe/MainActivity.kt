@@ -10063,7 +10063,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ::firstRunOnboardingSnapshot.isInitialized && firstRunOnboardingSnapshot.isComplete
         privacyControls.visibility = View.VISIBLE
         privacySettingsControls.visibility =
-            if (firstRunOnboardingComplete()) View.VISIBLE else View.GONE
+            if (
+                firstRunOnboardingComplete() ||
+                firstRunPreviewStage == FirstRunOnboardingStage.COMPLETE
+            ) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
         accountDeletionControls.visibility =
             if (
                 onboardingCompleted ||
@@ -10402,9 +10409,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             snapshot.stage == FirstRunOnboardingStage.DEVICE_CHECK ||
                 firstRunOnboardingComplete()
         val mayUseWalk = firstRunOnboardingComplete()
+        // 미리보기가 완료 단계를 가리키면 인증 이후 화면까지 그린다. 표시 전용이다. 보행 시작·신고·
+        // 경로 요청은 각자 currentReporterUserId() 와 walkSafetyOutputsAllowed() 로 따로 막혀 있고
+        // 그 판정은 바꾸지 않으므로, 화면은 보이되 동작하지는 않는다.
+        val showVerifiedSurfaces =
+            mayUseWalk || renderStage == FirstRunOnboardingStage.COMPLETE
         if (::priorityUserOnboardingControls.isInitialized) {
             priorityUserOnboardingControls.visibility =
-                if (mayTrain) View.VISIBLE else View.GONE
+                if (mayTrain || showVerifiedSurfaces) View.VISIBLE else View.GONE
             priorityUserAgeButtons.values.forEach { button ->
                 button.visibility = View.GONE
                 button.isEnabled = false
@@ -10412,33 +10424,33 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             loginUserIdInput.visibility = View.GONE
             loginSaveButton.visibility = View.GONE
             accountLogoutButton.visibility =
-                if (firstRunOnboardingComplete()) View.VISIBLE else View.GONE
+                if (showVerifiedSurfaces) View.VISIBLE else View.GONE
         }
         if (::officialEnvironmentStatusText.isInitialized) {
             officialEnvironmentStatusText.visibility =
-                if (mayUseWalk) View.VISIBLE else View.GONE
+                if (showVerifiedSurfaces) View.VISIBLE else View.GONE
             officialEnvironmentConfirmButton.visibility =
-                if (mayUseWalk) View.VISIBLE else View.GONE
+                if (showVerifiedSurfaces) View.VISIBLE else View.GONE
             phoneMountingStatusText.visibility =
-                if (mayUseWalk) View.VISIBLE else View.GONE
+                if (showVerifiedSurfaces) View.VISIBLE else View.GONE
             phoneMountingChestConfirmButton.visibility =
-                if (mayUseWalk) View.VISIBLE else View.GONE
+                if (showVerifiedSurfaces) View.VISIBLE else View.GONE
             phoneMountingNecklaceConfirmButton.visibility =
-                if (mayUseWalk) View.VISIBLE else View.GONE
+                if (showVerifiedSurfaces) View.VISIBLE else View.GONE
         }
         if (::startupCapabilityText.isInitialized) {
             startupCapabilityText.visibility =
-                if (mayCheckDevice) View.VISIBLE else View.GONE
+                if (mayCheckDevice || showVerifiedSurfaces) View.VISIBLE else View.GONE
             startupMetricPreflightButton.visibility =
-                if (mayCheckDevice) View.VISIBLE else View.GONE
+                if (mayCheckDevice || showVerifiedSurfaces) View.VISIBLE else View.GONE
             startupCapabilityConfirmButton.visibility =
-                if (mayUseWalk) View.VISIBLE else View.GONE
+                if (showVerifiedSurfaces) View.VISIBLE else View.GONE
         }
         if (::fieldSessionLogButton.isInitialized) {
             fieldSessionLogButton.visibility =
-                if (mayUseWalk) View.VISIBLE else View.GONE
+                if (showVerifiedSurfaces) View.VISIBLE else View.GONE
         }
-        if (::runtimeControls.isInitialized && !mayUseWalk) {
+        if (::runtimeControls.isInitialized && !showVerifiedSurfaces) {
             runtimeControls.visibility = View.GONE
         }
         refreshFirstRunNoticeUi()

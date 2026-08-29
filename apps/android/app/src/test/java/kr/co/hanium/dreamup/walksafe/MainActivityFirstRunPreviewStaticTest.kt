@@ -48,6 +48,36 @@ class MainActivityFirstRunPreviewStaticTest {
     }
 
     @Test
+    fun completedSurfacesArePreviewableButWalkOutputStaysOnTheRealState() {
+        val render = source.substringAfter("private fun updateFirstRunOnboardingUi()")
+            .substringBefore("private fun linkPriorityUserAccessibilityTraversal")
+
+        // 인증 이후 화면은 미리보기로 볼 수 있다.
+        assertTrue(
+            render.contains(
+                "mayUseWalk || renderStage == FirstRunOnboardingStage.COMPLETE",
+            ),
+        )
+
+        // 보행 출력 자체는 미리보기를 타지 않는다. 이 판정은 첫 실행 완료를 먼저 요구한다.
+        val outputs = source.substringAfter("private fun walkSafetyOutputsAllowed()")
+            .substringBefore("private fun ")
+        assertTrue(outputs.contains("firstRunOnboardingComplete()"))
+        listOf("renderStage", "firstRunPreviewStage", "showVerifiedSurfaces").forEach { leak ->
+            assertFalse(leak, outputs.contains(leak))
+        }
+
+        // 실제로 돌아가는 보행 런타임 패널은 살아있는 세션을 요구하므로 미리보기 대상이 아니다.
+        // 값이 다음 줄에 오는 형태는 라이브 런타임 패널 한 곳뿐이다.
+        val runtimePanel = source
+            .substringAfter("runtimeControls.visibility =\n")
+            .take(600)
+        assertTrue(runtimePanel.contains("firstRunOnboardingComplete()"))
+        assertTrue(runtimePanel.contains("isWalkSessionRuntimeActive()"))
+        assertFalse(runtimePanel.contains("renderStage"))
+    }
+
+    @Test
     fun previewNeverWritesOnboardingEvidenceOrIdentity() {
         val cycle = source.substringAfter("private fun cycleFirstRunPreviewStage()")
             .substringBefore("private fun updateFirstRunPreviewStageButton")
