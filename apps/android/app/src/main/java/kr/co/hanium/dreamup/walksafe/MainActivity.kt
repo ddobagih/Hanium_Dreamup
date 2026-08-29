@@ -10757,8 +10757,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             fieldSessionLogButton.visibility =
                 if (showVerifiedSurfaces) View.VISIBLE else View.GONE
         }
-        if (::runtimeControls.isInitialized && !showVerifiedSurfaces) {
-            runtimeControls.visibility = View.GONE
+        if (::runtimeControls.isInitialized) {
+            // 완료 단계를 미리보면 보행 화면 자체도 그린다. 표시 전용이다. 실제 안내는
+            // walkSafetyOutputsAllowed() 가 첫 실행 완료를 먼저 요구하므로 나가지 않고, 각 조작도
+            // currentReporterUserId() 로 따로 막혀 있다.
+            val previewingWalkScreen =
+                !mayUseWalk && renderStage == FirstRunOnboardingStage.COMPLETE
+            if (previewingWalkScreen) {
+                runtimeControls.visibility = View.VISIBLE
+            } else if (!showVerifiedSurfaces) {
+                runtimeControls.visibility = View.GONE
+            }
         }
         refreshFirstRunNoticeUi()
         if (::firstRunProgressBar.isInitialized) {
@@ -12652,6 +12661,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 isWalkSessionRuntimeActive() &&
                 !permissionRecoveryGate.blocksAutomaticResourceStart
             ) {
+                View.VISIBLE
+            } else if (firstRunPreviewStage == FirstRunOnboardingStage.COMPLETE) {
+                // 완료 단계 미리보기에서는 보행 화면도 그린다. 표시 전용이며 실제 안내는
+                // walkSafetyOutputsAllowed() 가, 각 조작은 currentReporterUserId() 가 계속 막는다.
                 View.VISIBLE
             } else {
                 View.GONE

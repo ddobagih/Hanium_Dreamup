@@ -67,14 +67,21 @@ class MainActivityFirstRunPreviewStaticTest {
             assertFalse(leak, outputs.contains(leak))
         }
 
-        // 실제로 돌아가는 보행 런타임 패널은 살아있는 세션을 요구하므로 미리보기 대상이 아니다.
+        // 보행 화면도 완료 단계 미리보기로 볼 수 있다. 다만 그것은 표시 전용 분기여야 하고,
+        // 실제로 패널을 여는 조건은 여전히 살아있는 보행 세션이어야 한다.
         // 값이 다음 줄에 오는 형태는 라이브 런타임 패널 한 곳뿐이다.
         val runtimePanel = source
             .substringAfter("runtimeControls.visibility =\n")
-            .take(600)
-        assertTrue(runtimePanel.contains("firstRunOnboardingComplete()"))
-        assertTrue(runtimePanel.contains("isWalkSessionRuntimeActive()"))
-        assertFalse(runtimePanel.contains("renderStage"))
+            .take(700)
+        val realCondition = runtimePanel.substringBefore("} else if")
+        assertTrue(realCondition.contains("firstRunOnboardingComplete()"))
+        assertTrue(realCondition.contains("isWalkSessionRuntimeActive()"))
+        assertFalse(realCondition.contains("firstRunPreviewStage"))
+        assertTrue(
+            runtimePanel.contains(
+                "} else if (firstRunPreviewStage == FirstRunOnboardingStage.COMPLETE)",
+            ),
+        )
     }
 
     @Test
