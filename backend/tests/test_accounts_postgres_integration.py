@@ -11,7 +11,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 import pytest
 from sqlalchemy import create_engine, func, inspect, select, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.account_schemas import (
@@ -235,6 +235,51 @@ def test_email_account_downgrade_allows_empty_tables(
             )
     finally:
         _clear_account_downgrade_fixtures(engine)
+        engine.dispose()
+
+
+@pytest.mark.parametrize("extra_column", ("document_versions", "selections"))
+def test_signup_consent_receipt_constraints_reject_extra_keys(
+    extra_column: str,
+) -> None:
+    engine, _ = _session_factory()
+    observed_at = utc_now()
+    document_versions = {
+        "terms_of_service": "v1",
+        "privacy_notice": "v1",
+        "location_terms": "v1",
+        "raw_original": "v1",
+        "automatic_reporting": "v1",
+        "training_reuse": "v1",
+    }
+    selections = {
+        "terms_of_service": True,
+        "privacy_notice": True,
+        "location_terms": True,
+        "raw_original": False,
+        "automatic_reporting": False,
+        "training_reuse": False,
+    }
+    if extra_column == "document_versions":
+        document_versions["unexpected"] = "v1"
+    else:
+        selections["unexpected"] = False
+
+    try:
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(
+                    SignupConsentReceipt.__table__.insert().values(
+                        id=uuid.uuid4(),
+                        account_id=uuid.uuid4(),
+                        schema_version="walksafe.signup-consent.v1",
+                        document_versions=document_versions,
+                        selections=selections,
+                        receipt_sha256=uuid.uuid4().hex + uuid.uuid4().hex,
+                        recorded_at=observed_at,
+                    )
+                )
+    finally:
         engine.dispose()
 
 

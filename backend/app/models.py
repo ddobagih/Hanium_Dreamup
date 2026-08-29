@@ -2844,16 +2844,20 @@ class SignupConsentReceipt(Base):
         ),
         CheckConstraint(
             "jsonb_typeof(document_versions) = 'object' AND "
-            "jsonb_object_length(document_versions) = 6 AND "
             "document_versions ?& ARRAY['terms_of_service', 'privacy_notice', "
-            "'location_terms', 'raw_original', 'automatic_reporting', 'training_reuse']",
+            "'location_terms', 'raw_original', 'automatic_reporting', 'training_reuse'] AND "
+            "document_versions - ARRAY['terms_of_service', 'privacy_notice', "
+            "'location_terms', 'raw_original', 'automatic_reporting', 'training_reuse'] "
+            "= '{}'::jsonb",
             name="ck_signup_consent_receipts_document_keys",
         ),
         CheckConstraint(
             "jsonb_typeof(selections) = 'object' AND "
-            "jsonb_object_length(selections) = 6 AND "
             "selections ?& ARRAY['terms_of_service', 'privacy_notice', "
+            "'location_terms', 'raw_original', 'automatic_reporting', 'training_reuse'] AND "
+            "selections - ARRAY['terms_of_service', 'privacy_notice', "
             "'location_terms', 'raw_original', 'automatic_reporting', 'training_reuse'] "
+            "= '{}'::jsonb "
             "AND selections->'terms_of_service' = 'true'::jsonb "
             "AND selections->'privacy_notice' = 'true'::jsonb "
             "AND selections->'location_terms' = 'true'::jsonb "
