@@ -377,10 +377,14 @@ class WalkSafeFeedbackPolicy(
 }
 
 object VibrationPatterns {
+    /**
+     * FP-020 단계별 진동. STOP은 길어지는 3연타, WARNING은 짧은 2연타로 촉각만으로 구분된다.
+     * CAUTION 이하는 진동 없이 음성만 사용해 중대 위험의 진동 신호를 희석하지 않는다.
+     */
     fun forLevel(level: MessageLevel): LongArray? {
         return when (level) {
             MessageLevel.STOP -> longArrayOf(0L, 180L, 80L, 240L, 80L, 320L)
-            MessageLevel.WARNING,
+            MessageLevel.WARNING -> longArrayOf(0L, 120L, 120L, 120L)
             MessageLevel.CAUTION,
             MessageLevel.AWARE,
             MessageLevel.INFO,

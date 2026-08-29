@@ -57,11 +57,18 @@ class WalkSafeFeedbackPolicyTest {
     }
 
     @Test
-    fun vibrationIsReservedForStopAlerts() {
-        assertNull(VibrationPatterns.forLevel(MessageLevel.WARNING))
+    fun stopAndWarningCarryDistinctVibrationAndLowerLevelsCarryNone() {
+        val stop = VibrationPatterns.forLevel(MessageLevel.STOP)
+        val warning = VibrationPatterns.forLevel(MessageLevel.WARNING)
+
+        assertNotNull(stop)
+        assertNotNull(warning)
+        assertFalse(stop!!.contentEquals(warning!!))
+
         assertNull(VibrationPatterns.forLevel(MessageLevel.CAUTION))
         assertNull(VibrationPatterns.forLevel(MessageLevel.AWARE))
-        assertNotNull(VibrationPatterns.forLevel(MessageLevel.STOP))
+        assertNull(VibrationPatterns.forLevel(MessageLevel.INFO))
+        assertNull(VibrationPatterns.forLevel(MessageLevel.NONE))
     }
 
     @Test

@@ -202,7 +202,8 @@ class MessagePolicyTest {
 
         assertEquals(MessagePurpose.OBSTACLE_WARNING, decision.purpose)
         assertEquals(MessageLevel.STOP, decision.userFacing.messageLevel)
-        assertTrue(decision.userFacing.message?.contains("멈추세요") == true)
+        // RQ-FP-020-001이 고정한 문구. 좌우 이동 지시로 대체하지 않는다.
+        assertTrue(decision.userFacing.message?.endsWith("멈추세요. 주변을 확인하세요.") == true)
         assertFalse(decision.userFacing.message == CROSSWALK_REFERENCE_NOTICE_KO)
     }
 
