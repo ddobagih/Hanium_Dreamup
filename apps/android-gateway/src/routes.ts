@@ -95,6 +95,10 @@ import {
   currentServerCapacityLevelForTelemetry,
   mergeServerCapacityIntoFieldSessionResponse
 } from "./server-capacity.js";
+import {
+  DEV_FIRST_RUN_EVIDENCE_PATH,
+  handleDevFirstRunEvidenceRequest
+} from "./dev-first-run-evidence.js";
 
 const ALLOWED_METHODS = new Map<string, readonly string[]>([
   ["/api/field-session", ["GET", "POST", "DELETE"]],
@@ -1082,6 +1086,11 @@ async function dispatchGatewayRequest(
       privacyRightsRequestUrl,
       request.method === "HEAD"
     );
+  }
+  // 개발 전용. 운영에서는 스스로 404를 돌려주므로 세션 검사 앞에 두어도 경로가 열리지 않는다.
+  // 4~8단계는 로그인 전이라 여기서 세션을 요구하면 목적을 잃는다.
+  if (pathname === DEV_FIRST_RUN_EVIDENCE_PATH) {
+    return noStore(await handleDevFirstRunEvidenceRequest(request));
   }
   const methods = ALLOWED_METHODS.get(pathname);
   if (!methods) return routeNotFound();
