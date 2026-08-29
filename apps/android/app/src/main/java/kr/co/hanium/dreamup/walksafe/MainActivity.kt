@@ -44,6 +44,8 @@ import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.animation.AlphaAnimation
+import android.view.animation.Animation
 import android.view.accessibility.AccessibilityManager
 import android.util.Size
 import android.widget.Button
@@ -469,6 +471,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var firstRunConsentCountText: TextView
     private lateinit var firstRunDisclosureToggleButton: Button
     private var firstRunDisclosureExpanded = false
+
+    /**
+     * DEBUG 전용 첫 실행 단계 미리보기. 4~8단계는 아직 전용 위젯이 없고 실제로 도달하려면 운영 SMS·
+     * 계정 활성화 증거가 필요하므로, 그 화면들을 만드는 동안 눈으로 확인할 수단이 없다. 이 값은 어떤
+     * 단계 화면을 그릴지만 바꾼다. 증거·신원·동의를 만들지 않고, 각 조작의 isEnabled 와 보행 진입은
+     * 실제 단계로만 판정하므로 미리보기로는 상태를 바꿀 수 없다. release 빌드에는 만들지 않는다.
+     */
+    private var firstRunPreviewStage: FirstRunOnboardingStage? = null
+    private var firstRunPreviewStageButton: Button? = null
+    /**
+     * 5~8단계 공통 대기 화면. 네 단계는 안내 문장만 다르고 구조가 같아 하나로 처리한다. 주 행동
+     * 버튼은 두지 않는다. 대기 상태는 반드시 문장으로 알리며 점 애니메이션은 시각 보조일 뿐이라
+     * 접근성 트리에서 제외한다.
+     */
+    private lateinit var firstRunWaitingCard: LinearLayout
+    private lateinit var firstRunWaitingText: TextView
+    private val firstRunWaitingDots = mutableListOf<View>()
     private lateinit var firstRunNoticeToggleButton: Button
     private var firstRunNoticeExpandedByUser = false
     private lateinit var firstRunProgressBar: LinearLayout
@@ -9140,10 +9159,80 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             emphasis = true,
             onClick = { persistIntegratedConsentDraft(announce = true) },
         )
+        if (BuildConfig.DEBUG) {
+            firstRunPreviewStageButton = accessiblePriorityUserButton(
+                label = "미리보기 단계: 실제",
+                onClick = { cycleFirstRunPreviewStage() },
+            )
+        }
+        firstRunWaitingText = TextView(this).apply {
+            id = View.generateViewId()
+            textSize = 18f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            setLineSpacing(0f, 1.65f)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        firstRunWaitingCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val density = resources.displayMetrics.density
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = WS_CORNER_RADIUS_DP * density
+                setColor(WS_COLOR_NOTICE_FILL)
+                setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+            }
+            setPadding(
+                (14f * density).roundToInt(),
+                (12f * density).roundToInt(),
+                (14f * density).roundToInt(),
+                (12f * density).roundToInt(),
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = (WS_GROUP_GAP_DP * density).roundToInt()
+            }
+            // 진행 중임을 눈으로 알리는 보조 표시. 낭독은 아래 문장이 담당하므로 트리에서 제외한다.
+            addView(
+                LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply {
+                        bottomMargin = (WS_CONTROL_GAP_DP * density).roundToInt()
+                    }
+                    repeat(FIRST_RUN_WAITING_DOT_COUNT) { index ->
+                        val dot = View(this@MainActivity).apply {
+                            background = GradientDrawable().apply {
+                                shape = GradientDrawable.OVAL
+                                setColor(WS_COLOR_EMPHASIS)
+                            }
+                            alpha = FIRST_RUN_WAITING_DOT_MIN_ALPHA
+                            layoutParams = LinearLayout.LayoutParams(
+                                (8f * density).roundToInt(),
+                                (8f * density).roundToInt(),
+                            ).apply {
+                                if (index > 0) {
+                                    leftMargin = (8f * density).roundToInt()
+                                }
+                            }
+                        }
+                        firstRunWaitingDots += dot
+                        addView(dot)
+                    }
+                },
+            )
+            addView(firstRunWaitingText)
+        }
         firstRunOnboardingControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             addView(firstRunProgressBar)
+            firstRunPreviewStageButton?.let(::addView)
             addView(firstRunOnboardingStatusText)
             addView(firstRunPurposeButton)
             listOf(
@@ -9158,6 +9247,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 addView(firstRunConsentCards.getValue(item))
             }
             addView(firstRunIntegratedConsentSaveButton)
+            addView(firstRunWaitingCard)
         }
         priorityUserOnboardingStatusText = TextView(this).apply {
             id = View.generateViewId()
@@ -9818,7 +9908,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun refreshFirstRunNoticeUi() {
         if (!::productPurposeText.isInitialized || !::firstRunNoticeToggleButton.isInitialized) return
         val acknowledged = !::firstRunOnboardingSnapshot.isInitialized ||
-            firstRunOnboardingSnapshot.stage != FirstRunOnboardingStage.PURPOSE_AND_SAFETY
+            (firstRunPreviewStage ?: firstRunOnboardingSnapshot.stage) !=
+            FirstRunOnboardingStage.PURPOSE_AND_SAFETY
         val expanded = !acknowledged || firstRunNoticeExpandedByUser
         val version = "앱 버전: ${BuildConfig.VERSION_NAME}"
         applyNoticeHeadingStyle(
@@ -9871,6 +9962,76 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ::firstRunOnboardingSnapshot.isInitialized &&
             firstRunOnboardingSnapshot.mayEnterWalk &&
             !accountDeletionStateMachine.processingBlocked()
+
+    /**
+     * 5~8단계의 대기 문장. 네 단계 모두 외부 증거를 기다리는 화면이라 사용자가 할 일이 없다는 사실을
+     * 문장으로 분명히 말한다. 갱신 방식(폴링/푸시)이 정해지지 않아 자동 전환을 단정하는 문구는 쓰지
+     * 않는다. 재전송·타이머·진행률·보호자 경로도 같은 이유로 아직 표시하지 않는다.
+     */
+    private fun firstRunWaitingTextOrNull(stage: FirstRunOnboardingStage): String? = when (stage) {
+        FirstRunOnboardingStage.VERIFIED_SMS ->
+            "운영 공급자의 SMS 검증 증거를 기다리고 있습니다. 이 화면에서 아무것도 입력할 필요가 없습니다."
+        FirstRunOnboardingStage.GUARDIAN_APPROVAL ->
+            "미성년 사용자에게 필요한 보호자 확인 증거를 기다리고 있습니다. 이 화면에서 아무것도 입력할 필요가 없습니다."
+        FirstRunOnboardingStage.ACCOUNT_ACTIVATION ->
+            "운영 계정 활성화 증거를 기다리고 있습니다. 이 화면에서 아무것도 입력할 필요가 없습니다."
+        FirstRunOnboardingStage.VERIFIED_LOGIN ->
+            "검증된 로그인 증거를 기다리고 있습니다. 이 화면에서 아무것도 입력할 필요가 없습니다."
+        else -> null
+    }
+
+    /** 대기 점은 시각 보조다. 사용자가 애니메이션을 꺼 두었으면 켜지 않는다. */
+    private fun updateFirstRunWaitingDots(active: Boolean) {
+        val animationsEnabled = Settings.Global.getFloat(
+            contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) > 0f
+        firstRunWaitingDots.forEachIndexed { index, dot ->
+            if (!active || !animationsEnabled) {
+                dot.clearAnimation()
+                dot.alpha = FIRST_RUN_WAITING_DOT_MIN_ALPHA
+                return@forEachIndexed
+            }
+            if (dot.animation != null) return@forEachIndexed
+            dot.startAnimation(
+                AlphaAnimation(FIRST_RUN_WAITING_DOT_MIN_ALPHA, 1f).apply {
+                    duration = FIRST_RUN_WAITING_DOT_PERIOD_MS
+                    startOffset = index * FIRST_RUN_WAITING_DOT_STAGGER_MS
+                    repeatMode = Animation.REVERSE
+                    repeatCount = Animation.INFINITE
+                },
+            )
+        }
+    }
+
+    /** 실제 → 1단계 → … → 12단계 → 실제 순으로 미리볼 화면만 바꾼다. DEBUG 빌드에만 존재한다. */
+    private fun cycleFirstRunPreviewStage() {
+        if (!BuildConfig.DEBUG) return
+        val order = FIRST_RUN_PREVIEW_STAGES
+        val current = firstRunPreviewStage
+        firstRunPreviewStage = when {
+            current == null -> order.first()
+            else -> order.getOrNull(order.indexOf(current) + 1)
+        }
+        updateFirstRunOnboardingUi()
+        val label = firstRunPreviewStage
+            ?.let { "${firstRunStageNumber(it)}단계 화면" }
+            ?: "실제 단계"
+        speakInteraction("미리보기를 $label 로 바꿨습니다. 화면만 바뀌고 진행 상태는 그대로입니다.")
+    }
+
+    private fun updateFirstRunPreviewStageButton(renderStage: FirstRunOnboardingStage) {
+        val button = firstRunPreviewStageButton ?: return
+        val preview = firstRunPreviewStage
+        button.text = if (preview == null) {
+            "미리보기 단계: 실제"
+        } else {
+            "미리보기 단계: ${firstRunStageNumber(renderStage)}/$FIRST_RUN_STAGE_COUNT"
+        }
+        button.contentDescription =
+            "${button.text}. 누르면 다음 단계 화면을 미리봅니다. 진행 상태는 바뀌지 않습니다."
+    }
 
     private fun firstRunStageNumber(stage: FirstRunOnboardingStage): Int = when (stage) {
         FirstRunOnboardingStage.PURPOSE_AND_SAFETY -> 1
@@ -10132,8 +10293,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             !::firstRunOnboardingStatusText.isInitialized
         ) return
         val snapshot = firstRunOnboardingSnapshot
-        val stageNumber = firstRunStageNumber(snapshot.stage)
-        val message = when (snapshot.stage) {
+        // renderStage 는 무엇을 보여줄지만 정한다. 아래의 모든 isEnabled 와 보행 진입 판정은 계속
+        // snapshot.stage / firstRunOnboardingComplete() 즉 실제 단계를 쓰므로, 미리보기로는 어떤
+        // 조작도 활성화되지 않고 증거·신원도 생기지 않는다.
+        val renderStage = firstRunPreviewStage ?: snapshot.stage
+        val stageNumber = firstRunStageNumber(renderStage)
+        updateFirstRunPreviewStageButton(renderStage)
+        val message = when (renderStage) {
             FirstRunOnboardingStage.PURPOSE_AND_SAFETY ->
                 "첫 실행 $stageNumber/${FIRST_RUN_STAGE_COUNT}단계. WalkSafe의 목적과 안전 한계를 읽고 확인하세요."
             FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED ->
@@ -10165,7 +10331,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         firstRunOnboardingStatusText.contentDescription = message
         applyStageHeadingStyle(message)
         firstRunPurposeButton.visibility =
-            if (snapshot.stage == FirstRunOnboardingStage.PURPOSE_AND_SAFETY) {
+            if (renderStage == FirstRunOnboardingStage.PURPOSE_AND_SAFETY) {
                 View.VISIBLE
             } else {
                 View.GONE
@@ -10174,7 +10340,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             snapshot.stage == FirstRunOnboardingStage.PURPOSE_AND_SAFETY
         firstRunAgeButtons.forEach { (_, button) ->
             button.visibility =
-                if (snapshot.stage == FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED) {
+                if (renderStage == FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED) {
                     View.VISIBLE
                 } else {
                     View.GONE
@@ -10183,7 +10349,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 snapshot.stage == FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED
         }
         val integratedConsentVisible =
-            snapshot.stage == FirstRunOnboardingStage.INTEGRATED_CONSENT
+            renderStage == FirstRunOnboardingStage.INTEGRATED_CONSENT
         if (::firstRunIntegratedConsentDisclosureText.isInitialized) {
             // 항목마다 승인 전문의 해당 조항을 이미 담고 있으므로, 문서 전체는 요청할 때만 편다.
             firstRunIntegratedConsentDisclosureText.visibility =
@@ -10217,6 +10383,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 if (integratedConsentVisible) View.VISIBLE else View.GONE
         }
         updateIntegratedConsentUi()
+
+        if (::firstRunWaitingCard.isInitialized) {
+            val waitingText = firstRunWaitingTextOrNull(renderStage)
+            firstRunWaitingCard.visibility =
+                if (waitingText == null) View.GONE else View.VISIBLE
+            if (waitingText != null && firstRunWaitingText.text != waitingText) {
+                firstRunWaitingText.text = waitingText
+                firstRunWaitingText.contentDescription = waitingText
+            }
+            updateFirstRunWaitingDots(active = waitingText != null)
+        }
 
         val mayTrain =
             snapshot.stage == FirstRunOnboardingStage.FP004_TRAINING ||
@@ -21187,6 +21364,26 @@ generation != cameraFallbackGeneration
         const val WS_TOUCH_PRIMARY_DP = 56f
         const val WS_CORNER_RADIUS_DP = 10f
         const val FIRST_RUN_STAGE_COUNT = 12
+        const val FIRST_RUN_WAITING_DOT_COUNT = 3
+        const val FIRST_RUN_WAITING_DOT_MIN_ALPHA = 0.2f
+        const val FIRST_RUN_WAITING_DOT_PERIOD_MS = 750L
+        const val FIRST_RUN_WAITING_DOT_STAGGER_MS = 300L
+
+        /** DEBUG 미리보기 순회 순서. 1~12단계만 돌며 BLOCKED_UNDER_14 는 진행 경로가 아니라 제외한다. */
+        val FIRST_RUN_PREVIEW_STAGES = listOf(
+            FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
+            FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED,
+            FirstRunOnboardingStage.INTEGRATED_CONSENT,
+            FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION,
+            FirstRunOnboardingStage.VERIFIED_SMS,
+            FirstRunOnboardingStage.GUARDIAN_APPROVAL,
+            FirstRunOnboardingStage.ACCOUNT_ACTIVATION,
+            FirstRunOnboardingStage.VERIFIED_LOGIN,
+            FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+            FirstRunOnboardingStage.DEVICE_CHECK,
+            FirstRunOnboardingStage.FP004_TRAINING,
+            FirstRunOnboardingStage.COMPLETE,
+        )
         const val WS_SECTION_GAP_DP = 24f
         /** 같은 그룹의 버튼 사이. 섹션 간격보다 좁아야 덩어리로 읽힌다. */
         const val WS_GROUP_GAP_DP = 8f

@@ -31,7 +31,8 @@ class MainActivityFirstRunRegistrationStaticTest {
         )
 
         val update = functionBlock("private fun updateFirstRunOnboardingUi()")
-        assertTrue(update.contains("val stageNumber = firstRunStageNumber(snapshot.stage)"))
+        // 진행바는 화면에 그려지는 단계를 따른다. DEBUG 미리보기가 없으면 renderStage 는 실제 단계다.
+        assertTrue(update.contains("val stageNumber = firstRunStageNumber(renderStage)"))
         assertTrue(update.contains("FIRST_RUN_STAGE_COUNT"))
         assertTrue(update.contains("if (index < stageNumber)"))
     }
