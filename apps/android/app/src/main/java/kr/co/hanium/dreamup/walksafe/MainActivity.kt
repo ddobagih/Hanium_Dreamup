@@ -232,7 +232,10 @@ import kr.co.hanium.dreamup.walksafe.network.runGatewayActivityCallbackIfCurrent
 import kr.co.hanium.dreamup.walksafe.network.DeviceDeletionEvidence
 import kr.co.hanium.dreamup.walksafe.network.deviceDeletionEvidenceSha256
 import kr.co.hanium.dreamup.walksafe.network.validatedAccountDeletionStatusOrNull
+import kr.co.hanium.dreamup.walksafe.network.AndroidFirstRunSignupClient
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
+import kr.co.hanium.dreamup.walksafe.network.FirstRunSignupHttpException
+import kr.co.hanium.dreamup.walksafe.network.FirstRunSignupProtocolException
 import kr.co.hanium.dreamup.walksafe.network.GatewayCredentialPolicy
 import kr.co.hanium.dreamup.walksafe.network.GatewayCapacityProcessState
 import kr.co.hanium.dreamup.walksafe.network.GatewayEndpointPolicy
@@ -304,6 +307,8 @@ import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingEvidenceVerifier
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingPolicy
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingSnapshot
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingStage
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOpaqueActorBinding
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOpaqueSubmissionHandle
 import kr.co.hanium.dreamup.walksafe.session.FirstRunReceiptHash
 import kr.co.hanium.dreamup.walksafe.session.INTEGRATED_CONSENT_DISCLOSURE_KO
 import kr.co.hanium.dreamup.walksafe.session.INTEGRATED_CONSENT_POLICY_VERSION
@@ -488,6 +493,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var firstRunWaitingCard: LinearLayout
     private lateinit var firstRunWaitingText: TextView
     private val firstRunWaitingDots = mutableListOf<View>()
+
+    /**
+     * 첫 실행 4·5·7·8단계. 이메일은 출시 전까지 휴대전화 확인을 대신하는 한시적 대체다
+     * (product/decisions.md, 2026-08-30). 앱이 보관하는 것은 서버가 발급한 불투명 제출 핸들뿐이고,
+     * 이메일 주소와 인증코드는 요청에만 싣고 저장하지 않는다.
+     */
+    private val firstRunSignupClient = AndroidFirstRunSignupClient()
+    private lateinit var firstRunEmailInput: EditText
+    private lateinit var firstRunCodeInput: EditText
+    private lateinit var firstRunSignupButton: Button
+    private var firstRunSignupCall: CancellableNetworkCall<*>? = null
+    private var firstRunSignupRequestInFlight = false
     private lateinit var firstRunNoticeToggleButton: Button
     private var firstRunNoticeExpandedByUser = false
     private lateinit var firstRunProgressBar: LinearLayout
@@ -6907,6 +6924,253 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         return true
     }
 
+    /** 서버 영수증 하나로 한 단계를 닫는다. 검증자는 방금 만든 그 증거만 통과시킨다. */
+    private fun completeFirstRunStageWithReceipt(
+        stage: FirstRunOnboardingStage,
+        action: String,
+        receiptSha256: String,
+        announcement: String,
+        buildEvidence: (FirstRunReceiptHash) -> FirstRunOnboardingEvidence?,
+    ): Boolean {
+        if (firstRunOnboardingSnapshot.stage != stage) return false
+        val receipt = runCatching { FirstRunReceiptHash.fromSha256Hex(receiptSha256) }
+            .getOrNull() ?: return false
+        val evidence = runCatching { buildEvidence(receipt) }.getOrNull() ?: return false
+        val started = FirstRunOnboardingPolicy.beginAttempt(
+            snapshot = firstRunOnboardingSnapshot,
+            request = firstRunLocalRequest(action),
+        )
+        val token = started.current.pendingAttempt ?: return false
+        val completed = FirstRunOnboardingPolicy.completeAttempt(
+            snapshot = started.current,
+            token = token,
+            evidence = evidence,
+            verifier = FirstRunOnboardingEvidenceVerifier { presentedToken, presentedEvidence ->
+                presentedToken === token && presentedEvidence === evidence
+            },
+        )
+        if (!completed.accepted) return false
+        firstRunOnboardingSnapshot = completed.current
+        onFirstRunOnboardingStateChanged(announcement)
+        return true
+    }
+
+    private fun firstRunSubmissionHandleOrNull(): String? =
+        sensitivePrefs.getString(PREF_FIRST_RUN_SUBMISSION_HANDLE, null)
+            ?.takeIf { it.isNotBlank() }
+
+    private fun startFirstRunSignupRequest(
+        call: CancellableNetworkCall<*>,
+        onFailure: (String) -> Unit,
+        run: () -> Unit,
+    ) {
+        synchronized(integratedConsentLock) {
+            firstRunSignupCall?.cancel()
+            firstRunSignupCall = call
+            firstRunSignupRequestInFlight = true
+        }
+        updateFirstRunOnboardingUi()
+        gatewaySessionExecutor.execute {
+            val outcome = runCatching { run() }
+            runOnUiThread {
+                synchronized(integratedConsentLock) {
+                    if (firstRunSignupCall === call) {
+                        firstRunSignupCall = null
+                        firstRunSignupRequestInFlight = false
+                    }
+                }
+                outcome.exceptionOrNull()?.let { error ->
+                    onFailure(
+                        when (error) {
+                            is FirstRunSignupHttpException ->
+                                error.code ?: "server_error_${error.statusCode}"
+                            is FirstRunSignupProtocolException -> "protocol_error"
+                            else -> "network_error"
+                        },
+                    )
+                }
+                updateFirstRunOnboardingUi()
+            }
+        }
+    }
+
+    /**
+     * 4·5·7·8단계를 서버 증거로 진행한다. 6단계 보호자 승인은 아직 서버 경로가 없어 대상이 아니고,
+     * 9·10단계는 네트워크 없이 실제 관측으로 닫는다.
+     */
+    private fun advanceFirstRunSignupStage() {
+        if (firstRunSignupRequestInFlight) return
+        val origin = configuredGatewayOriginOrNull() ?: run {
+            updateNavigationStatus("firstRunSignup=blocked:gateway_origin_unavailable")
+            speakInteraction("가입 서버가 구성되지 않아 진행할 수 없습니다.")
+            return
+        }
+        when (firstRunOnboardingSnapshot.stage) {
+            FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION ->
+                submitFirstRunEmail(origin)
+
+            FirstRunOnboardingStage.VERIFIED_SMS -> verifyFirstRunEmail(origin)
+            FirstRunOnboardingStage.ACCOUNT_ACTIVATION -> activateFirstRunAccount(origin)
+            FirstRunOnboardingStage.VERIFIED_LOGIN -> completeFirstRunLogin(origin)
+            FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION ->
+                completeFirstRunPermissionObservation()
+
+            FirstRunOnboardingStage.DEVICE_CHECK -> completeFirstRunDeviceCheck()
+            else -> speakInteraction("이 단계는 여기서 진행하지 않습니다.")
+        }
+    }
+
+    private fun submitFirstRunEmail(origin: String) {
+        val email = firstRunEmailInput.text?.toString()?.trim().orEmpty()
+        if (email.isEmpty()) {
+            speakInteraction("이메일 주소를 입력하세요.")
+            return
+        }
+        val call = firstRunSignupClient.submitEmailCall(origin, email)
+        startFirstRunSignupRequest(
+            call = call,
+            onFailure = { reason ->
+                updateNavigationStatus("firstRunSignup=submit_failed reason=$reason")
+                speakInteraction("이메일 제출에 실패했습니다. 주소를 확인하고 다시 시도하세요.")
+            },
+        ) {
+            val result = call.execute()
+            runOnUiThread {
+                // 주소는 저장하지 않는다. 이후 단계가 참조하는 것은 서버가 준 핸들뿐이다.
+                firstRunEmailInput.text?.clear()
+                sensitivePrefs.edit()
+                    .putString(PREF_FIRST_RUN_SUBMISSION_HANDLE, result.submissionHandle)
+                    .commit()
+                completeFirstRunStageWithReceipt(
+                    stage = FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION,
+                    action = "first_run_email_submission",
+                    receiptSha256 = result.receiptSha256,
+                    announcement = result.verificationCode?.let {
+                        "이메일 제출을 확인했습니다. 개발 환경 인증번호는 $it 입니다."
+                    } ?: "이메일 제출을 확인했습니다. 받은 인증번호를 입력하세요.",
+                ) { receipt ->
+                    FirstRunOnboardingEvidence.LocalCredentialPhoneSubmission(
+                        submissionHandle = FirstRunOpaqueSubmissionHandle.fromProvider(
+                            result.submissionHandle,
+                        ),
+                        receiptHash = receipt,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun verifyFirstRunEmail(origin: String) {
+        val handle = firstRunSubmissionHandleOrNull() ?: run {
+            speakInteraction("제출 기록을 찾지 못했습니다. 이메일부터 다시 제출하세요.")
+            return
+        }
+        val code = firstRunCodeInput.text?.toString()?.trim().orEmpty()
+        if (code.isEmpty()) {
+            speakInteraction("인증번호를 입력하세요.")
+            return
+        }
+        val call = firstRunSignupClient.verifyEmailCall(origin, handle, code)
+        startFirstRunSignupRequest(
+            call = call,
+            onFailure = { reason ->
+                updateNavigationStatus("firstRunSignup=verify_failed reason=$reason")
+                speakInteraction("인증번호를 확인하지 못했습니다. 다시 확인하세요.")
+            },
+        ) {
+            val result = call.execute()
+            runOnUiThread {
+                firstRunCodeInput.text?.clear()
+                completeFirstRunStageWithReceipt(
+                    stage = FirstRunOnboardingStage.VERIFIED_SMS,
+                    action = "first_run_email_verification",
+                    receiptSha256 = result.receiptSha256,
+                    announcement = "이메일 인증을 확인했습니다.",
+                ) { receipt -> FirstRunOnboardingEvidence.VerifiedSms(receipt) }
+            }
+        }
+    }
+
+    private fun activateFirstRunAccount(origin: String) {
+        val handle = firstRunSubmissionHandleOrNull() ?: return
+        val call = firstRunSignupClient.activateCall(origin, handle)
+        startFirstRunSignupRequest(
+            call = call,
+            onFailure = { reason ->
+                updateNavigationStatus("firstRunSignup=activation_failed reason=$reason")
+                speakInteraction("계정 활성화를 확인하지 못했습니다.")
+            },
+        ) {
+            val result = call.execute()
+            runOnUiThread {
+                completeFirstRunStageWithReceipt(
+                    stage = FirstRunOnboardingStage.ACCOUNT_ACTIVATION,
+                    action = "first_run_account_activation",
+                    receiptSha256 = result.receiptSha256,
+                    announcement = "계정 활성화를 확인했습니다.",
+                ) { receipt -> FirstRunOnboardingEvidence.AccountActivation(receipt) }
+            }
+        }
+    }
+
+    private fun completeFirstRunLogin(origin: String) {
+        val handle = firstRunSubmissionHandleOrNull() ?: return
+        val call = firstRunSignupClient.loginCall(origin, handle)
+        startFirstRunSignupRequest(
+            call = call,
+            onFailure = { reason ->
+                updateNavigationStatus("firstRunSignup=login_failed reason=$reason")
+                speakInteraction("검증된 로그인을 확인하지 못했습니다.")
+            },
+        ) {
+            val result = call.execute()
+            val binding = result.actorBinding ?: throw FirstRunSignupProtocolException()
+            runOnUiThread {
+                completeFirstRunStageWithReceipt(
+                    stage = FirstRunOnboardingStage.VERIFIED_LOGIN,
+                    action = "first_run_verified_login",
+                    receiptSha256 = result.receiptSha256,
+                    announcement = "검증된 로그인을 확인했습니다.",
+                ) { receipt ->
+                    FirstRunOnboardingEvidence.VerifiedLogin(
+                        actorBinding = FirstRunOpaqueActorBinding.fromProvider(binding),
+                        receiptHash = receipt,
+                    )
+                }
+            }
+        }
+    }
+
+    /** 9단계. 실제 권한 상태를 보고 닫는다. 빠진 권한이 있으면 진행하지 않는다. */
+    private fun completeFirstRunPermissionObservation() {
+        val decision = startupCapabilityDecision
+        if (decision == null || missingWalkSessionPermissions(decision).isNotEmpty()) {
+            speakInteraction("필요한 권한을 먼저 허용하세요.")
+            return
+        }
+        completeFirstRunStageWithReceipt(
+            stage = FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+            action = "first_run_permission_observation",
+            receiptSha256 = firstRunLocalReceipt("first_run_permission_observation").value,
+            announcement = "현재 권한 상태를 확인했습니다.",
+        ) { receipt -> FirstRunOnboardingEvidence.JitPermissionObservation(receipt) }
+    }
+
+    /** 10단계. 기기 점검 판정이 시작 가능일 때만 닫는다. */
+    private fun completeFirstRunDeviceCheck() {
+        val decision = startupCapabilityDecision
+        if (decision == null || !decision.mayConfirmAndStart) {
+            speakInteraction("기기 기능 점검을 먼저 통과해야 합니다.")
+            return
+        }
+        completeFirstRunStageWithReceipt(
+            stage = FirstRunOnboardingStage.DEVICE_CHECK,
+            action = "first_run_device_check",
+            receiptSha256 = firstRunLocalReceipt("first_run_device_check").value,
+            announcement = "기기 기능 점검을 확인했습니다.",
+        ) { receipt -> FirstRunOnboardingEvidence.DeviceCheck(receipt) }
+    }
+
     private fun cancelActivityOriginalUploads() {
         if (::metadataLogUploader.isInitialized) {
             metadataLogUploader.cancelActiveUpload()
@@ -9165,6 +9429,29 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 onClick = { cycleFirstRunPreviewStage() },
             )
         }
+        firstRunEmailInput = EditText(this).apply {
+            id = View.generateViewId()
+            hint = "이메일 주소"
+            textSize = 20f
+            setSingleLine(true)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            contentDescription = "이메일 주소 입력"
+        }
+        firstRunCodeInput = EditText(this).apply {
+            id = View.generateViewId()
+            hint = "이메일로 받은 인증번호"
+            textSize = 20f
+            setSingleLine(true)
+            inputType = InputType.TYPE_CLASS_NUMBER
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            contentDescription = "인증번호 입력"
+        }
+        firstRunSignupButton = accessiblePriorityUserButton(
+            label = "다음 단계로",
+            emphasis = true,
+            onClick = { advanceFirstRunSignupStage() },
+        )
         firstRunWaitingText = TextView(this).apply {
             id = View.generateViewId()
             textSize = 18f
@@ -9247,6 +9534,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 addView(firstRunConsentCards.getValue(item))
             }
             addView(firstRunIntegratedConsentSaveButton)
+            addView(firstRunEmailInput)
+            addView(firstRunCodeInput)
+            addView(firstRunSignupButton)
             addView(firstRunWaitingCard)
         }
         priorityUserOnboardingStatusText = TextView(this).apply {
@@ -10391,6 +10681,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         updateIntegratedConsentUi()
 
+        if (::firstRunSignupButton.isInitialized) {
+            val emailStage =
+                renderStage == FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION
+            val codeStage = renderStage == FirstRunOnboardingStage.VERIFIED_SMS
+            val signupStage = renderStage in FIRST_RUN_SIGNUP_STAGES
+            firstRunEmailInput.visibility = if (emailStage) View.VISIBLE else View.GONE
+            firstRunCodeInput.visibility = if (codeStage) View.VISIBLE else View.GONE
+            firstRunSignupButton.visibility = if (signupStage) View.VISIBLE else View.GONE
+            firstRunSignupButton.text =
+                if (firstRunSignupRequestInFlight) "서버 확인 중" else "다음 단계로"
+            firstRunSignupButton.contentDescription = firstRunSignupButton.text
+            firstRunSignupButton.isEnabled =
+                !firstRunSignupRequestInFlight &&
+                snapshot.stage in FIRST_RUN_SIGNUP_STAGES
+            firstRunEmailInput.isEnabled = firstRunSignupButton.isEnabled
+            firstRunCodeInput.isEnabled = firstRunSignupButton.isEnabled
+        }
         if (::firstRunWaitingCard.isInitialized) {
             val waitingText = firstRunWaitingTextOrNull(renderStage)
             firstRunWaitingCard.visibility =
@@ -21376,6 +21683,15 @@ generation != cameraFallbackGeneration
         const val WS_TOUCH_PRIMARY_DP = 56f
         const val WS_CORNER_RADIUS_DP = 10f
         const val FIRST_RUN_STAGE_COUNT = 12
+        val FIRST_RUN_SIGNUP_STAGES = setOf(
+            FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION,
+            FirstRunOnboardingStage.VERIFIED_SMS,
+            FirstRunOnboardingStage.ACCOUNT_ACTIVATION,
+            FirstRunOnboardingStage.VERIFIED_LOGIN,
+            FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+            FirstRunOnboardingStage.DEVICE_CHECK,
+        )
+        const val PREF_FIRST_RUN_SUBMISSION_HANDLE = "first_run_submission_handle"
         const val FIRST_RUN_WAITING_DOT_COUNT = 3
         const val FIRST_RUN_WAITING_DOT_MIN_ALPHA = 0.2f
         const val FIRST_RUN_WAITING_DOT_PERIOD_MS = 750L
