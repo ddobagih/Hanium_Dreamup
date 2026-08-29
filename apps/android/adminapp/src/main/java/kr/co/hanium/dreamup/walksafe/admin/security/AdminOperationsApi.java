@@ -39,7 +39,7 @@ public interface AdminOperationsApi {
         private final List<DeliveryHistoryItem> deliveryHistory;
 
         public Result(String correlationId, int statusCode) {
-            this(correlationId, statusCode, ResultKind.MUTATION, List.of(), List.of());
+            this(correlationId, statusCode, ResultKind.MUTATION, AdminJava8Collections.list(), AdminJava8Collections.list());
         }
 
         private Result(
@@ -52,8 +52,8 @@ public interface AdminOperationsApi {
             this.correlationId = correlationId;
             this.statusCode = statusCode;
             this.kind = kind;
-            this.reviewHistory = List.copyOf(reviewHistory);
-            this.deliveryHistory = List.copyOf(deliveryHistory);
+            this.reviewHistory = AdminJava8Collections.copyList(reviewHistory);
+            this.deliveryHistory = AdminJava8Collections.copyList(deliveryHistory);
         }
 
         public String correlationId() { return correlationId; }
@@ -74,7 +74,7 @@ public interface AdminOperationsApi {
             int statusCode,
             List<ReviewHistoryItem> history
         ) {
-            return new Result(correlationId, statusCode, ResultKind.REVIEW_HISTORY, history, List.of());
+            return new Result(correlationId, statusCode, ResultKind.REVIEW_HISTORY, history, AdminJava8Collections.list());
         }
 
         static Result deliveryHistory(
@@ -82,7 +82,7 @@ public interface AdminOperationsApi {
             int statusCode,
             List<DeliveryHistoryItem> history
         ) {
-            return new Result(correlationId, statusCode, ResultKind.DELIVERY_HISTORY, List.of(), history);
+            return new Result(correlationId, statusCode, ResultKind.DELIVERY_HISTORY, AdminJava8Collections.list(), history);
         }
     }
 
@@ -90,6 +90,7 @@ public interface AdminOperationsApi {
         private final int revision;
         private final AdminReportDecision.Decision decision;
         private final String reason;
+        private final String userVisibleReason;
         private final String duplicateOfReportId;
         private final String decidedAt;
 
@@ -97,12 +98,14 @@ public interface AdminOperationsApi {
             int revision,
             AdminReportDecision.Decision decision,
             String reason,
+            String userVisibleReason,
             String duplicateOfReportId,
             String decidedAt
         ) {
             this.revision = revision;
             this.decision = decision;
             this.reason = reason;
+            this.userVisibleReason = userVisibleReason;
             this.duplicateOfReportId = duplicateOfReportId;
             this.decidedAt = decidedAt;
         }
@@ -110,12 +113,14 @@ public interface AdminOperationsApi {
         public int revision() { return revision; }
         public AdminReportDecision.Decision decision() { return decision; }
         public String reason() { return reason; }
+        public String userVisibleReason() { return userVisibleReason; }
         public String duplicateOfReportId() { return duplicateOfReportId; }
         public String decidedAt() { return decidedAt; }
     }
 
     final class DeliveryHistoryItem {
         private final int revision;
+        private final int packageRevision;
         private final AdminInstitutionDelivery.Status status;
         private final String externalReceiptId;
         private final String institution;
@@ -124,6 +129,7 @@ public interface AdminOperationsApi {
 
         DeliveryHistoryItem(
             int revision,
+            int packageRevision,
             AdminInstitutionDelivery.Status status,
             String externalReceiptId,
             String institution,
@@ -131,6 +137,7 @@ public interface AdminOperationsApi {
             String recordedAt
         ) {
             this.revision = revision;
+            this.packageRevision = packageRevision;
             this.status = status;
             this.externalReceiptId = externalReceiptId;
             this.institution = institution;
@@ -139,6 +146,7 @@ public interface AdminOperationsApi {
         }
 
         public int revision() { return revision; }
+        public int packageRevision() { return packageRevision; }
         public AdminInstitutionDelivery.Status status() { return status; }
         public String externalReceiptId() { return externalReceiptId; }
         public String institution() { return institution; }

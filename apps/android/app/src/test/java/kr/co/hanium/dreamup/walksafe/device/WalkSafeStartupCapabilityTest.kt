@@ -53,6 +53,25 @@ class WalkSafeStartupCapabilityTest {
     }
 
     @Test
+    fun explicitInstallCheckCanReplaceTheStaticApprovedDeviceList() {
+        val decision = WalkSafeStartupCapabilityResolver.resolve(
+            availableInput().copy(
+                approvedDesignatedDeviceProfile = false,
+                designatedDeviceProfileVersion = null,
+            ),
+            approvedDeviceProfileRequired = false,
+        )
+
+        assertEquals(WalkSafeStartupCapabilityTier.FULL, decision.tier)
+        assertTrue(decision.mayConfirmAndStart)
+        assertFalse(
+            decision.unavailableRequirements.contains(
+                WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE,
+            ),
+        )
+    }
+
+    @Test
     fun everyUnavailableCoreCapabilityBlocksStart() {
         val unavailableInputs = listOf(
             availableInput().copy(androidVersionSupported = false),

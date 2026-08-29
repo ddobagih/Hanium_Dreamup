@@ -31,7 +31,7 @@ class MainActivityFirstRunRegistrationStaticTest {
         )
 
         val update = functionBlock("private fun updateFirstRunOnboardingUi()")
-        assertTrue(update.contains("val stageNumber = firstRunStageNumber(snapshot.stage)"))
+        assertTrue(update.contains("val stageNumber = firstRunStageNumber(snapshot)"))
         assertTrue(update.contains("FIRST_RUN_STAGE_COUNT"))
         assertTrue(update.contains("if (index < stageNumber)"))
     }
@@ -41,7 +41,7 @@ class MainActivityFirstRunRegistrationStaticTest {
         val create = functionBlock("override fun onCreate(savedInstanceState: Bundle?)")
         assertInOrder(
             create,
-            "firstRunOnboardingSnapshot = FirstRunOnboardingPolicy.initial(",
+            "firstRunOnboardingSnapshot = FirstRunOnboardingPolicy.initialEmailAccount(",
             "restorePriorityUserOnboardingFromPrefs()",
             "scheduleGatewaySessionRestoreAfterPrivacyStartupInspection()",
         )
@@ -70,19 +70,21 @@ class MainActivityFirstRunRegistrationStaticTest {
         assertInOrder(
             processSession,
             "val firstRun = snapshot.restoredFirstRunSnapshot",
-            "val actorId = firstRun?.reporterActorBinding?.value",
+            "val reporterActorId = firstRun?.reporterActorBinding?.value",
+            "val verifiedEmailActorId = firstRun?.takeIf",
+            "val actorId = reporterActorId ?: verifiedEmailActorId",
             "session != null",
             "firstRun != null",
-            "firstRun.isComplete",
             "actorId != null",
             "actorId == session.actorId",
             "firstRunOnboardingSnapshot = firstRun",
             "reporterUserId = actorId",
+            "firstRun.isComplete",
             "} else {\n            permissionSessionPolicy.authenticationExpired()",
         )
         assertTrue(
             functionBlock("private fun onAccountLogoutClicked()")
-                .contains("firstRunOnboardingSnapshot = FirstRunOnboardingPolicy.initial("),
+                .contains("firstRunOnboardingSnapshot = FirstRunOnboardingPolicy.initialEmailAccount("),
         )
     }
 
@@ -101,12 +103,14 @@ class MainActivityFirstRunRegistrationStaticTest {
         assertInOrder(
             start,
             "if (!firstRunDeviceCheckAllowsPreflight()) return",
-            "walkSessionResourceProbe.start { refreshStartupCapabilityUi() }",
+            "walkSessionResourceProbe.start {",
+            "observeWalkRuntimeResourceSafety()",
+            "refreshStartupCapabilityUi()",
             "startupCapabilityProbe.start()",
         )
         val gate = functionBlock("private fun firstRunDeviceCheckAllowsPreflight()")
-        assertTrue(gate.contains("FirstRunOnboardingStage.DEVICE_CHECK"))
-        assertTrue(gate.contains("firstRunOnboardingComplete()"))
+        assertTrue(gate.contains("PostLoginDeviceCheckState.RUNNING"))
+        assertTrue(gate.contains("PostLoginDeviceCheckPolicy.isCurrent"))
     }
 
     @Test
@@ -196,6 +200,10 @@ class MainActivityFirstRunRegistrationStaticTest {
         assertInOrder(
             detectorLoad,
             "if (!firstRunOnboardingComplete()) return",
+            "loadDetectorForCurrentProcess()",
+        )
+        assertInOrder(
+            functionBlock("private fun loadDetectorForCurrentProcess()"),
             "detectorLoadAttempted = true",
             "TfliteAndroidFrameDetector.createWithStatus",
         )
@@ -206,6 +214,8 @@ class MainActivityFirstRunRegistrationStaticTest {
         val policy = functionBlock("private fun firstRunPermissionRequestAllowed(")
         assertInOrder(
             policy,
+            "PermissionRequestPurpose.POST_LOGIN_DEVICE_CHECK ->",
+            "FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION",
             "PermissionRequestPurpose.METRIC_PREFLIGHT_CAMERA ->",
             "firstRunDeviceCheckAllowsPreflight()",
             "PermissionRequestPurpose.WALK_SESSION,",
@@ -214,7 +224,6 @@ class MainActivityFirstRunRegistrationStaticTest {
             "PermissionRequestPurpose.VOICE_COMMAND,",
             "firstRunOnboardingComplete()",
         )
-        assertFalse(policy.contains("FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION"))
 
         val request = functionBlock("private fun requestPermissionsWithLease(")
         assertInOrder(
@@ -244,8 +253,8 @@ class MainActivityFirstRunRegistrationStaticTest {
         val stageGate = functionBlock("private fun firstRunDeviceCheckAllowsPreflight()")
         assertInOrder(
             stageGate,
-            "FirstRunOnboardingStage.DEVICE_CHECK",
-            "firstRunOnboardingComplete()",
+            "PostLoginDeviceCheckState.RUNNING",
+            "PostLoginDeviceCheckPolicy.isCurrent",
         )
 
         val eligibility = functionBlock("private fun canBeginRuntimeMetricPreflight()")
@@ -362,9 +371,18 @@ class MainActivityFirstRunRegistrationStaticTest {
             functionBlock("private fun requestExplicitReport()")
                 .contains("if (!currentRuntimeMetricOutputAllowsWork())"),
         )
-        assertTrue(
-            functionBlock("private fun isReportUploadTerminalCurrent(")
-                .contains("walkSafetyOutputsAllowed()"),
+        assertInOrder(
+            functionBlock("private fun processReportCandidate("),
+            "walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch)",
+            "!officialEnvironmentOutputsAllowed || !phoneMountingOutputsAllowed",
+            "reportQueueStore.enqueue(",
+        )
+        assertInOrder(
+            functionBlock("private fun drainInitialExactReportQueue("),
+            "val context = reportQueueDrainContext(trigger)",
+            "if (!context.allRequiredBaseGatesAllowed()) break",
+            "reportQueueDrainCoordinator.startNext(",
+            "call.execute()",
         )
     }
 

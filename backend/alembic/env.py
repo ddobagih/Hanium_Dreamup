@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from logging.config import fileConfig
 from pathlib import Path
 import sys
 
@@ -15,8 +14,7 @@ from backend.app.models import Base  # noqa: E402
 
 
 config = context.config
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# Migrations also run in-process; do not let Alembic reconfigure host logging.
 
 database_url = migration_database_url()
 config.set_main_option("sqlalchemy.url", database_url)

@@ -106,33 +106,24 @@ class GatewayCapacityMainActivityStaticTest {
         assertTrue(prepare.contains("reportCandidate=blocked:gateway_capacity"))
         assertTrue(explicitPreparation.contains("explicitRequest = true"))
         assertFalse(explicit.contains("GatewayCapacityProcessState"))
-        val revalidation = process.indexOf("gatewaySessionClient.revalidate(")
-        val refreshedCapacity = process.indexOf(
-            "GatewayCapacityProcessState.admission()",
-        )
-        val automaticUploadGate = process.indexOf(
-            "transferPurpose == ReportTransferPurpose.AUTOMATIC",
-            revalidation,
-        )
-        val upload = process.indexOf("uploadCall.execute()")
-        assertTrue(revalidation >= 0)
-        assertTrue(automaticUploadGate > revalidation)
-        assertTrue(refreshedCapacity > revalidation)
-        assertTrue(upload > refreshedCapacity)
-        assertTrue(
-            process.substring(revalidation, refreshedCapacity)
-                .contains("GatewayCapacityProcessState.fenceSessionGeneration("),
-        )
-        assertTrue(
-            process.substring(automaticUploadGate, upload)
-                .contains("transferPurpose == ReportTransferPurpose.AUTOMATIC"),
-        )
-        assertTrue(
-            process.substring(automaticUploadGate, upload)
-                .contains(".automaticReportCandidateAllowed"),
-        )
-        assertTrue(process.substring(automaticUploadGate, upload).contains("uploadCall.cancel()"))
-        assertTrue(process.substring(automaticUploadGate, upload).contains("return@execute"))
+        assertTrue(process.contains("reportQueueStore.enqueue("))
+        assertFalse(process.contains("uploadCall("))
+        assertFalse(process.contains("gatewaySessionClient.revalidate("))
+        val capture = functionBlock("private fun captureReportQueueDrainTriggerBeforeTransition(")
+        assertTrue(capture.contains("GatewaySessionProcessCoordinator.snapshot()"))
+        assertTrue(capture.contains("gatewaySession.isUsableFor(reporter)"))
+        assertTrue(capture.contains("gatewaySessionGeneration = gatewaySnapshot.generation"))
+        assertTrue(capture.contains("AndroidNetworkTransferPolicy.isAllowed("))
+        val context = functionBlock("private fun reportQueueDrainContext(")
+        assertTrue(context.contains("currentGateway.generation == trigger.gatewaySessionGeneration"))
+        assertTrue(context.contains("currentGateway.session === trigger.gatewaySession"))
+        assertTrue(context.contains("trigger.gatewaySession.isUsableFor(reporter)"))
+        val drain = functionBlock("private fun drainInitialExactReportQueue(")
+        val contextGate = drain.indexOf("reportQueueDrainContext(trigger)")
+        val startNext = drain.indexOf("reportQueueDrainCoordinator.startNext(")
+        val execute = drain.indexOf("call.execute()")
+        assertTrue(contextGate >= 0 && startNext > contextGate)
+        assertTrue(execute > startNext)
         assertTrue(capacitySource.contains("explicitSafetyReportAllowed: Boolean = true"))
         assertTrue(capacitySource.contains("activeSafetyFeaturesAllowed: Boolean = true"))
         assertTrue(capacitySource.contains("activeRawSessionStopAllowed: Boolean = true"))

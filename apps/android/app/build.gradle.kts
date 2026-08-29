@@ -31,6 +31,83 @@ val configuredGatewayOrigin = providers.gradleProperty("WALKSAFE_GATEWAY_ORIGIN"
     ?.trim()
 val verifiedReleaseGatewayOrigin = normalizedHttpsOriginOrNull(configuredGatewayOrigin)
 val debugGatewayOrigin = verifiedReleaseGatewayOrigin ?: "http://127.0.0.1:8081"
+fun configuredReportQueueValue(name: String): String? = providers.gradleProperty(name)
+    .orElse(providers.environmentVariable(name))
+    .orNull
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+
+val reportQueueEnabled = when (
+    val configured = configuredReportQueueValue("WALKSAFE_REPORT_QUEUE_ENABLED")?.lowercase()
+) {
+    null, "false" -> false
+    "true" -> true
+    else -> error("WALKSAFE_REPORT_QUEUE_ENABLED must be true or false")
+}
+fun configuredPositiveInt(name: String): Int? = configuredReportQueueValue(name)
+    ?.toIntOrNull()
+    ?.takeIf { it > 0 }
+fun configuredPositiveLong(name: String): Long? = configuredReportQueueValue(name)
+    ?.toLongOrNull()
+    ?.takeIf { it > 0L }
+
+val reportQueueMaxEntries = configuredPositiveInt("WALKSAFE_REPORT_QUEUE_MAX_ENTRIES")
+val reportQueueMaxPayloadBytes =
+    configuredPositiveInt("WALKSAFE_REPORT_QUEUE_MAX_PAYLOAD_BYTES")
+val reportQueueMaxStoredEntryBytes =
+    configuredPositiveLong("WALKSAFE_REPORT_QUEUE_MAX_STORED_ENTRY_BYTES")
+val reportQueueMaxTotalBytes =
+    configuredPositiveLong("WALKSAFE_REPORT_QUEUE_MAX_TOTAL_BYTES")
+val reportQueueAutomaticMaxEntries =
+    configuredPositiveInt("WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_ENTRIES")
+val reportQueueAutomaticMaxTotalBytes =
+    configuredPositiveLong("WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES")
+
+if (reportQueueEnabled) {
+    check(reportQueueMaxEntries != null && reportQueueMaxEntries >= 2) {
+        "Enabled report queue requires WALKSAFE_REPORT_QUEUE_MAX_ENTRIES >= 2"
+    }
+    check(reportQueueMaxPayloadBytes != null && reportQueueMaxPayloadBytes <= 16 * 1_024 * 1_024) {
+        "Enabled report queue requires WALKSAFE_REPORT_QUEUE_MAX_PAYLOAD_BYTES in 1..16777216"
+    }
+    check(
+        reportQueueMaxStoredEntryBytes != null &&
+            reportQueueMaxStoredEntryBytes >= reportQueueMaxPayloadBytes.toLong() &&
+            reportQueueMaxStoredEntryBytes <= 44L * 1_024L * 1_024L
+    ) {
+        "Enabled report queue requires max stored entry bytes from max payload to 46137344"
+    }
+    check(
+        reportQueueMaxTotalBytes != null &&
+            reportQueueMaxTotalBytes >= reportQueueMaxStoredEntryBytes
+    ) {
+        "Enabled report queue requires total bytes >= max stored entry bytes"
+    }
+    check(
+        reportQueueAutomaticMaxEntries != null &&
+            reportQueueAutomaticMaxEntries < reportQueueMaxEntries
+    ) {
+        "Enabled report queue requires an automatic entry limit below the total entry limit"
+    }
+    check(
+        reportQueueAutomaticMaxTotalBytes != null &&
+            reportQueueAutomaticMaxTotalBytes >= reportQueueMaxStoredEntryBytes &&
+            reportQueueAutomaticMaxTotalBytes < reportQueueMaxTotalBytes &&
+            reportQueueMaxTotalBytes - reportQueueAutomaticMaxTotalBytes >=
+            reportQueueMaxStoredEntryBytes
+    ) {
+        "Enabled report queue requires automatic capacity plus one max stored explicit entry reserve"
+    }
+}
+val reportQueueBuildMaxEntries = if (reportQueueEnabled) reportQueueMaxEntries!! else 0
+val reportQueueBuildMaxPayloadBytes = if (reportQueueEnabled) reportQueueMaxPayloadBytes!! else 0
+val reportQueueBuildMaxStoredEntryBytes =
+    if (reportQueueEnabled) reportQueueMaxStoredEntryBytes!! else 0L
+val reportQueueBuildMaxTotalBytes = if (reportQueueEnabled) reportQueueMaxTotalBytes!! else 0L
+val reportQueueBuildAutomaticMaxEntries =
+    if (reportQueueEnabled) reportQueueAutomaticMaxEntries!! else 0
+val reportQueueBuildAutomaticMaxTotalBytes =
+    if (reportQueueEnabled) reportQueueAutomaticMaxTotalBytes!! else 0L
 val debugLongLivedLoginEnabled =
     providers.gradleProperty("walksafe.longLivedLoginEnabled").orNull == "true"
 val validateWalkSafeSourceCommit by tasks.registering {
@@ -61,6 +138,33 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WALKSAFE_PRODUCT_ROLE", "\"USER\"")
+        buildConfigField("boolean", "WALKSAFE_REPORT_QUEUE_ENABLED", "$reportQueueEnabled")
+        buildConfigField("int", "WALKSAFE_REPORT_QUEUE_MAX_ENTRIES", "$reportQueueBuildMaxEntries")
+        buildConfigField(
+            "int",
+            "WALKSAFE_REPORT_QUEUE_MAX_PAYLOAD_BYTES",
+            "$reportQueueBuildMaxPayloadBytes",
+        )
+        buildConfigField(
+            "long",
+            "WALKSAFE_REPORT_QUEUE_MAX_STORED_ENTRY_BYTES",
+            "${reportQueueBuildMaxStoredEntryBytes}L",
+        )
+        buildConfigField(
+            "long",
+            "WALKSAFE_REPORT_QUEUE_MAX_TOTAL_BYTES",
+            "${reportQueueBuildMaxTotalBytes}L",
+        )
+        buildConfigField(
+            "int",
+            "WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_ENTRIES",
+            "$reportQueueBuildAutomaticMaxEntries",
+        )
+        buildConfigField(
+            "long",
+            "WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES",
+            "${reportQueueBuildAutomaticMaxTotalBytes}L",
+        )
     }
 
     buildTypes {

@@ -8,7 +8,11 @@ Android 사용자 앱과 별도 Android 관리자 앱에 FastAPI 및 PostgreSQL/
 - `/detect/v2`의 기본 모드는 `fake`다. 실제 추론은 운영 환경에서 768 unified 모델·runtime config를 명시하며, `/ready`가 실제 warmup 추론과 13-class 순서를 검증한다.
 - `/reports/v2`는 손상 점자블록 신고만 저장한다. 공공기관 자동 API 제출은 제공하지 않는다. 관리자는 별도 앱에서 검토 결정을 남기고 외부 기관에 수동 신고한 사실·접수번호·상태만 서버에 기록할 수 있다.
 - 현장 gateway의 역할별 service token, actor assertion, rate limit은 임시 운영 경계다. 조직 IdP·중앙 RBAC·signed upload URL을 대신하지 않으므로 외부 공개 API로 간주하지 않는다.
+- raw collection 수신은 Gateway 보행 ledger 결속 전까지 기본 비활성이다. 신규 commit은 별도 암호화 `.wsrc` 저장소에서 receipt v2, `QUARANTINED`, `RAW_QUARANTINE_14D`로 기록하며 승인 여부와 무관하게 정확히 14일 뒤 삭제 후보가 된다. 기존 receipt v1·`COMMITTED`·`RAW_ORIGINAL_180D` 행과 hash는 변경하지 않고 legacy 180일 후보로 계속 처리한다. 두 수명주기 모두 자동 scheduler 없이 최소권한 `scripts/manage_raw_collection_retention.py`의 수동 preview/apply/reconcile one-shot만 제공하며, 실제 운영 삭제는 `NOT_RUN`이다. TRAINING 승인은 최신 별도 동의, 사람 승인, 비식별 PASS와 금지 kind 제외를 요구하고 별도 sanitized artifact 및 immutable dataset revision으로 승격한다. 승인 revision의 3년 만료와 철회·계정삭제 gate 차단은 기술 목표이며 실제 운영 승격·삭제 검증은 `NOT_RUN`이다.
+- 계정 암호화·lookup HMAC·OTP HMAC 세 키와 key version은 비밀이 아닌 도메인 분리 SHA-256 fingerprint singleton에 결속한다. 예상하지 않은 키 교체는 startup/readiness와 계정 서비스에서 fail-closed하며, 운영 key rotation 절차는 아직 제공하지 않는다. OTP 전송 중단은 기본 30초의 bounded delivery lease가 지난 뒤 같은 handle의 새 코드로만 재시도한다.
 - 관리자 Android 앱은 배포환경에서 `PASSWORD_TOTP` 방식만 사용한다. 정적 `WALKSAFE_ADMIN_TOKEN`은 `WALKSAFE_ADMIN_SECURITY_ENABLED=true`일 때 관리자 API를 우회할 수 없다.
+- `POST /account-enrollments/email-otp`, `POST /accounts`, `POST /accounts/authenticate`는 Gateway 전용 일반 테스트 이메일 가입·로그인 경로다. 이메일 OTP는 휴대전화 본인확인이나 정식 연령 증명을 대체하지 않는다. 생년월일은 만 14세 경계 판정에만 사용하고 저장하지 않으며, ASCII 이메일만 받아 domain을 소문자로 canonicalize한 뒤 AES-GCM 암호문과 별도 keyed lookup HMAC으로만 저장한다. 인증은 계정 존재 여부와 무관하게 PostgreSQL 전역·lookup-HMAC별 입장 제한을 먼저 적용하고, 프로세스별 scrypt 동시 실행 상한이 차면 no-store 503으로 닫는다. 제한은 429, 저장소 장애는 503이며 둘 다 민감정보를 반환하지 않는다. OTP의 IP 제한은 Gateway가 신뢰 프록시에서 검증해 새로 설정한 canonical 단일 `X-WalkSafe-Client-IP`만 사용하고, 헤더가 없으면 Backend peer IP를 사용한다. 원래 클라이언트가 보낸 동명 헤더는 전달하지 않는다.
+- 사용자 계정의 `auth_epoch`는 현재 생성 시 1인 Backend 정본이다. 비밀번호 변경·계정 잠금 기능을 추가할 때는 같은 transaction에서 epoch를 증가시키고 Gateway가 기존 세션을 재검증하도록 별도 계약을 추가해야 한다.
 
 ## 관리자 보안 초기 등록과 복구
 
@@ -46,14 +50,14 @@ Android 사용자 앱과 별도 Android 관리자 앱에 FastAPI 및 PostgreSQL/
 
 운영 전환은 같은 release candidate와 승인된 maintenance window에서 다음 순서로 수행한다.
 
-1. 새 APK·backend·migration·설정의 후보 식별자와 DB backup·복원 절차를 확인한다. 새 APK가 설치된 모든 active 관리자 기기에서 구 backend 기본 흐름이 동작하는지 확인한다.
+1. 새 APK·backend·migration·설정의 후보 식별자와 DB backup·복원 절차를 확인한다. `/var/lib/walksafe/uploads`, `/var/lib/walksafe/raw-objects`, account-deletion journal root가 같은 filesystem이고 raw root가 `walksafe-backend:walksafe-backup-readers 2750`, ACL·symlink 없음인지 확인한다. 새 APK가 설치된 모든 active 관리자 기기에서 구 backend 기본 흐름이 동작하는지 확인한다.
 2. API용 `walksafe-backend` 계정이 별도로 존재하는지 확인한다. [`walksafe-backend.conf`](../deploy/sysusers.d/walksafe-backend.conf)를 `/etc/sysusers.d/`에 설치한 뒤 `systemd-sysusers`로 로그인 불가 계정 `walksafe-maintenance`와 `walksafe-issuer-bind`를 만든다. 세 계정은 서로 다른 UID·primary GID를 사용하고 다른 두 역할의 그룹에 가입시키지 않는다.
 3. `/etc/walksafe/backend-runtime.env`와 `/etc/walksafe/backend-migration.env`를 각각 regular file, `root:root`, `0600`, hard-link count 1로 설치한다. 둘 다 symlink이면 안 된다. runtime 파일에는 migration URL을 넣지 않고 migration 파일에는 API DB·TOTP·issuer·gateway·provider·image-key credential을 넣지 않는다.
 4. `/etc/walksafe/admin-credential-issuer.key`를 regular file, `root:walksafe-backend`, 정확히 `0440`, hard-link count 1로 설치한다. 파일과 모든 상위 경로는 symlink가 아니어야 하고, 상위 디렉터리는 root 소유이며 group/other 쓰기를 허용하지 않는다. `0640`을 포함한 다른 mode는 배포 loader가 거부한다.
 5. 설치한 systemd unit의 실제 `FragmentPath`가 root 소유이고 group/other 쓰기 불가인지 확인하고 `systemctl daemon-reload`를 실행한다. Backend는 migration만 자동 요구하며 issuer bind를 자동 실행하지 않는다는 점을 확인한다.
 6. 관리자 ingress에서 신규 요청을 차단하고 진행 중 요청을 배출한 다음 `walksafe-backend.service`를 명시적으로 정지한다. `walksafe-admin-issuer-bind.service`의 `Conflicts=`에 정지를 맡기지 않는다.
 7. 과거 `/etc/walksafe/backend.env`를 API가 읽었던 배치라면 거기에 있던 migration credential을 재사용하지 않는다. API를 정지한 상태에서 기존 credential·세션을 폐기 또는 회전하고, 새 maintenance 전용 credential은 `backend-migration.env`에만 넣는다.
-8. `walksafe-backend-migrate.service`를 수동 실행해 성공과 예상 Alembic head `202608250002`를 확인한다. migration 완료부터 issuer bind 성공 전까지 새 backend의 startup/readiness가 fail-closed하는 것이 정상이며 API를 시작하지 않는다. migration이 실패해도 API와 ingress를 정지한 채 원인을 해결하며 구 backend를 새 schema 위에서 시작하지 않는다.
+8. `walksafe-backend-migrate.service`를 수동 실행해 성공과 예상 Alembic head `202608290011`을 확인한다. migration 완료부터 issuer bind 성공 전까지 새 backend의 startup/readiness가 fail-closed하는 것이 정상이며 API를 시작하지 않는다. migration이 실패해도 API와 ingress를 정지한 채 원인을 해결하며 구 backend를 새 schema 위에서 시작하지 않는다.
 9. `walksafe-admin-issuer-bind.service`를 `walksafe-issuer-bind` 비권한 계정으로 수동 실행해 `BOUND`를 확인한다. 이 oneshot은 enable하지 않는다. migration 성공만으로 bind가 실행됐다고 가정하지 않는다.
 10. 결속에 사용한 migration credential을 다시 회전하거나 더 이상 필요 없으면 폐기하고 DB session을 무효화한다. 새 값은 계속 migration 환경에만 둔다. 기존 `/etc/walksafe/backend.env`의 정확한 대상·소유권·파일 종류를 확인한 뒤 삭제하며, 읽을 수 있는 백업이나 다른 서비스 환경으로 옮기지 않는다. 보존할 전환 증거에는 비밀값 대신 receipt와 지문만 남긴다.
 11. 아래 점검에서 파일·계정 분리가 모두 확인된 뒤에만 `walksafe-backend.service`를 시작한다. issuer 원본은 API가 계속 사용하므로 유지한다.

@@ -44,11 +44,19 @@ _REPORT_IMAGE_CLEANUP_TABLES = (
 )
 _FP008_CLEANUP_TABLES = (
     "report_institution_delivery_events",
+    "report_delivery_packages",
     "report_review_decisions",
     "admin_device_proof_challenges",
     "admin_device_keys",
 )
+_CRITICAL_INCIDENT_CLEANUP_TABLES = (
+    "critical_incident_events",
+    "critical_incidents",
+)
 _PRIVACY_CLEANUP_TABLES = (
+    "raw_collection_chunks",
+    "raw_collection_objects",
+    "raw_collections",
     "account_deletion_events",
     "account_deletion_device_targets",
     "account_deletion_items",
@@ -57,6 +65,9 @@ _PRIVACY_CLEANUP_TABLES = (
     "account_deletion_tombstones",
     "privacy_consent_events",
     "privacy_hmac_key_bindings",
+    "signup_consent_receipts",
+    "account_enrollments",
+    "user_accounts",
 )
 
 
@@ -140,6 +151,8 @@ os.environ["DETECT_V2_COCO_MODEL_PATH"] = ""
 os.environ["DETECT_V2_UNIFIED_MODEL_PATH"] = ""
 os.environ["DETECT_V2_RUNTIME_CONFIG_PATH"] = ""
 os.environ["WALKSAFE_FIELD_TEST_SECURITY_ENABLED"] = "false"
+os.environ["WALKSAFE_RAW_INGEST_ENABLED"] = "false"
+os.environ["WALKSAFE_RAW_OBJECT_DIR"] = ""
 os.environ["WALKSAFE_ALLOW_INSECURE_LOCAL_DEV"] = "true"
 os.environ["WALKSAFE_ENVIRONMENT"] = "test"
 os.environ["WALKSAFE_SOURCE_COMMIT"] = ""
@@ -147,6 +160,15 @@ os.environ["WALKSAFE_FIELD_TEST_TOKEN"] = ""
 os.environ["WALKSAFE_ADMIN_TOKEN"] = ""
 os.environ["WALKSAFE_PRIVACY_HMAC_SECRET"] = (
     "walksafe-pytest-privacy-hmac-secret-boundary-v2"
+)
+os.environ["WALKSAFE_ACCOUNT_EMAIL_ENCRYPTION_KEY_B64"] = (
+    base64.urlsafe_b64encode(b"E" * 32).decode("ascii").rstrip("=")
+)
+os.environ["WALKSAFE_ACCOUNT_EMAIL_LOOKUP_HMAC_KEY_B64"] = (
+    base64.urlsafe_b64encode(b"L" * 32).decode("ascii").rstrip("=")
+)
+os.environ["WALKSAFE_ACCOUNT_OTP_HMAC_KEY_B64"] = (
+    base64.urlsafe_b64encode(b"O" * 32).decode("ascii").rstrip("=")
 )
 
 
@@ -181,12 +203,41 @@ def clean_test_storage() -> Iterator[Callable[[], None] | None]:
             if actual_name.lower() in _PROTECTED_DATABASE_NAMES or "test" not in actual_name.lower():
                 raise RuntimeError(f"refusing to clean non-test database {actual_name!r}")
             if connection.execute(text("SELECT to_regclass('public.reports')")).scalar_one() is not None:
-                connection.execute(
-                    text(
-                        "TRUNCATE TABLE report_image_objects, "
-                        "report_original_access_grants, reports"
+                report_tables = [
+                    table_name
+                    for table_name in (
+                        "report_deletion_external_copy_states",
+                        "report_deletion_tombstones",
+                        "report_deletion_legal_holds",
+                        "report_content_revisions",
+                        "report_user_request_status_events",
+                        "report_user_requests",
+                        "report_image_objects",
+                        "report_original_access_grants",
+                        "reports",
                     )
+                    if connection.execute(
+                        text("SELECT to_regclass(:table_name)"),
+                        {"table_name": table_name},
+                    ).scalar_one()
+                    is not None
+                ]
+                guarded_tables = {
+                    "report_content_revisions",
+                    "report_deletion_external_copy_states",
+                    "report_deletion_tombstones",
+                }.intersection(report_tables)
+                for table_name in guarded_tables:
+                    connection.execute(
+                        text(f"ALTER TABLE {table_name} DISABLE TRIGGER USER")
+                    )
+                connection.execute(
+                    text("TRUNCATE TABLE " + ", ".join(report_tables))
                 )
+                for table_name in guarded_tables:
+                    connection.execute(
+                        text(f"ALTER TABLE {table_name} ENABLE TRIGGER USER")
+                    )
             privacy_tables = [
                 table_name
                 for table_name in _PRIVACY_CLEANUP_TABLES
@@ -212,9 +263,11 @@ def clean_test_storage() -> Iterator[Callable[[], None] | None]:
                 table_name
                 for table_name in (
                     *_FP008_CLEANUP_TABLES,
+                    *_CRITICAL_INCIDENT_CLEANUP_TABLES,
                     *_REPORT_IMAGE_CLEANUP_TABLES,
-                    *_ADMIN_SECURITY_CLEANUP_TABLES,
-                    "report_export_audits",
+                        *_ADMIN_SECURITY_CLEANUP_TABLES,
+                        "admin_operation_audits",
+                        "report_export_audits",
                     "report_status_audits",
                     "report_read_audits",
                     "actor_rate_limit_events",

@@ -10,7 +10,7 @@ class AndroidReportPurposeHeaderStaticTest {
         val source =
             File("src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploader.kt")
                 .readText()
-        val uploadCall = source.substringAfter("fun uploadCall(")
+        val uploadCall = source.substringAfter("fun queuedUploadCall(")
         val authority =
             File("src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt")
                 .readText()
@@ -30,15 +30,16 @@ class AndroidReportPurposeHeaderStaticTest {
         assertTrue(linearized.indexOf("synchronized(lock)") < linearized.indexOf("opener()"))
         assertTrue(
             source.contains(
-                "setRequestProperty(REPORT_PURPOSE_HEADER, transferPurpose.wireValue)",
+                "setRequestProperty(REPORT_PURPOSE_HEADER, purpose.wireValue)",
             ),
         )
+        assertTrue(uploadCall.contains("val purpose = report.priority.toTransferPurpose()"))
         assertTrue(
-            uploadCall.indexOf("automaticReport ==") <
-                uploadCall.indexOf(
-                    "setRequestProperty(REPORT_PURPOSE_HEADER, transferPurpose.wireValue)",
-                ),
+            source.contains(
+                "setRequestProperty(\n                    CONSENT_RECEIPT_HEADER,\n                    consentConfirmation.backendConsentReceiptSha256",
+            ),
         )
+        assertTrue(!source.contains("consentConfirmation.gatewayAuditRecordSha256"))
     }
 
     @Test
@@ -51,7 +52,7 @@ class AndroidReportPurposeHeaderStaticTest {
 
         assertTrue(
             process.contains(
-                "transferPurpose == ReportTransferPurpose.AUTOMATIC",
+                "ReportQueuePriority.AUTOMATIC",
             ),
         )
     }

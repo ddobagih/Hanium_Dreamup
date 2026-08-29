@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="WalkSafe 63개 기능 정책과 5개 출시 Gate의 2026-08-28 구현 상태 재판정">
+  <link rel="icon" href="data:,">
+  <title>WalkSafe 전체 기능 구현 상태 재판정</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5a667a;
+      --line: #d8e0eb;
+      --paper: #ffffff;
+      --canvas: #f3f6fa;
+      --navy: #173b72;
+      --blue: #2563eb;
+      --blue-soft: #eaf1ff;
+      --green: #157347;
+      --green-soft: #eaf7f0;
+      --amber: #a85d00;
+      --amber-soft: #fff4db;
+      --orange: #b54708;
+      --orange-soft: #fff0e8;
+      --red: #b42318;
+      --red-soft: #fff0ee;
+      --gray-soft: #eef2f6;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+      line-height: 1.55;
+    }
+    a { color: #164fc5; }
+    button, input, select { font: inherit; }
+    :focus-visible { outline: 3px solid #0b5fff; outline-offset: 2px; }
+
+    .skip-link {
+      position: absolute;
+      left: 1rem;
+      top: -4rem;
+      z-index: 20;
+      padding: .7rem 1rem;
+      border-radius: .5rem;
+      background: #111827;
+      color: white;
+    }
+    .skip-link:focus { top: 1rem; }
+
+    header {
+      color: white;
+      background:
+        radial-gradient(circle at 85% 15%, rgb(96 165 250 / 35%), transparent 28rem),
+        linear-gradient(135deg, #102a52, #174b91 60%, #2462b5);
+      padding: 2.6rem 1rem 4.4rem;
+    }
+    .wrap { width: min(1500px, calc(100% - 2rem)); margin: 0 auto; }
+    .eyebrow { margin: 0 0 .5rem; color: #cfe2ff; font-size: .88rem; font-weight: 800; letter-spacing: .04em; }
+    h1 { max-width: 900px; margin: 0 0 .7rem; font-size: clamp(2rem, 5vw, 3.6rem); line-height: 1.13; }
+    header .lead { max-width: 950px; margin: 0; color: #e8f1ff; font-size: clamp(1rem, 2vw, 1.18rem); }
+    header code { color: white; }
+
+    main { padding-bottom: 4rem; }
+    .hero-summary {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: .8rem;
+      margin-top: -2.4rem;
+    }
+    .metric, .panel {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      box-shadow: 0 10px 30px rgb(28 48 78 / 8%);
+    }
+    .metric { padding: 1rem 1.05rem; }
+    .metric span { display: block; color: var(--muted); font-size: .82rem; font-weight: 750; }
+    .metric strong { display: block; margin-top: .18rem; color: var(--navy); font-size: clamp(1.6rem, 4vw, 2.2rem); line-height: 1.1; }
+    .metric small { display: block; margin-top: .35rem; color: var(--muted); }
+
+    section { margin-top: 1rem; }
+    .panel { padding: 1.15rem; }
+    h2 { margin: 0 0 .75rem; font-size: 1.3rem; }
+    h3 { margin: 0 0 .55rem; font-size: 1.02rem; }
+    p { margin-top: 0; }
+    .muted { color: var(--muted); }
+
+    .decision-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 1rem; }
+    .headline-score {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      padding: 1rem;
+      border: 1px solid #bcd0f4;
+      border-radius: .8rem;
+      background: var(--blue-soft);
+    }
+    .headline-score strong { min-width: 5.5rem; color: var(--navy); font-size: 2.3rem; line-height: 1; }
+    .headline-score p { margin: 0; }
+    .track { height: .72rem; overflow: hidden; border-radius: 999px; background: #d9e2ef; }
+    .track > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #1f67d8, #2f8f67); }
+    .score-note { margin: .7rem 0 0; color: var(--muted); font-size: .88rem; }
+    .meeting-points { margin: 0; padding-left: 1.2rem; }
+    .meeting-points li + li { margin-top: .45rem; }
+    .warning {
+      margin-top: .8rem;
+      padding: .8rem .9rem;
+      border-left: 5px solid var(--red);
+      border-radius: .5rem;
+      background: var(--red-soft);
+    }
+    .warning strong { color: var(--red); }
+
+    .legend { display: flex; flex-wrap: wrap; gap: .45rem .7rem; margin-top: .8rem; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      min-width: max-content;
+      padding: .22rem .52rem;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      background: white;
+      font-size: .76rem;
+      font-weight: 850;
+    }
+    .s100 { color: var(--green); background: var(--green-soft); }
+    .s75 { color: #1769aa; background: #eaf5ff; }
+    .s50 { color: var(--amber); background: var(--amber-soft); }
+    .s25 { color: var(--orange); background: var(--orange-soft); }
+    .s0 { color: var(--red); background: var(--red-soft); }
+
+    .table-shell { overflow: hidden; border: 1px solid var(--line); border-radius: .8rem; background: white; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: .72rem .7rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #eaf0f8; color: #344054; font-size: .8rem; white-space: nowrap; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #f8faff; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .id { color: #324866; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; font-weight: 800; white-space: nowrap; }
+    .feature-name { min-width: 230px; font-weight: 760; }
+    .evidence, .remaining { min-width: 300px; color: #39465a; }
+    .remaining { color: #5b3d20; }
+    .mini-progress { width: 110px; }
+    .mini-progress .track { height: .48rem; margin-top: .3rem; }
+    .mini-progress span:first-child { font-weight: 850; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(230px, 2fr) repeat(2, minmax(170px, 1fr)) auto;
+      gap: .7rem;
+      align-items: end;
+      margin-bottom: .8rem;
+    }
+    label { display: block; color: var(--muted); font-size: .8rem; font-weight: 800; }
+    input, select, button {
+      width: 100%;
+      min-height: 2.6rem;
+      margin-top: .25rem;
+      padding: .5rem .65rem;
+      border: 1px solid #abb7c7;
+      border-radius: .55rem;
+      background: white;
+      color: var(--ink);
+    }
+    button { width: auto; border-color: var(--navy); background: var(--navy); color: white; font-weight: 800; cursor: pointer; }
+    button:hover { background: #245693; }
+    .result-line { margin: 0 0 .65rem; color: var(--muted); font-size: .88rem; }
+
+    .source-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem 1rem; margin: 0; padding-left: 1.2rem; }
+    .footnote { margin: .8rem 0 0; color: var(--muted); font-size: .82rem; }
+
+    @media (max-width: 980px) {
+      .hero-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .decision-grid { grid-template-columns: 1fr; }
+      .controls { grid-template-columns: 1fr 1fr; }
+      .source-list { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .wrap { width: min(100% - 1rem, 1500px); }
+      header { padding-top: 2rem; }
+      .hero-summary { grid-template-columns: 1fr 1fr; gap: .55rem; }
+      .metric { padding: .8rem; }
+      .metric:first-child { grid-column: 1 / -1; }
+      .controls { grid-template-columns: 1fr; }
+      .controls button { width: 100%; }
+      .headline-score { align-items: flex-start; flex-direction: column; }
+      .panel { padding: .9rem; }
+    }
+
+    @media print {
+      @page { size: A4 landscape; margin: 10mm; }
+      body { background: white; font-size: 9pt; }
+      header { padding: 8mm; color: #111; background: white; border: 2px solid #111; }
+      header .lead, .eyebrow { color: #333; }
+      .hero-summary { margin-top: 4mm; grid-template-columns: repeat(5, 1fr); }
+      .metric, .panel { box-shadow: none; break-inside: avoid; }
+      .controls { display: none; }
+      .table-scroll { overflow: visible; }
+      table { font-size: 7.5pt; }
+      th { position: static; }
+      tr { break-inside: avoid; }
+      .feature-name { min-width: 0; }
+      .evidence, .remaining { min-width: 0; }
+      a { color: #111; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">본문으로 건너뛰기</a>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">WalkSafe · 회의용 재판정 · 2026-08-28</p>
+      <h1>전체 기능 구현 상태</h1>
+      <p class="lead">현재 <code>current</code> 브랜치 <code>bd6260cae0d0</code>의 코드·테스트·8월 25~28일 작업 기록을 기준으로 63개 기능 정책과 출시 Gate 5개를 다시 판정했다.</p>
+    </div>
+  </header>
+
+  <main id="content" class="wrap">
+    <section class="hero-summary" aria-label="핵심 지표">
+      <article class="metric"><span>로컬 기능 구현률</span><strong id="overall-score">68%</strong><small>63개 동일 가중치</small></article>
+      <article class="metric"><span>전체 기능 정책</span><strong>63개</strong><small>FP 54 + 공통정책 9</small></article>
+      <article class="metric"><span>로컬 구현 완료</span><strong id="complete-count">30개</strong><small>100% 판정</small></article>
+      <article class="metric"><span>정식시험</span><strong>0/279</strong><small>아직 미실행</small></article>
+      <article class="metric"><span>출시 Gate</span><strong>0/5</strong><small>출시 불가</small></article>
+    </section>
+
+    <section class="decision-grid">
+      <article class="panel">
+        <h2>회의에서 먼저 말할 결론</h2>
+        <div class="headline-score">
+          <strong>약 68%</strong>
+          <p><b>코드와 저장소 내부 검증 기준</b>으로 계산한 현재 구현률이다. 63개 기능을 각각 0·25·50·75·100%로 판정해 동일한 비중으로 평균냈다.</p>
+        </div>
+        <div class="track" aria-label="전체 로컬 구현률 68퍼센트"><span style="width:68%"></span></div>
+        <p class="score-note">기능마다 실제 작업량은 다르므로 이 수치는 일정 예측이 아니라, 회의에서 범위와 상태를 일관되게 비교하기 위한 진척 지표다.</p>
+        <div class="warning"><strong>출시 완료율은 0%다.</strong> 로컬 코드가 있어도 실기기·현장·정식시험 279건, 클라우드 운영, 실제 복원·배포와 Gate 5개가 끝나지 않았다.</div>
+      </article>
+      <article class="panel">
+        <h2>현재 상태 요약</h2>
+        <ul class="meeting-points">
+          <li><b>강한 영역:</b> 계정·보안, 경로 이탈·방향 책임, 권한·보행 상태.</li>
+          <li><b>다음 구현:</b> 위험안내 계약, 탐지·카메라 품질, 음성·전체 접근성.</li>
+          <li><b>가장 큰 미구현:</b> 원본자료 수집 수명주기와 자동신고 암호화 영속 대기열.</li>
+          <li><b>최종 단계:</b> AI 모델 승인·복구, 클라우드 운영, 실기기·현장시험과 출시 Gate.</li>
+        </ul>
+        <div class="legend" aria-label="판정 범례">
+          <span class="badge s100">100% 로컬 완료</span>
+          <span class="badge s75">75% 대부분 구현</span>
+          <span class="badge s50">50% 부분 구현</span>
+          <span class="badge s25">25% 착수</span>
+          <span class="badge s0">0% 미구현</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <h2>분야별 구현 현황</h2>
+      <p class="muted">12개 EPIC은 기능 분류이고, 합계 63개는 실제 기능 정책 단위다.</p>
+      <div class="table-shell"><div class="table-scroll">
+        <table>
+          <thead><tr><th>분야</th><th class="num">기능 수</th><th class="num">평균 구현률</th><th>현재 판단</th><th>핵심 남은 일</th></tr></thead>
+          <tbody id="epic-summary-body"></tbody>
+        </table>
+      </div></div>
+    </section>
+
+    <section class="panel">
+      <h2>63개 기능별 상세 재판정</h2>
+      <div class="controls">
+        <label>기능 검색<input id="search" type="search" placeholder="예: 경로 이탈, FP-023, 암호화"></label>
+        <label>분야<select id="epic-filter"><option value="">전체 분야</option></select></label>
+        <label>상태<select id="status-filter"><option value="">전체 상태</option><option value="100">100% 로컬 완료</option><option value="75">75% 대부분 구현</option><option value="50">50% 부분 구현</option><option value="25">25% 착수</option><option value="0">0% 미구현</option></select></label>
+        <button id="reset" type="button">필터 초기화</button>
+      </div>
+      <p id="result-line" class="result-line" aria-live="polite">63개 표시</p>
+      <div class="table-shell"><div class="table-scroll">
+        <table>
+          <thead><tr><th>분야</th><th>ID</th><th>기능</th><th>구현률</th><th>판정</th><th>현재 확인된 구현</th><th>남은 구현·검증</th></tr></thead>
+          <tbody id="feature-body"></tbody>
+        </table>
+      </div></div>
+    </section>
+
+    <section class="panel">
+      <h2>출시 Gate 5개</h2>
+      <p class="muted">Gate는 기능 구현률 63개 평균에 넣지 않았다. 실제 측정·훈련·독립 검토가 있어야만 닫을 수 있다.</p>
+      <div class="table-shell"><div class="table-scroll">
+        <table>
+          <thead><tr><th>Gate</th><th>확인할 내용</th><th>상태</th><th>닫기 위해 필요한 실제 증거</th></tr></thead>
+          <tbody id="gate-body"></tbody>
+        </table>
+      </div></div>
+    </section>
+
+    <section class="panel">
+      <h2>판정 기준과 근거</h2>
+      <ul class="source-list">
+        <li><b>100%</b>: 로컬 주요 흐름과 내부 회귀가 완료됨. 실기기·운영 검증은 별도.</li>
+        <li><b>75%</b>: 주요 흐름은 있으나 일부 연결·예외·운영 결속이 남음.</li>
+        <li><b>50%</b>: 중요한 구성요소는 있으나 핵심 흐름 하나 이상이 남음.</li>
+        <li><b>25%</b>: 뼈대·후보·기초 흐름만 있으며 실제 사용 흐름은 미완성.</li>
+        <li><b>0%</b>: 승인 요구를 수행할 핵심 구현을 현재 제품 경로에서 확인하지 못함.</li>
+        <li><a href="walksafe-feature-development-status-20260828.html">8월 28일 기능 개발 상태</a></li>
+        <li><a href="../control/audits/walksafe-implementation-gap-analysis-20260825-r030.json">R030 구현 Gap 기준선</a></li>
+        <li><a href="../../daylog/2026-08-25.md">8월 25일 보안·서버 작업 기록</a></li>
+        <li><a href="../../daylog/2026-08-26.md">8월 26일 FP-048·FP-023 작업 기록</a></li>
+        <li><a href="../../daylog/2026-08-28.md">8월 28일 Android 통합 기록</a></li>
+      </ul>
+      <p class="footnote">주의: R030의 공식 상태는 정식 증거까지 요구해 모든 항목을 완료로 올리지 않는다. 이 문서는 회의용으로 현재 코드 구현 정도를 별도 재판정한 보조 상태표이며 정책·출시 승인 기록을 변경하지 않는다.</p>
+    </section>
+  </main>
+
+  <script>
+    const epicMeta = {
+      "EPIC-01": { name: "제품 경계·지원환경", summary: "제품 목적과 Android 전용 경계는 정리됐고 출시 단계 실행과 승인 기기 확정이 남았다.", next: "지원 기기·배포 단계·과거 Web 폐쇄를 실제 환경에서 확인" },
+      "EPIC-02": { name: "보행 상태·권한·동의", summary: "보행 상태기계, 동의·권한·세션 분리는 강하지만 실제 가입 공급자와 기기 검증이 남았다.", next: "실제 SMS·보호자·계정 공급자 연결과 실기기 lifecycle 시험" },
+      "EPIC-03": { name: "계정·관리자·보안", summary: "관리자 분리, 계정 삭제, 복구와 키 회전의 저장소 내부 구현이 가장 진척됐다.", next: "운영 자격정보·KMS·관리자 앱 서명과 분실 복구훈련" },
+      "EPIC-04": { name: "경로·도착·이탈", summary: "사용자 선택형 경로 이탈과 방향 책임 분리가 로컬 코드에 반영됐다.", next: "실제 TMAP·야외 GPS·도착 확인을 실기기에서 검증" },
+      "EPIC-05": { name: "객체탐지·위험안내", summary: "탐지·거리·위험 판단은 있으나 승인 모델과 품질 Gate, 정확한 행동 문구가 남았다.", next: "FP-020 문구·진동 → FP-019·021 품질 pipeline 순서로 구현" },
+      "EPIC-06": { name: "음성·진동·접근성", summary: "TTS 실패 안전정지와 장애 화면은 완료됐지만 호출어와 전 화면 접근성이 남았다.", next: "길라잡이 호출어·명령 상태전이·TalkBack 전체 흐름" },
+      "EPIC-07": { name: "원본 수집·보존·삭제", summary: "일부 로그·삭제 기반은 있으나 승인 원본자료의 실제 수집 pipeline은 꺼져 있다.", next: "공통 manifest/chunk, 단말 암호화 저장, 서버 수신·보존·삭제" },
+      "EPIC-08": { name: "자동신고·전송 대기함", summary: "신고 후보·서버 일부는 있으나 핵심인 암호화 영속 대기열과 전송 정책이 없다.", next: "재부팅 복원 queue, 보행 중 전송 금지, receipt 기반 삭제" },
+      "EPIC-09": { name: "서버 용량·장애대응", summary: "서버 용량 전달은 완료됐고 기기 자원 감시와 중앙 안전정지는 부분 구현이다.", next: "배터리·발열·신선도·추론지연을 중앙 안전 상태에 통합" },
+      "EPIC-10": { name: "AI 모델 수명주기", summary: "후보 등록·수동 학습 기반만 있고 승인·독립평가·이전 정상 모델 복구가 없다.", next: "데이터 권리·고정 분할·독립평가·승인 모델 rollback" },
+      "EPIC-11": { name: "릴리스·운영·복구", summary: "readiness·telemetry·백업 실행 틀은 있으나 실제 배포·복원·당직 연결은 미실행이다.", next: "클라우드 설정, 실제 restore·rollback, dashboard·alert·on-call" },
+      "EPIC-12": { name: "정식시험·현장검증", summary: "시험 계획은 있으나 정식 279건과 실기기·현장 시험은 실행하지 않았다.", next: "고정 출시 후보 뒤 279건·실기기·현장·접근성 시험 실행" }
+    };
+
+    const features = [
+      {epic:"EPIC-01",id:"FP-003",name:"단일 책임자 의사결정",score:100,evidence:"관리자 추가인증·기기결속 세션·복구 상태기계·고위험 작업 동결을 내부 구현·검증했다.",remain:"운영 자격정보와 외부 복구자료를 안전하게 주입하고 실제 분실 복구훈련을 수행한다."},
+      {epic:"EPIC-01",id:"FP-002",name:"현재 출시 단계와 완료 판정",score:100,evidence:"시연·제한시험·정식출시를 분리하고 증거가 없으면 승격하지 않는 NOT_ELIGIBLE 경계를 내부 검증했다.",remain:"동일 출시 후보로 단계별 실제 시험·승인 기록을 만들어야 한다."},
+      {epic:"EPIC-01",id:"FP-007",name:"사용자용 Android 전용 앱",score:100,evidence:"사용자 Android 앱, 별도 관리자 앱, 독립 Gateway 경계를 유지하고 Web은 제품 범위에서 제외했다.",remain:"실제 서명·Google Play/사설 배포와 승인 기기 연결을 수행한다."},
+      {epic:"EPIC-01",id:"FP-009",name:"지원 기기와 과거 Web 버전",score:100,evidence:"Legacy Web 공식 경로와 runtime allowlist를 닫고 Android 경로·기기 사전검사를 내부 검증했다.",remain:"승인 기기 프로필과 과거 URL·캐시 PWA 비활성을 실제 환경에서 확인한다."},
+      {epic:"EPIC-01",id:"FP-001",name:"제품 목적과 안전 우선순위",score:100,evidence:"목적지 없이도 안전 Gate를 통과한 위험안내가 작동하고 경로 안내와 근거리 위험 역할을 분리했다.",remain:"실기기·대상 사용자 시험으로 제품 목적과 과신 방지 문구를 검증한다."},
+
+      {epic:"EPIC-02",id:"FP-017",name:"보행 시작·화면 이탈 일시정지",score:100,evidence:"ACTIVE/PAUSED 상태기계, background 출력 차단, 명시적 재개와 stale callback 폐기를 구현·검증했다.",remain:"잠금·홈·통화·프로세스 종료를 실제 기기에서 검증한다."},
+      {epic:"EPIC-02",id:"FP-018",name:"보행 종료·복구 상태",score:100,evidence:"보행 세대와 작업 세대로 늦은 결과를 차단하고 시작·재개 readiness와 안전정지를 내부 검증했다.",remain:"실기기 lifecycle 시험과 정식 시험 증거가 남았다."},
+      {epic:"EPIC-02",id:"NPC-PERMISSION-SESSION-LIFECYCLE",name:"권한·로그인·동의 상태 분리",score:100,evidence:"권한·로그인·원본·자동신고·망 동의를 독립 보존하고 철회·만료 때 필요한 기능만 닫는다.",remain:"실기기 권한 변경·재시작·인증만료와 운영 접수 경로를 검증한다."},
+      {epic:"EPIC-02",id:"FP-004",name:"전맹·저시력 우선 사용자와 사전교육",score:100,evidence:"안전 범위, 접근 가능한 3단계 온보딩과 필수 연습 상태기계를 구현·검증하고 최신 UI를 통합했다.",remain:"실제 사용자·보호자 확인 공급자·TalkBack 환경에서 관찰시험을 한다."},
+      {epic:"EPIC-02",id:"FP-005",name:"공식 사용환경과 횡단보도 한계",score:100,evidence:"GPS·카메라 품질과 날씨·공사·혼잡 확인을 나누고 미승인 상태를 fail-closed하도록 내부 검증했다.",remain:"생산 카메라 품질 입력과 승인 기기·날씨별 현장 프로필을 연결한다."},
+      {epic:"EPIC-02",id:"FP-006",name:"단독 보행 목표와 휴대전화 장착",score:100,evidence:"가슴형·목걸이형 후보, 장착 확인·재확인과 품질 실패 출력 억제 흐름을 구현·검증했다.",remain:"여러 체형·기기·거치대에서 장착각과 품질 기준을 실측 승인한다."},
+      {epic:"EPIC-02",id:"FP-010",name:"첫 실행과 회원가입",score:100,evidence:"안내→연령→동의→가입→SMS→보호자→로그인→권한→기기점검 순서를 상태기계로 고정하고 내부 검증했다.",remain:"실제 계정 DB와 SMS·보호자 확인 공급자를 연결한다."},
+      {epic:"EPIC-02",id:"FP-011",name:"장기 로그인 유지",score:100,evidence:"1회용 refresh 회전·재사용 차단·기기별 폐기와 Android Keystore 저장을 구현·검증했다.",remain:"운영 만료값, 보호 API 자동갱신과 실제 네트워크 부분실패를 검증한다."},
+      {epic:"EPIC-02",id:"FP-013",name:"첫 실행 통합 동의",score:100,evidence:"원본·자동신고·이동통신망·학습 동의를 분리하고 서버 영수증·철회 fail-closed를 내부 검증했다.",remain:"최종 법률 문구와 보호자·TalkBack 실사용 검증이 남았다."},
+      {epic:"EPIC-02",id:"FP-015",name:"사용 중 철회·계정 삭제",score:100,evidence:"철회와 삭제를 구분하고 새 처리를 즉시 닫으며 Android→Gateway→Backend 삭제 경로와 상태 조회를 내부 검증했다.",remain:"향후 영속 대기열·원본 저장소까지 삭제 범위를 연결한다."},
+      {epic:"EPIC-02",id:"FP-014",name:"권한 거부·철회 시 기능별 처리",score:100,evidence:"카메라·위치·마이크 권한별 기능 차단, 설정 복귀 재검사와 명시적 재개를 내부 검증했다.",remain:"실제 Android 권한 만료·철회·설정 왕복 시험이 남았다."},
+      {epic:"EPIC-02",id:"FP-016",name:"카메라 중심 보행 화면",score:100,evidence:"보행 화면과 상태 출력을 구성하고 화면 이탈 시 즉시 일시정지하며 release에서 개발 입력을 숨기도록 내부 검증했다.",remain:"화면읽기·회전·장시간 보행을 실제 기기에서 검증한다."},
+      {epic:"EPIC-02",id:"FP-012",name:"여러 기기 로그인·한 번에 한 보행",score:100,evidence:"기기별 세션과 서버 권위 보행 lease, 인계·중복 요청·오프라인 전 소유자 종료를 내부 구현했다.",remain:"두 실제 기기와 불안정 네트워크에서 충돌·인계를 검증한다."},
+
+      {epic:"EPIC-03",id:"FP-047",name:"사용자·관리자 로그인과 권한 분리",score:100,evidence:"사용자 앱·Gateway·관리자 앱 권위를 분리하고 관리자 비밀번호·TOTP·고위험 1회 인증·감사를 구현했다.",remain:"운영 계정과 실제 등록 기기로 권한·폐기 훈련을 수행한다."},
+      {epic:"EPIC-03",id:"FP-008",name:"관리자용 Android 앱",score:100,evidence:"별도 adminapp에서 로그인·검수·중복판정·수동 기관전달 기록과 장애 격리를 구현·검증했다.",remain:"별도 앱 식별값·서명·사설 배포와 실제 기관전달 흐름을 검증한다."},
+      {epic:"EPIC-03",id:"FP-046",name:"개인정보 수집·보존·사용자 권리",score:100,evidence:"privacy DB 제약, 개인정보 요청, 계정삭제 API와 one-shot 실제 삭제·최소권한 역할을 내부 검증했다.",remain:"EPIC-07 원본 저장소별 보존·삭제와 운영 scheduler를 연결한다."},
+      {epic:"EPIC-03",id:"NPC-SINGLE-ADMIN-RECOVERY",name:"한 명의 관리자와 계정 복구",score:100,evidence:"외부 복구자료 custody, 분실 세션 폐기, 고위험 동결·재인증과 감사 경계를 내부 검증했다.",remain:"실제 휴대전화 분실과 외부 복구자료를 사용한 Gate 훈련이 남았다."},
+      {epic:"EPIC-03",id:"FP-048",name:"암호화·키 회전·보안사고",score:100,evidence:"Android·Gateway·서버·백업 암호화 경계와 Gateway 7종 상태 일괄 키 회전, 실패 복구를 내부 검증했다.",remain:"실제 TLS·Secret Manager/KMS·분리 복원과 독립 보안검토가 남았다."},
+
+      {epic:"EPIC-04",id:"FP-022",name:"TMAP 목적지 검색과 큰 경로",score:100,evidence:"후보 3개씩 읽기, 명시 선택, 저장 TMAP 경로·GPS 기반 방향과 남은 거리 계산을 구현·검증했다.",remain:"실제 TMAP·GPS에서 검색·회전·도착 사용자 확인을 현장 검증한다."},
+      {epic:"EPIC-04",id:"FP-023",name:"경로 이탈·재탐색·TMAP 장애",score:100,evidence:"연속 이탈 판정, 사용자 선택형 재탐색·재확인·종료, 암호화 경로 snapshot과 global safe-stop을 구현했다.",remain:"야외 GPS·TMAP 장애와 실제 사용자 선택 흐름을 검증한다."},
+      {epic:"EPIC-04",id:"NPC-NAVIGATION-ROUTE-DIRECTION",name:"경로·진행방향·보폭 책임 분리",score:100,evidence:"GPS는 이동방향, TMAP은 경로, 센서는 카메라 방향, 보폭은 진행량 보조로만 사용하도록 고정했다.",remain:"실외 회전·GPS 흔들림·센서 오차를 실기기로 확인한다."},
+      {epic:"EPIC-04",id:"FP-024",name:"점자블록 경로 보조와 손상 처리",score:100,evidence:"신뢰 가능한 TMAP 경로 안의 점자블록만 보조하고 경로 밖·손상·불확실 관측은 안내에서 제외한다.",remain:"실제 점자블록·깊이·GPS·회전센서 조합을 현장에서 시험한다."},
+
+      {epic:"EPIC-05",id:"FP-019",name:"휴대전화 내부 물체 후보 탐지",score:50,evidence:"13종 후보 모델, TFLite 실행·추적·거리 pipeline과 내부 테스트가 있다.",remain:"승인 모델·allowlist에 결속하고 반복 탐지 실패를 전체 안전정지에 연결한다."},
+      {epic:"EPIC-05",id:"FP-020",name:"위험 등급·우선순위·행동 안내",score:75,evidence:"거리·추적·접근 여부에 따른 위험 선택과 안내 우선순위·반복 제한 로직이 있다.",remain:"STOP 문구를 정확히 고정하고 WARNING 전용 진동과 불확실 후보 무안내를 추가한다."},
+      {epic:"EPIC-05",id:"FP-021",name:"탐지대상·카메라 품질·거리 근거",score:50,evidence:"프레임 전처리, ARCore 깊이·좌표 정렬·신뢰도·신선도 구성요소가 있다.",remain:"밝기·가림·흔들림·장착각 사전 Gate와 탐지 후 class·거리·신뢰도 Gate를 통합한다."},
+
+      {epic:"EPIC-06",id:"FP-025",name:"길라잡이 호출어와 단말내 음성인식",score:25,evidence:"버튼식 Android 음성인식과 제한 명령 파서는 있으나 상시 호출어 흐름은 없다.",remain:"활성 보행 전용 ‘길라잡이’ 호출어, 오프라인 강제와 듣기 시작·끝 신호를 구현한다."},
+      {epic:"EPIC-06",id:"FP-027",name:"단말내 음성안내·진동 대체",score:100,evidence:"오프라인 한국어 TTS 사전확인과 반복 실패 시 화면·진동 안내 뒤 전체 안전정지를 구현했다.",remain:"지원 기기의 실제 오프라인 음성팩·진동·TalkBack 충돌을 검증한다."},
+      {epic:"EPIC-06",id:"FP-029",name:"장애 확인창의 접근 가능한 조작",score:100,evidence:"권한·장애 시 이유, 종료·설정·재검사와 명시적 재개를 제공하는 접근 가능 표면을 구현했다.",remain:"TalkBack만으로 각 장애에서 종료·설정 왕복·재검사를 실기기 검증한다."},
+      {epic:"EPIC-06",id:"FP-028",name:"Android 화면읽기 지원 범위",score:50,evidence:"화면읽기 활성 감지, contentDescription·상태 안내와 일부 포커스·표시 개선이 있다.",remain:"가입부터 삭제·복구까지 전체 화면 읽기 순서와 상태변경 포커스를 완결한다."},
+      {epic:"EPIC-06",id:"FP-030",name:"화면 미확인 사용과 시각 접근성",score:50,evidence:"일부 큰 버튼·상태 안내와 온보딩 접근성 개선이 반영됐다.",remain:"전 화면 큰 글자·대비·48dp 터치영역·확대·회전을 적용하고 저시력·전맹 시험을 한다."},
+      {epic:"EPIC-06",id:"FP-026",name:"음성 명령·확인·중재",score:50,evidence:"등록 명령, 부정 표현·낮은 신뢰 거부와 위험안내 우선순위의 기본 parser가 있다.",remain:"일시정지·재개·종료 상태전이와 비가역 작업의 접근 가능한 이중 확인을 완성한다."},
+
+      {epic:"EPIC-07",id:"NPC-RAW-ORIGINAL-COLLECTION",name:"활성 보행 중 원본 수집",score:0,evidence:"field log 후보 구조는 있지만 정식 release 제품 경로는 원본을 저장하지 않는 구현을 선택한다.",remain:"영상·음성·정확 위치·센서·경로·탐지·성능 원본을 공통 manifest/chunk로 암호화 수집한다."},
+      {epic:"EPIC-07",id:"NPC-DATA-LIFECYCLE",name:"보존기간과 삭제기한",score:50,evidence:"신고 180일 경계, 계정삭제 one-shot, 백업 35일 상한 등 일부 저장소 수명주기는 있다.",remain:"단말·검역·학습·백업·권리요청까지 모든 저장소의 TTL·hold·삭제 receipt를 통합한다."},
+
+      {epic:"EPIC-08",id:"FP-031",name:"손상 점자블록 자동신고",score:25,evidence:"반복 관측 기반 신고 후보 생성과 동의 Gate 일부는 있으나 올바른 대기열 전송 흐름은 없다.",remain:"보행 중 전송을 금지하고 종료 뒤 암호화 queue에 넣어 허용망에서 조용히 전송한다."},
+      {epic:"EPIC-08",id:"FP-032",name:"신고 중복·재시도·처리 단계",score:50,evidence:"Gateway 크기·동시수·속도 제한과 서버 신고 처리 일부가 있다.",remain:"고정 신고 ID, 서버 idempotency, 상태조회·receipt와 부분실패 재시도를 끝까지 연결한다."},
+      {epic:"EPIC-08",id:"FP-035",name:"보행 중 단말 저장·정지 후 전송",score:0,evidence:"현재 영속 queue가 없고 기존 후보는 정책과 반대로 즉시 인터넷 전송 경로를 사용한다.",remain:"보행 중 네트워크 전송 금지, 정지+허용망 전송, 움직임 재개 즉시 중단을 구현한다."},
+      {epic:"EPIC-08",id:"NPC-AUTO-REPORT",name:"자동신고 공통 정책",score:25,evidence:"후보 생성·자동신고 선택 상태의 기반은 있으나 재부팅 가능한 안전 전송 pipeline이 없다.",remain:"지속 동의, 무알림 처리, 영속 queue·망 조건·30일 제한을 하나의 흐름으로 구현한다."},
+      {epic:"EPIC-08",id:"FP-034",name:"수집할 사용자 활동자료 목록",score:0,evidence:"일부 field log 타입은 있으나 승인 원본 목록을 실제 release 수집·저장하는 경로는 꺼져 있다.",remain:"영상·깊이·음성·위치·센서·경로·탐지·신고·성능 schema와 암호화 저장을 구현한다."},
+      {epic:"EPIC-08",id:"FP-036",name:"서버 확인 뒤 단말 삭제·서버 보존",score:25,evidence:"서버 신고 삭제 worker와 보존 기반은 있으나 chunk receipt와 단말 원본 삭제 연결은 없다.",remain:"SHA-256 수신확인과 서버 영속 확인 뒤 정확히 같은 단말 사본만 삭제한다."},
+      {epic:"EPIC-08",id:"NPC-PHONE-QUEUE-CAPACITY",name:"휴대전화 대기자료 용량",score:0,evidence:"암호화 영속 대기열·재부팅 복원·byte 상한 구현을 제품 경로에서 확인하지 못했다.",remain:"30일·byte 상한, 오래된 자료 정리와 새 자료 조용한 보류를 구현한다."},
+      {epic:"EPIC-08",id:"FP-033",name:"관리자 검수·기관 전달·사용자 피드백",score:75,evidence:"별도 관리자 앱의 승인·반려·중복판정과 수동 기관 전달 기록이 구현됐다.",remain:"신고 목록·상세·상태 알림과 제출본·수신 증거를 한 흐름으로 완결한다."},
+
+      {epic:"EPIC-09",id:"FP-043",name:"지속 장애 시 멈출 기능 범위",score:50,evidence:"TTS·권한·TMAP 일부 실패 안전정지와 서버 용량 동작은 연결됐으나 통합 조정기는 부분적이다.",remain:"카메라·거리·위치·AI·음성·자원 장애를 하나의 중앙 안전상태에 모은다."},
+      {epic:"EPIC-09",id:"FP-044",name:"오프라인·일부 기능 제한",score:50,evidence:"오프라인 TTS와 일부 제한모드·용량 보류는 있으나 신고 영속 queue가 없다.",remain:"비행기모드·재부팅·queue 가득 참에서 안전기능 유지와 자료 보류를 검증한다."},
+      {epic:"EPIC-09",id:"FP-045",name:"저장공간·배터리·발열·복구",score:25,evidence:"서버 저장공간 상태는 연결됐지만 단말 배터리·발열·카메라 신선도·추론지연 통합은 미완성이다.",remain:"기기 자원별 축소·전체정지·복구 상태와 지원폰 실측 임계값을 구현한다."},
+      {epic:"EPIC-09",id:"NPC-SERVER-CAPACITY-STATE-SYNC",name:"서버 용량상태 단말 전달",score:100,evidence:"Backend→Gateway→Android exact 5필드 상태, single-flight·암호화 cache·generation fence를 구현했다.",remain:"운영 서버 부하·stale·장애 조건과 실제 단말에서 Gate를 검증한다."},
+      {epic:"EPIC-09",id:"NPC-SERVER-STORAGE-CAPACITY",name:"서버 원본·백업 용량과 저장비",score:75,evidence:"local filesystem producer와 70·85·95·100% 상태·35일 백업 상한·readiness 기반을 구현했다.",remain:"클라우드 원본 저장소·offsite backup·실제 비용 측정과 복원을 수행한다."},
+      {epic:"EPIC-09",id:"FP-040",name:"휴대전화·서버 역할과 단일 Gateway",score:75,evidence:"Android 보호 경로를 독립 Gateway로 모으고 세션·route·method·크기·시간·속도 제한을 적용했다.",remain:"운영 사용자 계정과 모든 관리자·쓰기 API의 역할·idempotency를 통합한다."},
+      {epic:"EPIC-09",id:"FP-041",name:"계정·공간 DB와 대용량 원본 저장소",score:50,evidence:"PostgreSQL/PostGIS 메타데이터와 신고 파일 분리, 일부 동의·삭제 모델이 있다.",remain:"계정·원본 object storage·KMS·수신확인·이관·삭제 완료표식을 구현한다."},
+      {epic:"EPIC-09",id:"FP-042",name:"외부 비밀키·대기자료·중복방지",score:50,evidence:"지도·backend 비밀을 앱에서 분리하고 Gateway 자원 제한과 일부 멱등 경계를 구현했다.",remain:"내구성 queue, 모든 쓰기 idempotency, 일일 사용량·월비용 차단을 구현한다."},
+
+      {epic:"EPIC-10",id:"FP-037",name:"현재 모델의 사용 위치",score:25,evidence:"13종 후보 모델과 provenance는 있으나 배포 부적격 후보가 주 실행 설정에 남아 있다.",remain:"승인된 모델·앱·설정 묶음에서만 위험안내·자동신고를 허용한다."},
+      {epic:"EPIC-10",id:"FP-039",name:"모델 등록·교체·이전 정상판 복구",score:25,evidence:"후보 registry와 fallback 코드 기반은 있으나 승인된 이전 정상 조합이 없다.",remain:"서명된 모델·앱·기준값 manifest와 원자적 rollback을 구현·훈련한다."},
+      {epic:"EPIC-10",id:"FP-038",name:"재학습·안전검사·독립평가",score:25,evidence:"수동 학습·기초 데이터 검사·후보 등록 도구는 있다.",remain:"출처·동의·그룹 분할·잠긴 시험셋·독립평가·철회자료 제거 pipeline을 완성한다."},
+
+      {epic:"EPIC-11",id:"FP-051",name:"앱 배포·버전 일치·업데이트·복구",score:50,evidence:"release APK를 source commit·HTTPS origin·provenance에 결속하고 잘못된 값이면 빌드를 막는다.",remain:"실제 서명, 단계 배포, 보행 중 업데이트 연기와 이전 정상판 rollback을 훈련한다."},
+      {epic:"EPIC-11",id:"FP-053",name:"백업·복원·비용·용량 운영",score:75,evidence:"암호화·서명 백업, 격리 복원 검증기, 전용 계정·공유 잠금과 35일 보존 틀을 구현했다.",remain:"실제 DB·object backup을 만들어 격리 restore하고 클라우드 비용을 측정한다."},
+      {epic:"EPIC-11",id:"FP-052",name:"운영 상태 확인·알림·관리자 지원",score:75,evidence:"Backend readiness, loopback Gateway health와 민감정보 없는 bounded telemetry를 구현했다.",remain:"중앙 dashboard·alert 전달·주/대체 on-call과 실제 장애훈련을 연결한다."},
+      {epic:"EPIC-11",id:"FP-054",name:"유지보수·안전 배포·서비스 종료",score:50,evidence:"백업 공유 잠금·readiness·일부 안전 중단 기반은 있다.",remain:"신규 보행 차단, 진행 보행 안전종료, migration·canary·rollback·서비스 종료를 훈련한다."},
+
+      {epic:"EPIC-12",id:"FP-049",name:"출시 전 기능·안전·접근성 시험",score:0,evidence:"시험 계획은 있으나 정식시험은 0/279이고 고정 출시 후보의 실행 결과가 없다.",remain:"하나의 불변 후보로 자동·실폰·접근성·현장·보안·개인정보 시험 279건을 실행한다."},
+      {epic:"EPIC-12",id:"FP-050",name:"휴대전화 성능·현장 사용자 시험",score:0,evidence:"일부 모델 계측 도구 외에 카메라·ARCore·TTS·진동·TMAP 동시 장시간 현장시험은 없다.",remain:"지원폰별 열·배터리·FPS·지연·queue와 대상 사용자 현장시험을 수행한다."}
+    ];
+
+    const gates = [
+      {id:"GATE-PHONE-QUEUE-BYTE-LIMIT",name:"휴대전화 대기자료 실제 용량 한도",need:"영속 queue 구현 뒤 지원폰별 byte·30일 상한과 가득 찬 상태를 실측"},
+      {id:"GATE-SERVER-CAPACITY-STATE-CONTRACT",name:"서버 용량상태 단말 전달 규칙",need:"실제 서버·Gateway·Android에서 70·85·95·100%, stale·복구를 고정 후보로 검증"},
+      {id:"GATE-RAW-COLLECTION-RELEASE-REVIEW",name:"무가림 원본 수집 출시 전 독립 검토",need:"원본 pipeline 완성 뒤 개인정보·보안 독립 검토와 승인 기록"},
+      {id:"GATE-CLOUD-COST-MEASUREMENT",name:"실제 클라우드 저장비 측정",need:"선택한 Google/AWS 무료 환경의 실제 저장·전송·백업 사용량과 월 비용 측정"},
+      {id:"GATE-SINGLE-ADMIN-RECOVERY-DRILL",name:"관리자 휴대전화 분실 복구훈련",need:"외부 복구자료로 새 기기 등록, 기존 세션 폐기, 고위험 동결·복귀를 실제 수행"}
+    ];
+
+    const statusLabel = score => ({100:"로컬 완료",75:"대부분 구현",50:"부분 구현",25:"착수",0:"미구현"})[score];
+    const scoreClass = score => `s${score}`;
+    const overall = Math.round(features.reduce((sum, item) => sum + item.score, 0) / features.length);
+
+    function progressMarkup(score) {
+      return `<div class="mini-progress" aria-label="구현률 ${score}퍼센트"><span>${score}%</span><div class="track"><span style="width:${score}%"></span></div></div>`;
+    }
+
+    function renderSummary() {
+      const body = document.getElementById("epic-summary-body");
+      body.replaceChildren();
+      Object.entries(epicMeta).forEach(([epic, meta]) => {
+        const items = features.filter(item => item.epic === epic);
+        const average = Math.round(items.reduce((sum, item) => sum + item.score, 0) / items.length);
+        const row = document.createElement("tr");
+        row.innerHTML = `<td><b>${epic}</b><br>${meta.name}</td><td class="num">${items.length}</td><td class="num"><b>${average}%</b></td><td>${meta.summary}</td><td>${meta.next}</td>`;
+        body.append(row);
+      });
+    }
+
+    function renderFeatures() {
+      const query = document.getElementById("search").value.trim().toLocaleLowerCase("ko");
+      const epic = document.getElementById("epic-filter").value;
+      const status = document.getElementById("status-filter").value;
+      const visible = features.filter(item => {
+        const searchable = `${item.epic} ${item.id} ${item.name} ${item.evidence} ${item.remain}`.toLocaleLowerCase("ko");
+        return (!query || searchable.includes(query)) && (!epic || item.epic === epic) && (!status || String(item.score) === status);
+      });
+      const body = document.getElementById("feature-body");
+      body.replaceChildren();
+      visible.forEach(item => {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td><b>${item.epic}</b><br>${epicMeta[item.epic].name}</td><td class="id">${item.id}</td><td class="feature-name">${item.name}</td><td>${progressMarkup(item.score)}</td><td><span class="badge ${scoreClass(item.score)}">${statusLabel(item.score)}</span></td><td class="evidence">${item.evidence}</td><td class="remaining">${item.remain}</td>`;
+        body.append(row);
+      });
+      document.getElementById("result-line").textContent = `전체 63개 중 ${visible.length}개 표시`;
+    }
+
+    function renderGates() {
+      const body = document.getElementById("gate-body");
+      gates.forEach(gate => {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td class="id">${gate.id}</td><td class="feature-name">${gate.name}</td><td><span class="badge s0">0% · NOT_RUN</span></td><td class="remaining">${gate.need}</td>`;
+        body.append(row);
+      });
+    }
+
+    function initialize() {
+      document.getElementById("overall-score").textContent = `${overall}%`;
+      document.getElementById("complete-count").textContent = `${features.filter(item => item.score === 100).length}개`;
+      const epicFilter = document.getElementById("epic-filter");
+      Object.entries(epicMeta).forEach(([id, meta]) => epicFilter.add(new Option(`${id} ${meta.name}`, id)));
+      ["search", "epic-filter", "status-filter"].forEach(id => document.getElementById(id).addEventListener(id === "search" ? "input" : "change", renderFeatures));
+      document.getElementById("reset").addEventListener("click", () => {
+        document.getElementById("search").value = "";
+        document.getElementById("epic-filter").value = "";
+        document.getElementById("status-filter").value = "";
+        renderFeatures();
+        document.getElementById("search").focus();
+      });
+      renderSummary();
+      renderFeatures();
+      renderGates();
+    }
+
+    initialize();
+  </script>
+</body>
+</html>

@@ -35,8 +35,10 @@ import {
   maxGatewayStateEnvelopeBytes
 } from "./encrypted-json-store.js";
 
-export const INTEGRATED_CONSENT_POLICY_VERSION = "FP-013-1.0.0";
+export const INTEGRATED_CONSENT_POLICY_VERSION = "FP-013-1.1.0";
 export const INTEGRATED_CONSENT_CONTROL = "integrated-consent";
+export const INTEGRATED_CONSENT_BOOTSTRAP_CONTROL =
+  "integrated-consent-bootstrap";
 export const CONSENT_INSTALLATION_HEADER = "x-walksafe-consent-installation-id";
 export const CONSENT_POLICY_HEADER = "x-walksafe-consent-policy-version";
 export const CONSENT_REVISION_HEADER = "x-walksafe-consent-revision";
@@ -74,10 +76,10 @@ export type IntegratedConsentItemVersions = {
 
 export const INTEGRATED_CONSENT_ITEM_VERSIONS: IntegratedConsentItemVersions =
   Object.freeze({
-    raw_source_collection: "FP-013-RAW-1.0.0",
-    automatic_reporting: "FP-013-AUTO-1.0.0",
+    raw_source_collection: "FP-013-RAW-1.1.0",
+    automatic_reporting: "FP-013-AUTO-1.1.0",
     mobile_network_transfer: "FP-013-MOBILE-1.0.0",
-    training_reuse: "FP-013-TRAINING-1.0.0"
+    training_reuse: "FP-013-TRAINING-1.1.0"
   });
 
 const ITEM_VERSION_PATTERNS: Record<IntegratedConsentKey, RegExp> = {
@@ -95,7 +97,7 @@ export type IntegratedConsentSelections = {
 };
 
 export type IntegratedConsentConfirmation = {
-  schema_version: "walksafe.integrated-consent-confirmation.v1";
+  schema_version: "walksafe.integrated-consent-confirmation.v2";
   current: true;
   installation_id: string;
   request_id: string;
@@ -105,10 +107,11 @@ export type IntegratedConsentConfirmation = {
   revision: number;
   selections: IntegratedConsentSelections;
   confirmed_at: string;
-  receipt_sha256: string;
+  gateway_audit_record_sha256: string;
+  backend_consent_receipt_sha256: string;
 };
 
-type IntegratedConsentEvent = {
+type LegacyIntegratedConsentEvent = {
   request_id: string;
   policy_version: string;
   item_versions: IntegratedConsentItemVersions;
@@ -120,8 +123,35 @@ type IntegratedConsentEvent = {
   receipt_sha256: string;
 };
 
+type IntegratedConsentEventV4 = {
+  request_id: string;
+  policy_version: string;
+  item_versions: IntegratedConsentItemVersions;
+  client_revision: number;
+  revision: number;
+  selections: IntegratedConsentSelections;
+  confirmed_at: string;
+  previous_gateway_audit_record_sha256: string | null;
+  gateway_audit_record_sha256: string;
+  backend_consent_receipt_sha256: string;
+  backend_recorded_at: string;
+  field_actor_binding_sha256: string;
+};
+
+type IntegratedConsentEventV5 = IntegratedConsentEventV4 & {
+  expected_previous_backend_receipt_sha256: string | null;
+};
+
+type AuthoritativeIntegratedConsentEvent =
+  | IntegratedConsentEventV4
+  | IntegratedConsentEventV5;
+
+type IntegratedConsentEvent =
+  | LegacyIntegratedConsentEvent
+  | AuthoritativeIntegratedConsentEvent;
+
 type IntegratedConsentState = {
-  schema_version: 2 | 3;
+  schema_version: 2 | 3 | 4 | 5 | 6;
   installation_id: string;
   control_secret_sha256: string;
   field_actor_binding?: {
@@ -138,6 +168,7 @@ type ConsentRecordInput = {
   policyVersion: string;
   itemVersions: IntegratedConsentItemVersions;
   clientRevision: number;
+  expectedPreviousBackendReceiptSha256: string | null;
   controlSecret: string;
   selections: IntegratedConsentSelections;
   fieldActorBindingId: string;
@@ -156,6 +187,19 @@ type PrivacyConsentReceiptV2 = {
   client_revision: number;
   receipt_sha256: string;
   recorded_at: string;
+};
+
+export type IntegratedConsentBootstrap = {
+  schema_version: "walksafe.integrated-consent-bootstrap.v1";
+  status: "READY" | "RECONSENT_REQUIRED";
+  source: "CURRENT_CONSENT" | "SIGNUP_CONSENT" | "NONE";
+  installation_id: string;
+  policy_version: string;
+  item_versions: IntegratedConsentItemVersions;
+  client_revision_floor: number;
+  selections: IntegratedConsentSelections | null;
+  source_receipt_sha256: string | null;
+  expected_previous_backend_receipt_sha256: string | null;
 };
 
 class IntegratedConsentRequestError extends Error {
@@ -229,12 +273,36 @@ function sha256(value: string): string {
 
 function eventReceipt(
   installationId: string,
-  event: Omit<IntegratedConsentEvent, "receipt_sha256">
+  event: Omit<LegacyIntegratedConsentEvent, "receipt_sha256">
 ): string {
   return sha256(canonicalJson({
     installation_id: installationId,
     ...event
   }));
+}
+
+function eventAuditRecord(
+  installationId: string,
+  event:
+    | Omit<IntegratedConsentEventV4, "gateway_audit_record_sha256">
+    | Omit<IntegratedConsentEventV5, "gateway_audit_record_sha256">
+): string {
+  return sha256(canonicalJson({
+    installation_id: installationId,
+    ...event
+  }));
+}
+
+function authoritativeEvent(
+  event: IntegratedConsentEvent
+): event is AuthoritativeIntegratedConsentEvent {
+  return "gateway_audit_record_sha256" in event;
+}
+
+function eventAuditSha256(event: IntegratedConsentEvent): string {
+  return authoritativeEvent(event)
+    ? event.gateway_audit_record_sha256
+    : event.receipt_sha256;
 }
 
 function validIsoInstant(value: unknown): value is string {
@@ -527,7 +595,11 @@ function validState(value: unknown, installationId: string): value is Integrated
     !state ||
     !(
       (state.schema_version === 2 && exactKeys(state, legacyKeys)) ||
-      (state.schema_version === 3 && exactKeys(state, currentKeys))
+      ((state.schema_version === 3 ||
+        state.schema_version === 4 ||
+        state.schema_version === 5 ||
+        state.schema_version === 6) &&
+        exactKeys(state, currentKeys))
     ) ||
     state.installation_id !== installationId ||
     typeof state.control_secret_sha256 !== "string" ||
@@ -537,7 +609,7 @@ function validState(value: unknown, installationId: string): value is Integrated
   ) {
     return false;
   }
-  if (state.schema_version === 3 && state.field_actor_binding !== null) {
+  if (state.schema_version !== 2 && state.field_actor_binding !== null) {
     const binding = objectValue(state.field_actor_binding);
     if (
       !binding ||
@@ -551,13 +623,66 @@ function validState(value: unknown, installationId: string): value is Integrated
       return false;
     }
   }
-  let previousReceipt: string | null = null;
+  let previousAuditRecord: string | null = null;
   let previousClientRevision = 0;
+  const previousClientRevisionByActor = new Map<string, number>();
+  let foundAuthoritativeEvent = false;
   for (let index = 0; index < state.events.length; index += 1) {
     const rawEvent = objectValue(state.events[index]);
     if (
       !rawEvent ||
-      !exactKeys(rawEvent, [
+      typeof rawEvent.request_id !== "string" ||
+      !REQUEST_ID.test(rawEvent.request_id) ||
+      typeof rawEvent.policy_version !== "string" ||
+      !POLICY_VERSION.test(rawEvent.policy_version) ||
+      !Number.isSafeInteger(rawEvent.client_revision) ||
+      (rawEvent.client_revision as number) <= 0 ||
+      rawEvent.revision !== index + 1 ||
+      !validIsoInstant(rawEvent.confirmed_at)
+    ) {
+      return false;
+    }
+    const selections = selectionsOrNull(rawEvent.selections);
+    const itemVersions = itemVersionsOrNull(rawEvent.item_versions);
+    if (!selections || !itemVersions) return false;
+    if ("receipt_sha256" in rawEvent) {
+      if (
+        foundAuthoritativeEvent ||
+        (rawEvent.client_revision as number) <= previousClientRevision ||
+        !exactKeys(rawEvent, [
+          "request_id",
+          "policy_version",
+          "item_versions",
+          "client_revision",
+          "revision",
+          "selections",
+          "confirmed_at",
+          "previous_receipt_sha256",
+          "receipt_sha256"
+        ]) ||
+        rawEvent.previous_receipt_sha256 !== previousAuditRecord ||
+        typeof rawEvent.receipt_sha256 !== "string" ||
+        !SHA256.test(rawEvent.receipt_sha256)
+      ) return false;
+      const eventWithoutReceipt: Omit<LegacyIntegratedConsentEvent, "receipt_sha256"> = {
+        request_id: rawEvent.request_id,
+        policy_version: rawEvent.policy_version,
+        item_versions: itemVersions,
+        client_revision: rawEvent.client_revision as number,
+        revision: rawEvent.revision,
+        selections,
+        confirmed_at: rawEvent.confirmed_at,
+        previous_receipt_sha256:
+          rawEvent.previous_receipt_sha256 as string | null
+      };
+      if (eventReceipt(installationId, eventWithoutReceipt) !== rawEvent.receipt_sha256) {
+        return false;
+      }
+      previousAuditRecord = rawEvent.receipt_sha256;
+    } else {
+      const hasExpectedPrevious =
+        "expected_previous_backend_receipt_sha256" in rawEvent;
+      const eventKeys = [
         "request_id",
         "policy_version",
         "item_versions",
@@ -565,42 +690,97 @@ function validState(value: unknown, installationId: string): value is Integrated
         "revision",
         "selections",
         "confirmed_at",
-        "previous_receipt_sha256",
-        "receipt_sha256"
-      ]) ||
-      typeof rawEvent.request_id !== "string" ||
-      !REQUEST_ID.test(rawEvent.request_id) ||
-      typeof rawEvent.policy_version !== "string" ||
-      !POLICY_VERSION.test(rawEvent.policy_version) ||
-      !Number.isSafeInteger(rawEvent.client_revision) ||
-      (rawEvent.client_revision as number) <= previousClientRevision ||
-      rawEvent.revision !== index + 1 ||
-      !validIsoInstant(rawEvent.confirmed_at) ||
-      rawEvent.previous_receipt_sha256 !== previousReceipt ||
-      typeof rawEvent.receipt_sha256 !== "string" ||
-      !SHA256.test(rawEvent.receipt_sha256)
-    ) {
-      return false;
+        "previous_gateway_audit_record_sha256",
+        "gateway_audit_record_sha256",
+        "backend_consent_receipt_sha256",
+        "backend_recorded_at",
+        "field_actor_binding_sha256",
+        ...(hasExpectedPrevious
+          ? ["expected_previous_backend_receipt_sha256"]
+          : [])
+      ];
+      if (
+        (state.schema_version !== 4 &&
+          state.schema_version !== 5 &&
+          state.schema_version !== 6) ||
+        (hasExpectedPrevious &&
+          state.schema_version !== 5 &&
+          state.schema_version !== 6) ||
+        !exactKeys(rawEvent, eventKeys) ||
+        rawEvent.previous_gateway_audit_record_sha256 !== previousAuditRecord ||
+        typeof rawEvent.gateway_audit_record_sha256 !== "string" ||
+        !SHA256.test(rawEvent.gateway_audit_record_sha256) ||
+        typeof rawEvent.backend_consent_receipt_sha256 !== "string" ||
+        !SHA256.test(rawEvent.backend_consent_receipt_sha256) ||
+        !validWholeSecondInstant(rawEvent.backend_recorded_at) ||
+        typeof rawEvent.field_actor_binding_sha256 !== "string" ||
+        !SHA256.test(rawEvent.field_actor_binding_sha256) ||
+        (hasExpectedPrevious &&
+          rawEvent.expected_previous_backend_receipt_sha256 !== null &&
+          (typeof rawEvent.expected_previous_backend_receipt_sha256 !== "string" ||
+            !SHA256.test(rawEvent.expected_previous_backend_receipt_sha256)))
+      ) return false;
+      const actorClientRevision = previousClientRevisionByActor.get(
+        rawEvent.field_actor_binding_sha256
+      ) ?? 0;
+      if (
+        (state.schema_version === 6 &&
+          (rawEvent.client_revision as number) <= actorClientRevision) ||
+        (state.schema_version !== 6 &&
+          (rawEvent.client_revision as number) <= previousClientRevision)
+      ) return false;
+      const eventWithoutAudit = {
+        request_id: rawEvent.request_id,
+        policy_version: rawEvent.policy_version,
+        item_versions: itemVersions,
+        client_revision: rawEvent.client_revision as number,
+        revision: rawEvent.revision,
+        selections,
+        confirmed_at: rawEvent.confirmed_at,
+        previous_gateway_audit_record_sha256:
+          rawEvent.previous_gateway_audit_record_sha256 as string | null,
+        backend_consent_receipt_sha256: rawEvent.backend_consent_receipt_sha256,
+        backend_recorded_at: rawEvent.backend_recorded_at,
+        field_actor_binding_sha256: rawEvent.field_actor_binding_sha256,
+        ...(hasExpectedPrevious
+          ? {
+              expected_previous_backend_receipt_sha256:
+                rawEvent.expected_previous_backend_receipt_sha256 as string | null
+            }
+          : {})
+      };
+      if (eventAuditRecord(installationId, eventWithoutAudit) !== rawEvent.gateway_audit_record_sha256) {
+        return false;
+      }
+      previousAuditRecord = rawEvent.gateway_audit_record_sha256;
+      previousClientRevisionByActor.set(
+        rawEvent.field_actor_binding_sha256,
+        rawEvent.client_revision as number
+      );
+      foundAuthoritativeEvent = true;
     }
-    const selections = selectionsOrNull(rawEvent.selections);
-    const itemVersions = itemVersionsOrNull(rawEvent.item_versions);
-    if (!selections || !itemVersions) return false;
-    const eventWithoutReceipt: Omit<IntegratedConsentEvent, "receipt_sha256"> = {
-      request_id: rawEvent.request_id,
-      policy_version: rawEvent.policy_version,
-      item_versions: itemVersions,
-      client_revision: rawEvent.client_revision as number,
-      revision: rawEvent.revision,
-      selections,
-      confirmed_at: rawEvent.confirmed_at,
-      previous_receipt_sha256:
-        rawEvent.previous_receipt_sha256 as string | null
-    };
-    if (eventReceipt(installationId, eventWithoutReceipt) !== rawEvent.receipt_sha256) {
-      return false;
-    }
-    previousReceipt = rawEvent.receipt_sha256;
     previousClientRevision = rawEvent.client_revision as number;
+  }
+  if (
+    state.schema_version !== 4 &&
+    state.schema_version !== 5 &&
+    state.schema_version !== 6 &&
+    foundAuthoritativeEvent
+  ) return false;
+  const currentEvent = state.events.at(-1);
+  if (
+    (state.schema_version === 4 ||
+      state.schema_version === 5 ||
+      state.schema_version === 6) &&
+    currentEvent &&
+    authoritativeEvent(currentEvent)
+  ) {
+    const binding = objectValue(state.field_actor_binding);
+    if (
+      !binding ||
+      binding.actor_sha256 !== currentEvent.field_actor_binding_sha256 ||
+      binding.consent_revision !== currentEvent.revision
+    ) return false;
   }
   return true;
 }
@@ -640,7 +820,7 @@ function readState(installationId: string): IntegratedConsentState {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return {
-        schema_version: 3,
+        schema_version: 6,
         installation_id: installationId,
         control_secret_sha256: "",
         field_actor_binding: null,
@@ -752,10 +932,10 @@ async function withInstallationLock<T>(
 
 function confirmation(
   installationId: string,
-  event: IntegratedConsentEvent
+  event: AuthoritativeIntegratedConsentEvent
 ): IntegratedConsentConfirmation {
   return {
-    schema_version: "walksafe.integrated-consent-confirmation.v1",
+    schema_version: "walksafe.integrated-consent-confirmation.v2",
     current: true,
     installation_id: installationId,
     request_id: event.request_id,
@@ -765,13 +945,15 @@ function confirmation(
     revision: event.revision,
     selections: { ...event.selections },
     confirmed_at: event.confirmed_at,
-    receipt_sha256: event.receipt_sha256
+    gateway_audit_record_sha256: event.gateway_audit_record_sha256,
+    backend_consent_receipt_sha256: event.backend_consent_receipt_sha256
   };
 }
 
 function currentConfirmation(
   installationId: string,
-  controlSecret: string
+  controlSecret: string,
+  fieldActorBindingId: string
 ): IntegratedConsentConfirmation | null {
   if (!INSTALLATION_ID.test(installationId)) {
     throw new IntegratedConsentRequestError(400, "integrated_consent_installation_invalid", "Installation ID is invalid.");
@@ -781,6 +963,32 @@ function currentConfirmation(
   if (state.events.length === 0) return null;
   verifyControlSecret(state, controlSecret, false);
   const current = state.events.at(-1);
+  if (current && !authoritativeEvent(current)) {
+    throw new IntegratedConsentRequestError(
+      409,
+      "integrated_consent_reconsent_required",
+      "A Backend-confirmed consent receipt is required."
+    );
+  }
+  const binding = state.field_actor_binding ?? null;
+  const actorSha256 = sha256(
+    `integrated-consent-field-actor\0${fieldActorBindingId}`
+  );
+  if (
+    current &&
+    (!binding ||
+      binding.consent_revision !== current.revision ||
+      !timingSafeEqual(
+        Buffer.from(binding.actor_sha256, "hex"),
+        Buffer.from(actorSha256, "hex")
+      ))
+  ) {
+    throw new IntegratedConsentRequestError(
+      409,
+      "integrated_consent_actor_reconsent_required",
+      "Consent must be confirmed for the current field actor."
+    );
+  }
   return current ? confirmation(installationId, current) : null;
 }
 
@@ -823,6 +1031,16 @@ async function recordConsent(
     );
   }
   if (
+    input.expectedPreviousBackendReceiptSha256 !== null &&
+    !SHA256.test(input.expectedPreviousBackendReceiptSha256)
+  ) {
+    throw new IntegratedConsentRequestError(
+      400,
+      "integrated_consent_expected_previous_receipt_invalid",
+      "Expected previous Backend receipt must be null or a lowercase SHA-256."
+    );
+  }
+  if (
     input.fieldActorBindingId.trim().length === 0 ||
     input.fieldActorBindingId.length > 128
   ) {
@@ -842,8 +1060,19 @@ async function recordConsent(
       `integrated-consent-field-actor\0${input.fieldActorBindingId}`
     );
     const binding = state.field_actor_binding ?? null;
-    const prior = state.events.find((event) => event.request_id === input.requestId);
+    const prior = state.events.find((event) =>
+      event.request_id === input.requestId &&
+      (!authoritativeEvent(event) ||
+        event.field_actor_binding_sha256 === actorSha256)
+    );
     if (prior) {
+      if (!authoritativeEvent(prior)) {
+        throw new IntegratedConsentRequestError(
+          409,
+          "integrated_consent_reconsent_required",
+          "A new Backend-confirmed consent decision is required."
+        );
+      }
       if (binding && !timingSafeEqual(
         Buffer.from(binding.actor_sha256, "hex"),
         Buffer.from(actorSha256, "hex")
@@ -857,12 +1086,16 @@ async function recordConsent(
       if (
         prior.policy_version !== input.policyVersion ||
         prior.client_revision !== input.clientRevision ||
+        !("expected_previous_backend_receipt_sha256" in prior) ||
+        prior.expected_previous_backend_receipt_sha256 !==
+          input.expectedPreviousBackendReceiptSha256 ||
         !equalItemVersions(prior.item_versions, input.itemVersions) ||
         !equalSelections(prior.selections, input.selections)
       ) {
         throw new IntegratedConsentRequestError(409, "integrated_consent_request_conflict", "Request ID was already used.");
       }
-      if (state.events.at(-1)?.receipt_sha256 !== prior.receipt_sha256) {
+      if (state.events.at(-1) === undefined ||
+        eventAuditSha256(state.events.at(-1)!) !== prior.gateway_audit_record_sha256) {
         throw new IntegratedConsentRequestError(
           409,
           "integrated_consent_request_stale",
@@ -871,14 +1104,15 @@ async function recordConsent(
       }
       const synced = await syncBackend();
       if (synced.error) return { error: synced.error };
-      if (!binding) {
-        state.schema_version = 3;
-        state.field_actor_binding = {
-          actor_sha256: actorSha256,
-          consent_revision: prior.revision,
-          bound_at: new Date(nowMs).toISOString()
-        };
-        writeState(state);
+      if (
+        synced.receipt.receipt_sha256 !== prior.backend_consent_receipt_sha256 ||
+        synced.receipt.recorded_at !== prior.backend_recorded_at
+      ) {
+        throw new IntegratedConsentRequestError(
+          502,
+          "integrated_consent_backend_receipt_mismatch",
+          "The consent Backend returned a different receipt for an existing request."
+        );
       }
       return {
         confirmation: confirmation(input.installationId, prior),
@@ -889,7 +1123,10 @@ async function recordConsent(
     if (state.events.length >= MAX_EVENTS) {
       throw new IntegratedConsentRequestError(503, "integrated_consent_capacity_unavailable", "Consent ledger capacity is unavailable.");
     }
-    const currentClientRevision = state.events.at(-1)?.client_revision ?? 0;
+    const currentClientRevision = state.events.findLast((event) =>
+      authoritativeEvent(event) &&
+      event.field_actor_binding_sha256 === actorSha256
+    )?.client_revision ?? 0;
     if (input.clientRevision <= currentClientRevision) {
       throw new IntegratedConsentRequestError(
         409,
@@ -897,8 +1134,12 @@ async function recordConsent(
         "A newer consent decision is already stored."
       );
     }
-    const previousReceipt = state.events.at(-1)?.receipt_sha256 ?? null;
-    const eventWithoutReceipt: Omit<IntegratedConsentEvent, "receipt_sha256"> = {
+    const previousAuditRecord = state.events.at(-1)
+      ? eventAuditSha256(state.events.at(-1)!)
+      : null;
+    const synced = await syncBackend();
+    if (synced.error) return { error: synced.error };
+    const eventWithoutAudit: Omit<IntegratedConsentEventV5, "gateway_audit_record_sha256"> = {
       request_id: input.requestId,
       policy_version: input.policyVersion,
       item_versions: { ...input.itemVersions },
@@ -906,15 +1147,21 @@ async function recordConsent(
       revision: state.events.length + 1,
       selections: { ...input.selections },
       confirmed_at: new Date(nowMs).toISOString(),
-      previous_receipt_sha256: previousReceipt
+      previous_gateway_audit_record_sha256: previousAuditRecord,
+      backend_consent_receipt_sha256: synced.receipt.receipt_sha256,
+      backend_recorded_at: synced.receipt.recorded_at,
+      field_actor_binding_sha256: actorSha256,
+      expected_previous_backend_receipt_sha256:
+        input.expectedPreviousBackendReceiptSha256
     };
-    const event: IntegratedConsentEvent = {
-      ...eventWithoutReceipt,
-      receipt_sha256: eventReceipt(input.installationId, eventWithoutReceipt)
+    const event: IntegratedConsentEventV5 = {
+      ...eventWithoutAudit,
+      gateway_audit_record_sha256: eventAuditRecord(
+        input.installationId,
+        eventWithoutAudit
+      )
     };
-    const synced = await syncBackend();
-    if (synced.error) return { error: synced.error };
-    state.schema_version = 3;
+    state.schema_version = 6;
     state.events.push(event);
     state.field_actor_binding = {
       actor_sha256: actorSha256,
@@ -1018,6 +1265,136 @@ function privacyConsentReceiptOrNull(
   };
 }
 
+function integratedConsentBootstrapOrNull(
+  value: unknown,
+  installationId: string
+): IntegratedConsentBootstrap | null {
+  const payload = objectValue(value);
+  if (
+    !payload ||
+    !exactKeys(payload, [
+      "schema_version",
+      "status",
+      "source",
+      "installation_id",
+      "policy_version",
+      "item_versions",
+      "client_revision_floor",
+      "selections",
+      "source_receipt_sha256",
+      "expected_previous_backend_receipt_sha256"
+    ]) ||
+    payload.schema_version !== "walksafe.integrated-consent-bootstrap.v1" ||
+    (payload.status !== "READY" && payload.status !== "RECONSENT_REQUIRED") ||
+    (payload.source !== "CURRENT_CONSENT" &&
+      payload.source !== "SIGNUP_CONSENT" &&
+      payload.source !== "NONE") ||
+    payload.installation_id !== installationId ||
+    payload.policy_version !== INTEGRATED_CONSENT_POLICY_VERSION ||
+    !Number.isSafeInteger(payload.client_revision_floor) ||
+    (payload.client_revision_floor as number) < 0
+  ) {
+    return null;
+  }
+  const itemVersions = itemVersionsOrNull(payload.item_versions);
+  if (!itemVersions || !equalItemVersions(itemVersions, INTEGRATED_CONSENT_ITEM_VERSIONS)) {
+    return null;
+  }
+  const selections = payload.selections === null
+    ? null
+    : selectionsOrNull(payload.selections);
+  if (payload.selections !== null && selections === null) return null;
+  const sourceReceipt = payload.source_receipt_sha256;
+  const expectedPrevious = payload.expected_previous_backend_receipt_sha256;
+  if (
+    (sourceReceipt !== null &&
+      (typeof sourceReceipt !== "string" || !SHA256.test(sourceReceipt))) ||
+    (expectedPrevious !== null &&
+      (typeof expectedPrevious !== "string" || !SHA256.test(expectedPrevious))) ||
+    (expectedPrevious === null && payload.client_revision_floor !== 0) ||
+    (payload.status === "READY" &&
+      (payload.source === "NONE" || selections === null)) ||
+    (payload.status === "RECONSENT_REQUIRED" &&
+      (payload.source !== "NONE" || selections !== null)) ||
+    (payload.source === "NONE" && sourceReceipt !== null) ||
+    (payload.source !== "NONE" && sourceReceipt === null)
+  ) {
+    return null;
+  }
+  return {
+    schema_version: "walksafe.integrated-consent-bootstrap.v1",
+    status: payload.status,
+    source: payload.source,
+    installation_id: installationId,
+    policy_version: INTEGRATED_CONSENT_POLICY_VERSION,
+    item_versions: { ...itemVersions },
+    client_revision_floor: payload.client_revision_floor as number,
+    selections,
+    source_receipt_sha256: sourceReceipt as string | null,
+    expected_previous_backend_receipt_sha256: expectedPrevious as string | null
+  };
+}
+
+async function fetchIntegratedConsentBootstrap(
+  request: Request,
+  installationId: string,
+  context: IntegratedConsentBackendContext
+): Promise<Response> {
+  if (!INSTALLATION_ID.test(installationId)) {
+    throw new IntegratedConsentRequestError(
+      400,
+      "integrated_consent_installation_invalid",
+      "Installation ID is invalid."
+    );
+  }
+  const headers = proxyRequestHeaders(
+    request,
+    { accept: "application/json" },
+    context.accountGeneration
+  );
+  if (
+    !headers.get(ACTOR_ID_HEADER) ||
+    headers.get(ACCOUNT_GENERATION_HEADER) !== String(context.accountGeneration) ||
+    !headers.get(ACTOR_ASSERTION_HEADER)
+  ) {
+    return gatewayConsentBackendError(
+      503,
+      "gateway_backend_assertion_unavailable",
+      "The backend actor assertion is unavailable."
+    );
+  }
+  const query = new URLSearchParams({
+    installation_id: installationId,
+    policy_version: INTEGRATED_CONSENT_POLICY_VERSION
+  });
+  const init: RequestInit = {
+    method: "GET",
+    headers,
+    cache: "no-store",
+    signal: context.signal
+  };
+  const target = backendUrl(`/privacy/consent-bootstrap?${query.toString()}`);
+  const response = context.fetchImpl
+    ? await fetchBackend(request, target, init, 15_000, context.fetchImpl)
+    : await fetchBackend(request, target, init);
+  if (response.status !== 200) return toBackendResponse(response);
+  const bootstrap = integratedConsentBootstrapOrNull(
+    await boundedConsentBackendJson(response),
+    installationId
+  );
+  if (!bootstrap) {
+    return gatewayConsentBackendError(
+      502,
+      "gateway_upstream_protocol_invalid",
+      "The consent Backend returned an invalid bootstrap response."
+    );
+  }
+  return Response.json(bootstrap, {
+    status: 200,
+    headers: { "cache-control": "no-store" }
+  });
+}
+
 async function syncConsentToBackend(
   request: Request,
   input: ConsentRecordInput,
@@ -1028,6 +1405,8 @@ async function syncConsentToBackend(
     installation_id: input.installationId,
     request_id: input.requestId,
     client_revision: input.clientRevision,
+    expected_previous_backend_receipt_sha256:
+      input.expectedPreviousBackendReceiptSha256,
     policy_version: input.policyVersion,
     item_versions: input.itemVersions,
     raw_source_collection: input.selections.raw_source_collection,
@@ -1112,6 +1491,44 @@ function errorResponse(error: unknown): Response {
   );
 }
 
+export async function handleIntegratedConsentBootstrapRequest(
+  request: Request,
+  backendContext: IntegratedConsentBackendContext
+): Promise<Response> {
+  const url = new URL(request.url);
+  const queryKeys = [...url.searchParams.keys()];
+  try {
+    if (
+      request.method !== "GET" ||
+      queryKeys.length !== 3 ||
+      !queryKeys.includes("control") ||
+      !queryKeys.includes("installation_id") ||
+      !queryKeys.includes("policy_version") ||
+      url.searchParams.get("control") !== INTEGRATED_CONSENT_BOOTSTRAP_CONTROL
+    ) {
+      throw new IntegratedConsentRequestError(
+        400,
+        "integrated_consent_bootstrap_query_invalid",
+        "Consent bootstrap query is invalid."
+      );
+    }
+    if (url.searchParams.get("policy_version") !== INTEGRATED_CONSENT_POLICY_VERSION) {
+      throw new IntegratedConsentRequestError(
+        409,
+        "integrated_consent_reconsent_required",
+        "The current consent policy version is required."
+      );
+    }
+    return await fetchIntegratedConsentBootstrap(
+      request,
+      url.searchParams.get("installation_id") ?? "",
+      backendContext
+    );
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
 export async function handleIntegratedConsentRequest(
   request: Request,
   backendContext?: IntegratedConsentBackendContext
@@ -1132,9 +1549,17 @@ export async function handleIntegratedConsentRequest(
       if (url.searchParams.get("policy_version") !== INTEGRATED_CONSENT_POLICY_VERSION) {
         throw new IntegratedConsentRequestError(409, "integrated_consent_reconsent_required", "The current consent policy version is required.");
       }
+      if (!backendContext) {
+        throw new IntegratedConsentRequestError(
+          401,
+          "integrated_consent_field_session_required",
+          "A live field session is required to read consent."
+        );
+      }
       const current = currentConfirmation(
         url.searchParams.get("installation_id") ?? "",
-        request.headers.get(CONSENT_CONTROL_SECRET_HEADER)?.trim() ?? ""
+        request.headers.get(CONSENT_CONTROL_SECRET_HEADER)?.trim() ?? "",
+        backendContext.fieldActorBindingId
       );
       if (!current) {
         throw new IntegratedConsentRequestError(404, "integrated_consent_not_found", "No consent selection is stored.");
@@ -1173,13 +1598,17 @@ export async function handleIntegratedConsentRequest(
         "policy_version",
         "item_versions",
         "client_revision",
+        "expected_previous_backend_receipt_sha256",
         "selections"
       ]) ||
       payload.schema_version !== "walksafe.integrated-consent-request.v1" ||
       typeof payload.installation_id !== "string" ||
       typeof payload.request_id !== "string" ||
       typeof payload.policy_version !== "string" ||
-      typeof payload.client_revision !== "number"
+      typeof payload.client_revision !== "number" ||
+      (payload.expected_previous_backend_receipt_sha256 !== null &&
+        (typeof payload.expected_previous_backend_receipt_sha256 !== "string" ||
+          !SHA256.test(payload.expected_previous_backend_receipt_sha256)))
     ) {
       throw new IntegratedConsentRequestError(400, "integrated_consent_request_invalid", "Consent request is invalid.");
     }
@@ -1201,6 +1630,8 @@ export async function handleIntegratedConsentRequest(
       policyVersion: payload.policy_version,
       itemVersions,
       clientRevision: payload.client_revision,
+      expectedPreviousBackendReceiptSha256:
+        payload.expected_previous_backend_receipt_sha256 as string | null,
       controlSecret:
         request.headers.get(CONSENT_CONTROL_SECRET_HEADER)?.trim() ?? "",
       selections,
@@ -1263,11 +1694,18 @@ export async function authorizeIntegratedConsentRequest(
       const state = readState(installationId);
       verifyControlSecret(state, controlSecret, false);
       const currentEvent = state.events.at(-1);
+      if (currentEvent && !authoritativeEvent(currentEvent)) {
+        throw new IntegratedConsentRequestError(
+          409,
+          "integrated_consent_reconsent_required",
+          "A Backend-confirmed consent receipt is required."
+        );
+      }
       const current = currentEvent
         ? confirmation(installationId, currentEvent)
         : null;
       const receiptMatches = current !== null && timingSafeEqual(
-        Buffer.from(current.receipt_sha256, "hex"),
+        Buffer.from(current.backend_consent_receipt_sha256, "hex"),
         Buffer.from(receipt, "hex")
       );
       if (
@@ -1319,10 +1757,17 @@ export async function authorizeIntegratedConsentRequest(
       }
       const actorSha256 = sha256(`integrated-consent-field-actor\0${fieldActorId}`);
       const binding = state.field_actor_binding ?? null;
-      if (binding && !timingSafeEqual(
-        Buffer.from(binding.actor_sha256, "hex"),
-        Buffer.from(actorSha256, "hex")
-      )) {
+      const actorMatches = binding !== null && currentEvent !== undefined &&
+        binding.consent_revision === currentEvent.revision &&
+        timingSafeEqual(
+          Buffer.from(binding.actor_sha256, "hex"),
+          Buffer.from(actorSha256, "hex")
+        ) &&
+        timingSafeEqual(
+          Buffer.from(currentEvent.field_actor_binding_sha256, "hex"),
+          Buffer.from(actorSha256, "hex")
+        );
+      if (!actorMatches) {
         return {
           error: Response.json(
             {
@@ -1334,15 +1779,6 @@ export async function authorizeIntegratedConsentRequest(
             { status: 409, headers: { "cache-control": "no-store" } }
           )
         };
-      }
-      if (!binding) {
-        state.schema_version = 3;
-        state.field_actor_binding = {
-          actor_sha256: actorSha256,
-          consent_revision: current.revision,
-          bound_at: new Date().toISOString()
-        };
-        writeState(state);
       }
       return { confirmation: current };
     });

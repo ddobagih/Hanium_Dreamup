@@ -62,6 +62,34 @@ REPORT_STATUS_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/status$"
 )
+ADMIN_REPORT_STATUS_PATH_PATTERN = re.compile(
+    r"^/admin/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
+    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/status$"
+)
+ADMIN_REPORT_DELIVERY_PACKAGE_PATH_PATTERN = re.compile(
+    r"^/admin/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
+    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/delivery-packages$"
+)
+ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN = re.compile(
+    r"^/admin/report-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
+    r"[0-9a-fA-F]{12}/status$"
+)
+ADMIN_INCIDENT_STATUS_PATH_PATTERN = re.compile(
+    r"^/admin/incidents/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
+    r"[0-9a-fA-F]{12}/status$"
+)
+ADMIN_RAW_COLLECTION_DECISION_PATH_PATTERN = re.compile(
+    r"^/admin/raw-collections/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
+    r"[0-9a-fA-F]{12}/decisions$"
+)
+ADMIN_RAW_COLLECTION_HOLD_PATH_PATTERN = re.compile(
+    r"^/admin/raw-collections/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
+    r"[0-9a-fA-F]{12}/legal-holds$"
+)
 REPORT_ORIGINAL_GRANT_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/original-access-grants$"
@@ -200,6 +228,33 @@ def classify_admin_operation(method: str, path: str) -> AdminOperation | None:
     normalized_path = normalize_admin_operation_path(path)
     if normalized_path is None:
         return None
+    if (
+        normalized_method == "GET"
+        and normalized_path == "/admin/raw-collections/quarantine"
+    ):
+        return AdminOperation(
+            "admin.raw_collection.list", normalized_method, normalized_path, "HIGH"
+        )
+    if (
+        normalized_method == "POST"
+        and ADMIN_RAW_COLLECTION_DECISION_PATH_PATTERN.fullmatch(normalized_path)
+    ):
+        return AdminOperation(
+            "admin.raw_collection.purpose_decide",
+            normalized_method,
+            normalized_path,
+            "HIGH",
+        )
+    if (
+        normalized_method == "POST"
+        and ADMIN_RAW_COLLECTION_HOLD_PATH_PATTERN.fullmatch(normalized_path)
+    ):
+        return AdminOperation(
+            "admin.raw_collection.legal_hold",
+            normalized_method,
+            normalized_path,
+            "HIGH",
+        )
     if normalized_method == "GET" and normalized_path == "/reports/export":
         return AdminOperation("report.export", normalized_method, normalized_path, "HIGH")
     for operation_path, action in (
@@ -212,6 +267,46 @@ def classify_admin_operation(method: str, path: str) -> AdminOperation | None:
     if normalized_method == "PATCH" and REPORT_STATUS_PATH_PATTERN.fullmatch(normalized_path):
         return AdminOperation(
             "report.status.patch",
+            normalized_method,
+            normalized_path,
+            "HIGH",
+        )
+    if (
+        normalized_method == "PATCH"
+        and ADMIN_REPORT_STATUS_PATH_PATTERN.fullmatch(normalized_path)
+    ):
+        return AdminOperation(
+            "admin.report.status.update",
+            normalized_method,
+            normalized_path,
+            "HIGH",
+        )
+    if (
+        normalized_method == "POST"
+        and ADMIN_REPORT_DELIVERY_PACKAGE_PATH_PATTERN.fullmatch(normalized_path)
+    ):
+        return AdminOperation(
+            "admin.report.delivery_package.create",
+            normalized_method,
+            normalized_path,
+            "HIGH",
+        )
+    if (
+        normalized_method == "PATCH"
+        and ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN.fullmatch(normalized_path)
+    ):
+        return AdminOperation(
+            "admin.report_request.status.update",
+            normalized_method,
+            normalized_path,
+            "HIGH",
+        )
+    if (
+        normalized_method == "PATCH"
+        and ADMIN_INCIDENT_STATUS_PATH_PATTERN.fullmatch(normalized_path)
+    ):
+        return AdminOperation(
+            "admin.incident.status.update",
             normalized_method,
             normalized_path,
             "HIGH",

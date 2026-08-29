@@ -74,6 +74,7 @@ class STTResult:
     duration_sec: float
     segments: list[dict[str, Any]]
     model: str
+    model_revision: str
     acoustic: STTAcousticEvidence
 
 
@@ -98,6 +99,7 @@ class LocalSTTEngine:
         self.compute_type = compute_type or ("float16" if self.device == "cuda" else "int8")
         self.language = language
         self._model = None
+        self._loaded_revision: str | None = None
         self._load_lock = Lock()
 
     def load(self) -> None:
@@ -124,10 +126,13 @@ class LocalSTTEngine:
                     "faster-whisper is not installed. Install with `pip install -r voice/requirements.txt`."
                 ) from exc
             self._model = WhisperModel(str(model_path), device=self.device, compute_type=self.compute_type)
+            self._loaded_revision = self.model_revision
 
     def transcribe_file(self, audio_path: str | Path, beam_size: int = 5) -> STTResult:
         self.load()
         assert self._model is not None
+        if self._loaded_revision is None:
+            raise RuntimeError("STT model revision is not bound to the loaded model")
         start = time.perf_counter()
         segments_iter, info = self._model.transcribe(
             str(audio_path),
@@ -162,5 +167,6 @@ class LocalSTTEngine:
             duration_sec=elapsed,
             segments=segments,
             model=self.model_size,
+            model_revision=self._loaded_revision,
             acoustic=acoustic,
         )

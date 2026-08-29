@@ -11,10 +11,11 @@ import org.junit.Test;
 
 public final class AdminOperationModelsTest {
     @Test
-    public void reviewBodyIsExactSixWithPhysicalNullAndAllReviewsRequired() throws Exception {
+    public void reviewBodyIsExactSevenWithPhysicalNullAndAllReviewsRequired() throws Exception {
         AdminReportDecision approved = new AdminReportDecision(
             AdminReportDecision.Decision.APPROVED,
             "현장 정보와 사진을 확인함",
+            null,
             null,
             true,
             true,
@@ -23,25 +24,42 @@ public final class AdminOperationModelsTest {
         JSONObject body = new JSONObject(new String(approved.requestBody(REPORT_ID), StandardCharsets.UTF_8));
 
         assertEquals(Set.of(
-            "decision", "reason", "duplicate_of_report_id",
+            "decision", "reason", "user_visible_reason", "duplicate_of_report_id",
             "location_reviewed", "photo_reviewed", "privacy_reviewed"
         ), keys(body));
+        assertTrue(body.has("user_visible_reason"));
+        assertTrue(body.isNull("user_visible_reason"));
         assertTrue(body.has("duplicate_of_report_id"));
         assertTrue(body.isNull("duplicate_of_report_id"));
         assertEquals("APPROVED", body.getString("decision"));
 
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.APPROVED, "reason", null, true, false, true
+            AdminReportDecision.Decision.APPROVED, "reason", null, null, true, false, true
         ));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.APPROVED, "reason", OTHER_REPORT_ID, true, true, true
+            AdminReportDecision.Decision.APPROVED, "reason", null, OTHER_REPORT_ID, true, true, true
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
+            AdminReportDecision.Decision.APPROVED,
+            "reason",
+            "승인에는 공개 거절 사유가 없어야 함",
+            null,
+            true,
+            true,
+            true
         ));
     }
 
     @Test
     public void rejectedAndDuplicateKeepExactFlagsWithoutRequiringApprovedCompleteness() throws Exception {
         AdminReportDecision rejected = new AdminReportDecision(
-            AdminReportDecision.Decision.REJECTED, "사진 확인 불가", null, true, false, true
+            AdminReportDecision.Decision.REJECTED,
+            "내부 사진 확인 불가",
+            "사진을 확인할 수 없어 요청을 처리하지 못했습니다.",
+            null,
+            true,
+            false,
+            true
         );
         JSONObject rejectedBody = new JSONObject(new String(
             rejected.requestBody(REPORT_ID), StandardCharsets.UTF_8
@@ -49,7 +67,13 @@ public final class AdminOperationModelsTest {
         assertTrue(!rejectedBody.getBoolean("photo_reviewed"));
 
         AdminReportDecision duplicate = new AdminReportDecision(
-            AdminReportDecision.Decision.DUPLICATE, "위치 중복", OTHER_REPORT_ID, false, true, false
+            AdminReportDecision.Decision.DUPLICATE,
+            "내부 위치 중복",
+            "같은 위치의 기존 신고와 중복됩니다.",
+            OTHER_REPORT_ID,
+            false,
+            true,
+            false
         );
         JSONObject duplicateBody = new JSONObject(new String(
             duplicate.requestBody(REPORT_ID), StandardCharsets.UTF_8
@@ -62,6 +86,7 @@ public final class AdminOperationModelsTest {
         AdminReportDecision duplicate = new AdminReportDecision(
             AdminReportDecision.Decision.DUPLICATE,
             "동일 위치와 사진",
+            "기존 신고와 중복됩니다.",
             OTHER_REPORT_ID,
             true,
             true,
@@ -69,7 +94,10 @@ public final class AdminOperationModelsTest {
         );
         assertThrows(IllegalArgumentException.class, () -> duplicate.requestBody(OTHER_REPORT_ID));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.DUPLICATE, "reason", null, true, true, true
+            AdminReportDecision.Decision.DUPLICATE, "reason", "공개 사유", null, true, true, true
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
+            AdminReportDecision.Decision.REJECTED, "reason", " ", null, true, true, true
         ));
     }
 
@@ -84,6 +112,7 @@ public final class AdminOperationModelsTest {
             "운영자가 전화 접수 후 기록",
             null,
             "2026-08-09T01:02:03Z",
+            1L,
             0L,
             IDEMPOTENCY_KEY
         );
@@ -91,13 +120,14 @@ public final class AdminOperationModelsTest {
 
         assertEquals(Set.of(
             "institution", "channel", "recipient", "status", "external_receipt_id",
-            "reason", "evidence_sha256", "observed_at", "expected_revision", "idempotency_key"
+            "reason", "evidence_sha256", "observed_at", "package_revision", "expected_revision", "idempotency_key"
         ), keys(body));
         assertTrue(body.has("external_receipt_id"));
         assertTrue(body.isNull("external_receipt_id"));
         assertTrue(body.has("evidence_sha256"));
         assertTrue(body.isNull("evidence_sha256"));
         assertEquals("SUBMITTED", body.getString("status"));
+        assertEquals(1L, body.getLong("package_revision"));
         assertEquals(0L, body.getLong("expected_revision"));
     }
 
@@ -110,7 +140,7 @@ public final class AdminOperationModelsTest {
         assertThrows(IllegalArgumentException.class, () -> delivery(null, null, "2026-08-09T01:02:03Z", 0, "not-uuid"));
         assertThrows(IllegalArgumentException.class, () -> new AdminInstitutionDelivery(
             "institution", "phone", "recipient", AdminInstitutionDelivery.Status.ACKNOWLEDGED,
-            null, "reason", null, "2026-08-09T01:02:03Z", 1, IDEMPOTENCY_KEY
+            null, "reason", null, "2026-08-09T01:02:03Z", 1, 1, IDEMPOTENCY_KEY
         ));
     }
 
@@ -123,7 +153,7 @@ public final class AdminOperationModelsTest {
     ) {
         return new AdminInstitutionDelivery(
             "institution", "phone", "recipient", AdminInstitutionDelivery.Status.FAILED,
-            externalReceipt, "reason", evidence, observedAt, revision, idempotencyKey
+            externalReceipt, "reason", evidence, observedAt, 1, revision, idempotencyKey
         );
     }
 

@@ -245,7 +245,7 @@ def test_append_only_audit_tables_reject_truncate(table_name: str) -> None:
             transaction = connection.begin()
             try:
                 with pytest.raises(DBAPIError, match="append-only"):
-                    connection.execute(text(f"TRUNCATE TABLE {table_name}"))
+                    connection.execute(text(f"TRUNCATE TABLE {table_name} CASCADE"))
             finally:
                 transaction.rollback()
     finally:

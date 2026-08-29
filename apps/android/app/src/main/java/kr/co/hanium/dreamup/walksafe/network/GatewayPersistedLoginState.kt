@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.network
 
 import java.util.Collections
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingEvidence
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingFlow
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingSnapshot
 
 internal enum class GatewaySessionStoreResult {
@@ -17,6 +18,7 @@ internal class GatewayPersistedLoginBundle(
     val firstRunEpoch: Long,
     orderedEvidence: List<FirstRunOnboardingEvidence>,
     val session: GatewayFieldSessionPersistence,
+    val firstRunFlow: FirstRunOnboardingFlow = FirstRunOnboardingFlow.LEGACY_PHONE_V3,
 ) {
     val orderedEvidence: List<FirstRunOnboardingEvidence> =
         Collections.unmodifiableList(orderedEvidence.toList())
@@ -274,6 +276,7 @@ internal object GatewayPersistedLoginStatePolicy {
         val sourceVersion = source.session.version()
         val renewedVersion = renewed.session.version()
         return source.firstRunEpoch == renewed.firstRunEpoch &&
+            source.firstRunFlow == renewed.firstRunFlow &&
             source.orderedEvidence == renewed.orderedEvidence &&
             sourceVersion.gatewayBaseUrl == renewedVersion.gatewayBaseUrl &&
             sourceVersion.actorId == renewedVersion.actorId &&
@@ -291,6 +294,7 @@ internal object GatewayPersistedLoginStatePolicy {
         first: GatewayPersistedLoginBundle,
         second: GatewayPersistedLoginBundle,
     ): Boolean = first.firstRunEpoch == second.firstRunEpoch &&
+        first.firstRunFlow == second.firstRunFlow &&
         first.orderedEvidence == second.orderedEvidence &&
         sameSession(first.session, second.session)
 

@@ -12,6 +12,34 @@ class FirstRunOnboardingPolicyTest {
     private val acceptingVerifier = FirstRunOnboardingEvidenceVerifier { _, _ -> true }
 
     @Test
+    fun emailJitAndDeviceCheckAdvanceLocallyWithoutNewReceiptEntries() {
+        val loggedIn = FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
+            FirstRunOnboardingPolicy.initialEmailAccount(2L),
+            actorBinding(),
+            receipt(40),
+        ).current
+        val receiptKeys = loggedIn.completedReceiptHashes.keys
+
+        val jit = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            loggedIn,
+            loggedIn.epoch,
+            loggedIn.revision,
+        )
+        val device = FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(
+            jit.current,
+            jit.current.epoch,
+            jit.current.revision,
+        )
+
+        assertTrue(jit.accepted)
+        assertEquals(FirstRunOnboardingStage.DEVICE_CHECK, jit.current.stage)
+        assertEquals(receiptKeys, jit.current.completedReceiptHashes.keys)
+        assertTrue(device.accepted)
+        assertEquals(FirstRunOnboardingStage.FP004_TRAINING, device.current.stage)
+        assertEquals(receiptKeys, device.current.completedReceiptHashes.keys)
+    }
+
+    @Test
     fun adultCompletesTheOrderedFlowWithoutGuardianApproval() {
         var snapshot = readyForRemoteFlow(FirstRunAgeBand.ADULT_18_PLUS)
         val visited = mutableListOf(snapshot.stage)

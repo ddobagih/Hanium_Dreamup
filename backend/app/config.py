@@ -62,6 +62,7 @@ DEFAULT_INFERENCE_STARTUP_TIMEOUT_SECONDS = 30.0
 DEFAULT_DATABASE_CONNECT_TIMEOUT_SECONDS = 5
 DEFAULT_DATABASE_STATEMENT_TIMEOUT_MS = 10_000
 DEFAULT_FIELD_TEST_SECURITY_ENABLED = "true"
+DEFAULT_RAW_INGEST_ENABLED = "false"
 DEFAULT_ADMIN_SECURITY_ENABLED = "false"
 DEFAULT_ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60
 DEFAULT_ADMIN_STEP_UP_TTL_SECONDS = 5 * 60
@@ -71,6 +72,16 @@ DEFAULT_ADMIN_AUTH_RATE_LIMIT_WINDOW_SECONDS = 5 * 60
 DEFAULT_ADMIN_CREDENTIAL_ISSUER_KEY_FILE = Path(
     "/etc/walksafe/admin-credential-issuer.key"
 )
+DEFAULT_ACCOUNT_OTP_TTL_SECONDS = 10 * 60
+DEFAULT_ACCOUNT_OTP_ATTEMPT_LIMIT = 5
+DEFAULT_ACCOUNT_OTP_RESEND_COOLDOWN_SECONDS = 60
+DEFAULT_ACCOUNT_OTP_DELIVERY_LEASE_SECONDS = 30
+DEFAULT_ACCOUNT_AUTHENTICATION_GLOBAL_LIMIT = 120
+DEFAULT_ACCOUNT_AUTHENTICATION_GLOBAL_WINDOW_SECONDS = 60
+DEFAULT_ACCOUNT_AUTHENTICATION_EMAIL_LIMIT = 10
+DEFAULT_ACCOUNT_AUTHENTICATION_EMAIL_WINDOW_SECONDS = 15 * 60
+DEFAULT_ACCOUNT_AUTHENTICATION_SCRYPT_INFLIGHT_LIMIT = 4
+DEFAULT_ACCOUNT_SMTP_TIMEOUT_SECONDS = 5.0
 MIN_FIELD_TEST_TOKEN_LENGTH = 24
 MIN_PRIVACY_HMAC_SECRET_BYTES = 32
 DEPLOYMENT_ENVIRONMENTS = frozenset({"field", "staging", "production"})
@@ -242,6 +253,37 @@ def _parse_bool(name: str, default: str = "false") -> bool:
     if value in {"0", "false", "no", "off", ""}:
         return False
     raise ValueError(f"{name} must be a boolean")
+
+
+def _parse_optional_base64url_32_byte_key(name: str) -> bytes | None:
+    raw_value = _env_text(name)
+    if not raw_value:
+        return None
+    try:
+        decoded = base64.b64decode(
+            raw_value + "=" * (-len(raw_value) % 4),
+            altchars=b"-_",
+            validate=True,
+        )
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError(
+            f"{name} must be canonical unpadded Base64url for exactly 32 bytes"
+        ) from exc
+    canonical = base64.urlsafe_b64encode(decoded).decode("ascii").rstrip("=")
+    if len(decoded) != 32 or canonical != raw_value:
+        raise ValueError(
+            f"{name} must be canonical unpadded Base64url for exactly 32 bytes"
+        )
+    return decoded
+
+
+def _parse_signup_document_version(name: str, default: str) -> str:
+    value = _env_text(name, default)
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}", value) is None:
+        raise ValueError(
+            f"{name} must be a 1-64 character canonical document version"
+        )
+    return value
 
 
 def validate_admin_totp_secret(raw_secret: str) -> str:
@@ -660,6 +702,78 @@ class Settings:
             "WALKSAFE_FIELD_TEST_SECURITY_ENABLED",
             DEFAULT_FIELD_TEST_SECURITY_ENABLED,
         )
+        self.raw_ingest_enabled = _parse_bool(
+            "WALKSAFE_RAW_INGEST_ENABLED",
+            DEFAULT_RAW_INGEST_ENABLED,
+        )
+        raw_object_dir_text = _env_text("WALKSAFE_RAW_OBJECT_DIR")
+        raw_object_dir = (
+            Path(raw_object_dir_text).expanduser()
+            if raw_object_dir_text
+            else None
+        )
+        self._raw_object_dir_was_absolute = (
+            raw_object_dir.is_absolute() if raw_object_dir is not None else False
+        )
+        self._configured_raw_object_dir = (
+            raw_object_dir.absolute() if raw_object_dir is not None else None
+        )
+        self.raw_object_dir = (
+            raw_object_dir.resolve() if raw_object_dir is not None else None
+        )
+        if self.raw_ingest_enabled and self.raw_object_dir is None:
+            raise ValueError(
+                "WALKSAFE_RAW_OBJECT_DIR is required when raw ingest is enabled"
+            )
+        if self.raw_object_dir is not None:
+            roots_overlap = False
+            for child, parent in (
+                (self.raw_object_dir, self.upload_dir),
+                (self.upload_dir, self.raw_object_dir),
+            ):
+                try:
+                    child.relative_to(parent)
+                except ValueError:
+                    continue
+                roots_overlap = True
+            if roots_overlap:
+                raise ValueError(
+                    "WALKSAFE_RAW_OBJECT_DIR and UPLOAD_DIR must not contain each other"
+                )
+        training_object_dir_text = _env_text("WALKSAFE_TRAINING_OBJECT_DIR")
+        training_object_dir = (
+            Path(training_object_dir_text).expanduser()
+            if training_object_dir_text
+            else None
+        )
+        self._training_object_dir_was_absolute = (
+            training_object_dir.is_absolute()
+            if training_object_dir is not None
+            else False
+        )
+        self._configured_training_object_dir = (
+            training_object_dir.absolute()
+            if training_object_dir is not None
+            else None
+        )
+        self.training_object_dir = (
+            training_object_dir.resolve() if training_object_dir is not None else None
+        )
+        if self.training_object_dir is not None:
+            for other in (self.upload_dir, self.raw_object_dir):
+                if other is None:
+                    continue
+                for child, parent in (
+                    (self.training_object_dir, other),
+                    (other, self.training_object_dir),
+                ):
+                    try:
+                        child.relative_to(parent)
+                    except ValueError:
+                        continue
+                    raise ValueError(
+                        "WALKSAFE_TRAINING_OBJECT_DIR must be disjoint from raw and upload storage"
+                    )
         self.admin_security_enabled = _parse_bool(
             "WALKSAFE_ADMIN_SECURITY_ENABLED",
             DEFAULT_ADMIN_SECURITY_ENABLED,
@@ -721,6 +835,215 @@ class Settings:
         )
         self.upload_backup_reader_group_gid: int | None = None
         self.walksafe_environment = _env_text("WALKSAFE_ENVIRONMENT", "development").lower()
+        self.account_email_encryption_key = _parse_optional_base64url_32_byte_key(
+            "WALKSAFE_ACCOUNT_EMAIL_ENCRYPTION_KEY_B64"
+        )
+        self.account_email_lookup_hmac_key = _parse_optional_base64url_32_byte_key(
+            "WALKSAFE_ACCOUNT_EMAIL_LOOKUP_HMAC_KEY_B64"
+        )
+        self.account_otp_hmac_key = _parse_optional_base64url_32_byte_key(
+            "WALKSAFE_ACCOUNT_OTP_HMAC_KEY_B64"
+        )
+        configured_account_keys = tuple(
+            key
+            for key in (
+                self.account_email_encryption_key,
+                self.account_email_lookup_hmac_key,
+                self.account_otp_hmac_key,
+            )
+            if key is not None
+        )
+        if configured_account_keys and len(configured_account_keys) != 3:
+            raise ValueError(
+                "account email encryption, lookup HMAC, and OTP HMAC keys "
+                "must be configured together"
+            )
+        if len(configured_account_keys) == 3 and len(set(configured_account_keys)) != 3:
+            raise ValueError("account encryption and HMAC keys must be distinct")
+        self.account_email_key_version = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_EMAIL_KEY_VERSION",
+            1,
+        )
+        self.account_otp_ttl_seconds = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_OTP_TTL_SECONDS",
+            DEFAULT_ACCOUNT_OTP_TTL_SECONDS,
+        )
+        self.account_otp_attempt_limit = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_OTP_ATTEMPT_LIMIT",
+            DEFAULT_ACCOUNT_OTP_ATTEMPT_LIMIT,
+        )
+        self.account_otp_resend_cooldown_seconds = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_OTP_RESEND_COOLDOWN_SECONDS",
+            DEFAULT_ACCOUNT_OTP_RESEND_COOLDOWN_SECONDS,
+        )
+        self.account_otp_delivery_lease_seconds = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_OTP_DELIVERY_LEASE_SECONDS",
+            DEFAULT_ACCOUNT_OTP_DELIVERY_LEASE_SECONDS,
+        )
+        if self.account_otp_ttl_seconds > 30 * 60:
+            raise ValueError("WALKSAFE_ACCOUNT_OTP_TTL_SECONDS must be at most 1800")
+        if self.account_otp_attempt_limit > 10:
+            raise ValueError("WALKSAFE_ACCOUNT_OTP_ATTEMPT_LIMIT must be at most 10")
+        if self.account_otp_resend_cooldown_seconds > self.account_otp_ttl_seconds:
+            raise ValueError(
+                "WALKSAFE_ACCOUNT_OTP_RESEND_COOLDOWN_SECONDS must not exceed the OTP TTL"
+            )
+        if self.account_otp_delivery_lease_seconds > min(
+            120,
+            self.account_otp_ttl_seconds,
+        ):
+            raise ValueError(
+                "WALKSAFE_ACCOUNT_OTP_DELIVERY_LEASE_SECONDS must be at most 120 "
+                "and must not exceed the OTP TTL"
+            )
+        self.account_enrollment_global_limit = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_ENROLLMENT_GLOBAL_LIMIT",
+            120,
+        )
+        self.account_enrollment_ip_limit = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_ENROLLMENT_IP_LIMIT",
+            10,
+        )
+        self.account_enrollment_email_limit = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_ENROLLMENT_EMAIL_LIMIT",
+            5,
+        )
+        self.account_enrollment_global_window_seconds = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_ENROLLMENT_GLOBAL_WINDOW_SECONDS",
+            60,
+        )
+        self.account_enrollment_ip_window_seconds = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_ENROLLMENT_IP_WINDOW_SECONDS",
+            10 * 60,
+        )
+        self.account_enrollment_email_window_seconds = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_ENROLLMENT_EMAIL_WINDOW_SECONDS",
+            60 * 60,
+        )
+        if max(
+            self.account_enrollment_global_limit,
+            self.account_enrollment_ip_limit,
+            self.account_enrollment_email_limit,
+        ) > 10_000:
+            raise ValueError("account enrollment rate limits must be at most 10000")
+        if max(
+            self.account_enrollment_global_window_seconds,
+            self.account_enrollment_ip_window_seconds,
+            self.account_enrollment_email_window_seconds,
+        ) > 24 * 60 * 60:
+            raise ValueError(
+                "account enrollment rate-limit windows must be at most 86400 seconds"
+            )
+        self.account_authentication_global_limit = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_AUTHENTICATION_GLOBAL_LIMIT",
+            DEFAULT_ACCOUNT_AUTHENTICATION_GLOBAL_LIMIT,
+        )
+        self.account_authentication_email_limit = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_AUTHENTICATION_EMAIL_LIMIT",
+            DEFAULT_ACCOUNT_AUTHENTICATION_EMAIL_LIMIT,
+        )
+        self.account_authentication_global_window_seconds = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_AUTHENTICATION_GLOBAL_WINDOW_SECONDS",
+            DEFAULT_ACCOUNT_AUTHENTICATION_GLOBAL_WINDOW_SECONDS,
+        )
+        self.account_authentication_email_window_seconds = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_AUTHENTICATION_EMAIL_WINDOW_SECONDS",
+            DEFAULT_ACCOUNT_AUTHENTICATION_EMAIL_WINDOW_SECONDS,
+        )
+        self.account_authentication_scrypt_inflight_limit = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_AUTHENTICATION_SCRYPT_INFLIGHT_LIMIT",
+            DEFAULT_ACCOUNT_AUTHENTICATION_SCRYPT_INFLIGHT_LIMIT,
+        )
+        if max(
+            self.account_authentication_global_limit,
+            self.account_authentication_email_limit,
+        ) > 10_000:
+            raise ValueError(
+                "account authentication rate limits must be at most 10000"
+            )
+        if max(
+            self.account_authentication_global_window_seconds,
+            self.account_authentication_email_window_seconds,
+        ) > 24 * 60 * 60:
+            raise ValueError(
+                "account authentication rate-limit windows must be at most "
+                "86400 seconds"
+            )
+        if self.account_authentication_scrypt_inflight_limit > 16:
+            raise ValueError(
+                "WALKSAFE_ACCOUNT_AUTHENTICATION_SCRYPT_INFLIGHT_LIMIT must "
+                "be at most 16"
+            )
+        self.account_signup_document_versions = {
+            "terms_of_service": _parse_signup_document_version(
+                "WALKSAFE_SIGNUP_TERMS_OF_SERVICE_VERSION",
+                "walksafe.terms-of-service.v1",
+            ),
+            "privacy_notice": _parse_signup_document_version(
+                "WALKSAFE_SIGNUP_PRIVACY_NOTICE_VERSION",
+                "walksafe.privacy-notice.v1",
+            ),
+            "location_terms": _parse_signup_document_version(
+                "WALKSAFE_SIGNUP_LOCATION_TERMS_VERSION",
+                "walksafe.location-terms.v1",
+            ),
+            "raw_original": _parse_signup_document_version(
+                "WALKSAFE_SIGNUP_RAW_ORIGINAL_VERSION",
+                "FP-013-RAW-1.1.0",
+            ),
+            "automatic_reporting": _parse_signup_document_version(
+                "WALKSAFE_SIGNUP_AUTOMATIC_REPORTING_VERSION",
+                "FP-013-AUTO-1.1.0",
+            ),
+            "training_reuse": _parse_signup_document_version(
+                "WALKSAFE_SIGNUP_TRAINING_REUSE_VERSION",
+                "FP-013-TRAINING-1.1.0",
+            ),
+        }
+        self.account_smtp_host = _env_text("WALKSAFE_ACCOUNT_SMTP_HOST")
+        self.account_smtp_port = _parse_positive_int(
+            "WALKSAFE_ACCOUNT_SMTP_PORT",
+            465,
+        )
+        if self.account_smtp_port > 65_535:
+            raise ValueError("WALKSAFE_ACCOUNT_SMTP_PORT must be at most 65535")
+        self.account_smtp_security = _env_text(
+            "WALKSAFE_ACCOUNT_SMTP_SECURITY",
+            "implicit_tls",
+        ).lower()
+        if self.account_smtp_security not in {"implicit_tls", "starttls"}:
+            raise ValueError(
+                "WALKSAFE_ACCOUNT_SMTP_SECURITY must be implicit_tls or starttls"
+            )
+        self.account_smtp_username = _env_text("WALKSAFE_ACCOUNT_SMTP_USERNAME")
+        self.account_smtp_password = _env_text("WALKSAFE_ACCOUNT_SMTP_PASSWORD")
+        if bool(self.account_smtp_username) != bool(self.account_smtp_password):
+            raise ValueError(
+                "WALKSAFE_ACCOUNT_SMTP_USERNAME and WALKSAFE_ACCOUNT_SMTP_PASSWORD "
+                "must be configured together"
+            )
+        self.account_smtp_from = _env_text("WALKSAFE_ACCOUNT_SMTP_FROM")
+        if any(
+            character in self.account_smtp_from
+            for character in ("\r", "\n", "\x00")
+        ):
+            raise ValueError("WALKSAFE_ACCOUNT_SMTP_FROM contains invalid characters")
+        if bool(self.account_smtp_host) != bool(self.account_smtp_from):
+            raise ValueError(
+                "WALKSAFE_ACCOUNT_SMTP_HOST and WALKSAFE_ACCOUNT_SMTP_FROM "
+                "must be configured together"
+            )
+        self.account_smtp_timeout_seconds = _parse_positive_float(
+            "WALKSAFE_ACCOUNT_SMTP_TIMEOUT_SECONDS",
+            DEFAULT_ACCOUNT_SMTP_TIMEOUT_SECONDS,
+        )
+        if self.account_smtp_timeout_seconds > 30:
+            raise ValueError(
+                "WALKSAFE_ACCOUNT_SMTP_TIMEOUT_SECONDS must be at most 30"
+            )
+        self.account_smtp_configured = bool(
+            self.account_smtp_host and self.account_smtp_from
+        )
         self.admin_credential_issuer_key_file = (
             _parse_admin_credential_issuer_key_file(
                 raw_admin_credential_issuer_key_file,
@@ -864,6 +1187,10 @@ class Settings:
                 raise ValueError(
                     "WALKSAFE_PRIVACY_HMAC_SECRET must contain at least 32 UTF-8 bytes"
                 )
+            if len(configured_account_keys) != 3:
+                raise ValueError(
+                    "deployment environments require all account encryption and HMAC keys"
+                )
             if self.gateway_session_secret in {
                 value for value in (self.field_test_token, self.admin_token) if value
             }:
@@ -933,6 +1260,62 @@ class Settings:
                     "UPLOAD_DIR must be a service-owned ACL-free 2750 real directory "
                     "in the dedicated backup-reader group"
                 )
+            if self._configured_raw_object_dir is not None:
+                if not self._raw_object_dir_was_absolute:
+                    raise ValueError(
+                        "WALKSAFE_RAW_OBJECT_DIR must be absolute in deployment environments"
+                    )
+                try:
+                    raw_object_metadata = self._configured_raw_object_dir.stat(
+                        follow_symlinks=False
+                    )
+                except OSError as exc:
+                    raise ValueError(
+                        "WALKSAFE_RAW_OBJECT_DIR must exist before deployment startup"
+                    ) from exc
+                if (
+                    self._configured_raw_object_dir.is_symlink()
+                    or not self._configured_raw_object_dir.is_dir()
+                    or raw_object_metadata.st_uid != os.geteuid()
+                    or raw_object_metadata.st_gid
+                    != self.upload_backup_reader_group_gid
+                    or stat.S_IMODE(raw_object_metadata.st_mode) != 0o2750
+                    or not _directory_acl_is_absent(
+                        self._configured_raw_object_dir
+                    )
+                ):
+                    raise ValueError(
+                        "WALKSAFE_RAW_OBJECT_DIR must be a service-owned ACL-free "
+                        "2750 real directory in the dedicated backup-reader group"
+                    )
+            if self._configured_training_object_dir is not None:
+                if not self._training_object_dir_was_absolute:
+                    raise ValueError(
+                        "WALKSAFE_TRAINING_OBJECT_DIR must be absolute in deployment environments"
+                    )
+                try:
+                    training_object_metadata = self._configured_training_object_dir.stat(
+                        follow_symlinks=False
+                    )
+                except OSError as exc:
+                    raise ValueError(
+                        "WALKSAFE_TRAINING_OBJECT_DIR must exist before deployment startup"
+                    ) from exc
+                if (
+                    self._configured_training_object_dir.is_symlink()
+                    or not self._configured_training_object_dir.is_dir()
+                    or training_object_metadata.st_uid != os.geteuid()
+                    or training_object_metadata.st_gid
+                    != self.upload_backup_reader_group_gid
+                    or stat.S_IMODE(training_object_metadata.st_mode) != 0o2750
+                    or not _directory_acl_is_absent(
+                        self._configured_training_object_dir
+                    )
+                ):
+                    raise ValueError(
+                        "WALKSAFE_TRAINING_OBJECT_DIR must be a service-owned ACL-free "
+                        "2750 real directory in the dedicated backup-reader group"
+                    )
             self._validate_deployment_maintenance_lock()
             if not self.admin_security_enabled:
                 raise ValueError(

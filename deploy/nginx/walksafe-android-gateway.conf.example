@@ -1,8 +1,8 @@
 # DRAFT_DEPLOYMENT_EXAMPLE — NOT_APPLIED.
 # Do not install or reload nginx from this example without separate review.
 # Replace every CHANGE_ME placeholder with an approved hostname/certificate.
-# This ingress exposes exactly eight Android API path templates plus the independent
-# privacy-rights page and never falls back to Next/Web or the protected backend.
+# This ingress exposes only the enumerated Android API path templates plus the
+# independent privacy-rights page and never falls back to Next/Web or Backend.
 
 server {
     listen 443 ssl;
@@ -51,8 +51,34 @@ server {
     proxy_set_header X-Forwarded-Server "";
     proxy_set_header X-Original-Forwarded-For "";
 
+    location = /api/account-enrollments/email-otp {
+        client_max_body_size 4k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/accounts {
+        client_max_body_size 16k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
     location = /api/field-session {
         client_max_body_size 4k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/speech/stt {
+        client_max_body_size 10m;
+        client_body_timeout 15s;
+        proxy_request_buffering off;
+        proxy_send_timeout 20s;
+        proxy_read_timeout 40s;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/speech/tts {
+        client_max_body_size 2k;
+        proxy_send_timeout 15s;
+        proxy_read_timeout 70s;
         proxy_pass http://127.0.0.1:8081;
     }
 
@@ -77,6 +103,44 @@ server {
             return 405;
         }
         client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/raw-collections/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/manifest$" {
+        if ($request_method != PUT) {
+            return 405;
+        }
+        client_max_body_size 512k;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/raw-collections/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/objects/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/chunks/(?:0|[1-9][0-9]{0,2}|1[0-9]{3}|20(?:[0-3][0-9]|4[0-7]))$" {
+        if ($request_method != PUT) {
+            return 405;
+        }
+        client_max_body_size 8m;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/raw-collections/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" {
+        if ($request_method != GET) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/raw-collections/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/commit$" {
+        if ($request_method != POST) {
+            return 405;
+        }
+        client_max_body_size 16k;
+        proxy_request_buffering off;
+        proxy_buffering off;
         proxy_pass http://127.0.0.1:8081;
     }
 

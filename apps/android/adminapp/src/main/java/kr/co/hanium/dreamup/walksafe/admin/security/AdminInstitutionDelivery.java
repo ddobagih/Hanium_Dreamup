@@ -6,7 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-/** Exact ten-field record of a delivery performed manually outside WalkSafe. */
+/** Exact package-bound record of a delivery performed manually outside WalkSafe. */
 public final class AdminInstitutionDelivery {
     public enum Status {
         SUBMITTED,
@@ -15,7 +15,7 @@ public final class AdminInstitutionDelivery {
         FAILED
     }
 
-    private static final Set<String> EXACT_KEYS = Set.of(
+    private static final Set<String> EXACT_KEYS = AdminJava8Collections.set(
         "institution",
         "channel",
         "recipient",
@@ -24,6 +24,7 @@ public final class AdminInstitutionDelivery {
         "reason",
         "evidence_sha256",
         "observed_at",
+        "package_revision",
         "expected_revision",
         "idempotency_key"
     );
@@ -36,6 +37,7 @@ public final class AdminInstitutionDelivery {
     private final String reason;
     private final String evidenceSha256;
     private final String observedAt;
+    private final long packageRevision;
     private final long expectedRevision;
     private final String idempotencyKey;
 
@@ -48,6 +50,7 @@ public final class AdminInstitutionDelivery {
         String reason,
         String evidenceSha256,
         String observedAt,
+        long packageRevision,
         long expectedRevision,
         String idempotencyKey
     ) {
@@ -67,12 +70,15 @@ public final class AdminInstitutionDelivery {
         }
         this.evidenceSha256 = evidenceSha256;
         this.observedAt = utcInstant(observedAt);
+        if (packageRevision < 1L) throw new IllegalArgumentException("package_revision must be positive");
+        this.packageRevision = packageRevision;
         if (expectedRevision < 0L) throw new IllegalArgumentException("expected_revision must be non-negative");
         this.expectedRevision = expectedRevision;
         this.idempotencyKey = AdminReportDecision.canonicalUuid(idempotencyKey, "idempotency_key");
     }
 
     public Status status() { return status; }
+    public long packageRevision() { return packageRevision; }
     public long expectedRevision() { return expectedRevision; }
     public String idempotencyKey() { return idempotencyKey; }
 
@@ -86,6 +92,7 @@ public final class AdminInstitutionDelivery {
         fields.put("reason", reason);
         fields.put("evidence_sha256", evidenceSha256);
         fields.put("observed_at", observedAt);
+        fields.put("package_revision", packageRevision);
         fields.put("expected_revision", expectedRevision);
         fields.put("idempotency_key", idempotencyKey);
         if (!fields.keySet().equals(EXACT_KEYS)) throw new IllegalStateException("invalid exact10 delivery shape");

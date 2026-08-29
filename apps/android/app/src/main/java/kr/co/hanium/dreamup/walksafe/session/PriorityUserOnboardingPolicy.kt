@@ -11,6 +11,7 @@ enum class PriorityUserAgeBand(val labelKo: String) {
     UNDER_14("만 14세 미만"),
     AGE_14_TO_17("만 14세 이상 18세 미만"),
     ADULT_18_PLUS("만 18세 이상"),
+    VERIFIED_14_PLUS("가입 시 만 14세 이상 확인됨"),
 }
 
 enum class PriorityUserPractice(
@@ -435,6 +436,7 @@ class PriorityUserOnboardingPolicy(
             PriorityUserBlockReason.GUARDIAN_VERIFICATION_REQUIRED
         }
         PriorityUserAgeBand.ADULT_18_PLUS -> null
+        PriorityUserAgeBand.VERIFIED_14_PLUS -> null
     }
 
     private fun cancelPendingPracticeLocked() {

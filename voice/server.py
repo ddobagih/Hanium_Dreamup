@@ -1,8 +1,8 @@
 """Local STT, intent, and TTS prototype API.
 
 This server classifies commands and returns audio; it does not execute reports
-or navigation itself. Web/PWA callbacks consume its STT result, while the
-Android product path uses platform speech services independently.
+or navigation itself. Android reaches STT/TTS only through its authenticated
+Gateway, which projects a smaller mobile contract.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import math
 import os
 import re
 import tempfile
+import unicodedata
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -27,7 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from voice.intents import classify_intent, intent_response_payload, intent_schema_payload
 from voice.inference_process import IsolatedInferencePool, VoiceInferenceTimeout
@@ -43,7 +44,12 @@ from voice.request_limits import (
 )
 from voice.telemetry import intent_telemetry_schema
 from voice.stt import LocalSTTEngine
-from voice.tts import DEFAULT_TTS_MODEL_ID, LocalTTSEngine
+from voice.tts import (
+    DEFAULT_TTS_MODEL_ID,
+    DEFAULT_TTS_SPEAKER,
+    SUPPORTED_TTS_SPEAKERS,
+    LocalTTSEngine,
+)
 
 
 DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
@@ -56,6 +62,13 @@ DEFAULT_STT_RATE_WINDOW_SECONDS = 60.0
 DEFAULT_STT_GLOBAL_RATE_LIMIT = 120
 DEFAULT_STT_ACTOR_RATE_LIMIT = 12
 DEFAULT_STT_IP_RATE_LIMIT = 30
+DEFAULT_TTS_MAX_REQUEST_BYTES = 4096
+DEFAULT_TTS_MAX_RESPONSE_BYTES = 4 * 1024 * 1024
+DEFAULT_TTS_MAX_AUDIO_DURATION_SECONDS = 30.0
+DEFAULT_TTS_RATE_WINDOW_SECONDS = 60.0
+DEFAULT_TTS_GLOBAL_RATE_LIMIT = 120
+DEFAULT_TTS_ACTOR_RATE_LIMIT = 30
+DEFAULT_TTS_IP_RATE_LIMIT = 60
 DEFAULT_STT_MAX_CONCURRENCY = 1
 DEFAULT_STT_QUEUE_TIMEOUT_SECONDS = 2.0
 DEFAULT_TTS_MAX_CONCURRENCY = 1
@@ -66,9 +79,11 @@ DEFAULT_READY_TIMEOUT_SECONDS = 180.0
 DEPLOYMENT_FLOAT_ENV_LIMITS = (
     ("VOICE_STT_UPLOAD_QUEUE_TIMEOUT_SECONDS", DEFAULT_STT_UPLOAD_QUEUE_TIMEOUT_SECONDS, 0.05, 30.0),
     ("VOICE_STT_RATE_WINDOW_SECONDS", DEFAULT_STT_RATE_WINDOW_SECONDS, 1.0, 3600.0),
+    ("VOICE_TTS_RATE_WINDOW_SECONDS", DEFAULT_TTS_RATE_WINDOW_SECONDS, 1.0, 3600.0),
     ("VOICE_STT_MAX_AUDIO_DURATION_SECONDS", DEFAULT_STT_MAX_AUDIO_DURATION_SECONDS, 1.0, 120.0),
     ("VOICE_STT_QUEUE_TIMEOUT_SECONDS", DEFAULT_STT_QUEUE_TIMEOUT_SECONDS, 0.1, 30.0),
     ("VOICE_TTS_QUEUE_TIMEOUT_SECONDS", DEFAULT_TTS_QUEUE_TIMEOUT_SECONDS, 0.1, 30.0),
+    ("VOICE_TTS_MAX_AUDIO_DURATION_SECONDS", DEFAULT_TTS_MAX_AUDIO_DURATION_SECONDS, 1.0, 120.0),
     ("VOICE_STT_INFERENCE_TIMEOUT_SECONDS", DEFAULT_STT_INFERENCE_TIMEOUT_SECONDS, 1.0, 300.0),
     ("VOICE_TTS_INFERENCE_TIMEOUT_SECONDS", DEFAULT_TTS_INFERENCE_TIMEOUT_SECONDS, 1.0, 300.0),
     ("VOICE_READY_TIMEOUT_SECONDS", DEFAULT_READY_TIMEOUT_SECONDS, 1.0, 300.0),
@@ -120,10 +135,19 @@ class TranscriptRequest(BaseModel):
 
 
 class TTSRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     text: str | None = Field(default=None, min_length=1, max_length=180)
     phrase_id: str | None = Field(default=None, min_length=1, max_length=80)
-    use_cache: bool = True
-    allow_fallback: bool = True
+    use_cache: bool = False
+    allow_fallback: bool = False
+
+    @field_validator("text")
+    @classmethod
+    def reject_control_characters(cls, value: str | None) -> str | None:
+        if value is not None and any(unicodedata.category(character) in {"Cc", "Cf"} for character in value):
+            raise ValueError("TTS text must not contain Unicode control characters")
+        return value
 
 
 def env_csv(name: str, default: str) -> list[str]:
@@ -196,6 +220,7 @@ STT_UPLOAD_GATE = UploadConcurrencyGate(
     )
 )
 STT_REQUEST_RATE_LIMITER = ProcessLocalRateLimiter()
+TTS_REQUEST_RATE_LIMITER = ProcessLocalRateLimiter()
 
 
 def upload_content_type(audio: UploadFile) -> str:
@@ -287,7 +312,7 @@ def get_tts_engine() -> LocalTTSEngine:
         language=os.getenv("VOICE_TTS_LANGUAGE", "Korean"),
         mode=os.getenv("VOICE_TTS_MODE", "custom"),
         voice_instruct=os.getenv("VOICE_TTS_INSTRUCT", "차분하고 명확한 한국어 보행 안전 안내 음성. 너무 빠르지 않게 말하세요."),
-        speaker=os.getenv("VOICE_TTS_SPEAKER") or None,
+        speaker=os.getenv("VOICE_TTS_SPEAKER", DEFAULT_TTS_SPEAKER),
         ref_audio=os.getenv("VOICE_TTS_REF_AUDIO") or None,
         ref_text=os.getenv("VOICE_TTS_REF_TEXT") or None,
         cache_dir=os.getenv("VOICE_TTS_CACHE_DIR", "outputs/voice/cache"),
@@ -341,6 +366,10 @@ def validate_voice_runtime_configuration() -> None:
         raise RuntimeError("process-local Voice limits require VOICE_SERVICE_WORKERS=1")
     if os.getenv("VOICE_SERVICE_REPLICAS", "").strip() != "1":
         raise RuntimeError("process-local Voice limits require VOICE_SERVICE_REPLICAS=1")
+    if os.getenv("VOICE_TTS_MODE", "custom").strip() != "custom":
+        raise RuntimeError("deployed Voice TTS mode must be custom")
+    if os.getenv("VOICE_TTS_SPEAKER", DEFAULT_TTS_SPEAKER).strip() not in SUPPORTED_TTS_SPEAKERS:
+        raise RuntimeError("VOICE_TTS_SPEAKER must name a supported Qwen3-TTS preset")
     for name, default, minimum, maximum in DEPLOYMENT_FLOAT_ENV_LIMITS:
         bounded_env_float(name, default, minimum=minimum, maximum=maximum)
     voice_process_lock_path()
@@ -428,7 +457,10 @@ def _voice_rate_identity(request: Request) -> tuple[str | None, str] | JSONRespo
 @app.middleware("http")
 async def require_internal_service_auth(request: Request, call_next: Any) -> Response:
     if request.method == "OPTIONS":
-        return await call_next(request)
+        response = await call_next(request)
+        if request.url.path.startswith(("/speech/stt", "/speech/tts")):
+            response.headers["cache-control"] = "no-store"
+        return response
     authorized, reason = _voice_request_authorized(
         request.client.host if request.client else None,
         request.headers,
@@ -440,10 +472,29 @@ async def require_internal_service_auth(request: Request, call_next: Any) -> Res
             reason,
             "Voice service access is restricted to an authenticated internal caller.",
         )
-    if request.method != "POST" or request.url.path != "/speech/stt":
-        return await call_next(request)
+    is_stt = request.method == "POST" and request.url.path == "/speech/stt"
+    is_tts = request.method == "POST" and request.url.path == "/speech/tts"
+    if not is_stt and not is_tts:
+        try:
+            response = await call_next(request)
+        except Exception:
+            if request.url.path.startswith(("/speech/stt", "/speech/tts")):
+                return _voice_error_response(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "voice_internal_error",
+                    "Voice request failed.",
+                )
+            raise
+        if request.url.path.startswith(("/speech/stt", "/speech/tts")):
+            response.headers["cache-control"] = "no-store"
+        return response
 
-    request_limit = max_request_bytes()
+    request_limit = max_request_bytes() if is_stt else bounded_env_int(
+        "VOICE_TTS_MAX_REQUEST_BYTES",
+        DEFAULT_TTS_MAX_REQUEST_BYTES,
+        minimum=512,
+        maximum=64 * 1024,
+    )
     declared_length = request.headers.get("content-length")
     if declared_length is not None:
         try:
@@ -463,34 +514,41 @@ async def require_internal_service_auth(request: Request, call_next: Any) -> Res
     if isinstance(identity, JSONResponse):
         return identity
     actor_id, client_ip = identity
+    rate_prefix = "VOICE_STT" if is_stt else "VOICE_TTS"
+    default_window = DEFAULT_STT_RATE_WINDOW_SECONDS if is_stt else DEFAULT_TTS_RATE_WINDOW_SECONDS
+    default_global = DEFAULT_STT_GLOBAL_RATE_LIMIT if is_stt else DEFAULT_TTS_GLOBAL_RATE_LIMIT
+    default_ip = DEFAULT_STT_IP_RATE_LIMIT if is_stt else DEFAULT_TTS_IP_RATE_LIMIT
+    default_actor = DEFAULT_STT_ACTOR_RATE_LIMIT if is_stt else DEFAULT_TTS_ACTOR_RATE_LIMIT
+    rate_scope = "stt" if is_stt else "tts"
     window_seconds = bounded_env_float(
-        "VOICE_STT_RATE_WINDOW_SECONDS",
-        DEFAULT_STT_RATE_WINDOW_SECONDS,
+        f"{rate_prefix}_RATE_WINDOW_SECONDS",
+        default_window,
         minimum=1.0,
         maximum=3600.0,
     )
     rate_limits = [
-        ("service:stt", bounded_env_int(
-            "VOICE_STT_GLOBAL_RATE_LIMIT",
-            DEFAULT_STT_GLOBAL_RATE_LIMIT,
+        (f"service:{rate_scope}", bounded_env_int(
+            f"{rate_prefix}_GLOBAL_RATE_LIMIT",
+            default_global,
             minimum=1,
             maximum=100_000,
         )),
-        (f"ip:{client_ip}", bounded_env_int(
-            "VOICE_STT_IP_RATE_LIMIT",
-            DEFAULT_STT_IP_RATE_LIMIT,
+        (f"{rate_scope}:ip:{client_ip}", bounded_env_int(
+            f"{rate_prefix}_IP_RATE_LIMIT",
+            default_ip,
             minimum=1,
             maximum=10_000,
         )),
     ]
     if actor_id:
-        rate_limits.append((f"actor:{actor_id}", bounded_env_int(
-            "VOICE_STT_ACTOR_RATE_LIMIT",
-            DEFAULT_STT_ACTOR_RATE_LIMIT,
+        rate_limits.append((f"{rate_scope}:actor:{actor_id}", bounded_env_int(
+            f"{rate_prefix}_ACTOR_RATE_LIMIT",
+            default_actor,
             minimum=1,
             maximum=10_000,
         )))
-    rate_decision = STT_REQUEST_RATE_LIMITER.check(rate_limits, window_seconds)
+    limiter = STT_REQUEST_RATE_LIMITER if is_stt else TTS_REQUEST_RATE_LIMITER
+    rate_decision = limiter.check(rate_limits, window_seconds)
     if not rate_decision.allowed:
         return _voice_error_response(
             status.HTTP_429_TOO_MANY_REQUESTS,
@@ -499,21 +557,23 @@ async def require_internal_service_auth(request: Request, call_next: Any) -> Res
             **{"retry-after": str(rate_decision.retry_after_seconds)},
         )
 
-    acquired = await STT_UPLOAD_GATE.acquire(
-        bounded_env_float(
-            "VOICE_STT_UPLOAD_QUEUE_TIMEOUT_SECONDS",
-            DEFAULT_STT_UPLOAD_QUEUE_TIMEOUT_SECONDS,
-            minimum=0.05,
-            maximum=30.0,
+    upload_acquired = False
+    if is_stt:
+        upload_acquired = await STT_UPLOAD_GATE.acquire(
+            bounded_env_float(
+                "VOICE_STT_UPLOAD_QUEUE_TIMEOUT_SECONDS",
+                DEFAULT_STT_UPLOAD_QUEUE_TIMEOUT_SECONDS,
+                minimum=0.05,
+                maximum=30.0,
+            )
         )
-    )
-    if not acquired:
-        return _voice_error_response(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "stt_upload_busy",
-            "Speech upload capacity is busy. Retry shortly.",
-            **{"retry-after": "1"},
-        )
+        if not upload_acquired:
+            return _voice_error_response(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "stt_upload_busy",
+                "Speech upload capacity is busy. Retry shortly.",
+                **{"retry-after": "1"},
+            )
 
     original_receive = request._receive
     received_bytes = 0
@@ -540,16 +600,24 @@ async def require_internal_service_auth(request: Request, call_next: Any) -> Res
                     "voice_request_too_large",
                     f"Voice request exceeds the {request_limit} byte limit.",
                 )
-            raise
+            return _voice_error_response(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "voice_internal_error",
+                "Voice request failed.",
+            )
         if request_too_large:
             return _voice_error_response(
                 status.HTTP_413_CONTENT_TOO_LARGE,
                 "voice_request_too_large",
                 f"Voice request exceeds the {request_limit} byte limit.",
             )
+        response.headers["cache-control"] = "no-store"
+        if is_tts:
+            response.headers["x-content-type-options"] = "nosniff"
         return response
     finally:
-        STT_UPLOAD_GATE.release()
+        if upload_acquired:
+            STT_UPLOAD_GATE.release()
 
 
 @app.get("/health")
@@ -721,8 +789,22 @@ async def speech_stt(request: Request, audio: UploadFile = File(...)) -> dict[st
             )
         finally:
             STT_INFERENCE_SEMAPHORE.release()
+        if (
+            not re.fullmatch(r"[0-9a-f]{40}", result.model_revision)
+            or len(result.transcript) > 500
+            or any(
+                unicodedata.category(character) in {"Cc", "Cf"}
+                for character in result.transcript
+            )
+        ):
+            raise stt_error(
+                status.HTTP_502_BAD_GATEWAY,
+                "stt_result_invalid",
+                "Speech recognition returned an invalid result.",
+            )
         intent_result = classify_intent(result.transcript)
         return {
+            "schema_version": "walksafe.voice-stt-response.v1",
             "transcript": result.transcript,
             **intent_response_payload(
                 intent_result,
@@ -735,6 +817,7 @@ async def speech_stt(request: Request, audio: UploadFile = File(...)) -> dict[st
             "duration_sec": result.duration_sec,
             "audio_duration_sec": media_duration_seconds,
             "model": result.model,
+            "model_revision": result.model_revision,
             "segments": result.segments,
         }
     except VoiceInferenceTimeout as exc:
@@ -745,7 +828,7 @@ async def speech_stt(request: Request, audio: UploadFile = File(...)) -> dict[st
         ) from exc
     except VoiceClientDisconnected as exc:
         raise stt_error(499, "voice_client_disconnected", "Voice client disconnected.") from exc
-    except RuntimeError as exc:
+    except (RuntimeError, ValueError) as exc:
         raise stt_error(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "stt_unavailable",
@@ -773,9 +856,54 @@ def tts_fallback_path() -> Path | None:
     return None
 
 
+async def validate_tts_wav_response(http_request: Request, path: Path) -> None:
+    byte_limit = bounded_env_int(
+        "VOICE_TTS_MAX_RESPONSE_BYTES",
+        DEFAULT_TTS_MAX_RESPONSE_BYTES,
+        minimum=1024,
+        maximum=32 * 1024 * 1024,
+    )
+    try:
+        size = path.stat().st_size
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "tts_response_unavailable", "message": "Speech audio is unavailable."},
+        ) from exc
+    if size <= 0 or size > byte_limit:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "tts_response_invalid", "message": "Speech audio exceeded its response limit."},
+        )
+    try:
+        duration = await run_inference_until_disconnect(http_request, probe_audio_duration(path))
+    except (AudioProbeError, VoiceClientDisconnected) as exc:
+        raise HTTPException(
+            status_code=499 if isinstance(exc, VoiceClientDisconnected) else status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "tts_response_invalid", "message": "Speech audio could not be validated."},
+        ) from exc
+    duration_limit = bounded_env_float(
+        "VOICE_TTS_MAX_AUDIO_DURATION_SECONDS",
+        DEFAULT_TTS_MAX_AUDIO_DURATION_SECONDS,
+        minimum=1.0,
+        maximum=120.0,
+    )
+    if duration > duration_limit:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "tts_response_invalid", "message": "Speech audio exceeded its duration limit."},
+        )
+
+
 @app.post("/speech/tts")
-async def speech_tts(http_request: Request, request: TTSRequest) -> FileResponse:
+async def speech_tts(http_request: Request, request: TTSRequest) -> Response:
     text = resolve_tts_request_text(request)
+    if request.text is not None and request.use_cache:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "tts_cache_not_allowed", "message": "Arbitrary TTS text cannot be cached."},
+        )
+    effective_cache = request.use_cache and request.phrase_id is not None
     try:
         await asyncio.wait_for(
             TTS_INFERENCE_SEMAPHORE.acquire(),
@@ -797,7 +925,7 @@ async def speech_tts(http_request: Request, request: TTSRequest) -> FileResponse
             TTS_INFERENCE_POOL.run(
                 "infer",
                 text,
-                request.use_cache,
+                effective_cache,
                 timeout=bounded_env_float(
                     "VOICE_TTS_INFERENCE_TIMEOUT_SECONDS",
                     DEFAULT_TTS_INFERENCE_TIMEOUT_SECONDS,
@@ -830,8 +958,16 @@ async def speech_tts(http_request: Request, request: TTSRequest) -> FileResponse
             "X-Voice-Fallback": "true",
             "X-Voice-Mode": "fallback",
             "X-Voice-Generation-Seconds": "0.000",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
         }
-        return FileResponse(fallback_path, media_type="audio/wav", filename=fallback_path.name, headers=headers)
+        await validate_tts_wav_response(http_request, fallback_path)
+        return FileResponse(
+            fallback_path,
+            media_type="audio/wav",
+            filename="walksafe-guidance.wav",
+            headers=headers,
+        )
     finally:
         TTS_INFERENCE_SEMAPHORE.release()
     headers = {
@@ -840,8 +976,39 @@ async def speech_tts(http_request: Request, request: TTSRequest) -> FileResponse
         "X-Voice-Fallback": "false",
         "X-Voice-Mode": result.mode,
         "X-Voice-Generation-Seconds": f"{result.duration_sec:.3f}",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
     }
-    return FileResponse(result.output_path, media_type="audio/wav", filename=result.output_path.name, headers=headers)
+    model_revision = result.model_revision or ""
+    if not re.fullmatch(r"[0-9a-f]{40}", model_revision):
+        if result.transient:
+            result.output_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "tts_model_revision_unavailable",
+                "message": "Speech synthesis model revision is unavailable.",
+            },
+        )
+    headers["X-Voice-Model-Revision"] = model_revision
+    try:
+        await validate_tts_wav_response(http_request, result.output_path)
+    except Exception:
+        if result.transient:
+            result.output_path.unlink(missing_ok=True)
+        raise
+    if result.transient:
+        try:
+            audio_bytes = await asyncio.to_thread(result.output_path.read_bytes)
+        finally:
+            result.output_path.unlink(missing_ok=True)
+        return Response(content=audio_bytes, media_type="audio/wav", headers=headers)
+    return FileResponse(
+        result.output_path,
+        media_type="audio/wav",
+        filename="walksafe-guidance.wav",
+        headers=headers,
+    )
 
 
 @app.post("/speech/tts/cache-status")

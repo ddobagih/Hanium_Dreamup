@@ -74,10 +74,12 @@ class IntegratedConsentWithdrawalTest {
 
     private fun mutation() = PendingIntegratedConsentMutation(
         installationId = INSTALLATION_ID,
+        actorSha256 = "a".repeat(64),
         requestId = REQUEST_ID,
         policyVersion = INTEGRATED_CONSENT_POLICY_VERSION,
         clientRevision = 2L,
         previousServerRevision = 1L,
+        expectedPreviousBackendReceiptSha256 = "1".repeat(64),
         desiredSelections = IntegratedConsentSelections(rawSourceCollection = false),
         withdrawalItems = setOf(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
         createdAtEpochMs = 1_000L,
@@ -98,7 +100,8 @@ class IntegratedConsentWithdrawalTest {
         revision = revision,
         selections = IntegratedConsentSelections(rawSourceCollection = granted),
         confirmedAt = "2026-07-25T12:00:00.000Z",
-        receiptSha256 = "a".repeat(64),
+        gatewayAuditRecordSha256 = "9".repeat(64),
+        backendConsentReceiptSha256 = "a".repeat(64),
         controlSecret = "b".repeat(64),
     )
 

@@ -7,6 +7,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashSet;
@@ -71,6 +72,8 @@ public final class AdminSecurityController implements AutoCloseable {
 
     private final AdminSecurityApi api;
     private final AdminOperationsApi operationsApi;
+    private final AdminReportRepository reportRepository;
+    private final AdminIncidentRepository incidentRepository;
     private final AdminSecurityTelemetry.Recorder telemetry;
     private AdminSecurityState securityState = AdminSecurityState.SIGNED_OUT;
     private String accessToken;
@@ -79,8 +82,8 @@ public final class AdminSecurityController implements AutoCloseable {
     private String recoveryToken;
     private String recoveryAdminId;
     private String currentSessionId;
-    private List<AdminSecurityApi.SessionInfo> sessions = List.of();
-    private List<AdminSecurityApi.DeviceInfo> devices = List.of();
+    private List<AdminSecurityApi.SessionInfo> sessions = AdminJava8Collections.list();
+    private List<AdminSecurityApi.DeviceInfo> devices = AdminJava8Collections.list();
     private long reauthenticatedUntilEpochMs;
     private AdminHighRiskActionGate.Binding pendingReconfirmation;
     private String stateVersion;
@@ -89,18 +92,47 @@ public final class AdminSecurityController implements AutoCloseable {
     private String recoveryCustodyAttestedAt;
 
     public AdminSecurityController(AdminSecurityApi api) {
-        this(api, null, AdminSecurityTelemetry.androidLogRecorder());
+        this(api, null, null, null, AdminSecurityTelemetry.androidLogRecorder());
     }
 
     public AdminSecurityController(
         AdminSecurityApi api,
         AdminSecurityTelemetry.Recorder telemetry
     ) {
-        this(api, null, telemetry);
+        this(api, null, null, null, telemetry);
     }
 
     public AdminSecurityController(AdminSecurityApi api, AdminOperationsApi operationsApi) {
-        this(api, operationsApi, AdminSecurityTelemetry.androidLogRecorder());
+        this(api, operationsApi, null, null, AdminSecurityTelemetry.androidLogRecorder());
+    }
+
+    public AdminSecurityController(
+        AdminSecurityApi api,
+        AdminOperationsApi operationsApi,
+        AdminReportRepository reportRepository
+    ) {
+        this(
+            api,
+            operationsApi,
+            reportRepository,
+            null,
+            AdminSecurityTelemetry.androidLogRecorder()
+        );
+    }
+
+    public AdminSecurityController(
+        AdminSecurityApi api,
+        AdminOperationsApi operationsApi,
+        AdminReportRepository reportRepository,
+        AdminIncidentRepository incidentRepository
+    ) {
+        this(
+            api,
+            operationsApi,
+            reportRepository,
+            incidentRepository,
+            AdminSecurityTelemetry.androidLogRecorder()
+        );
     }
 
     public AdminSecurityController(
@@ -108,10 +140,31 @@ public final class AdminSecurityController implements AutoCloseable {
         AdminOperationsApi operationsApi,
         AdminSecurityTelemetry.Recorder telemetry
     ) {
+        this(api, operationsApi, null, null, telemetry);
+    }
+
+    public AdminSecurityController(
+        AdminSecurityApi api,
+        AdminOperationsApi operationsApi,
+        AdminReportRepository reportRepository,
+        AdminSecurityTelemetry.Recorder telemetry
+    ) {
+        this(api, operationsApi, reportRepository, null, telemetry);
+    }
+
+    public AdminSecurityController(
+        AdminSecurityApi api,
+        AdminOperationsApi operationsApi,
+        AdminReportRepository reportRepository,
+        AdminIncidentRepository incidentRepository,
+        AdminSecurityTelemetry.Recorder telemetry
+    ) {
         if (api == null) throw new IllegalArgumentException("api is required");
         if (telemetry == null) throw new IllegalArgumentException("telemetry is required");
         this.api = api;
         this.operationsApi = operationsApi;
+        this.reportRepository = reportRepository;
+        this.incidentRepository = incidentRepository;
         this.telemetry = telemetry;
     }
 
@@ -175,8 +228,8 @@ public final class AdminSecurityController implements AutoCloseable {
                 authenticatedDeviceId = null;
                 currentSessionId = null;
             }
-            sessions = List.of();
-            devices = List.of();
+            sessions = AdminJava8Collections.list();
+            devices = AdminJava8Collections.list();
             reauthenticatedUntilEpochMs = 0L;
             pendingReconfirmation = null;
             stateVersion = null;
@@ -217,7 +270,7 @@ public final class AdminSecurityController implements AutoCloseable {
     public synchronized void reauthenticate(
         String password,
         String totpCode,
-        AdminHighRiskActionGate.Action action,
+        AdminHighRiskActionGate.Operation action,
         long nowEpochMs
     ) throws IOException {
         if (securityState != AdminSecurityState.NORMAL) throw new IllegalStateException("administrator access is not normal");
@@ -256,6 +309,44 @@ public final class AdminSecurityController implements AutoCloseable {
         }
     }
 
+    private synchronized void reauthenticate(
+        char[] password,
+        char[] totpCode,
+        AdminHighRiskActionGate.Operation action,
+        long nowEpochMs
+    ) throws IOException {
+        if (securityState != AdminSecurityState.NORMAL) throw new IllegalStateException("administrator access is not normal");
+        if (recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) {
+            throw new IllegalStateException("recovery custody is not attested");
+        }
+        if (action == null) throw new IllegalArgumentException("high-risk action is required");
+        String token = requireAccessToken();
+        String nonce = newNonce();
+        try {
+            AdminSecurityApi.ReauthenticationResult result = api.reauthenticate(
+                token,
+                password,
+                totpCode,
+                action.reauthenticationAction(),
+                action.method(),
+                action.path(),
+                nonce
+            );
+            long until = result.reauthenticatedUntilEpochMs();
+            if (until <= nowEpochMs) throw new IOException("invalid reauthentication expiry");
+            if (!action.reauthenticationAction().equals(result.action())
+                || !action.method().equals(result.method())
+                || !action.path().equals(result.path())) {
+                throw new IOException("reauthentication binding response does not match the request");
+            }
+            pendingReconfirmation = new AdminHighRiskActionGate.Binding(action, nonce, until);
+            reauthenticatedUntilEpochMs = until;
+        } catch (IOException | RuntimeException error) {
+            clearReconfirmation();
+            throw error;
+        }
+    }
+
     public synchronized void revokeSession(String sessionId) throws IOException {
         String token = requireAccessToken();
         requireCanonicalSessionId(sessionId, "invalid_session_id");
@@ -273,7 +364,7 @@ public final class AdminSecurityController implements AutoCloseable {
             for (AdminSecurityApi.SessionInfo item : sessions) {
                 if (!item.sessionId().equals(sessionId)) remaining.add(item);
             }
-            sessions = List.copyOf(remaining);
+            sessions = AdminJava8Collections.copyList(remaining);
             if (next != AdminSecurityState.NORMAL
                 || recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) {
                 clearReconfirmation();
@@ -333,12 +424,12 @@ public final class AdminSecurityController implements AutoCloseable {
             for (AdminSecurityApi.SessionInfo session : sessions) {
                 if (!session.deviceId().equals(deviceId)) remaining.add(session);
             }
-            sessions = List.copyOf(remaining);
+            sessions = AdminJava8Collections.copyList(remaining);
             List<AdminSecurityApi.DeviceInfo> remainingDevices = new ArrayList<>();
             for (AdminSecurityApi.DeviceInfo device : devices) {
                 if (!device.deviceId().equals(deviceId)) remainingDevices.add(device);
             }
-            devices = List.copyOf(remainingDevices);
+            devices = AdminJava8Collections.copyList(remainingDevices);
             clearReconfirmation();
         } catch (IOException | RuntimeException error) {
             failClosed();
@@ -457,7 +548,7 @@ public final class AdminSecurityController implements AutoCloseable {
     }
 
     public synchronized AdminHighRiskActionGate.Decision highRiskDecision(
-        AdminHighRiskActionGate.Action action,
+        AdminHighRiskActionGate.Operation action,
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) {
@@ -515,8 +606,195 @@ public final class AdminSecurityController implements AutoCloseable {
         );
     }
 
+    public synchronized AdminReportModels.Page listAdminReports(
+        AdminReportModels.Filters filters,
+        String cursor,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireReportRepository().list(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            filters,
+            cursor
+        );
+    }
+
+    public synchronized AdminReportModels.Detail getAdminReportDetail(
+        String reportId,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireReportRepository().detail(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            reportId
+        );
+    }
+
+    public synchronized AdminReportModels.StatusSnapshot updateAdminReportStatus(
+        String reportId,
+        String nextStatus,
+        int expectedVersion,
+        char[] password,
+        char[] totpCode,
+        long nowEpochMs,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        AdminHighRiskActionGate.Operation operation = AdminHighRiskActionGate.reportStatus(reportId);
+        reauthenticate(password, totpCode, operation, nowEpochMs);
+        AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
+            operation,
+            nowEpochMs,
+            operationalWorkflowsEnabled
+        );
+        if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
+        return requireReportRepository().updateStatus(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            reportId,
+            nextStatus,
+            expectedVersion,
+            decision.requestHeaders()
+        );
+    }
+
+    public synchronized AdminDeliveryPackage createAdminDeliveryPackage(
+        String reportId,
+        String password,
+        String totpCode,
+        long nowEpochMs,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        AdminHighRiskActionGate.Operation operation = AdminHighRiskActionGate.deliveryPackage(reportId);
+        reauthenticate(password, totpCode, operation, nowEpochMs);
+        AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
+            operation,
+            nowEpochMs,
+            operationalWorkflowsEnabled
+        );
+        if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
+        return requireReportRepository().createDeliveryPackage(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            reportId,
+            decision.requestHeaders()
+        );
+    }
+
+    public synchronized AdminAuditModels.Page listAdminAudits(
+        AdminAuditModels.Filters filters,
+        String cursor,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireReportRepository().audits(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            filters,
+            cursor
+        );
+    }
+
+    public synchronized AdminIncidentModels.Page listAdminIncidents(
+        AdminIncidentModels.Filters filters,
+        String cursor,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireIncidentRepository().list(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            filters,
+            cursor
+        );
+    }
+
+    public synchronized AdminIncidentModels.Detail getAdminIncidentDetail(
+        String incidentId,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireIncidentRepository().detail(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            incidentId
+        );
+    }
+
+    public synchronized AdminIncidentModels.StatusSnapshot updateAdminIncidentStatus(
+        String incidentId,
+        AdminIncidentModels.StatusRequest request,
+        char[] password,
+        char[] totpCode,
+        long nowEpochMs,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        AdminHighRiskActionGate.Operation operation =
+            AdminHighRiskActionGate.incidentStatus(incidentId);
+        try {
+            reauthenticate(password, totpCode, operation, nowEpochMs);
+            AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
+                operation,
+                nowEpochMs,
+                operationalWorkflowsEnabled
+            );
+            if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
+            return requireIncidentRepository().updateStatus(
+                requireOperationalSession(operationalWorkflowsEnabled),
+                incidentId,
+                request,
+                decision.requestHeaders()
+            );
+        } finally {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totpCode != null) Arrays.fill(totpCode, '\0');
+        }
+    }
+
+    public synchronized AdminReportRequestModels.Page listAdminReportRequests(
+        AdminReportRequestModels.Filters filters,
+        String cursor,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireReportRepository().listRequests(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            filters,
+            cursor
+        );
+    }
+
+    public synchronized AdminReportRequestModels.Detail getAdminReportRequestDetail(
+        String requestId,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireReportRepository().requestDetail(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            requestId
+        );
+    }
+
+    public synchronized AdminReportRequestModels.StatusSnapshot updateAdminReportRequestStatus(
+        String requestId,
+        String nextStatus,
+        int expectedVersion,
+        String publicResponse,
+        String internalNote,
+        char[] password,
+        char[] totpCode,
+        long nowEpochMs,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        AdminHighRiskActionGate.Operation operation =
+            AdminHighRiskActionGate.reportRequestStatus(requestId);
+        reauthenticate(password, totpCode, operation, nowEpochMs);
+        AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
+            operation,
+            nowEpochMs,
+            operationalWorkflowsEnabled
+        );
+        if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
+        return requireReportRepository().updateRequestStatus(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            requestId,
+            nextStatus,
+            expectedVersion,
+            publicResponse,
+            internalNote,
+            decision.requestHeaders()
+        );
+    }
+
     public synchronized AdminHighRiskActionGate.Decision consumeHighRiskAuthorization(
-        AdminHighRiskActionGate.Action action,
+        AdminHighRiskActionGate.Operation action,
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) {
@@ -556,6 +834,20 @@ public final class AdminSecurityController implements AutoCloseable {
         return operationsApi;
     }
 
+    private AdminReportRepository requireReportRepository() {
+        if (reportRepository == null) {
+            throw new IllegalStateException("administrator report reads are unavailable");
+        }
+        return reportRepository;
+    }
+
+    private AdminIncidentRepository requireIncidentRepository() {
+        if (incidentRepository == null) {
+            throw new IllegalStateException("administrator incident operations are unavailable");
+        }
+        return incidentRepository;
+    }
+
     private AdminOperationsApi.SessionContext requireOperationalSession(boolean operationalWorkflowsEnabled) {
         if (!operationalWorkflowsEnabled) throw new IllegalStateException("operational workflows are locked");
         if (securityState != AdminSecurityState.NORMAL) {
@@ -583,8 +875,8 @@ public final class AdminSecurityController implements AutoCloseable {
 
     private void failClosed() {
         securityState = AdminSecurityState.FAIL_CLOSED;
-        sessions = List.of();
-        devices = List.of();
+        sessions = AdminJava8Collections.list();
+        devices = AdminJava8Collections.list();
         clearReconfirmation();
         stateVersion = null;
         observedAt = null;
@@ -598,8 +890,8 @@ public final class AdminSecurityController implements AutoCloseable {
         authenticatedAdminId = null;
         authenticatedDeviceId = null;
         currentSessionId = null;
-        sessions = List.of();
-        devices = List.of();
+        sessions = AdminJava8Collections.list();
+        devices = AdminJava8Collections.list();
         clearReconfirmation();
         stateVersion = null;
         observedAt = null;
@@ -641,8 +933,8 @@ public final class AdminSecurityController implements AutoCloseable {
         }
         if (currentDeviceCount != 1) throw new IOException("current administrator device binding is invalid");
         applyRemoteState(state, expectedState);
-        sessions = List.copyOf(updatedSessions);
-        devices = List.copyOf(updatedDevices);
+        sessions = AdminJava8Collections.copyList(updatedSessions);
+        devices = AdminJava8Collections.copyList(updatedDevices);
     }
 
     private void applyRemoteState(
@@ -695,7 +987,7 @@ public final class AdminSecurityController implements AutoCloseable {
     }
 
     private static String requiredMetadata(String value, String reason) throws IOException {
-        if (value == null || value.isBlank() || value.length() > 128 || value.chars().anyMatch(character -> character < 0x20)) {
+        if (value == null || value.trim().isEmpty() || value.length() > 128 || value.chars().anyMatch(character -> character < 0x20)) {
             throw new IOException(reason);
         }
         return value;

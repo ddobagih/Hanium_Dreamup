@@ -222,7 +222,7 @@ class MainActivityWithdrawalRestartStaticTest {
             )
         assertTrue(legacy.contains("PREF_INTEGRATED_CONSENT_REVISION"))
         assertTrue(legacy.contains("PREF_INTEGRATED_CONSENT_CLIENT_REVISION"))
-        assertTrue(legacy.contains("PREF_INTEGRATED_CONSENT_RECEIPT_SHA256"))
+        assertTrue(legacy.contains("PREF_INTEGRATED_CONSENT_BACKEND_RECEIPT_SHA256"))
         assertTrue(legacy.contains("restoreServerRevisionFloor("))
         assertTrue(!legacy.contains("IntegratedConsentConfirmation("))
     }
@@ -241,7 +241,10 @@ class MainActivityWithdrawalRestartStaticTest {
         assertTrue(restore.contains("confirmation.revision != legacyRevision"))
         assertTrue(restore.contains("confirmation.clientRevision != legacyClientRevision"))
         assertTrue(restore.contains("confirmation.selections != legacySelections"))
-        assertTrue(restore.contains("confirmation.receiptSha256 != legacyReceipt"))
+        assertTrue(restore.contains("confirmation.backendConsentReceiptSha256 != legacyReceipt"))
+        assertTrue(
+            restore.contains("confirmation.gatewayAuditRecordSha256 != storedGatewayAudit"),
+        )
         assertTrue(restore.contains("confirmation.controlSecret != controlSecret"))
         assertTrue(restore.contains("!integratedConsentSession.restoreCurrentConfirmation(confirmation)"))
     }

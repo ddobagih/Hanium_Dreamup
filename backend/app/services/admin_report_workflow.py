@@ -11,11 +11,15 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
+    AdminOperationAudit,
     Report,
+    ReportDeliveryPackage,
     ReportInstitutionDeliveryEvent,
     ReportReviewDecision,
+    ReportStatusAudit,
 )
 from backend.app.schemas import (
+    AdminReportStatusUpdateV1,
     ReportInstitutionDeliveryRequest,
     ReportReviewDecisionRequest,
 )
@@ -29,14 +33,126 @@ _DELIVERY_TRANSITIONS: dict[str | None, frozenset[str]] = {
     "ACKNOWLEDGED": frozenset({"RESOLVED"}),
     "RESOLVED": frozenset(),
 }
+_REPORT_STATUS_TRANSITIONS: dict[str, tuple[str, ...]] = {
+    "new": ("reviewed", "resolved"),
+    "reviewed": ("new", "resolved"),
+    "resolved": ("reviewed",),
+}
 
 
 class AdminReportWorkflowError(RuntimeError):
-    def __init__(self, code: str, message: str, *, status_code: int) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        status_code: int,
+        latest_status: dict[str, object] | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.status_code = status_code
+        self.latest_status = latest_status
+
+
+def allowed_next_statuses(status: str) -> tuple[str, ...]:
+    try:
+        return _REPORT_STATUS_TRANSITIONS[status]
+    except KeyError as exc:
+        raise ValueError("unknown report status") from exc
+
+
+def update_admin_report_status(
+    db: Session,
+    *,
+    report_id: uuid.UUID,
+    payload: AdminReportStatusUpdateV1,
+    identity: AdminSessionIdentity,
+    correlation_id: uuid.UUID,
+    query_sha256: str,
+    now: datetime | None = None,
+) -> Report:
+    """Apply one row-locked CAS transition and its action audit atomically."""
+
+    report = _locked_report(db, report_id)
+    current_version = report.status_version
+    if payload.expected_version != current_version:
+        latest = {
+            "id": str(report.id),
+            "status": report.status,
+            "status_version": current_version,
+            "allowed_next_statuses": list(allowed_next_statuses(report.status)),
+            "updated_at": report.updated_at,
+        }
+        _rollback_or_database_unavailable(db)
+        raise AdminReportWorkflowError(
+            "report_status_version_conflict",
+            "The report status changed before this request was applied.",
+            status_code=409,
+            latest_status=latest,
+        )
+    if payload.status == report.status or payload.status not in allowed_next_statuses(report.status):
+        _rollback_or_database_unavailable(db)
+        raise AdminReportWorkflowError(
+            "report_status_transition_invalid",
+            f"Report status transition {report.status}->{payload.status} is not allowed.",
+            status_code=422,
+            latest_status={
+                "id": str(report.id),
+                "status": report.status,
+                "status_version": current_version,
+                "allowed_next_statuses": list(allowed_next_statuses(report.status)),
+                "updated_at": report.updated_at,
+            },
+        )
+
+    changed_at = _as_utc(now or datetime.now(UTC))
+    previous_status = report.status
+    report.status = payload.status
+    report.status_version = current_version + 1
+    report.updated_at = changed_at
+    try:
+        db.add(
+            ReportStatusAudit(
+                report_id=report.id,
+                previous_status=previous_status,
+                next_status=report.status,
+                previous_version=current_version,
+                next_version=report.status_version,
+                actor_id=identity.admin_id,
+                session_id=identity.session_id,
+                device_id=identity.device_id,
+                correlation_id=correlation_id,
+                note=payload.note,
+                resolution_reason=payload.resolution_reason,
+                created_at=changed_at,
+            )
+        )
+        db.add(
+            AdminOperationAudit(
+                actor_id=identity.admin_id,
+                session_id=identity.session_id,
+                device_id=identity.device_id,
+                correlation_id=correlation_id,
+                operation="admin.report.status.update",
+                outcome="SUCCEEDED",
+                resource_type="report_status",
+                resource_id=str(report.id),
+                query_sha256=query_sha256,
+                result_count=1,
+                error_code=None,
+                created_at=changed_at,
+            )
+        )
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    _commit_append(db, conflict_code="report_status_version_conflict")
+    try:
+        db.refresh(report)
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    return report
 
 
 def _raise_workflow_store_unavailable(exc: SQLAlchemyError) -> NoReturn:
@@ -140,7 +256,15 @@ def append_report_review_decision(
 ) -> ReportReviewDecision:
     """Append one decision without changing the report lifecycle projection."""
 
-    _locked_report(db, report_id)
+    report = _locked_report(db, report_id)
+    current_content_revision = int(report.content_revision or 0)
+    if payload.content_revision != current_content_revision:
+        _rollback_or_database_unavailable(db)
+        raise AdminReportWorkflowError(
+            "report_content_revision_conflict",
+            "The report content changed before this review was recorded.",
+            status_code=409,
+        )
     if payload.duplicate_of_report_id == report_id:
         _rollback_or_database_unavailable(db)
         raise AdminReportWorkflowError(
@@ -167,8 +291,10 @@ def append_report_review_decision(
     decision = ReportReviewDecision(
         report_id=report_id,
         revision=1 if previous is None else previous.revision + 1,
+        content_revision=current_content_revision,
         decision=payload.decision,
         reason=payload.reason,
+        user_visible_reason=payload.user_visible_reason,
         duplicate_of_report_id=payload.duplicate_of_report_id,
         location_reviewed=payload.location_reviewed,
         photo_reviewed=payload.photo_reviewed,
@@ -230,6 +356,7 @@ def _delivery_intent_matches(
         and event.external_receipt_id == payload.external_receipt_id
         and event.reason == payload.reason
         and event.evidence_sha256 == payload.evidence_sha256
+        and event.package_revision == payload.package_revision
         and _as_utc(event.observed_at) == payload.observed_at
         and event.expected_revision == payload.expected_revision
         and event.idempotency_key == payload.idempotency_key
@@ -239,6 +366,8 @@ def _delivery_intent_matches(
 def _require_latest_approval(
     db: Session,
     report_id: uuid.UUID,
+    *,
+    content_revision: int,
 ) -> ReportReviewDecision:
     decision = _latest_review_decision(db, report_id)
     if (
@@ -248,6 +377,7 @@ def _require_latest_approval(
         or not decision.photo_reviewed
         or not decision.privacy_reviewed
         or decision.duplicate_of_report_id is not None
+        or int(decision.content_revision or 0) != content_revision
     ):
         raise AdminReportWorkflowError(
             "latest_review_approval_required",
@@ -267,7 +397,7 @@ def append_report_institution_delivery_event(
 ) -> ReportInstitutionDeliveryEvent:
     """Record a manual delivery observation; this function never sends data."""
 
-    _locked_report(db, report_id)
+    report = _locked_report(db, report_id)
     idempotency_key = payload.idempotency_key
     try:
         existing = db.execute(
@@ -314,14 +444,47 @@ def append_report_institution_delivery_event(
         )
 
     try:
-        approval = _require_latest_approval(db, report_id)
+        approval = _require_latest_approval(
+            db,
+            report_id,
+            content_revision=int(report.content_revision or 0),
+        )
     except AdminReportWorkflowError as exc:
         if exc.code != "admin_report_workflow_unavailable":
             _rollback_or_database_unavailable(db)
         raise
+    try:
+        package = db.execute(
+            select(ReportDeliveryPackage).where(
+                ReportDeliveryPackage.report_id == report_id,
+                ReportDeliveryPackage.revision == payload.package_revision,
+            )
+        ).scalar_one_or_none()
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    if (
+        package is None
+        or package.review_decision_id != approval.id
+        or int(package.content_revision or 0) != int(report.content_revision or 0)
+    ):
+        _rollback_or_database_unavailable(db)
+        raise AdminReportWorkflowError(
+            "delivery_package_invalid",
+            "Manual delivery requires a package for the latest approved review.",
+            status_code=409,
+        )
+    if previous is not None and previous.package_revision != package.revision:
+        _rollback_or_database_unavailable(db)
+        raise AdminReportWorkflowError(
+            "delivery_package_revision_conflict",
+            "A delivery workflow cannot switch package revisions after submission.",
+            status_code=409,
+        )
     event = ReportInstitutionDeliveryEvent(
         report_id=report_id,
         review_decision_id=approval.id,
+        package_id=package.id,
+        package_revision=package.revision,
         revision=current_revision + 1,
         institution=payload.institution,
         channel=payload.channel,
@@ -381,6 +544,8 @@ __all__ = [
     "AdminReportWorkflowError",
     "append_report_institution_delivery_event",
     "append_report_review_decision",
+    "allowed_next_statuses",
     "list_report_institution_delivery_events",
     "list_report_review_decisions",
+    "update_admin_report_status",
 ]

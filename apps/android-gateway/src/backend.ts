@@ -1,8 +1,10 @@
 import { createHmac } from "node:crypto";
-import { isIP } from "node:net";
 
 import {
   gatewaySessionActor,
+  gatewaySessionAccountGeneration,
+  gatewayFieldLongSessionBinding,
+  gatewayTrustedClientIp,
   gatewayTokenForBackend,
   gatewayUnavailableResponse,
   gatewayUnauthorizedResponse,
@@ -16,6 +18,14 @@ export const FIELD_TEST_TOKEN_HEADER = "x-walksafe-field-test-token";
 export const ACTOR_ID_HEADER = "x-walksafe-actor-id";
 export const ACTOR_ASSERTION_HEADER = "x-walksafe-actor-assertion";
 export const ACCOUNT_GENERATION_HEADER = "x-walksafe-account-generation";
+export const RAW_REQUEST_PROOF_HEADER = "x-walksafe-raw-request-proof";
+export const RAW_PURPOSE_HEADER = "x-walksafe-raw-purpose";
+export const RAW_WALK_ID_HEADER = "x-walksafe-raw-walk-id";
+export const RAW_MANIFEST_SHA256_HEADER = "x-walksafe-raw-manifest-sha256";
+export const RAW_CHUNK_SHA256_HEADER = "x-walksafe-chunk-sha256";
+export const RAW_COMMIT_SHA256_HEADER = "x-walksafe-raw-commit-sha256";
+export const RAW_CONSENT_RECEIPT_SHA256_HEADER =
+  "x-walksafe-consent-receipt-sha256";
 export const DELETION_ACCESS_PRE_DIGEST_HEADER =
   "x-walksafe-deletion-access-pre-digest";
 export const DELETION_TOMBSTONE_HEADER =
@@ -31,6 +41,9 @@ const IMAGE_UPLOAD_ACTOR_RATE_LIMIT = 12;
 const IMAGE_UPLOAD_IP_RATE_LIMIT = 30;
 const IMAGE_UPLOAD_MAX_CONCURRENCY = 1;
 const ACTOR_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$/;
+const RAW_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const LOWER_SHA256 = /^[0-9a-f]{64}$/;
 
 type BoundedFormDataResult =
   | { formData: FormData; error?: never }
@@ -230,11 +243,7 @@ function pruneImageUploadRateEvents(nowMs: number): void {
 }
 
 function imageUploadClientIp(request: Request): string {
-  const configuredHeader = process.env.WALKSAFE_GATEWAY_TRUSTED_IP_HEADER?.trim().toLowerCase() ?? "";
-  if (configuredHeader !== "cf-connecting-ip" && configuredHeader !== "x-real-ip") return "unbound";
-  const value = request.headers.get(configuredHeader) ?? "";
-  if (!value || value !== value.trim() || value.includes(",") || isIP(value) === 0) return "unbound";
-  return value;
+  return gatewayTrustedClientIp(request) ?? "unbound";
 }
 
 export function acquireImageUploadAdmission(
@@ -310,6 +319,14 @@ export function backendUrl(path: string, request?: Request): string {
   return `${BACKEND_API_BASE_URL}${path}${query}`;
 }
 
+export function backendServiceRequestHeaders(initial?: HeadersInit): Headers | null {
+  const token = gatewayTokenForBackend();
+  if (token.length < 24) return null;
+  const headers = new Headers(initial);
+  headers.set(FIELD_TEST_TOKEN_HEADER, token);
+  return headers;
+}
+
 export function createBackendActorAssertion(
   actorId: string,
   accountGeneration: number,
@@ -332,6 +349,152 @@ export function createBackendActorAssertion(
     `${accountGeneration}:${nowSeconds}`;
   const signature = createHmac("sha256", secret).update(message).digest("base64url");
   return `v2.${nowSeconds}.${signature}`;
+}
+
+export type RawCollectionOperation =
+  | "PUT_MANIFEST"
+  | "PUT_CHUNK"
+  | "GET_STATUS"
+  | "COMMIT";
+
+export type RawCollectionBackendProofInput = {
+  actorId: string;
+  accountGeneration: number;
+  operation: RawCollectionOperation;
+  method: "HEAD" | "GET" | "PUT" | "POST";
+  path: string;
+  purpose: "GENERAL_RAW" | "AUTO_REPORT";
+  walkId: string;
+  manifestSha256: string;
+  consentReceiptSha256: string | null;
+  chunkSha256: string | null;
+  commitSha256: string | null;
+};
+
+function rawCollectionOperationForPath(path: string): RawCollectionOperation | null {
+  const collection = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+  if (new RegExp(`^/raw-collections/${collection}/manifest$`).test(path)) {
+    return "PUT_MANIFEST";
+  }
+  if (new RegExp(`^/raw-collections/${collection}/commit$`).test(path)) {
+    return "COMMIT";
+  }
+  if (new RegExp(
+    `^/raw-collections/${collection}/objects/${collection}/chunks/(?:0|[1-9][0-9]{0,3})$`
+  ).test(path)) {
+    return "PUT_CHUNK";
+  }
+  if (new RegExp(`^/raw-collections/${collection}$`).test(path)) {
+    return "GET_STATUS";
+  }
+  return null;
+}
+
+function canonicalRawProofJson(value: Record<string, unknown>): string {
+  return `{${Object.keys(value).sort().map((key) =>
+    `${JSON.stringify(key)}:${JSON.stringify(value[key])}`
+  ).join(",")}}`;
+}
+
+export function rawCollectionRequestProofMessage(
+  input: RawCollectionBackendProofInput,
+  issuedAt: number
+): Buffer | null {
+  const actualOperation = rawCollectionOperationForPath(input.path);
+  const actualMethod = input.operation === "PUT_MANIFEST" || input.operation === "PUT_CHUNK"
+    ? "PUT"
+    : input.operation === "COMMIT" ? "POST" : "GET";
+  const hashesMatch = input.operation === "PUT_MANIFEST"
+    ? input.consentReceiptSha256 !== null && input.chunkSha256 === null &&
+      input.commitSha256 === null
+    : input.operation === "PUT_CHUNK"
+      ? input.consentReceiptSha256 !== null && input.chunkSha256 !== null &&
+        input.commitSha256 === null
+      : input.operation === "COMMIT"
+        ? input.consentReceiptSha256 !== null && input.chunkSha256 === null &&
+          input.commitSha256 !== null
+        : input.consentReceiptSha256 === null && input.chunkSha256 === null &&
+          input.commitSha256 === null;
+  if (
+    !ACTOR_ID_PATTERN.test(input.actorId) ||
+    !Number.isSafeInteger(input.accountGeneration) || input.accountGeneration < 1 ||
+    actualOperation !== input.operation ||
+    (input.method !== "HEAD" && input.method !== actualMethod) ||
+    (input.method === "HEAD" && input.operation === "GET_STATUS") ||
+    (input.purpose !== "GENERAL_RAW" && input.purpose !== "AUTO_REPORT") ||
+    !RAW_UUID.test(input.walkId) ||
+    !LOWER_SHA256.test(input.manifestSha256) ||
+    (input.consentReceiptSha256 !== null &&
+      !LOWER_SHA256.test(input.consentReceiptSha256)) ||
+    (input.chunkSha256 !== null && !LOWER_SHA256.test(input.chunkSha256)) ||
+    (input.commitSha256 !== null && !LOWER_SHA256.test(input.commitSha256)) ||
+    !hashesMatch ||
+    !Number.isSafeInteger(issuedAt) || issuedAt <= 0
+  ) return null;
+  const payload = {
+    account_generation: input.accountGeneration,
+    actor_id: input.actorId,
+    chunk_sha256: input.chunkSha256,
+    commit_sha256: input.commitSha256,
+    consent_receipt_sha256: input.consentReceiptSha256,
+    issued_at: issuedAt,
+    manifest_sha256: input.manifestSha256,
+    method: input.method,
+    operation: input.operation,
+    path: input.path,
+    purpose: input.purpose,
+    version: 1,
+    walk_id: input.walkId
+  };
+  return Buffer.from(
+    `walksafe/raw-collection-request-proof/v1\0${canonicalRawProofJson(payload)}`,
+    "utf8"
+  );
+}
+
+export function createRawCollectionRequestProof(
+  input: RawCollectionBackendProofInput,
+  nowSeconds = Math.floor(Date.now() / 1000)
+): string | null {
+  const secret = process.env.WALKSAFE_GATEWAY_SESSION_SECRET?.trim() ?? "";
+  const message = rawCollectionRequestProofMessage(input, nowSeconds);
+  if (secret.length < 32 || message === null) return null;
+  const signature = createHmac("sha256", secret).update(message).digest("base64url");
+  return `v1.${nowSeconds}.${signature}`;
+}
+
+export function rawCollectionBackendHeaders(
+  input: RawCollectionBackendProofInput,
+  initial?: HeadersInit,
+  nowSeconds = Math.floor(Date.now() / 1000)
+): Headers | null {
+  const serviceToken = gatewayTokenForBackend();
+  const actorAssertion = createBackendActorAssertion(
+    input.actorId,
+    input.accountGeneration,
+    nowSeconds
+  );
+  const rawProof = createRawCollectionRequestProof(input, nowSeconds);
+  if (serviceToken.length < 24 || !actorAssertion || !rawProof) return null;
+  const headers = new Headers(initial);
+  headers.set(FIELD_TEST_TOKEN_HEADER, serviceToken);
+  headers.set(ACTOR_ID_HEADER, input.actorId);
+  headers.set(ACCOUNT_GENERATION_HEADER, String(input.accountGeneration));
+  headers.set(ACTOR_ASSERTION_HEADER, actorAssertion);
+  headers.set(RAW_REQUEST_PROOF_HEADER, rawProof);
+  headers.set(RAW_PURPOSE_HEADER, input.purpose);
+  headers.set(RAW_WALK_ID_HEADER, input.walkId);
+  headers.set(RAW_MANIFEST_SHA256_HEADER, input.manifestSha256);
+  if (input.consentReceiptSha256 !== null) {
+    headers.set(RAW_CONSENT_RECEIPT_SHA256_HEADER, input.consentReceiptSha256);
+  }
+  if (input.chunkSha256 !== null) {
+    headers.set(RAW_CHUNK_SHA256_HEADER, input.chunkSha256);
+  }
+  if (input.commitSha256 !== null) {
+    headers.set(RAW_COMMIT_SHA256_HEADER, input.commitSha256);
+  }
+  return headers;
 }
 
 function attachBackendActor(
@@ -466,6 +629,34 @@ export function authorizeProxyRequest(request: Request): Response | null {
 export function authorizedProxyActor(request: Request): string | null {
   if (!isFieldSessionAuthorized(request)) return null;
   return gatewaySessionActor(request);
+}
+
+export type AuthorizedProxyDeviceBinding = Readonly<{
+  actorId: string;
+  accountGeneration: number;
+  deviceId: string;
+}>;
+
+/**
+ * Resolves only a current v7 Backend-account device session. The caller must
+ * use this value, rather than any inbound identity header, when proxying user
+ * rights requests.
+ */
+export function authorizedProxyDeviceBinding(
+  request: Request
+): AuthorizedProxyDeviceBinding | null {
+  if (!isFieldSessionAuthorized(request)) return null;
+  const actorId = gatewaySessionActor(request);
+  const accountGeneration = gatewaySessionAccountGeneration(request);
+  const binding = gatewayFieldLongSessionBinding(request);
+  if (
+    !actorId ||
+    accountGeneration === null ||
+    !binding ||
+    binding.actorId !== actorId ||
+    binding.accountGeneration !== accountGeneration
+  ) return null;
+  return { actorId, accountGeneration, deviceId: binding.deviceId };
 }
 
 export function proxyRequestHeaders(

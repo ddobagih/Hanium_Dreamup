@@ -380,7 +380,7 @@ object VibrationPatterns {
     fun forLevel(level: MessageLevel): LongArray? {
         return when (level) {
             MessageLevel.STOP -> longArrayOf(0L, 180L, 80L, 240L, 80L, 320L)
-            MessageLevel.WARNING,
+            MessageLevel.WARNING -> longArrayOf(0L, 220L)
             MessageLevel.CAUTION,
             MessageLevel.AWARE,
             MessageLevel.INFO,

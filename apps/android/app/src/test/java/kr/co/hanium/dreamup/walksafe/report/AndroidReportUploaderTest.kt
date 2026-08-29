@@ -100,18 +100,50 @@ class AndroidReportUploaderTest {
     }
 
     @Test
-    fun actorReceiptFieldMustAlwaysBePresentAndExact() {
+    fun clientMetadataActorFieldIsNotUsedAsTransportReceipt() {
         listOf(OMITTED_RECEIPT_FIELD, JSONObject.NULL, "another-actor").forEach { actorId ->
             ReportTransferPurpose.entries.forEach { purpose ->
-                assertThrows(ReportUploadProtocolException::class.java) {
+                assertNotNull(
                     validatedReportUploadResponseOrNull(
                         statusCode = 201,
                         body = structuredSuccessBody(actorId = actorId),
                         receiptExpectation = receiptExpectation(purpose),
-                    )
-                }
+                    ),
+                )
             }
         }
+    }
+
+    @Test
+    fun queueTransportReceiptAndStatusMustMatchExactFrozenPayload() {
+        val report = queuedReport()
+        val receipt = transportReceipt(report)
+        val uploadBody = JSONObject().put("transport_receipt", receipt).toString()
+        val statusBody = JSONObject()
+            .put("persistence_state", "PERSISTED")
+            .put("user_status", "RECEIVED")
+            .put("transport_receipt", receipt)
+            .toString()
+
+        assertNotNull(parseQueuedUploadReceiptOrNull(uploadBody, report))
+        assertNotNull(parseQueuedStatusReceiptOrNull(statusBody, report))
+        assertNull(
+            parseQueuedUploadReceiptOrNull(
+                JSONObject(uploadBody)
+                    .put(
+                        "transport_receipt",
+                        JSONObject(receipt.toString()).put("payload_bytes", report.payload.payloadBytes + 1),
+                    )
+                    .toString(),
+                report,
+            ),
+        )
+        assertNull(
+            parseQueuedStatusReceiptOrNull(
+                JSONObject(statusBody).put("unexpected", true).toString(),
+                report,
+            ),
+        )
     }
 
     @Test
@@ -469,6 +501,31 @@ class AndroidReportUploaderTest {
             .toString()
     }
 
+    private fun queuedReport(): QueuedReport {
+        val payload = requireNotNull(
+            FrozenReportPayload.freeze(
+                "123e4567-e89b-42d3-a456-426614174010",
+                "{}".toByteArray(),
+                byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xd9.toByte()),
+            ),
+        )
+        return QueuedReport(
+            payload = payload,
+            priority = ReportQueuePriority.EXPLICIT,
+            walkSessionId = "123e4567-e89b-42d3-a456-426614174011",
+            consentReceiptSha256 = "c".repeat(64),
+            createdAtEpochMs = 1_000L,
+            expiresAtEpochMs = 1_000L + REPORT_QUEUE_TTL_MS,
+        )
+    }
+
+    private fun transportReceipt(report: QueuedReport) = JSONObject()
+        .put("marker", REPORT_RECEIPT_MARKER)
+        .put("report_id", report.payload.reportId)
+        .put("persistence_marker", "123e4567-e89b-42d3-a456-426614174012")
+        .put("payload_sha256", report.payload.payloadSha256)
+        .put("payload_bytes", report.payload.payloadBytes)
+
     private fun consentConfirmation() = IntegratedConsentConfirmation(
         schemaVersion = INTEGRATED_CONSENT_CONFIRMATION_SCHEMA_VERSION,
         policyVersion = INTEGRATED_CONSENT_POLICY_VERSION,
@@ -479,7 +536,8 @@ class AndroidReportUploaderTest {
         revision = 1L,
         selections = IntegratedConsentSelections(rawSourceCollection = true),
         confirmedAt = "2026-07-25T12:00:00.000Z",
-        receiptSha256 = "a".repeat(64),
+        gatewayAuditRecordSha256 = "9".repeat(64),
+        backendConsentReceiptSha256 = "a".repeat(64),
         controlSecret = "b".repeat(64),
     )
 

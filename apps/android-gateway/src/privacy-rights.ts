@@ -360,6 +360,10 @@ function safeInteger(value: unknown, minimum = 0): value is number {
   return Number.isSafeInteger(value) && (value as number) >= minimum;
 }
 
+function nextAccountGeneration(generation: number): number {
+  return generation === Number.MAX_SAFE_INTEGER ? generation : generation + 1;
+}
+
 function objectValue(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -620,14 +624,14 @@ function validLedger(value: unknown): value is PrivacyLedger {
       const tombstone = actor.tombstones[0] as Record<string, unknown> | undefined;
       if (
         !tombstone ||
-        actor.next_generation !== (tombstone.generation as number) + 1 ||
+        actor.next_generation !== nextAccountGeneration(tombstone.generation as number) ||
         actor.processing_epoch !== 2
       ) {
         return false;
       }
     } else if (
       actor.tombstones.length !== 0 ||
-      actor.next_generation !== actor.active_generation + 1 ||
+      actor.next_generation !== nextAccountGeneration(actor.active_generation) ||
       actor.processing_epoch !== 1
     ) {
       return false;
@@ -1083,6 +1087,49 @@ export function activateActorGeneration(
       processing_epoch: actor.processing_epoch
     });
     return { value: generation, changed: true };
+  });
+}
+
+export function bindBackendActorGeneration(
+  actorId: string,
+  accountGeneration: number,
+  nowEpochMs = Date.now()
+): number {
+  const occurredAt = isoInstantFromEpoch(nowEpochMs);
+  if (
+    !PRIVACY_ACTOR_ID.test(actorId) ||
+    !safeInteger(accountGeneration, 1) ||
+    !occurredAt
+  ) {
+    throw new PrivacyRightsLedgerError(
+      "conflict",
+      "backend actor generation input is invalid"
+    );
+  }
+  return mutateLedger((ledger) => {
+    const digest = actorDigest(actorId);
+    const existing = ledger.actors[digest];
+    if (existing) {
+      if (existing.active_generation === accountGeneration) {
+        return { value: accountGeneration, changed: false };
+      }
+      throw new PrivacyRightsLedgerError(
+        existing.active_generation === null ? "inactive" : "conflict",
+        "backend account generation does not match the gateway ledger"
+      );
+    }
+    ledger.actors[digest] = {
+      next_generation: nextAccountGeneration(accountGeneration),
+      active_generation: accountGeneration,
+      processing_epoch: 1,
+      tombstones: []
+    };
+    appendEvent(ledger, "BACKEND_ACTOR_GENERATION_BOUND", occurredAt, {
+      actor_sha256: digest,
+      account_generation: accountGeneration,
+      processing_epoch: 1
+    });
+    return { value: accountGeneration, changed: true };
   });
 }
 

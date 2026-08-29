@@ -314,7 +314,8 @@ class ReportPrivacyConsentSessionTest {
                             rawSourceCollection = true,
                         ),
                         confirmedAt = "2026-07-25T12:00:00.000Z",
-                        receiptSha256 = "a".repeat(64),
+                        gatewayAuditRecordSha256 = "9".repeat(64),
+                        backendConsentReceiptSha256 = "a".repeat(64),
                         controlSecret = "c".repeat(64),
                     ),
                     networkBinding = IntegratedConsentNetworkBinding.forTest(

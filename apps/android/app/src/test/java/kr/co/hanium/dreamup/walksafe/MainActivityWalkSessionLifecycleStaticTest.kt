@@ -311,15 +311,25 @@ class MainActivityWalkSessionLifecycleStaticTest {
     fun remoteNavigationAndReportActionsRevalidateExactSessionLeases() {
         val destination = functionBlock("private fun performDestinationSearch(")
         val route = functionBlock("private fun requestRoute(")
+        val prepare = functionBlock("private fun prepareReportCandidate(")
         val report = functionBlock("private fun processReportCandidate(")
+        val capture = functionBlock("private fun captureReportQueueDrainTriggerBeforeTransition(")
+        val drainContext = functionBlock("private fun reportQueueDrainContext(")
 
         assertTrue(destination.contains("isDestinationSearchLeaseCurrent(expectedWalkEpoch, requestId)"))
         assertTrue(destination.contains("gatewaySessionClient.revalidate("))
         assertTrue(route.contains("isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId)"))
         assertTrue(route.contains("gatewaySessionClient.revalidate("))
         assertTrue(report.contains("walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch)"))
-        assertTrue(report.contains("walkSessionResourceProbe.snapshot()"))
-        assertTrue(report.contains("gatewaySessionClient.revalidate("))
+        assertTrue(prepare.contains("walkSessionResourceProbe.snapshot()"))
+        assertTrue(report.contains("reportQueueStore.enqueue("))
+        assertFalse(report.contains("gatewaySessionClient.revalidate("))
+        assertTrue(capture.contains("val gatewaySnapshot = GatewaySessionProcessCoordinator.snapshot()"))
+        assertTrue(capture.contains("gatewaySession.isUsableFor(reporter)"))
+        assertTrue(capture.contains("gatewaySessionGeneration = gatewaySnapshot.generation"))
+        assertTrue(drainContext.contains("currentGateway.generation == trigger.gatewaySessionGeneration"))
+        assertTrue(drainContext.contains("currentGateway.session === trigger.gatewaySession"))
+        assertTrue(drainContext.contains("trigger.gatewaySession.isUsableFor(reporter)"))
     }
 
     private fun functionBlock(marker: String): String {

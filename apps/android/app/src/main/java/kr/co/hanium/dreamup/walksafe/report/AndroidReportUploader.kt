@@ -6,6 +6,7 @@ import java.net.URL
 import java.security.MessageDigest
 import java.util.UUID
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
+import kr.co.hanium.dreamup.walksafe.network.BoundedHttpResponse
 import kr.co.hanium.dreamup.walksafe.network.CONSENT_CONTROL_SECRET_HEADER
 import kr.co.hanium.dreamup.walksafe.network.CONSENT_INSTALLATION_HEADER
 import kr.co.hanium.dreamup.walksafe.network.CONSENT_NETWORK_TRANSPORT_HEADER
@@ -21,6 +22,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 const val REPORT_PURPOSE_HEADER = "x-walksafe-report-purpose"
+internal const val REPORT_ID_HEADER = "x-walksafe-report-id"
+internal const val REPORT_PAYLOAD_SHA256_HEADER = "x-walksafe-report-payload-sha256"
+internal const val REPORT_PAYLOAD_BYTES_HEADER = "x-walksafe-report-payload-bytes"
 
 data class ReportUploadResponse(
     val statusCode: Int,
@@ -32,6 +36,74 @@ data class ReportUploadResponse(
         return duplicateReportIdsFromBody(responseBody)
     }
 }
+
+internal fun parseQueuedUploadReceiptOrNull(
+    body: String,
+    report: QueuedReport,
+): ReportQueueReceipt? = runCatching {
+    val root = JSONObject(body)
+    strictTransportReceipt(root.getJSONObject("transport_receipt"), report)
+}.getOrNull()
+
+internal fun parseQueuedStatusReceiptOrNull(
+    body: String,
+    report: QueuedReport,
+): ReportQueueReceipt? = runCatching {
+    val root = JSONObject(body)
+    require(root.keysAsSet() == REPORT_STATUS_FIELDS)
+    require(root.getString("persistence_state") == "PERSISTED")
+    require(root.getString("user_status") in REPORT_USER_STATUSES)
+    strictTransportReceipt(root.getJSONObject("transport_receipt"), report)
+}.getOrNull()
+
+private fun strictTransportReceipt(
+    value: JSONObject,
+    report: QueuedReport,
+): ReportQueueReceipt {
+    require(value.keysAsSet() == REPORT_RECEIPT_FIELDS)
+    val receipt = ReportQueueReceipt(
+        reportId = value.getString("report_id"),
+        payloadSha256 = value.getString("payload_sha256"),
+        payloadBytes = value.strictPositiveLong("payload_bytes"),
+        marker = value.getString("marker"),
+        persistenceMarker = value.getString("persistence_marker"),
+    )
+    require(receipt.reportId == report.payload.reportId)
+    require(receipt.payloadSha256 == report.payload.payloadSha256)
+    require(receipt.payloadBytes == report.payload.payloadBytes)
+    require(receipt.marker == REPORT_RECEIPT_MARKER)
+    require(isCanonicalReportUuid(receipt.persistenceMarker))
+    return receipt
+}
+
+private fun ReportQueuePriority.toTransferPurpose(): ReportTransferPurpose =
+    if (this == ReportQueuePriority.EXPLICIT) {
+        ReportTransferPurpose.EXPLICIT
+    } else {
+        ReportTransferPurpose.AUTOMATIC
+    }
+
+private fun BoundedHttpResponse.toUploadException(
+    connection: HttpURLConnection,
+): ReportUploadHttpException = ReportUploadHttpException(
+    ReportUploadError(
+        statusCode = statusCode,
+        errorBody = body,
+        retryAfterMs = connection.getHeaderField("Retry-After")
+            ?.trim()
+            ?.toLongOrNull()
+            ?.coerceIn(1L, MAX_SERVER_RETRY_AFTER_MS / 1_000L)
+            ?.times(1_000L),
+    ),
+)
+
+private fun JSONObject.keysAsSet(): Set<String> = buildSet { keys().forEach(::add) }
+
+private fun JSONObject.strictPositiveLong(name: String): Long = when (val value = get(name)) {
+    is Int -> value.toLong()
+    is Long -> value
+    else -> error("$name must be an integer")
+}.also { require(it > 0L) }
 
 enum class ReportUploadReceiptOutcome {
     BOUND,
@@ -53,6 +125,135 @@ data class ReportUploadError(
 
 /** Multipart uploader requiring a live privacy-session permit at creation and socket open. */
 internal class AndroidReportUploader internal constructor() {
+    internal fun queuedUploadCall(
+        permit: ReportUploadPermit,
+        session: GatewayFieldSession,
+        consentConfirmation: IntegratedConsentConfirmation,
+        networkBinding: IntegratedConsentNetworkBinding,
+        report: QueuedReport,
+    ): CancellableNetworkCall<ReportQueueReceipt> {
+        require(
+            consentConfirmation.backendConsentReceiptSha256 ==
+                report.consentReceiptSha256,
+        )
+        val purpose = report.priority.toTransferPurpose()
+        return reportTransportCall(
+            permit = permit,
+            session = session,
+            consentConfirmation = consentConfirmation,
+            networkBinding = networkBinding,
+            purpose = purpose,
+            report = report,
+            requestMethod = "POST",
+            endpoint = session.gatewayBaseUrl.trimEnd('/') + "/api/reports/v2",
+        ) { connection, cancellation ->
+            val boundary = "----walksafe-${System.currentTimeMillis()}"
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            val metadataSnapshot = report.payload.metadataUtf8()
+            val imageSnapshot = report.payload.imageJpeg()
+            try {
+                connection.outputStream.use { output ->
+                    cancellation.attach(output)
+                    try {
+                        writeMultipart(output, boundary, metadataSnapshot, imageSnapshot)
+                    } finally {
+                        cancellation.detach(output)
+                    }
+                }
+            } finally {
+                metadataSnapshot.fill(0)
+                imageSnapshot.fill(0)
+            }
+            val response = connection.readBoundedResponse(REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation)
+            if (response.statusCode !in 200..299) throw response.toUploadException(connection)
+            parseQueuedUploadReceiptOrNull(response.body, report)
+                ?: throw ReportUploadProtocolException()
+        }
+    }
+
+    internal fun queuedStatusCall(
+        permit: ReportUploadPermit,
+        session: GatewayFieldSession,
+        consentConfirmation: IntegratedConsentConfirmation,
+        networkBinding: IntegratedConsentNetworkBinding,
+        report: QueuedReport,
+    ): CancellableNetworkCall<ReportQueueReceipt?> {
+        require(
+            consentConfirmation.backendConsentReceiptSha256 ==
+                report.consentReceiptSha256,
+        )
+        val purpose = report.priority.toTransferPurpose()
+        return reportTransportCall(
+            permit = permit,
+            session = session,
+            consentConfirmation = consentConfirmation,
+            networkBinding = networkBinding,
+            purpose = purpose,
+            report = report,
+            requestMethod = "GET",
+            endpoint = session.gatewayBaseUrl.trimEnd('/') +
+                "/api/reports/v2/${report.payload.reportId}/status",
+        ) { connection, cancellation ->
+            val response = connection.readBoundedResponse(REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation)
+            when (response.statusCode) {
+                404 -> null
+                in 200..299 -> parseQueuedStatusReceiptOrNull(response.body, report)
+                    ?: throw ReportUploadProtocolException()
+                else -> throw response.toUploadException(connection)
+            }
+        }
+    }
+
+    private fun <T> reportTransportCall(
+        permit: ReportUploadPermit,
+        session: GatewayFieldSession,
+        consentConfirmation: IntegratedConsentConfirmation,
+        networkBinding: IntegratedConsentNetworkBinding,
+        purpose: ReportTransferPurpose,
+        report: QueuedReport,
+        requestMethod: String,
+        endpoint: String,
+        execute: (HttpURLConnection, kr.co.hanium.dreamup.walksafe.network.HttpConnectionCancellation) -> T,
+    ): CancellableNetworkCall<T> = cancellableHttpCall { cancellation ->
+        val connection = ReportPrivacyConsentSession.withLiveUploadPermit(
+            permit = permit,
+            expectedPurpose = purpose,
+        ) {
+            networkBinding.openConnection(URL(endpoint)) as HttpURLConnection
+        }
+        cancellation.attach(connection)
+        try {
+            connection.apply {
+                this.requestMethod = requestMethod
+                connectTimeout = 8_000
+                readTimeout = 12_000
+                doInput = true
+                instanceFollowRedirects = false
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Connection", "close")
+                setRequestProperty(REPORT_PURPOSE_HEADER, purpose.wireValue)
+                setRequestProperty(REPORT_ID_HEADER, report.payload.reportId)
+                setRequestProperty(REPORT_PAYLOAD_SHA256_HEADER, report.payload.payloadSha256)
+                setRequestProperty(REPORT_PAYLOAD_BYTES_HEADER, report.payload.payloadBytes.toString())
+                setRequestProperty(CONSENT_INSTALLATION_HEADER, consentConfirmation.installationId)
+                setRequestProperty(CONSENT_CONTROL_SECRET_HEADER, consentConfirmation.controlSecret)
+                setRequestProperty(CONSENT_NETWORK_TRANSPORT_HEADER, networkBinding.transport.wireValue)
+                setRequestProperty(CONSENT_POLICY_HEADER, consentConfirmation.policyVersion)
+                setRequestProperty(CONSENT_REVISION_HEADER, consentConfirmation.revision.toString())
+                setRequestProperty(
+                    CONSENT_RECEIPT_HEADER,
+                    consentConfirmation.backendConsentReceiptSha256,
+                )
+                session.requestHeaders().forEach(::setRequestProperty)
+            }
+            execute(connection, cancellation)
+        } finally {
+            cancellation.detach(connection)
+            connection.disconnect()
+        }
+    }
+
     internal fun uploadCall(
         permit: ReportUploadPermit,
         session: GatewayFieldSession,
@@ -125,7 +326,7 @@ internal class AndroidReportUploader internal constructor() {
                 )
                 setRequestProperty(
                     CONSENT_RECEIPT_HEADER,
-                    consentConfirmation.receiptSha256,
+                    consentConfirmation.backendConsentReceiptSha256,
                 )
                 session.requestHeaders().forEach(::setRequestProperty)
             }
@@ -169,6 +370,13 @@ internal class AndroidReportUploader internal constructor() {
         boundary: String,
         metadataJson: String,
         imageJpeg: ByteArray,
+    ) = writeMultipart(output, boundary, metadataJson.toByteArray(Charsets.UTF_8), imageJpeg)
+
+    private fun writeMultipart(
+        output: OutputStream,
+        boundary: String,
+        metadataUtf8: ByteArray,
+        imageJpeg: ByteArray,
     ) {
         val line = "\r\n"
         output.write("--$boundary$line".toByteArray(Charsets.UTF_8))
@@ -176,7 +384,7 @@ internal class AndroidReportUploader internal constructor() {
             "Content-Disposition: form-data; name=\"metadata\"$line".toByteArray(Charsets.UTF_8),
         )
         output.write("Content-Type: application/json$line$line".toByteArray(Charsets.UTF_8))
-        output.write(metadataJson.toByteArray(Charsets.UTF_8))
+        output.write(metadataUtf8)
         output.write(line.toByteArray(Charsets.UTF_8))
 
         output.write("--$boundary$line".toByteArray(Charsets.UTF_8))
@@ -254,12 +462,6 @@ internal fun validatedReportUploadResponseOrNull(
         if (!UPLOAD_PATH_PATTERN.matches(root.optString("image_path"))) return null
         val confidence = (root.opt("confidence") as? Number)?.toDouble() ?: return null
         if (!confidence.isFinite() || confidence !in 0.0..1.0) return null
-        val actualActorId =
-            nullableReceiptString(metadata, "ingested_by_actor_id")
-                ?: throw ReportUploadProtocolException()
-        if (actualActorId != receiptExpectation.gatewayActorId) {
-            throw ReportUploadProtocolException()
-        }
         val actualTraceId = nullableReceiptString(metadata, "trace_id")
         if (actualTraceId != null && actualTraceId != receiptExpectation.traceId) {
             throw ReportUploadProtocolException()
@@ -302,6 +504,19 @@ private fun ByteArray.sha256Hex(): String {
 
 private const val LOWER_HEX_DIGITS = "0123456789abcdef"
 private val UPLOAD_PATH_PATTERN = Regex("/uploads/[A-Za-z0-9._-]{1,160}")
+private val REPORT_STATUS_FIELDS = setOf(
+    "persistence_state",
+    "user_status",
+    "transport_receipt",
+)
+private val REPORT_USER_STATUSES = setOf("RECEIVED", "IN_REVIEW", "COMPLETED")
+private val REPORT_RECEIPT_FIELDS = setOf(
+    "marker",
+    "report_id",
+    "persistence_marker",
+    "payload_sha256",
+    "payload_bytes",
+)
 
 fun duplicateReportIdsFromBody(body: String): List<String> {
     if (body.isBlank()) return emptyList()

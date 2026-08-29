@@ -71,7 +71,33 @@ class MessagePolicyTest {
         assertEquals(MessagePurpose.APPROACH_CAUTION, decision.purpose)
         assertEquals(MessageLevel.CAUTION, decision.userFacing.messageLevel)
         assertNull(decision.userFacing.stepsAhead)
-        assertNotNull(decision.userFacing.message)
+        assertTrue(
+            decision.userFacing.message?.endsWith("속도를 늦추고 주변을 확인하세요.") == true,
+        )
+    }
+
+    @Test
+    fun pseudoApproachCautionUsesApprovedActionSuffix() {
+        val policy = MessagePolicy()
+
+        val decision = policy.evaluate(
+            MetricDepthDecision(
+                className = "person",
+                source = DepthSource.POLYGON_TREND_PSEUDO_DEPTH,
+                riskDistanceM = null,
+                trend = Trend.APPROACHING,
+                confidenceFinal = 0.80f,
+                trackKey = "person-pseudo-approaching",
+            ),
+            nowMs = 0L,
+        )
+
+        assertEquals(MessagePurpose.APPROACH_CAUTION, decision.purpose)
+        assertEquals(MessageLevel.CAUTION, decision.userFacing.messageLevel)
+        assertNull(decision.userFacing.stepsAhead)
+        assertTrue(
+            decision.userFacing.message?.endsWith("속도를 늦추고 주변을 확인하세요.") == true,
+        )
     }
 
     @Test
@@ -202,7 +228,7 @@ class MessagePolicyTest {
 
         assertEquals(MessagePurpose.OBSTACLE_WARNING, decision.purpose)
         assertEquals(MessageLevel.STOP, decision.userFacing.messageLevel)
-        assertTrue(decision.userFacing.message?.contains("멈추세요") == true)
+        assertTrue(decision.userFacing.message?.endsWith("멈추세요. 주변을 확인하세요.") == true)
         assertFalse(decision.userFacing.message == CROSSWALK_REFERENCE_NOTICE_KO)
     }
 
@@ -323,6 +349,7 @@ class MessagePolicyTest {
 
         assertEquals(MessagePurpose.OBSTACLE_WARNING, decision.purpose)
         assertEquals(MessageLevel.WARNING, decision.userFacing.messageLevel)
+        assertTrue(decision.userFacing.message?.endsWith("멈출 준비를 하세요.") == true)
     }
 
     @Test

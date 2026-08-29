@@ -89,7 +89,7 @@ public final class AdminCanonicalEncoding {
 
     /** Parses a raw query without treating '+' as a space and rejects invalid percent UTF-8. */
     public static List<QueryParameter> parseRawQuery(String rawQuery) {
-        if (rawQuery == null || rawQuery.isEmpty()) return List.of();
+        if (rawQuery == null || rawQuery.isEmpty()) return AdminJava8Collections.list();
         List<QueryParameter> result = new ArrayList<>();
         for (String pair : rawQuery.split("&", -1)) {
             int delimiter = pair.indexOf('=');
@@ -97,7 +97,7 @@ public final class AdminCanonicalEncoding {
             String value = delimiter < 0 ? "" : pair.substring(delimiter + 1);
             result.add(new QueryParameter(percentDecode(name), percentDecode(value)));
         }
-        return List.copyOf(result);
+        return AdminJava8Collections.copyList(result);
     }
 
     public static String sha256Hex(byte[] value) {

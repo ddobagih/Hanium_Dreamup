@@ -54,7 +54,7 @@ public final class AdminSecurityControllerTest {
         assertThrows(IllegalStateException.class, () -> controller.recordReviewDecision(
             "11111111-1111-4111-8111-111111111111",
             new AdminReportDecision(
-                AdminReportDecision.Decision.APPROVED, "reviewed", null, true, true, true
+                AdminReportDecision.Decision.APPROVED, "reviewed", null, null, true, true, true
             ),
             true
         ));
@@ -366,7 +366,7 @@ public final class AdminSecurityControllerTest {
         AdminSecurityController controller = new AdminSecurityController(api, operations);
         controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
         AdminReportDecision review = new AdminReportDecision(
-            AdminReportDecision.Decision.APPROVED, "reviewed", null, true, true, true
+            AdminReportDecision.Decision.APPROVED, "reviewed", null, null, true, true, true
         );
 
         assertThrows(IllegalStateException.class, () -> controller.recordReviewDecision(

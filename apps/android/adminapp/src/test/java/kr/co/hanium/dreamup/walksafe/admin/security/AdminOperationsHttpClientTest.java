@@ -54,6 +54,7 @@ public final class AdminOperationsHttpClientTest {
         assertEquals(Integer.valueOf(1), reviewRead.returnedItemCount());
         assertEquals(Integer.valueOf(1), deliveryRead.returnedItemCount());
         assertEquals("APPROVED", reviewRead.reviewHistory().get(0).decision().name());
+        assertNull(reviewRead.reviewHistory().get(0).userVisibleReason());
         assertEquals(1, deliveryRead.deliveryHistory().get(0).revision());
         assertEquals("SUBMITTED", deliveryRead.deliveryHistory().get(0).status().name());
         assertEquals("서울시 도로관리과", deliveryRead.deliveryHistory().get(0).institution());
@@ -84,6 +85,8 @@ public final class AdminOperationsHttpClientTest {
         );
         JSONObject body = new JSONObject(operation.bodyText());
         assertEquals(EXACT_REVIEW_KEYS, keys(body));
+        assertTrue(body.has("user_visible_reason"));
+        assertTrue(body.isNull("user_visible_reason"));
         assertTrue(body.isNull("duplicate_of_report_id"));
         assertEquals(EMPTY_SHA, challenge.getString("query_sha256"));
     }
@@ -140,6 +143,24 @@ public final class AdminOperationsHttpClientTest {
         );
         assertThrows(IOException.class, () -> client(duplicate, new CapturingSigner())
             .readReviewDecisions(SESSION, REPORT_ID));
+
+        FakeTransport missingPublicReason = new FakeTransport();
+        missingPublicReason.reviewHistoryOverride = FakeTransport.reviewHistoryJson().replace(
+            "\"user_visible_reason\":null,",
+            ""
+        );
+        assertThrows(IOException.class, () -> client(missingPublicReason, new CapturingSigner())
+            .readReviewDecisions(SESSION, REPORT_ID));
+
+        FakeTransport invalidApprovedPublicReason = new FakeTransport();
+        invalidApprovedPublicReason.reviewHistoryOverride = FakeTransport.reviewHistoryJson().replace(
+            "\"user_visible_reason\":null",
+            "\"user_visible_reason\":\"공개 거절 사유\""
+        );
+        assertThrows(IOException.class, () ->
+            client(invalidApprovedPublicReason, new CapturingSigner())
+                .readReviewDecisions(SESSION, REPORT_ID)
+        );
 
         FakeTransport wrongRevision = new FakeTransport();
         wrongRevision.deliveryHistoryOverride = FakeTransport.deliveryHistoryJson().replace(
@@ -205,6 +226,7 @@ public final class AdminOperationsHttpClientTest {
             AdminReportDecision.Decision.APPROVED,
             "reviewed",
             null,
+            null,
             true,
             true,
             true
@@ -221,6 +243,7 @@ public final class AdminOperationsHttpClientTest {
             "manually submitted outside the app",
             null,
             "2026-08-09T01:02:03Z",
+            1L,
             0L,
             "55555555-5555-4555-8555-555555555555"
         );
@@ -322,6 +345,7 @@ public final class AdminOperationsHttpClientTest {
                   "revision":1,
                   "decision":"APPROVED",
                   "reason":"reviewed",
+                  "user_visible_reason":null,
                   "duplicate_of_report_id":null,
                   "location_reviewed":true,
                   "photo_reviewed":true,
@@ -342,6 +366,8 @@ public final class AdminOperationsHttpClientTest {
                   "id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
                   "report_id":"44444444-4444-4444-8444-444444444444",
                   "review_decision_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                  "package_id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                  "package_revision":1,
                   "revision":1,
                   "institution":"서울시 도로관리과",
                   "channel":"phone",
@@ -391,7 +417,7 @@ public final class AdminOperationsHttpClientTest {
         "query_sha256", "read_purpose", "session_id"
     );
     private static final Set<String> EXACT_REVIEW_KEYS = Set.of(
-        "decision", "reason", "duplicate_of_report_id",
+        "decision", "reason", "user_visible_reason", "duplicate_of_report_id",
         "location_reviewed", "photo_reviewed", "privacy_reviewed"
     );
     private static final String ORIGIN = "http://127.0.0.1:8000";

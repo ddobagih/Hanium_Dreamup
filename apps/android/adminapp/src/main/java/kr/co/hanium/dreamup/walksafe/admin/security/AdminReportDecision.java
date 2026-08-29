@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Exact six-field, append-only administrator review decision request. */
+/** Exact seven-field, append-only administrator review decision request. */
 public final class AdminReportDecision {
     public enum Decision {
         APPROVED,
@@ -13,9 +13,10 @@ public final class AdminReportDecision {
         DUPLICATE
     }
 
-    private static final Set<String> EXACT_KEYS = Set.of(
+    private static final Set<String> EXACT_KEYS = AdminJava8Collections.set(
         "decision",
         "reason",
+        "user_visible_reason",
         "duplicate_of_report_id",
         "location_reviewed",
         "photo_reviewed",
@@ -24,6 +25,7 @@ public final class AdminReportDecision {
 
     private final Decision decision;
     private final String reason;
+    private final String userVisibleReason;
     private final String duplicateOfReportId;
     private final boolean locationReviewed;
     private final boolean photoReviewed;
@@ -32,6 +34,7 @@ public final class AdminReportDecision {
     public AdminReportDecision(
         Decision decision,
         String reason,
+        String userVisibleReason,
         String duplicateOfReportId,
         boolean locationReviewed,
         boolean photoReviewed,
@@ -40,6 +43,14 @@ public final class AdminReportDecision {
         if (decision == null) throw new IllegalArgumentException("decision is required");
         this.decision = decision;
         this.reason = requiredText(reason, "reason", 500);
+        this.userVisibleReason = userVisibleReason == null
+            ? null
+            : requiredText(userVisibleReason, "user_visible_reason", 500);
+        if ((decision == Decision.APPROVED) != (this.userVisibleReason == null)) {
+            throw new IllegalArgumentException(
+                "user_visible_reason is null only for APPROVED"
+            );
+        }
         this.duplicateOfReportId = duplicateOfReportId == null
             ? null
             : canonicalUuid(duplicateOfReportId, "duplicate_of_report_id");
@@ -57,6 +68,7 @@ public final class AdminReportDecision {
 
     public Decision decision() { return decision; }
     public String reason() { return reason; }
+    public String userVisibleReason() { return userVisibleReason; }
     public String duplicateOfReportId() { return duplicateOfReportId; }
 
     public byte[] requestBody(String reportId) {
@@ -67,11 +79,12 @@ public final class AdminReportDecision {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("decision", decision.name());
         fields.put("reason", reason);
+        fields.put("user_visible_reason", userVisibleReason);
         fields.put("duplicate_of_report_id", duplicateOfReportId);
         fields.put("location_reviewed", locationReviewed);
         fields.put("photo_reviewed", photoReviewed);
         fields.put("privacy_reviewed", privacyReviewed);
-        if (!fields.keySet().equals(EXACT_KEYS)) throw new IllegalStateException("invalid exact6 review shape");
+        if (!fields.keySet().equals(EXACT_KEYS)) throw new IllegalStateException("invalid exact7 review shape");
         return AdminCanonicalEncoding.canonicalJsonBytes(fields);
     }
 
@@ -88,8 +101,7 @@ public final class AdminReportDecision {
     static String requiredText(String value, String label, int maxLength) {
         if (value == null) throw new IllegalArgumentException(label + " is required");
         String normalized = value.trim();
-        if (normalized.isEmpty() || normalized.length() > maxLength
-            || normalized.chars().anyMatch(character -> character < 0x20 || character == 0x7f)) {
+        if (normalized.isEmpty() || normalized.length() > maxLength) {
             throw new IllegalArgumentException(label + " is invalid");
         }
         return normalized;

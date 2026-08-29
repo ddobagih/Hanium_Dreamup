@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.depth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,6 +43,7 @@ class ObjectTrackerTest {
 
         assertEquals(track.trackId, stableTrack.trackId)
         assertTrue(stableTrack.stable)
+        assertFalse(stableTrack.idSwitchSuspected)
         assertTrue(stableTrack.distanceHistory.isEmpty())
     }
 
@@ -76,9 +78,13 @@ class ObjectTrackerTest {
         val tracker = ObjectTracker()
         val duplicate = geometry(x = 0.30f, width = 0.20f)
 
-        val active = tracker.update(listOf(duplicate, duplicate), timestampMs = 0L)
+        val first = tracker.update(listOf(duplicate, duplicate), timestampMs = 0L)
+        val next = tracker.update(listOf(duplicate, duplicate), timestampMs = 500L)
+            .filter { it.missedFrames == 0 }
 
-        assertEquals(2, active.size)
+        assertEquals(2, first.size)
+        assertEquals(2, next.size)
+        assertEquals(2, next.map { it.trackId }.toSet().size)
     }
 
     @Test
@@ -93,6 +99,289 @@ class ObjectTrackerTest {
         assertFalse(first.trackId == afterStall.trackId)
         assertEquals(1, afterStall.ageFrames)
         assertFalse(afterStall.stable)
+    }
+
+    @Test
+    fun reappearanceAfterAnyMissStartsAFreshUnstableTrack() {
+        val tracker = ObjectTracker()
+        val geometry = geometry(x = 0.30f, width = 0.20f)
+        val first = tracker.update(listOf(geometry), timestampMs = 1_000L).single()
+
+        tracker.update(emptyList(), timestampMs = 1_100L)
+        val reappeared = tracker.update(listOf(geometry), timestampMs = 1_200L)
+            .single { it.missedFrames == 0 }
+
+        assertFalse(first.trackId == reappeared.trackId)
+        assertEquals(1, reappeared.ageFrames)
+        assertFalse(reappeared.stable)
+    }
+
+    @Test
+    fun reappearedTrackDoesNotInheritMetricHistoryOrTtc() {
+        val tracker = ObjectTracker()
+        val geometry = geometry(x = 0.30f, width = 0.20f)
+        val distances = listOf(4.0f, 3.5f, 3.0f, 2.5f)
+        var previousTrack: TrackState? = null
+        distances.forEachIndexed { index, distanceM ->
+            val timestampMs = index * 500L
+            val track = tracker.update(listOf(geometry), timestampMs).single()
+            tracker.recordDistance(
+                track = track,
+                distanceM = distanceM,
+                source = DepthSource.ARCORE_RAW_DEPTH,
+                confidence = 0.90f,
+                timestampMs = timestampMs,
+            )
+            previousTrack = track
+        }
+        val oldTrack = requireNotNull(previousTrack)
+
+        tracker.update(emptyList(), timestampMs = 1_600L)
+        val reappeared = tracker.update(listOf(geometry), timestampMs = 1_700L)
+            .single { it.missedFrames == 0 }
+        val kinematics = tracker.approachKinematics(
+            track = reappeared,
+            currentDistanceM = 2.0f,
+            source = DepthSource.ARCORE_RAW_DEPTH,
+        )
+
+        assertFalse(oldTrack.trackId == reappeared.trackId)
+        assertTrue(reappeared.distanceHistory.isEmpty())
+        assertEquals(Trend.UNKNOWN, kinematics.trend)
+        assertEquals(0f, kinematics.approachScore, 0.001f)
+        assertNull(kinematics.timeToCollisionMs)
+    }
+
+    @Test
+    fun overlappingImplausibleAreaOrCenterChangeStartsNewTrack() {
+        val cases = listOf(
+            geometry(x = 0.30f, width = 0.40f) to geometry(x = 0.46f, width = 0.08f),
+            geometry(x = 0.00f, width = 0.80f) to geometry(x = 0.55f, width = 0.45f),
+        )
+
+        cases.forEach { (firstGeometry, implausibleGeometry) ->
+            val tracker = ObjectTracker()
+            val first = tracker.update(listOf(firstGeometry), timestampMs = 0L).single()
+
+            val current = tracker.update(listOf(implausibleGeometry), timestampMs = 500L)
+                .single { it.missedFrames == 0 }
+
+            assertFalse(first.trackId == current.trackId)
+            assertEquals(1, current.ageFrames)
+            assertFalse(current.stable)
+            assertFalse(current.idSwitchSuspected)
+        }
+    }
+
+    @Test
+    fun oneDetectionAmbiguousBetweenTwoTracksStartsWithoutMetricHistoryOrTtc() {
+        val tracker = ObjectTracker()
+        val left = geometry(x = 0.20f, width = 0.20f)
+        val right = geometry(x = 0.60f, width = 0.20f)
+        val leftDistances = listOf(4.0f, 3.5f, 3.0f, 2.5f)
+        val rightDistances = listOf(6.0f, 6.2f, 6.4f, 6.6f)
+        var oldTrackIds = emptySet<String>()
+        leftDistances.indices.forEach { index ->
+            val timestampMs = index * 500L
+            val visible = tracker.update(listOf(left, right), timestampMs)
+                .filter { it.missedFrames == 0 }
+            visible.forEach { track ->
+                val isLeft = requireNotNull(track.latestGeometry).centerNorm.x < 0.5f
+                tracker.recordDistance(
+                    track = track,
+                    distanceM = if (isLeft) leftDistances[index] else rightDistances[index],
+                    source = DepthSource.ARCORE_RAW_DEPTH,
+                    confidence = 0.90f,
+                    timestampMs = timestampMs,
+                )
+            }
+            oldTrackIds = visible.map { it.trackId }.toSet()
+        }
+
+        val fresh = tracker.update(
+            listOf(geometry(x = 0.25f, width = 0.50f)),
+            timestampMs = 2_000L,
+        ).single { it.missedFrames == 0 }
+        val kinematics = tracker.approachKinematics(
+            track = fresh,
+            currentDistanceM = 2.0f,
+            source = DepthSource.ARCORE_RAW_DEPTH,
+        )
+
+        assertFalse(fresh.trackId in oldTrackIds)
+        assertEquals(1, fresh.ageFrames)
+        assertTrue(fresh.distanceHistory.isEmpty())
+        assertEquals(Trend.UNKNOWN, kinematics.trend)
+        assertNull(kinematics.timeToCollisionMs)
+    }
+
+    @Test
+    fun reducedDetectionCountDoesNotReuseStrongAnchorFromAmbiguousTracks() {
+        val tracker = ObjectTracker()
+        val left = geometry(x = 0.20f, width = 0.20f)
+        val right = geometry(x = 0.45f, width = 0.20f)
+        val leftDistances = listOf(4.0f, 3.5f, 3.0f, 2.5f)
+        val rightDistances = listOf(6.0f, 6.2f, 6.4f, 6.6f)
+        var oldTrackIds = emptySet<String>()
+        leftDistances.indices.forEach { index ->
+            val timestampMs = index * 500L
+            val visible = tracker.update(listOf(left, right), timestampMs)
+                .filter { it.missedFrames == 0 }
+            visible.forEach { track ->
+                val isLeft = requireNotNull(track.latestGeometry).centerNorm.x < 0.5f
+                tracker.recordDistance(
+                    track = track,
+                    distanceM = if (isLeft) leftDistances[index] else rightDistances[index],
+                    source = DepthSource.ARCORE_RAW_DEPTH,
+                    confidence = 0.90f,
+                    timestampMs = timestampMs,
+                )
+            }
+            oldTrackIds = visible.map { it.trackId }.toSet()
+        }
+
+        val fresh = tracker.update(
+            listOf(geometry(x = 0.25f, width = 0.20f)),
+            timestampMs = 2_000L,
+        ).single { it.missedFrames == 0 }
+        val kinematics = tracker.approachKinematics(
+            track = fresh,
+            currentDistanceM = 2.0f,
+            source = DepthSource.ARCORE_RAW_DEPTH,
+        )
+
+        assertFalse(fresh.trackId in oldTrackIds)
+        assertEquals(1, fresh.ageFrames)
+        assertFalse(fresh.stable)
+        assertTrue(fresh.distanceHistory.isEmpty())
+        assertEquals(Trend.UNKNOWN, kinematics.trend)
+        assertNull(kinematics.timeToCollisionMs)
+    }
+
+    @Test
+    fun sameCountReplacementDoesNotReuseAmbiguousStrongAnchor() {
+        val tracker = ObjectTracker()
+        val left = geometry(x = 0.20f, width = 0.20f)
+        val right = geometry(x = 0.45f, width = 0.20f)
+        val leftDistances = listOf(4.0f, 3.5f, 3.0f, 2.5f)
+        val rightDistances = listOf(6.0f, 6.2f, 6.4f, 6.6f)
+        var oldTrackIds = emptySet<String>()
+        leftDistances.indices.forEach { index ->
+            val timestampMs = index * 500L
+            val visible = tracker.update(listOf(left, right), timestampMs)
+                .filter { it.missedFrames == 0 }
+            visible.forEach { track ->
+                val isLeft = requireNotNull(track.latestGeometry).centerNorm.x < 0.5f
+                tracker.recordDistance(
+                    track = track,
+                    distanceM = if (isLeft) leftDistances[index] else rightDistances[index],
+                    source = DepthSource.ARCORE_RAW_DEPTH,
+                    confidence = 0.90f,
+                    timestampMs = timestampMs,
+                )
+            }
+            oldTrackIds = visible.map { it.trackId }.toSet()
+        }
+
+        val current = tracker.update(
+            listOf(
+                geometry(x = 0.25f, width = 0.20f),
+                geometry(x = 0.80f, width = 0.20f),
+            ),
+            timestampMs = 2_000L,
+        ).filter { it.missedFrames == 0 }
+        val ambiguous = current.single {
+            requireNotNull(it.latestGeometry).centerNorm.x < 0.5f
+        }
+        val kinematics = tracker.approachKinematics(
+            track = ambiguous,
+            currentDistanceM = 2.0f,
+            source = DepthSource.ARCORE_RAW_DEPTH,
+        )
+
+        assertEquals(2, current.size)
+        assertTrue(current.none { it.trackId in oldTrackIds })
+        assertEquals(1, ambiguous.ageFrames)
+        assertFalse(ambiguous.stable)
+        assertTrue(ambiguous.distanceHistory.isEmpty())
+        assertEquals(Trend.UNKNOWN, kinematics.trend)
+        assertNull(kinematics.timeToCollisionMs)
+    }
+
+    @Test
+    fun ambiguousTwoObjectCrossingDoesNotReuseEitherOldTrackId() {
+        val tracker = ObjectTracker()
+        val oldTrackIds = tracker.update(
+            listOf(
+                geometry(x = 0.20f, width = 0.20f),
+                geometry(x = 0.60f, width = 0.20f),
+            ),
+            timestampMs = 0L,
+        ).map { it.trackId }.toSet()
+
+        val crossing = tracker.update(
+            listOf(
+                geometry(x = 0.35f, width = 0.20f),
+                geometry(x = 0.45f, width = 0.20f),
+            ),
+            timestampMs = 500L,
+        ).filter { it.missedFrames == 0 }
+
+        assertEquals(2, crossing.size)
+        assertTrue(crossing.none { it.trackId in oldTrackIds })
+        assertTrue(crossing.all { it.ageFrames == 1 && !it.stable })
+    }
+
+    @Test
+    fun nearbyStationaryObjectsKeepPositionBoundIdsAndBecomeStable() {
+        val tracker = ObjectTracker()
+        val detections = listOf(
+            geometry(x = 0.20f, width = 0.20f),
+            geometry(x = 0.45f, width = 0.20f),
+        )
+        val first = tracker.update(detections, timestampMs = 0L)
+        val firstLeft = first.single { requireNotNull(it.latestGeometry).centerNorm.x < 0.5f }
+        val firstRight = first.single { requireNotNull(it.latestGeometry).centerNorm.x > 0.5f }
+
+        tracker.update(detections, timestampMs = 500L)
+        val third = tracker.update(detections, timestampMs = 1_000L)
+            .filter { it.missedFrames == 0 }
+        val thirdLeft = third.single { requireNotNull(it.latestGeometry).centerNorm.x < 0.5f }
+        val thirdRight = third.single { requireNotNull(it.latestGeometry).centerNorm.x > 0.5f }
+
+        assertEquals(firstLeft.trackId, thirdLeft.trackId)
+        assertEquals(firstRight.trackId, thirdRight.trackId)
+        assertEquals(3, thirdLeft.ageFrames)
+        assertEquals(3, thirdRight.ageFrames)
+        assertTrue(thirdLeft.stable)
+        assertTrue(thirdRight.stable)
+    }
+
+    @Test
+    fun separatedObjectsKeepPositionBoundIdsWhenDetectionOrderChanges() {
+        val tracker = ObjectTracker()
+        val first = tracker.update(
+            listOf(
+                geometry(x = 0.10f, width = 0.15f),
+                geometry(x = 0.75f, width = 0.15f),
+            ),
+            timestampMs = 0L,
+        )
+        val firstLeft = first.single { requireNotNull(it.latestGeometry).centerNorm.x < 0.5f }
+        val firstRight = first.single { requireNotNull(it.latestGeometry).centerNorm.x > 0.5f }
+
+        val reordered = tracker.update(
+            listOf(
+                geometry(x = 0.74f, width = 0.15f),
+                geometry(x = 0.11f, width = 0.15f),
+            ),
+            timestampMs = 500L,
+        ).filter { it.missedFrames == 0 }
+        val currentLeft = reordered.single { requireNotNull(it.latestGeometry).centerNorm.x < 0.5f }
+        val currentRight = reordered.single { requireNotNull(it.latestGeometry).centerNorm.x > 0.5f }
+
+        assertEquals(firstLeft.trackId, currentLeft.trackId)
+        assertEquals(firstRight.trackId, currentRight.trackId)
     }
 
     @Test

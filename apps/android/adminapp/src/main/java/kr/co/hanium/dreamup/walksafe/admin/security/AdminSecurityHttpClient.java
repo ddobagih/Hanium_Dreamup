@@ -11,6 +11,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,13 +39,15 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         final Map<String, String> headers;
 
         Response(int statusCode, String body) {
-            this(statusCode, body, Map.of());
+            this(statusCode, body, AdminJava8Collections.map());
         }
 
         Response(int statusCode, String body, Map<String, String> headers) {
             this.statusCode = statusCode;
             this.body = body == null ? "" : body;
-            this.headers = headers == null ? Map.of() : Map.copyOf(headers);
+            this.headers = headers == null
+                ? AdminJava8Collections.map()
+                : AdminJava8Collections.copyMap(headers);
         }
     }
 
@@ -146,8 +149,8 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     @Override
     public synchronized DeviceInventory getDeviceInventory(String accessToken) throws IOException {
         JSONObject response = get("/admin/security/sessions", protectedHeaders(accessToken));
-        boolean legacyResponse = hasExactKeys(response, Set.of("sessions"));
-        if (!legacyResponse) requireExactKeys(response, Set.of("sessions", "devices"));
+        boolean legacyResponse = hasExactKeys(response, AdminJava8Collections.set("sessions"));
+        if (!legacyResponse) requireExactKeys(response, AdminJava8Collections.set("sessions", "devices"));
         JSONArray array = requiredArray(response, "sessions");
         if (array.length() > 100) throw new IOException("too many administrator sessions");
         List<SessionInfo> sessions = new ArrayList<>();
@@ -156,7 +159,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         for (int index = 0; index < array.length(); index++) {
             JSONObject item = array.optJSONObject(index);
             if (item == null) throw new IOException("invalid administrator session item");
-            requireExactKeys(item, Set.of(
+            requireExactKeys(item, AdminJava8Collections.set(
                 "session_id", "device_id", "device_label", "current", "revoked", "last_seen_at"
             ));
             if (!(item.opt("current") instanceof Boolean) || !(item.opt("revoked") instanceof Boolean)) {
@@ -204,7 +207,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         for (int index = 0; index < deviceArray.length(); index++) {
             JSONObject item = deviceArray.optJSONObject(index);
             if (item == null) throw new IOException("invalid administrator device item");
-            requireExactKeys(item, Set.of("device_id", "current"));
+            requireExactKeys(item, AdminJava8Collections.set("device_id", "current"));
             if (!(item.opt("current") instanceof Boolean)) {
                 throw new IOException("invalid administrator device flags");
             }
@@ -307,7 +310,62 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             ),
             protectedHeaders(accessToken)
         );
-        requireExactKeys(response, Set.of(
+        return parseReauthentication(response, safeAction, safeMethod, safePath);
+    }
+
+    @Override
+    public synchronized ReauthenticationResult reauthenticate(
+        String accessToken,
+        char[] password,
+        char[] totpCode,
+        String action,
+        String method,
+        String path,
+        String nonce
+    ) throws IOException {
+        requireSecret(password, "invalid_password", 12, 256);
+        requireTotp(totpCode);
+        String safeAction = requireAction(action);
+        String safeMethod = requireMethod(method);
+        String safePath = requirePath(path);
+        String safeNonce = requireNonce(nonce);
+        SensitiveByteBuffer encoded = new SensitiveByteBuffer();
+        byte[] body = null;
+        try {
+            encoded.writeAscii("{\"password\":");
+            encoded.writeJsonString(password);
+            encoded.writeAscii(",\"totp_code\":");
+            encoded.writeJsonString(totpCode);
+            encoded.writeAscii(",\"action\":");
+            encoded.writeJsonString(safeAction.toCharArray());
+            encoded.writeAscii(",\"method\":");
+            encoded.writeJsonString(safeMethod.toCharArray());
+            encoded.writeAscii(",\"path\":");
+            encoded.writeJsonString(safePath.toCharArray());
+            encoded.writeAscii(",\"nonce\":");
+            encoded.writeJsonString(safeNonce.toCharArray());
+            encoded.writeAscii("}");
+            body = encoded.copy();
+            JSONObject response = execute(
+                "POST",
+                "/admin/security/reauthenticate",
+                protectedHeaders(accessToken),
+                body
+            );
+            return parseReauthentication(response, safeAction, safeMethod, safePath);
+        } finally {
+            if (body != null) Arrays.fill(body, (byte) 0);
+            encoded.destroy();
+        }
+    }
+
+    private static ReauthenticationResult parseReauthentication(
+        JSONObject response,
+        String safeAction,
+        String safeMethod,
+        String safePath
+    ) throws IOException {
+        requireExactKeys(response, AdminJava8Collections.set(
             "reauthenticated_until_epoch_ms", "action", "method", "path"
         ));
         if (!(response.opt("reauthenticated_until_epoch_ms") instanceof Number)) {
@@ -344,7 +402,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             ),
             publicHeaders(deviceId)
         );
-        requireExactKeys(response, Set.of("recovery_token", "security_state"));
+        requireExactKeys(response, AdminJava8Collections.set("recovery_token", "security_state"));
         String token = requiredToken(response, "recovery_token");
         AdminSecurityState state = requiredState(response);
         if (state != AdminSecurityState.RECOVERY_IN_PROGRESS) throw new IOException("recovery did not start");
@@ -460,7 +518,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         Response challenge = executeRaw(
             "POST",
             AdminOperationsHttpClient.CHALLENGE_PATH,
-            Map.copyOf(challengeHeaders),
+            AdminJava8Collections.copyMap(challengeHeaders),
             intent.challengeRequestBytes()
         );
         requireExactStatus(challenge.statusCode, 200, "administrator device challenge");
@@ -477,7 +535,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         }
         Map<String, String> protectedHeaders = new LinkedHashMap<>(challengeHeaders);
         protectedHeaders.putAll(proof.proofHeaders());
-        Response operation = executeRaw("POST", path, Map.copyOf(protectedHeaders), body);
+        Response operation = executeRaw("POST", path, AdminJava8Collections.copyMap(protectedHeaders), body);
         requireExactStatus(operation.statusCode, 200, "administrator proof-bound request");
         return parseJsonResponse(operation.body);
     }
@@ -491,7 +549,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         requestHeaders.put("Accept", "application/json");
         if (body != null) requestHeaders.put("Content-Type", "application/json; charset=utf-8");
         requestHeaders.putAll(headers);
-        Response response = transport.execute(method, origin + path, Map.copyOf(requestHeaders), body);
+        Response response = transport.execute(method, origin + path, AdminJava8Collections.copyMap(requestHeaders), body);
         if (response.statusCode < 200 || response.statusCode > 299) {
             AdminSecurityApiException typedError = parseTypedError(response);
             if (typedError != null) throw typedError;
@@ -523,11 +581,11 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         }
         Map<String, String> headers = new LinkedHashMap<>(publicHeaders(boundDeviceId));
         headers.put("Authorization", "Bearer " + safeToken);
-        return Map.copyOf(headers);
+        return AdminJava8Collections.copyMap(headers);
     }
 
     private static Map<String, String> publicHeaders(String deviceId) throws IOException {
-        return Map.of(
+        return AdminJava8Collections.map(
             "X-WalkSafe-App-Kind", APP_KIND,
             "X-WalkSafe-Role", ROLE,
             "X-WalkSafe-Audience", AUDIENCE,
@@ -536,7 +594,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     }
 
     private static LoginResult parseLoginResult(JSONObject response) throws IOException {
-        requireExactKeys(response, Set.of("access_token", "security_state", "current_session_id"));
+        requireExactKeys(response, AdminJava8Collections.set("access_token", "security_state", "current_session_id"));
         return new LoginResult(
             requiredToken(response, "access_token"),
             requiredState(response),
@@ -545,7 +603,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     }
 
     private static StateSnapshot parseState(JSONObject response) throws IOException {
-        boolean legacyResponse = hasExactKeys(response, Set.of(
+        boolean legacyResponse = hasExactKeys(response, AdminJava8Collections.set(
             "security_state",
             "state_version",
             "observed_at"
@@ -553,7 +611,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         AdminRecoveryCustodyState custodyState = AdminRecoveryCustodyState.UNATTESTED;
         String custodyAttestedAt = null;
         if (!legacyResponse) {
-            requireExactKeys(response, Set.of(
+            requireExactKeys(response, AdminJava8Collections.set(
                 "security_state",
                 "state_version",
                 "observed_at",
@@ -624,7 +682,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         Object raw = response.opt(key);
         if (!(raw instanceof String)) throw new IOException("invalid response field type: " + key);
         String value = (String) raw;
-        if (value.isBlank() || value.length() > maxLength || containsControl(value)) {
+        if (value.trim().isEmpty() || value.length() > maxLength || containsControl(value)) {
             throw new IOException("invalid response field: " + key);
         }
         return value;
@@ -636,7 +694,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         if (raw == JSONObject.NULL) return null;
         if (!(raw instanceof String)) throw new IOException("invalid response field type: " + key);
         String value = (String) raw;
-        if (value.isBlank() || value.length() > maxLength || containsControl(value)) {
+        if (value.trim().isEmpty() || value.length() > maxLength || containsControl(value)) {
             throw new IOException("invalid response field: " + key);
         }
         return value;
@@ -702,7 +760,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     }
 
     private static String requireLabel(String value) throws IOException {
-        if (value == null || value.isBlank() || value.length() > 80 || containsControl(value)) {
+        if (value == null || value.trim().isEmpty() || value.length() > 80 || containsControl(value)) {
             throw new IOException("invalid_device_label");
         }
         return value.trim();
@@ -711,6 +769,13 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     private static String requireTotp(String value) throws IOException {
         if (value == null || !value.matches("[0-9]{6}")) throw new IOException("invalid_totp_code");
         return value;
+    }
+
+    private static void requireTotp(char[] value) throws IOException {
+        if (value == null || value.length != 6) throw new IOException("invalid_totp_code");
+        for (char character : value) {
+            if (character < '0' || character > '9') throw new IOException("invalid_totp_code");
+        }
     }
 
     private static String requireAction(String value) throws IOException {
@@ -753,6 +818,16 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         return value;
     }
 
+    private static void requireSecret(char[] value, String reason, int minLength, int maxLength)
+        throws IOException {
+        if (value == null || value.length < minLength || value.length > maxLength) {
+            throw new IOException(reason);
+        }
+        for (char character : value) {
+            if (character < 0x20 || character == 0x7f) throw new IOException(reason);
+        }
+    }
+
     private static boolean containsControl(String value) {
         return value.chars().anyMatch(character -> character < 0x20 || character == 0x7f);
     }
@@ -760,10 +835,10 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     private static AdminSecurityApiException parseTypedError(Response response) {
         try {
             JSONObject root = new JSONObject(response.body);
-            requireExactKeys(root, Set.of("detail"));
+            requireExactKeys(root, AdminJava8Collections.set("detail"));
             JSONObject detail = root.optJSONObject("detail");
             if (detail == null) return null;
-            requireExactKeys(detail, Set.of("code", "message"));
+            requireExactKeys(detail, AdminJava8Collections.set("code", "message"));
             String wireCode = requiredText(detail, "code", 128);
             requiredText(detail, "message", 1024);
             AdminSecurityApiException.Code code = AdminSecurityApiException.Code.fromWireValue(wireCode);
@@ -820,6 +895,70 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         return value.toString().getBytes(StandardCharsets.UTF_8);
     }
 
+    private static final class SensitiveByteBuffer extends ByteArrayOutputStream {
+        void writeAscii(String value) {
+            for (int index = 0; index < value.length(); index++) write((byte) value.charAt(index));
+        }
+
+        void writeJsonString(char[] value) throws IOException {
+            write('"');
+            for (int index = 0; index < value.length; index++) {
+                char character = value[index];
+                switch (character) {
+                    case '"' -> writeAscii("\\\"");
+                    case '\\' -> writeAscii("\\\\");
+                    case '\b' -> writeAscii("\\b");
+                    case '\f' -> writeAscii("\\f");
+                    case '\n' -> writeAscii("\\n");
+                    case '\r' -> writeAscii("\\r");
+                    case '\t' -> writeAscii("\\t");
+                    default -> {
+                        int codePoint = character;
+                        if (Character.isHighSurrogate(character)) {
+                            if (index + 1 >= value.length || !Character.isLowSurrogate(value[index + 1])) {
+                                throw new IOException("credential contains invalid Unicode");
+                            }
+                            codePoint = Character.toCodePoint(character, value[++index]);
+                        } else if (Character.isLowSurrogate(character)) {
+                            throw new IOException("credential contains invalid Unicode");
+                        }
+                        if (codePoint < 0x20) {
+                            writeAscii(String.format(Locale.ROOT, "\\u%04x", codePoint));
+                        } else {
+                            writeUtf8(codePoint);
+                        }
+                    }
+                }
+            }
+            write('"');
+        }
+
+        private void writeUtf8(int codePoint) {
+            if (codePoint <= 0x7f) {
+                write(codePoint);
+            } else if (codePoint <= 0x7ff) {
+                write(0xc0 | codePoint >> 6);
+                write(0x80 | codePoint & 0x3f);
+            } else if (codePoint <= 0xffff) {
+                write(0xe0 | codePoint >> 12);
+                write(0x80 | codePoint >> 6 & 0x3f);
+                write(0x80 | codePoint & 0x3f);
+            } else {
+                write(0xf0 | codePoint >> 18);
+                write(0x80 | codePoint >> 12 & 0x3f);
+                write(0x80 | codePoint >> 6 & 0x3f);
+                write(0x80 | codePoint & 0x3f);
+            }
+        }
+
+        byte[] copy() { return toByteArray(); }
+
+        void destroy() {
+            Arrays.fill(buf, (byte) 0);
+            reset();
+        }
+    }
+
     private static final class UrlConnectionTransport implements Transport {
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body) throws IOException {
@@ -843,8 +982,8 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
                     : connection.getErrorStream();
                 String retryAfter = connection.getHeaderField("Retry-After");
                 Map<String, String> responseHeaders = retryAfter == null
-                    ? Map.of()
-                    : Map.of("Retry-After", retryAfter);
+                    ? AdminJava8Collections.map()
+                    : AdminJava8Collections.map("Retry-After", retryAfter);
                 return new Response(status, stream == null ? "" : readBounded(stream), responseHeaders);
             } finally {
                 connection.disconnect();

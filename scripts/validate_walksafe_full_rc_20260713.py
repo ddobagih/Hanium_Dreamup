@@ -2085,6 +2085,8 @@ def _validate_runtime_contracts(source: Path) -> None:
             ),
             "UPLOAD_DIR": "/var/lib/walksafe/uploads",
             "WALKSAFE_UPLOAD_BACKUP_READER_GROUP": "walksafe-backup-readers",
+            "WALKSAFE_RAW_INGEST_ENABLED": "false",
+            "WALKSAFE_RAW_OBJECT_DIR": "/var/lib/walksafe/raw-objects",
             "WALKSAFE_REPORT_IMAGE_KEY_PROVIDER": "secret_file",
             "WALKSAFE_REPORT_IMAGE_KEY_FILE": (
                 "/etc/walksafe/report-image-keyring.json"
@@ -2134,6 +2136,7 @@ def _validate_runtime_contracts(source: Path) -> None:
             WALKSAFE_BACKEND_REPLICAS WALKSAFE_ACTOR_RATE_LIMIT_STORE DATABASE_URL
             DATABASE_CONNECT_TIMEOUT_SECONDS DATABASE_STATEMENT_TIMEOUT_MS UPLOAD_DIR
             WALKSAFE_UPLOAD_BACKUP_READER_GROUP
+            WALKSAFE_RAW_INGEST_ENABLED WALKSAFE_RAW_OBJECT_DIR
             WALKSAFE_DATABASE_AT_REST_ENCRYPTION_CONFIRMED
             WALKSAFE_DATABASE_TRANSPORT_SECURITY_CONFIRMED
             WALKSAFE_DATABASE_ENCRYPTION_KEY_BOUNDARY WALKSAFE_REPORT_IMAGE_KEY_BOUNDARY
@@ -2513,7 +2516,8 @@ def _validate_runtime_contracts(source: Path) -> None:
                 "-/run/walksafe-backup"
             ],
             "ReadWritePaths": [
-                "/var/lib/walksafe/uploads /var/lib/walksafe/android-debug-logs "
+                "/var/lib/walksafe/uploads /var/lib/walksafe/raw-objects "
+                "/var/lib/walksafe/android-debug-logs "
                 "/var/lib/walksafe/capacity /run/walksafe-backend"
             ],
         },

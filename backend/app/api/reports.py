@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 from contextlib import contextmanager
+from dataclasses import dataclass
 import errno
 import fcntl
 import hashlib
@@ -34,7 +35,11 @@ from sqlalchemy.orm import Session
 
 from backend.app.config import Settings
 from backend.app.database import get_db
-from backend.app.field_test_security import ADMIN_RECONFIRM_NONCE_HEADER_NAME
+from backend.app.field_test_security import (
+    ADMIN_RECONFIRM_NONCE_HEADER_NAME,
+    FieldTestAccess,
+    VerifiedActorAssertion,
+)
 from backend.app.models import Report, ReportExportAudit, ReportImageObject, ReportStatusAudit
 from backend.app.schemas import (
     ClassName,
@@ -50,6 +55,8 @@ from backend.app.schemas import (
     ReportReviewDecisionRequest,
     ReportReviewDecisionResponse,
     ReportStatus,
+    ReportTransportReceiptV1,
+    ReportTransportStatusV1,
     ReportStatusUpdate,
     ReportV2Metadata,
 )
@@ -296,6 +303,15 @@ MAX_REPORT_EXPORT_ROWS = 10_000
 MAX_REPORT_SUMMARY_ROWS = 10_000
 AUTO_REPORT_MAX_AGE = timedelta(minutes=5)
 AUTO_REPORT_MAX_FUTURE_SKEW = timedelta(seconds=30)
+REPORT_TRANSPORT_PAYLOAD_DOMAIN = b"walksafe-report-payload-v1\0"
+REPORT_TRANSPORT_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+REPORT_TRANSPORT_BYTES_PATTERN = re.compile(r"^[1-9][0-9]{0,18}$")
+REPORT_TRANSPORT_MARKER = "DATABASE_AND_ENCRYPTED_IMAGE_STORE"
+REPORT_TRANSPORT_USER_STATUS = {
+    "new": "RECEIVED",
+    "reviewed": "IN_REVIEW",
+    "resolved": "COMPLETED",
+}
 
 # Android metadata is client-supplied evidence, not an authenticated identity.
 # Keep this allowlist explicit so arbitrary device fields are not persisted.
@@ -340,6 +356,102 @@ REPORT_V2_METADATA_ALLOWLIST = {
 ACTOR_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
 UNKNOWN_ACTOR_ID = "unknown"
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ReportTransportContract:
+    report_id: uuid.UUID
+    payload_sha256: str
+    payload_bytes: int
+
+
+def report_transport_payload_sha256(
+    report_id: uuid.UUID,
+    metadata_bytes: bytes,
+    image_bytes: bytes,
+) -> str:
+    digest = hashlib.sha256()
+    digest.update(REPORT_TRANSPORT_PAYLOAD_DOMAIN)
+    digest.update(str(report_id).encode("ascii"))
+    digest.update(len(metadata_bytes).to_bytes(8, byteorder="big", signed=False))
+    digest.update(metadata_bytes)
+    digest.update(len(image_bytes).to_bytes(8, byteorder="big", signed=False))
+    digest.update(image_bytes)
+    return digest.hexdigest()
+
+
+def _resolve_report_transport_contract(
+    report_id_header: str | None,
+    payload_sha256_header: str | None,
+    payload_bytes_header: str | None,
+) -> ReportTransportContract | None:
+    values = (report_id_header, payload_sha256_header, payload_bytes_header)
+    present = sum(value is not None for value in values)
+    if present == 0:
+        return None
+    if present != len(values):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "report_transport_headers_incomplete"},
+        )
+    assert report_id_header is not None
+    assert payload_sha256_header is not None
+    assert payload_bytes_header is not None
+    try:
+        report_id = uuid.UUID(report_id_header)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "report_transport_id_invalid"},
+        ) from exc
+    if str(report_id) != report_id_header:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "report_transport_id_invalid"},
+        )
+    if REPORT_TRANSPORT_SHA256_PATTERN.fullmatch(payload_sha256_header) is None:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "report_transport_payload_sha256_invalid"},
+        )
+    if REPORT_TRANSPORT_BYTES_PATTERN.fullmatch(payload_bytes_header) is None:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "report_transport_payload_bytes_invalid"},
+        )
+    payload_bytes = int(payload_bytes_header)
+    if payload_bytes > 9_223_372_036_854_775_807:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "report_transport_payload_bytes_invalid"},
+        )
+    return ReportTransportContract(
+        report_id=report_id,
+        payload_sha256=payload_sha256_header,
+        payload_bytes=payload_bytes,
+    )
+
+
+def _validate_report_transport_payload(
+    contract: ReportTransportContract,
+    *,
+    metadata_bytes: bytes,
+    image_bytes: bytes,
+) -> None:
+    actual_bytes = len(metadata_bytes) + len(image_bytes)
+    actual_sha256 = report_transport_payload_sha256(
+        contract.report_id,
+        metadata_bytes,
+        image_bytes,
+    )
+    if (
+        contract.payload_bytes != actual_bytes
+        or contract.payload_sha256 != actual_sha256
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "report_transport_payload_mismatch"},
+        )
 
 ALLOWED_STATUS_TRANSITIONS: dict[ReportStatus, set[ReportStatus]] = {
     "new": {"new", "reviewed", "resolved"},
@@ -735,7 +847,108 @@ def _field_creation_response(
         update={
             "metadata": sanitized_metadata,
             "duplicate_report_ids": [],
+            "transport_receipt": _report_transport_receipt(report),
         }
+    )
+
+
+def _report_transport_receipt(
+    report: Report,
+) -> ReportTransportReceiptV1 | None:
+    if (
+        report.client_payload_sha256 is None
+        or report.client_payload_bytes is None
+        or report.persistence_marker is None
+    ):
+        return None
+    return ReportTransportReceiptV1(
+        marker=REPORT_TRANSPORT_MARKER,
+        report_id=report.id,
+        persistence_marker=report.persistence_marker,
+        payload_sha256=report.client_payload_sha256,
+        payload_bytes=report.client_payload_bytes,
+    )
+
+
+def _report_transport_not_found() -> NoReturn:
+    raise HTTPException(
+        status_code=404,
+        detail={"code": "report_transport_status_not_found"},
+    )
+
+
+def _report_transport_status_actor(
+    request: Request,
+    *,
+    actor_header: str | None,
+    account_generation_header: str | None,
+    security_enabled: bool,
+) -> tuple[str, int]:
+    try:
+        actor_id = _resolved_actor_id(actor_header, required=True)
+        account_generation = _resolved_account_generation(
+            account_generation_header,
+            actor_id=actor_id,
+            required=True,
+        )
+    except HTTPException:
+        _report_transport_not_found()
+    assert account_generation is not None
+    verified = getattr(request.state, "verified_actor_assertion", None)
+    if security_enabled and (
+        not isinstance(verified, VerifiedActorAssertion)
+        or verified.access is not FieldTestAccess.FIELD
+        or verified.actor_id != actor_id
+        or verified.account_generation != account_generation
+    ):
+        _report_transport_not_found()
+    return actor_id, account_generation
+
+
+def _parse_report_transport_status_id(value: str) -> uuid.UUID:
+    try:
+        report_id = uuid.UUID(value)
+    except ValueError:
+        _report_transport_not_found()
+    if str(report_id) != value:
+        _report_transport_not_found()
+    return report_id
+
+
+def _report_transport_status_response(row: object) -> ReportTransportStatusV1:
+    return ReportTransportStatusV1(
+        persistence_state="PERSISTED",
+        user_status=REPORT_TRANSPORT_USER_STATUS[row.status],
+        transport_receipt=ReportTransportReceiptV1(
+            marker=REPORT_TRANSPORT_MARKER,
+            report_id=row.id,
+            persistence_marker=row.persistence_marker,
+            payload_sha256=row.client_payload_sha256,
+            payload_bytes=row.client_payload_bytes,
+        ),
+    )
+
+
+def _report_transport_status_statement(
+    report_id: uuid.UUID,
+    *,
+    privacy_subject: str,
+    account_generation: int,
+):
+    return (
+        select(
+            Report.id,
+            Report.status,
+            Report.client_payload_sha256,
+            Report.client_payload_bytes,
+            Report.persistence_marker,
+        )
+        .where(Report.id == report_id)
+        .where(Report.privacy_subject_hmac == privacy_subject)
+        .where(Report.account_generation == account_generation)
+        .where(Report.client_payload_sha256.is_not(None))
+        .where(Report.client_payload_bytes.is_not(None))
+        .where(Report.persistence_marker.is_not(None))
     )
 
 
@@ -1413,6 +1626,9 @@ def _shared_report_write_lock(
         os.close(parent_descriptor)
 
 
+shared_maintenance_write_lock = _shared_report_write_lock
+
+
 def _idempotent_report_replay(
     db: Session,
     *,
@@ -1447,6 +1663,35 @@ def _idempotent_report_replay(
         .where(Report.payload.contains({"image_sha256": image_sha256}))
         .order_by(Report.created_at.desc())
         .limit(1)
+    )
+
+
+def _report_transport_replay(
+    db: Session,
+    *,
+    contract: ReportTransportContract,
+    privacy_subject: str,
+    account_generation: int,
+) -> Report | None:
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+        {"lock_key": f"walksafe-report-transport-v1\n{contract.report_id}"},
+    )
+    existing = db.get(Report, contract.report_id)
+    if existing is None:
+        return None
+    if (
+        existing.client_payload_sha256 == contract.payload_sha256
+        and existing.client_payload_bytes == contract.payload_bytes
+        and existing.persistence_marker is not None
+        and existing.privacy_subject_hmac == privacy_subject
+        and existing.account_generation == account_generation
+    ):
+        return existing
+    db.rollback()
+    raise HTTPException(
+        status_code=409,
+        detail={"code": "report_transport_id_conflict"},
     )
 
 
@@ -1671,6 +1916,7 @@ def _persist_v2_report(
     account_generation: int | None,
     settings: Settings,
     key_manager: ReportImageKeyManager,
+    transport_contract: ReportTransportContract | None = None,
 ) -> ReportResponse:
     privacy_subject, bound_generation = _privacy_report_binding(
         db=db,
@@ -1700,7 +1946,22 @@ def _persist_v2_report(
         content=content,
         actor_id=actor_id,
     )
-    report_id = uuid.uuid4()
+    if transport_contract is not None:
+        assert privacy_subject is not None and bound_generation is not None
+        replay = _report_transport_replay(
+            db,
+            contract=transport_contract,
+            privacy_subject=privacy_subject,
+            account_generation=bound_generation,
+        )
+        if replay is not None:
+            db.rollback()
+            return _field_creation_response(replay)
+    report_id = (
+        transport_contract.report_id
+        if transport_contract is not None
+        else uuid.uuid4()
+    )
     filename = f"{report_id}{image_suffix(content_type)}"
     destination = settings.upload_dir / f"{report_id}.wse"
     gps = parsed.gps
@@ -1708,7 +1969,11 @@ def _persist_v2_report(
     longitude = gps.longitude if gps else None
     location = WKTElement(f"POINT({longitude} {latitude})", srid=4326) if gps else None
     is_fake = _is_fake_payload(stored_payload, report_source)
-    if settings.field_test_security_enabled and parsed.auto_reported:
+    if (
+        transport_contract is None
+        and settings.field_test_security_enabled
+        and parsed.auto_reported
+    ):
         assert gps is not None
         assert privacy_subject is not None and bound_generation is not None
         lock_auto_report_cooldown(
@@ -1740,20 +2005,22 @@ def _persist_v2_report(
     )
     duplicate_candidates = find_duplicate_candidates_v2(db, parsed, is_fake=is_fake)
     stored_payload = _with_duplicate_candidate_payload(stored_payload, duplicate_candidates)
-    replay = _idempotent_report_replay(
-        db,
-        actor_id=actor_id,
-        privacy_subject=privacy_subject,
-        account_generation=bound_generation,
-        class_name=parsed.class_name,
-        captured_at=parsed.captured_at,
-        image_sha256=str(stored_payload["image_sha256"]),
-    )
-    if replay is not None:
-        db.rollback()
-        return _field_creation_response(replay)
+    if transport_contract is None:
+        replay = _idempotent_report_replay(
+            db,
+            actor_id=actor_id,
+            privacy_subject=privacy_subject,
+            account_generation=bound_generation,
+            class_name=parsed.class_name,
+            captured_at=parsed.captured_at,
+            image_sha256=str(stored_payload["image_sha256"]),
+        )
+        if replay is not None:
+            db.rollback()
+            return _field_creation_response(replay)
     report = Report(
         id=report_id,
+        status="new",
         class_id=parsed.model_class_id,
         class_name=parsed.class_name,
         confidence=parsed.confidence,
@@ -1773,6 +2040,17 @@ def _persist_v2_report(
         payload=stored_payload,
         privacy_subject_hmac=privacy_subject,
         account_generation=bound_generation,
+        client_payload_sha256=(
+            transport_contract.payload_sha256
+            if transport_contract is not None
+            else None
+        ),
+        client_payload_bytes=(
+            transport_contract.payload_bytes
+            if transport_contract is not None
+            else None
+        ),
+        persistence_marker=(uuid.uuid4() if transport_contract is not None else None),
     )
     _commit_new_report_with_image(
         db,
@@ -1853,13 +2131,34 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             default=None,
             alias="x-walksafe-account-generation",
         ),
+        x_walksafe_report_id: Optional[str] = Header(
+            default=None,
+            alias="x-walksafe-report-id",
+        ),
+        x_walksafe_report_payload_sha256: Optional[str] = Header(
+            default=None,
+            alias="x-walksafe-report-payload-sha256",
+        ),
+        x_walksafe_report_payload_bytes: Optional[str] = Header(
+            default=None,
+            alias="x-walksafe-report-payload-bytes",
+        ),
         db: Session = Depends(get_db),
     ) -> ReportResponse:
-        actor_id = _resolved_actor_id(x_walksafe_actor_id, required=settings.field_test_security_enabled)
+        transport_contract = _resolve_report_transport_contract(
+            x_walksafe_report_id,
+            x_walksafe_report_payload_sha256,
+            x_walksafe_report_payload_bytes,
+        )
+        transport_required = transport_contract is not None
+        actor_id = _resolved_actor_id(
+            x_walksafe_actor_id,
+            required=settings.field_test_security_enabled or transport_required,
+        )
         account_generation = _resolved_account_generation(
             x_walksafe_account_generation,
             actor_id=actor_id,
-            required=settings.field_test_security_enabled,
+            required=settings.field_test_security_enabled or transport_required,
         )
         _enforce_metadata_size(metadata, settings)
         try:
@@ -1881,6 +2180,12 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         _enforce_secured_android_provenance(parsed, settings)
         _enforce_secured_auto_report_gate(parsed, settings, actor_id=actor_id)
         content, content_type = await read_image_upload(image, settings)
+        if transport_contract is not None:
+            _validate_report_transport_payload(
+                transport_contract,
+                metadata_bytes=metadata.encode("utf-8"),
+                image_bytes=content,
+            )
         return await to_thread.run_sync(
             lambda: _persist_v2_report(
                 db,
@@ -1891,8 +2196,52 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 account_generation=account_generation,
                 settings=settings,
                 key_manager=key_manager,
+                transport_contract=transport_contract,
             )
         )
+
+    @router.get(
+        "/reports/v2/{report_id}/status",
+        response_model=ReportTransportStatusV1,
+    )
+    def get_report_transport_status(
+        report_id: str,
+        request: Request,
+        response: Response,
+        x_walksafe_actor_id: Optional[str] = Header(
+            default=None,
+            alias="x-walksafe-actor-id",
+        ),
+        x_walksafe_account_generation: Optional[str] = Header(
+            default=None,
+            alias="x-walksafe-account-generation",
+        ),
+        db: Session = Depends(get_db),
+    ) -> ReportTransportStatusV1:
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        parsed_report_id = _parse_report_transport_status_id(report_id)
+        actor_id, account_generation = _report_transport_status_actor(
+            request,
+            actor_header=x_walksafe_actor_id,
+            account_generation_header=x_walksafe_account_generation,
+            security_enabled=settings.field_test_security_enabled,
+        )
+        subject = privacy_subject_hmac(
+            actor_id,
+            account_generation,
+            settings.privacy_hmac_secret,
+        )
+        row = db.execute(
+            _report_transport_status_statement(
+                parsed_report_id,
+                privacy_subject=subject,
+                account_generation=account_generation,
+            )
+        ).one_or_none()
+        if row is None:
+            _report_transport_not_found()
+        return _report_transport_status_response(row)
 
     @router.get("/reports", response_model=List[ReportResponse])
     def list_reports(
@@ -2655,6 +3004,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 )
 
             previous_status = report.status
+            previous_version = report.status_version
             report_payload = dict(report.payload or {})
             history = list(report_payload.get("status_history") or [])
             history.append(
@@ -2681,13 +3031,33 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 report_payload.pop("agency_reviewed_by_actor_id", None)
                 report_payload.pop("agency_reviewed_at", None)
             report.status = payload.status
+            report.status_version = previous_version + 1
             report.payload = report_payload
+            identity = getattr(request.state, "admin_security_identity", None)
+            proof = getattr(request.state, "admin_device_proof", None)
             db.add(
                 ReportStatusAudit(
                     report_id=report.id,
                     previous_status=previous_status,
                     next_status=payload.status,
+                    previous_version=previous_version,
+                    next_version=report.status_version,
                     actor_id=actor_id,
+                    session_id=(
+                        identity.session_id
+                        if isinstance(identity, AdminSessionIdentity)
+                        else None
+                    ),
+                    device_id=(
+                        identity.device_id
+                        if isinstance(identity, AdminSessionIdentity)
+                        else None
+                    ),
+                    correlation_id=(
+                        proof.correlation_id
+                        if isinstance(proof, VerifiedAdminDeviceProof)
+                        else None
+                    ),
                     note=payload.note,
                     resolution_reason=payload.resolution_reason,
                 )

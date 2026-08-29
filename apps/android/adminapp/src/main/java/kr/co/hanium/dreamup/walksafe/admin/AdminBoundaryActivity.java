@@ -1,9 +1,12 @@
 package kr.co.hanium.dreamup.walksafe.admin;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -18,15 +21,34 @@ import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import java.time.Instant;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeviceKeyStore;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminAuditController;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminAuditModels;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeliveryPackage;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeliveryPackageSaver;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminInstitutionDelivery;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentController;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentHttpClient;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentModels;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentRepository;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOperationsApi;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOperationsHttpClient;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportController;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportHttpClient;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportModels;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportRequestController;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportRequestModels;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportRepository;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportWorkflowController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryMessagePolicy;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryCustodyState;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportDecision;
@@ -38,9 +60,29 @@ import kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityState;
 public final class AdminBoundaryActivity extends Activity {
     private static final String DEVICE_PREFS = "walksafe_admin_device_identity";
     private static final String DEVICE_ID_KEY = "device_id";
+    private static final String REPORT_FILTER_ID_STATE = "admin_report_filter_id";
+    private static final String REPORT_FILTER_STATUS_STATE = "admin_report_filter_status";
+    private static final String REPORT_FILTER_CLASS_STATE = "admin_report_filter_class";
+    private static final String REPORT_FILTER_FROM_STATE = "admin_report_filter_from";
+    private static final String REPORT_FILTER_TO_STATE = "admin_report_filter_to";
+    private static final String REPORT_SELECTED_ID_STATE = "admin_report_selected_id";
+    private static final String REQUEST_FILTER_REPORT_STATE = "admin_request_filter_report";
+    private static final String REQUEST_FILTER_TYPE_STATE = "admin_request_filter_type";
+    private static final String REQUEST_FILTER_STATUS_STATE = "admin_request_filter_status";
+    private static final String REQUEST_SELECTED_ID_STATE = "admin_request_selected_id";
+    private static final String AUDIT_EVENT_TYPE_STATE = "admin_audit_event_type";
+    private static final String AUDIT_ACTOR_STATE = "admin_audit_actor";
+    private static final String INCIDENT_FILTER_STATUS_STATE = "admin_incident_filter_status";
+    private static final String INCIDENT_SELECTED_ID_STATE = "admin_incident_selected_id";
+    private static final int CREATE_DELIVERY_PACKAGE_DOCUMENT = 7_301;
 
     private final ExecutorService networkExecutor = Executors.newSingleThreadExecutor();
     private AdminSecurityController controller;
+    private AdminReportController reportController;
+    private AdminReportRequestController reportRequestController;
+    private AdminReportWorkflowController reportWorkflowController;
+    private AdminAuditController auditController;
+    private AdminIncidentController incidentController;
     private String deviceId;
     private AdminDeviceKeyStore.Descriptor deviceKeyDescriptor;
     private String deviceKeyFailure;
@@ -68,9 +110,14 @@ public final class AdminBoundaryActivity extends Activity {
     private Spinner custodyMaterialKindInput;
     private CheckBox custodyConfirmationInput;
     private LinearLayout operationsGroup;
+    private AdminReportPanel reportPanel;
+    private AdminReportRequestPanel reportRequestPanel;
+    private AdminAuditPanel auditPanel;
+    private AdminIncidentPanel incidentPanel;
     private EditText reportIdInput;
     private Spinner reviewDecisionInput;
     private EditText reviewReasonInput;
+    private EditText reviewUserVisibleReasonInput;
     private EditText duplicateReportIdInput;
     private CheckBox locationReviewedInput;
     private CheckBox photoReviewedInput;
@@ -84,10 +131,14 @@ public final class AdminBoundaryActivity extends Activity {
     private EditText evidenceSha256Input;
     private EditText observedAtInput;
     private EditText expectedRevisionInput;
+    private EditText packageRevisionInput;
     private EditText idempotencyKeyInput;
     private Button revokeCurrentButton;
     private LinearLayout contentRoot;
     private boolean operationInFlight;
+    private AdminDeliveryPackage pendingDeliveryPackage;
+    private AdminDeliveryPackageSaver.Saved verifiedDeliveryPackage;
+    private boolean awaitingSafResult;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -106,6 +157,8 @@ public final class AdminBoundaryActivity extends Activity {
                     keyStore
                 );
                 AdminOperationsApi operationsApi = null;
+                AdminReportRepository reportRepository = null;
+                AdminIncidentRepository incidentRepository = null;
                 if (BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED) {
                     operationsApi = new AdminOperationsHttpClient(
                         BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
@@ -113,9 +166,170 @@ public final class AdminBoundaryActivity extends Activity {
                         deviceKeyDescriptor,
                         keyStore
                     );
+                    reportRepository = new AdminReportHttpClient(
+                        BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
+                        BuildConfig.DEBUG,
+                        deviceKeyDescriptor,
+                        keyStore
+                    );
+                    incidentRepository = new AdminIncidentHttpClient(
+                        BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
+                        BuildConfig.DEBUG,
+                        deviceKeyDescriptor,
+                        keyStore
+                    );
                     operationsClientConfigured = true;
                 }
-                controller = new AdminSecurityController(securityClient, operationsApi);
+                controller = new AdminSecurityController(
+                    securityClient,
+                    operationsApi,
+                    reportRepository,
+                    incidentRepository
+                );
+                reportController = new AdminReportController(new AdminReportController.Loader() {
+                    @Override
+                    public AdminReportModels.Page loadPage(
+                        AdminReportModels.Filters filters,
+                        String cursor
+                    ) throws Exception {
+                        return controller.listAdminReports(
+                            filters,
+                            cursor,
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                        );
+                    }
+
+                    @Override
+                    public AdminReportModels.Detail loadDetail(String reportId) throws Exception {
+                        return controller.getAdminReportDetail(
+                            reportId,
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                        );
+                    }
+                });
+                reportRequestController = new AdminReportRequestController(
+                    new AdminReportRequestController.Loader() {
+                        @Override
+                        public AdminReportRequestModels.Page loadPage(
+                            AdminReportRequestModels.Filters filters,
+                            String cursor
+                        ) throws Exception {
+                            return controller.listAdminReportRequests(
+                                filters,
+                                cursor,
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                            );
+                        }
+
+                        @Override
+                        public AdminReportRequestModels.Detail loadDetail(String requestId)
+                            throws Exception {
+                            return controller.getAdminReportRequestDetail(
+                                requestId,
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                            );
+                        }
+
+                        @Override
+                        public AdminReportRequestModels.StatusSnapshot updateStatus(
+                            String requestId,
+                            String nextStatus,
+                            int expectedVersion,
+                            String publicResponse,
+                            String internalNote,
+                            char[] password,
+                            char[] totp
+                        ) throws Exception {
+                            return controller.updateAdminReportRequestStatus(
+                                requestId,
+                                nextStatus,
+                                expectedVersion,
+                                publicResponse,
+                                internalNote,
+                                password,
+                                totp,
+                                System.currentTimeMillis(),
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                            );
+                        }
+                    }
+                );
+                reportWorkflowController = new AdminReportWorkflowController(
+                    new AdminReportWorkflowController.Loader() {
+                        @Override
+                        public AdminReportModels.StatusSnapshot updateStatus(
+                            String reportId,
+                            String nextStatus,
+                            int expectedVersion,
+                            char[] password,
+                            char[] totp
+                        ) throws Exception {
+                            return controller.updateAdminReportStatus(
+                                reportId,
+                                nextStatus,
+                                expectedVersion,
+                                password,
+                                totp,
+                                System.currentTimeMillis(),
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                            );
+                        }
+
+                        @Override
+                        public AdminDeliveryPackage createPackage(
+                            String reportId,
+                            String password,
+                            String totp
+                        ) throws Exception {
+                            return controller.createAdminDeliveryPackage(
+                                reportId,
+                                password,
+                                totp,
+                                System.currentTimeMillis(),
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                            );
+                        }
+
+                        @Override
+                        public AdminReportModels.Detail refreshDetail(String reportId) throws Exception {
+                            return controller.getAdminReportDetail(
+                                reportId,
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                            );
+                        }
+                    }
+                );
+                auditController = new AdminAuditController((filters, cursor) ->
+                    controller.listAdminAudits(
+                        filters,
+                        cursor,
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    )
+                );
+                incidentController = new AdminIncidentController(
+                    new AdminIncidentController.Loader() {
+                        @Override
+                        public AdminIncidentModels.Page loadPage(
+                            AdminIncidentModels.Filters filters,
+                            String cursor
+                        ) throws Exception {
+                            return controller.listAdminIncidents(
+                                filters,
+                                cursor,
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                            );
+                        }
+
+                        @Override
+                        public AdminIncidentModels.Detail loadDetail(String incidentId)
+                            throws Exception {
+                            return controller.getAdminIncidentDetail(
+                                incidentId,
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                            );
+                        }
+                    }
+                );
             } catch (Exception error) {
                 deviceKeyFailure = "키 사용 불가";
                 operationsClientConfigured = false;
@@ -123,19 +337,102 @@ public final class AdminBoundaryActivity extends Activity {
         }
         setContentView(buildContent());
         render();
+        restoreReportPanelState(savedInstanceState);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        if (reportPanel != null) {
+            AdminReportPanel.FilterDraft draft = reportPanel.filterDraft();
+            outState.putString(REPORT_FILTER_ID_STATE, draft.reportId());
+            outState.putString(REPORT_FILTER_STATUS_STATE, draft.status());
+            outState.putString(REPORT_FILTER_CLASS_STATE, draft.className());
+            outState.putString(REPORT_FILTER_FROM_STATE, draft.createdFrom());
+            outState.putString(REPORT_FILTER_TO_STATE, draft.createdTo());
+            outState.putString(REPORT_SELECTED_ID_STATE, reportPanel.selectedReportId());
+        }
+        if (reportRequestPanel != null) {
+            AdminReportRequestPanel.FilterDraft draft = reportRequestPanel.filterDraft();
+            outState.putString(REQUEST_FILTER_REPORT_STATE, draft.reportId());
+            outState.putString(REQUEST_FILTER_TYPE_STATE, draft.requestType());
+            outState.putString(REQUEST_FILTER_STATUS_STATE, draft.status());
+            outState.putString(REQUEST_SELECTED_ID_STATE, reportRequestPanel.selectedRequestId());
+        }
+        if (auditPanel != null) {
+            outState.putString(AUDIT_EVENT_TYPE_STATE, auditPanel.eventType());
+            outState.putString(AUDIT_ACTOR_STATE, auditPanel.actorId());
+        }
+        if (incidentPanel != null) {
+            outState.putString(INCIDENT_FILTER_STATUS_STATE, incidentPanel.filterStatus());
+            outState.putString(INCIDENT_SELECTED_ID_STATE, incidentPanel.selectedIncidentId());
+        }
+        super.onSaveInstanceState(outState);
     }
 
     @Override
     protected void onStop() {
+        if (reportController != null) reportController.invalidate();
+        if (reportRequestController != null) reportRequestController.invalidate();
+        if (auditController != null) auditController.invalidate();
+        if (incidentController != null) incidentController.invalidate();
+        if (!awaitingSafResult && reportWorkflowController != null) {
+            reportWorkflowController.invalidate();
+        }
+        if (reportPanel != null) reportPanel.clearHighRiskInputs();
+        if (reportRequestPanel != null) reportRequestPanel.clearSensitiveInputs();
+        if (incidentPanel != null) incidentPanel.clearSensitiveInputs();
         clearSensitiveInputs();
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
+        if (reportRequestController != null) reportRequestController.invalidate();
+        if (incidentController != null) incidentController.invalidate();
+        if (pendingDeliveryPackage != null) pendingDeliveryPackage.destroy();
+        pendingDeliveryPackage = null;
+        verifiedDeliveryPackage = null;
         if (controller != null) networkExecutor.execute(controller::close);
         networkExecutor.shutdown();
         super.onDestroy();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != CREATE_DELIVERY_PACKAGE_DOCUMENT) return;
+        awaitingSafResult = false;
+        Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
+        AdminDeliveryPackage packageValue = pendingDeliveryPackage;
+        pendingDeliveryPackage = null;
+        if (uri == null || packageValue == null) {
+            if (packageValue != null) packageValue.destroy();
+            if (uri != null) deleteSafDocument(uri);
+            reportWorkflowController.markSaveFailed(true);
+            reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+            return;
+        }
+        networkExecutor.execute(() -> {
+            try {
+                AdminDeliveryPackageSaver.Saved saved = AdminDeliveryPackageSaver.save(
+                    packageValue,
+                    safDestination(uri)
+                );
+                runOnUiThread(() -> {
+                    if (isDestroyed()) return;
+                    verifiedDeliveryPackage = saved;
+                    packageRevisionInput.setText(Integer.toString(saved.revision()));
+                    reportWorkflowController.markSaved(saved.revision());
+                    reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    if (isDestroyed()) return;
+                    reportWorkflowController.markSaveFailed(false);
+                    reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+                });
+            }
+        });
     }
 
     private View buildContent() {
@@ -252,7 +549,7 @@ public final class AdminBoundaryActivity extends Activity {
         Button refreshButton = button("서버 보안상태와 기기 세션 새로고침");
         refreshButton.setOnClickListener(view -> refresh());
         sessionGroup.addView(refreshButton, matchWrap());
-        revokeCurrentButton = button("현재 기기 세션 폐기");
+        revokeCurrentButton = button("로그아웃");
         revokeCurrentButton.setOnClickListener(view -> revokeCurrentSession());
         sessionGroup.addView(revokeCurrentButton, matchWrap());
         sessionList = group();
@@ -282,6 +579,160 @@ public final class AdminBoundaryActivity extends Activity {
             15
         ), matchWrap());
 
+        reportPanel = new AdminReportPanel(this, new AdminReportPanel.Listener() {
+            @Override
+            public void onApplyFilters(AdminReportPanel.FilterDraft filters) {
+                loadFirstReportPage(filters);
+            }
+
+            @Override
+            public void onLoadMore() {
+                loadNextReportPage();
+            }
+
+            @Override
+            public void onOpenDetail(String reportId) {
+                loadReportDetail(reportId);
+            }
+
+            @Override
+            public void onRetry() {
+                retryReportRequest();
+            }
+
+            @Override
+            public void onUseInOperations(AdminReportModels.Detail detail) {
+                connectReportToOperations(detail);
+            }
+
+            @Override
+            public void onUpdateStatus(
+                AdminReportModels.Detail detail,
+                String nextStatus,
+                char[] password,
+                char[] totp
+            ) {
+                runStatusUpdate(detail, nextStatus, password, totp);
+            }
+
+            @Override
+            public void onCreateDeliveryPackage(
+                AdminReportModels.Detail detail,
+                char[] password,
+                char[] totp
+            ) {
+                runDeliveryPackageCreation(detail, password, totp);
+            }
+        });
+        group.addView(reportPanel, matchWrap());
+
+        reportRequestPanel = new AdminReportRequestPanel(
+            this,
+            new AdminReportRequestPanel.Listener() {
+                @Override
+                public void onApplyFilters(AdminReportRequestPanel.FilterDraft filters) {
+                    loadFirstReportRequestPage(filters);
+                }
+
+                @Override
+                public void onLoadMore() {
+                    loadNextReportRequestPage();
+                }
+
+                @Override
+                public void onOpenDetail(String requestId) {
+                    loadReportRequestDetail(requestId);
+                }
+
+                @Override
+                public void onRetry() {
+                    retryReportRequestRead();
+                }
+
+                @Override
+                public void onUpdateStatus(
+                    AdminReportRequestModels.Detail detail,
+                    String nextStatus,
+                    String publicResponse,
+                    String internalNote,
+                    char[] password,
+                    char[] totp
+                ) {
+                    runReportRequestStatusUpdate(
+                        detail,
+                        nextStatus,
+                        publicResponse,
+                        internalNote,
+                        password,
+                        totp
+                    );
+                }
+            }
+        );
+        group.addView(reportRequestPanel, matchWrap());
+
+        incidentPanel = new AdminIncidentPanel(this, new AdminIncidentPanel.Listener() {
+            @Override
+            public void onApplyStatus(String status) {
+                loadFirstIncidentPage(status);
+            }
+
+            @Override
+            public void onLoadMore() {
+                loadNextIncidentPage();
+            }
+
+            @Override
+            public void onOpenDetail(String incidentId) {
+                loadIncidentDetail(incidentId);
+            }
+
+            @Override
+            public void onRetry() {
+                retryIncidentRequest();
+            }
+
+            @Override
+            public void onUpdateStatus(
+                AdminIncidentModels.Detail detail,
+                String nextState,
+                String reason,
+                String observation,
+                String evidenceSha256,
+                char[] password,
+                char[] totp
+            ) {
+                runIncidentStatusUpdate(
+                    detail,
+                    nextState,
+                    reason,
+                    observation,
+                    evidenceSha256,
+                    password,
+                    totp
+                );
+            }
+        });
+        group.addView(incidentPanel, matchWrap());
+
+        auditPanel = new AdminAuditPanel(this, new AdminAuditPanel.Listener() {
+            @Override
+            public void onLoad(String eventType, String actorId) {
+                loadAudits(eventType, actorId);
+            }
+
+            @Override
+            public void onLoadMore() {
+                loadMoreAudits();
+            }
+
+            @Override
+            public void onRetry() {
+                retryAudits();
+            }
+        });
+        group.addView(auditPanel, matchWrap());
+
         reportIdInput = input("신고 UUID", InputType.TYPE_CLASS_TEXT, false);
         group.addView(reportIdInput, matchWrap());
 
@@ -290,9 +741,15 @@ public final class AdminBoundaryActivity extends Activity {
         group.addView(reviewHeading, matchWrap());
         reviewDecisionInput = enumSpinner(AdminReportDecision.Decision.values());
         group.addView(reviewDecisionInput, matchWrap());
-        reviewReasonInput = input("결정 사유", InputType.TYPE_CLASS_TEXT, false);
+        reviewReasonInput = input("내부 검토 사유 (사용자 비공개)", InputType.TYPE_CLASS_TEXT, false);
+        reviewUserVisibleReasonInput = input(
+            "사용자에게 보여줄 사유 (REJECTED/DUPLICATE 필수)",
+            InputType.TYPE_CLASS_TEXT,
+            false
+        );
         duplicateReportIdInput = input("중복 대상 신고 UUID (DUPLICATE일 때만)", InputType.TYPE_CLASS_TEXT, false);
         group.addView(reviewReasonInput, matchWrap());
+        group.addView(reviewUserVisibleReasonInput, matchWrap());
         group.addView(duplicateReportIdInput, matchWrap());
         locationReviewedInput = checkBox("위치 검토 완료");
         photoReviewedInput = checkBox("사진 검토 완료");
@@ -329,12 +786,14 @@ public final class AdminBoundaryActivity extends Activity {
         observedAtInput.setText(Instant.now().toString());
         expectedRevisionInput = input("예상 최신 revision", InputType.TYPE_CLASS_NUMBER, false);
         expectedRevisionInput.setText("0");
+        packageRevisionInput = input("저장 검증된 제출본 revision", InputType.TYPE_CLASS_NUMBER, false);
         idempotencyKeyInput = input("멱등 UUID", InputType.TYPE_CLASS_TEXT, false);
         idempotencyKeyInput.setText(UUID.randomUUID().toString());
         group.addView(externalReceiptInput, matchWrap());
         group.addView(deliveryReasonInput, matchWrap());
         group.addView(evidenceSha256Input, matchWrap());
         group.addView(observedAtInput, matchWrap());
+        group.addView(packageRevisionInput, matchWrap());
         group.addView(expectedRevisionInput, matchWrap());
         group.addView(idempotencyKeyInput, matchWrap());
         Button deliveryButton = button("이미 수행한 수동 전달 사실 기록");
@@ -352,6 +811,7 @@ public final class AdminBoundaryActivity extends Activity {
             AdminReportDecision decision = new AdminReportDecision(
                 AdminReportDecision.Decision.valueOf(reviewDecisionInput.getSelectedItem().toString()),
                 normalized(reviewReasonInput),
+                nullableNormalized(reviewUserVisibleReasonInput),
                 nullableNormalized(duplicateReportIdInput),
                 locationReviewedInput.isChecked(),
                 photoReviewedInput.isChecked(),
@@ -378,8 +838,18 @@ public final class AdminBoundaryActivity extends Activity {
 
     private void recordDelivery() {
         try {
+            String reportId = normalized(reportIdInput);
             String revision = normalized(expectedRevisionInput);
+            String packageRevision = normalized(packageRevisionInput);
             if (!revision.matches("[0-9]{1,18}")) throw new IllegalArgumentException("invalid revision");
+            if (!packageRevision.matches("[1-9][0-9]{0,17}")) {
+                throw new IllegalArgumentException("invalid package revision");
+            }
+            long parsedPackageRevision = Long.parseLong(packageRevision);
+            if (verifiedDeliveryPackage == null
+                || !verifiedDeliveryPackage.matchesDelivery(reportId, parsedPackageRevision)) {
+                throw new IllegalArgumentException("delivery package does not match report and revision");
+            }
             AdminInstitutionDelivery delivery = new AdminInstitutionDelivery(
                 normalized(institutionInput),
                 normalized(deliveryChannelInput),
@@ -389,10 +859,10 @@ public final class AdminBoundaryActivity extends Activity {
                 normalized(deliveryReasonInput),
                 nullableNormalized(evidenceSha256Input),
                 normalized(observedAtInput),
+                parsedPackageRevision,
                 Long.parseLong(revision),
                 normalized(idempotencyKeyInput)
             );
-            String reportId = normalized(reportIdInput);
             runOperationalOperation("수동 전달 사실을 내부 기록하고 있습니다.", () ->
                 controller.recordDelivery(
                     reportId,
@@ -426,6 +896,9 @@ public final class AdminBoundaryActivity extends Activity {
                     setInteractiveEnabled(contentRoot, true);
                     resultText.setText(operationalResultMessage(result));
                     render();
+                    if (result.kind() == AdminOperationsApi.ResultKind.MUTATION) {
+                        refreshConnectedReportDetail();
+                    }
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> {
@@ -447,7 +920,9 @@ public final class AdminBoundaryActivity extends Activity {
                 message.append("\n\nrevision ").append(item.revision())
                     .append(" / ").append(item.decision())
                     .append("\n결정시각: ").append(item.decidedAt())
-                    .append("\n사유: ").append(item.reason());
+                    .append("\n내부 사유: ").append(item.reason())
+                    .append("\n사용자 공개 사유: ")
+                    .append(item.userVisibleReason() == null ? "없음" : item.userVisibleReason());
                 if (item.duplicateOfReportId() != null) {
                     message.append("\n중복 대상: ").append(item.duplicateOfReportId());
                 }
@@ -460,6 +935,7 @@ public final class AdminBoundaryActivity extends Activity {
             for (AdminOperationsApi.DeliveryHistoryItem item : result.deliveryHistory()) {
                 message.append("\n\nrevision ").append(item.revision())
                     .append(" / status ").append(item.status())
+                    .append(" / package revision ").append(item.packageRevision())
                     .append("\n기관: ").append(item.institution())
                     .append("\n관찰시각: ").append(item.observedAt())
                     .append("\n서버 기록시각: ").append(item.recordedAt())
@@ -535,14 +1011,18 @@ public final class AdminBoundaryActivity extends Activity {
     private void revokeCurrentSession() {
         String sessionId = controller.snapshot().currentSessionId();
         if (sessionId == null) {
-            resultText.setText("폐기할 현재 세션을 확인할 수 없습니다.");
+            resultText.setText("로그아웃할 현재 세션을 확인할 수 없습니다.");
             return;
         }
-        revokeSession(sessionId);
+        revokeSession(sessionId, true);
     }
 
-    private void revokeSession(String sessionId) {
-        runSecurityOperation("선택한 기기 세션을 폐기하고 있습니다.", "기기 세션을 폐기했습니다.",
+    private void revokeSession(String sessionId, boolean currentSession) {
+        runSecurityOperation(
+            currentSession
+                ? "서버에서 현재 세션을 폐기하고 로그아웃하고 있습니다."
+                : "선택한 기기 세션을 폐기하고 있습니다.",
+            currentSession ? "로그아웃했습니다." : "기기 세션을 폐기했습니다.",
             AdminRecoveryMessagePolicy.Phase.GENERAL, () ->
             controller.revokeSession(sessionId)
         );
@@ -645,6 +1125,21 @@ public final class AdminBoundaryActivity extends Activity {
             && snapshot.securityState() == AdminSecurityState.NORMAL
             && custodyAttested;
         operationsGroup.setVisibility(operationsVisible ? View.VISIBLE : View.GONE);
+        if (reportPanel != null && reportController != null) {
+            reportPanel.render(reportController.snapshot());
+            if (reportWorkflowController != null) {
+                reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+            }
+        }
+        if (reportRequestPanel != null && reportRequestController != null) {
+            reportRequestPanel.render(reportRequestController.snapshot());
+        }
+        if (auditPanel != null && auditController != null) {
+            auditPanel.render(auditController.snapshot());
+        }
+        if (incidentPanel != null && incidentController != null) {
+            incidentPanel.render(incidentController.snapshot());
+        }
         if (!BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED) {
             operationalLockText.setText(R.string.admin_operations_default_locked);
         } else if (!operationsClientConfigured) {
@@ -681,9 +1176,9 @@ public final class AdminBoundaryActivity extends Activity {
             );
             description.setPadding(0, 20, 0, 4);
             sessionList.addView(description, matchWrap());
-            Button revoke = button(session.isCurrent() ? "현재 세션 폐기" : "이 기기 세션 폐기");
+            Button revoke = button(session.isCurrent() ? "로그아웃" : "이 기기 세션 폐기");
             revoke.setEnabled(!session.isRevoked());
-            revoke.setOnClickListener(view -> revokeSession(session.sessionId()));
+            revoke.setOnClickListener(view -> revokeSession(session.sessionId(), session.isCurrent()));
             sessionList.addView(revoke, matchWrap());
         }
         for (AdminSecurityApi.DeviceInfo device : devices) {
@@ -719,6 +1214,484 @@ public final class AdminBoundaryActivity extends Activity {
         clear(recoveryCodeInput);
         clear(newPasswordInput);
         clear(newTotpInput);
+    }
+
+    private void loadFirstReportPage(AdminReportPanel.FilterDraft draft) {
+        if (reportController == null) return;
+        try {
+            AdminReportModels.Filters filters = new AdminReportModels.Filters(
+                draft.reportId(),
+                draft.status(),
+                draft.className(),
+                draft.createdFrom(),
+                draft.createdTo()
+            );
+            executeReportRequest(reportController.beginFirstPage(filters));
+        } catch (IllegalArgumentException error) {
+            resultText.setText("신고 ID, 상태, 유형, 생성시각 조건을 다시 확인해 주세요.");
+        }
+    }
+
+    private void loadNextReportPage() {
+        if (reportController == null) return;
+        try {
+            executeReportRequest(reportController.beginNextPage());
+        } catch (IllegalStateException error) {
+            resultText.setText("불러올 다음 신고 페이지가 없습니다.");
+        }
+    }
+
+    private void loadReportDetail(String reportId) {
+        if (reportController == null) return;
+        try {
+            executeReportRequest(reportController.beginDetail(reportId));
+        } catch (IllegalArgumentException error) {
+            resultText.setText("상세를 확인할 신고 UUID가 올바르지 않습니다.");
+        }
+    }
+
+    private void retryReportRequest() {
+        if (reportController == null) return;
+        try {
+            executeReportRequest(reportController.beginRetry());
+        } catch (IllegalStateException error) {
+            resultText.setText("다시 시도할 신고 요청이 없습니다.");
+        }
+    }
+
+    private void executeReportRequest(AdminReportController.Request request) {
+        reportPanel.render(reportController.snapshot());
+        networkExecutor.execute(() -> {
+            boolean applied = reportController.execute(request);
+            runOnUiThread(() -> {
+                if (isDestroyed() || !applied) return;
+                reportPanel.render(reportController.snapshot());
+            });
+        });
+    }
+
+    private void loadFirstReportRequestPage(AdminReportRequestPanel.FilterDraft draft) {
+        if (reportRequestController == null) return;
+        try {
+            executeReportRequestRead(reportRequestController.beginFirstPage(
+                new AdminReportRequestModels.Filters(
+                    draft.reportId(),
+                    draft.requestType(),
+                    draft.status()
+                )
+            ));
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            resultText.setText("신고 ID, 요청 유형, 처리 상태 조건을 다시 확인해 주세요.");
+        }
+    }
+
+    private void loadNextReportRequestPage() {
+        if (reportRequestController == null) return;
+        try {
+            executeReportRequestRead(reportRequestController.beginNextPage());
+        } catch (IllegalStateException error) {
+            resultText.setText("불러올 다음 사용자 요청 페이지가 없습니다.");
+        }
+    }
+
+    private void loadReportRequestDetail(String requestId) {
+        if (reportRequestController == null) return;
+        try {
+            executeReportRequestRead(reportRequestController.beginDetail(requestId));
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            resultText.setText("상세를 확인할 사용자 요청 UUID가 올바르지 않습니다.");
+        }
+    }
+
+    private void retryReportRequestRead() {
+        if (reportRequestController == null) return;
+        try {
+            executeReportRequestRead(reportRequestController.beginRetry());
+        } catch (IllegalStateException error) {
+            resultText.setText("다시 시도할 사용자 요청 조회가 없습니다.");
+        }
+    }
+
+    private void executeReportRequestRead(AdminReportRequestController.Request request) {
+        reportRequestPanel.render(reportRequestController.snapshot());
+        networkExecutor.execute(() -> {
+            boolean applied = reportRequestController.execute(request);
+            runOnUiThread(() -> {
+                if (isDestroyed() || !applied) return;
+                reportRequestPanel.render(reportRequestController.snapshot());
+            });
+        });
+    }
+
+    private void runReportRequestStatusUpdate(
+        AdminReportRequestModels.Detail detail,
+        String nextStatus,
+        String publicResponse,
+        String internalNote,
+        char[] password,
+        char[] totp
+    ) {
+        try {
+            AdminReportRequestController.Request request =
+                reportRequestController.beginStatusUpdate(
+                    detail.summary().requestId(),
+                    nextStatus,
+                    detail.summary().statusVersion(),
+                    publicResponse,
+                    internalNote,
+                    password,
+                    totp
+                );
+            reportRequestPanel.render(reportRequestController.snapshot());
+            networkExecutor.execute(() -> {
+                boolean applied = reportRequestController.execute(request);
+                runOnUiThread(() -> {
+                    if (isDestroyed() || !applied) return;
+                    reportRequestPanel.render(reportRequestController.snapshot());
+                });
+            });
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            resultText.setText("상태 변경 입력과 재인증 정보를 확인해 주세요.");
+        }
+    }
+
+    private void connectReportToOperations(AdminReportModels.Detail detail) {
+        String reportId = detail.summary().id();
+        reportIdInput.setText(reportId);
+        int currentDeliveryRevision = detail.delivery() == null ? 0 : detail.delivery().revision();
+        expectedRevisionInput.setText(Integer.toString(currentDeliveryRevision));
+        packageRevisionInput.setText(
+            verifiedDeliveryPackage != null
+                && verifiedDeliveryPackage.matchesDelivery(reportId, verifiedDeliveryPackage.revision())
+                ? Integer.toString(verifiedDeliveryPackage.revision())
+                : ""
+        );
+        resultText.setText(
+            "선택한 신고를 아래 폼에 연결했습니다. 기관 전달은 앱 밖에서 수행한 사실만 기록하세요."
+        );
+        reportIdInput.requestFocus();
+    }
+
+    private void refreshConnectedReportDetail() {
+        if (reportPanel == null || reportPanel.selectedReportId() == null) return;
+        if (!reportPanel.selectedReportId().equals(normalized(reportIdInput))) return;
+        loadReportDetail(reportPanel.selectedReportId());
+    }
+
+    private void restoreReportPanelState(Bundle savedInstanceState) {
+        if (reportPanel == null || savedInstanceState == null) return;
+        reportPanel.restore(
+            new AdminReportPanel.FilterDraft(
+                savedInstanceState.getString(REPORT_FILTER_ID_STATE, ""),
+                savedInstanceState.getString(REPORT_FILTER_STATUS_STATE, ""),
+                savedInstanceState.getString(REPORT_FILTER_CLASS_STATE, ""),
+                savedInstanceState.getString(REPORT_FILTER_FROM_STATE, ""),
+                savedInstanceState.getString(REPORT_FILTER_TO_STATE, "")
+            ),
+            savedInstanceState.getString(REPORT_SELECTED_ID_STATE)
+        );
+        if (reportRequestPanel != null) {
+            reportRequestPanel.restore(
+                new AdminReportRequestPanel.FilterDraft(
+                    savedInstanceState.getString(REQUEST_FILTER_REPORT_STATE, ""),
+                    savedInstanceState.getString(REQUEST_FILTER_TYPE_STATE, ""),
+                    savedInstanceState.getString(REQUEST_FILTER_STATUS_STATE, "")
+                ),
+                savedInstanceState.getString(REQUEST_SELECTED_ID_STATE)
+            );
+        }
+        if (auditPanel != null) {
+            auditPanel.restore(
+                savedInstanceState.getString(AUDIT_EVENT_TYPE_STATE, ""),
+                savedInstanceState.getString(AUDIT_ACTOR_STATE, "")
+            );
+        }
+        if (incidentPanel != null) {
+            incidentPanel.restore(
+                savedInstanceState.getString(INCIDENT_FILTER_STATUS_STATE, ""),
+                savedInstanceState.getString(INCIDENT_SELECTED_ID_STATE)
+            );
+        }
+    }
+
+    private void runStatusUpdate(
+        AdminReportModels.Detail detail,
+        String nextStatus,
+        char[] password,
+        char[] totp
+    ) {
+        try {
+            executeReportWorkflow(reportWorkflowController.beginStatus(
+                detail.summary().id(),
+                nextStatus,
+                detail.summary().statusVersion(),
+                password,
+                totp
+            ));
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            resultText.setText("상태 변경 재인증 입력을 확인해 주세요.");
+        }
+    }
+
+    private void runDeliveryPackageCreation(
+        AdminReportModels.Detail detail,
+        char[] password,
+        char[] totp
+    ) {
+        try {
+            AdminReportWorkflowController.Request request = reportWorkflowController.beginPackage(
+                detail.summary().id(),
+                password,
+                totp
+            );
+            verifiedDeliveryPackage = null;
+            packageRevisionInput.setText("");
+            executeReportWorkflow(request);
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            resultText.setText("제출본 생성 재인증 입력을 확인해 주세요.");
+        }
+    }
+
+    private void executeReportWorkflow(AdminReportWorkflowController.Request request) {
+        reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+        networkExecutor.execute(() -> {
+            boolean applied = reportWorkflowController.execute(request);
+            runOnUiThread(() -> {
+                if (isDestroyed() || !applied) return;
+                AdminReportWorkflowController.State state = reportWorkflowController.snapshot();
+                if (state.refreshedDetail() != null) {
+                    reportController.replaceDetail(state.refreshedDetail());
+                    reportPanel.render(reportController.snapshot());
+                }
+                reportPanel.renderWorkflow(state);
+                if (state.phase() == AdminReportWorkflowController.Phase.PACKAGE_READY) {
+                    launchPackageDocumentPicker();
+                }
+            });
+        });
+    }
+
+    private void launchPackageDocumentPicker() {
+        AdminDeliveryPackage packageValue = reportWorkflowController.consumePackage();
+        if (packageValue == null) {
+            reportWorkflowController.markSaveFailed(false);
+            reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+            return;
+        }
+        if (pendingDeliveryPackage != null) pendingDeliveryPackage.destroy();
+        pendingDeliveryPackage = packageValue;
+        awaitingSafResult = true;
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/zip")
+            .putExtra(
+                Intent.EXTRA_TITLE,
+                "walksafe-report-" + reportWorkflowController.snapshot().reportId()
+                    + "-r" + packageValue.revision() + ".zip"
+            );
+        try {
+            startActivityForResult(intent, CREATE_DELIVERY_PACKAGE_DOCUMENT);
+        } catch (RuntimeException error) {
+            awaitingSafResult = false;
+            pendingDeliveryPackage.destroy();
+            pendingDeliveryPackage = null;
+            reportWorkflowController.markSaveFailed(false);
+            reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+        }
+    }
+
+    private AdminDeliveryPackageSaver.Destination safDestination(Uri uri) {
+        return new AdminDeliveryPackageSaver.Destination() {
+            @Override
+            public OutputStream openOutput() throws IOException {
+                OutputStream output = getContentResolver().openOutputStream(uri, "wt");
+                if (output == null) throw new IOException("SAF output unavailable");
+                return output;
+            }
+
+            @Override
+            public InputStream openInput() throws IOException {
+                InputStream input = getContentResolver().openInputStream(uri);
+                if (input == null) throw new IOException("SAF input unavailable");
+                return input;
+            }
+
+            @Override
+            public void delete() throws IOException {
+                if (!deleteSafDocument(uri)) throw new IOException("SAF document cleanup failed");
+            }
+        };
+    }
+
+    private boolean deleteSafDocument(Uri uri) {
+        try {
+            if (DocumentsContract.isDocumentUri(this, uri)) {
+                return DocumentsContract.deleteDocument(getContentResolver(), uri);
+            }
+            return getContentResolver().delete(uri, null, null) > 0;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void loadFirstIncidentPage(String status) {
+        if (incidentController == null) return;
+        try {
+            String optionalStatus = status == null || status.trim().isEmpty() ? null : status;
+            executeIncidentRequest(incidentController.beginFirstPage(
+                new AdminIncidentModels.Filters(optionalStatus)
+            ));
+        } catch (IllegalArgumentException error) {
+            resultText.setText("중대 사고 상태 조건을 다시 확인해 주세요.");
+        }
+    }
+
+    private void loadNextIncidentPage() {
+        if (incidentController == null) return;
+        try {
+            executeIncidentRequest(incidentController.beginNextPage());
+        } catch (IllegalStateException error) {
+            resultText.setText("불러올 다음 중대 사고 페이지가 없습니다.");
+        }
+    }
+
+    private void loadIncidentDetail(String incidentId) {
+        if (incidentController == null) return;
+        try {
+            executeIncidentRequest(incidentController.beginDetail(incidentId));
+        } catch (IllegalArgumentException error) {
+            resultText.setText("상세를 확인할 중대 사고 UUID가 올바르지 않습니다.");
+        }
+    }
+
+    private void retryIncidentRequest() {
+        if (incidentController == null) return;
+        try {
+            executeIncidentRequest(incidentController.beginRetry());
+        } catch (IllegalStateException error) {
+            resultText.setText("다시 시도할 중대 사고 조회가 없습니다.");
+        }
+    }
+
+    private void executeIncidentRequest(AdminIncidentController.Request request) {
+        incidentPanel.render(incidentController.snapshot());
+        networkExecutor.execute(() -> {
+            boolean applied = incidentController.execute(request);
+            runOnUiThread(() -> {
+                if (isDestroyed() || !applied) return;
+                incidentPanel.render(incidentController.snapshot());
+            });
+        });
+    }
+
+    private void runIncidentStatusUpdate(
+        AdminIncidentModels.Detail detail,
+        String nextState,
+        String reason,
+        String observation,
+        String evidenceSha256,
+        char[] password,
+        char[] totp
+    ) {
+        try {
+            if (detail == null || !detail.allowedNextStates().contains(nextState)
+                || !AdminIncidentModels.isAllowedTransition(detail.summary().status(), nextState)) {
+                throw new IllegalArgumentException("incident transition is not allowed");
+            }
+            AdminIncidentModels.StatusRequest request = new AdminIncidentModels.StatusRequest(
+                nextState,
+                detail.summary().statusVersion(),
+                UUID.randomUUID().toString(),
+                reason,
+                observation,
+                evidenceSha256
+            );
+            if (operationInFlight) throw new IllegalStateException("operation is already running");
+            operationInFlight = true;
+            setInteractiveEnabled(contentRoot, false);
+            resultText.setText("중대 사고 상태 기록을 저장하고 있습니다. 복구나 제어는 수행하지 않습니다.");
+            networkExecutor.execute(() -> {
+                try {
+                    controller.updateAdminIncidentStatus(
+                        detail.summary().incidentId(),
+                        request,
+                        password,
+                        totp,
+                        System.currentTimeMillis(),
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    );
+                    runOnUiThread(() -> {
+                        if (isDestroyed()) return;
+                        operationInFlight = false;
+                        setInteractiveEnabled(contentRoot, true);
+                        incidentPanel.clearSubmittedEvidence();
+                        resultText.setText(
+                            "중대 사고 상태를 기록했습니다. 이 기록은 자동 복구나 자동 제어를 수행하지 않습니다."
+                        );
+                        loadIncidentDetail(detail.summary().incidentId());
+                    });
+                } catch (AdminIncidentRepository.StatusConflictException conflict) {
+                    runOnUiThread(() -> {
+                        if (isDestroyed()) return;
+                        operationInFlight = false;
+                        setInteractiveEnabled(contentRoot, true);
+                        resultText.setText(
+                            "다른 변경으로 상태 version이 달라졌습니다. 자동 재제출하지 않고 최신 기록을 조회합니다."
+                        );
+                        loadIncidentDetail(detail.summary().incidentId());
+                    });
+                } catch (Exception error) {
+                    runOnUiThread(() -> {
+                        if (isDestroyed()) return;
+                        operationInFlight = false;
+                        setInteractiveEnabled(contentRoot, true);
+                        resultText.setText("중대 사고 상태 기록을 저장하지 못했습니다. 입력과 서버 상태를 확인해 주세요.");
+                    });
+                } finally {
+                    Arrays.fill(password, '\0');
+                    Arrays.fill(totp, '\0');
+                }
+            });
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            Arrays.fill(password, '\0');
+            Arrays.fill(totp, '\0');
+            resultText.setText("허용된 다음 상태, 사유, 관찰, SHA-256과 재인증 정보를 확인해 주세요.");
+        }
+    }
+
+    private void loadAudits(String eventType, String actorId) {
+        try {
+            executeAuditRequest(auditController.begin(new AdminAuditModels.Filters(eventType, actorId)));
+        } catch (IllegalArgumentException error) {
+            resultText.setText("감사 사건 유형과 관리자 ID 조건을 확인해 주세요.");
+        }
+    }
+
+    private void loadMoreAudits() {
+        try {
+            executeAuditRequest(auditController.beginNext());
+        } catch (IllegalStateException error) {
+            resultText.setText("불러올 다음 감사 페이지가 없습니다.");
+        }
+    }
+
+    private void retryAudits() {
+        try {
+            executeAuditRequest(auditController.beginRetry());
+        } catch (IllegalStateException error) {
+            resultText.setText("다시 시도할 감사 요청이 없습니다.");
+        }
+    }
+
+    private void executeAuditRequest(AdminAuditController.Request request) {
+        auditPanel.render(auditController.snapshot());
+        networkExecutor.execute(() -> {
+            boolean applied = auditController.execute(request);
+            runOnUiThread(() -> {
+                if (isDestroyed() || !applied) return;
+                auditPanel.render(auditController.snapshot());
+            });
+        });
     }
 
     private static void clear(EditText input) {

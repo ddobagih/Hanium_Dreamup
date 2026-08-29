@@ -14,6 +14,7 @@ from starlette.requests import Request
 from backend.app.api import reports as reports_api
 from backend.app.models import (
     Report,
+    ReportDeliveryPackage,
     ReportInstitutionDeliveryEvent,
     ReportReviewDecision,
 )
@@ -39,6 +40,7 @@ IDEMPOTENCY_KEY = uuid.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 SESSION_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
 CORRELATION_ID = uuid.UUID("33333333-3333-4333-8333-333333333333")
 DECISION_ID = uuid.UUID("44444444-4444-4444-8444-444444444444")
+PACKAGE_ID = uuid.UUID("99999999-9999-4999-8999-999999999999")
 
 
 def _approved_request(**overrides: object) -> dict[str, object]:
@@ -51,6 +53,8 @@ def _approved_request(**overrides: object) -> dict[str, object]:
         "privacy_reviewed": True,
     }
     payload.update(overrides)
+    if payload["decision"] in {"REJECTED", "DUPLICATE"}:
+        payload.setdefault("user_visible_reason", "신고 처리 결과를 확인해 주세요")
     return payload
 
 
@@ -64,6 +68,7 @@ def _delivery_request(**overrides: object) -> dict[str, object]:
         "reason": "  관리자가 공식 창구에 수동 제출함  ",
         "evidence_sha256": "a" * 64,
         "observed_at": "2026-08-09T03:00:00Z",
+        "package_revision": 1,
         "expected_revision": 0,
         "idempotency_key": str(IDEMPOTENCY_KEY),
     }
@@ -252,10 +257,12 @@ def test_workflow_request_contracts_have_exact_fields_and_normalize_bounded_text
     assert set(ReportReviewDecisionRequest.model_fields) == {
         "decision",
         "reason",
+        "user_visible_reason",
         "duplicate_of_report_id",
         "location_reviewed",
         "photo_reviewed",
         "privacy_reviewed",
+        "content_revision",
     }
     assert set(ReportInstitutionDeliveryRequest.model_fields) == {
         "institution",
@@ -266,6 +273,7 @@ def test_workflow_request_contracts_have_exact_fields_and_normalize_bounded_text
         "reason",
         "evidence_sha256",
         "observed_at",
+        "package_revision",
         "expected_revision",
         "idempotency_key",
     }
@@ -276,6 +284,7 @@ def test_workflow_request_contracts_have_exact_fields_and_normalize_bounded_text
     delivery = ReportInstitutionDeliveryRequest.model_validate(_delivery_request())
 
     assert review.reason == "확인 완료"
+    assert review.user_visible_reason is None
     assert delivery.institution == "서울시청"
     assert delivery.channel == "WEB_PORTAL"
     assert delivery.recipient == "safety-desk"
@@ -938,6 +947,15 @@ def _typed_decision(decision: str = "APPROVED") -> ReportReviewDecision:
     )
 
 
+def _package() -> ReportDeliveryPackage:
+    return ReportDeliveryPackage(
+        id=PACKAGE_ID,
+        report_id=REPORT_ID,
+        review_decision_id=DECISION_ID,
+        revision=1,
+    )
+
+
 @pytest.mark.parametrize(
     ("fail_operation", "fail_execute_call"),
     [
@@ -954,7 +972,7 @@ def test_delivery_store_failures_are_normalized_and_rolled_back(
     fail_execute_call: int,
 ) -> None:
     db = _OperationFailureSession(
-        [Report(id=REPORT_ID), None, None, _typed_decision()],
+        [Report(id=REPORT_ID), None, None, _typed_decision(), _package()],
         fail_operation=fail_operation,
         fail_execute_call=fail_execute_call,
     )
@@ -987,9 +1005,10 @@ def test_delivery_append_uses_exact_transition_and_latest_typed_approval() -> No
         report_id=REPORT_ID,
         revision=1,
         status="SUBMITTED",
+        package_revision=1,
     )
     approval = _typed_decision()
-    db = _FakeSession([report, None, previous, approval])
+    db = _FakeSession([report, None, previous, approval, _package()])
     payload = ReportInstitutionDeliveryRequest.model_validate(
         _delivery_request(
             status="ACKNOWLEDGED",
@@ -1052,6 +1071,7 @@ def test_delivery_retry_returns_original_before_revision_and_approval_checks() -
         external_receipt_id=payload.external_receipt_id,
         reason=payload.reason,
         evidence_sha256=payload.evidence_sha256,
+        package_revision=payload.package_revision,
         observed_at=payload.observed_at,
         expected_revision=payload.expected_revision,
         idempotency_key=payload.idempotency_key,
@@ -1084,6 +1104,7 @@ def test_delivery_retry_expunge_failure_is_normalized_and_rolled_back() -> None:
         external_receipt_id=payload.external_receipt_id,
         reason=payload.reason,
         evidence_sha256=payload.evidence_sha256,
+        package_revision=payload.package_revision,
         observed_at=payload.observed_at,
         expected_revision=payload.expected_revision,
         idempotency_key=payload.idempotency_key,
@@ -1120,6 +1141,7 @@ def test_delivery_retry_rejects_same_key_with_different_intent() -> None:
         external_receipt_id=payload.external_receipt_id,
         reason="다른 제출 사유",
         evidence_sha256=payload.evidence_sha256,
+        package_revision=payload.package_revision,
         observed_at=payload.observed_at,
         expected_revision=payload.expected_revision,
         idempotency_key=payload.idempotency_key,

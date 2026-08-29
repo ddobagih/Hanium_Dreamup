@@ -31,6 +31,11 @@ enum class ActivityOriginalMotionState {
     STATIONARY,
 }
 
+data class ActivityOriginalStationarySnapshot(
+    val stepCount: Int,
+    val observedAtMs: Long,
+)
+
 enum class ActivityOriginalUploadDecision(val uploadAllowed: Boolean) {
     BLOCKED_WHILE_WALKING(false),
     WIFI_ALLOWED(true),
@@ -99,6 +104,20 @@ class ActivityOriginalMotionEvidence(
         } else {
             ActivityOriginalMotionState.WALKING
         }
+    }
+
+    @Synchronized
+    fun stationarySnapshotAt(observedAtMs: Long): ActivityOriginalStationarySnapshot? {
+        if (!observationStarted || observedAtMs < 0L) return null
+        val stepCount = lastStepCount ?: return null
+        val movementAtMs = lastMovementAtMs ?: return null
+        if (
+            observedAtMs < movementAtMs ||
+            observedAtMs - movementAtMs < stationaryConfirmationMs
+        ) {
+            return null
+        }
+        return ActivityOriginalStationarySnapshot(stepCount, observedAtMs)
     }
 
     @Synchronized
@@ -249,6 +268,13 @@ class ActivityOriginalUploadAdmissionController(
         ).uploadAllowed
     }
 
+    fun stationarySnapshot(
+        observedAtMs: Long,
+    ): ActivityOriginalStationarySnapshot? = synchronized(lock) {
+        if (!sessionActive) return@synchronized null
+        motionEvidence.stationarySnapshotAt(observedAtMs)
+    }
+
     fun admit(
         consentAllowed: Boolean,
         preference: MobileNetworkPreference,
@@ -319,22 +345,26 @@ object AndroidNetworkTransferPolicy {
 
 class IntegratedConsentNetworkBinding private constructor(
     val transport: IntegratedConsentNetworkTransport,
+    private val networkIdentity: Any,
     private val connectionOpener: (URL) -> URLConnection,
 ) {
     internal fun openConnection(url: URL): URLConnection = connectionOpener(url)
+
+    internal fun isSameNetworkBinding(other: IntegratedConsentNetworkBinding): Boolean =
+        transport == other.transport && networkIdentity === other.networkIdentity
 
     companion object {
         internal fun fromNetwork(
             network: Network,
             transport: IntegratedConsentNetworkTransport,
         ): IntegratedConsentNetworkBinding =
-            IntegratedConsentNetworkBinding(transport, network::openConnection)
+            IntegratedConsentNetworkBinding(transport, network, network::openConnection)
 
         internal fun forTest(
             transport: IntegratedConsentNetworkTransport,
             connectionOpener: (URL) -> URLConnection,
         ): IntegratedConsentNetworkBinding =
-            IntegratedConsentNetworkBinding(transport, connectionOpener)
+            IntegratedConsentNetworkBinding(transport, Any(), connectionOpener)
     }
 }
 

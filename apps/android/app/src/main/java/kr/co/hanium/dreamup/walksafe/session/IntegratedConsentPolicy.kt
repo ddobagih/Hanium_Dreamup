@@ -2,22 +2,27 @@ package kr.co.hanium.dreamup.walksafe.session
 
 import java.util.Collections
 
-const val INTEGRATED_CONSENT_POLICY_VERSION = "FP-013-1.0.0"
+const val INTEGRATED_CONSENT_POLICY_VERSION = "FP-013-1.1.0"
+const val PREVIOUS_INTEGRATED_CONSENT_POLICY_VERSION = "FP-013-1.0.0"
 const val INTEGRATED_CONSENT_CONFIRMATION_SCHEMA_VERSION =
-    "walksafe.integrated-consent-confirmation.v1"
-const val INTEGRATED_CONSENT_RAW_ITEM_VERSION = "FP-013-RAW-1.0.0"
-const val INTEGRATED_CONSENT_AUTOMATIC_ITEM_VERSION = "FP-013-AUTO-1.0.0"
+    "walksafe.integrated-consent-confirmation.v2"
+const val INTEGRATED_CONSENT_RAW_ITEM_VERSION = "FP-013-RAW-1.1.0"
+const val INTEGRATED_CONSENT_AUTOMATIC_ITEM_VERSION = "FP-013-AUTO-1.1.0"
 const val INTEGRATED_CONSENT_MOBILE_ITEM_VERSION = "FP-013-MOBILE-1.0.0"
-const val INTEGRATED_CONSENT_TRAINING_ITEM_VERSION = "FP-013-TRAINING-1.0.0"
+const val INTEGRATED_CONSENT_TRAINING_ITEM_VERSION = "FP-013-TRAINING-1.1.0"
 
 const val INTEGRATED_CONSENT_DISCLOSURE_KO =
     "통합 동의 문서 $INTEGRATED_CONSENT_POLICY_VERSION. 네 항목을 각각 허용하거나 거부할 수 있습니다. " +
-        "1. 원본 수집: 신고용 카메라 JPEG와 디버그 원본·센서 메타데이터를 신고 확인과 품질 점검 시 수집하며, " +
-        "WalkSafe 서버가 최대 180일 보관합니다. " +
-        "2. 자동신고: 손상 점자블록 후보의 JPEG·정확한 위치·방향·모델 메타데이터를 보행 중 자동 전송하며, " +
-        "WalkSafe 서버가 최대 180일 보관합니다. " +
+        "1. 신고·진단용 raw v2: 탐지·성능 메타데이터와 chunk 시각·크기·hash만 수집하며, 영상·음성·이미지·" +
+        "정확한 위치·이동경로·개별 frame·bbox는 제외합니다. 기기에 최대 30일 암호화 저장하고 사용자가 " +
+        "재확인한 PAUSED 상태에서만 전송하며, 서버 검역은 receipt commit부터 최대 14일입니다. END에서는 " +
+        "전송하지 않습니다. " +
+        "2. 자동신고: JPEG 신고 사진과 정확한 위치·방향·탐지 metadata를 기기에 암호화해 대기하고, 사용자가 " +
+        "재확인한 PAUSED 상태에서만 동의와 네트워크 조건을 다시 확인해 전송합니다. END는 자동 전송 시점이 아닙니다. " +
         "3. 이동통신 전송: Wi-Fi가 아닐 때 같은 서버 자료를 이동통신망으로 전송합니다. 거부하면 Wi-Fi만 사용합니다. " +
-        "4. 학습 재사용: 수집 자료를 모델 개선용 학습 후보로 재사용하며, 거부하면 신고 처리 외 학습에 쓰지 않습니다. " +
+        "4. 학습 재사용: 사람의 승인과 비식별 처리를 통과한 정제 이미지·라벨·metadata만 dataset 승인일부터 " +
+        "최대 3년간 모델 개선 후보로 사용하며, 정확한 위치·원본 음성·식별 가능한 얼굴은 제외합니다. " +
+        "거부하면 신고 처리 외 학습에 쓰지 않습니다. " +
         "각 항목은 언제든 이 화면에서 철회할 수 있고, 철회 즉시 해당 경로를 중단한 뒤 서버에 새 선택을 저장합니다."
 
 enum class IntegratedConsentItem(val wireValue: String) {
@@ -77,7 +82,8 @@ data class IntegratedConsentConfirmation(
     val revision: Long,
     val selections: IntegratedConsentSelections,
     val confirmedAt: String,
-    val receiptSha256: String,
+    val gatewayAuditRecordSha256: String,
+    val backendConsentReceiptSha256: String,
     val controlSecret: String,
 ) {
     init {
@@ -88,7 +94,8 @@ data class IntegratedConsentConfirmation(
         require(clientRevision > 0L)
         require(revision > 0L)
         require(confirmedAt.isNotBlank())
-        require(SHA256.matches(receiptSha256))
+        require(SHA256.matches(gatewayAuditRecordSha256))
+        require(SHA256.matches(backendConsentReceiptSha256))
         require(CONTROL_SECRET.matches(controlSecret))
     }
 
@@ -121,20 +128,27 @@ enum class IntegratedConsentApplyResult {
 
 data class PendingIntegratedConsentMutation(
     val installationId: String,
+    val actorSha256: String,
     val requestId: String,
     val policyVersion: String,
     val clientRevision: Long,
     val previousServerRevision: Long,
+    val expectedPreviousBackendReceiptSha256: String?,
     val desiredSelections: IntegratedConsentSelections,
     val withdrawalItems: Set<IntegratedConsentItem>,
     val createdAtEpochMs: Long,
 ) {
     init {
         require(INSTALLATION_ID.matches(installationId))
+        require(SHA256.matches(actorSha256))
         require(REQUEST_ID.matches(requestId))
         require(policyVersion == INTEGRATED_CONSENT_POLICY_VERSION)
         require(clientRevision > 0L)
         require(previousServerRevision >= 0L)
+        require(
+            expectedPreviousBackendReceiptSha256 == null ||
+                SHA256.matches(expectedPreviousBackendReceiptSha256),
+        )
         require(createdAtEpochMs > 0L)
         require(withdrawalItems.all { !desiredSelections.isGranted(it) })
     }
@@ -153,6 +167,7 @@ data class PendingIntegratedConsentMutation(
     private companion object {
         val INSTALLATION_ID = Regex("^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
         val REQUEST_ID = Regex("^[A-Za-z0-9_-]{16,128}$")
+        val SHA256 = Regex("^[0-9a-f]{64}$")
     }
 }
 
@@ -351,6 +366,26 @@ class IntegratedConsentSession {
         pendingMutation = null
         pendingRetry = false
         accountDeletionBlocked = false
+        failClosed = false
+        revisionFloorInstallationId = null
+        revisionFloorPolicyVersion = null
+        revisionFloor = 0L
+        changed
+    }
+
+    fun resetForPolicyReconsent(): Boolean = synchronized(lock) {
+        if (accountDeletionBlocked) return@synchronized false
+        val changed =
+            current != null ||
+                locallyWithdrawn.isNotEmpty() ||
+                pendingMutation != null ||
+                pendingRetry ||
+                failClosed ||
+                revisionFloor > 0L
+        current = null
+        locallyWithdrawn = emptySet()
+        pendingMutation = null
+        pendingRetry = false
         failClosed = false
         revisionFloorInstallationId = null
         revisionFloorPolicyVersion = null

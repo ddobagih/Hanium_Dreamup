@@ -10,6 +10,7 @@ import java.security.MessageDigest
  * asset availability and delegate fallback are resolved later by the detector loader.
  */
 data class TwoModelRuntimeConfig(
+    val bundleVersion: String,
     val runtimeSourceModel: String?,
     val primaryModelKey: String,
     val fallbackModelKey: String?,
@@ -53,6 +54,11 @@ data class TwoModelRuntimeConfig(
 
         fun parse(json: String): TwoModelRuntimeConfig {
             val root = JSONObject(json)
+            val bundleVersion = root.get("version") as? String
+                ?: throw IllegalArgumentException("version must be a string bundleVersion")
+            require(bundleVersion.isNotBlank() && bundleVersion == bundleVersion.trim()) {
+                "version must be a trimmed non-blank bundleVersion"
+            }
             val models = root.getJSONObject("models")
             val runtimeSourceModel = root.optString("source_model").ifBlank { null }
             val primaryModelKey = root.optString("primary_model", UNIFIED_MODEL_KEY)
@@ -83,6 +89,7 @@ data class TwoModelRuntimeConfig(
                 require(unifiedWalksafe != null) { "unified_walksafe model config is required for unified primary runtime" }
             }
             return TwoModelRuntimeConfig(
+                bundleVersion = bundleVersion,
                 runtimeSourceModel = runtimeSourceModel,
                 primaryModelKey = primaryModelKey,
                 fallbackModelKey = fallbackModelKey,

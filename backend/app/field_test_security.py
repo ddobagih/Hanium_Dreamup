@@ -59,6 +59,13 @@ ADMIN_TOKEN_HEADER = b"x-walksafe-admin-token"
 ACTOR_ID_HEADER = b"x-walksafe-actor-id"
 ACTOR_ASSERTION_HEADER = b"x-walksafe-actor-assertion"
 ACCOUNT_GENERATION_HEADER = b"x-walksafe-account-generation"
+RAW_REQUEST_PROOF_HEADER = b"x-walksafe-raw-request-proof"
+RAW_PURPOSE_HEADER = b"x-walksafe-raw-purpose"
+RAW_WALK_ID_HEADER = b"x-walksafe-raw-walk-id"
+RAW_MANIFEST_SHA256_HEADER = b"x-walksafe-raw-manifest-sha256"
+RAW_CHUNK_SHA256_HEADER = b"x-walksafe-chunk-sha256"
+RAW_COMMIT_SHA256_HEADER = b"x-walksafe-raw-commit-sha256"
+RAW_CONSENT_RECEIPT_SHA256_HEADER = b"x-walksafe-consent-receipt-sha256"
 DELETION_ACCESS_PRE_DIGEST_HEADER = b"x-walksafe-deletion-access-pre-digest"
 DELETION_TOMBSTONE_ID_HEADER = b"x-walksafe-deletion-tombstone-id"
 AUTHORIZATION_HEADER = b"authorization"
@@ -77,6 +84,10 @@ ADMIN_RECONFIRM_NONCE_HEADER = ADMIN_RECONFIRM_NONCE_HEADER_NAME.lower().encode(
 ACTOR_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
 ACCOUNT_GENERATION_PATTERN = re.compile(r"^[1-9][0-9]{0,18}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+CANONICAL_UUID_PATTERN = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+    r"[0-9a-f]{4}-[0-9a-f]{12}$"
+)
 DELETION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 DELETION_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 DELETION_STATUS_PATH = re.compile(
@@ -87,9 +98,68 @@ DELETION_EVIDENCE_PATH = re.compile(
 )
 DELETION_STATUS_TEMPLATE = "/privacy/account-deletions/{request_id}/status"
 DELETION_EVIDENCE_TEMPLATE = "/privacy/account-deletions/{request_id}/device-evidence"
+REPORT_TRANSPORT_STATUS_PATH = re.compile(
+    r"^/reports/v2/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+    r"[0-9a-f]{4}-[0-9a-f]{12}/status$"
+)
+REPORT_TRANSPORT_STATUS_TEMPLATE = "/reports/v2/{report_id}/status"
+USER_REPORT_LIST_TEMPLATE = "/reports/mine"
+USER_REPORT_DETAIL_TEMPLATE = "/reports/mine/{report_id}"
+USER_REPORT_REQUEST_TEMPLATE = "/reports/mine/{report_id}/requests"
+USER_REPORT_CONTENT_TEMPLATE = "/reports/mine/{report_id}/content"
+USER_REPORT_CORRECTION_TEMPLATE = "/reports/mine/{report_id}/corrections"
+USER_REPORT_DELETION_STATUS_TEMPLATE = "/reports/mine/deletions/{request_id}"
+USER_REPORT_DETAIL_PATH = re.compile(
+    r"^/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+    r"[0-9a-f]{4}-[0-9a-f]{12}$"
+)
+USER_REPORT_REQUEST_PATH = re.compile(
+    r"^/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+    r"[0-9a-f]{4}-[0-9a-f]{12}/requests$"
+)
+USER_REPORT_CONTENT_PATH = re.compile(
+    r"^/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+    r"[0-9a-f]{4}-[0-9a-f]{12}/content$"
+)
+USER_REPORT_CORRECTION_PATH = re.compile(
+    r"^/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+    r"[0-9a-f]{4}-[0-9a-f]{12}/corrections$"
+)
+USER_REPORT_DELETION_STATUS_PATH = re.compile(
+    r"^/reports/mine/deletions/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+    r"[0-9a-f]{4}-[0-9a-f]{12}$"
+)
+
+
+def _user_report_route(path: str, method: str) -> bool:
+    normalized = method.upper()
+    return (
+        (path == USER_REPORT_LIST_TEMPLATE and normalized == "GET")
+        or (path == USER_REPORT_DETAIL_TEMPLATE and normalized == "GET")
+        or (path == USER_REPORT_REQUEST_TEMPLATE and normalized == "POST")
+        or (path == USER_REPORT_CONTENT_TEMPLATE and normalized == "GET")
+        or (path == USER_REPORT_CORRECTION_TEMPLATE and normalized == "POST")
+        or (path == USER_REPORT_DELETION_STATUS_TEMPLATE and normalized == "GET")
+        or (USER_REPORT_DETAIL_PATH.fullmatch(path) is not None and normalized == "GET")
+        or (USER_REPORT_REQUEST_PATH.fullmatch(path) is not None and normalized == "POST")
+        or (USER_REPORT_CONTENT_PATH.fullmatch(path) is not None and normalized == "GET")
+        or (USER_REPORT_CORRECTION_PATH.fullmatch(path) is not None and normalized == "POST")
+        or (
+            USER_REPORT_DELETION_STATUS_PATH.fullmatch(path) is not None
+            and normalized == "GET"
+        )
+    )
+
+
+def _report_transport_status_path(path: str) -> bool:
+    return (
+        path == REPORT_TRANSPORT_STATUS_TEMPLATE
+        or REPORT_TRANSPORT_STATUS_PATH.fullmatch(path) is not None
+    )
 ACTOR_ASSERTION_MAX_AGE_SECONDS = 30
 ACTOR_RATE_LIMITS = {
     "report": 12,
+    "raw_collection": 240,
     "navigation": 30,
     "detect": 180,
     "export": 6,
@@ -109,6 +179,13 @@ ADMIN_DEVICE_PROOF_PUBLIC_AUTH_ROUTES = {
     ("POST", "/admin/security/sessions"): "LOGIN",
     ("POST", "/admin/security/recovery/complete"): "RECOVERY_COMPLETE",
 }
+ACCOUNT_GATEWAY_ROUTES = frozenset(
+    {
+        ("POST", "/account-enrollments/email-otp"),
+        ("POST", "/accounts"),
+        ("POST", "/accounts/authenticate"),
+    }
+)
 
 
 class FieldTestAccess(str, Enum):
@@ -116,13 +193,98 @@ class FieldTestAccess(str, Enum):
     ADMIN = "admin"
 
 
+class RawCollectionOperation(str, Enum):
+    PUT_MANIFEST = "PUT_MANIFEST"
+    PUT_CHUNK = "PUT_CHUNK"
+    GET_STATUS = "GET_STATUS"
+    COMMIT = "COMMIT"
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedActorAssertion:
+    actor_id: str
+    account_generation: int | None
+    access: FieldTestAccess
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedRawCollectionRequestProof:
+    actor_id: str
+    account_generation: int
+    operation: RawCollectionOperation
+    method: str
+    path: str
+    purpose: str
+    walk_id: str
+    manifest_sha256: str
+    consent_receipt_sha256: str | None
+    chunk_sha256: str | None
+    commit_sha256: str | None
+
+
+def _raw_ingest_route(path: str) -> bool:
+    return path.startswith("/raw-collections/")
+
+
+def _raw_ingest_write_route(path: str, method: str) -> bool:
+    normalized_method = method.upper()
+    if normalized_method in {"POST", "PUT"}:
+        return _raw_ingest_route(path)
+    if normalized_method != "HEAD":
+        return False
+    operation = raw_collection_operation(path, method)
+    return operation in {
+        RawCollectionOperation.PUT_MANIFEST,
+        RawCollectionOperation.PUT_CHUNK,
+        RawCollectionOperation.COMMIT,
+    }
+
+
+def raw_collection_operation(
+    path: str,
+    method: str,
+) -> RawCollectionOperation | None:
+    normalized_method = method.upper()
+    parts = path.split("/")
+    if len(parts) == 3 and parts[1] == "raw-collections":
+        if normalized_method == "GET" and parts[2]:
+            return RawCollectionOperation.GET_STATUS
+    if len(parts) == 4 and parts[1] == "raw-collections" and parts[3] == "manifest":
+        if normalized_method in {"HEAD", "PUT"}:
+            return RawCollectionOperation.PUT_MANIFEST
+    if len(parts) == 4 and parts[1] == "raw-collections" and parts[3] == "commit":
+        if normalized_method in {"HEAD", "POST"}:
+            return RawCollectionOperation.COMMIT
+    if (
+        len(parts) == 7
+        and parts[1] == "raw-collections"
+        and parts[3] == "objects"
+        and parts[5] == "chunks"
+        and normalized_method in {"HEAD", "PUT"}
+    ):
+        return RawCollectionOperation.PUT_CHUNK
+    return None
+
+
 def _rate_limit_group(path: str, method: str) -> str | None:
     normalized_method = method.upper()
-    if normalized_method == "POST" and path == "/privacy/consent-events":
+    if _raw_ingest_route(path) and normalized_method in {"GET", "POST", "PUT"}:
+        return "raw_collection"
+    if normalized_method == "HEAD" and _raw_ingest_write_route(
+        path,
+        normalized_method,
+    ):
+        return "raw_collection"
+    if (
+        (normalized_method == "POST" and path == "/privacy/consent-events")
+        or (normalized_method == "GET" and path == "/privacy/consent-bootstrap")
+    ):
         return "privacy"
     if _privacy_deletion_route(path, normalized_method) is not None:
         return "privacy"
     if normalized_method == "POST" and path in {"/reports", "/reports/v2"}:
+        return "report"
+    if _user_report_route(path, normalized_method):
         return "report"
     if normalized_method == "POST" and path in {"/detect", "/detect/v2"}:
         return "detect"
@@ -142,6 +304,12 @@ def _rate_limit_group(path: str, method: str) -> str | None:
     if normalized_method == "GET" and (
         path == "/reports"
         or path.startswith("/reports/")
+        or path == "/admin/reports"
+        or path.startswith("/admin/reports/")
+        or path == "/admin/report-requests"
+        or path.startswith("/admin/report-requests/")
+        or path == "/admin/incidents"
+        or path.startswith("/admin/incidents/")
         or path.startswith("/uploads/")
         or path.startswith("/android/debug/")
     ):
@@ -159,15 +327,28 @@ def requires_actor_identity(path: str, method: str) -> bool:
         or (path.startswith("/reports/") and normalized_method == "PATCH")
         or (path.startswith("/uploads/") and normalized_method == "GET")
         or path.startswith("/android/debug/")
+        or _user_report_route(path, normalized_method)
     )
 
 
 def requires_account_generation(path: str, method: str) -> bool:
     normalized_method = method.upper()
     return (
-        (normalized_method == "POST" and path == "/privacy/consent-events")
+        (
+            (normalized_method == "POST" and path == "/privacy/consent-events")
+            or (
+                normalized_method == "GET"
+                and path == "/privacy/consent-bootstrap"
+            )
+        )
         or _privacy_deletion_route(path, normalized_method) is not None
         or (normalized_method == "POST" and path in {"/reports", "/reports/v2"})
+        or (
+            normalized_method == "GET"
+            and _report_transport_status_path(path)
+        )
+        or _raw_ingest_route(path)
+        or _user_report_route(path, normalized_method)
     )
 
 
@@ -192,6 +373,34 @@ def requires_admin_device_proof(path: str, method: str) -> bool:
     return is_admin_device_proof_workflow_request(method, path)
 
 
+def _report_transport_status_route(path: str, method: str) -> bool:
+    return method.upper() == "GET" and _report_transport_status_path(path)
+
+
+def _report_transport_status_not_found_response() -> JSONResponse:
+    return JSONResponse(
+        status_code=404,
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+        content={"detail": {"code": "report_transport_status_not_found"}},
+    )
+
+
+def _user_report_not_found_response() -> JSONResponse:
+    return JSONResponse(
+        status_code=404,
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+        content={"detail": {"code": "report_not_found"}},
+    )
+
+
+def _concealed_report_response(path: str, method: str) -> JSONResponse | None:
+    if _report_transport_status_route(path, method):
+        return _report_transport_status_not_found_response()
+    if _user_report_route(path, method):
+        return _user_report_not_found_response()
+    return None
+
+
 _ACTOR_RATE_LIMITER = InMemoryActorRateLimiter(
     ACTOR_RATE_LIMITS,
     ACTOR_RATE_WINDOW_SECONDS,
@@ -208,10 +417,14 @@ def required_field_test_access(path: str, method: str) -> FieldTestAccess | None
         return None
     if (normalized_method, path) in PUBLIC_ADMIN_SECURITY_ROUTES:
         return None
+    if (normalized_method, path) in ACCOUNT_GATEWAY_ROUTES:
+        return FieldTestAccess.FIELD
 
     if path in {"/docs", "/redoc", "/openapi.json"}:
         return FieldTestAccess.ADMIN
     if normalized_method == "GET" and path == "/internal/capacity":
+        return FieldTestAccess.FIELD
+    if _raw_ingest_route(path):
         return FieldTestAccess.FIELD
     if normalized_method == "POST" and path == "/privacy/consent-events":
         return FieldTestAccess.FIELD
@@ -222,10 +435,25 @@ def required_field_test_access(path: str, method: str) -> FieldTestAccess | None
     if path.startswith("/uploads/") or path.startswith("/android/debug/"):
         return FieldTestAccess.ADMIN
 
+    if path == "/admin/reports" or path.startswith("/admin/reports/"):
+        return FieldTestAccess.ADMIN
+    if path == "/admin/report-requests" or path.startswith("/admin/report-requests/"):
+        return FieldTestAccess.ADMIN
+    if path == "/admin/incidents" or path.startswith("/admin/incidents/"):
+        return FieldTestAccess.ADMIN
+
+    if _user_report_route(path, normalized_method):
+        return FieldTestAccess.FIELD
+
     if path == "/reports":
         return FieldTestAccess.FIELD if normalized_method == "POST" else FieldTestAccess.ADMIN
     if path == "/reports/v2":
         return FieldTestAccess.FIELD if normalized_method == "POST" else FieldTestAccess.ADMIN
+    if (
+        normalized_method == "GET"
+        and _report_transport_status_path(path)
+    ):
+        return FieldTestAccess.FIELD
     if path == "/reports/duplicate-check":
         # Nearby report identifiers reveal location-linked records and are only
         # needed by the administrator review workflow. Report creation performs
@@ -497,14 +725,31 @@ def _device_proof_headers(scope: Scope) -> tuple[str, str, str]:
     )
 
 
-def _admin_security_error_response(exc: AdminSecurityError) -> JSONResponse:
+def _admin_security_error_response(
+    exc: AdminSecurityError,
+    *,
+    method: str | None = None,
+    path: str | None = None,
+) -> JSONResponse:
     headers = (
         {"Retry-After": str(exc.retry_after)}
         if exc.retry_after is not None
         else None
     )
+    operation = (
+        classify_admin_operation(method, path)
+        if method is not None and path is not None
+        else None
+    )
+    status_code = (
+        403
+        if exc.status_code == 409
+        and operation is not None
+        and operation.action == "admin.incident.status.update"
+        else exc.status_code
+    )
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=status_code,
         headers=headers,
         content={"detail": {"code": exc.code, "message": exc.message}},
     )
@@ -597,6 +842,204 @@ def verify_actor_assertion(
         issued_at=issued_at,
         account_generation=account_generation,
     )
+    return compare_digest(assertion, expected)
+
+
+def raw_collection_request_proof_payload(
+    *,
+    actor_id: str,
+    account_generation: int,
+    operation: RawCollectionOperation | str,
+    method: str,
+    path: str,
+    purpose: str,
+    walk_id: str,
+    manifest_sha256: str,
+    consent_receipt_sha256: str | None,
+    chunk_sha256: str | None,
+    commit_sha256: str | None,
+    issued_at: int,
+) -> dict[str, object]:
+    operation_value = RawCollectionOperation(operation)
+    if account_generation < 1:
+        raise ValueError("account_generation must be positive")
+    if purpose not in {"GENERAL_RAW", "AUTO_REPORT"}:
+        raise ValueError("purpose must be a raw collection purpose")
+    if CANONICAL_UUID_PATTERN.fullmatch(walk_id) is None:
+        raise ValueError("walk_id must be a canonical UUID")
+    if SHA256_PATTERN.fullmatch(manifest_sha256) is None:
+        raise ValueError("manifest_sha256 must be lowercase SHA-256")
+    for name, value in (
+        ("consent_receipt_sha256", consent_receipt_sha256),
+        ("chunk_sha256", chunk_sha256),
+        ("commit_sha256", commit_sha256),
+    ):
+        if value is not None and SHA256_PATTERN.fullmatch(value) is None:
+            raise ValueError(f"{name} must be lowercase SHA-256 or null")
+    if operation_value is RawCollectionOperation.PUT_MANIFEST:
+        valid_operation_hashes = (
+            consent_receipt_sha256 is not None
+            and chunk_sha256 is None
+            and commit_sha256 is None
+        )
+    elif operation_value is RawCollectionOperation.PUT_CHUNK:
+        valid_operation_hashes = (
+            consent_receipt_sha256 is not None
+            and chunk_sha256 is not None
+            and commit_sha256 is None
+        )
+    elif operation_value is RawCollectionOperation.COMMIT:
+        valid_operation_hashes = (
+            consent_receipt_sha256 is not None
+            and chunk_sha256 is None
+            and commit_sha256 is not None
+        )
+    else:
+        valid_operation_hashes = (
+            consent_receipt_sha256 is None
+            and chunk_sha256 is None
+            and commit_sha256 is None
+        )
+    if not valid_operation_hashes:
+        raise ValueError("raw proof hashes do not match the operation contract")
+    return {
+        "account_generation": account_generation,
+        "actor_id": actor_id,
+        "chunk_sha256": chunk_sha256,
+        "commit_sha256": commit_sha256,
+        "consent_receipt_sha256": consent_receipt_sha256,
+        "issued_at": issued_at,
+        "manifest_sha256": manifest_sha256,
+        "method": method.upper(),
+        "operation": operation_value.value,
+        "path": path,
+        "purpose": purpose,
+        "version": 1,
+        "walk_id": walk_id,
+    }
+
+
+def raw_collection_request_proof_message(
+    *,
+    actor_id: str,
+    account_generation: int,
+    operation: RawCollectionOperation | str,
+    method: str,
+    path: str,
+    purpose: str,
+    walk_id: str,
+    manifest_sha256: str,
+    consent_receipt_sha256: str | None,
+    chunk_sha256: str | None,
+    commit_sha256: str | None,
+    issued_at: int,
+) -> bytes:
+    payload = raw_collection_request_proof_payload(
+        actor_id=actor_id,
+        account_generation=account_generation,
+        operation=operation,
+        method=method,
+        path=path,
+        purpose=purpose,
+        walk_id=walk_id,
+        manifest_sha256=manifest_sha256,
+        consent_receipt_sha256=consent_receipt_sha256,
+        chunk_sha256=chunk_sha256,
+        commit_sha256=commit_sha256,
+        issued_at=issued_at,
+    )
+    return b"walksafe/raw-collection-request-proof/v1\0" + json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+
+
+def create_raw_collection_request_proof(
+    *,
+    actor_id: str,
+    account_generation: int,
+    operation: RawCollectionOperation | str,
+    method: str,
+    path: str,
+    purpose: str,
+    walk_id: str,
+    manifest_sha256: str,
+    consent_receipt_sha256: str | None,
+    chunk_sha256: str | None,
+    commit_sha256: str | None,
+    secret: str,
+    issued_at: int | None = None,
+) -> str:
+    timestamp = int(time()) if issued_at is None else issued_at
+    message = raw_collection_request_proof_message(
+        actor_id=actor_id,
+        account_generation=account_generation,
+        operation=operation,
+        method=method,
+        path=path,
+        purpose=purpose,
+        walk_id=walk_id,
+        manifest_sha256=manifest_sha256,
+        consent_receipt_sha256=consent_receipt_sha256,
+        chunk_sha256=chunk_sha256,
+        commit_sha256=commit_sha256,
+        issued_at=timestamp,
+    )
+    signature = base64.urlsafe_b64encode(
+        hmac.new(secret.encode(), message, hashlib.sha256).digest()
+    ).decode("ascii").rstrip("=")
+    return f"v1.{timestamp}.{signature}"
+
+
+def verify_raw_collection_request_proof(
+    assertion: str,
+    *,
+    actor_id: str,
+    account_generation: int,
+    operation: RawCollectionOperation | str,
+    method: str,
+    path: str,
+    purpose: str,
+    walk_id: str,
+    manifest_sha256: str,
+    consent_receipt_sha256: str | None,
+    chunk_sha256: str | None,
+    commit_sha256: str | None,
+    secret: str,
+    now: int | None = None,
+) -> bool:
+    parts = assertion.split(".")
+    if (
+        len(parts) != 3
+        or parts[0] != "v1"
+        or not parts[1].isdigit()
+        or len(secret) < 32
+    ):
+        return False
+    issued_at = int(parts[1])
+    current = int(time()) if now is None else now
+    if issued_at > current + 5 or current - issued_at > ACTOR_ASSERTION_MAX_AGE_SECONDS:
+        return False
+    try:
+        expected = create_raw_collection_request_proof(
+            actor_id=actor_id,
+            account_generation=account_generation,
+            operation=operation,
+            method=method,
+            path=path,
+            purpose=purpose,
+            walk_id=walk_id,
+            manifest_sha256=manifest_sha256,
+            consent_receipt_sha256=consent_receipt_sha256,
+            chunk_sha256=chunk_sha256,
+            commit_sha256=commit_sha256,
+            secret=secret,
+            issued_at=issued_at,
+        )
+    except ValueError:
+        return False
     return compare_digest(assertion, expected)
 
 
@@ -729,12 +1172,16 @@ class FieldTestSecurityMiddleware:
         settings: Any,
         admin_session_authorizer: Any | None = None,
         admin_device_proof_verifier: Any | None = None,
+        admin_security_denial_recorder: Any | None = None,
     ) -> None:
         self.app = app
         self.settings = settings
         self.admin_session_authorizer = admin_session_authorizer or _authorize_admin_request
         self.admin_device_proof_verifier = (
             admin_device_proof_verifier or _verify_admin_device_proof_request
+        )
+        self.admin_security_denial_recorder = (
+            admin_security_denial_recorder or record_admin_security_denial
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -744,7 +1191,7 @@ class FieldTestSecurityMiddleware:
 
         path = scope.get("path", "")
         method = scope.get("method", "GET")
-        if path.startswith("/privacy/"):
+        if path.startswith("/privacy/") or (method.upper(), path) in ACCOUNT_GATEWAY_ROUTES:
             downstream_send = send
 
             async def privacy_no_store_send(message: Message) -> None:
@@ -848,7 +1295,7 @@ class FieldTestSecurityMiddleware:
         ):
             try:
                 await asyncio.to_thread(
-                    record_admin_security_denial,
+                    self.admin_security_denial_recorder,
                     action="admin.write.unregistered",
                     reason="admin_operation_not_registered",
                     method=method,
@@ -899,7 +1346,7 @@ class FieldTestSecurityMiddleware:
             except AdminSecurityError as exc:
                 try:
                     await asyncio.to_thread(
-                        record_admin_security_denial,
+                        self.admin_security_denial_recorder,
                         action=high_risk_action or "admin.request.authorize",
                         reason=exc.code,
                         method=method,
@@ -908,17 +1355,10 @@ class FieldTestSecurityMiddleware:
                     )
                 except AdminSecurityError as audit_exc:
                     exc = audit_exc
-                headers = (
-                    {"Retry-After": str(exc.retry_after)}
-                    if exc.retry_after is not None
-                    else None
-                )
-                response = JSONResponse(
-                    status_code=exc.status_code,
-                    headers=headers,
-                    content={
-                        "detail": {"code": exc.code, "message": exc.message}
-                    },
+                response = _admin_security_error_response(
+                    exc,
+                    method=method,
+                    path=path,
                 )
                 await response(scope, receive, send)
                 return
@@ -983,13 +1423,41 @@ class FieldTestSecurityMiddleware:
                     await response(scope, receive, send)
                     return
                 except AdminSecurityError as exc:
-                    response = _admin_security_error_response(exc)
+                    try:
+                        await asyncio.to_thread(
+                            self.admin_security_denial_recorder,
+                            action="admin.device_proof.verify",
+                            reason=exc.code,
+                            method=method,
+                            path=path,
+                            device_id=admin_identity.device_id,
+                        )
+                    except AdminSecurityError as audit_exc:
+                        exc = audit_exc
+                    response = _admin_security_error_response(
+                        exc,
+                        method=method,
+                        path=path,
+                    )
                     await response(scope, receive, send)
                     return
                 state = dict(scope.get("state") or {})
                 state["admin_device_proof"] = proof
                 scope["state"] = state
         elif not self.settings.field_test_security_enabled:
+            if _raw_ingest_route(path):
+                response = JSONResponse(
+                    status_code=401,
+                    headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+                    content={
+                        "detail": {
+                            "code": "raw_gateway_assertion_required",
+                            "message": "Raw collection access cannot use the insecure local actor bypass.",
+                        }
+                    },
+                )
+                await response(scope, receive, send)
+                return
             await self.app(scope, receive, send)
             return
 
@@ -1013,15 +1481,17 @@ class FieldTestSecurityMiddleware:
             if requires_actor_identity(path, method):
                 actor_id = _header(scope, ACTOR_ID_HEADER)
                 if ACTOR_ID_PATTERN.fullmatch(actor_id) is None:
-                    response = JSONResponse(
-                        status_code=422,
-                        content={
-                            "detail": {
-                                "code": "invalid_actor_id" if actor_id else "missing_actor_id",
-                                "message": "A named actor is required for this secured operation.",
-                            }
-                        },
-                    )
+                    response = _concealed_report_response(
+                        path, method
+                    ) or JSONResponse(
+                            status_code=422,
+                            content={
+                                "detail": {
+                                    "code": "invalid_actor_id" if actor_id else "missing_actor_id",
+                                    "message": "A named actor is required for this secured operation.",
+                                }
+                            },
+                        )
                     await response(scope, receive, send)
                     return
                 privacy_route = _privacy_deletion_route(path, method)
@@ -1141,15 +1611,17 @@ class FieldTestSecurityMiddleware:
                 else:
                     account_generation = _positive_account_generation(scope)
                     if requires_account_generation(path, method) and account_generation is None:
-                        response = JSONResponse(
-                            status_code=422,
-                            content={
-                                "detail": {
-                                    "code": "account_generation_invalid",
-                                    "message": "A positive account generation is required.",
-                                }
-                            },
-                        )
+                        response = _concealed_report_response(
+                            path, method
+                        ) or JSONResponse(
+                                status_code=422,
+                                content={
+                                    "detail": {
+                                        "code": "account_generation_invalid",
+                                        "message": "A positive account generation is required.",
+                                    }
+                                },
+                            )
                         await response(scope, receive, send)
                         return
                 insecure_local_actor_bypass = (
@@ -1169,17 +1641,121 @@ class FieldTestSecurityMiddleware:
                         secret=getattr(self.settings, "gateway_session_secret", ""),
                         account_generation=account_generation,
                     ):
-                        response = JSONResponse(
-                            status_code=401,
-                            content={
-                                "detail": {
-                                    "code": "actor_assertion_invalid" if assertion else "actor_assertion_required",
-                                    "message": "The actor identity must be bound to the authenticated gateway session.",
-                                }
-                            },
-                        )
+                        response = _concealed_report_response(
+                            path, method
+                        ) or JSONResponse(
+                                status_code=401,
+                                content={
+                                    "detail": {
+                                        "code": "actor_assertion_invalid" if assertion else "actor_assertion_required",
+                                        "message": "The actor identity must be bound to the authenticated gateway session.",
+                                    }
+                                },
+                            )
                         await response(scope, receive, send)
                         return
+                    scope = dict(scope)
+                    state = dict(scope.get("state") or {})
+                    state["verified_actor_assertion"] = VerifiedActorAssertion(
+                        actor_id=actor_id,
+                        account_generation=account_generation,
+                        access=required,
+                    )
+                    scope["state"] = state
+            if _raw_ingest_write_route(path, method) and not bool(
+                getattr(self.settings, "raw_ingest_enabled", False)
+            ):
+                response = JSONResponse(
+                    status_code=503,
+                    headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+                    content={
+                        "detail": {
+                            "code": "raw_ingest_disabled",
+                            "message": "Raw collection ingest is not enabled.",
+                        }
+                    },
+                )
+                await response(scope, receive, send)
+                return
+            if _raw_ingest_route(path):
+                operation = raw_collection_operation(path, method)
+                purpose = _header(scope, RAW_PURPOSE_HEADER)
+                walk_id = _header(scope, RAW_WALK_ID_HEADER)
+                manifest_sha256 = _header(scope, RAW_MANIFEST_SHA256_HEADER)
+                raw_consent_receipt_sha256 = _header(
+                    scope,
+                    RAW_CONSENT_RECEIPT_SHA256_HEADER,
+                )
+                consent_receipt_sha256 = raw_consent_receipt_sha256 or None
+                raw_chunk_sha256 = _header(scope, RAW_CHUNK_SHA256_HEADER)
+                chunk_sha256 = raw_chunk_sha256 or None
+                raw_commit_sha256 = _header(scope, RAW_COMMIT_SHA256_HEADER)
+                commit_sha256 = raw_commit_sha256 or None
+                proof = _header(scope, RAW_REQUEST_PROOF_HEADER)
+                valid_proof = (
+                    operation is not None
+                    and account_generation is not None
+                    and verify_raw_collection_request_proof(
+                        proof,
+                        actor_id=actor_id,
+                        account_generation=account_generation,
+                        operation=operation,
+                        method=method,
+                        path=path,
+                        purpose=purpose,
+                        walk_id=walk_id,
+                        manifest_sha256=manifest_sha256,
+                        consent_receipt_sha256=consent_receipt_sha256,
+                        chunk_sha256=chunk_sha256,
+                        commit_sha256=commit_sha256,
+                        secret=getattr(
+                            self.settings,
+                            "gateway_session_secret",
+                            "",
+                        ),
+                    )
+                )
+                if not valid_proof:
+                    response = JSONResponse(
+                        status_code=401,
+                        headers={
+                            "Cache-Control": "no-store",
+                            "Pragma": "no-cache",
+                        },
+                        content={
+                            "detail": {
+                                "code": (
+                                    "raw_request_proof_invalid"
+                                    if proof
+                                    else "raw_request_proof_required"
+                                ),
+                                "message": (
+                                    "A request-bound Gateway proof is required "
+                                    "for raw collection access."
+                                ),
+                            }
+                        },
+                    )
+                    await response(scope, receive, send)
+                    return
+                scope = dict(scope)
+                state = dict(scope.get("state") or {})
+                state["verified_raw_collection_request_proof"] = (
+                    VerifiedRawCollectionRequestProof(
+                        actor_id=actor_id,
+                        account_generation=account_generation,
+                        operation=operation,
+                        method=method.upper(),
+                        path=path,
+                        purpose=purpose,
+                        walk_id=walk_id,
+                        manifest_sha256=manifest_sha256,
+                        consent_receipt_sha256=consent_receipt_sha256,
+                        chunk_sha256=chunk_sha256,
+                        commit_sha256=commit_sha256,
+                    )
+                )
+                scope["state"] = state
             if rate_limit_group is not None:
                 limiter = (
                     _POSTGRES_ACTOR_RATE_LIMITER
@@ -1237,6 +1813,7 @@ class FieldTestSecurityMiddleware:
 
 
 __all__ = [
+    "ACCOUNT_GATEWAY_ROUTES",
     "ACCOUNT_GENERATION_HEADER",
     "ACTOR_ASSERTION_HEADER",
     "ADMIN_APP_KIND_HEADER",
@@ -1252,15 +1829,30 @@ __all__ = [
     "FIELD_TOKEN_HEADER",
     "DELETION_ACCESS_PRE_DIGEST_HEADER",
     "DELETION_TOMBSTONE_ID_HEADER",
+    "RAW_CHUNK_SHA256_HEADER",
+    "RAW_COMMIT_SHA256_HEADER",
+    "RAW_CONSENT_RECEIPT_SHA256_HEADER",
+    "RAW_MANIFEST_SHA256_HEADER",
+    "RAW_PURPOSE_HEADER",
+    "RAW_REQUEST_PROOF_HEADER",
+    "RAW_WALK_ID_HEADER",
     "FieldTestAccess",
     "FieldTestSecurityMiddleware",
+    "RawCollectionOperation",
+    "VerifiedActorAssertion",
     "VerifiedPrivacyDeletionAssertion",
+    "VerifiedRawCollectionRequestProof",
     "create_actor_assertion",
     "create_privacy_deletion_assertion",
+    "create_raw_collection_request_proof",
+    "raw_collection_request_proof_message",
+    "raw_collection_request_proof_payload",
+    "raw_collection_operation",
     "requires_account_generation",
     "requires_actor_identity",
     "requires_admin_device_proof",
     "required_field_test_access",
     "verify_actor_assertion",
     "verify_privacy_deletion_assertion",
+    "verify_raw_collection_request_proof",
 ]

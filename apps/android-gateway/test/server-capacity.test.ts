@@ -508,7 +508,7 @@ test("OpenAPI exposes optional capacity only on basic and long session status", 
       }>;
     };
   };
-  assert.equal(contract.info.version, "0.7.0");
+  assert.equal(contract.info.version, "0.11.0");
   const capacity = contract.components.schemas.CapacitySnapshot!;
   assert.deepEqual(capacity.required, [
     "version",

@@ -117,6 +117,17 @@ DB 서버가 commit을 완료했지만 client 응답 전에 연결이 끊기는 
 
 현재 실제 transfer receipt, deletion receipt, legal approval과 최종 한국어 notice는 0건이다. 이 문서와 timer·service template의 존재는 실행·승인·출시 증거가 아니며 release 상태는 `NOT_ELIGIBLE`이다.
 
+## Raw collection 14일 검역·legacy 180일 수동 TTL
+
+신규 raw commit은 receipt v2, `QUARANTINED`, `RAW_QUARANTINE_14D`로 분리되고 `quarantine_expires_at = committed_at + 14 days`인 기술 목표를 DB 제약으로 고정한다. REPORT/TRAINING 승인 여부는 원본 수명을 늘리지 않는다. 최신 법적 보존 APPLY event가 만료 전인 행만 삭제 후보에서 제외된다. 기존 receipt v1·`COMMITTED`·`RAW_ORIGINAL_180D` 행과 hash는 바꾸지 않으며 `retention_expires_at <= as-of`인 legacy 후보로 함께 처리한다.
+
+`scripts/manage_raw_collection_retention.py`의 기본 preview는 DB·파일을 바꾸지 않는다. apply/reconcile은 별도 운영 승인과 최소권한 역할 아래 수동 one-shot으로만 실행하며, 14일/180일 후보를 fail-closed로 검증하고 실제 삭제 시 내용 없는 DB 삭제 receipt를 남긴다. service, timer, 자동 실행은 제공하지 않는다. 실제 운영 DB·object store에서의 삭제와 reconcile은 `NOT_RUN`이다.
+
+TRAINING 승격은 최신 Backend `TRAINING_REUSE` 동의, 사람 승인, 명시적 비식별 PASS, 영상·원본 음성·정확 위치·경로·불명확한 제3자 얼굴 제외를 요구하며 raw 원본과 다른 sanitized artifact 저장 경계를 사용한다. 승인 dataset revision과 member/lifecycle lineage는 append-only이고 승인 시각부터 3년 만료를 기술 목표로 둔다. 철회·계정삭제·만료 revision은 새 학습 gate 발급을 차단하며 `model/train_yolo.py`는 dry-run을 포함한 실행 직전에 Backend DB에서 동의·삭제 fence·최신 revision을 다시 확인한다. `scripts/manage_training_dataset_lifecycle.py`는 수동 승인·짧은 HMAC gate 발급을, `scripts/manage_training_artifact_retention.py`는 삭제 가능한 파생물의 수동 preview/apply/reconcile과 삭제 receipt를 제공한다. 실제 운영 승격·학습·파생물 삭제는 `NOT_RUN`이다.
+
+- 14일과 3년은 승인된 법적 보유기간이나 최종 사용자 고지가 아니라 현재 구현의 기술 목표다.
+- backup restore tombstone reapply 검증은 `NOT_RUN`으로 유지한다.
+
 ## 개인정보 보호
 
 - 검증 로그에는 실제 전화번호, 정확한 집 주소, secret을 그대로 붙이지 않는다.

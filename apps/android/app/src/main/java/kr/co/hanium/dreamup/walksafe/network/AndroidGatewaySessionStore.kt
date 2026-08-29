@@ -11,6 +11,7 @@ import kr.co.hanium.dreamup.walksafe.security.LocalAead
 import kr.co.hanium.dreamup.walksafe.session.FirstRunAgeBand
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingEvidence
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingEvidenceVerifier
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingFlow
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingPolicy
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingSnapshot
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingStage
@@ -32,6 +33,7 @@ internal class AndroidGatewaySessionStore(
     private val preferences: SharedPreferences,
     private val sessionAead: LocalAead = AndroidKeyStoreAead(SESSION_KEY_POLICY),
     private val installIdAead: LocalAead = AndroidKeyStoreAead(INSTALL_ID_KEY_POLICY),
+    private val v3SessionAead: LocalAead = AndroidKeyStoreAead(V3_SESSION_KEY_POLICY),
     private val legacySessionAead: LocalAead = AndroidKeyStoreAead(LEGACY_SESSION_KEY_POLICY),
 ) {
     fun getOrCreateInstallDeviceId(): String? = synchronized(PROCESS_LOCK) {
@@ -286,6 +288,7 @@ internal class AndroidGatewaySessionStore(
             firstRunEpoch = firstRunSnapshot.epoch,
             orderedEvidence = evidence,
             session = persisted,
+            firstRunFlow = firstRunSnapshot.flow,
         )
     }
 
@@ -300,6 +303,38 @@ internal class AndroidGatewaySessionStore(
         val receipts = snapshot.completedReceiptHashes
         fun receipt(stage: FirstRunOnboardingStage): FirstRunReceiptHash =
             receipts[stage] ?: throw IllegalArgumentException("missing first-run receipt")
+        if (snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4) {
+            return runCatching {
+                buildList {
+                    if (FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT in receipts) {
+                        add(
+                            FirstRunOnboardingEvidence.EmailOtpEnrollment(
+                                ageBand = FirstRunAgeBand.VERIFIED_14_PLUS,
+                                receiptHash = receipt(
+                                    FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT,
+                                ),
+                            ),
+                        )
+                        add(
+                            FirstRunOnboardingEvidence.AccountCreated(
+                                receipt(FirstRunOnboardingStage.ACCOUNT_CREATED),
+                            ),
+                        )
+                    }
+                    add(
+                        FirstRunOnboardingEvidence.VerifiedLogin(
+                            actorBinding = requireNotNull(snapshot.verifiedActorBinding),
+                            receiptHash = receipt(FirstRunOnboardingStage.VERIFIED_LOGIN),
+                        ),
+                    )
+                    add(
+                        FirstRunOnboardingEvidence.Fp004Training(
+                            receipt(FirstRunOnboardingStage.FP004_TRAINING),
+                        ),
+                    )
+                }
+            }.getOrNull()
+        }
         return runCatching {
             buildList {
                 add(
@@ -373,11 +408,20 @@ internal class AndroidGatewaySessionStore(
     private fun restoreAuthenticatedFirstRun(
         bundle: GatewayPersistedLoginBundle,
     ): FirstRunOnboardingSnapshot? {
-        val restored = FirstRunOnboardingPolicy.restoreVerifiedReceiptPrefix(
-            epoch = bundle.firstRunEpoch,
-            orderedEvidence = bundle.orderedEvidence,
-            verifier = AUTHENTICATED_ENVELOPE_EVIDENCE_VERIFIER,
-        )
+        val restored = when (bundle.firstRunFlow) {
+            FirstRunOnboardingFlow.LEGACY_PHONE_V3 ->
+                FirstRunOnboardingPolicy.restoreVerifiedReceiptPrefix(
+                    epoch = bundle.firstRunEpoch,
+                    orderedEvidence = bundle.orderedEvidence,
+                    verifier = AUTHENTICATED_ENVELOPE_EVIDENCE_VERIFIER,
+                )
+            FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ->
+                FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+                    epoch = bundle.firstRunEpoch,
+                    orderedEvidence = bundle.orderedEvidence,
+                    verifier = AUTHENTICATED_ENVELOPE_EVIDENCE_VERIFIER,
+                )
+        }
         return restored.snapshot.takeIf {
             restored.fullyRestored &&
                 restored.restoredEvidenceCount == bundle.orderedEvidence.size &&
@@ -415,14 +459,22 @@ internal class AndroidGatewaySessionStore(
             processStorageBlocked = true
             return null
         }
-        val legacyPresent = runCatching {
-            preferences.contains(V2_STATE_PREF_KEY) ||
+        val unsupportedLegacyPresent = runCatching {
+            preferences.contains(V3_FAIL_CLOSED_PREF_KEY) ||
+                preferences.contains(V2_STATE_PREF_KEY) ||
                 preferences.contains(V1_STATE_PREF_KEY)
         }.getOrDefault(true)
-        if (legacyPresent) {
+        if (unsupportedLegacyPresent) {
             markFailClosedLocked()
             return null
         }
+        val v4Present = runCatching { preferences.contains(STATE_PREF_KEY) }.getOrDefault(true)
+        val v3Present = runCatching { preferences.contains(V3_STATE_PREF_KEY) }.getOrDefault(true)
+        if (v4Present && v3Present) {
+            markFailClosedLocked()
+            return null
+        }
+        if (v3Present) return migrateCompletedV3StateLocked()
         val encoded = runCatching {
             preferences.getString(STATE_PREF_KEY, null)
         }.getOrElse {
@@ -449,6 +501,35 @@ internal class AndroidGatewaySessionStore(
         return LoadedState(state)
     }
 
+    /**
+     * V3 had no flow discriminator. Only its exact, authenticated, completed legacy reducer
+     * bundle may cross the migration boundary; it is always tagged LEGACY_PHONE_V3 in V4.
+     */
+    private fun migrateCompletedV3StateLocked(): LoadedState? {
+        val state = runCatching {
+            val encoded = preferences.getString(V3_STATE_PREF_KEY, null)
+                ?: error("missing v3 gateway state")
+            val opened = v3SessionAead.open(encoded, V3_STATE_AAD, STATE_LIMITS)
+                as? AeadOpenResult.Opened
+                ?: error("v3 gateway state authentication failed")
+            val payload = opened.plaintext
+            try {
+                require(opened.keyVersion == 3 && !opened.needsRewrap)
+                decodeV3State(JSONObject(String(payload, Charsets.UTF_8)))
+            } finally {
+                payload.fill(0)
+            }
+        }.getOrElse {
+            markFailClosedLocked()
+            return null
+        }
+        if (!saveStateLocked(state) || !v3SessionAead.destroyKnownVersions()) {
+            markFailClosedLocked()
+            return null
+        }
+        return LoadedState(state)
+    }
+
     private fun saveStateLocked(state: GatewayPersistedLoginState): Boolean {
         val saved = runCatching {
             val payload = encodeState(state).toString().toByteArray(Charsets.UTF_8)
@@ -459,6 +540,8 @@ internal class AndroidGatewaySessionStore(
                     ?: error("gateway state encryption failed")
                 preferences.edit()
                     .putString(STATE_PREF_KEY, envelope)
+                    .remove(V3_STATE_PREF_KEY)
+                    .remove(V3_FAIL_CLOSED_PREF_KEY)
                     .remove(V2_STATE_PREF_KEY)
                     .remove(V1_STATE_PREF_KEY)
                     .remove(FAIL_CLOSED_PREF_KEY)
@@ -479,6 +562,8 @@ internal class AndroidGatewaySessionStore(
         val removed = runCatching {
             preferences.edit()
                 .remove(STATE_PREF_KEY)
+                .remove(V3_STATE_PREF_KEY)
+                .remove(V3_FAIL_CLOSED_PREF_KEY)
                 .remove(V2_STATE_PREF_KEY)
                 .remove(V1_STATE_PREF_KEY)
                 .remove(FAIL_CLOSED_PREF_KEY)
@@ -576,9 +661,61 @@ internal class AndroidGatewaySessionStore(
         }
     }
 
+    private fun decodeV3State(payload: JSONObject): GatewayPersistedLoginState {
+        require(payload.getInt("payload_version") == V3_STATE_FORMAT_VERSION)
+        return when (payload.getString("state")) {
+            STATE_ACTIVE -> {
+                require(payload.jsonKeys() == ACTIVE_FIELDS)
+                GatewayPersistedLoginState.Active(
+                    decodeV3Bundle(
+                        firstRun = payload.getJSONObject("first_run"),
+                        session = payload.getJSONObject("session"),
+                    ),
+                )
+            }
+            STATE_RENEWING -> {
+                require(payload.jsonKeys() == RENEWING_FIELDS)
+                val operationId = payload.getString("operation_id")
+                val state = GatewayPersistedLoginState.Renewing(
+                    operationId = operationId,
+                    bundle = decodeV3Bundle(
+                        firstRun = payload.getJSONObject("first_run"),
+                        session = payload.getJSONObject("session"),
+                    ),
+                )
+                require(
+                    GatewayPersistedLoginStatePolicy.reserveRenewal(
+                        current = GatewayPersistedLoginState.Active(state.bundle),
+                        expectedVersion = state.bundle.session.version(),
+                        operationId = operationId,
+                    ).result == GatewaySessionStoreResult.COMMITTED,
+                )
+                state
+            }
+            STATE_PENDING_REVOCATION -> {
+                require(payload.jsonKeys() == PENDING_FIELDS)
+                val pending = GatewayPendingRevocation(
+                    operationId = payload.getString("operation_id"),
+                    version = GatewaySessionVersion(
+                        gatewayBaseUrl = payload.getString("gateway_base_url"),
+                        actorId = payload.getString("actor_id"),
+                        deviceId = payload.getString("device_id"),
+                        familyId = payload.getString("family_id"),
+                        rotation = payload.getLong("rotation"),
+                    ),
+                    refreshToken = payload.getString("refresh_token"),
+                )
+                validatePending(pending)
+                GatewayPersistedLoginState.PendingRevocation(pending)
+            }
+            else -> throw IllegalArgumentException("unsupported v3 gateway login state")
+        }
+    }
+
     private fun encodeFirstRun(bundle: GatewayPersistedLoginBundle): JSONObject =
         JSONObject()
             .put("epoch", bundle.firstRunEpoch)
+            .put("flow", bundle.firstRunFlow.name)
             .put(
                 "ordered_evidence",
                 JSONArray().also { array ->
@@ -602,6 +739,32 @@ internal class AndroidGatewaySessionStore(
             firstRunEpoch = firstRun.getLong("epoch"),
             orderedEvidence = evidence,
             session = decodeSession(session),
+            firstRunFlow = FirstRunOnboardingFlow.valueOf(firstRun.getString("flow")),
+        )
+        require(restoreAuthenticatedFirstRun(bundle) != null)
+        return bundle
+    }
+
+    private fun decodeV3Bundle(
+        firstRun: JSONObject,
+        session: JSONObject,
+    ): GatewayPersistedLoginBundle {
+        require(firstRun.jsonKeys() == V3_FIRST_RUN_FIELDS)
+        val evidenceArray = firstRun.getJSONArray("ordered_evidence")
+        require(
+            evidenceArray.length() in
+                V3_MIN_COMPLETE_EVIDENCE_COUNT..MAX_COMPLETE_EVIDENCE_COUNT,
+        )
+        val evidence = buildList {
+            for (index in 0 until evidenceArray.length()) {
+                add(decodeEvidence(evidenceArray.getJSONObject(index)))
+            }
+        }
+        val bundle = GatewayPersistedLoginBundle(
+            firstRunEpoch = firstRun.getLong("epoch"),
+            orderedEvidence = evidence,
+            session = decodeSession(session),
+            firstRunFlow = FirstRunOnboardingFlow.LEGACY_PHONE_V3,
         )
         require(restoreAuthenticatedFirstRun(bundle) != null)
         return bundle
@@ -612,6 +775,8 @@ internal class AndroidGatewaySessionStore(
             .put("stage", evidence.stage.name)
             .put("receipt_sha256", evidence.receiptHash.value)
         when (evidence) {
+            is FirstRunOnboardingEvidence.EmailOtpEnrollment ->
+                encoded.put("age_band", evidence.ageBand.name)
             is FirstRunOnboardingEvidence.AgeAndGuardianNeed ->
                 encoded.put("age_band", evidence.ageBand.name)
             is FirstRunOnboardingEvidence.LocalCredentialPhoneSubmission ->
@@ -629,6 +794,17 @@ internal class AndroidGatewaySessionStore(
             encoded.getString("receipt_sha256"),
         )
         return when (stage) {
+            FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT -> {
+                require(encoded.jsonKeys() == AGE_EVIDENCE_FIELDS)
+                FirstRunOnboardingEvidence.EmailOtpEnrollment(
+                    ageBand = FirstRunAgeBand.valueOf(encoded.getString("age_band")),
+                    receiptHash = receipt,
+                )
+            }
+            FirstRunOnboardingStage.ACCOUNT_CREATED -> {
+                require(encoded.jsonKeys() == BASIC_EVIDENCE_FIELDS)
+                FirstRunOnboardingEvidence.AccountCreated(receipt)
+            }
             FirstRunOnboardingStage.PURPOSE_AND_SAFETY -> {
                 require(encoded.jsonKeys() == BASIC_EVIDENCE_FIELDS)
                 FirstRunOnboardingEvidence.PurposeAndSafety(receipt)
@@ -820,6 +996,8 @@ internal class AndroidGatewaySessionStore(
         val markerStored = runCatching {
             preferences.edit()
                 .remove(STATE_PREF_KEY)
+                .remove(V3_STATE_PREF_KEY)
+                .remove(V3_FAIL_CLOSED_PREF_KEY)
                 .remove(V2_STATE_PREF_KEY)
                 .remove(V1_STATE_PREF_KEY)
                 .putBoolean(FAIL_CLOSED_PREF_KEY, true)
@@ -830,14 +1008,17 @@ internal class AndroidGatewaySessionStore(
 
     private fun deleteCredentialKeysLocked(): Boolean {
         val sessionKeysDeleted = sessionAead.destroyKnownVersions()
+        val v3SessionKeysDeleted = v3SessionAead.destroyKnownVersions()
         val legacyKeysDeleted = legacySessionAead.destroyKnownVersions()
-        return sessionKeysDeleted && legacyKeysDeleted
+        return sessionKeysDeleted && v3SessionKeysDeleted && legacyKeysDeleted
     }
 
     private fun stageKeyResetLocked(scope: String): Boolean = runCatching {
         require(scope == KEY_RESET_SCOPE_SESSION || scope == KEY_RESET_SCOPE_INSTALLATION)
         preferences.edit()
             .remove(STATE_PREF_KEY)
+            .remove(V3_STATE_PREF_KEY)
+            .remove(V3_FAIL_CLOSED_PREF_KEY)
             .remove(V2_STATE_PREF_KEY)
             .remove(V1_STATE_PREF_KEY)
             .remove(FAIL_CLOSED_PREF_KEY)
@@ -870,10 +1051,11 @@ internal class AndroidGatewaySessionStore(
             return false
         }
         val sessionDeleted = sessionAead.destroyKnownVersions()
+        val v3Deleted = v3SessionAead.destroyKnownVersions()
         val legacyDeleted = legacySessionAead.destroyKnownVersions()
         val installDeleted = scope != KEY_RESET_SCOPE_INSTALLATION ||
             installIdAead.destroyKnownVersions()
-        val sessionCreated = sessionDeleted && legacyDeleted && installDeleted &&
+        val sessionCreated = sessionDeleted && v3Deleted && legacyDeleted && installDeleted &&
             sessionAead.createFreshAfterVerifiedPurge()
         val installCreated = scope != KEY_RESET_SCOPE_INSTALLATION ||
             (sessionCreated && installIdAead.createFreshAfterVerifiedPurge())
@@ -887,6 +1069,8 @@ internal class AndroidGatewaySessionStore(
 
     private fun gatewayCredentialArtifactsAbsentLocked(): Boolean = runCatching {
         !preferences.contains(STATE_PREF_KEY) &&
+            !preferences.contains(V3_STATE_PREF_KEY) &&
+            !preferences.contains(V3_FAIL_CLOSED_PREF_KEY) &&
             !preferences.contains(V2_STATE_PREF_KEY) &&
             !preferences.contains(V1_STATE_PREF_KEY) &&
             !preferences.contains(FAIL_CLOSED_PREF_KEY)
@@ -909,13 +1093,16 @@ internal class AndroidGatewaySessionStore(
         @Volatile
         var processStorageBlocked = false
 
-        const val STATE_FORMAT_VERSION = 3
+        const val STATE_FORMAT_VERSION = 4
+        const val V3_STATE_FORMAT_VERSION = 3
         const val INSTALL_ID_FORMAT_VERSION = 1
-        const val STATE_PREF_KEY = "gateway_login_bundle_encrypted_v3"
+        const val STATE_PREF_KEY = "gateway_login_bundle_encrypted_v4"
+        const val V3_STATE_PREF_KEY = "gateway_login_bundle_encrypted_v3"
+        const val V3_FAIL_CLOSED_PREF_KEY = "gateway_login_bundle_fail_closed_v3"
         const val INSTALL_ID_PREF_KEY = "gateway_install_id_encrypted_v1"
         const val V2_STATE_PREF_KEY = "gateway_session_encrypted_v2"
         const val V1_STATE_PREF_KEY = "gateway_session_encrypted_v1"
-        const val FAIL_CLOSED_PREF_KEY = "gateway_login_bundle_fail_closed_v3"
+        const val FAIL_CLOSED_PREF_KEY = "gateway_login_bundle_fail_closed_v4"
         const val KEY_RESET_PENDING_PREF_KEY = "gateway_key_reset_pending_v1"
         const val KEY_RESET_SCOPE_SESSION = "SESSION"
         const val KEY_RESET_SCOPE_INSTALLATION = "INSTALLATION"
@@ -930,16 +1117,25 @@ internal class AndroidGatewaySessionStore(
         const val MAX_INSTALL_ENVELOPE_CHARS = 2_048
         const val MAX_INSTALL_CIPHERTEXT_BYTES = 1_024
         const val MAX_INSTALL_PLAINTEXT_BYTES = 512
-        const val MIN_COMPLETE_EVIDENCE_COUNT = 10
+        const val MIN_COMPLETE_EVIDENCE_COUNT = 2
+        const val V3_MIN_COMPLETE_EVIDENCE_COUNT = 10
         const val MAX_COMPLETE_EVIDENCE_COUNT = 11
 
         val STATE_AAD =
+            "kr.co.hanium.dreamup.walksafe|USER|gateway-session|payload=4"
+                .toByteArray(Charsets.UTF_8)
+        val V3_STATE_AAD =
             "kr.co.hanium.dreamup.walksafe|USER|gateway-session|payload=3"
                 .toByteArray(Charsets.UTF_8)
         val INSTALL_ID_AAD =
             "kr.co.hanium.dreamup.walksafe|USER|install-id|payload=1"
                 .toByteArray(Charsets.UTF_8)
         val SESSION_KEY_POLICY = AeadKeyPolicy(
+            aliasPrefix = "walksafe_gateway_login_bundle_v",
+            currentVersion = 4,
+            readableVersions = setOf(4),
+        )
+        val V3_SESSION_KEY_POLICY = AeadKeyPolicy(
             aliasPrefix = "walksafe_gateway_login_bundle_v",
             currentVersion = 3,
             readableVersions = setOf(3),
@@ -979,7 +1175,8 @@ internal class AndroidGatewaySessionStore(
             "rotation",
             "refresh_token",
         )
-        val FIRST_RUN_FIELDS = setOf("epoch", "ordered_evidence")
+        val FIRST_RUN_FIELDS = setOf("epoch", "flow", "ordered_evidence")
+        val V3_FIRST_RUN_FIELDS = setOf("epoch", "ordered_evidence")
         val BASIC_EVIDENCE_FIELDS = setOf("stage", "receipt_sha256")
         val AGE_EVIDENCE_FIELDS = BASIC_EVIDENCE_FIELDS + "age_band"
         val SUBMISSION_EVIDENCE_FIELDS = BASIC_EVIDENCE_FIELDS + "submission_handle"

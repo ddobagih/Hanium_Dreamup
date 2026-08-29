@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import importlib
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -715,7 +716,7 @@ def test_postgres_startup_totp_candidate_exact_binding_and_normal_ops_blocked() 
         with engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608250002"
+            ).scalar_one() == "202608290011"
 
         with engine.connect() as connection:
             transaction = connection.begin()
@@ -975,6 +976,24 @@ def test_postgres_initial_unattested_recovery_requires_same_transaction_audit(
 def test_postgres_runtime_acl_migration_downgrade_and_reupgrade_on_fresh_database(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    tracked_loggers = tuple(
+        logging.getLogger(name)
+        for name in ("", "sqlalchemy.engine", "alembic", "backend.app.main")
+    )
+
+    def logging_state() -> tuple[tuple[object, ...], ...]:
+        return tuple(
+            (
+                logger.disabled,
+                logger.level,
+                logger.propagate,
+                tuple(logger.handlers),
+                tuple(logger.filters),
+            )
+            for logger in tracked_loggers
+        )
+
+    initial_logging_state = logging_state()
     configured_url = make_url(os.environ["WALKSAFE_TEST_DATABASE_URL"].strip())
     database_name = f"walksafe_acl_migration_test_{uuid.uuid4().hex}"
     assert database_name.startswith("walksafe_acl_migration_test_")
@@ -1007,7 +1026,7 @@ def test_postgres_runtime_acl_migration_downgrade_and_reupgrade_on_fresh_databas
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608250002"
+            ).scalar_one() == "202608290011"
             assert connection.execute(
                 text(
                     "SELECT EXISTS (SELECT 1 FROM pg_extension "
@@ -1061,7 +1080,7 @@ def test_postgres_runtime_acl_migration_downgrade_and_reupgrade_on_fresh_databas
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608250002"
+            ).scalar_one() == "202608290011"
             assert connection.execute(
                 text(
                     "SELECT count(*) FROM pg_trigger "
@@ -1071,6 +1090,7 @@ def test_postgres_runtime_acl_migration_downgrade_and_reupgrade_on_fresh_databas
                     "AND NOT tgisinternal"
                 )
             ).scalar_one() == 1
+        assert logging_state() == initial_logging_state
     finally:
         disposable_engine.dispose()
         if created:

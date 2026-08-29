@@ -10,18 +10,125 @@ class MainActivityIntegratedConsentStaticTest {
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
 
     @Test
-    fun consentAndNetworkBlocksReleaseTheAcquiredReportLease() {
-        assertReleaseBeforeBlockedReturn(
-            "!consentConfirmation.selections.automaticReporting",
-            "reportCandidate=blocked:automatic_consent_required",
+    fun v11BootstrapAndCasAreBoundAcrossInitialSaveAndExactRetry() {
+        val refresh = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun refreshIntegratedConsentFromServer",
         )
-        assertReleaseBeforeBlockedReturn(
-            "networkStateProbe.currentIntegratedConsentBinding()",
-            "reportCandidate=blocked:network_transport_untrusted",
+        val bootstrap = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun startIntegratedConsentBootstrap",
         )
-        assertReleaseBeforeBlockedReturn(
-            "!consentConfirmation.selections.mobileNetworkTransfer",
-            "reportCandidate=blocked:mobile_network_consent_required",
+        val persist = source.substringAfter(
+            "private fun persistIntegratedConsentDraft(announce: Boolean)",
+        ).substringBefore("private fun retryPendingIntegratedConsentMutation")
+        val retry = source.substringAfter(
+            "private fun retryPendingIntegratedConsentMutation",
+        ).substringBefore("private fun startIntegratedConsentRequest")
+
+        assertTrue(refresh.contains("bootstrapOnMissing = true"))
+        assertTrue(refresh.contains("session = gatewaySession"))
+        assertTrue(bootstrap.contains("isCurrentGatewaySession(gatewaySession)"))
+        assertTrue(bootstrap.contains("bootstrap.clientRevisionFloor"))
+        assertTrue(bootstrap.contains("bootstrap.expectedPreviousBackendReceiptSha256"))
+        assertTrue(bootstrap.contains("IntegratedConsentBootstrapStatus.READY"))
+        assertTrue(persist.contains("integratedConsentBootstrapReady"))
+        assertTrue(persist.contains("expectedPreviousBackendReceiptSha256 ="))
+        assertTrue(retry.contains("mutation.expectedPreviousBackendReceiptSha256"))
+        val request = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun startIntegratedConsentRequest",
+        )
+        assertTrue(request.contains("integrated_consent_actor_reconsent_required"))
+        assertTrue(request.contains("privacy_consent_previous_receipt_conflict"))
+        val sessionChange = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun onGatewayProcessSessionChanged",
+        )
+        assertTrue(sessionChange.contains("integratedConsentConfirmedActorSha256"))
+        assertTrue(sessionChange.contains("integratedConsentActorSha256(currentSession)"))
+        assertTrue(source.contains("session.lease.backendAccountGeneration"))
+        assertTrue(retry.contains("mutation.actorSha256"))
+    }
+
+    @Test
+    fun knownV1PolicyMigratesToDeniedReconsentWithoutDroppingStableSecrets() {
+        val migration = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun migrateKnownIntegratedConsentPolicyAtStartup",
+        )
+
+        assertTrue(migration.contains("PREVIOUS_INTEGRATED_CONSENT_POLICY_VERSION"))
+        assertTrue(migration.contains("PREF_RAW_SOURCE_FIELD_LOG_BLOCKED"))
+        assertTrue(migration.contains("resetForPolicyReconsent()"))
+        assertTrue(migration.contains(".remove(PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION)"))
+        assertFalse(migration.contains(".remove(PREF_INTEGRATED_CONSENT_CONTROL_SECRET)"))
+        assertFalse(migration.contains(".remove(PREF_INTEGRATED_CONSENT_CLIENT_REVISION)"))
+    }
+
+    @Test
+    fun signupShowsAccessibleDetailedConsentNoticeAtReadableSize() {
+        val controls = source.substringAfter("val accountConsentDisclosure =")
+            .substringBefore("accountConsentChecks.clear()")
+
+        assertTrue(controls.contains("14일"))
+        assertTrue(controls.contains("30일"))
+        assertTrue(controls.contains("3년"))
+        assertTrue(controls.contains("PAUSED"))
+        assertTrue(controls.contains("END는 자동 전송"))
+        assertTrue(controls.contains("영상·음성·이미지·정확한 위치"))
+        assertTrue(controls.contains("본인인증이나 공적 연령 인증이 아닙니다"))
+        assertTrue(controls.contains("거부하면"))
+        assertTrue(controls.contains("출시 전 처리방침/약관 URL 확정 필요"))
+        assertTrue(controls.contains("contentDescription = accountConsentDisclosure"))
+        assertTrue(controls.contains("textSize = 18f"))
+        assertTrue(controls.contains("View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
+        assertTrue(source.contains("[선택] 신고·진단용 raw v2 자료 처리 동의"))
+    }
+
+    @Test
+    fun consentAndNetworkGatesPrecedeDrainAndEveryAcquiredLeaseIsReleased() {
+        val process = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun processReportCandidate",
+        )
+        assertTrue(
+            ReportStaticSourceInspector.appearsInOrder(
+                process,
+                "integratedConsentSession.currentConfirmationOrNull()",
+                "!consentConfirmation.selections.rawSourceCollection",
+                "!explicitRequest && !consentConfirmation.selections.automaticReporting",
+                "reportQueueStore.enqueue(",
+            ),
+        )
+
+        val capture = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun captureReportQueueDrainTriggerBeforeTransition",
+        )
+        assertTrue(capture.contains("reportPrivacyConsentSession.isGranted()"))
+        assertTrue(capture.contains("integratedConsentSession.currentConfirmationOrNull("))
+        assertTrue(capture.contains("AndroidNetworkTransferPolicy.isAllowed("))
+        assertTrue(capture.contains("currentIntegratedConsentBinding() ?: return null"))
+
+        val context = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun reportQueueDrainContext",
+        )
+        assertTrue(context.contains("currentConfirmation == trigger.consentConfirmation"))
+        assertTrue(context.contains("trigger.networkBinding.isSameNetworkBinding(currentBinding)"))
+        assertTrue(context.contains("AndroidNetworkTransferPolicy.isAllowed("))
+
+        val coordinator = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/report/" +
+                "ReportQueueDrainCoordinator.kt",
+        ).readText()
+        val startNext = ReportStaticSourceInspector.functionBlock(coordinator, "fun startNext")
+        assertTrue(startNext.contains("finally"))
+        assertTrue(startNext.contains("policy.release(lease)"))
+        assertTrue(
+            ReportStaticSourceInspector.blockAfter(startNext, "cancelBlock =")
+                .contains("policy.release(lease)"),
         )
     }
 
@@ -114,18 +221,6 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(update.contains("updateFirstRunConsentSummaryUi()"))
     }
 
-    private fun assertReleaseBeforeBlockedReturn(marker: String, status: String) {
-        val markerIndex = source.indexOf(marker)
-        val returnIndex = source.indexOf(status, markerIndex)
-        assertTrue("missing marker: $marker", markerIndex >= 0)
-        assertTrue("missing blocked return: $status", returnIndex > markerIndex)
-        assertTrue(
-            "report lease must be released before: $status",
-            source.substring(markerIndex, returnIndex)
-                .contains("reportAttemptStore.release(lease)"),
-        )
-    }
-
     @Test
     fun gatewayConnectionFailureIsHandledInsteadOfKillingTheProcess() {
         val request = ReportStaticSourceInspector.functionBlock(
@@ -136,7 +231,7 @@ class MainActivityIntegratedConsentStaticTest {
         // ConnectException 은 IOException 계열이라 RuntimeException 으로 잡히지 않는다.
         // Gateway 가 닿지 않을 때 실행자 스레드에서 빠져나가면 프로세스가 종료된다.
         assertFalse(request.contains("catch (_: RuntimeException)"))
-        assertTrue(request.contains("catch (_: Exception)"))
+        assertTrue(request.contains("catch (error: Exception)"))
         assertTrue(request.contains("integratedConsent=blocked:server_confirmation_failed"))
     }
 }

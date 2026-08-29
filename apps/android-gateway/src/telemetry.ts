@@ -10,11 +10,26 @@ export const GATEWAY_REQUEST_ID_HEADER = "x-request-id";
 export const GATEWAY_TELEMETRY_MAX_LATENCY_MS = 60_000;
 
 export const GATEWAY_ROUTE_TEMPLATES = Object.freeze([
+  "/api/account-enrollments/email-otp",
+  "/api/accounts",
   "/api/field-session",
   "/api/field-walk",
+  "/api/speech/stt",
+  "/api/speech/tts",
   "/api/navigation/walking",
   "/api/navigation/destinations/search",
   "/api/reports/v2",
+  "/api/reports/v2/{report_id}/status",
+  "/api/reports/mine",
+  "/api/reports/mine/deletions/{request_id}",
+  "/api/reports/mine/{report_id}",
+  "/api/reports/mine/{report_id}/content",
+  "/api/reports/mine/{report_id}/corrections",
+  "/api/reports/mine/{report_id}/requests",
+  "/api/raw-collections/{collection_id}/manifest",
+  "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}",
+  "/api/raw-collections/{collection_id}",
+  "/api/raw-collections/{collection_id}/commit",
   "/privacy/rights",
   "/privacy/account-deletions",
   "/privacy/account-deletions/{request_id}/status",
@@ -42,8 +57,28 @@ const ACCOUNT_DELETION_STATUS_ROUTE =
   /^\/privacy\/account-deletions\/[A-Za-z0-9_-]{16,128}\/status$/;
 const ACCOUNT_DELETION_EVIDENCE_ROUTE =
   /^\/privacy\/account-deletions\/[A-Za-z0-9_-]{16,128}\/device-evidence$/;
+const REPORT_TRANSPORT_STATUS_ROUTE =
+  /^\/api\/reports\/v2\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/status$/;
+const USER_REPORT_DETAIL_ROUTE =
+  /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const USER_REPORT_REQUEST_ROUTE =
+  /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/requests$/;
+const USER_REPORT_CONTENT_ROUTE =
+  /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/;
+const USER_REPORT_CORRECTION_ROUTE =
+  /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/corrections$/;
+const USER_REPORT_DELETION_ROUTE =
+  /^\/api\/reports\/mine\/deletions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const RAW_COLLECTION_MANIFEST_ROUTE =
+  /^\/api\/raw-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/manifest$/;
+const RAW_COLLECTION_CHUNK_ROUTE =
+  /^\/api\/raw-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/objects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/chunks\/(?:0|[1-9][0-9]{0,3})$/;
+const RAW_COLLECTION_STATUS_ROUTE =
+  /^\/api\/raw-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const RAW_COLLECTION_COMMIT_ROUTE =
+  /^\/api\/raw-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/commit$/;
 const STATIC_ROUTE_TEMPLATES = new Set<GatewayRouteTemplate>(
-  GATEWAY_ROUTE_TEMPLATES.filter(route => !route.includes("{request_id}"))
+  GATEWAY_ROUTE_TEMPLATES.filter(route => !route.includes("{"))
 );
 
 export function gatewayRouteTemplate(request: Request): GatewayRouteTemplate | null {
@@ -56,6 +91,36 @@ export function gatewayRouteTemplate(request: Request): GatewayRouteTemplate | n
   }
   if (ACCOUNT_DELETION_EVIDENCE_ROUTE.test(pathname)) {
     return "/privacy/account-deletions/{request_id}/device-evidence";
+  }
+  if (REPORT_TRANSPORT_STATUS_ROUTE.test(pathname)) {
+    return "/api/reports/v2/{report_id}/status";
+  }
+  if (USER_REPORT_DELETION_ROUTE.test(pathname)) {
+    return "/api/reports/mine/deletions/{request_id}";
+  }
+  if (USER_REPORT_DETAIL_ROUTE.test(pathname)) {
+    return "/api/reports/mine/{report_id}";
+  }
+  if (USER_REPORT_CONTENT_ROUTE.test(pathname)) {
+    return "/api/reports/mine/{report_id}/content";
+  }
+  if (USER_REPORT_CORRECTION_ROUTE.test(pathname)) {
+    return "/api/reports/mine/{report_id}/corrections";
+  }
+  if (USER_REPORT_REQUEST_ROUTE.test(pathname)) {
+    return "/api/reports/mine/{report_id}/requests";
+  }
+  if (RAW_COLLECTION_MANIFEST_ROUTE.test(pathname)) {
+    return "/api/raw-collections/{collection_id}/manifest";
+  }
+  if (RAW_COLLECTION_CHUNK_ROUTE.test(pathname)) {
+    return "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}";
+  }
+  if (RAW_COLLECTION_STATUS_ROUTE.test(pathname)) {
+    return "/api/raw-collections/{collection_id}";
+  }
+  if (RAW_COLLECTION_COMMIT_ROUTE.test(pathname)) {
+    return "/api/raw-collections/{collection_id}/commit";
   }
   return null;
 }

@@ -4,8 +4,16 @@ import java.security.MessageDigest
 import java.util.Collections
 
 const val FIRST_RUN_ONBOARDING_POLICY_VERSION = "FP-010-1.0.0"
+const val EMAIL_ACCOUNT_ONBOARDING_POLICY_VERSION = "FP-010-EMAIL-2.0.0"
+
+enum class FirstRunOnboardingFlow {
+    LEGACY_PHONE_V3,
+    EMAIL_ACCOUNT_V4,
+}
 
 enum class FirstRunOnboardingStage {
+    EMAIL_OTP_ENROLLMENT,
+    ACCOUNT_CREATED,
     PURPOSE_AND_SAFETY,
     AGE_AND_GUARDIAN_NEED,
     INTEGRATED_CONSENT,
@@ -25,6 +33,8 @@ enum class FirstRunAgeBand {
     UNDER_14,
     AGE_14_TO_17,
     ADULT_18_PLUS,
+    /** Backend enrollment/authentication proved that the account is eligible for age 14+. */
+    VERIFIED_14_PLUS,
 }
 
 @JvmInline
@@ -64,6 +74,8 @@ value class FirstRunOpaqueSubmissionHandle private constructor(val value: String
 value class FirstRunOpaqueActorBinding private constructor(val value: String) {
     companion object {
         private val BINDING = Regex("^actor_([0-9a-f]{32})$")
+        private val BACKEND_ACCOUNT_ID =
+            Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
         /**
          * Accepts only a provider-issued 128-bit-or-stronger random binding. Providers must never
@@ -71,7 +83,10 @@ value class FirstRunOpaqueActorBinding private constructor(val value: String) {
          */
         fun fromProvider(value: String): FirstRunOpaqueActorBinding {
             val body = BINDING.matchEntire(value)?.groupValues?.get(1)
-            require(body != null && body.any { it in 'a'..'f' }) {
+            require(
+                (body != null && body.any { it in 'a'..'f' }) ||
+                    BACKEND_ACCOUNT_ID.matches(value),
+            ) {
                 "An actor binding must be an opaque verified provider binding"
             }
             return FirstRunOpaqueActorBinding(value)
@@ -82,6 +97,19 @@ value class FirstRunOpaqueActorBinding private constructor(val value: String) {
 sealed interface FirstRunOnboardingEvidence {
     val stage: FirstRunOnboardingStage
     val receiptHash: FirstRunReceiptHash
+
+    data class EmailOtpEnrollment(
+        val ageBand: FirstRunAgeBand,
+        override val receiptHash: FirstRunReceiptHash,
+    ) : FirstRunOnboardingEvidence {
+        override val stage = FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT
+    }
+
+    data class AccountCreated(
+        override val receiptHash: FirstRunReceiptHash,
+    ) : FirstRunOnboardingEvidence {
+        override val stage = FirstRunOnboardingStage.ACCOUNT_CREATED
+    }
 
     data class PurposeAndSafety(
         override val receiptHash: FirstRunReceiptHash,
@@ -186,6 +214,7 @@ class FirstRunOnboardingAttemptToken internal constructor(
 @ConsistentCopyVisibility
 data class FirstRunOnboardingSnapshot internal constructor(
     val policyVersion: String,
+    val flow: FirstRunOnboardingFlow,
     val epoch: Long,
     val revision: Long,
     val stage: FirstRunOnboardingStage,
@@ -196,10 +225,22 @@ data class FirstRunOnboardingSnapshot internal constructor(
     val pendingAttempt: FirstRunOnboardingAttemptToken?,
 ) {
     init {
-        require(policyVersion == FIRST_RUN_ONBOARDING_POLICY_VERSION)
+        require(
+            policyVersion == when (flow) {
+                FirstRunOnboardingFlow.LEGACY_PHONE_V3 ->
+                    FIRST_RUN_ONBOARDING_POLICY_VERSION
+                FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ->
+                    EMAIL_ACCOUNT_ONBOARDING_POLICY_VERSION
+            },
+        )
         require(epoch > 0L) { "epoch must be positive" }
         require(revision >= 0L) { "revision must not be negative" }
-        val expectedReceipts = expectedCompletedStages(stage, ageBand)
+        val expectedReceipts = expectedCompletedStages(
+            flow = flow,
+            stage = stage,
+            ageBand = ageBand,
+            actual = completedReceiptHashes.keys,
+        )
         require(
             expectedReceipts != null &&
                 completedReceiptHashes.keys == expectedReceipts,
@@ -210,9 +251,13 @@ data class FirstRunOnboardingSnapshot internal constructor(
             "A terminal snapshot cannot retain an attempt"
         }
         require(
-            (localCredentialPhoneSubmissionHandle != null) ==
-                (FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION in
-                    completedReceiptHashes),
+            if (flow == FirstRunOnboardingFlow.LEGACY_PHONE_V3) {
+                (localCredentialPhoneSubmissionHandle != null) ==
+                    (FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION in
+                        completedReceiptHashes)
+            } else {
+                localCredentialPhoneSubmissionHandle == null
+            },
         ) {
             "A submission handle and its completed receipt must stay paired"
         }
@@ -245,7 +290,8 @@ data class FirstRunOnboardingSnapshot internal constructor(
         get() = isComplete
 
     val guardianApprovalRequired: Boolean
-        get() = ageBand == FirstRunAgeBand.AGE_14_TO_17
+        get() = flow == FirstRunOnboardingFlow.LEGACY_PHONE_V3 &&
+            ageBand == FirstRunAgeBand.AGE_14_TO_17
 
     val hasVerifiedActorBinding: Boolean
         get() = verifiedActorBinding != null
@@ -264,6 +310,52 @@ data class FirstRunOnboardingSnapshot internal constructor(
         )
 
         fun expectedCompletedStages(
+            flow: FirstRunOnboardingFlow,
+            stage: FirstRunOnboardingStage,
+            ageBand: FirstRunAgeBand?,
+            actual: Set<FirstRunOnboardingStage>,
+        ): Set<FirstRunOnboardingStage>? = when (flow) {
+            FirstRunOnboardingFlow.LEGACY_PHONE_V3 ->
+                expectedLegacyCompletedStages(stage, ageBand)
+            FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ->
+                expectedEmailCompletedStages(stage, ageBand, actual)
+        }
+
+        private fun expectedEmailCompletedStages(
+            stage: FirstRunOnboardingStage,
+            ageBand: FirstRunAgeBand?,
+            actual: Set<FirstRunOnboardingStage>,
+        ): Set<FirstRunOnboardingStage>? {
+            if (stage == FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT) {
+                return emptySet<FirstRunOnboardingStage>().takeIf { ageBand == null }
+            }
+            if (ageBand != FirstRunAgeBand.VERIFIED_14_PLUS) return null
+            val signupPrefix = listOf(
+                FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT,
+                FirstRunOnboardingStage.ACCOUNT_CREATED,
+                FirstRunOnboardingStage.VERIFIED_LOGIN,
+            )
+            if (stage == FirstRunOnboardingStage.ACCOUNT_CREATED) {
+                return signupPrefix.take(1).toSet()
+            }
+            if (stage == FirstRunOnboardingStage.VERIFIED_LOGIN) {
+                return signupPrefix.take(2).toSet()
+            }
+            val completedPostLogin = when (stage) {
+                FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+                FirstRunOnboardingStage.DEVICE_CHECK,
+                FirstRunOnboardingStage.FP004_TRAINING,
+                -> emptySet()
+                FirstRunOnboardingStage.COMPLETE ->
+                    setOf(FirstRunOnboardingStage.FP004_TRAINING)
+                else -> return null
+            }
+            val signupCompleted = signupPrefix.toSet() + completedPostLogin
+            val loginPrefix = setOf(FirstRunOnboardingStage.VERIFIED_LOGIN) + completedPostLogin
+            return actual.takeIf { it == signupCompleted || it == loginPrefix }
+        }
+
+        private fun expectedLegacyCompletedStages(
             stage: FirstRunOnboardingStage,
             ageBand: FirstRunAgeBand?,
         ): Set<FirstRunOnboardingStage>? {
@@ -363,6 +455,7 @@ object FirstRunOnboardingPolicy {
         require(epoch > 0L) { "epoch must be positive" }
         return FirstRunOnboardingSnapshot(
             policyVersion = FIRST_RUN_ONBOARDING_POLICY_VERSION,
+            flow = FirstRunOnboardingFlow.LEGACY_PHONE_V3,
             epoch = epoch,
             revision = 0L,
             stage = FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
@@ -373,6 +466,126 @@ object FirstRunOnboardingPolicy {
             pendingAttempt = null,
         )
     }
+
+    fun initialEmailAccount(epoch: Long = 1L): FirstRunOnboardingSnapshot {
+        require(epoch > 0L) { "epoch must be positive" }
+        return FirstRunOnboardingSnapshot(
+            policyVersion = EMAIL_ACCOUNT_ONBOARDING_POLICY_VERSION,
+            flow = FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4,
+            epoch = epoch,
+            revision = 0L,
+            stage = FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT,
+            ageBand = null,
+            completedReceiptHashes = immutableReceiptHashes(emptyMap()),
+            localCredentialPhoneSubmissionHandle = null,
+            verifiedActorBinding = null,
+            pendingAttempt = null,
+        )
+    }
+
+    fun recordEmailOtpEnrollment(
+        snapshot: FirstRunOnboardingSnapshot,
+        receiptHash: FirstRunReceiptHash,
+    ): FirstRunOnboardingTransition {
+        if (
+            snapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ||
+            snapshot.stage != FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT ||
+            snapshot.pendingAttempt != null
+        ) return rejected(snapshot, FirstRunOnboardingRejection.STAGE_MISMATCH)
+        if (snapshot.revision == Long.MAX_VALUE) {
+            return rejected(snapshot, FirstRunOnboardingRejection.COUNTER_EXHAUSTED)
+        }
+        return accepted(
+            snapshot,
+            advance(
+                snapshot,
+                FirstRunOnboardingEvidence.EmailOtpEnrollment(
+                    ageBand = FirstRunAgeBand.VERIFIED_14_PLUS,
+                    receiptHash = receiptHash,
+                ),
+            ),
+        )
+    }
+
+    fun recordEmailAccountCreated(
+        snapshot: FirstRunOnboardingSnapshot,
+        receiptHash: FirstRunReceiptHash,
+    ): FirstRunOnboardingTransition {
+        if (
+            snapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ||
+            snapshot.stage != FirstRunOnboardingStage.ACCOUNT_CREATED ||
+            snapshot.pendingAttempt != null
+        ) return rejected(snapshot, FirstRunOnboardingRejection.STAGE_MISMATCH)
+        if (snapshot.revision == Long.MAX_VALUE) {
+            return rejected(snapshot, FirstRunOnboardingRejection.COUNTER_EXHAUSTED)
+        }
+        return accepted(
+            snapshot,
+            advance(snapshot, FirstRunOnboardingEvidence.AccountCreated(receiptHash)),
+        )
+    }
+
+    /**
+     * A verified password session is valid either after account creation or as returning-user
+     * login. The returning-user path intentionally records no synthetic email-OTP/account-create
+     * evidence and proceeds directly to JIT permission observation.
+     */
+    fun recordVerifiedEmailLogin(
+        snapshot: FirstRunOnboardingSnapshot,
+        actorBinding: FirstRunOpaqueActorBinding,
+        receiptHash: FirstRunReceiptHash,
+    ): FirstRunOnboardingTransition {
+        if (
+            snapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ||
+            snapshot.stage !in setOf(
+                FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT,
+                FirstRunOnboardingStage.VERIFIED_LOGIN,
+            ) ||
+            snapshot.pendingAttempt != null
+        ) return rejected(snapshot, FirstRunOnboardingRejection.STAGE_MISMATCH)
+        if (snapshot.revision == Long.MAX_VALUE) {
+            return rejected(snapshot, FirstRunOnboardingRejection.COUNTER_EXHAUSTED)
+        }
+        val receipts = immutableReceiptHashes(
+            snapshot.completedReceiptHashes +
+                (FirstRunOnboardingStage.VERIFIED_LOGIN to receiptHash),
+        )
+        return accepted(
+            snapshot,
+            snapshot.copy(
+                revision = snapshot.revision + 1L,
+                stage = FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+                ageBand = FirstRunAgeBand.VERIFIED_14_PLUS,
+                completedReceiptHashes = receipts,
+                verifiedActorBinding = actorBinding,
+                pendingAttempt = null,
+            ),
+        )
+    }
+
+    fun recordEmailJitPermissionObservation(
+        snapshot: FirstRunOnboardingSnapshot,
+        expectedEpoch: Long,
+        expectedRevision: Long,
+    ): FirstRunOnboardingTransition = advanceEmailLocalPostLoginStage(
+        snapshot = snapshot,
+        expectedEpoch = expectedEpoch,
+        expectedRevision = expectedRevision,
+        expectedStage = FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+        nextStage = FirstRunOnboardingStage.DEVICE_CHECK,
+    )
+
+    fun recordEmailDeviceCheckPassed(
+        snapshot: FirstRunOnboardingSnapshot,
+        expectedEpoch: Long,
+        expectedRevision: Long,
+    ): FirstRunOnboardingTransition = advanceEmailLocalPostLoginStage(
+        snapshot = snapshot,
+        expectedEpoch = expectedEpoch,
+        expectedRevision = expectedRevision,
+        expectedStage = FirstRunOnboardingStage.DEVICE_CHECK,
+        nextStage = FirstRunOnboardingStage.FP004_TRAINING,
+    )
 
     fun acknowledgePurposeAndSafety(
         snapshot: FirstRunOnboardingSnapshot,
@@ -455,6 +668,97 @@ object FirstRunOnboardingPolicy {
         )
     }
 
+    fun restoreVerifiedEmailReceiptPrefix(
+        epoch: Long,
+        orderedEvidence: List<FirstRunOnboardingEvidence>,
+        verifier: FirstRunOnboardingEvidenceVerifier = productionEvidenceVerifier,
+    ): FirstRunOnboardingRestoreResult {
+        var snapshot = initialEmailAccount(epoch)
+        orderedEvidence.forEachIndexed { index, evidence ->
+            if (snapshot.isTerminal) {
+                return restoreStopped(
+                    snapshot,
+                    index,
+                    FirstRunOnboardingRejection.TERMINAL_STATE,
+                )
+            }
+            if (
+                snapshot.stage == FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION &&
+                evidence is FirstRunOnboardingEvidence.Fp004Training
+            ) {
+                snapshot = recordEmailJitPermissionObservation(
+                    snapshot,
+                    snapshot.epoch,
+                    snapshot.revision,
+                ).current
+                snapshot = recordEmailDeviceCheckPassed(
+                    snapshot,
+                    snapshot.epoch,
+                    snapshot.revision,
+                ).current
+            }
+            val returningLogin =
+                snapshot.stage == FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT &&
+                    evidence is FirstRunOnboardingEvidence.VerifiedLogin
+            if (!returningLogin && evidence.stage != snapshot.stage) {
+                return restoreStopped(
+                    snapshot,
+                    index,
+                    FirstRunOnboardingRejection.STAGE_MISMATCH,
+                )
+            }
+            if (snapshot.revision == Long.MAX_VALUE) {
+                return restoreStopped(
+                    snapshot,
+                    index,
+                    FirstRunOnboardingRejection.COUNTER_EXHAUSTED,
+                )
+            }
+            val token = FirstRunOnboardingAttemptToken(
+                epoch = snapshot.epoch,
+                revision = snapshot.revision,
+                stage = evidence.stage,
+                requestId = "req_${restoreIdentity("email-request", snapshot, index)}",
+                attemptId = "att_${restoreIdentity("email-attempt", snapshot, index)}",
+            )
+            if (!runCatching { verifier.verify(token, evidence) }.getOrDefault(false)) {
+                return restoreStopped(
+                    snapshot,
+                    index,
+                    FirstRunOnboardingRejection.REMOTE_EVIDENCE_REJECTED,
+                )
+            }
+            snapshot = when {
+                returningLogin -> {
+                    val login = evidence as FirstRunOnboardingEvidence.VerifiedLogin
+                    recordVerifiedEmailLogin(
+                        snapshot,
+                        login.actorBinding,
+                        login.receiptHash,
+                    ).current
+                }
+                evidence is FirstRunOnboardingEvidence.JitPermissionObservation ->
+                    recordEmailJitPermissionObservation(
+                        snapshot,
+                        snapshot.epoch,
+                        snapshot.revision,
+                    ).current
+                evidence is FirstRunOnboardingEvidence.DeviceCheck ->
+                    recordEmailDeviceCheckPassed(
+                        snapshot,
+                        snapshot.epoch,
+                        snapshot.revision,
+                    ).current
+                else -> advance(snapshot, evidence)
+            }
+        }
+        return FirstRunOnboardingRestoreResult(
+            snapshot = snapshot,
+            restoredEvidenceCount = orderedEvidence.size,
+            rejection = null,
+        )
+    }
+
     fun restartFp004Training(
         snapshot: FirstRunOnboardingSnapshot,
     ): FirstRunOnboardingTransition {
@@ -488,7 +792,7 @@ object FirstRunOnboardingPolicy {
         request: FirstRunOnboardingAttemptRequest,
     ): FirstRunOnboardingTransition {
         validateRequest(snapshot, request)?.let { return rejected(snapshot, it) }
-        if (snapshot.stage in LOCAL_STAGES) {
+        if (snapshot.stage in LOCAL_STAGES || snapshot.isEmailLocalPostLoginStage()) {
             return rejected(snapshot, FirstRunOnboardingRejection.STAGE_MISMATCH)
         }
         if (snapshot.revision == Long.MAX_VALUE) {
@@ -512,6 +816,9 @@ object FirstRunOnboardingPolicy {
     ): FirstRunOnboardingTransition {
         if (snapshot.isTerminal) {
             return rejected(snapshot, FirstRunOnboardingRejection.TERMINAL_STATE)
+        }
+        if (snapshot.isEmailLocalPostLoginStage()) {
+            return rejected(snapshot, FirstRunOnboardingRejection.STAGE_MISMATCH)
         }
         val pending = snapshot.pendingAttempt
             ?: return rejected(snapshot, FirstRunOnboardingRejection.NO_PENDING_ATTEMPT)
@@ -578,6 +885,36 @@ object FirstRunOnboardingPolicy {
         return accepted(snapshot, advance(snapshot, evidence))
     }
 
+    private fun advanceEmailLocalPostLoginStage(
+        snapshot: FirstRunOnboardingSnapshot,
+        expectedEpoch: Long,
+        expectedRevision: Long,
+        expectedStage: FirstRunOnboardingStage,
+        nextStage: FirstRunOnboardingStage,
+    ): FirstRunOnboardingTransition {
+        if (
+            snapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ||
+            snapshot.stage != expectedStage ||
+            snapshot.pendingAttempt != null
+        ) {
+            return rejected(snapshot, FirstRunOnboardingRejection.STAGE_MISMATCH)
+        }
+        if (snapshot.epoch != expectedEpoch || snapshot.revision != expectedRevision) {
+            return rejected(snapshot, FirstRunOnboardingRejection.STALE_STATE)
+        }
+        if (snapshot.revision == Long.MAX_VALUE) {
+            return rejected(snapshot, FirstRunOnboardingRejection.COUNTER_EXHAUSTED)
+        }
+        return accepted(
+            snapshot,
+            snapshot.copy(
+                revision = snapshot.revision + 1L,
+                stage = nextStage,
+                pendingAttempt = null,
+            ),
+        )
+    }
+
     private fun validateRequest(
         snapshot: FirstRunOnboardingSnapshot,
         request: FirstRunOnboardingAttemptRequest,
@@ -599,9 +936,14 @@ object FirstRunOnboardingPolicy {
     ): FirstRunOnboardingSnapshot {
         val ageBand = when (evidence) {
             is FirstRunOnboardingEvidence.AgeAndGuardianNeed -> evidence.ageBand
+            is FirstRunOnboardingEvidence.EmailOtpEnrollment -> evidence.ageBand
             else -> snapshot.ageBand
         }
         val nextStage = when (snapshot.stage) {
+            FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT ->
+                FirstRunOnboardingStage.ACCOUNT_CREATED
+            FirstRunOnboardingStage.ACCOUNT_CREATED ->
+                FirstRunOnboardingStage.VERIFIED_LOGIN
             FirstRunOnboardingStage.PURPOSE_AND_SAFETY ->
                 FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED
             FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED ->
@@ -693,6 +1035,13 @@ object FirstRunOnboardingPolicy {
         FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
         FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED,
     )
+
+    private fun FirstRunOnboardingSnapshot.isEmailLocalPostLoginStage(): Boolean =
+        flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 &&
+            stage in setOf(
+                FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+                FirstRunOnboardingStage.DEVICE_CHECK,
+            )
 
     private fun restoreIdentity(
         kind: String,

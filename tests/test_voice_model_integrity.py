@@ -113,6 +113,59 @@ def test_snapshot_manifest_is_itself_hash_pinned(
         verify_model_snapshot("stt", model_id, REVISION, manifest, manifest_sha256)
 
 
+def test_snapshot_manifest_must_not_be_a_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_id = "owner/stt-model"
+    manifest, manifest_sha256 = write_snapshot(
+        tmp_path,
+        monkeypatch,
+        kind="stt",
+        model_id=model_id,
+        files={
+            "config.json": b"{}",
+            "model.bin": b"weights",
+            "tokenizer.json": b"{}",
+            "vocabulary.json": b"{}",
+        },
+    )
+    manifest_link = tmp_path / "manifest-link.json"
+    manifest_link.symlink_to(manifest)
+
+    with pytest.raises(RuntimeError, match="manifest is unavailable"):
+        verify_model_snapshot("stt", model_id, REVISION, manifest_link, manifest_sha256)
+
+
+def test_snapshot_rejects_a_model_file_that_escapes_the_cache_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_id = "owner/tts-model"
+    manifest, manifest_sha256 = write_snapshot(
+        tmp_path,
+        monkeypatch,
+        kind="tts",
+        model_id=model_id,
+        files={"config.json": b"{}", "model.safetensors": b"weights"},
+    )
+    snapshot = (
+        tmp_path
+        / "hf"
+        / "hub"
+        / "models--owner--tts-model"
+        / "snapshots"
+        / REVISION
+    )
+    outside = tmp_path / "outside-model.safetensors"
+    outside.write_bytes(b"weights")
+    (snapshot / "model.safetensors").unlink()
+    (snapshot / "model.safetensors").symlink_to(outside)
+
+    with pytest.raises(RuntimeError, match="escapes its cache root"):
+        verify_model_snapshot("tts", model_id, REVISION, manifest, manifest_sha256)
+
+
 def test_snapshot_accepts_complete_stt_manifest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

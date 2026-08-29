@@ -1,11 +1,13 @@
 import {
   clearGatewaySession,
+  establishBackendGatewaySession,
   establishGatewaySession,
   gatewayLoginBusyResponse,
   gatewayLoginRateLimitResponse,
   gatewayFieldLongSessionBinding,
   gatewayFieldLongSessionBindingMatches,
   gatewaySessionActor,
+  gatewaySessionAccountGeneration,
   gatewaySessionScope,
   gatewaySessionStatus,
   gatewayUnauthorizedResponse,
@@ -19,8 +21,15 @@ import {
   withGatewayLoginLock
 } from "./auth.js";
 import {
+  authenticateBackendAccount,
+  parsePasswordGrant,
+  relayAccountCreation,
+  relayAccountEnrollment
+} from "./account-relay.js";
+import {
   acquireImageUploadAdmission,
   authorizedProxyActor,
+  authorizedProxyDeviceBinding,
   authorizeProxyRequest,
   backendUrl,
   fetchBackend,
@@ -35,7 +44,9 @@ import { resolvePrivacyRightsRequestUrl } from "./config.js";
 import {
   authorizeIntegratedConsentRequest,
   CONSENT_NETWORK_TRANSPORT_HEADER,
+  handleIntegratedConsentBootstrapRequest,
   handleIntegratedConsentRequest,
+  INTEGRATED_CONSENT_BOOTSTRAP_CONTROL,
   INTEGRATED_CONSENT_CONTROL
 } from "./integrated-consent.js";
 import {
@@ -59,6 +70,7 @@ import type { GatewayFieldLongSessionBinding } from "./auth.js";
 import {
   ACCOUNT_DELETION_CONTROL,
   activateActorGeneration,
+  bindBackendActorGeneration,
   abortPrivacyOperationsForAccountDeletion,
   beginPrivacyOperation,
   consentActorBindingId,
@@ -95,10 +107,16 @@ import {
   currentServerCapacityLevelForTelemetry,
   mergeServerCapacityIntoFieldSessionResponse
 } from "./server-capacity.js";
+import { relaySpeechStt, relaySpeechTts } from "./speech-relay.js";
+import { relayRawCollection } from "./raw-collection-relay.js";
 
 const ALLOWED_METHODS = new Map<string, readonly string[]>([
+  ["/api/account-enrollments/email-otp", ["POST"]],
+  ["/api/accounts", ["POST"]],
   ["/api/field-session", ["GET", "POST", "DELETE"]],
   ["/api/field-walk", ["GET", "POST"]],
+  ["/api/speech/stt", ["POST"]],
+  ["/api/speech/tts", ["POST"]],
   ["/api/navigation/walking", ["POST"]],
   ["/api/navigation/destinations/search", ["GET"]],
   ["/api/reports/v2", ["POST"]]
@@ -121,6 +139,49 @@ const PRIVACY_RIGHTS_PATH = "/privacy/rights";
 const ACCOUNT_DELETION_PATH = "/privacy/account-deletions";
 const ACCOUNT_DELETION_REQUEST_ID = /^[A-Za-z0-9_-]{16,128}$/;
 export const REPORT_PURPOSE_HEADER = "x-walksafe-report-purpose";
+export const REPORT_ID_HEADER = "x-walksafe-report-id";
+export const REPORT_PAYLOAD_SHA256_HEADER = "x-walksafe-report-payload-sha256";
+export const REPORT_PAYLOAD_BYTES_HEADER = "x-walksafe-report-payload-bytes";
+const REPORT_TRANSPORT_STATUS_BODY_LIMIT_BYTES = 4096;
+const CANONICAL_REPORT_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const LOWER_SHA256 = /^[0-9a-f]{64}$/;
+const POSITIVE_DECIMAL = /^[1-9][0-9]{0,18}$/;
+const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
+const REPORT_TRANSPORT_STATUS_ROUTE =
+  /^\/api\/reports\/v2\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/status$/;
+const USER_REPORT_LIST_ROUTE = "/api/reports/mine";
+const USER_REPORT_DETAIL_ROUTE =
+  /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+const USER_REPORT_REQUEST_ROUTE =
+  /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/requests$/;
+const USER_REPORT_CONTENT_ROUTE =
+  /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/content$/;
+const USER_REPORT_CORRECTION_ROUTE =
+  /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/corrections$/;
+const USER_REPORT_DELETION_ROUTE =
+  /^\/api\/reports\/mine\/deletions\/(?<requestId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+const USER_REPORT_BODY_LIMIT_BYTES = 4 * 1024;
+const USER_REPORT_RESPONSE_LIMIT_BYTES = 128 * 1024;
+const USER_REPORT_CURSOR = /^[A-Za-z0-9_-]{1,1024}$/;
+const USER_REPORT_STATUSES = new Set([
+  "RECEIVED", "INSTITUTION_SUBMITTED", "REJECTED", "RESOLVED"
+]);
+const USER_REQUEST_STATUSES = new Set([
+  "RECEIVED", "ACKNOWLEDGED", "RESOLVED", "REJECTED"
+]);
+const USER_REPORT_CONTENT_CATEGORIES = new Set([
+  "SIDEWALK_OBSTRUCTION", "ROAD_DAMAGE", "ACCESSIBILITY_BARRIER", "OTHER"
+]);
+const USER_REPORT_DELETION_STATES = new Set([
+  "PENDING", "LEGAL_HOLD", "REJECTED", "DELETED"
+]);
+
+type ReportTransportHeaders = Readonly<{
+  reportId: string;
+  payloadSha256: string;
+  payloadBytes: string;
+}>;
 
 function noStore(response: Response): Response {
   const headers = new Headers(response.headers);
@@ -215,12 +276,22 @@ function privacyOperationInactive(): Response {
   );
 }
 
-function startPrivacyOperation(actorId: string):
+function startPrivacyOperation(
+  actorId: string,
+  expectedAccountGeneration: number | null = null
+):
   | { lease: PrivacyOperationLease; error?: never }
   | { lease?: never; error: Response } {
   try {
     const lease = beginPrivacyOperation(actorId);
     if (!lease) return { error: privacyOperationInactive() };
+    if (
+      expectedAccountGeneration !== null &&
+      lease.accountGeneration !== expectedAccountGeneration
+    ) {
+      finishPrivacyOperation(lease);
+      return { error: privacyOperationInactive() };
+    }
     if (isAccountGenerationFencedV2(actorId, lease.accountGeneration)) {
       finishPrivacyOperation(lease);
       return { error: privacyOperationInactive() };
@@ -246,9 +317,10 @@ function cancelUpstream(response: Response): void {
 
 async function withFieldActorOperation(
   actorId: string,
-  operation: () => Response | Promise<Response>
+  operation: () => Response | Promise<Response>,
+  expectedAccountGeneration: number | null = null
 ): Promise<Response> {
-  const privacy = startPrivacyOperation(actorId);
+  const privacy = startPrivacyOperation(actorId, expectedAccountGeneration);
   if (privacy.error) return privacy.error;
   try {
     if (!privacyOperationIsCurrent(privacy.lease)) return privacyOperationInactive();
@@ -267,6 +339,61 @@ function objectPayload(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+function reportTransportHeaders(request: Request):
+  | { value: ReportTransportHeaders | null; error?: never }
+  | { value?: never; error: Response } {
+  const names = [
+    REPORT_ID_HEADER,
+    REPORT_PAYLOAD_SHA256_HEADER,
+    REPORT_PAYLOAD_BYTES_HEADER
+  ] as const;
+  const present = names.filter(name => request.headers.has(name));
+  if (present.length === 0) return { value: null };
+  if (present.length !== names.length) {
+    return {
+      error: Response.json(
+        { detail: { code: "report_transport_headers_incomplete" } },
+        { status: 422, headers: { "cache-control": "no-store" } }
+      )
+    };
+  }
+  const reportId = request.headers.get(REPORT_ID_HEADER) ?? "";
+  const payloadSha256 = request.headers.get(REPORT_PAYLOAD_SHA256_HEADER) ?? "";
+  const payloadBytes = request.headers.get(REPORT_PAYLOAD_BYTES_HEADER) ?? "";
+  let payloadByteCount = 0n;
+  try {
+    payloadByteCount = POSITIVE_DECIMAL.test(payloadBytes)
+      ? BigInt(payloadBytes)
+      : 0n;
+  } catch {
+    payloadByteCount = 0n;
+  }
+  if (
+    !CANONICAL_REPORT_UUID.test(reportId) ||
+    !LOWER_SHA256.test(payloadSha256) ||
+    payloadByteCount < 1n ||
+    payloadByteCount > MAX_POSTGRES_BIGINT
+  ) {
+    return {
+      error: Response.json(
+        { detail: { code: "report_transport_headers_invalid" } },
+        { status: 422, headers: { "cache-control": "no-store" } }
+      )
+    };
+  }
+  return { value: { reportId, payloadSha256, payloadBytes } };
+}
+
+function attachReportTransportHeaders(
+  headers: Headers,
+  transport: ReportTransportHeaders | null
+): void {
+  if (!transport) return;
+  headers.set(REPORT_ID_HEADER, transport.reportId);
+  headers.set(REPORT_PAYLOAD_SHA256_HEADER, transport.payloadSha256);
+  headers.set(REPORT_PAYLOAD_BYTES_HEADER, transport.payloadBytes);
 }
 
 function requestHasEntityBody(request: Request): boolean {
@@ -349,6 +476,18 @@ function privacyRightsPage(requestUrl: string, headOnly: boolean): Response {
   });
 }
 
+async function gatewayLoginAdmission(request: Request): Promise<Response | null> {
+  return withGatewayLoginLock(
+    async () => {
+      const rateLimited = await gatewayLoginRateLimitResponse(request);
+      if (rateLimited) return rateLimited;
+      await recordGatewayLoginAttempt(request);
+      return null;
+    },
+    gatewayLoginBusyResponse
+  );
+}
+
 async function fieldSession(
   request: Request,
   fetchImpl?: GatewayFetch
@@ -371,7 +510,11 @@ async function fieldSession(
       };
       const actorId = gatewaySessionActor(request);
       const response = actorId
-        ? await withFieldActorOperation(actorId, status)
+        ? await withFieldActorOperation(
+            actorId,
+            status,
+            gatewaySessionAccountGeneration(request)
+          )
         : status();
       return mergeServerCapacityIntoFieldSessionResponse(
         request,
@@ -389,7 +532,11 @@ async function fieldSession(
       if (!isGatewaySessionAuthorized(request)) return gatewayUnauthorizedResponse();
       const actorId = gatewaySessionActor(request);
       return actorId
-        ? withFieldActorOperation(actorId, () => listFieldLongSessionDevices(request))
+        ? withFieldActorOperation(
+            actorId,
+            () => listFieldLongSessionDevices(request),
+            gatewaySessionAccountGeneration(request)
+          )
         : gatewayUnauthorizedResponse();
     }
     return fieldSessionQueryInvalid();
@@ -413,7 +560,8 @@ async function fieldSession(
       return actorId
         ? withFieldActorOperation(
             actorId,
-            () => revokeFieldLongSessionDevice(request, queryEntries[0]![1])
+            () => revokeFieldLongSessionDevice(request, queryEntries[0]![1]),
+            gatewaySessionAccountGeneration(request)
           )
         : gatewayUnauthorizedResponse();
     }
@@ -439,7 +587,13 @@ async function fieldSession(
       hasFieldLongSessionCookie(request)
         ? clearCurrentFieldLongSession(request)
         : clearGatewaySession(request);
-    return actorId ? withFieldActorOperation(actorId, clear) : clear();
+    return actorId
+      ? withFieldActorOperation(
+          actorId,
+          clear,
+          gatewaySessionAccountGeneration(request)
+        )
+      : clear();
   }
 
   if (queryEntries.length > 0) return fieldSessionQueryInvalid();
@@ -449,6 +603,39 @@ async function fieldSession(
   if (!payload) return fieldSessionRequestInvalid();
 
   if (!isGatewayAccessConfigured()) return gatewayUnavailableResponse();
+  if (payload.grant_type === "password") {
+    const grant = parsePasswordGrant(payload);
+    if (!grant) return fieldSessionRequestInvalid();
+    const admission = await gatewayLoginAdmission(request);
+    if (admission) return admission;
+    const authenticated = await authenticateBackendAccount(request, grant, fetchImpl);
+    if (authenticated.error) return authenticated.error;
+    try {
+      const generation = bindBackendActorGeneration(
+        authenticated.value.actorId,
+        authenticated.value.accountGeneration
+      );
+      if (
+        generation !== authenticated.value.accountGeneration ||
+        isAccountGenerationFencedV2(authenticated.value.actorId, generation)
+      ) return privacyOperationInactive();
+    } catch (error) {
+      if (error instanceof PrivacyRightsLedgerError &&
+        (error.code === "inactive" || error.code === "conflict")) {
+        return privacyOperationInactive();
+      }
+      return privacyLedgerUnavailable();
+    }
+    return withFieldActorOperation(
+      authenticated.value.actorId,
+      () => establishBackendGatewaySession(
+        request,
+        { ...authenticated.value, deviceId: grant.deviceId },
+        grant.rememberMe
+      ),
+      authenticated.value.accountGeneration
+    );
+  }
   if (payload.grant_type === "refresh_token") {
     if (recoveryScoped) return gatewayUnauthorizedResponse(true);
     const parsed = refreshPayload(
@@ -481,15 +668,7 @@ async function fieldSession(
     return fieldSessionRequestInvalid();
   }
 
-  const admission = await withGatewayLoginLock(
-    async () => {
-      const rateLimited = await gatewayLoginRateLimitResponse(request);
-      if (rateLimited) return rateLimited;
-      await recordGatewayLoginAttempt(request);
-      return null;
-    },
-    gatewayLoginBusyResponse
-  );
+  const admission = await gatewayLoginAdmission(request);
   if (admission) return admission;
 
   const token = "token" in payload
@@ -559,7 +738,11 @@ async function fieldWalk(
     }
   };
   if (request.method === "GET") {
-    return withFieldActorOperation(binding.actorId, execute);
+    return withFieldActorOperation(
+      binding.actorId,
+      execute,
+      binding.accountGeneration ?? null
+    );
   }
   const bounded = await readBoundedJsonBody(request, 4 * 1024);
   if (bounded.error) return bounded.error;
@@ -572,7 +755,9 @@ async function fieldWalk(
           current.accountId === binding.accountId &&
           current.deviceId === binding.deviceId &&
           current.familyId === binding.familyId &&
-          current.sessionRotation === binding.sessionRotation;
+          current.sessionRotation === binding.sessionRotation &&
+          (current.accountGeneration ?? null) ===
+            (binding.accountGeneration ?? null);
       })();
   if (!bindingIsCurrent) return fieldWalkUnauthorized();
   const command = parseFieldWalkCommand(bounded.value);
@@ -584,7 +769,7 @@ async function fieldWalk(
     } catch {
       return fieldWalkLedgerUnavailable();
     }
-  });
+  }, binding.accountGeneration ?? null);
 }
 
 async function walkingRoute(request: Request, fetchImpl?: GatewayFetch): Promise<Response> {
@@ -592,7 +777,10 @@ async function walkingRoute(request: Request, fetchImpl?: GatewayFetch): Promise
   if (denied) return denied;
   const actorId = authorizedProxyActor(request);
   if (!actorId) return gatewayUnauthorizedResponse();
-  const operation = startPrivacyOperation(actorId);
+  const operation = startPrivacyOperation(
+    actorId,
+    gatewaySessionAccountGeneration(request)
+  );
   if (operation.error) return operation.error;
   try {
     const bounded = await readBoundedTextBody(request, 16 * 1024);
@@ -625,7 +813,10 @@ async function destinationSearch(request: Request, fetchImpl?: GatewayFetch): Pr
   if (denied) return denied;
   const actorId = authorizedProxyActor(request);
   if (!actorId) return gatewayUnauthorizedResponse();
-  const operation = startPrivacyOperation(actorId);
+  const operation = startPrivacyOperation(
+    actorId,
+    gatewaySessionAccountGeneration(request)
+  );
   if (operation.error) return operation.error;
   try {
     if (!privacyOperationIsCurrent(operation.lease)) return privacyOperationInactive();
@@ -658,13 +849,19 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
   if (denied) return denied;
   const fieldActorId = authorizedProxyActor(request);
   if (!fieldActorId) return gatewayUnauthorizedResponse();
-  const operation = startPrivacyOperation(fieldActorId);
+  const transport = reportTransportHeaders(request);
+  if (transport.error) return transport.error;
+  const operation = startPrivacyOperation(
+    fieldActorId,
+    gatewaySessionAccountGeneration(request)
+  );
   if (operation.error) return operation.error;
   const headers = proxyRequestHeaders(
     request,
     undefined,
     operation.lease.accountGeneration
   );
+  attachReportTransportHeaders(headers, transport.value);
   const admission = acquireImageUploadAdmission(request, headers);
   if (admission.error) {
     finishPrivacyOperation(operation.lease);
@@ -781,6 +978,715 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
   }
 }
 
+function reportTransportStatusNotFound(): Response {
+  return Response.json(
+    { detail: { code: "report_transport_status_not_found" } },
+    { status: 404, headers: { "cache-control": "no-store" } }
+  );
+}
+
+function reportTransportStatusUnavailable(): Response {
+  return Response.json(
+    { detail: { code: "gateway_report_transport_status_unavailable" } },
+    { status: 502, headers: { "cache-control": "no-store" } }
+  );
+}
+
+function exactObjectKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[]
+): boolean {
+  const actual = Object.keys(value).sort();
+  return actual.length === expected.length &&
+    actual.every((key, index) => key === [...expected].sort()[index]);
+}
+
+function reportTransportStatusPayload(
+  value: unknown,
+  reportId: string
+): Record<string, unknown> | null {
+  const payload = objectPayload(value);
+  if (!payload || !exactObjectKeys(
+    payload,
+    ["persistence_state", "user_status", "transport_receipt"]
+  )) return null;
+  const receipt = objectPayload(payload.transport_receipt);
+  if (!receipt || !exactObjectKeys(
+    receipt,
+    [
+      "marker",
+      "report_id",
+      "persistence_marker",
+      "payload_sha256",
+      "payload_bytes"
+    ]
+  )) return null;
+  if (
+    payload.persistence_state !== "PERSISTED" ||
+    typeof payload.user_status !== "string" ||
+    !["RECEIVED", "IN_REVIEW", "COMPLETED"].includes(payload.user_status) ||
+    receipt.marker !== "DATABASE_AND_ENCRYPTED_IMAGE_STORE" ||
+    receipt.report_id !== reportId ||
+    typeof receipt.persistence_marker !== "string" ||
+    !CANONICAL_REPORT_UUID.test(receipt.persistence_marker) ||
+    typeof receipt.payload_sha256 !== "string" ||
+    !LOWER_SHA256.test(receipt.payload_sha256) ||
+    typeof receipt.payload_bytes !== "number" ||
+    !Number.isSafeInteger(receipt.payload_bytes) ||
+    Number(receipt.payload_bytes) < 1
+  ) return null;
+  return {
+    persistence_state: payload.persistence_state,
+    user_status: payload.user_status,
+    transport_receipt: {
+      marker: receipt.marker,
+      report_id: receipt.report_id,
+      persistence_marker: receipt.persistence_marker,
+      payload_sha256: receipt.payload_sha256,
+      payload_bytes: receipt.payload_bytes
+    }
+  };
+}
+
+async function boundedReportTransportStatusPayload(
+  response: Response,
+  reportId: string
+): Promise<Record<string, unknown> | null> {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const contentLength = response.headers.get("content-length");
+  if (
+    !contentType.startsWith("application/json") ||
+    response.body === null ||
+    (contentLength !== null && (
+      !/^\d+$/.test(contentLength) ||
+      Number(contentLength) > REPORT_TRANSPORT_STATUS_BODY_LIMIT_BYTES
+    ))
+  ) {
+    cancelUpstream(response);
+    return null;
+  }
+  const headers = new Headers({ "content-type": contentType });
+  if (contentLength !== null) headers.set("content-length", contentLength);
+  const boundedRequest = new Request("http://gateway.invalid/internal/report-status", {
+    method: "POST",
+    headers,
+    body: response.body,
+    duplex: "half"
+  } as RequestInit & { duplex: "half" });
+  const bounded = await readBoundedJsonBody(
+    boundedRequest,
+    REPORT_TRANSPORT_STATUS_BODY_LIMIT_BYTES,
+    5_000
+  );
+  if (bounded.error) {
+    void boundedRequest.body?.cancel().catch(() => undefined);
+    return null;
+  }
+  return reportTransportStatusPayload(bounded.value, reportId);
+}
+
+async function reportTransportStatus(
+  request: Request,
+  reportId: string,
+  fetchImpl?: GatewayFetch
+): Promise<Response> {
+  const denied = authorizeProxyRequest(request);
+  if (denied) {
+    return denied.status === 401 || denied.status === 403
+      ? reportTransportStatusNotFound()
+      : denied;
+  }
+  const actorId = authorizedProxyActor(request);
+  if (!actorId) return reportTransportStatusNotFound();
+  const operation = startPrivacyOperation(
+    actorId,
+    gatewaySessionAccountGeneration(request)
+  );
+  if (operation.error) return operation.error.status === 409
+    ? reportTransportStatusNotFound() : operation.error;
+  try {
+    if (!privacyOperationIsCurrent(operation.lease)) {
+      return reportTransportStatusNotFound();
+    }
+    const init: RequestInit = {
+      method: "GET",
+      headers: proxyRequestHeaders(
+        request,
+        undefined,
+        operation.lease.accountGeneration
+      ),
+      cache: "no-store",
+      signal: operation.lease.controller.signal
+    };
+    const path = `/reports/v2/${reportId}/status`;
+    const response = fetchImpl
+      ? await fetchBackend(request, backendUrl(path), init, 15_000, fetchImpl)
+      : await fetchBackend(request, backendUrl(path), init);
+    if (!privacyOperationIsCurrent(operation.lease)) {
+      cancelUpstream(response);
+      return reportTransportStatusNotFound();
+    }
+    if ([401, 403, 404].includes(response.status)) {
+      cancelUpstream(response);
+      return reportTransportStatusNotFound();
+    }
+    if (response.status !== 200) {
+      cancelUpstream(response);
+      return reportTransportStatusUnavailable();
+    }
+    const payload = await boundedReportTransportStatusPayload(response, reportId);
+    if (!privacyOperationIsCurrent(operation.lease)) {
+      return reportTransportStatusNotFound();
+    }
+    if (!payload) return reportTransportStatusUnavailable();
+    return Response.json(payload, {
+      status: 200,
+      headers: { "cache-control": "no-store" }
+    });
+  } finally {
+    finishPrivacyOperation(operation.lease);
+  }
+}
+
+type UserReportRoute =
+  | Readonly<{ kind: "list" }>
+  | Readonly<{ kind: "detail" | "request" | "content" | "correction"; reportId: string }>
+  | Readonly<{ kind: "deletion"; requestId: string }>;
+
+function userReportRoute(pathname: string): UserReportRoute | null {
+  if (pathname === USER_REPORT_LIST_ROUTE) {
+    return { kind: "list" };
+  }
+  const deletion = USER_REPORT_DELETION_ROUTE.exec(pathname);
+  if (deletion?.groups?.requestId) {
+    return { kind: "deletion", requestId: deletion.groups.requestId };
+  }
+  const request = USER_REPORT_REQUEST_ROUTE.exec(pathname);
+  if (request?.groups?.reportId) {
+    return { kind: "request", reportId: request.groups.reportId };
+  }
+  const correction = USER_REPORT_CORRECTION_ROUTE.exec(pathname);
+  if (correction?.groups?.reportId) {
+    return { kind: "correction", reportId: correction.groups.reportId };
+  }
+  const content = USER_REPORT_CONTENT_ROUTE.exec(pathname);
+  if (content?.groups?.reportId) {
+    return { kind: "content", reportId: content.groups.reportId };
+  }
+  const detail = USER_REPORT_DETAIL_ROUTE.exec(pathname);
+  return detail?.groups?.reportId
+    ? { kind: "detail", reportId: detail.groups.reportId }
+    : null;
+}
+
+function userReportNotFound(): Response {
+  return Response.json(
+    { detail: { code: "report_not_found" } },
+    { status: 404, headers: { "cache-control": "no-store" } }
+  );
+}
+
+function userReportUnavailable(): Response {
+  return Response.json(
+    { detail: { code: "gateway_user_report_unavailable" } },
+    { status: 502, headers: { "cache-control": "no-store" } }
+  );
+}
+
+function validDateTime(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 20 && value.length <= 40 &&
+    Number.isFinite(Date.parse(value));
+}
+
+const AWARE_DATE_TIME =
+  /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})$/;
+
+function validAwareDateTime(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 20 && value.length <= 40 &&
+    AWARE_DATE_TIME.test(value) && Number.isFinite(Date.parse(value));
+}
+
+function optionalBoundedText(value: unknown): value is string | null {
+  return value === null || (
+    typeof value === "string" && value.length >= 1 && value.length <= 500
+  );
+}
+
+function sanitizeRequestSummary(value: unknown): Record<string, unknown> | null {
+  const item = objectPayload(value);
+  if (!item || !exactObjectKeys(item, [
+    "request_id", "request_type", "status", "status_version",
+    "public_response", "created_at", "updated_at"
+  ])) return null;
+  if (
+    typeof item.request_id !== "string" || !CANONICAL_REPORT_UUID.test(item.request_id) ||
+    (item.request_type !== "CORRECTION" && item.request_type !== "DELETE") ||
+    typeof item.status !== "string" || !USER_REQUEST_STATUSES.has(item.status) ||
+    typeof item.status_version !== "number" || !Number.isSafeInteger(item.status_version) ||
+    item.status_version < 1 || !optionalBoundedText(item.public_response) ||
+    !validDateTime(item.created_at) || !validDateTime(item.updated_at)
+  ) return null;
+  return {
+    request_id: item.request_id,
+    request_type: item.request_type,
+    status: item.status,
+    status_version: item.status_version,
+    public_response: item.public_response,
+    created_at: item.created_at,
+    updated_at: item.updated_at
+  };
+}
+
+function sanitizeUserReportItem(value: unknown): Record<string, unknown> | null {
+  const item = objectPayload(value);
+  if (!item || !exactObjectKeys(item, [
+    "report_id", "created_at", "user_status",
+    "public_rejection_reason", "latest_request"
+  ])) return null;
+  const latest = item.latest_request === null
+    ? null : sanitizeRequestSummary(item.latest_request);
+  if (
+    typeof item.report_id !== "string" || !CANONICAL_REPORT_UUID.test(item.report_id) ||
+    !validDateTime(item.created_at) || typeof item.user_status !== "string" ||
+    !USER_REPORT_STATUSES.has(item.user_status) ||
+    !optionalBoundedText(item.public_rejection_reason) ||
+    (item.latest_request !== null && latest === null)
+  ) return null;
+  return {
+    report_id: item.report_id,
+    created_at: item.created_at,
+    user_status: item.user_status,
+    public_rejection_reason: item.public_rejection_reason,
+    latest_request: latest
+  };
+}
+
+type UserReportCorrectionRequest = Readonly<{
+  expectedRevision: number;
+  idempotencyKey: string;
+  body: Record<string, unknown>;
+}>;
+
+function nullableContentCategory(value: unknown): boolean {
+  return value === null || (
+    typeof value === "string" && USER_REPORT_CONTENT_CATEGORIES.has(value)
+  );
+}
+
+function canonicalCorrectionDescription(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const nfc = value.normalize("NFC");
+  if (/\p{C}/u.test(nfc)) return null;
+  const normalized = nfc
+    .trim()
+    .split(/\s+/u)
+    .filter(Boolean)
+    .join(" ");
+  const length = Array.from(normalized).length;
+  return length >= 1 && length <= 500
+    ? normalized
+    : null;
+}
+
+function nullableCanonicalCorrectionDescription(value: unknown): boolean {
+  return value === null || canonicalCorrectionDescription(value) === value;
+}
+
+function sanitizeReportContentCurrent(
+  value: Record<string, unknown>,
+  reportId: string
+): Record<string, unknown> | null {
+  if (!exactObjectKeys(value, [
+    "schema_version", "report_id", "revision", "content_sha256",
+    "user_description", "category_hint", "corrected_at"
+  ]) ||
+    value.schema_version !== "walksafe.report-content-current.v1" ||
+    value.report_id !== reportId ||
+    typeof value.revision !== "number" || !Number.isSafeInteger(value.revision) ||
+    value.revision < 0 || typeof value.content_sha256 !== "string" ||
+    !LOWER_SHA256.test(value.content_sha256) ||
+    !nullableCanonicalCorrectionDescription(value.user_description) ||
+    !nullableContentCategory(value.category_hint) ||
+    !(
+      value.corrected_at === null || validAwareDateTime(value.corrected_at)
+    ) ||
+    (value.revision === 0 && (
+      value.user_description !== null ||
+      value.category_hint !== null ||
+      value.corrected_at !== null
+    )) ||
+    (value.revision > 0 && value.corrected_at === null)
+  ) return null;
+  return {
+    schema_version: value.schema_version,
+    report_id: value.report_id,
+    revision: value.revision,
+    content_sha256: value.content_sha256,
+    user_description: value.user_description,
+    category_hint: value.category_hint,
+    corrected_at: value.corrected_at
+  };
+}
+
+function sanitizeReportContentRevision(
+  value: Record<string, unknown>,
+  reportId: string,
+  expected: UserReportCorrectionRequest | null
+): Record<string, unknown> | null {
+  if (!expected || !exactObjectKeys(value, [
+    "schema_version", "report_id", "revision", "expected_revision",
+    "idempotency_key", "content_sha256", "user_description",
+    "category_hint", "corrected_at"
+  ]) ||
+    value.schema_version !== "walksafe.report-content-revision.v1" ||
+    value.report_id !== reportId ||
+    typeof value.revision !== "number" || !Number.isSafeInteger(value.revision) ||
+    value.revision < 1 || value.revision !== expected.expectedRevision + 1 ||
+    value.expected_revision !== expected.expectedRevision ||
+    value.idempotency_key !== expected.idempotencyKey ||
+    typeof value.content_sha256 !== "string" || !LOWER_SHA256.test(value.content_sha256) ||
+    !nullableCanonicalCorrectionDescription(value.user_description) ||
+    !nullableContentCategory(value.category_hint) ||
+    !validAwareDateTime(value.corrected_at)
+  ) return null;
+  return {
+    schema_version: value.schema_version,
+    report_id: value.report_id,
+    revision: value.revision,
+    expected_revision: value.expected_revision,
+    idempotency_key: value.idempotency_key,
+    content_sha256: value.content_sha256,
+    user_description: value.user_description,
+    category_hint: value.category_hint,
+    corrected_at: value.corrected_at
+  };
+}
+
+function sanitizeReportDeletionStatus(
+  value: Record<string, unknown>,
+  requestId: string
+): Record<string, unknown> | null {
+  if (!exactObjectKeys(value, [
+    "schema_version", "request_id", "report_id", "state",
+    "request_status_version", "external_copy_count", "updated_at"
+  ]) ||
+    value.schema_version !== "walksafe.report-deletion-status.v1" ||
+    value.request_id !== requestId ||
+    typeof value.report_id !== "string" || !CANONICAL_REPORT_UUID.test(value.report_id) ||
+    typeof value.state !== "string" || !USER_REPORT_DELETION_STATES.has(value.state) ||
+    typeof value.request_status_version !== "number" ||
+    !Number.isSafeInteger(value.request_status_version) ||
+    value.request_status_version < 1 ||
+    typeof value.external_copy_count !== "number" ||
+    !Number.isSafeInteger(value.external_copy_count) ||
+    value.external_copy_count < 0 || !validAwareDateTime(value.updated_at)
+  ) return null;
+  return {
+    schema_version: value.schema_version,
+    request_id: value.request_id,
+    report_id: value.report_id,
+    state: value.state,
+    request_status_version: value.request_status_version,
+    external_copy_count: value.external_copy_count,
+    updated_at: value.updated_at
+  };
+}
+
+function sanitizeUserReportResponse(
+  value: unknown,
+  route: UserReportRoute,
+  correctionRequest: UserReportCorrectionRequest | null
+): Record<string, unknown> | null {
+  const payload = objectPayload(value);
+  if (!payload) return null;
+  if (route.kind === "content") {
+    return sanitizeReportContentCurrent(payload, route.reportId);
+  }
+  if (route.kind === "correction") {
+    return sanitizeReportContentRevision(payload, route.reportId, correctionRequest);
+  }
+  if (route.kind === "deletion") {
+    return sanitizeReportDeletionStatus(payload, route.requestId);
+  }
+  if (route.kind === "request") return sanitizeRequestSummary(payload);
+  if (route.kind === "detail") {
+    if (!exactObjectKeys(payload, [
+      "schema_version", "report_id", "created_at", "user_status",
+      "public_rejection_reason", "latest_request"
+    ]) || payload.schema_version !== "walksafe.user-report-detail.v1") return null;
+    const item = { ...payload };
+    delete item.schema_version;
+    const sanitized = sanitizeUserReportItem(item);
+    return sanitized ? {
+      schema_version: "walksafe.user-report-detail.v1",
+      ...sanitized
+    } : null;
+  }
+  if (!exactObjectKeys(payload, ["schema_version", "items", "next_cursor"]) ||
+    payload.schema_version !== "walksafe.user-report-list.v1" ||
+    !Array.isArray(payload.items) || payload.items.length > 100 ||
+    !(
+      payload.next_cursor === null ||
+      (typeof payload.next_cursor === "string" && USER_REPORT_CURSOR.test(payload.next_cursor))
+    )) return null;
+  const items = payload.items.map(sanitizeUserReportItem);
+  if (items.some(item => item === null)) return null;
+  return {
+    schema_version: "walksafe.user-report-list.v1",
+    items,
+    next_cursor: payload.next_cursor
+  };
+}
+
+async function boundedUserReportPayload(
+  response: Response,
+  route: UserReportRoute,
+  correctionRequest: UserReportCorrectionRequest | null
+): Promise<Record<string, unknown> | null> {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const contentLength = response.headers.get("content-length");
+  if (
+    !contentType.startsWith("application/json") || response.body === null ||
+    (contentLength !== null && (
+      !/^\d+$/.test(contentLength) || Number(contentLength) > USER_REPORT_RESPONSE_LIMIT_BYTES
+    ))
+  ) {
+    cancelUpstream(response);
+    return null;
+  }
+  const boundedRequest = new Request("http://gateway.invalid/internal/user-report", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: response.body,
+    duplex: "half"
+  } as RequestInit & { duplex: "half" });
+  const bounded = await readBoundedJsonBody(
+    boundedRequest, USER_REPORT_RESPONSE_LIMIT_BYTES, 5_000
+  );
+  return bounded.error
+    ? null
+    : sanitizeUserReportResponse(bounded.value, route, correctionRequest);
+}
+
+function validUserReportQuery(url: URL): boolean {
+  const seen = new Set<string>();
+  for (const [key, value] of url.searchParams) {
+    if (seen.has(key) || !["limit", "cursor", "user_status"].includes(key)) return false;
+    seen.add(key);
+    if (key === "limit" && (!/^[1-9][0-9]{0,2}$/.test(value) || Number(value) > 100)) return false;
+    if (key === "cursor" && !USER_REPORT_CURSOR.test(value)) return false;
+    if (key === "user_status" && !USER_REPORT_STATUSES.has(value)) return false;
+  }
+  return true;
+}
+
+function validUserRequestBody(value: unknown): Record<string, unknown> | null {
+  const payload = objectPayload(value);
+  if (!payload || !exactObjectKeys(
+    payload, ["client_request_id", "request_type", "request_text"]
+  )) return null;
+  if (
+    typeof payload.client_request_id !== "string" ||
+    !CANONICAL_REPORT_UUID.test(payload.client_request_id) ||
+    (payload.request_type !== "CORRECTION" && payload.request_type !== "DELETE") ||
+    typeof payload.request_text !== "string" ||
+    payload.request_text !== payload.request_text.trim() ||
+    payload.request_text.length < 1 || payload.request_text.length > 500
+  ) return null;
+  return payload;
+}
+
+function validUserCorrectionBody(value: unknown): UserReportCorrectionRequest | null {
+  const payload = objectPayload(value);
+  if (!payload) return null;
+  const keys = Object.keys(payload);
+  const allowed = new Set([
+    "expected_revision", "idempotency_key", "user_description", "category_hint"
+  ]);
+  if (
+    keys.some(key => !allowed.has(key)) ||
+    !Object.hasOwn(payload, "expected_revision") ||
+    !Object.hasOwn(payload, "idempotency_key") ||
+    (!Object.hasOwn(payload, "user_description") && !Object.hasOwn(payload, "category_hint")) ||
+    typeof payload.expected_revision !== "number" ||
+    !Number.isSafeInteger(payload.expected_revision) || payload.expected_revision < 0 ||
+    typeof payload.idempotency_key !== "string" ||
+    !CANONICAL_REPORT_UUID.test(payload.idempotency_key)
+  ) return null;
+
+  const body: Record<string, unknown> = {
+    expected_revision: payload.expected_revision,
+    idempotency_key: payload.idempotency_key
+  };
+  if (Object.hasOwn(payload, "user_description")) {
+    if (payload.user_description === null) {
+      body.user_description = null;
+    } else if (typeof payload.user_description === "string") {
+      const normalized = canonicalCorrectionDescription(payload.user_description);
+      if (normalized === null) return null;
+      body.user_description = normalized;
+    } else {
+      return null;
+    }
+  }
+  if (Object.hasOwn(payload, "category_hint")) {
+    if (!nullableContentCategory(payload.category_hint)) return null;
+    body.category_hint = payload.category_hint;
+  }
+  return {
+    expectedRevision: payload.expected_revision,
+    idempotencyKey: payload.idempotency_key,
+    body
+  };
+}
+
+async function userReportProxy(
+  request: Request,
+  route: UserReportRoute,
+  fetchImpl?: GatewayFetch
+): Promise<Response> {
+  const denied = authorizeProxyRequest(request);
+  if (denied) return denied.status === 401 || denied.status === 403
+    ? userReportNotFound() : denied;
+  const binding = authorizedProxyDeviceBinding(request);
+  if (!binding) return userReportNotFound();
+  const operation = startPrivacyOperation(
+    binding.actorId,
+    binding.accountGeneration
+  );
+  if (operation.error) return operation.error.status === 409
+    ? userReportNotFound() : operation.error;
+  try {
+    if (!privacyOperationIsCurrent(operation.lease)) return userReportNotFound();
+    let body: string | undefined;
+    let correctionRequest: UserReportCorrectionRequest | null = null;
+    const headers = proxyRequestHeaders(
+      request,
+      route.kind === "request" || route.kind === "correction"
+        ? { "content-type": "application/json" }
+        : undefined,
+      operation.lease.accountGeneration
+    );
+    if (route.kind === "request" || route.kind === "correction") {
+      const bounded = await readBoundedJsonBody(request, USER_REPORT_BODY_LIMIT_BYTES);
+      if (bounded.error) return bounded.error;
+      const payload = route.kind === "request"
+        ? validUserRequestBody(bounded.value)
+        : null;
+      correctionRequest = route.kind === "correction"
+        ? validUserCorrectionBody(bounded.value)
+        : null;
+      if (!payload && !correctionRequest) {
+        return Response.json(
+          {
+            detail: {
+              code: route.kind === "correction"
+                ? "report_content_correction_invalid"
+                : "report_request_invalid"
+            }
+          },
+          { status: 422, headers: { "cache-control": "no-store" } }
+        );
+      }
+      body = JSON.stringify(payload ?? correctionRequest!.body);
+    }
+    let backendPath: string;
+    switch (route.kind) {
+      case "list":
+        backendPath = "/reports/mine";
+        break;
+      case "detail":
+        backendPath = `/reports/mine/${route.reportId}`;
+        break;
+      case "request":
+        backendPath = `/reports/mine/${route.reportId}/requests`;
+        break;
+      case "content":
+        backendPath = `/reports/mine/${route.reportId}/content`;
+        break;
+      case "correction":
+        backendPath = `/reports/mine/${route.reportId}/corrections`;
+        break;
+      case "deletion":
+        backendPath = `/reports/mine/deletions/${route.requestId}`;
+        break;
+    }
+    const init: RequestInit = {
+      method: route.kind === "request" || route.kind === "correction" ? "POST" : "GET",
+      headers,
+      ...(body === undefined ? {} : { body }),
+      cache: "no-store",
+      signal: operation.lease.controller.signal
+    };
+    const upstreamUrl = backendUrl(
+      backendPath,
+      route.kind === "list" ? request : undefined
+    );
+    const upstream = fetchImpl
+      ? await fetchBackend(request, upstreamUrl, init, 15_000, fetchImpl)
+      : await fetchBackend(request, upstreamUrl, init);
+    if (!privacyOperationIsCurrent(operation.lease)) {
+      cancelUpstream(upstream);
+      return userReportNotFound();
+    }
+    if ([401, 403, 404].includes(upstream.status)) {
+      cancelUpstream(upstream);
+      return userReportNotFound();
+    }
+    if ((route.kind === "request" || route.kind === "correction") && upstream.status === 409) {
+      cancelUpstream(upstream);
+      return Response.json(
+        {
+          detail: {
+            code: route.kind === "correction"
+              ? "report_content_conflict"
+              : "report_request_intent_conflict"
+          }
+        },
+        { status: 409, headers: { "cache-control": "no-store" } }
+      );
+    }
+    if (
+      (route.kind === "request" || route.kind === "correction") &&
+      [413, 415, 422, 429].includes(upstream.status)
+    ) {
+      const headers: Record<string, string> = { "cache-control": "no-store" };
+      const retryAfter = upstream.headers.get("retry-after");
+      if (upstream.status === 429 && retryAfter && /^\d+$/.test(retryAfter)) {
+        headers["retry-after"] = retryAfter;
+      }
+      cancelUpstream(upstream);
+      return Response.json(
+        {
+          detail: {
+            code: route.kind === "correction"
+              ? "report_content_correction_invalid"
+              : "report_request_invalid"
+          }
+        },
+        { status: upstream.status, headers }
+      );
+    }
+    const expected = route.kind === "request" || route.kind === "correction"
+      ? [200, 201]
+      : [200];
+    if (!expected.includes(upstream.status)) {
+      cancelUpstream(upstream);
+      return userReportUnavailable();
+    }
+    const payload = await boundedUserReportPayload(upstream, route, correctionRequest);
+    const stillCurrent = privacyOperationIsCurrent(operation.lease);
+    if (!stillCurrent) return userReportNotFound();
+    if (!payload) return userReportUnavailable();
+    return Response.json(payload, {
+      status: upstream.status,
+      headers: { "cache-control": "no-store" }
+    });
+  } finally {
+    finishPrivacyOperation(operation.lease);
+  }
+}
+
 function deletionNotFound(): Response {
   return Response.json(
     { code: "account_deletion_request_not_found" },
@@ -862,7 +1768,9 @@ async function accountDeletionRequestV2(
     const actorId = isGatewaySessionAuthorized(request)
       ? gatewaySessionActor(request)
       : null;
-    const accountGeneration = actorId ? currentActorGeneration(actorId) : null;
+    const accountGeneration = actorId
+      ? gatewaySessionAccountGeneration(request) ?? currentActorGeneration(actorId)
+      : null;
     const accepted = acceptOrReplayAccountDeletionV2(
       actorId,
       accountGeneration,
@@ -991,10 +1899,61 @@ async function accountDeletionEvidenceV2(
 
 async function dispatchGatewayRequest(
   request: Request,
+  correlationId: string,
   dependencies: GatewayDependencies = {}
 ): Promise<Response> {
   const requestUrl = new URL(request.url);
   const pathname = requestUrl.pathname;
+  if (pathname === "/api/raw-collections" || pathname.startsWith("/api/raw-collections/")) {
+    return noStore(await relayRawCollection(request, {
+      ...(dependencies.fetchImpl ? { fetchImpl: dependencies.fetchImpl } : {}),
+      bindingResolver: dependencies.fieldLongSessionBindingResolver
+        ?? gatewayFieldLongSessionBinding
+    }));
+  }
+  const userReport = userReportRoute(pathname);
+  if (userReport) {
+    const allowed = userReport.kind === "request" || userReport.kind === "correction"
+      ? ["POST"] as const
+      : ["GET"] as const;
+    if (!allowed.includes(request.method as never)) return methodNotAllowed(allowed);
+    if (gatewaySessionScope(request) === "account_deletion_recovery") {
+      return userReportNotFound();
+    }
+    if (userReport.kind === "list") {
+      if (!validUserReportQuery(requestUrl) || requestHasEntityBody(request)) {
+        return Response.json(
+          { detail: { code: "report_query_invalid" } },
+          { status: 400, headers: { "cache-control": "no-store" } }
+        );
+      }
+    } else if (
+      [...requestUrl.searchParams].length > 0 ||
+      (request.method === "GET" && requestHasEntityBody(request))
+    ) {
+      return userReportNotFound();
+    }
+    return noStore(await userReportProxy(request, userReport, dependencies.fetchImpl));
+  }
+  const reportStatusMatch = REPORT_TRANSPORT_STATUS_ROUTE.exec(pathname);
+  if (reportStatusMatch?.groups?.reportId) {
+    if ([...requestUrl.searchParams].length > 0) return reportTransportStatusNotFound();
+    if (request.method !== "GET") return methodNotAllowed(["GET"]);
+    if (requestHasEntityBody(request)) {
+      return Response.json(
+        { detail: { code: "report_transport_status_request_invalid" } },
+        { status: 400, headers: { "cache-control": "no-store" } }
+      );
+    }
+    if (gatewaySessionScope(request) === "account_deletion_recovery") {
+      return reportTransportStatusNotFound();
+    }
+    return noStore(await reportTransportStatus(
+      request,
+      reportStatusMatch.groups.reportId,
+      dependencies.fetchImpl
+    ));
+  }
   const deletionRoute = accountDeletionRouteV2(pathname);
   if (deletionRoute) {
     if ([...requestUrl.searchParams].length > 0) return deletionNotFound();
@@ -1035,15 +1994,49 @@ async function dispatchGatewayRequest(
         { status: 410, headers: { "cache-control": "no-store" } }
       );
     }
-    if (requestUrl.searchParams.get("control") === INTEGRATED_CONSENT_CONTROL) {
-      if (request.method !== "PUT") {
-        return noStore(await handleIntegratedConsentRequest(request));
-      }
+    if (
+      requestUrl.searchParams.get("control") ===
+      INTEGRATED_CONSENT_BOOTSTRAP_CONTROL
+    ) {
       const denied = authorizeProxyRequest(request);
       if (denied) return noStore(denied);
       const actorId = authorizedProxyActor(request);
       if (!actorId) return noStore(gatewayUnauthorizedResponse());
-      const operation = startPrivacyOperation(actorId);
+      const operation = startPrivacyOperation(
+        actorId,
+        gatewaySessionAccountGeneration(request)
+      );
+      if (operation.error) return noStore(operation.error);
+      try {
+        if (!privacyOperationIsCurrent(operation.lease)) {
+          return noStore(privacyOperationInactive());
+        }
+        const response = await handleIntegratedConsentBootstrapRequest(request, {
+          accountGeneration: operation.lease.accountGeneration,
+          fieldActorBindingId: consentActorBindingId(operation.lease),
+          signal: operation.lease.controller.signal,
+          ...(dependencies.fetchImpl
+            ? { fetchImpl: dependencies.fetchImpl }
+            : {})
+        });
+        if (!privacyOperationIsCurrent(operation.lease)) {
+          cancelUpstream(response);
+          return noStore(privacyOperationInactive());
+        }
+        return noStore(response);
+      } finally {
+        finishPrivacyOperation(operation.lease);
+      }
+    }
+    if (requestUrl.searchParams.get("control") === INTEGRATED_CONSENT_CONTROL) {
+      const denied = authorizeProxyRequest(request);
+      if (denied) return noStore(denied);
+      const actorId = authorizedProxyActor(request);
+      if (!actorId) return noStore(gatewayUnauthorizedResponse());
+      const operation = startPrivacyOperation(
+        actorId,
+        gatewaySessionAccountGeneration(request)
+      );
       if (operation.error) return noStore(operation.error);
       try {
         if (!privacyOperationIsCurrent(operation.lease)) {
@@ -1086,15 +2079,32 @@ async function dispatchGatewayRequest(
   const methods = ALLOWED_METHODS.get(pathname);
   if (!methods) return routeNotFound();
   if (!methods.includes(request.method)) return methodNotAllowed(methods);
+  const accountRelayRoute = pathname === "/api/account-enrollments/email-otp" ||
+    pathname === "/api/accounts";
+  const exactNoQueryRoute = accountRelayRoute ||
+    pathname === "/api/speech/stt" || pathname === "/api/speech/tts";
+  if (exactNoQueryRoute && [...requestUrl.searchParams].length > 0) {
+    return Response.json(
+      { detail: { code: "account_request_query_invalid" } },
+      { status: 400, headers: { "cache-control": "no-store" } }
+    );
+  }
   if (
     pathname !== "/api/field-session" &&
+    !accountRelayRoute &&
     gatewaySessionScope(request) === "account_deletion_recovery"
   ) {
     return noStore(gatewayUnauthorizedResponse(true));
   }
 
   let response: Response;
-  if (pathname === "/api/field-session") {
+  if (pathname === "/api/account-enrollments/email-otp") {
+    response = await relayAccountEnrollment(request, dependencies.fetchImpl);
+  }
+  else if (pathname === "/api/accounts") {
+    response = await relayAccountCreation(request, dependencies.fetchImpl);
+  }
+  else if (pathname === "/api/field-session") {
     response = await fieldSession(request, dependencies.fetchImpl);
   }
   else if (pathname === "/api/field-walk") {
@@ -1103,6 +2113,12 @@ async function dispatchGatewayRequest(
       dependencies.fieldLongSessionBindingResolver
         ?? gatewayFieldLongSessionBinding
     );
+  }
+  else if (pathname === "/api/speech/stt") {
+    response = await relaySpeechStt(request, correlationId, dependencies.fetchImpl);
+  }
+  else if (pathname === "/api/speech/tts") {
+    response = await relaySpeechTts(request, correlationId, dependencies.fetchImpl);
   }
   else if (pathname === "/api/navigation/walking") {
     response = await walkingRoute(request, dependencies.fetchImpl);
@@ -1121,7 +2137,7 @@ export async function handleGatewayRequest(
   const startedAt = performance.now();
   const correlationId = gatewayCorrelationId(request);
   const routeTemplate = gatewayRouteTemplate(request);
-  const response = await dispatchGatewayRequest(request, dependencies);
+  const response = await dispatchGatewayRequest(request, correlationId, dependencies);
   const responseWithRequestId = withGatewayRequestId(response, correlationId);
   const sink = dependencies.telemetrySink
     ?? (process.env.NODE_ENV === "test" ? undefined : writeGatewayTelemetry);

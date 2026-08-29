@@ -672,7 +672,7 @@ def _validate_rotation(previous_states: object, keyring: ReportImageKeyring) -> 
 def _assert_normal_terminal_keys_unused(db: Session, keyring: ReportImageKeyring) -> None:
     """Permit normal key retirement/destruction only after all object use is gone."""
 
-    from backend.app.models import ReportImageObject
+    from backend.app.models import RawCollectionChunk, ReportImageObject
 
     terminal_key_ids = sorted(
         slot.key_id
@@ -685,7 +685,11 @@ def _assert_normal_terminal_keys_unused(db: Session, keyring: ReportImageKeyring
         db.scalars(
             select(ReportImageObject.key_id)
             .where(ReportImageObject.key_id.in_(terminal_key_ids))
-            .distinct()
+            .union(
+                select(RawCollectionChunk.key_id).where(
+                    RawCollectionChunk.key_id.in_(terminal_key_ids)
+                )
+            )
         ).all()
     )
     if used_key_ids:

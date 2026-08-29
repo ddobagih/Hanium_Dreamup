@@ -36,6 +36,7 @@ def test_openapi_expresses_runtime_role_and_actor_security() -> None:
         "WalkSafeActorId",
         "WalkSafeActorAssertion",
         "WalkSafeAccountGeneration",
+        "WalkSafeRawRequestProof",
         "WalkSafeDeletionAccessPreDigest",
         "WalkSafeDeletionTombstoneId",
     }
@@ -58,12 +59,43 @@ def test_openapi_expresses_runtime_role_and_actor_security() -> None:
             expected_schemes.update({"WalkSafeActorId", "WalkSafeActorAssertion"})
         if requires_account_generation(path, method):
             expected_schemes.add("WalkSafeAccountGeneration")
+        if path.startswith("/raw-collections/"):
+            expected_schemes.add("WalkSafeRawRequestProof")
         if path.startswith("/privacy/account-deletions"):
             expected_schemes.add("WalkSafeDeletionAccessPreDigest")
             if path != "/privacy/account-deletions":
                 expected_schemes.add("WalkSafeDeletionTombstoneId")
             assert operation["x-walksafe-deletion-capability-scope"] == "account-deletion-only"
         assert set(requirement) == expected_schemes
+
+    for path, method, response_schema in (
+        ("/reports/mine", "get", "UserReportListPageV1"),
+        ("/reports/mine/{report_id}", "get", "UserReportDetailV1"),
+        (
+            "/reports/mine/{report_id}/requests",
+            "post",
+            "ReportUserRequestSummaryV1",
+        ),
+    ):
+        operation = schema["paths"][path][method]
+        assert operation["x-walksafe-required-role"] == "field"
+        assert set(operation["security"][0]) == {
+            "WalkSafeFieldToken",
+            "WalkSafeActorId",
+            "WalkSafeActorAssertion",
+            "WalkSafeAccountGeneration",
+        }
+        success = "201" if method == "post" else "200"
+        assert operation["responses"][success]["content"]["application/json"][
+            "schema"
+        ]["$ref"].endswith("/" + response_schema)
+
+    request_schema = schema["components"]["schemas"]["ReportUserRequestCreateV1"]
+    assert request_schema["additionalProperties"] is False
+    assert request_schema["properties"]["request_text"]["maxLength"] == 500
+    assert schema["components"]["schemas"]["UserReportSummaryV1"][
+        "additionalProperties"
+    ] is False
 
     deletion_item = schema["components"]["schemas"]["AccountDeletionItemStatusV2"]
     assert set(deletion_item["required"]) == {
@@ -98,6 +130,36 @@ def test_openapi_expresses_runtime_role_and_actor_security() -> None:
         "training_reuse",
     }
     assert consent_versions["additionalProperties"] is False
+    assert consent_versions["properties"]["raw_source_collection"]["const"] == (
+        "FP-013-RAW-1.1.0"
+    )
+    consent_request = schema["components"]["schemas"]["PrivacyConsentEventV2"]
+    assert "expected_previous_backend_receipt_sha256" in consent_request["required"]
+    assert consent_request["additionalProperties"] is False
+    bootstrap = schema["components"]["schemas"]["PrivacyConsentBootstrapV1"]
+    assert set(bootstrap["required"]) == {
+        "schema_version",
+        "status",
+        "source",
+        "installation_id",
+        "policy_version",
+        "item_versions",
+        "client_revision_floor",
+        "selections",
+        "source_receipt_sha256",
+        "expected_previous_backend_receipt_sha256",
+    }
+    assert bootstrap["additionalProperties"] is False
+    bootstrap_operation = schema["paths"]["/privacy/consent-bootstrap"]["get"]
+    assert set(bootstrap_operation["security"][0]) == {
+        "WalkSafeFieldToken",
+        "WalkSafeActorId",
+        "WalkSafeActorAssertion",
+        "WalkSafeAccountGeneration",
+    }
+    assert bootstrap_operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/PrivacyConsentBootstrapV1"}
     assert "200" in schema["paths"]["/privacy/account-deletions"]["post"]["responses"]
     for path, method in (
         ("/privacy/account-deletions", "post"),
@@ -120,6 +182,48 @@ def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
     assert "WalkSafeAdminBearer" in schema["components"]["securitySchemes"]
     assert "WalkSafeAdminToken" not in schema["components"]["securitySchemes"]
     assert "WalkSafeOriginalAccessGrant" in schema["components"]["securitySchemes"]
+    proof_schemes = {
+        "WalkSafeAdminDeviceChallengeId",
+        "WalkSafeAdminDeviceSignature",
+        "WalkSafeCorrelationId",
+    }
+    audit = schema["paths"]["/admin/reports/audits"]["get"]
+    assert audit["x-walksafe-admin-device-proof"] == {
+        "purpose": "ACTION",
+        "action": None,
+        "read_purpose": "admin.audit.list",
+        "session_id": "authenticated-admin-session",
+    }
+    assert proof_schemes <= set(audit["security"][0])
+    assert "WalkSafeReadPurpose" in audit["security"][0]
+    for path, method, action in (
+        (
+            "/admin/reports/{report_id}/status",
+            "patch",
+            "admin.report.status.update",
+        ),
+        (
+            "/admin/reports/{report_id}/delivery-packages",
+            "post",
+            "admin.report.delivery_package.create",
+        ),
+    ):
+        operation = schema["paths"][path][method]
+        assert operation["x-walksafe-admin-device-proof"] == {
+            "purpose": "ACTION",
+            "action": action,
+            "read_purpose": None,
+            "session_id": "authenticated-admin-session",
+        }
+        assert operation["x-walksafe-high-risk-action"] == action
+        assert proof_schemes <= set(operation["security"][0])
+        reconfirmation = [
+            item
+            for item in operation["parameters"]
+            if item.get("name") == "X-WalkSafe-Reconfirm-Nonce"
+        ]
+        assert len(reconfirmation) == 1
+        assert reconfirmation[0]["required"] is True
     state_response = schema["components"]["schemas"]["StateResponse"]
     assert set(state_response["required"]) == {
         "security_state",

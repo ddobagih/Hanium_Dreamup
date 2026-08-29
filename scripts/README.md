@@ -112,3 +112,17 @@
 - `check_*`의 PASS는 그 스크립트가 검사한 정적·smoke 범위만 증명합니다.
 - 현재 Android 통합검증에서는 canonical img768 PT warm-up과 Android APK asset 검사를 사용한다. Web NFT 검사는 legacy 회귀 범위일 뿐 Android 출시 필수 증거가 아니다. TFLite host invoke와 연결 실기기 계측은 필요한 runtime/device를 명시했을 때 추가 실행한다.
 - 분류 audit 스크립트는 manifest 문서를 갱신할 수 있으므로 읽기 전용 검사로 간주하지 않습니다.
+
+## Raw collection 180일 수동 retention
+
+`manage_raw_collection_retention.py`는 `COMMITTED`이면서 `RAW_ORIGINAL_180D`이고 지정한 `--as-of` 이하로 만료된 raw collection을 안정 정렬·bounded limit로 조회한다. 기본 동작은 preview이며 DB와 파일을 바꾸지 않는다.
+
+삭제는 자동 service/timer 없이 운영자가 `--manual-one-shot --apply`, canonical `--operation-id`, preview의 `--candidate-digest`, `--confirm DELETE-EXPIRED-RAW-COLLECTIONS`를 모두 제공할 때만 수행한다. DB URL은 전용 `WALKSAFE_RAW_RETENTION_DATABASE_URL` 환경변수로만 전달한다. 중단 뒤에는 같은 operation ID로 `--manual-one-shot --reconcile`을 실행하며, pre-commit은 원본을 복구하고 post-commit은 recovery 정리와 불변 receipt 발행을 완결한다. 개발·test 격리 확인에는 `--local-isolated`만 사용한다.
+
+## Account deletion worker credential 범위
+
+`account_deletion_worker.py`는 내부 v4 journal에 기존 report·raw count, 결속된 `user_accounts`, 삭제 시작 시점에 동결한 `account_enrollments` UUID 목록을 기록한다. 삭제·재조정은 이 UUID만 대상으로 삼아 같은 이메일의 이후 가입기록을 지우지 않는다. 외부 manifest는 v3를 유지하며 enrollment UUID와 이메일 HMAC을 내보내지 않고 count만 공개한다. 가입 동의 receipt와 tombstone·request·item·event·completion receipt 장부는 삭제하지 않으며, manifest의 retained evidence에는 확인한 가입 동의 receipt count만 기록한다. 기존 v1/v2/v3 journal은 복구 호환 범위로만 읽고, v3 재조정에서 같은 이메일 기록의 소유가 모호하면 fail-closed한다.
+
+## Account enrollment envelope 수동 purge
+
+`purge_account_enrollments.py`는 `--before` 이전에 만료됐거나 terminal 상태로 오래된 enrollment ID만 최대 1,000개 preview한다. 실제 삭제는 자동 timer 없이 `--manual-one-shot --apply`, preview의 `--candidate-digest`, `--confirm PURGE-EXPIRED-ACCOUNT-ENROLLMENTS`가 모두 일치할 때 전용 `WALKSAFE_ACCOUNT_ENROLLMENT_PURGE_DATABASE_URL`과 최소권한 `walksafe_account_enrollment_purger` 역할로 수행한다. 출력에는 ID·이메일·암호문을 포함하지 않는다.

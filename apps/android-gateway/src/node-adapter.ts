@@ -167,7 +167,9 @@ export function createGatewayServer(dependencies: GatewayDependencies = {}): Ser
       }
     })();
   });
-  server.requestTimeout = 20_000;
+  // Qwen3-TTS has a bounded 65 second upstream deadline. Keep the Node request
+  // ceiling slightly above it; individual routes retain their tighter limits.
+  server.requestTimeout = 75_000;
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 5_000;
   return server;
