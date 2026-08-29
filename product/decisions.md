@@ -4,6 +4,7 @@
 
 | 날짜 | 결정 | 이유 | 영향 범위 | 근거 |
 |---|---|---|---|---|
+| 2026-08-30 | 첫 실행 4·5단계의 본인확인을 이메일 회원가입·이메일 인증으로 **한시적 대체**한다. `RQ-FP-010-001`의 「회원가입과 휴대전화 확인」은 **변경하지 않는다**. 전환 조건: 출시 전에 본인확인(SMS)으로 되돌리며, 그때까지 이 대체 상태를 출시 근거로 쓰지 않는다 | 본인확인 API는 건당 비용과 계약 주체가 필요해 개발·시험 단계에서 확보하기 어렵다. 이메일은 SMTP로 비용 없이 같은 단계 구조를 검증할 수 있다 | backend 가입·인증 API, Gateway 프록시, Android 4·5단계 입력·문구, 요구사항 추적 | 팀원 전달: 2026-08-30. 요구 원문은 `docs/deliverables/03-requirements/system-requirements.md:1065` 그대로 유지 |
 | 2026-07-11 | 목적지까지 전역 경로는 TMAP으로 정하고, 정상 점자블록이 3 frame·700ms·confidence 0.55·freshness 1,200ms·GPS 25m·heading 35°·camera corridor gate를 모두 통과한 동안만 국소 단거리 steering 목표로 우선한다. 손상·불확실·미검출이면 TMAP으로 복귀한다 | 사용자가 원하는 점자블록 우선 보행과 지도 경로의 안정적인 목적지 도달을 함께 유지하기 위함 | Web navigation, Android 연구 navigation, 테스트·제출 문서 | 사용자 확인: 2026-07-11 |
 | 2026-07-11 | epoch270 img768 PT에서 export한 unified float32 13-class TFLite를 Android 개발 runtime primary로 적용한다. asset/tensor/hash 검증과 Device Field·Release 승인은 구분한다 | 최신 768 후보를 backend뿐 아니라 Android 연구 runtime에도 같은 class 계약으로 적용하기 위함 | model deployment record, Android runtime config, 제출 문서 | PT SHA-256 `a38857e...`, TFLite SHA-256 `92b39d3b...` |
 | 2026-07-11 | 목적지 검색과 보행 길안내 provider는 TMAP API로 고정하고 다른 provider 설정·응답은 거부한다 | 현재 제품이 실제 사용하는 외부 길안내 계약을 하나로 명확히 하기 위함 | navigation, 환경설정, 제출·운영 문서 | 사용자 확인: 2026-07-11 |
@@ -33,6 +34,9 @@
 - production PWA와 임시 HTTPS field profile은 준비됐지만 quick tunnel은 실서비스 도메인·가용성 근거가 아니다.
 - local model registry, 승격·rollback·격리는 구현됐으나 완전 자동 재학습·무중단 배포 MLOps는 아니다.
 - 현재 핵심 남은 근거는 실제 모바일 Web 현장 검증, 모델 약한 class 재검수, 정식 계정/RBAC와 운영 backup/retention이다.
+- 첫 실행 4·5단계는 2026-08-30 결정에 따라 이메일로 대체 구현한다. 요구는 휴대전화 확인 그대로이므로 이 구간은 **요구 미충족 상태로 진행 중**이며, 출시 전 본인확인 전환이 완료되어야 `RQ-FP-010-001`을 만족했다고 말할 수 있다. 전환 시 구현에서 확인할 것:
+  - `FirstRunOnboardingStage`의 `LOCAL_CREDENTIAL_PHONE_SUBMISSION`·`VERIFIED_SMS` **enum 이름은 바꾸지 않는다**. 단계 이름이 `firstRunLocalRequest`의 request·attempt id 해시에 들어가므로 개명하면 기존 설치의 복원과 영수증 연속성이 깨진다. 사용자에게 보이는 문구만 교체한다.
+  - 앱의 4·8단계 증거는 불투명 핸들(`onb_…`, `actor_…`)과 영수증만 담고 사용자 입력에서 파생하지 않으므로, 채널이 이메일에서 SMS로 바뀌어도 앱 상태기계는 다시 바꾸지 않아도 된다.
 
 ## B - 사용자 확인 필요
 
