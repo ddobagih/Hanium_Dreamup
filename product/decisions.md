@@ -36,7 +36,7 @@
 - 현재 핵심 남은 근거는 실제 모바일 Web 현장 검증, 모델 약한 class 재검수, 정식 계정/RBAC와 운영 backup/retention이다.
 - 첫 실행 4·5단계는 2026-08-30 결정에 따라 이메일로 대체 구현한다. 요구는 휴대전화 확인 그대로이므로 이 구간은 **요구 미충족 상태로 진행 중**이며, 출시 전 본인확인 전환이 완료되어야 `RQ-FP-010-001`을 만족했다고 말할 수 있다. 전환 시 구현에서 확인할 것:
   - `FirstRunOnboardingStage`의 `LOCAL_CREDENTIAL_PHONE_SUBMISSION`·`VERIFIED_SMS` **enum 이름은 바꾸지 않는다**. 단계 이름이 `firstRunLocalRequest`의 request·attempt id 해시에 들어가므로 개명하면 기존 설치의 복원과 영수증 연속성이 깨진다. 사용자에게 보이는 문구만 교체한다.
-  - 앱의 4·8단계 증거는 불투명 핸들(`onb_…`, `actor_…`)과 영수증만 담고 사용자 입력에서 파생하지 않으므로, 채널이 이메일에서 SMS로 바뀌어도 앱 상태기계는 다시 바꾸지 않아도 된다.
+  - 구현은 팀의 `account_enrollments`·`user_accounts` 경로(`/account-enrollments/email-otp`, `/accounts`, `/accounts/authenticate`, migration `202608290009`)를 쓴다. 같은 단계를 겨냥한 두 번째 구현을 2026-08-30에 걷어냈다.
 
 ## B - 사용자 확인 필요
 
