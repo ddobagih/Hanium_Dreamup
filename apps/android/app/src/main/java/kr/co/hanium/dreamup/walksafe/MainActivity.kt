@@ -22799,7 +22799,10 @@ generation != cameraFallbackGeneration
                         expectedResumeToken,
                         expectedGatewayWalkOperationId,
                     )
-                ) updateVoiceRecognitionSignal("음성 준비됨")
+                ) {
+                    updateVoiceRecognitionSignal("음성 준비됨")
+                    signalVoiceListening(started = true)
+                }
             }
 
             override fun onBeginningOfSpeech() {
@@ -22824,7 +22827,10 @@ generation != cameraFallbackGeneration
                         expectedResumeToken,
                         expectedGatewayWalkOperationId,
                     )
-                ) updateVoiceRecognitionSignal("음성 처리 중")
+                ) {
+                    updateVoiceRecognitionSignal("음성 처리 중")
+                    signalVoiceListening(started = false)
+                }
             }
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
             override fun onPartialResults(partialResults: Bundle?) = Unit
@@ -22843,6 +22849,8 @@ generation != cameraFallbackGeneration
                 voiceRecognitionActive = false
                 voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
                 updateVoiceCommandButton(active = false)
+                // 실패로 끝나도 듣기는 끝났다. 끝 신호가 없으면 사용자는 계속 듣고 있는 줄 안다.
+                signalVoiceListening(started = false)
                 updateNavigationStatus("voice=recognition_failed code=$error")
                 if (
                     error == SpeechRecognizer.ERROR_NO_MATCH ||
@@ -23400,6 +23408,23 @@ generation != cameraFallbackGeneration
                 else -> "서버 음성 명령 녹음 시작"
             }
             button.isEnabled = enabled
+        }
+    }
+
+    /**
+     * 듣기가 시작되고 끝난 것을 진동으로 알린다. 지금까지 이 신호는 버튼 글자와 화면 상태 문자열
+     * 뿐이었고, 그것은 화면을 보는 사람에게만 도착한다. 이 앱의 주 사용자에게는 아무 신호도 없었다.
+     *
+     * 위험 피드백을 억누르는 규칙(shouldSuppressFeedbackDuringVoiceRecognition)에 걸지 않는다.
+     * 그 규칙은 인식 중 다른 안내가 끼어드는 것을 막기 위한 것이고, 이 신호는 인식 그 자체를
+     * 알리는 것이라 억누르면 목적이 사라진다.
+     */
+    private fun signalVoiceListening(started: Boolean) {
+        val actuator = runCatching { ensureFeedbackActuator() }.getOrNull() ?: return
+        if (started) {
+            actuator.playVoiceListeningStartVibration()
+        } else {
+            actuator.playVoiceListeningEndVibration()
         }
     }
 

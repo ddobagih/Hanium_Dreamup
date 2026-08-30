@@ -210,6 +210,19 @@ class AndroidFeedbackActuator(
 
     fun vibrateRiskOnly(action: FeedbackAction): Boolean = vibrate(action.vibrationPatternMs)
 
+    /**
+     * 듣기 시작·끝 신호. 화면을 보지 않는 사용자에게 마이크가 열리고 닫힌 순간을 알린다.
+     *
+     * 소리가 아니라 진동인 이유: 이 신호가 나가는 시점에 마이크는 이미 열려 있어, 소리를 내면 그
+     * 소리가 인식 입력으로 들어간다.
+     *
+     * 위험 신호와 겹치지 않게 아주 짧게 둔다. 위험은 단발 220ms(WARNING)와 점점 길어지는 3연타
+     * (STOP)이고, 경로·장착은 단발 120ms 다. 듣기 신호는 그보다 짧은 35ms 를 쓴다.
+     */
+    fun playVoiceListeningStartVibration(): Boolean = vibrate(longArrayOf(0L, 35L))
+
+    fun playVoiceListeningEndVibration(): Boolean = vibrate(longArrayOf(0L, 35L, 45L, 35L))
+
     fun playRouteGuidancePausedVibration(): Boolean = vibrate(longArrayOf(0L, 120L))
 
     fun playRouteDeviationConfirmedVibration(): Boolean =
