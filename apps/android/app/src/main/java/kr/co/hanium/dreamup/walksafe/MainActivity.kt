@@ -507,6 +507,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var accountConsentAllCheck: CheckBox
     private lateinit var accountConsentSummaryText: TextView
     private lateinit var firstRunConsentAllButton: Button
+    /**
+     * 가입은 두 화면으로 나뉜다. 약관 동의와 가입 정보 입력을 한 화면에 세로로 붙이면 여섯 항목
+     * 조항을 지나야 이메일 칸에 닿는다. 표시 단계일 뿐이라 증거·상태기계는 그대로다.
+     */
+    private enum class AccountSignupStep { CONSENT, DETAILS }
+    private var accountSignupStep = AccountSignupStep.CONSENT
+    private lateinit var accountConsentContinueButton: Button
+    private lateinit var accountConsentStepControls: LinearLayout
+    private lateinit var accountDetailsStepControls: LinearLayout
     private var accountConsentDisclosureExpanded = false
     private lateinit var firstRunPurposeButton: Button
     private val firstRunAgeButtons = mutableMapOf<FirstRunAgeBand, Button>()
@@ -11557,6 +11566,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 refreshAccountConsentSummary()
             }
         }
+        accountConsentContinueButton = accessiblePriorityUserButton(
+            label = "동의하고 계속",
+            emphasis = true,
+            spokenLabel = "동의하고 계속. 다음 화면에서 가입 정보를 입력합니다",
+            onClick = {
+                accountSignupStep = AccountSignupStep.DETAILS
+                updateEmailAccountAccessUi(
+                    firstRunOnboardingSnapshot,
+                    firstRunPreviewStage ?: firstRunOnboardingSnapshot.stage,
+                )
+                accountEmailInput.post { accountEmailInput.requestFocus() }
+            },
+        )
         accountConsentSummaryText = TextView(this).apply {
             id = View.generateViewId()
             textSize = 18f
@@ -11648,11 +11670,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
             },
         )
-        accountSignupControls = LinearLayout(this).apply {
+        // 가입 첫 화면: 약관 동의만. 두 번째 화면: 가입 정보. 인증번호는 그 다음 단계가 그린다.
+        accountConsentStepControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            visibility = View.GONE
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            addView(accountDateOfBirthInput)
             addView(accountConsentDisclosureToggleButton)
             addView(accountConsentDisclosureText)
             addView(accountConsentAllCheck)
@@ -11660,7 +11681,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 addView(accountConsentCards.getValue(key))
             }
             addView(accountConsentSummaryText)
+            addView(accountConsentContinueButton)
+        }
+        accountDetailsStepControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(accountDateOfBirthInput)
             addView(accountRequestOtpButton)
+        }
+        accountSignupControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(accountConsentStepControls)
+            addView(accountDetailsStepControls)
             addView(accountPasswordConfirmationInput)
             addView(accountOtpInput)
             addView(accountCreateButton)
@@ -14054,8 +14088,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             accountAccessStatusText.contentDescription = authenticatedStatus
             return
         }
-        accountEmailInput.visibility = View.VISIBLE
-        accountPasswordInput.visibility = View.VISIBLE
         val creating = renderStage == FirstRunOnboardingStage.ACCOUNT_CREATED
         val verifiedLogin = snapshot.stage == FirstRunOnboardingStage.VERIFIED_LOGIN
         if (verifiedLogin) accountSignupExpanded = false
@@ -14072,6 +14104,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 renderStage != FirstRunOnboardingStage.VERIFIED_LOGIN
         accountSignupOpenShown = signupOpen
         val busy = accountRequestFence.isInFlight()
+        val inSignup = signupOpen && !creating && !verifiedLogin
+        val onConsentStep = inSignup && accountSignupStep == AccountSignupStep.CONSENT
+        val onDetailsStep = inSignup && accountSignupStep == AccountSignupStep.DETAILS
+        if (!inSignup) accountSignupStep = AccountSignupStep.CONSENT
+        accountConsentStepControls.visibility =
+            if (onConsentStep) View.VISIBLE else View.GONE
+        accountDetailsStepControls.visibility =
+            if (onDetailsStep) View.VISIBLE else View.GONE
+        // 약관 화면에서는 이메일·비밀번호 칸을 내린다. 그 화면에서 할 일은 동의뿐이다.
+        val credentialFieldsVisible = !onConsentStep
+        accountEmailInput.visibility = if (credentialFieldsVisible) View.VISIBLE else View.GONE
+        accountPasswordInput.visibility =
+            if (credentialFieldsVisible) View.VISIBLE else View.GONE
         accountRememberMeCheck.visibility = if (signupOpen) View.GONE else View.VISIBLE
         accountLoginButton.visibility = if (signupOpen) View.GONE else View.VISIBLE
         accountSignupToggleButton.visibility =
@@ -14093,17 +14138,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         accountSignupControls.visibility =
             if (signupOpen && !verifiedLogin) View.VISIBLE else View.GONE
-        accountDateOfBirthInput.visibility =
-            if (signupOpen && !creating && !verifiedLogin) {
-                View.VISIBLE
-            } else {
-                View.GONE
-            }
+        accountDateOfBirthInput.visibility = if (onDetailsStep) View.VISIBLE else View.GONE
         accountPasswordConfirmationInput.visibility =
             if (creating && signupOpen) View.VISIBLE else View.GONE
         accountOtpInput.visibility = if (creating && signupOpen) View.VISIBLE else View.GONE
         accountConsentDisclosureToggleButton.visibility =
-            if (signupOpen && !creating && !verifiedLogin) View.VISIBLE else View.GONE
+            if (onConsentStep) View.VISIBLE else View.GONE
         accountConsentDisclosureToggleButton.text =
             if (accountConsentDisclosureExpanded) {
                 "가입 동의 자세히 접기"
@@ -14117,28 +14157,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "가입 동의 자세히 보기, 접힘. 두 번 탭하여 펼치기"
             }
         accountConsentDisclosureText.visibility =
-            if (
-                signupOpen &&
-                !creating &&
-                !verifiedLogin &&
-                accountConsentDisclosureExpanded
-            ) {
-                View.VISIBLE
-            } else {
-                View.GONE
-            }
-        accountConsentChecks.values.forEach { check ->
-            check.visibility =
-                if (signupOpen && !creating && !verifiedLogin) {
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
-            check.isEnabled = !busy
+            if (onConsentStep && accountConsentDisclosureExpanded) View.VISIBLE else View.GONE
+        accountConsentChecks.values.forEach { check -> check.isEnabled = !busy }
+        accountConsentCards.values.forEach { card ->
+            card.visibility = if (onConsentStep) View.VISIBLE else View.GONE
         }
+        if (::accountConsentAllCheck.isInitialized) {
+            accountConsentAllCheck.visibility = if (onConsentStep) View.VISIBLE else View.GONE
+            accountConsentAllCheck.isEnabled = !busy
+        }
+        if (::accountConsentSummaryText.isInitialized) {
+            accountConsentSummaryText.visibility =
+                if (onConsentStep) View.VISIBLE else View.GONE
+        }
+        accountConsentContinueButton.visibility =
+            if (onConsentStep) View.VISIBLE else View.GONE
+        accountConsentContinueButton.isEnabled = !busy
         accountRequestOtpButton.visibility =
             if (
-                signupOpen &&
+                onDetailsStep &&
                 snapshot.stage == FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT
             ) {
                 View.VISIBLE
@@ -14167,7 +14204,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "인증번호가 발송되었습니다. 이메일·비밀번호·인증번호를 다시 확인하세요."
             snapshot.stage == FirstRunOnboardingStage.VERIFIED_LOGIN ->
                 "계정이 생성되었습니다. 같은 이메일과 비밀번호로 로그인하세요."
-            accountSignupExpanded ->
+            onConsentStep ->
+                "약관과 개인정보 처리에 동의하세요. 필수 3개에 동의해야 다음으로 넘어갑니다."
+            onDetailsStep || accountSignupExpanded ->
                 "가입 정보를 입력하고 인증번호를 받으세요."
             else ->
                 "이메일과 비밀번호를 입력하세요."

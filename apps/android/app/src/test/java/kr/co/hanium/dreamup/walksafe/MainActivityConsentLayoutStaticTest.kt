@@ -72,4 +72,44 @@ class MainActivityConsentLayoutStaticTest {
         assertFalse(source.contains("accountRequestOtpButton.isEnabled = selections.requiredGranted"))
         assertFalse(source.contains("accountCreateButton.isEnabled = selections.requiredGranted"))
     }
+
+    @Test
+    fun consentAndSignupDetailsAreSeparateScreens() {
+        val signup = source.substringAfter("accountSignupControls = LinearLayout(this).apply")
+            .substringBefore("\n        }")
+
+        // 가입은 두 화면이다. 약관 동의를 지나야 가입 정보에 닿는다.
+        assertTrue(signup.contains("addView(accountConsentStepControls)"))
+        assertTrue(signup.contains("addView(accountDetailsStepControls)"))
+
+        val consentStep = source.substringAfter("accountConsentStepControls = LinearLayout(this).apply")
+            .substringBefore("accountDetailsStepControls =")
+        assertTrue(consentStep.contains("addView(accountConsentAllCheck)"))
+        assertTrue(consentStep.contains("addView(accountConsentContinueButton)"))
+        // 약관 화면에는 가입 정보 칸이 없다.
+        assertFalse(consentStep.contains("addView(accountDateOfBirthInput)"))
+        assertFalse(consentStep.contains("addView(accountRequestOtpButton)"))
+
+        val detailsStep = source.substringAfter("accountDetailsStepControls = LinearLayout(this).apply")
+            .substringBefore("accountSignupControls = LinearLayout(this).apply")
+        assertTrue(detailsStep.contains("addView(accountDateOfBirthInput)"))
+        assertTrue(detailsStep.contains("addView(accountRequestOtpButton)"))
+        // 가입 정보 화면에는 약관 항목이 없다.
+        assertFalse(detailsStep.contains("accountConsentCards"))
+    }
+
+    @Test
+    fun theStepIsDisplayOnlyAndResetsWhenSignupCloses() {
+        val update = source.substringAfter("private fun updateEmailAccountAccessUi(")
+            .substringBefore("\n    private fun ")
+
+        assertTrue(update.contains("val onConsentStep = inSignup && accountSignupStep == AccountSignupStep.CONSENT"))
+        assertTrue(update.contains("if (!inSignup) accountSignupStep = AccountSignupStep.CONSENT"))
+
+        // 약관 화면에서는 이메일·비밀번호 칸을 내린다. 그 화면에서 할 일은 동의뿐이다.
+        assertTrue(update.contains("val credentialFieldsVisible = !onConsentStep"))
+
+        // 단계는 표시 상태다. 증거·상태기계는 건드리지 않는다.
+        assertFalse(update.contains("accountSignupStep") && update.contains("beginAttempt"))
+    }
 }
