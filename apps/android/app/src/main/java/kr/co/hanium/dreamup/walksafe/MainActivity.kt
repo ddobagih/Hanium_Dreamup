@@ -553,6 +553,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     /** accessiblePriorityUserButton(emphasis = true) 로 만든 각 단계의 주 행동. */
     private val wsEmphasisButtons = mutableListOf<Button>()
     private lateinit var offRouteNoticeText: TextView
+    private lateinit var walkLastResultText: TextView
     private lateinit var controlsScroll: ScrollView
     private lateinit var walkSafetyScroll: ScrollView
     private lateinit var walkSafetyOverlay: LinearLayout
@@ -12560,12 +12561,26 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 addView(fieldSessionLogButton)
             }
         }
+        // 조작 결과는 지금까지 말로만 나갔다. 음성은 흘러가므로 놓치면 다시 확인할 방법이 없고,
+        // 화면에는 무엇을 눌렀는지도 남지 않았다. 마지막 안내를 그대로 한 줄로 남긴다.
+        //
+        // 문구를 새로 만들지 않는다. 이미 말하고 있는 그 문장을 그대로 쓴다.
+        walkLastResultText = TextView(this).apply {
+            id = View.generateViewId()
+            textSize = 18f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            setLineSpacing(0f, 1.45f)
+            visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            // 방금 소리로 나간 문장이다. live region 으로 두면 같은 말을 두 번 듣는다.
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
+        }
         // 7구역 + 구분선. 이전에는 17개가 여백도 구분선도 없이 세로로 균등하게 나열돼, 주 행동과
         // 「진행음 볼륨」이 같은 무게로 보였다.
         runtimeControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            // 1. 상태와 사유
-            addView(walkSection(null, statusText, detailText))
+            // 1. 상태와 사유, 그리고 마지막 결과
+            addView(walkSection(null, statusText, detailText, walkLastResultText))
             addView(walkDivider())
             // 2. 경로 이탈 선택. 평소에는 통째로 숨어 있다.
             addView(routeDeviationActions)
@@ -21676,6 +21691,23 @@ generation != cameraFallbackGeneration
         )
     }
 
+    /**
+     * 방금 안내한 문장을 보행 화면에 남긴다. 말은 흘러가지만 결과는 남아야 한다 — 놓쳤을 때 다시
+     * 확인할 곳이 없으면 무엇을 눌렀고 어떻게 됐는지 알 수 없다.
+     *
+     * 문구는 만들지 않는다. 이미 나가는 그 문장 그대로다. 억눌려서 소리가 안 나간 경우에도 화면에는
+     * 남긴다 — 소리가 막힌 때야말로 화면이 유일한 통로다.
+     */
+    private fun showWalkLastResult(message: String) {
+        if (!::walkLastResultText.isInitialized) return
+        val line = "마지막 안내: $message"
+        walkLastResultText.visibility = View.VISIBLE
+        if (walkLastResultText.text != line) {
+            walkLastResultText.text = line
+            walkLastResultText.contentDescription = line
+        }
+    }
+
     private fun speakInteraction(message: String): Boolean {
         val generation = feedbackLifecycleGeneration
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -21686,6 +21718,7 @@ generation != cameraFallbackGeneration
             return true
         }
         if (!isFeedbackLifecycleCurrent(generation)) return false
+        showWalkLastResult(message)
         if (shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)) return false
         val screenReaderActive = isScreenReaderActive()
         val announced = announceForTalkBack(message = message, priority = TalkBackAnnouncementPriority.INTERACTION)
