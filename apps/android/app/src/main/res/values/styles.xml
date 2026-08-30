@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+    <!--
+      밝은 판으로 바꾸면서 테마 부모도 Light 로 옮긴다. 색을 지정하지 않은 텍스트가 테마 기본값을
+      쓰는데, 어두운 테마의 기본 글자색은 흰색이라 밝은 바탕에서 보이지 않는다.
+    -->
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:colorAccent">#0b6b58</item>
         <!--

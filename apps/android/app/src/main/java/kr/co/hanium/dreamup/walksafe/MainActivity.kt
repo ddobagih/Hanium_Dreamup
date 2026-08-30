@@ -8440,7 +8440,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     text = userReportSummaryText(report)
                     contentDescription = text
                     textSize = 16f
-                    setTextColor(0xffffffff.toInt())
+                    setTextColor(WS_COLOR_BUTTON_TEXT)
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
                 }
                 val detailButton = Button(this).apply {
@@ -10678,6 +10678,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (root is LinearLayout && root.orientation == LinearLayout.VERTICAL) {
             applyWsStackSpacing(root)
         }
+        if (root is CompoundButton) {
+            // 기본 체크 상자는 밝은 바탕에서 윤곽이 거의 보이지 않는다.
+            root.buttonTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(WS_COLOR_EMPHASIS, WS_COLOR_LINE),
+            )
+            root.setTextColor(WS_COLOR_BUTTON_TEXT)
+        }
         if (root is Button || root is EditText || root is CheckBox) {
             val targetSize = accessibilityTargetSizePx()
             root.minimumHeight = maxOf(root.minimumHeight, targetSize)
@@ -10869,10 +10877,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
 
     /** 한 가지 상태의 납작한 둥근 채움. 프레임워크 기본 버튼 배경은 인셋과 각진 모서리를 함께 들고 온다. */
-    private fun wsButtonFace(fill: Int, density: Float): GradientDrawable = GradientDrawable().apply {
+    private fun wsButtonFace(
+        fill: Int,
+        density: Float,
+        outlined: Boolean = false,
+    ): GradientDrawable = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         cornerRadius = WS_CORNER_RADIUS_DP * density
         setColor(fill)
+        // 밝은 면은 흰 바탕과 1.25:1 밖에 안 돼 경계가 보이지 않는다. 테두리가 경계를 만든다.
+        // 주 행동은 면 자체가 18.9:1 이라 테두리가 필요 없다.
+        if (outlined) setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
     }
 
     /**
@@ -10893,6 +10908,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         button.gravity = if (primary) Gravity.CENTER else Gravity.START or Gravity.CENTER_VERTICAL
         button.stateListAnimator = null
         button.elevation = 0f
+        // accessiblePriorityUserButton 이 남긴 backgroundTintList 가 아래 드로어블을 그대로 물들인다.
+        // 어두운 판에서는 색이 비슷해 가려져 있었지만, 밝은 판에서는 주 행동의 어두운 면이 연회색으로
+        // 칠해져 흰 글자가 사라진다.
+        button.backgroundTintList = null
         button.background = StateListDrawable().apply {
             addState(
                 intArrayOf(-android.R.attr.state_enabled),
@@ -10903,6 +10922,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         WS_COLOR_BUTTON_DISABLED_FILL
                     },
                     density,
+                    outlined = !primary,
                 ),
             )
             addState(
@@ -10914,6 +10934,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         WS_COLOR_BUTTON_PRESSED_FILL
                     },
                     density,
+                    outlined = !primary,
                 ),
             )
             addState(
@@ -10925,6 +10946,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 wsButtonFace(
                     if (primary) WS_COLOR_PRIMARY_ACTION_FILL else WS_COLOR_BUTTON_FILL,
                     density,
+                    outlined = !primary,
                 ),
             )
         }
@@ -11204,7 +11226,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             text = "첫 실행 등록 상태를 확인하는 중입니다."
             textSize = 20f
             setTypeface(typeface, Typeface.NORMAL)
-            setTextColor(0xffffe8bd.toInt())
+            setTextColor(WS_COLOR_EMPHASIS)
             letterSpacing = 0.0f
             setLineSpacing(0f, 1.2f)
             layoutParams = LinearLayout.LayoutParams(
@@ -11246,7 +11268,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             id = View.generateViewId()
             text = INTEGRATED_CONSENT_DISCLOSURE_KO
             textSize = 18f
-            setTextColor(0xffffffff.toInt())
+            setTextColor(WS_COLOR_BUTTON_TEXT)
             setLineSpacing(0f, 1.45f)
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -11509,7 +11531,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             id = View.generateViewId()
             text = accountConsentDisclosure
             contentDescription = accountConsentDisclosure
-            setTextColor(0xffffffff.toInt())
+            setTextColor(WS_COLOR_BUTTON_TEXT)
             textSize = 18f
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
@@ -11530,7 +11552,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 id = View.generateViewId()
                 text = label
                 contentDescription = label
-                setTextColor(0xffffffff.toInt())
+                setTextColor(WS_COLOR_BUTTON_TEXT)
                 textSize = 18f
                 isChecked = false
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -11563,7 +11585,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             id = View.generateViewId()
             text = ACCOUNT_CONSENT_ALL_LABEL
             contentDescription = ACCOUNT_CONSENT_ALL_LABEL
-            setTextColor(0xffffffff.toInt())
+            setTextColor(WS_COLOR_BUTTON_TEXT)
             textSize = 18f
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             setOnClickListener {
@@ -11596,7 +11618,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             id = View.generateViewId()
             text = "이 기기에서 로그인 유지"
             contentDescription = text
-            setTextColor(0xffffffff.toInt())
+            setTextColor(WS_COLOR_BUTTON_TEXT)
             textSize = 18f
             isChecked = false
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -11748,7 +11770,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             id = View.generateViewId()
             text = "최초 보행 전 교육 상태를 확인하는 중입니다."
             textSize = 18f
-            setTextColor(0xffffffff.toInt())
+            setTextColor(WS_COLOR_BUTTON_TEXT)
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -11788,7 +11810,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             id = View.generateViewId()
             text = "공식 사용환경을 확인하는 중입니다."
             textSize = 18f
-            setTextColor(0xffffe8bd.toInt())
+            setTextColor(WS_COLOR_EMPHASIS)
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -11802,7 +11824,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             id = View.generateViewId()
             text = "휴대전화 장착 상태를 확인하는 중입니다."
             textSize = 18f
-            setTextColor(0xffffe8bd.toInt())
+            setTextColor(WS_COLOR_EMPHASIS)
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -11819,7 +11841,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         startupCapabilityText = TextView(this).apply {
             text = "기기 기능을 확인하는 중입니다."
             textSize = 16f
-            setTextColor(0xffffe8bd.toInt())
+            setTextColor(WS_COLOR_EMPHASIS)
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -11872,7 +11894,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             id = View.generateViewId()
             text = getString(R.string.walk_safety_preparing)
             textSize = 20f
-            setTextColor(0xffffffff.toInt())
+            setTextColor(WS_COLOR_BUTTON_TEXT)
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -11896,7 +11918,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         navigationStatusText = TextView(this).apply {
             textSize = 14f
-            setTextColor(0xffd7ffd9.toInt())
+            setTextColor(WS_COLOR_NOTICE_TEXT)
             text = "navigation=destination_none hazard_only"
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
@@ -12014,7 +12036,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         privacyConsentStatusText = TextView(this).apply {
             id = View.generateViewId()
             textSize = 16f
-            setTextColor(0xffffe8bd.toInt())
+            setTextColor(WS_COLOR_EMPHASIS)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
@@ -12022,7 +12044,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         reportPrivacyDisclosureText = TextView(this).apply {
             text = REPORT_PRIVACY_DISCLOSURE_KO
             textSize = 13f
-            setTextColor(0xffffe8bd.toInt())
+            setTextColor(WS_COLOR_EMPHASIS)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
         reportPrivacyConsentButton = Button(this).apply {
@@ -12050,7 +12072,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             text = "내 신고 상태: 로그인이 필요합니다."
             contentDescription = text
             textSize = 18f
-            setTextColor(0xffffffff.toInt())
+            setTextColor(WS_COLOR_BUTTON_TEXT)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
@@ -12087,7 +12109,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             text = "신고를 선택하면 상세 상태가 표시됩니다."
             contentDescription = text
             textSize = 16f
-            setTextColor(0xffffffff.toInt())
+            setTextColor(WS_COLOR_BUTTON_TEXT)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
@@ -12192,7 +12214,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountDeletionStatusText = TextView(this).apply {
             id = View.generateViewId()
             textSize = 16f
-            setTextColor(0xffffe8bd.toInt())
+            setTextColor(WS_COLOR_EMPHASIS)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
@@ -12218,7 +12240,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             accountDeletionItemTexts[item] = TextView(this).apply {
                 id = View.generateViewId()
                 textSize = 14f
-                setTextColor(0xffffffff.toInt())
+                setTextColor(WS_COLOR_BUTTON_TEXT)
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             }
         }
@@ -14617,7 +14639,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         priorityUserOnboardingStatusText.text = message
         priorityUserOnboardingStatusText.contentDescription = message
-        priorityUserOnboardingStatusText.setTextColor(0xffffffff.toInt())
+        priorityUserOnboardingStatusText.setTextColor(WS_COLOR_BUTTON_TEXT)
         priorityUserOnboardingControls.setBackgroundColor(
             if (environment.highContrastEnabled) {
                 0xff000000.toInt()
@@ -24475,7 +24497,7 @@ generation != cameraFallbackGeneration
                 TextView(this).apply {
                     text = if (destinationSearchQuery.isBlank()) "검색어를 입력하세요." else "검색 결과 없음"
                     textSize = MIN_INTERACTIVE_TEXT_SP
-                    setTextColor(0xffd7d7ff.toInt())
+                    setTextColor(WS_COLOR_NOTICE_TEXT)
                 },
             )
             destinationMoreButton.visibility = View.GONE
@@ -26206,30 +26228,30 @@ generation != cameraFallbackGeneration
     private companion object {
         /** 마지막 컨트롤 아래 확보할 여백. 화면 밀도에 맞춰 px 로 환산한다. */
         /** 실측 대비 기준 디자인 토큰. 흰 글자/회색 면 6.97:1, 테두리 4.08:1. */
-        const val WS_COLOR_BUTTON_FILL = 0xff5a595b.toInt()
-        const val WS_COLOR_BUTTON_TEXT = 0xffffffff.toInt()
-        const val WS_COLOR_BUTTON_PRESSED_FILL = 0xff3f3e41.toInt()
+        const val WS_COLOR_BUTTON_FILL = 0xffefede9.toInt()
+        const val WS_COLOR_BUTTON_TEXT = 0xff1a1a1a.toInt()
+        const val WS_COLOR_BUTTON_PRESSED_FILL = 0xffd9d6d0.toInt()
         const val WS_COLOR_BUTTON_FOCUSED_FILL = 0xff765d00.toInt()
-        const val WS_COLOR_BUTTON_DISABLED_FILL = 0xff2f2e31.toInt()
-        const val WS_COLOR_BUTTON_DISABLED_TEXT = 0xffaaa7a2.toInt()
+        const val WS_COLOR_BUTTON_DISABLED_FILL = 0xfff4f3f0.toInt()
+        const val WS_COLOR_BUTTON_DISABLED_TEXT = 0xff6e6b66.toInt()
         /** 펼쳐진 안전 고지. 카드 위 10.81:1 로 AAA 를 유지한다. */
-        const val WS_COLOR_NOTICE_TEXT = 0xffc9c6c0.toInt()
-        const val WS_COLOR_NOTICE_FILL = 0xff141414.toInt()
-        const val WS_COLOR_LINE = 0xff6e6d70.toInt()
+        const val WS_COLOR_NOTICE_TEXT = 0xff3d3b38.toInt()
+        const val WS_COLOR_NOTICE_FILL = 0xfff4f3f0.toInt()
+        const val WS_COLOR_LINE = 0xff6e6b66.toInt()
         const val SAFETY_NOTICE_HEADING = "안전 고지"
-        const val WS_COLOR_EMPHASIS = 0xffffe8bd.toInt()
-        const val WS_COLOR_WARNING = 0xffe38a72.toInt()
+        const val WS_COLOR_EMPHASIS = 0xff8a5a00.toInt()
+        const val WS_COLOR_WARNING = 0xffb3341a.toInt()
         /** 주 행동은 배경과 글자를 뒤집어 구분한다. 색이 아니라 명도 대비로 읽히게 한다. */
-        const val WS_COLOR_PRIMARY_ACTION_FILL = 0xffffffff.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_TEXT = 0xff000000.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_PRESSED_FILL = 0xffd2d2d2.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_FILL = 0xff111111.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_TEXT = 0xffffffff.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_PRESSED_FILL = 0xff3a3a3a.toInt()
         /**
          * 주 행동은 첫 실행 미완료·ARCore 확인 중처럼 꺼져 있는 시간이 길다. 일반 버튼의 비활성
          * 색을 그대로 쓰면 화면에서 가장 흐린 요소가 되어 크기로 만든 위계가 뒤집힌다. 꺼져 있어도
          * 다른 버튼보다는 밝게 두어 「지금은 누를 수 없는 주 행동」으로 읽히게 한다.
          */
-        const val WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff9a9a9a.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT = 0xff1a1a1a.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff6b6b6b.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT = 0xffffffff.toInt()
         const val WS_TOUCH_PRIMARY_DP = 56f
         /** 보행 화면 일반 행동. 온보딩 48dp 보다 크게 잡아 한 손 조작에서 빗나가지 않게 한다. */
         const val WS_TOUCH_WALK_ACTION_DP = 56f
@@ -26282,8 +26304,8 @@ generation != cameraFallbackGeneration
         const val OVERLAY_BOTTOM_PADDING_DP = 24f
         const val OVERLAY_HORIZONTAL_PADDING_DP = 20f
         const val OVERLAY_TOP_PADDING_DP = 24f
-        const val WS_COLOR_OVERLAY_FILL = 0xee101010.toInt()
-        const val WS_COLOR_WALK_OVERLAY_FILL = 0xdd000000.toInt()
+        const val WS_COLOR_OVERLAY_FILL = 0xfaffffff.toInt()
+        const val WS_COLOR_WALK_OVERLAY_FILL = 0xf2ffffff.toInt()
 
         val PRIVACY_STARTUP_PROCESS_LOCK = Any()
         var accountDeletionStartupResetHandoffPending = false

@@ -47,12 +47,12 @@ class MainActivityWalkScreenLayoutStaticTest {
         assertTrue(source.contains("const val WS_TOUCH_WALK_PRIMARY_DP = 80f"))
         assertTrue(source.contains("const val WS_TOUCH_WALK_ACTION_DP = 56f"))
 
-        // 주 행동은 배경과 글자를 뒤집어 구분한다.
-        assertTrue(source.contains("WS_COLOR_PRIMARY_ACTION_FILL = 0xffffffff.toInt()"))
-        assertTrue(source.contains("WS_COLOR_PRIMARY_ACTION_TEXT = 0xff000000.toInt()"))
-
-        // 꺼져 있는 시간이 길다. 비활성일 때도 다른 버튼보다 밝아야 크기로 만든 위계가 유지된다.
-        assertTrue(source.contains("WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff9a9a9a.toInt()"))
+        // 주 행동은 배경과 글자를 뒤집어 구분하고, 꺼져 있을 때도 다른 버튼보다 무겁게 남는다.
+        // 색 값 자체는 여기서 고정하지 않는다 — 판을 밝게 바꾸면 값이 통째로 달라지지만 지켜야 할
+        // 것은 값이 아니라 관계다. 그 관계는 WalkSafePaletteContrastTest 가 대비로 계산해 고정한다.
+        assertTrue(source.contains("const val WS_COLOR_PRIMARY_ACTION_FILL"))
+        assertTrue(source.contains("const val WS_COLOR_PRIMARY_ACTION_TEXT"))
+        assertTrue(source.contains("const val WS_COLOR_PRIMARY_ACTION_DISABLED_FILL"))
         val style = source.substringAfter("private fun applyWsButtonStyle(")
             .substringBefore("private fun walkDivider()")
         assertTrue(style.contains("WS_COLOR_PRIMARY_ACTION_DISABLED_FILL"))
