@@ -286,8 +286,15 @@ class PriorityUserOnboardingStaticTest {
         assertTrue(traversal.contains("nextFocusForwardId = current.id"))
         assertTrue(traversal.contains("nextFocusDownId = current.id"))
         assertTrue(traversal.contains("nextFocusUpId = previous.id"))
-        assertTrue(update.contains("if (environment.highContrastEnabled)"))
-        assertTrue(update.contains("0xff000000.toInt()"))
+        // 고대비 설정이 실제로 무언가를 다르게 해야 한다. 어두운 판에서는 검은 면을 깔았고, 밝은
+        // 판에서는 면을 뒤집는 대신 테두리를 두껍고 진하게 세운다. 색 값 자체는 여기서 고정하지
+        // 않는다 — 판이 바뀌면 값은 달라지고, 지켜야 할 것은 「고대비일 때 달라진다」는 사실이다.
+        assertTrue(update.contains("if (environment.highContrastEnabled) 2f else 1f"))
+        assertTrue(
+            update.contains(
+                "if (environment.highContrastEnabled) WS_COLOR_BUTTON_BORDER else WS_COLOR_LINE",
+            ),
+        )
         assertTrue(update.contains("priorityUserOnboardingStatusText.contentDescription = message"))
         assertTrue(update.contains("button.contentDescription = button.text"))
         assertFalse(content.contains("setOnTouchListener"))

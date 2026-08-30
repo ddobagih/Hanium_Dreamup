@@ -12751,7 +12751,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         updateFirstRunOnboardingUi()
 
         controlsScroll = ScrollView(this).apply {
-            isFillViewport = false
+            // 내용이 짧으면 오버레이가 그 높이만큼만 그려지고, 그 아래로 뒤에 깔린 GLSurfaceView 가
+            // 그대로 비친다. 세션이 없을 때 그 표면은 검은색이라 화면 아래가 검게 잘려 보였다.
+            // 어두운 판에서는 오버레이도 거의 검어서 눈에 띄지 않았을 뿐이다.
+            // 화면을 채우게 해서 바탕색이 끝까지 이어지게 한다. walkSafetyScroll 은 이미 그렇게 한다.
+            isFillViewport = true
             isVerticalScrollBarEnabled = true
             addView(
                 overlay,
@@ -14670,12 +14674,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         priorityUserOnboardingStatusText.text = message
         priorityUserOnboardingStatusText.contentDescription = message
         priorityUserOnboardingStatusText.setTextColor(WS_COLOR_BUTTON_TEXT)
-        priorityUserOnboardingControls.setBackgroundColor(
-            if (environment.highContrastEnabled) {
-                0xff000000.toInt()
-            } else {
-                0xcc000000.toInt()
-            },
+        // 교육·연습 묶음을 한 덩어리로 세우는 패널이다. 어두운 판에서는 검은 면으로 세웠는데,
+        // 밝은 판에서는 그 면이 그대로 남아 같은 토큰을 쓰는 글자와 함께 검은 바탕에 검은 글씨가
+        // 됐다. 디자인의 Card — 흰 면 + 테두리 — 로 옮긴다.
+        //
+        // 고대비 설정은 면을 바꾸는 대신 테두리를 두껍고 진하게 한다. 밝은 판에서 강조는 면을
+        // 뒤집는 것이 아니라 경계를 세우는 쪽이다.
+        val panelDensity = resources.displayMetrics.density
+        priorityUserOnboardingControls.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = WS_CORNER_RADIUS_DP * panelDensity
+            setColor(WS_COLOR_NOTICE_FILL)
+            setStroke(
+                ((if (environment.highContrastEnabled) 2f else 1f) * panelDensity).roundToInt(),
+                if (environment.highContrastEnabled) WS_COLOR_BUTTON_BORDER else WS_COLOR_LINE,
+            )
+        }
+        priorityUserOnboardingControls.setPadding(
+            (16f * panelDensity).roundToInt(),
+            (16f * panelDensity).roundToInt(),
+            (16f * panelDensity).roundToInt(),
+            (16f * panelDensity).roundToInt(),
         )
         priorityUserAgeButtons.forEach { (ageBand, button) ->
             button.isEnabled = accountBound && !trainingDeliveryInFlight
