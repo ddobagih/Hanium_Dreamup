@@ -43,6 +43,7 @@ import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
 import android.text.InputType
 import android.view.Gravity
 import android.view.MotionEvent
@@ -141,6 +142,7 @@ import kr.co.hanium.dreamup.walksafe.device.WALKSAFE_PRODUCT_SAFETY_LIMITATION_K
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeApprovedDeviceProfiles
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupCapabilityDecision
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupCapabilityTier
+import kr.co.hanium.dreamup.walksafe.device.USER_INSTALLABLE_REQUIREMENTS
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupRequirement
 import kr.co.hanium.dreamup.walksafe.depth.ArCoreFrameProvider
 import kr.co.hanium.dreamup.walksafe.depth.CameraIntrinsics
@@ -516,6 +518,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     /** DEBUG 미리보기에서 온보딩 표면을 모두 내리고 보행 화면만 그리는 자리. */
     private var firstRunPreviewWalkScreenOnly = false
     private lateinit var accountConsentContinueButton: Button
+    private lateinit var voiceDataInstallButton: Button
     private lateinit var accountConsentStepControls: LinearLayout
     private lateinit var accountDetailsStepControls: LinearLayout
     private var accountConsentDisclosureExpanded = false
@@ -12534,6 +12537,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 updateWalkReadinessSection()
             },
         )
+        voiceDataInstallButton = accessiblePriorityUserButton(
+            label = "한국어 음성 데이터 설치 열기",
+            spokenLabel = "한국어 음성 데이터 설치 열기. 휴대폰 설정으로 이동합니다",
+            onClick = ::openVoiceDataInstallSettings,
+        )
         walkReadinessControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -12544,6 +12552,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(phoneMountingChestConfirmButton)
             addView(phoneMountingNecklaceConfirmButton)
             addView(startupCapabilityText)
+            addView(voiceDataInstallButton)
             addView(startupMetricPreflightButton)
             addView(postLoginDeviceCheckSettingsButton)
             addView(startupCapabilityConfirmButton)
@@ -16290,6 +16299,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val phoneMountingReady =
             phoneMountingReadiness(walkSessionLifecycle.snapshot().epoch).first ==
                 WalkSessionReadinessStatus.READY
+        val installableBlocking = decision.unavailableRequirements
+            .filter { it in USER_INSTALLABLE_REQUIREMENTS }
         val capabilityMessage = buildString {
             append(decision.noticeKo)
             append("\n기기 점검: ")
@@ -16305,10 +16316,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 },
             )
             if (confirmed) append("\n확인 완료: WalkSafe 기능을 시작할 수 있습니다.")
+            if (installableBlocking.isNotEmpty()) {
+                // 「이 휴대폰에서는 시작할 수 없습니다」로 끝내면 기기가 영구히 부적합한 것처럼
+                // 읽힌다. 설정에서 내려받으면 풀리는 항목은 그 사실을 말해 준다.
+                append("\n다음 행동: ")
+                append(installableBlocking.joinToString(", ") { it.labelKo })
+                append("은(는) 휴대폰 설정에서 음성 데이터를 내려받으면 사용할 수 있습니다.")
+            }
             append("\n${priorityUserDecision.noticeKo}")
         }
         applyWsStatusText(startupCapabilityText, capabilityMessage)
         startupCapabilityText.contentDescription = capabilityMessage
+        if (::voiceDataInstallButton.isInitialized) {
+            voiceDataInstallButton.visibility =
+                if (installableBlocking.isEmpty()) View.GONE else View.VISIBLE
+        }
         startupMetricPreflightButton.apply {
             visibility = if (currentPostLoginDeviceCheckSessionBinding() != null) {
                 View.VISIBLE
@@ -21114,6 +21136,33 @@ generation != cameraFallbackGeneration
                             isStartupCapabilityConfirmed()
                     )
             )
+    }
+
+    /**
+     * 한국어 음성 데이터 설치 화면을 연다. 엔진마다 화면이 달라 먼저 표준 설치 intent 를 시도하고,
+     * 그 화면이 없는 기기에서는 음성 입력 설정으로, 그것도 없으면 앱 설정으로 내려간다. 어디로도
+     * 갈 수 없으면 그 사실을 말한다 — 눌렀는데 아무 일도 안 일어나는 것이 가장 나쁘다.
+     */
+    private fun openVoiceDataInstallSettings() {
+        val candidates = listOf(
+            Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA),
+            Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(
+                Uri.fromParts("package", packageName, null),
+            ),
+        )
+        val opened = candidates.any { intent ->
+            runCatching {
+                startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                true
+            }.getOrDefault(false)
+        }
+        if (!opened) {
+            speakInteraction(
+                "이 휴대폰에서는 음성 데이터 설치 화면을 열 수 없습니다. " +
+                    "휴대폰 설정의 음성 항목에서 한국어 음성을 내려받으세요.",
+            )
+        }
     }
 
     private fun openAppSettings() {

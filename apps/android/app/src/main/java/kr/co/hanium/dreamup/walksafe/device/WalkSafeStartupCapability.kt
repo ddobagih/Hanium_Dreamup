@@ -27,6 +27,17 @@ enum class WalkSafeStartupCapabilityTier {
     BLOCKED,
 }
 
+/**
+ * 사용자가 휴대폰 설정에서 직접 해결할 수 있는 항목. 카메라나 ARCore 처럼 기기가 못 하는 것과
+ * 구분한다. 이 항목이 막고 있을 때는 「이 휴대폰에서는 시작할 수 없습니다」로 끝내면 안 된다 —
+ * 음성 데이터를 내려받으면 풀리는 문제다.
+ */
+val USER_INSTALLABLE_REQUIREMENTS: Set<WalkSafeStartupRequirement>
+    get() = setOf(
+        WalkSafeStartupRequirement.ON_DEVICE_STT,
+        WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS,
+    )
+
 enum class WalkSafeStartupRequirement(val labelKo: String) {
     ANDROID_VERSION("지원 Android 버전"),
     CAMERA("카메라"),
