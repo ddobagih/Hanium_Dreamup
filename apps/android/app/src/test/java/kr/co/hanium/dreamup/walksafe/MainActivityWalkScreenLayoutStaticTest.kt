@@ -53,12 +53,10 @@ class MainActivityWalkScreenLayoutStaticTest {
 
         // 꺼져 있는 시간이 길다. 비활성일 때도 다른 버튼보다 밝아야 크기로 만든 위계가 유지된다.
         assertTrue(source.contains("WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff9a9a9a.toInt()"))
-        assertTrue(
-            source.contains(
-                "if (primary) WS_COLOR_PRIMARY_ACTION_DISABLED_FILL " +
-                    "else WS_COLOR_BUTTON_DISABLED_FILL",
-            ),
-        )
+        val style = source.substringAfter("private fun applyWalkButtonStyle(")
+            .substringBefore("private fun walkDivider()")
+        assertTrue(style.contains("WS_COLOR_PRIMARY_ACTION_DISABLED_FILL"))
+        assertTrue(style.contains("WS_COLOR_BUTTON_DISABLED_FILL"))
 
         // 주 행동만 primary 다. 나머지는 같은 크기·같은 색으로 남는다.
         assertTrue(source.split("primary = true").size - 1 == 1)
@@ -110,5 +108,44 @@ class MainActivityWalkScreenLayoutStaticTest {
             ),
         )
         assertTrue(update.contains("routeDeviationEndButton.visibility = if (confirmed)"))
+    }
+
+    @Test
+    fun readinessSurfacesCollapseOnlyWhenNothingBlocksWalking() {
+        val section = source.substringAfter("private fun updateWalkReadinessSection() {")
+            .substringBefore("\n    private fun ")
+
+        // 접기를 제안할 조건은 보행을 막는 것이 하나도 없을 때뿐이다.
+        assertTrue(
+            section.contains(
+                "val everythingPassed = walkSafetyOutputsAllowed() && isStartupCapabilityConfirmed()",
+            ),
+        )
+
+        // 막는 것이 있으면 펼친 채 두고 토글을 내주지 않는다. 안전 사유는 사용자가 치울 수 없다.
+        val blocked = section.substringAfter("if (!everythingPassed) {")
+            .substringBefore("}")
+        assertTrue(blocked.contains("walkReadinessToggleButton.visibility = View.GONE"))
+        assertTrue(blocked.contains("walkReadinessControls.visibility = View.VISIBLE"))
+        assertFalse(blocked.contains("walkReadinessExpanded = "))
+    }
+
+    @Test
+    fun theWalkScreenSitsBelowOneCollapsibleReadinessGroup() {
+        val overlay = source.substringAfter("val overlay = LinearLayout(this).apply")
+            .substringBefore("val controlsScroll = ScrollView(this).apply")
+
+        // 준비 표면은 낱개로 오버레이에 붙지 않는다. 하나로 묶여야 접을 수 있다.
+        listOf(
+            "addView(officialEnvironmentStatusText)",
+            "addView(phoneMountingStatusText)",
+            "addView(startupCapabilityText)",
+            "addView(priorityUserOnboardingControls)",
+        ).forEach { assertFalse(overlay.contains(it)) }
+
+        assertTrue(
+            overlay.indexOf("addView(walkReadinessControls)") <
+                overlay.indexOf("addView(runtimeControls)"),
+        )
     }
 }

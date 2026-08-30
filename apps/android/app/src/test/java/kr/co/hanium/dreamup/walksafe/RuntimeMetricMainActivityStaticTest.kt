@@ -24,9 +24,10 @@ class RuntimeMetricMainActivityStaticTest {
         assertTrue(explanation.contains(".setPositiveButton("))
         assertTrue(explanation.contains("beginPostLoginDeviceCheckFromUserAction(sessionBinding)"))
 
+        // 준비 표면은 walkReadinessControls 로 묶였다. 순서 요구는 그 안에서 그대로 성립한다.
         val overlay = sourceSection(
-            "val overlay = LinearLayout(this).apply",
-            "controlsScroll = ScrollView(this).apply",
+            "walkReadinessControls = LinearLayout(this).apply",
+            "applyWalkButtonStyle(actionButton",
         )
         val preflight = overlay.indexOf("addView(startupMetricPreflightButton)")
         val confirmation = overlay.indexOf("addView(startupCapabilityConfirmButton)")
@@ -339,8 +340,8 @@ class RuntimeMetricMainActivityStaticTest {
             "val overlay = LinearLayout(this).apply",
         )
         val overlay = sourceSection(
-            "val overlay = LinearLayout(this).apply",
-            "controlsScroll = ScrollView(this).apply",
+            "walkReadinessControls = LinearLayout(this).apply",
+            "applyWalkButtonStyle(actionButton",
         )
         assertFalse(runtimeControls.contains("addView(fieldSessionLogButton)"))
         assertTrue(overlay.contains("addView(fieldSessionLogButton)"))

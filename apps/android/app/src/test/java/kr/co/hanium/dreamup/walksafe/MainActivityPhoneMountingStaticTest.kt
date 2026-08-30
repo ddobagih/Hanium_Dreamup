@@ -16,7 +16,8 @@ class MainActivityPhoneMountingStaticTest {
             content,
             "phoneMountingStatusText = TextView(this).apply",
         )
-        val overlay = blockStartingAt(content, "val overlay = LinearLayout(this).apply")
+        // 준비 표면은 walkReadinessControls 안에 순서 그대로 들어간다.
+        val overlay = blockStartingAt(content, "walkReadinessControls = LinearLayout(this).apply")
 
         assertTrue(statusView.contains("contentDescription = text"))
         assertTrue(statusView.contains("View.IMPORTANT_FOR_ACCESSIBILITY_YES"))

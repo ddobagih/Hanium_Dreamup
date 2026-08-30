@@ -20,6 +20,7 @@ import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.hardware.GeomagneticField
 import android.hardware.SensorManager
 import android.location.Location
@@ -514,6 +515,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val priorityUserAgeButtons = mutableMapOf<PriorityUserAgeBand, Button>()
     private val priorityUserPracticeButtons = mutableMapOf<PriorityUserPractice, Button>()
     private lateinit var runtimeControls: LinearLayout
+    private lateinit var walkReadinessControls: LinearLayout
+    private lateinit var walkReadinessToggleButton: Button
+    private lateinit var walkReadinessSummaryText: TextView
+    /** 사용자가 직접 편 상태. 막는 것이 있어 강제로 펼친 경우와 구분한다. */
+    private var walkReadinessExpanded = false
     private lateinit var offRouteNoticeText: TextView
     private lateinit var controlsScroll: ScrollView
     private lateinit var walkSafetyScroll: ScrollView
@@ -10653,36 +10659,84 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
      * 보행 화면 버튼의 팔레트. 온보딩이 쓰던 상태 색을 그대로 가져온다. 이전에는 보행 화면 버튼만
      * 플랫폼 기본 Button 이라 같은 앱에서 두 가지 버튼이 보였다.
      */
+    /** 한 가지 상태의 납작한 둥근 채움. 프레임워크 기본 버튼 배경은 인셋과 각진 모서리를 함께 들고 온다. */
+    private fun walkButtonFace(fill: Int, density: Float): GradientDrawable = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = WS_CORNER_RADIUS_DP * density
+        setColor(fill)
+    }
+
+    /**
+     * 보행 화면 버튼의 마감. 색만 칠하면 Theme.Material 의 기본 버튼 드로어블이 그대로 남아
+     * 인셋·각진 모서리·가운데 정렬이 따라온다. 설계 초안은 10dp 둥근 납작한 면에 왼쪽 정렬이므로
+     * 배경 자체를 갈아 끼운다. 카드에서 이미 쓰던 GradientDrawable 방식과 같다.
+     */
     private fun applyWalkButtonStyle(button: Button, minHeightDp: Float, primary: Boolean = false) {
         val density = resources.displayMetrics.density
-        val states = arrayOf(
-            intArrayOf(-android.R.attr.state_enabled),
-            intArrayOf(android.R.attr.state_pressed),
-            intArrayOf(android.R.attr.state_focused),
-            intArrayOf(),
-        )
         button.isAllCaps = false
         button.setSingleLine(false)
         button.ellipsize = null
         // applyAccessibleControlDefaults 가 maxOf 로 올리기만 하므로 여기서 잡은 크기가 살아남는다.
         button.minimumHeight = (minHeightDp * density).roundToInt()
         button.textSize = if (primary) 20f else 18f
-        if (primary) button.setTypeface(button.typeface, Typeface.BOLD)
-        button.backgroundTintList = ColorStateList(
-            states,
-            intArrayOf(
-                if (primary) WS_COLOR_PRIMARY_ACTION_DISABLED_FILL else WS_COLOR_BUTTON_DISABLED_FILL,
-                if (primary) WS_COLOR_PRIMARY_ACTION_PRESSED_FILL else WS_COLOR_BUTTON_PRESSED_FILL,
-                WS_COLOR_BUTTON_FOCUSED_FILL,
-                if (primary) WS_COLOR_PRIMARY_ACTION_FILL else WS_COLOR_BUTTON_FILL,
-            ),
+        button.typeface = Typeface.create(
+            if (primary) "sans-serif-medium" else "sans-serif",
+            if (primary) Typeface.BOLD else Typeface.NORMAL,
         )
+        // 주 행동만 가운데 정렬로 한 덩어리처럼 보이게 하고, 목록형 행동은 글머리를 왼쪽으로 맞춘다.
+        button.gravity = if (primary) Gravity.CENTER else Gravity.START or Gravity.CENTER_VERTICAL
+        button.stateListAnimator = null
+        button.elevation = 0f
+        button.background = StateListDrawable().apply {
+            addState(
+                intArrayOf(-android.R.attr.state_enabled),
+                walkButtonFace(
+                    if (primary) {
+                        WS_COLOR_PRIMARY_ACTION_DISABLED_FILL
+                    } else {
+                        WS_COLOR_BUTTON_DISABLED_FILL
+                    },
+                    density,
+                ),
+            )
+            addState(
+                intArrayOf(android.R.attr.state_pressed),
+                walkButtonFace(
+                    if (primary) {
+                        WS_COLOR_PRIMARY_ACTION_PRESSED_FILL
+                    } else {
+                        WS_COLOR_BUTTON_PRESSED_FILL
+                    },
+                    density,
+                ),
+            )
+            addState(
+                intArrayOf(android.R.attr.state_focused),
+                walkButtonFace(WS_COLOR_BUTTON_FOCUSED_FILL, density),
+            )
+            addState(
+                intArrayOf(),
+                walkButtonFace(
+                    if (primary) WS_COLOR_PRIMARY_ACTION_FILL else WS_COLOR_BUTTON_FILL,
+                    density,
+                ),
+            )
+        }
         val restingText = if (primary) WS_COLOR_PRIMARY_ACTION_TEXT else WS_COLOR_BUTTON_TEXT
         button.setTextColor(
             ColorStateList(
-                states,
+                arrayOf(
+                    intArrayOf(-android.R.attr.state_enabled),
+                    intArrayOf(android.R.attr.state_pressed),
+                    intArrayOf(android.R.attr.state_focused),
+                    intArrayOf(),
+                ),
                 intArrayOf(
-                    if (primary) WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT else WS_COLOR_BUTTON_DISABLED_TEXT,
+                    if (primary) {
+                        WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT
+                    } else {
+                        WS_COLOR_BUTTON_DISABLED_TEXT
+                    },
                     restingText,
                     WS_COLOR_BUTTON_TEXT,
                     restingText,
@@ -10691,9 +10745,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
         button.setPadding(
             (20f * density).roundToInt(),
-            (12f * density).roundToInt(),
+            (14f * density).roundToInt(),
             (20f * density).roundToInt(),
-            (12f * density).roundToInt(),
+            (14f * density).roundToInt(),
         )
     }
 
@@ -10726,12 +10780,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 topMargin = (WS_SECTION_GAP_DP * density).roundToInt()
                 bottomMargin = (WS_SECTION_GAP_DP * density).roundToInt()
             }
+            // 마지막 자식의 아래 여백은 구역 여백과 겹치므로 뒤에서 걷어낸다.
             label?.let {
                 addView(
                     TextView(this@MainActivity).apply {
                         text = it
                         textSize = 18f
                         setTextColor(WS_COLOR_NOTICE_TEXT)
+                        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                        // 한글에는 대문자가 없어 초안의 uppercase 대신 자간으로 라벨임을 알린다.
+                        letterSpacing = 0.12f
                         ViewCompat.setAccessibilityHeading(this, true)
                         layoutParams = LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -10742,15 +10800,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     },
                 )
             }
-            children.forEach { child ->
+            children.forEachIndexed { index, child ->
+                val gap = if (index == children.lastIndex) {
+                    0
+                } else {
+                    (WS_GROUP_GAP_DP * density).roundToInt()
+                }
                 (child.layoutParams as? LinearLayout.LayoutParams)?.let { existing ->
-                    existing.bottomMargin = (WS_GROUP_GAP_DP * density).roundToInt()
+                    existing.bottomMargin = gap
                 } ?: run {
                     child.layoutParams = LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                     ).apply {
-                        bottomMargin = (WS_GROUP_GAP_DP * density).roundToInt()
+                        bottomMargin = gap
                     }
                 }
                 addView(child)
@@ -11510,7 +11573,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ViewCompat.setAccessibilityHeading(safetySummaryText, true)
         statusText = TextView(this).apply {
             textSize = 24f
-            setTypeface(typeface, Typeface.BOLD)
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            setLineSpacing(0f, 1.3f)
             setTextColor(WS_COLOR_EMPHASIS)
             contentDescription = "WalkSafe 상태"
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -12146,6 +12210,41 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 addView(destinationLngInput)
             }
         }
+        // 장착·환경·기기 점검은 보행이 막혀 있는 동안에만 화면을 차지해야 한다. 전부 통과하면
+        // 한 줄로 접혀 보행 화면이 자기 화면을 갖는다. 하나라도 막고 있으면 사유가 그대로 펼쳐진
+        // 채로 남고 접기 버튼도 내주지 않는다. 안전을 막는 이유는 접히면 안 된다.
+        walkReadinessSummaryText = TextView(this).apply {
+            textSize = 18f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            setLineSpacing(0f, 1.45f)
+            visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
+        walkReadinessToggleButton = accessiblePriorityUserButton(
+            label = "기기 준비 상태 펼치기",
+            spokenLabel = "기기 준비 상태, 접힘. 두 번 탭하여 펼치기",
+            onClick = {
+                walkReadinessExpanded = !walkReadinessExpanded
+                updateWalkReadinessSection()
+            },
+        )
+        walkReadinessControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(priorityUserOnboardingControls)
+            addView(officialEnvironmentStatusText)
+            addView(officialEnvironmentConfirmButton)
+            addView(phoneMountingStatusText)
+            addView(phoneMountingChestConfirmButton)
+            addView(phoneMountingNecklaceConfirmButton)
+            addView(startupCapabilityText)
+            addView(startupMetricPreflightButton)
+            addView(postLoginDeviceCheckSettingsButton)
+            addView(startupCapabilityConfirmButton)
+            if (BuildConfig.DEBUG) {
+                addView(fieldSessionLogButton)
+            }
+        }
         applyWalkButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)
         listOf(
             explicitReportButton,
@@ -12230,19 +12329,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(firstRunNoticeToggleButton)
             addView(permissionDenialPanel)
             addView(firstRunOnboardingControls)
-            addView(priorityUserOnboardingControls)
-            addView(officialEnvironmentStatusText)
-            addView(officialEnvironmentConfirmButton)
-            addView(phoneMountingStatusText)
-            addView(phoneMountingChestConfirmButton)
-            addView(phoneMountingNecklaceConfirmButton)
-            addView(startupCapabilityText)
-            addView(startupMetricPreflightButton)
-            addView(postLoginDeviceCheckSettingsButton)
-            addView(startupCapabilityConfirmButton)
-            if (BuildConfig.DEBUG) {
-                addView(fieldSessionLogButton)
-            }
+            addView(walkReadinessSummaryText)
+            addView(walkReadinessToggleButton)
+            addView(walkReadinessControls)
             addView(privacySectionToggleButton)
             addView(privacyControls)
             addView(runtimeControls)
@@ -12601,6 +12690,46 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         } else {
             FIRST_RUN_STAGE_COUNT
         }
+
+    /**
+     * 준비 표면을 접을지 정한다. 접기는 보행을 막는 것이 하나도 없을 때만 제안한다. 막는 것이
+     * 있으면 강제로 펼친 채 두고 토글 자체를 내주지 않는다 — 사용자가 안전 사유를 치울 수 있으면
+     * 안 된다.
+     */
+    private fun updateWalkReadinessSection() {
+        if (!::walkReadinessControls.isInitialized) return
+        if (walkReadinessControls.visibility == View.GONE) {
+            walkReadinessToggleButton.visibility = View.GONE
+            walkReadinessSummaryText.visibility = View.GONE
+            return
+        }
+        val everythingPassed = walkSafetyOutputsAllowed() && isStartupCapabilityConfirmed()
+        if (!everythingPassed) {
+            // 사용자의 접기 선택은 그대로 기억해 둔다. 다시 통과하면 접힌 채로 돌아온다.
+            walkReadinessToggleButton.visibility = View.GONE
+            walkReadinessSummaryText.visibility = View.GONE
+            walkReadinessControls.visibility = View.VISIBLE
+            return
+        }
+        walkReadinessToggleButton.visibility = View.VISIBLE
+        walkReadinessToggleButton.text =
+            if (walkReadinessExpanded) "기기 준비 상태 접기" else "기기 준비 상태 펼치기"
+        walkReadinessToggleButton.contentDescription =
+            if (walkReadinessExpanded) {
+                "기기 준비 상태, 펼침. 두 번 탭하여 접기"
+            } else {
+                "기기 준비 상태, 접힘. 두 번 탭하여 펼치기"
+            }
+        walkReadinessControls.visibility =
+            if (walkReadinessExpanded) View.VISIBLE else View.GONE
+        walkReadinessSummaryText.visibility =
+            if (walkReadinessExpanded) View.GONE else View.VISIBLE
+        val summary = "기기 준비 완료. 장착, 환경, 기기 점검을 모두 통과했습니다."
+        if (walkReadinessSummaryText.text != summary) {
+            walkReadinessSummaryText.text = summary
+            walkReadinessSummaryText.contentDescription = summary
+        }
+    }
 
     private fun updatePrivacySectionVisibility() {
         if (
@@ -13858,6 +13987,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (::fieldSessionLogButton.isInitialized) {
             fieldSessionLogButton.visibility =
                 if (showVerifiedSurfaces) View.VISIBLE else View.GONE
+        }
+        if (::walkReadinessControls.isInitialized) {
+            // 준비 표면 중 하나라도 나올 상황이면 덩어리를 띄우고, 접을지는 아래에서 정한다.
+            walkReadinessControls.visibility =
+                if (mayTrain || mayCheckDevice || showVerifiedSurfaces) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+            updateWalkReadinessSection()
         }
         if (::runtimeControls.isInitialized) {
             // 완료 단계를 미리보면 보행 화면 자체도 그린다. 표시 전용이다. 실제 안내는
@@ -15818,6 +15957,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         updateFieldSessionLogButton()
         applyActionButtonState()
         maybeAdvanceWalkSessionAfterCapabilityCheck()
+        updateWalkReadinessSection()
     }
 
     private fun applyRuntimeReadinessIfActive(

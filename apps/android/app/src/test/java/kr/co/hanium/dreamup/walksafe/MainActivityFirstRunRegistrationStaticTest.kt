@@ -422,13 +422,22 @@ class MainActivityFirstRunRegistrationStaticTest {
             "val overlay = LinearLayout(this).apply",
             "controlsScroll = ScrollView(this).apply",
         )
+        // 준비 표면(우선사용자 교육·환경·장착·기기 점검)은 walkReadinessControls 한 덩어리다.
         assertInOrder(
             overlay,
             "addView(productPurposeText)",
             "addView(firstRunOnboardingControls)",
+            "addView(walkReadinessControls)",
+            "addView(runtimeControls)",
+        )
+        val readiness = sourceSection(
+            "walkReadinessControls = LinearLayout(this).apply",
+            "applyWalkButtonStyle(actionButton",
+        )
+        assertInOrder(
+            readiness,
             "addView(priorityUserOnboardingControls)",
             "addView(startupCapabilityText)",
-            "addView(runtimeControls)",
         )
 
         val traversal = functionBlock("private fun linkFirstRunAccessibilityTraversal()")

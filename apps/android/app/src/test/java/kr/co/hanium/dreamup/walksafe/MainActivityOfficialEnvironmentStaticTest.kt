@@ -205,8 +205,9 @@ class MainActivityOfficialEnvironmentStaticTest {
         val statusView = source.substringAfter(
             "officialEnvironmentStatusText = TextView(this).apply",
         ).substringBefore("startupCapabilityText = TextView(this).apply")
-        val overlay = source.substringAfter("val overlay = LinearLayout(this).apply")
-            .substringBefore("val controlsScroll = ScrollView(this).apply")
+        // 준비 표면은 walkReadinessControls 안에 순서 그대로 들어간다.
+        val overlay = source.substringAfter("walkReadinessControls = LinearLayout(this).apply")
+            .substringBefore("\n        }\n")
         val update = functionBlock("private fun updateOfficialEnvironmentUi()")
         val message = functionBlock("private fun officialEnvironmentStatusMessage(")
 

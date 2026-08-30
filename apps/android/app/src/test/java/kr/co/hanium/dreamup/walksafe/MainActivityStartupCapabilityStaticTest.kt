@@ -23,16 +23,24 @@ class MainActivityStartupCapabilityStaticTest {
         assertTrue(capability.contains("시각장애인의 도심 보행"))
         assertTrue(capability.contains("안드로이드 보행 보조 서비스"))
 
+        // 준비 표면은 walkReadinessControls 한 덩어리로 묶여 오버레이에 들어간다. 화면에 나오는
+        // 순서는 목적 고지 → 준비 표면 → 보행 화면이고, 덩어리 안에서 점검과 확인의 순서가 유지된다.
         val overlay = activity.substringAfter("val overlay = LinearLayout(this).apply")
             .substringBefore("val controlsScroll = ScrollView(this).apply")
         val purpose = overlay.indexOf("addView(productPurposeText)")
-        val capability = overlay.indexOf("addView(startupCapabilityText)")
-        val confirmation = overlay.indexOf("addView(startupCapabilityConfirmButton)")
+        val readiness = overlay.indexOf("addView(walkReadinessControls)")
         val runtime = overlay.indexOf("addView(runtimeControls)")
         assertTrue(purpose >= 0)
-        assertTrue(purpose < capability)
+        assertTrue(purpose < readiness)
+        assertTrue(readiness < runtime)
+
+        val readinessBlock = activity
+            .substringAfter("walkReadinessControls = LinearLayout(this).apply")
+            .substringBefore("\n        }\n")
+        val capability = readinessBlock.indexOf("addView(startupCapabilityText)")
+        val confirmation = readinessBlock.indexOf("addView(startupCapabilityConfirmButton)")
+        assertTrue(capability >= 0)
         assertTrue(capability < confirmation)
-        assertTrue(confirmation < runtime)
     }
 
     @Test
