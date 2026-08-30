@@ -155,4 +155,26 @@ class MainActivityWalkScreenLayoutStaticTest {
                 overlay.indexOf("addView(runtimeControls)"),
         )
     }
+
+    @Test
+    fun statusTextIsStructuredWithoutRewritingTheMessage() {
+        val format = source.substringAfter("private fun applyWsStatusText(")
+            .substringBefore("\n    /** 상태 카드의 면.")
+
+        // 문구는 요구와 테스트가 고정한다. 구조만 입히고 글자는 건드리지 않는다.
+        assertTrue(format.contains("val lines = message.split"))
+        assertFalse(format.contains("replace("))
+
+        // 상태 줄은 「원인:」 바로 앞 줄이다. 막는 상태만 warning 색을 받는다.
+        assertTrue(format.contains("lines.indexOfFirst { it.startsWith(\"원인:\") }"))
+        assertTrue(format.contains("WS_COLOR_WARNING"))
+        assertTrue(source.contains("val BLOCKING_STATUS_WORDS = setOf(\"사용 불가\", \"제한\", \"교정 필요\")"))
+
+        // TalkBack 은 지금처럼 원문 한 덩어리로 읽어야 한다.
+        listOf(
+            "officialEnvironmentStatusText.contentDescription = message",
+            "phoneMountingStatusText.contentDescription = message",
+            "startupCapabilityText.contentDescription = capabilityMessage",
+        ).forEach { assertTrue(source.contains(it)) }
+    }
 }

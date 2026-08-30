@@ -14,6 +14,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
@@ -10709,6 +10710,97 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         button.textSize = 16f
     }
 
+    /**
+     * 상태 문구는 이미 타입이 있는 글이다 — 「설명 문단 / 상태 / 원인: / 다음 행동:」 네 부분이고
+     * 그 라벨이 문자열 안에 그대로 들어 있다. 그런데 지금까지 전부 같은 크기·같은 색으로 찍혀서,
+     * 세 덩어리가 쌓이면 어디가 상태이고 어디가 할 일인지 눈으로 구분되지 않았다.
+     *
+     * 문자열은 한 글자도 바꾸지 않는다. 요구와 테스트가 이 문구를 고정하고 있고, TalkBack 도 지금처럼
+     * 한 덩어리로 읽어야 한다. contentDescription 은 호출부가 원문 그대로 유지한다.
+     */
+    private fun applyWsStatusText(view: TextView, message: String) {
+        val lines = message.split("\n")
+        val causeIndex = lines.indexOfFirst { it.startsWith("원인:") }
+        val statusIndex = if (causeIndex > 0) causeIndex - 1 else -1
+        val builder = SpannableStringBuilder()
+        lines.forEachIndexed { index, line ->
+            val start = builder.length
+            builder.append(line)
+            val end = builder.length
+            val labelEnd = LABEL_PREFIXES.firstOrNull { line.startsWith(it) }?.length
+            when {
+                index == statusIndex -> {
+                    builder.setSpan(
+                        StyleSpan(Typeface.BOLD),
+                        start,
+                        end,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                    builder.setSpan(
+                        ForegroundColorSpan(
+                            if (line in BLOCKING_STATUS_WORDS) {
+                                WS_COLOR_WARNING
+                            } else {
+                                WS_COLOR_EMPHASIS
+                            },
+                        ),
+                        start,
+                        end,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                    builder.setSpan(
+                        RelativeSizeSpan(1.15f),
+                        start,
+                        end,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                }
+                labelEnd != null -> {
+                    // 「원인:」·「다음 행동:」 은 라벨이다. 라벨만 세우고 내용은 본문 색으로 둔다.
+                    builder.setSpan(
+                        StyleSpan(Typeface.BOLD),
+                        start,
+                        start + labelEnd,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                    builder.setSpan(
+                        ForegroundColorSpan(WS_COLOR_BUTTON_TEXT),
+                        start + labelEnd,
+                        end,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                }
+                else -> builder.setSpan(
+                    RelativeSizeSpan(0.94f),
+                    start,
+                    end,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            }
+            if (index != lines.lastIndex) builder.append("\n")
+        }
+        view.text = builder
+    }
+
+    /** 상태 카드의 면. 세 덩어리가 각자 경계를 가져야 한 벽으로 읽히지 않는다. */
+    private fun applyWsStatusCard(view: TextView) {
+        val density = resources.displayMetrics.density
+        view.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = WS_CORNER_RADIUS_DP * density
+            setColor(WS_COLOR_NOTICE_FILL)
+            setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+        }
+        view.setPadding(
+            (16f * density).roundToInt(),
+            (14f * density).roundToInt(),
+            (16f * density).roundToInt(),
+            (14f * density).roundToInt(),
+        )
+        view.setTextColor(WS_COLOR_NOTICE_TEXT)
+        view.setLineSpacing(0f, 1.5f)
+    }
+
     /** 입력칸도 버튼과 같은 면 위에 놓는다. 기본 밑줄 스타일은 어두운 바탕에서 거의 보이지 않는다. */
     private fun applyWsFieldStyle(field: EditText) {
         val density = resources.displayMetrics.density
@@ -12399,6 +12491,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(privacyControls)
             addView(runtimeControls)
         }
+        listOf(
+            officialEnvironmentStatusText,
+            phoneMountingStatusText,
+            startupCapabilityText,
+        ).forEach(::applyWsStatusCard)
         applyAccessibleControlDefaults(overlay)
         // 트리 훑기가 모든 버튼에 기본 마감을 입힌 뒤라, 주 행동은 여기서 다시 덮어써야 한다.
         applyWsButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)
@@ -14941,7 +15038,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val snapshot = walkSessionLifecycle.snapshot()
         val assessment = currentOfficialEnvironmentAssessment(snapshot.epoch)
         val message = officialEnvironmentStatusMessage(assessment)
-        officialEnvironmentStatusText.text = message
+        applyWsStatusText(officialEnvironmentStatusText, message)
         officialEnvironmentStatusText.contentDescription = message
         officialEnvironmentConfirmButton.apply {
             isEnabled =
@@ -15198,7 +15295,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             currentPhoneMountingAssessment(snapshot.epoch)
         }
         val message = phoneMountingStatusMessage(assessment)
-        phoneMountingStatusText.text = message
+        applyWsStatusText(phoneMountingStatusText, message)
         phoneMountingStatusText.contentDescription = message
         val buttonsEnabled =
             isActivityForeground &&
@@ -15941,7 +16038,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (confirmed) append("\n확인 완료: WalkSafe 기능을 시작할 수 있습니다.")
             append("\n${priorityUserDecision.noticeKo}")
         }
-        startupCapabilityText.text = capabilityMessage
+        applyWsStatusText(startupCapabilityText, capabilityMessage)
         startupCapabilityText.contentDescription = capabilityMessage
         startupMetricPreflightButton.apply {
             visibility = if (currentPostLoginDeviceCheckSessionBinding() != null) {
@@ -25740,6 +25837,10 @@ generation != cameraFallbackGeneration
         const val WS_TOUCH_WALK_ACTION_DP = 56f
         /** 부차 행동의 최소 터치 크기. */
         const val WS_TOUCH_MIN_DP = 48f
+        /** 상태 문구 안의 라벨. 문자열 자체는 각 메시지 생성기가 소유한다. */
+        val LABEL_PREFIXES = listOf("원인:", "다음 행동:", "확인 완료:", "기기 점검:")
+        /** 보행을 막는 상태 낱말. 나머지 상태는 통과로 본다. */
+        val BLOCKING_STATUS_WORDS = setOf("사용 불가", "제한", "교정 필요")
         /** 보행 화면 주 행동 하나. 나머지와 무게가 같아 보이면 안 된다. */
         const val WS_TOUCH_WALK_PRIMARY_DP = 80f
         const val WS_CORNER_RADIUS_DP = 10f
