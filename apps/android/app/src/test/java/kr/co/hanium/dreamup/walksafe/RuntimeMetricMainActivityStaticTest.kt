@@ -27,7 +27,7 @@ class RuntimeMetricMainActivityStaticTest {
         // 준비 표면은 walkReadinessControls 로 묶였다. 순서 요구는 그 안에서 그대로 성립한다.
         val overlay = sourceSection(
             "walkReadinessControls = LinearLayout(this).apply",
-            "applyWalkButtonStyle(actionButton",
+            "runtimeControls = LinearLayout(this).apply",
         )
         val preflight = overlay.indexOf("addView(startupMetricPreflightButton)")
         val confirmation = overlay.indexOf("addView(startupCapabilityConfirmButton)")
@@ -341,7 +341,7 @@ class RuntimeMetricMainActivityStaticTest {
         )
         val overlay = sourceSection(
             "walkReadinessControls = LinearLayout(this).apply",
-            "applyWalkButtonStyle(actionButton",
+            "runtimeControls = LinearLayout(this).apply",
         )
         assertFalse(runtimeControls.contains("addView(fieldSessionLogButton)"))
         assertTrue(overlay.contains("addView(fieldSessionLogButton)"))

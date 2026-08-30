@@ -432,7 +432,7 @@ class MainActivityFirstRunRegistrationStaticTest {
         )
         val readiness = sourceSection(
             "walkReadinessControls = LinearLayout(this).apply",
-            "applyWalkButtonStyle(actionButton",
+            "runtimeControls = LinearLayout(this).apply",
         )
         assertInOrder(
             readiness,

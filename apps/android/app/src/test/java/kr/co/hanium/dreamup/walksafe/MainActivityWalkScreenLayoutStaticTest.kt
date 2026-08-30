@@ -41,7 +41,7 @@ class MainActivityWalkScreenLayoutStaticTest {
     fun primaryActionIsHeavierThanEveryOtherControl() {
         assertTrue(
             source.contains(
-                "applyWalkButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)",
+                "applyWsButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)",
             ),
         )
         assertTrue(source.contains("const val WS_TOUCH_WALK_PRIMARY_DP = 80f"))
@@ -53,13 +53,20 @@ class MainActivityWalkScreenLayoutStaticTest {
 
         // 꺼져 있는 시간이 길다. 비활성일 때도 다른 버튼보다 밝아야 크기로 만든 위계가 유지된다.
         assertTrue(source.contains("WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff9a9a9a.toInt()"))
-        val style = source.substringAfter("private fun applyWalkButtonStyle(")
+        val style = source.substringAfter("private fun applyWsButtonStyle(")
             .substringBefore("private fun walkDivider()")
         assertTrue(style.contains("WS_COLOR_PRIMARY_ACTION_DISABLED_FILL"))
         assertTrue(style.contains("WS_COLOR_BUTTON_DISABLED_FILL"))
 
-        // 주 행동만 primary 다. 나머지는 같은 크기·같은 색으로 남는다.
-        assertTrue(source.split("primary = true").size - 1 == 1)
+        // 보행 화면에서 primary 는 주 행동 하나뿐이다. 나머지 한 곳은 온보딩 각 단계의 강조
+        // 버튼을 같은 마감으로 덮어쓰는 자리이고, 그 단계에도 강조 버튼은 하나씩만 있다.
+        assertTrue(source.split("primary = true").size - 1 == 2)
+        assertTrue(
+            source.contains(
+                "wsEmphasisButtons.forEach { applyWsButtonStyle(it, WS_TOUCH_PRIMARY_DP, " +
+                    "primary = true) }",
+            ),
+        )
     }
 
     @Test

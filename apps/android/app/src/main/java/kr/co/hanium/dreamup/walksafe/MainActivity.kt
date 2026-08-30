@@ -54,6 +54,7 @@ import android.util.Size
 import android.util.TypedValue
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.CompoundButton
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -520,6 +521,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var walkReadinessSummaryText: TextView
     /** 사용자가 직접 편 상태. 막는 것이 있어 강제로 펼친 경우와 구분한다. */
     private var walkReadinessExpanded = false
+    /** accessiblePriorityUserButton(emphasis = true) 로 만든 각 단계의 주 행동. */
+    private val wsEmphasisButtons = mutableListOf<Button>()
     private lateinit var offRouteNoticeText: TextView
     private lateinit var controlsScroll: ScrollView
     private lateinit var walkSafetyScroll: ScrollView
@@ -10634,6 +10637,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         (48f * resources.displayMetrics.density).roundToInt()
 
     private fun applyAccessibleControlDefaults(root: View) {
+        // 마감도 여기서 한 번에 입힌다. 버튼 70개가 두 가지 방법으로 만들어져 있어 만드는 자리마다
+        // 손대면 반드시 빠지는 것이 생긴다. 트리를 훑는 이 지점이 유일한 적용 지점이다.
+        // CompoundButton(CheckBox 등)도 Button 하위라 그냥 두면 네모난 버튼 면을 뒤집어쓴다.
+        if (root is Button && root !is CompoundButton) {
+            applyWsButtonStyle(root, WS_TOUCH_WALK_ACTION_DP)
+        }
+        if (root is EditText) applyWsFieldStyle(root)
+        if (root is LinearLayout && root.orientation == LinearLayout.VERTICAL) {
+            applyWsStackSpacing(root)
+        }
         if (root is Button || root is EditText || root is CheckBox) {
             val targetSize = accessibilityTargetSizePx()
             root.minimumHeight = maxOf(root.minimumHeight, targetSize)
@@ -10659,8 +10672,51 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
      * 보행 화면 버튼의 팔레트. 온보딩이 쓰던 상태 색을 그대로 가져온다. 이전에는 보행 화면 버튼만
      * 플랫폼 기본 Button 이라 같은 앱에서 두 가지 버튼이 보였다.
      */
+    /**
+     * 세로로 쌓인 컨트롤이 서로 붙어 한 덩어리처럼 보이지 않게 한다. 여백을 하나도 지정하지 않은
+     * 묶음에만 손대므로, 구역·2열처럼 여백을 직접 정한 곳은 그대로 둔다.
+     *
+     * ponytail: 「아무도 여백을 안 줬으면 준다」는 휴리스틱이다. 일부러 0으로 붙여 놓은 묶음이
+     * 생기면 그 자리에 표시를 두고 여기서 빼는 편이 낫다.
+     */
+    private fun applyWsStackSpacing(stack: LinearLayout) {
+        if (stack.childCount < 2) return
+        val children = (0 until stack.childCount).map(stack::getChildAt)
+        val untouched = children.all { child ->
+            (child.layoutParams as? LinearLayout.LayoutParams)?.bottomMargin == 0
+        }
+        if (!untouched) return
+        val gap = (WS_GROUP_GAP_DP * resources.displayMetrics.density).roundToInt()
+        children.dropLast(1).forEach { child ->
+            (child.layoutParams as? LinearLayout.LayoutParams)?.bottomMargin = gap
+        }
+    }
+
+    /** 입력칸도 버튼과 같은 면 위에 놓는다. 기본 밑줄 스타일은 어두운 바탕에서 거의 보이지 않는다. */
+    private fun applyWsFieldStyle(field: EditText) {
+        val density = resources.displayMetrics.density
+        field.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = WS_CORNER_RADIUS_DP * density
+            setColor(WS_COLOR_NOTICE_FILL)
+            setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+        }
+        field.setTextColor(WS_COLOR_BUTTON_TEXT)
+        field.setHintTextColor(WS_COLOR_NOTICE_TEXT)
+        field.minimumHeight = maxOf(
+            field.minimumHeight,
+            (WS_TOUCH_WALK_ACTION_DP * density).roundToInt(),
+        )
+        field.setPadding(
+            (16f * density).roundToInt(),
+            (12f * density).roundToInt(),
+            (16f * density).roundToInt(),
+            (12f * density).roundToInt(),
+        )
+    }
+
     /** 한 가지 상태의 납작한 둥근 채움. 프레임워크 기본 버튼 배경은 인셋과 각진 모서리를 함께 들고 온다. */
-    private fun walkButtonFace(fill: Int, density: Float): GradientDrawable = GradientDrawable().apply {
+    private fun wsButtonFace(fill: Int, density: Float): GradientDrawable = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         cornerRadius = WS_CORNER_RADIUS_DP * density
         setColor(fill)
@@ -10671,7 +10727,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
      * 인셋·각진 모서리·가운데 정렬이 따라온다. 설계 초안은 10dp 둥근 납작한 면에 왼쪽 정렬이므로
      * 배경 자체를 갈아 끼운다. 카드에서 이미 쓰던 GradientDrawable 방식과 같다.
      */
-    private fun applyWalkButtonStyle(button: Button, minHeightDp: Float, primary: Boolean = false) {
+    private fun applyWsButtonStyle(button: Button, minHeightDp: Float, primary: Boolean = false) {
         val density = resources.displayMetrics.density
         button.isAllCaps = false
         button.setSingleLine(false)
@@ -10690,7 +10746,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         button.background = StateListDrawable().apply {
             addState(
                 intArrayOf(-android.R.attr.state_enabled),
-                walkButtonFace(
+                wsButtonFace(
                     if (primary) {
                         WS_COLOR_PRIMARY_ACTION_DISABLED_FILL
                     } else {
@@ -10701,7 +10757,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             )
             addState(
                 intArrayOf(android.R.attr.state_pressed),
-                walkButtonFace(
+                wsButtonFace(
                     if (primary) {
                         WS_COLOR_PRIMARY_ACTION_PRESSED_FILL
                     } else {
@@ -10712,11 +10768,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             )
             addState(
                 intArrayOf(android.R.attr.state_focused),
-                walkButtonFace(WS_COLOR_BUTTON_FOCUSED_FILL, density),
+                wsButtonFace(WS_COLOR_BUTTON_FOCUSED_FILL, density),
             )
             addState(
                 intArrayOf(),
-                walkButtonFace(
+                wsButtonFace(
                     if (primary) WS_COLOR_PRIMARY_ACTION_FILL else WS_COLOR_BUTTON_FILL,
                     density,
                 ),
@@ -10902,9 +10958,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ),
             )
             if (emphasis) {
-                // 이 단계의 주 행동은 더 큰 터치 영역과 굵기로 구분한다.
+                // 이 단계의 주 행동은 더 큰 터치 영역과 굵기로 구분한다. 실제 마감은 트리를 훑은
+                // 뒤에 주 행동용으로 다시 입힌다.
                 minimumHeight = (WS_TOUCH_PRIMARY_DP * density).roundToInt()
                 setTypeface(typeface, Typeface.BOLD)
+                wsEmphasisButtons += this
             }
             setPadding(
                 (20f * density).roundToInt(),
@@ -12245,21 +12303,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 addView(fieldSessionLogButton)
             }
         }
-        applyWalkButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)
-        listOf(
-            explicitReportButton,
-            voiceReportButton,
-            destinationSearchButton,
-            destinationCancelButton,
-            destinationMoreButton,
-            routeButton,
-            destinationResetButton,
-            progressBeepToggleButton,
-            progressBeepVolumeButton,
-            routeDeviationNewRouteButton,
-            routeDeviationRecheckButton,
-            routeDeviationEndButton,
-        ).forEach { applyWalkButtonStyle(it, WS_TOUCH_WALK_ACTION_DP) }
         // 7구역 + 구분선. 이전에는 17개가 여백도 구분선도 없이 세로로 균등하게 나열돼, 주 행동과
         // 「진행음 볼륨」이 같은 무게로 보였다.
         runtimeControls = LinearLayout(this).apply {
@@ -12337,6 +12380,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(runtimeControls)
         }
         applyAccessibleControlDefaults(overlay)
+        // 트리 훑기가 모든 버튼에 기본 마감을 입힌 뒤라, 주 행동은 여기서 다시 덮어써야 한다.
+        applyWsButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)
+        wsEmphasisButtons.forEach { applyWsButtonStyle(it, WS_TOUCH_PRIMARY_DP, primary = true) }
         walkSafetyOverlay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.START
