@@ -307,7 +307,7 @@ def test_fp046_schema_migration_constraints_and_append_only_evidence() -> None:
         return table is not None and table.name in privacy_tables
 
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "202608300001"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "202608250002"
         assert compare_metadata(
             MigrationContext.configure(
                 connection,

@@ -1087,7 +1087,7 @@ def test_postgres_expired_recovery_proof_reaches_real_cleanup_route(
             assert "test" in database_name.lower()
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608300001"
+            ).scalar_one() == "202608250002"
 
         with owner_sessions() as db:
             provision_admin_security(

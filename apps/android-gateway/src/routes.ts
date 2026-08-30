@@ -95,21 +95,13 @@ import {
   currentServerCapacityLevelForTelemetry,
   mergeServerCapacityIntoFieldSessionResponse
 } from "./server-capacity.js";
-import {
-  FIRST_RUN_ROUTE_PATHS,
-  isFirstRunRoute,
-  proxyFirstRunRequest
-} from "./first-run.js";
 
 const ALLOWED_METHODS = new Map<string, readonly string[]>([
   ["/api/field-session", ["GET", "POST", "DELETE"]],
   ["/api/field-walk", ["GET", "POST"]],
   ["/api/navigation/walking", ["POST"]],
   ["/api/navigation/destinations/search", ["GET"]],
-  ["/api/reports/v2", ["POST"]],
-  ...FIRST_RUN_ROUTE_PATHS.map(
-    (path) => [path, ["POST"]] as [string, readonly string[]]
-  )
+  ["/api/reports/v2", ["POST"]]
 ]);
 
 export const PUBLIC_GATEWAY_ROUTES = Object.freeze([
@@ -1090,10 +1082,6 @@ async function dispatchGatewayRequest(
       privacyRightsRequestUrl,
       request.method === "HEAD"
     );
-  }
-  // 4·5·7·8단계는 계정이 생기기 전이라 세션을 요구하지 않는다. 배포 환경 차단은 Backend 가 한다.
-  if (isFirstRunRoute(pathname)) {
-    return noStore(await proxyFirstRunRequest(request, dependencies.fetchImpl));
   }
   const methods = ALLOWED_METHODS.get(pathname);
   if (!methods) return routeNotFound();

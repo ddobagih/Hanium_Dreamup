@@ -2041,7 +2041,7 @@ def test_postgres_recovery_custody_migration_preflights_control_count(
             assert revision == prior_revision
             assert custody_column_count == 0
         else:
-            assert revision == "202608300001"
+            assert revision == "202608250002"
             assert custody_column_count == 1
     finally:
         engine.dispose()

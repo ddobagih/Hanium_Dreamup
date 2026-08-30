@@ -101,8 +101,7 @@ class MessagePolicy(
             steps <= 4 -> "전방 약 ${steps}보 앞 $target"
             else -> "전방 $target"
         }
-        // RQ-FP-020-001: 이동할 공간의 안전성이 검증되기 전에는 좌우 이동을 지시하지 않고 이 문구로 제한한다.
-        val action = if (level == MessageLevel.STOP) "멈추세요. 주변을 확인하세요." else "속도를 줄이세요."
+        val action = if (level == MessageLevel.STOP) "멈추세요." else "속도를 줄이세요."
         return MessagePolicyDecision(
             userFacing = UserFacingDepth(stepsAhead = steps, messageLevel = level, message = "$phrase. $action"),
             purpose = MessagePurpose.OBSTACLE_WARNING,
