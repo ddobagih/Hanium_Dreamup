@@ -514,6 +514,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val priorityUserAgeButtons = mutableMapOf<PriorityUserAgeBand, Button>()
     private val priorityUserPracticeButtons = mutableMapOf<PriorityUserPractice, Button>()
     private lateinit var runtimeControls: LinearLayout
+    private lateinit var offRouteNoticeText: TextView
     private lateinit var controlsScroll: ScrollView
     private lateinit var walkSafetyScroll: ScrollView
     private lateinit var walkSafetyOverlay: LinearLayout
@@ -10648,6 +10649,137 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
+    /**
+     * 보행 화면 버튼의 팔레트. 온보딩이 쓰던 상태 색을 그대로 가져온다. 이전에는 보행 화면 버튼만
+     * 플랫폼 기본 Button 이라 같은 앱에서 두 가지 버튼이 보였다.
+     */
+    private fun applyWalkButtonStyle(button: Button, minHeightDp: Float, primary: Boolean = false) {
+        val density = resources.displayMetrics.density
+        val states = arrayOf(
+            intArrayOf(-android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_pressed),
+            intArrayOf(android.R.attr.state_focused),
+            intArrayOf(),
+        )
+        button.isAllCaps = false
+        button.setSingleLine(false)
+        button.ellipsize = null
+        // applyAccessibleControlDefaults 가 maxOf 로 올리기만 하므로 여기서 잡은 크기가 살아남는다.
+        button.minimumHeight = (minHeightDp * density).roundToInt()
+        button.textSize = if (primary) 20f else 18f
+        if (primary) button.setTypeface(button.typeface, Typeface.BOLD)
+        button.backgroundTintList = ColorStateList(
+            states,
+            intArrayOf(
+                WS_COLOR_BUTTON_DISABLED_FILL,
+                if (primary) WS_COLOR_PRIMARY_ACTION_PRESSED_FILL else WS_COLOR_BUTTON_PRESSED_FILL,
+                WS_COLOR_BUTTON_FOCUSED_FILL,
+                if (primary) WS_COLOR_PRIMARY_ACTION_FILL else WS_COLOR_BUTTON_FILL,
+            ),
+        )
+        val restingText = if (primary) WS_COLOR_PRIMARY_ACTION_TEXT else WS_COLOR_BUTTON_TEXT
+        button.setTextColor(
+            ColorStateList(
+                states,
+                intArrayOf(
+                    WS_COLOR_BUTTON_DISABLED_TEXT,
+                    restingText,
+                    WS_COLOR_BUTTON_TEXT,
+                    restingText,
+                ),
+            ),
+        )
+        button.setPadding(
+            (20f * density).roundToInt(),
+            (12f * density).roundToInt(),
+            (20f * density).roundToInt(),
+            (12f * density).roundToInt(),
+        )
+    }
+
+    /** 구역 사이의 선 하나. 접근성 트리에는 넣지 않는다. 읽을 것이 없다. */
+    private fun walkDivider(): View {
+        val density = resources.displayMetrics.density
+        return View(this).apply {
+            setBackgroundColor(WS_COLOR_LINE)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                maxOf(1, (1f * density).roundToInt()),
+            )
+        }
+    }
+
+    /**
+     * 한 구역. 구역 사이는 WS_SECTION_GAP_DP, 구역 안 컨트롤 사이는 WS_GROUP_GAP_DP 로 벌어져
+     * 같은 덩어리끼리 먼저 읽힌다. 이전에는 17개가 여백 없이 같은 간격으로 나열돼 있었다.
+     */
+    private fun walkSection(label: String?, vararg children: View): LinearLayout {
+        val density = resources.displayMetrics.density
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = (WS_SECTION_GAP_DP * density).roundToInt()
+                bottomMargin = (WS_SECTION_GAP_DP * density).roundToInt()
+            }
+            label?.let {
+                addView(
+                    TextView(this@MainActivity).apply {
+                        text = it
+                        textSize = 18f
+                        setTextColor(WS_COLOR_NOTICE_TEXT)
+                        ViewCompat.setAccessibilityHeading(this, true)
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ).apply {
+                            bottomMargin = (WS_TITLE_GAP_DP * density).roundToInt()
+                        }
+                    },
+                )
+            }
+            children.forEach { child ->
+                (child.layoutParams as? LinearLayout.LayoutParams)?.let { existing ->
+                    existing.bottomMargin = (WS_GROUP_GAP_DP * density).roundToInt()
+                } ?: run {
+                    child.layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply {
+                        bottomMargin = (WS_GROUP_GAP_DP * density).roundToInt()
+                    }
+                }
+                addView(child)
+            }
+        }
+    }
+
+    /** 짝을 이루는 두 행동을 한 줄에 둔다. 각 칸은 최소 터치 크기를 그대로 지킨다. */
+    private fun walkTwoColumnRow(left: View, right: View): LinearLayout {
+        val density = resources.displayMetrics.density
+        val gap = (WS_GROUP_GAP_DP * density).roundToInt()
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(
+                left,
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    rightMargin = gap / 2
+                },
+            )
+            addView(
+                right,
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    leftMargin = gap / 2
+                },
+            )
+        }
+    }
+
     private fun buildContentView(): FrameLayout {
         surfaceView = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
@@ -11377,16 +11509,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         ViewCompat.setAccessibilityHeading(safetySummaryText, true)
         statusText = TextView(this).apply {
-            textSize = 20f
-            setTextColor(0xffffffff.toInt())
+            textSize = 24f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(WS_COLOR_EMPHASIS)
             contentDescription = "WalkSafe 상태"
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             // This text changes every 500 ms. Safety speech uses explicit announcements below.
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
         }
         detailText = TextView(this).apply {
-            textSize = 14f
-            setTextColor(0xffd7e0ff.toInt())
+            textSize = 18f
+            setLineSpacing(0f, 1.45f)
+            setTextColor(WS_COLOR_NOTICE_TEXT)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         navigationStatusText = TextView(this).apply {
@@ -11784,7 +11918,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         updateBackendAuthButtonText()
         destinationQueryInput = EditText(this).apply {
             hint = "목적지 검색"
-            textSize = 12f
+            // 12sp 는 접근성 기본값이 16sp 로 끌어올려 주고 있었을 뿐이다. 입력칸도 본문 하한을 지킨다.
+            textSize = 20f
+            minimumHeight = (WS_TOUCH_WALK_ACTION_DP * resources.displayMetrics.density).roundToInt()
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -11849,10 +11985,40 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             contentDescription = text
             setOnClickListener { endNavigationAfterDeviation() }
         }
+        // 이탈 안내는 지금까지 contentDescription 에만 있어 TalkBack 으로만 전달됐다. 눈으로도
+        // 읽히도록 같은 문장을 warning 색 본문으로 내보낸다.
+        offRouteNoticeText = TextView(this).apply {
+            textSize = 18f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(WS_COLOR_WARNING)
+            setLineSpacing(0f, 1.45f)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
         routeDeviationActions = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE
+            val density = resources.displayMetrics.density
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = WS_CORNER_RADIUS_DP * density
+                setStroke((1f * density).roundToInt(), WS_COLOR_WARNING)
+            }
+            setPadding(
+                (16f * density).roundToInt(),
+                (16f * density).roundToInt(),
+                (16f * density).roundToInt(),
+                (16f * density).roundToInt(),
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = (WS_SECTION_GAP_DP * density).roundToInt()
+                bottomMargin = (WS_SECTION_GAP_DP * density).roundToInt()
+            }
+            addView(offRouteNoticeText)
             addView(routeDeviationNewRouteButton)
             addView(routeDeviationRecheckButton)
             addView(routeDeviationEndButton)
@@ -11971,35 +12137,78 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
             if (BuildConfig.DEBUG) {
+                // `navigation=off_route_reroute_user_confirmed` 같은 내부 상태 문자열이다. 제품 화면에
+                // 두면 사용자에게 그대로 낭독된다. 갱신 경로는 그대로 두고 표시 위치만 옮겼다.
+                addView(navigationStatusText)
                 addView(debugUploadButton)
                 addView(debugFrameCaptureButton)
                 addView(destinationLatInput)
                 addView(destinationLngInput)
             }
         }
+        applyWalkButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)
+        listOf(
+            explicitReportButton,
+            voiceReportButton,
+            destinationSearchButton,
+            destinationCancelButton,
+            destinationMoreButton,
+            routeButton,
+            destinationResetButton,
+            progressBeepToggleButton,
+            progressBeepVolumeButton,
+            routeDeviationNewRouteButton,
+            routeDeviationRecheckButton,
+            routeDeviationEndButton,
+        ).forEach { applyWalkButtonStyle(it, WS_TOUCH_WALK_ACTION_DP) }
+        // 7구역 + 구분선. 이전에는 17개가 여백도 구분선도 없이 세로로 균등하게 나열돼, 주 행동과
+        // 「진행음 볼륨」이 같은 무게로 보였다.
         runtimeControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(statusText)
-            addView(detailText)
-            addView(navigationStatusText)
+            // 1. 상태와 사유
+            addView(walkSection(null, statusText, detailText))
+            addView(walkDivider())
+            // 2. 경로 이탈 선택. 평소에는 통째로 숨어 있다.
             addView(routeDeviationActions)
-            addView(actionButton)
-            addView(explicitReportButton)
-            addView(gatewayVoiceStatusText)
-            addView(voiceReportButton)
-            addView(destinationQueryInput)
-            addView(destinationSearchButton)
-            addView(destinationCancelButton)
-            addView(destinationSearchResultsContainer)
-            addView(destinationMoreButton)
+            // 3. 주 행동 하나만 둔다.
+            addView(walkSection(null, actionButton))
+            addView(walkDivider())
+            // 4. 신고와 음성 명령
+            addView(
+                walkSection(
+                    null,
+                    explicitReportButton,
+                    gatewayVoiceStatusText,
+                    voiceReportButton,
+                ),
+            )
+            addView(walkDivider())
+            // 5. 목적지 검색
+            addView(
+                walkSection(
+                    "목적지",
+                    destinationQueryInput,
+                    walkTwoColumnRow(destinationSearchButton, destinationCancelButton),
+                    destinationSearchResultsContainer,
+                    destinationMoreButton,
+                ),
+            )
+            addView(walkDivider())
+            // 6. 경로 제어
+            addView(
+                walkSection(null, walkTwoColumnRow(routeButton, destinationResetButton)),
+            )
+            addView(walkDivider())
+            // 7. 진행음
+            addView(
+                walkSection("진행음", progressBeepToggleButton, progressBeepVolumeButton),
+            )
             if (BuildConfig.DEBUG) {
-                addView(runtimeDebugControlsToggleButton)
-                addView(runtimeDebugControls)
+                addView(walkDivider())
+                addView(
+                    walkSection(null, runtimeDebugControlsToggleButton, runtimeDebugControls),
+                )
             }
-            addView(routeButton)
-            addView(destinationResetButton)
-            addView(progressBeepToggleButton)
-            addView(progressBeepVolumeButton)
         }
         val overlayBottomPaddingPx =
             (OVERLAY_BOTTOM_PADDING_DP * resources.displayMetrics.density).toInt()
@@ -24015,6 +24224,13 @@ generation != cameraFallbackGeneration
             suspected -> "경로 이탈 의심. 위치 다시 확인 선택"
             else -> null
         }
+        if (::offRouteNoticeText.isInitialized) {
+            offRouteNoticeText.text = when {
+                confirmed -> "경로를 벗어났습니다"
+                suspected -> "경로를 벗어난 것으로 보입니다"
+                else -> ""
+            }
+        }
         routeDeviationNewRouteButton.visibility = if (confirmed) View.VISIBLE else View.GONE
         routeDeviationRecheckButton.visibility = if (suspected || confirmed) View.VISIBLE else View.GONE
         routeDeviationEndButton.visibility = if (confirmed) View.VISIBLE else View.GONE
@@ -25279,7 +25495,16 @@ generation != cameraFallbackGeneration
         const val WS_COLOR_LINE = 0xff6e6d70.toInt()
         const val SAFETY_NOTICE_HEADING = "안전 고지"
         const val WS_COLOR_EMPHASIS = 0xffffe8bd.toInt()
+        const val WS_COLOR_WARNING = 0xffe38a72.toInt()
+        /** 주 행동은 배경과 글자를 뒤집어 구분한다. 색이 아니라 명도 대비로 읽히게 한다. */
+        const val WS_COLOR_PRIMARY_ACTION_FILL = 0xffffffff.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_TEXT = 0xff000000.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_PRESSED_FILL = 0xffd2d2d2.toInt()
         const val WS_TOUCH_PRIMARY_DP = 56f
+        /** 보행 화면 일반 행동. 온보딩 48dp 보다 크게 잡아 한 손 조작에서 빗나가지 않게 한다. */
+        const val WS_TOUCH_WALK_ACTION_DP = 56f
+        /** 보행 화면 주 행동 하나. 나머지와 무게가 같아 보이면 안 된다. */
+        const val WS_TOUCH_WALK_PRIMARY_DP = 80f
         const val WS_CORNER_RADIUS_DP = 10f
         const val FIRST_RUN_STAGE_COUNT = 12
         const val FIRST_RUN_WAITING_DOT_COUNT = 3
