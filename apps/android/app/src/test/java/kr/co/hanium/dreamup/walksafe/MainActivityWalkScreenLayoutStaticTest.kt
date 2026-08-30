@@ -51,6 +51,15 @@ class MainActivityWalkScreenLayoutStaticTest {
         assertTrue(source.contains("WS_COLOR_PRIMARY_ACTION_FILL = 0xffffffff.toInt()"))
         assertTrue(source.contains("WS_COLOR_PRIMARY_ACTION_TEXT = 0xff000000.toInt()"))
 
+        // 꺼져 있는 시간이 길다. 비활성일 때도 다른 버튼보다 밝아야 크기로 만든 위계가 유지된다.
+        assertTrue(source.contains("WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff9a9a9a.toInt()"))
+        assertTrue(
+            source.contains(
+                "if (primary) WS_COLOR_PRIMARY_ACTION_DISABLED_FILL " +
+                    "else WS_COLOR_BUTTON_DISABLED_FILL",
+            ),
+        )
+
         // 주 행동만 primary 다. 나머지는 같은 크기·같은 색으로 남는다.
         assertTrue(source.split("primary = true").size - 1 == 1)
     }

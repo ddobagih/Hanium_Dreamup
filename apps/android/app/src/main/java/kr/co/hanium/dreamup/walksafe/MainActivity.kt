@@ -10671,7 +10671,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         button.backgroundTintList = ColorStateList(
             states,
             intArrayOf(
-                WS_COLOR_BUTTON_DISABLED_FILL,
+                if (primary) WS_COLOR_PRIMARY_ACTION_DISABLED_FILL else WS_COLOR_BUTTON_DISABLED_FILL,
                 if (primary) WS_COLOR_PRIMARY_ACTION_PRESSED_FILL else WS_COLOR_BUTTON_PRESSED_FILL,
                 WS_COLOR_BUTTON_FOCUSED_FILL,
                 if (primary) WS_COLOR_PRIMARY_ACTION_FILL else WS_COLOR_BUTTON_FILL,
@@ -10682,7 +10682,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ColorStateList(
                 states,
                 intArrayOf(
-                    WS_COLOR_BUTTON_DISABLED_TEXT,
+                    if (primary) WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT else WS_COLOR_BUTTON_DISABLED_TEXT,
                     restingText,
                     WS_COLOR_BUTTON_TEXT,
                     restingText,
@@ -12178,8 +12178,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 walkSection(
                     null,
                     explicitReportButton,
-                    gatewayVoiceStatusText,
                     voiceReportButton,
+                    gatewayVoiceStatusText,
                 ),
             )
             addView(walkDivider())
@@ -25500,6 +25500,13 @@ generation != cameraFallbackGeneration
         const val WS_COLOR_PRIMARY_ACTION_FILL = 0xffffffff.toInt()
         const val WS_COLOR_PRIMARY_ACTION_TEXT = 0xff000000.toInt()
         const val WS_COLOR_PRIMARY_ACTION_PRESSED_FILL = 0xffd2d2d2.toInt()
+        /**
+         * 주 행동은 첫 실행 미완료·ARCore 확인 중처럼 꺼져 있는 시간이 길다. 일반 버튼의 비활성
+         * 색을 그대로 쓰면 화면에서 가장 흐린 요소가 되어 크기로 만든 위계가 뒤집힌다. 꺼져 있어도
+         * 다른 버튼보다는 밝게 두어 「지금은 누를 수 없는 주 행동」으로 읽히게 한다.
+         */
+        const val WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff9a9a9a.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT = 0xff1a1a1a.toInt()
         const val WS_TOUCH_PRIMARY_DP = 56f
         /** 보행 화면 일반 행동. 온보딩 48dp 보다 크게 잡아 한 손 조작에서 빗나가지 않게 한다. */
         const val WS_TOUCH_WALK_ACTION_DP = 56f
