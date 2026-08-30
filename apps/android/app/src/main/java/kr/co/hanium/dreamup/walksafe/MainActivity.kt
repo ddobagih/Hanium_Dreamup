@@ -19,6 +19,7 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
+import android.text.method.ScrollingMovementMethod
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
@@ -44,6 +45,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.text.InputType
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
@@ -501,6 +503,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var accountSignupCollapsedByUser = false
     /** 지금 화면에 가입 입력이 펼쳐져 있는가. 토글은 저장 상태가 아니라 이것을 뒤집어야 한다. */
     private var accountSignupOpenShown = false
+    private val accountConsentCards = linkedMapOf<String, LinearLayout>()
+    private lateinit var accountConsentAllCheck: CheckBox
+    private lateinit var accountConsentSummaryText: TextView
+    private lateinit var firstRunConsentAllButton: Button
     private var accountConsentDisclosureExpanded = false
     private lateinit var firstRunPurposeButton: Button
     private val firstRunAgeButtons = mutableMapOf<FirstRunAgeBand, Button>()
@@ -11300,9 +11306,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ).apply {
                     bottomMargin = (WS_GROUP_GAP_DP * density).roundToInt()
                 }
+                // 문서가 쓰는 이름 그대로여야 조항을 찾는다. RAW_SOURCE_COLLECTION 은 문서에서
+                // 「신고·진단용 raw v2」라 부르는데 여기서 「원본 수집」으로 찾고 있어 항상 실패했고,
+                // 그래서 그 항목만 문서 전체가 실렸다.
                 val clause = consentClauseOrNull(
                     when (item) {
-                        IntegratedConsentItem.RAW_SOURCE_COLLECTION -> "원본 수집"
+                        IntegratedConsentItem.RAW_SOURCE_COLLECTION -> "신고·진단용 raw v2"
                         IntegratedConsentItem.AUTOMATIC_REPORTING -> "자동신고"
                         IntegratedConsentItem.MOBILE_NETWORK_TRANSFER -> "이동통신 전송"
                         IntegratedConsentItem.TRAINING_REUSE -> "학습 재사용"
@@ -11311,11 +11320,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 firstRunConsentClauseTexts[item] = TextView(this@MainActivity).apply {
                     id = View.generateViewId()
                     text = clause
-                    textSize = 18f
-                    setTextColor(WS_COLOR_NOTICE_TEXT)
-                    setLineSpacing(0f, 1.45f)
                     contentDescription = clause
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                    applyWsClauseBox(this)
                     layoutParams = LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -11328,6 +11335,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 addView(button)
             }
         }
+        firstRunConsentAllButton = accessiblePriorityUserButton(
+            label = INTEGRATED_CONSENT_ALL_LABEL,
+            onClick = {
+                // 네 항목은 모두 선택이다. 한 번에 켜고 끄되 개별 항목은 그대로 각자 바꿀 수 있다.
+                val grantAll = !IntegratedConsentItem.entries.all(integratedConsentDraft::isGranted)
+                IntegratedConsentItem.entries.forEach { item ->
+                    updateIntegratedConsentDraft(item, grantAll)
+                }
+            },
+        )
         firstRunIntegratedConsentSaveButton = accessiblePriorityUserButton(
             label = "네 가지 선택을 서버에 저장하고 확인",
             emphasis = true,
@@ -11482,15 +11499,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
         accountConsentChecks.clear()
+        accountConsentCards.clear()
+        // 조항 원문은 위 accountConsentDisclosure 가 소유한다. 항목별 상자는 거기서 잘라 쓴다.
+        val consentClauseStops = listOf("[필수] ", "[선택] ", "선택 동의는 나중에")
         linkedMapOf(
-            "terms_of_service" to "[필수] 서비스 이용약관 동의",
-            "privacy_notice" to "[필수] 개인정보 수집·이용 안내 확인",
-            "location_terms" to "[필수] 위치기반서비스 이용약관 동의",
-            "raw_original" to "[선택] 신고·진단용 raw v2 자료 처리 동의",
-            "automatic_reporting" to "[선택] 자동 신고 동의",
-            "training_reuse" to "[선택] 승인·비식별 자료 학습 재사용 동의",
-        ).forEach { (key, label) ->
-            accountConsentChecks[key] = CheckBox(this).apply {
+            "terms_of_service" to ("[필수] 서비스 이용약관 동의" to "[필수] 서비스 이용약관:"),
+            "privacy_notice" to ("[필수] 개인정보 수집·이용 안내 확인" to "[필수] 개인정보 수집·이용:"),
+            "location_terms" to ("[필수] 위치기반서비스 이용약관 동의" to "[필수] 위치기반서비스:"),
+            "raw_original" to ("[선택] 신고·진단용 raw v2 자료 처리 동의" to "[선택] 신고·진단용 raw v2:"),
+            "automatic_reporting" to ("[선택] 자동 신고 동의" to "[선택] 자동 신고:"),
+            "training_reuse" to ("[선택] 승인·비식별 자료 학습 재사용 동의" to "[선택] 학습 재사용:"),
+        ).forEach { (key, pair) ->
+            val (label, clauseLabel) = pair
+            val check = CheckBox(this).apply {
                 id = View.generateViewId()
                 text = label
                 contentDescription = label
@@ -11498,7 +11519,50 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 textSize = 18f
                 isChecked = false
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                setOnCheckedChangeListener { _, _ -> refreshAccountConsentSummary() }
             }
+            accountConsentChecks[key] = check
+            val clause = documentClauseOrNull(
+                accountConsentDisclosure,
+                clauseLabel,
+                consentClauseStops,
+            )
+            accountConsentCards[key] = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                addView(check)
+                if (clause != null) {
+                    addView(
+                        TextView(this@MainActivity).apply {
+                            id = View.generateViewId()
+                            text = clause
+                            contentDescription = clause
+                            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                            applyWsClauseBox(this)
+                        },
+                    )
+                }
+            }
+        }
+        accountConsentAllCheck = CheckBox(this).apply {
+            id = View.generateViewId()
+            text = ACCOUNT_CONSENT_ALL_LABEL
+            contentDescription = ACCOUNT_CONSENT_ALL_LABEL
+            setTextColor(0xffffffff.toInt())
+            textSize = 18f
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            setOnClickListener {
+                val grantAll = isChecked
+                accountConsentChecks.values.forEach { it.isChecked = grantAll }
+                refreshAccountConsentSummary()
+            }
+        }
+        accountConsentSummaryText = TextView(this).apply {
+            id = View.generateViewId()
+            textSize = 18f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         accountRememberMeCheck = CheckBox(this).apply {
             id = View.generateViewId()
@@ -11591,9 +11655,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(accountDateOfBirthInput)
             addView(accountConsentDisclosureToggleButton)
             addView(accountConsentDisclosureText)
+            addView(accountConsentAllCheck)
             SIGNUP_DOCUMENT_VERSIONS.keys.forEach { key ->
-                addView(accountConsentChecks.getValue(key))
+                addView(accountConsentCards.getValue(key))
             }
+            addView(accountConsentSummaryText)
             addView(accountRequestOtpButton)
             addView(accountPasswordConfirmationInput)
             addView(accountOtpInput)
@@ -11631,6 +11697,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(firstRunDisclosureToggleButton)
             addView(firstRunIntegratedConsentDisclosureText)
             addView(firstRunConsentCountText)
+            addView(firstRunConsentAllButton)
             IntegratedConsentItem.entries.forEach { item ->
                 addView(firstRunConsentCards.getValue(item))
             }
@@ -12663,7 +12730,55 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     /** 승인된 통합 동의 전문에서 해당 항목의 조항만 잘라낸다. 새 문구를 만들지 않는다. */
+    /**
+     * 문서 원문에서 한 항목의 조항만 잘라낸다. 문구는 그 문서가 소유하므로 여기서 만들지 않는다.
+     * 라벨을 못 찾으면 null 을 돌려 호출부가 원문 전체를 그대로 보이게 한다.
+     */
+    private fun documentClauseOrNull(source: String, label: String, stops: List<String>): String? {
+        val start = source.indexOf(label)
+        if (start < 0) return null
+        val rest = source.substring(start)
+        val next = stops
+            .mapNotNull { stop -> rest.indexOf(stop, label.length).takeIf { it > 0 } }
+            .minOrNull()
+        return if (next != null) rest.substring(0, next).trim() else rest.trim()
+    }
+
+    /**
+     * 약관 한 조항을 그 자리에서 읽는 상자. 전문을 다른 화면으로 보내지 않고 항목 옆에 둔다.
+     * 높이를 제한하고 안에서 스크롤하므로 여섯 항목이 화면을 밀어내지 않는다. 낭독은 잘리지 않는다 —
+     * TalkBack 은 보이는 만큼이 아니라 텍스트 전체를 읽는다.
+     */
+    private fun applyWsClauseBox(view: TextView) {
+        val density = resources.displayMetrics.density
+        view.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = WS_CORNER_RADIUS_DP * density
+            setColor(WS_COLOR_NOTICE_FILL)
+            setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+        }
+        view.setPadding(
+            (14f * density).roundToInt(),
+            (12f * density).roundToInt(),
+            (14f * density).roundToInt(),
+            (12f * density).roundToInt(),
+        )
+        view.textSize = 18f
+        view.setTextColor(WS_COLOR_NOTICE_TEXT)
+        view.setLineSpacing(0f, 1.45f)
+        view.maxHeight = (WS_CLAUSE_BOX_MAX_HEIGHT_DP * density).roundToInt()
+        view.isVerticalScrollBarEnabled = true
+        view.movementMethod = ScrollingMovementMethod()
+        // 바깥 스크롤이 가로채면 상자 안이 움직이지 않는다.
+        view.setOnTouchListener { child, event ->
+            child.parent?.requestDisallowInterceptTouchEvent(true)
+            if (event.action == MotionEvent.ACTION_UP) child.performClick()
+            false
+        }
+    }
+
     private fun consentClauseOrNull(label: String): String? {
+
         val source = INTEGRATED_CONSENT_DISCLOSURE_KO
         val start = source.indexOf("$label: ")
         if (start < 0) return null
@@ -13854,6 +13969,34 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
     }
 
+    /**
+     * 필수 동의가 몇 개 남았는지 말한다. 참고 화면은 확인 버튼을 잠가 남은 것을 알리지만, 잠긴 버튼은
+     * 눌러도 아무 말을 하지 않는다. 주 사용자가 화면을 보지 않으므로 버튼은 살려 두고 남은 항목을
+     * 문장으로 알린다. 필수 판정 자체는 SignupConsentSelections.requiredGranted 그대로다.
+     */
+    private fun refreshAccountConsentSummary() {
+        if (!::accountConsentSummaryText.isInitialized) return
+        val selections = currentAccountConsentSelections()
+        val granted = listOf(
+            selections.termsOfService,
+            selections.privacyNotice,
+            selections.locationTerms,
+        ).count { it }
+        val summary = if (selections.requiredGranted) {
+            "필수 동의 3개를 모두 확인했습니다. 계정을 만들 수 있습니다."
+        } else {
+            "필수 동의 3개 중 ${granted}개 확인했습니다. 남은 필수 항목에 동의해야 계정을 만들 수 있습니다."
+        }
+        if (accountConsentSummaryText.text != summary) {
+            accountConsentSummaryText.text = summary
+            accountConsentSummaryText.contentDescription = summary
+        }
+        if (::accountConsentAllCheck.isInitialized) {
+            val all = accountConsentChecks.values.all { it.isChecked }
+            if (accountConsentAllCheck.isChecked != all) accountConsentAllCheck.isChecked = all
+        }
+    }
+
     private fun currentAccountConsentSelections(): SignupConsentSelections =
         SignupConsentSelections(
             termsOfService = accountConsentChecks["terms_of_service"]?.isChecked == true,
@@ -13873,6 +14016,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountConsentChecks["automatic_reporting"]?.isChecked =
             selections.automaticReporting
         accountConsentChecks["training_reuse"]?.isChecked = selections.trainingReuse
+        refreshAccountConsentSummary()
     }
 
     /**
@@ -14139,6 +14283,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (::firstRunConsentCountText.isInitialized) {
             firstRunConsentCountText.visibility =
                 if (integratedConsentVisible) View.VISIBLE else View.GONE
+        }
+        if (::firstRunConsentAllButton.isInitialized) {
+            firstRunConsentAllButton.visibility =
+                if (integratedConsentVisible) View.VISIBLE else View.GONE
+            val allGranted =
+                IntegratedConsentItem.entries.all(integratedConsentDraft::isGranted)
+            val label = if (allGranted) "네 항목 모두 거부" else INTEGRATED_CONSENT_ALL_LABEL
+            firstRunConsentAllButton.text = label
+            firstRunConsentAllButton.contentDescription = label
         }
         if (::firstRunIntegratedConsentSaveButton.isInitialized) {
             firstRunIntegratedConsentSaveButton.visibility =
@@ -25878,6 +26031,11 @@ generation != cameraFallbackGeneration
         const val WS_TOUCH_WALK_ACTION_DP = 56f
         /** 부차 행동의 최소 터치 크기. */
         const val WS_TOUCH_MIN_DP = 48f
+        /** 약관 조항 상자의 최대 높이. 이보다 길면 상자 안에서 스크롤한다. */
+        const val WS_CLAUSE_BOX_MAX_HEIGHT_DP = 132f
+        const val ACCOUNT_CONSENT_ALL_LABEL =
+            "필수 3개와 선택 3개에 모두 동의합니다"
+        const val INTEGRATED_CONSENT_ALL_LABEL = "네 항목 모두 허용"
         /** 상태 문구 안의 라벨. 문자열 자체는 각 메시지 생성기가 소유한다. */
         val LABEL_PREFIXES = listOf("원인:", "다음 행동:", "확인 완료:", "기기 점검:")
         /** 보행을 막는 상태 낱말. 나머지 상태는 통과로 본다. */
