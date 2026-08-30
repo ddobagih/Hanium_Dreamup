@@ -12822,9 +12822,28 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         // 그대로 두고 클릭 역할만 뗀다.
         view.isClickable = false
         view.isLongClickable = false
-        // 바깥 스크롤이 가로채면 상자 안이 움직이지 않는다.
-        view.setOnTouchListener { child, _ ->
-            child.parent?.requestDisallowInterceptTouchEvent(true)
+        // 바깥 스크롤이 가로채면 상자 안이 움직이지 않는다. 그렇다고 무조건 막으면 반대 문제가
+        // 생긴다 — 조항 상자가 화면 폭을 다 차지하므로, 손가락이 상자에서 시작하면 페이지 자체가
+        // 넘어가지 않는다. 항목이 여섯이면 사실상 스크롤이 막힌다.
+        //
+        // 그래서 상자가 그 방향으로 더 움직일 수 있을 때만 가로채기를 막는다. 위아래 끝에 닿으면
+        // 바깥 화면이 이어받는다.
+        var lastTouchY = 0f
+        view.setOnTouchListener { child, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> lastTouchY = event.y
+                MotionEvent.ACTION_MOVE -> {
+                    val movingUp = event.y < lastTouchY
+                    lastTouchY = event.y
+                    val direction = if (movingUp) 1 else -1
+                    child.parent?.requestDisallowInterceptTouchEvent(
+                        child.canScrollVertically(direction),
+                    )
+                }
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL,
+                -> child.parent?.requestDisallowInterceptTouchEvent(false)
+            }
             false
         }
     }

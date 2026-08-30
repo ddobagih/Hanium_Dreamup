@@ -38,7 +38,7 @@ class MainActivityConsentLayoutStaticTest {
         // 높이를 제한하고 상자 안에서 스크롤한다. 여섯 항목이 화면을 밀어내면 안 된다.
         assertTrue(box.contains("maxHeight = (WS_CLAUSE_BOX_MAX_HEIGHT_DP"))
         assertTrue(box.contains("movementMethod = ScrollingMovementMethod()"))
-        assertTrue(box.contains("requestDisallowInterceptTouchEvent(true)"))
+        assertTrue(box.contains("requestDisallowInterceptTouchEvent("))
 
         // 두 화면 모두 같은 상자를 쓴다.
         assertEquals(2, source.split("applyWsClauseBox(this)").size - 1)
@@ -123,6 +123,20 @@ class MainActivityConsentLayoutStaticTest {
         assertTrue(box.contains("view.isClickable = false"))
         assertTrue(box.contains("view.isLongClickable = false"))
         assertTrue(box.contains("movementMethod = ScrollingMovementMethod()"))
-        assertTrue(box.contains("requestDisallowInterceptTouchEvent(true)"))
+        assertTrue(box.contains("requestDisallowInterceptTouchEvent("))
+    }
+
+    @Test
+    fun theClauseBoxDoesNotSwallowThePageScroll() {
+        val box = source.substringAfter("private fun applyWsClauseBox(")
+            .substringBefore("\n    private fun ")
+
+        // 무조건 가로채기를 막으면 상자가 화면 폭을 다 차지하므로 페이지가 넘어가지 않는다.
+        // 상자가 그 방향으로 더 갈 수 있을 때만 막고, 끝에 닿으면 바깥 화면이 이어받는다.
+        assertTrue(box.contains("child.canScrollVertically(direction)"))
+        assertTrue(box.contains("val movingUp = event.y < lastTouchY"))
+        assertTrue(box.contains("MotionEvent.ACTION_UP,"))
+        assertTrue(box.contains("-> child.parent?.requestDisallowInterceptTouchEvent(false)"))
+        assertFalse(box.contains("requestDisallowInterceptTouchEvent(true)"))
     }
 }
