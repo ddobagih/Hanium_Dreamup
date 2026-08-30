@@ -112,4 +112,17 @@ class MainActivityConsentLayoutStaticTest {
         // 단계는 표시 상태다. 증거·상태기계는 건드리지 않는다.
         assertFalse(update.contains("accountSignupStep") && update.contains("beginAttempt"))
     }
+
+    @Test
+    fun theClauseBoxIsReadingMaterialNotAControl() {
+        val box = source.substringAfter("private fun applyWsClauseBox(")
+            .substringBefore("\n    private fun ")
+
+        // movementMethod 가 붙으면 클릭 가능으로 잡혀 스크린리더가 「버튼, 두 번 탭하여 활성화」로
+        // 읽는데 눌러도 하는 일이 없다. 손가락 스크롤은 두고 클릭 역할만 뗀다.
+        assertTrue(box.contains("view.isClickable = false"))
+        assertTrue(box.contains("view.isLongClickable = false"))
+        assertTrue(box.contains("movementMethod = ScrollingMovementMethod()"))
+        assertTrue(box.contains("requestDisallowInterceptTouchEvent(true)"))
+    }
 }

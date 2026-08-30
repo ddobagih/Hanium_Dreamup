@@ -192,4 +192,24 @@ class MainActivityWalkScreenLayoutStaticTest {
         // 라이선스 전문을 저장소에 함께 둔다. OFL 1.1 의 요구다.
         assertTrue(java.io.File("../licenses/pretendard-OFL-1.1.txt").exists())
     }
+
+    @Test
+    fun theStatusLineSpeaksItsValueNotJustItsLabel() {
+        val update = source.substringAfter("private fun updateStatus(status: String, detail: String)")
+            .substringBefore("\n    private fun ")
+
+        // 고정 라벨만 붙어 있으면 스크린리더가 그 말만 하고 실제 상태는 영영 읽지 않는다.
+        assertTrue(update.contains("statusText.contentDescription = \"WalkSafe 상태. \$status\""))
+
+        // 자동 낭독은 계속 꺼 둔다. 500ms 마다 말이 끼어들면 안 된다.
+        assertTrue(source.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE"))
+    }
+
+    @Test
+    fun theDestinationFieldAndItsButtonDoNotShareOneName() {
+        val field = source.substringAfter("destinationQueryInput = EditText(this).apply")
+            .substringBefore("destinationSearchButton =")
+        assertTrue(field.contains("hint = \"목적지 검색\""))
+        assertTrue(field.contains("contentDescription = \"목적지 입력\""))
+    }
 }

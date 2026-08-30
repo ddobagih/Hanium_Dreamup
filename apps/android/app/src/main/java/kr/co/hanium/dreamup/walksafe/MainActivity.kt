@@ -12285,6 +12285,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         updateBackendAuthButtonText()
         destinationQueryInput = EditText(this).apply {
             hint = "목적지 검색"
+            // 바로 아래 「목적지 검색」 버튼과 이름이 같아 스크린리더로 두 번 연속 같은 말이
+            // 들린다. 보이는 hint 는 그대로 두고 낭독 이름만 구분한다.
+            contentDescription = "목적지 입력"
             // 12sp 는 접근성 기본값이 16sp 로 끌어올려 주고 있었을 뿐이다. 입력칸도 본문 하한을 지킨다.
             textSize = 20f
             minimumHeight = (WS_TOUCH_WALK_ACTION_DP * resources.displayMetrics.density).roundToInt()
@@ -12805,10 +12808,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         view.maxHeight = (WS_CLAUSE_BOX_MAX_HEIGHT_DP * density).roundToInt()
         view.isVerticalScrollBarEnabled = true
         view.movementMethod = ScrollingMovementMethod()
+        // 조항은 읽는 글이다. movementMethod 가 붙으면 클릭 가능으로 잡혀 스크린리더가 「버튼,
+        // 두 번 탭하여 활성화」로 읽는데, 눌러도 하는 일이 없다. 손가락 스크롤은 아래 터치 처리로
+        // 그대로 두고 클릭 역할만 뗀다.
+        view.isClickable = false
+        view.isLongClickable = false
         // 바깥 스크롤이 가로채면 상자 안이 움직이지 않는다.
-        view.setOnTouchListener { child, event ->
+        view.setOnTouchListener { child, _ ->
             child.parent?.requestDisallowInterceptTouchEvent(true)
-            if (event.action == MotionEvent.ACTION_UP) child.performClick()
             false
         }
     }
@@ -25561,6 +25568,10 @@ generation != cameraFallbackGeneration
 
     private fun updateStatus(status: String, detail: String) {
         statusText.text = status
+        // 고정 라벨 「WalkSafe 상태」만 붙여 두면 스크린리더가 그 말만 하고 실제 상태는 영영 읽지
+        // 않는다. 라벨과 값을 함께 준다. 자동 낭독은 그대로 끄여 있으므로(LIVE_REGION_NONE)
+        // 500ms 마다 말이 끼어들지는 않고, 사용자가 그 줄에 초점을 옮겼을 때만 들린다.
+        statusText.contentDescription = "WalkSafe 상태. $status"
         detailText.text = detail
     }
 
