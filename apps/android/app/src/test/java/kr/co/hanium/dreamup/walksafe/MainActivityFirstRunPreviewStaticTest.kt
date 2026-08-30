@@ -134,6 +134,8 @@ class MainActivityFirstRunPreviewStaticTest {
         assertTrue(
             render.contains("if (firstRunOnboardingComplete() || previewWalkOnly) View.GONE"),
         )
-        assertTrue(render.contains("previewWalkOnly ||"))
+        // 완료 자리에서는 보행 화면을 그리지 않는다. 겹치면 자리를 나눈 의미가 없다.
+        assertTrue(render.contains("previewWalkOnly -> View.VISIBLE"))
+        assertTrue(render.contains("firstRunPreviewStage != null -> View.GONE"))
     }
 }

@@ -14480,16 +14480,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         }
         if (::runtimeControls.isInitialized) {
-            // 완료 단계를 미리보면 보행 화면 자체도 그린다. 표시 전용이다. 실제 안내는
-            // walkSafetyOutputsAllowed() 가 첫 실행 완료를 먼저 요구하므로 나가지 않고, 각 조작도
-            // currentReporterUserId() 로 따로 막혀 있다.
-            val previewingWalkScreen =
-                previewWalkOnly ||
-                    (!mayUseWalk && renderStage == FirstRunOnboardingStage.COMPLETE)
-            if (previewingWalkScreen) {
-                runtimeControls.visibility = View.VISIBLE
-            } else if (!showVerifiedSurfaces) {
-                runtimeControls.visibility = View.GONE
+            // 보행 화면은 전용 미리보기 자리에서만 그린다. 완료 자리에서 함께 그리면 두 화면이 한
+            // 스크롤에 겹쳐 어느 쪽도 제대로 볼 수 없다 — 자리를 나눈 이유가 사라진다. 어느 자리든
+            // 표시 전용이며 실제 안내는 walkSafetyOutputsAllowed() 가, 각 조작은
+            // currentReporterUserId() 가 따로 막는다.
+            runtimeControls.visibility = when {
+                previewWalkOnly -> View.VISIBLE
+                firstRunPreviewStage != null -> View.GONE
+                !showVerifiedSurfaces -> View.GONE
+                else -> runtimeControls.visibility
             }
         }
         refreshFirstRunNoticeUi()
