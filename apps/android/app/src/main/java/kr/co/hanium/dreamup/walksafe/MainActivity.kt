@@ -10742,7 +10742,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = WS_CORNER_RADIUS_DP * density
             setColor(0x00000000)
-            setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+            setStroke((WS_BUTTON_BORDER_DP * density).roundToInt(), WS_COLOR_BUTTON_BORDER)
         }
         button.setTextColor(WS_COLOR_NOTICE_TEXT)
         button.textSize = 16f
@@ -10829,35 +10829,39 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             setColor(WS_COLOR_NOTICE_FILL)
             setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
         }
+        // Card: padding 16px 균일.
         view.setPadding(
             (16f * density).roundToInt(),
-            (14f * density).roundToInt(),
             (16f * density).roundToInt(),
-            (14f * density).roundToInt(),
+            (16f * density).roundToInt(),
+            (16f * density).roundToInt(),
         )
         view.setTextColor(WS_COLOR_NOTICE_TEXT)
-        view.setLineSpacing(0f, 1.5f)
+        view.setLineSpacing(0f, 1.6f)
     }
 
     /** 입력칸도 버튼과 같은 면 위에 놓는다. 기본 밑줄 스타일은 어두운 바탕에서 거의 보이지 않는다. */
     private fun applyWsFieldStyle(field: EditText) {
         val density = resources.displayMetrics.density
+        // InputField: 면은 카드와 같은 흰색, 테두리는 버튼과 같은 1.5px 진한 선이다. 조작할 수
+        // 있는 것이라 장식 구분선이 아니라 버튼 테두리 쪽을 쓴다.
         field.background = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = WS_CORNER_RADIUS_DP * density
             setColor(WS_COLOR_NOTICE_FILL)
-            setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+            setStroke((WS_BUTTON_BORDER_DP * density).roundToInt(), WS_COLOR_BUTTON_BORDER)
         }
         field.setTextColor(WS_COLOR_BUTTON_TEXT)
         field.setHintTextColor(WS_COLOR_NOTICE_TEXT)
+        field.textSize = 18f
         field.minimumHeight = maxOf(
             field.minimumHeight,
             (WS_TOUCH_WALK_ACTION_DP * density).roundToInt(),
         )
         field.setPadding(
-            (16f * density).roundToInt(),
+            (14f * density).roundToInt(),
             (12f * density).roundToInt(),
-            (16f * density).roundToInt(),
+            (14f * density).roundToInt(),
             (12f * density).roundToInt(),
         )
     }
@@ -10881,13 +10885,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         fill: Int,
         density: Float,
         outlined: Boolean = false,
+        focused: Boolean = false,
     ): GradientDrawable = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         cornerRadius = WS_CORNER_RADIUS_DP * density
         setColor(fill)
-        // 밝은 면은 흰 바탕과 1.25:1 밖에 안 돼 경계가 보이지 않는다. 테두리가 경계를 만든다.
-        // 주 행동은 면 자체가 18.9:1 이라 테두리가 필요 없다.
-        if (outlined) setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+        // 밝은 면은 아이보리 바탕과 밝기가 거의 같아 경계가 보이지 않는다. 테두리가 경계를 만든다.
+        // 조작할 수 있는 것의 경계라 구분선보다 진하고 두껍다. 주 행동은 면 자체가 어두워 필요 없다.
+        when {
+            // 초점은 면을 갈아끼우지 않고 테두리로 표시한다. 면을 바꾸면 그 버튼이 다른 버튼으로
+            // 보이고, 주 행동이 초점을 받으면 위계까지 흔들린다.
+            focused -> setStroke((WS_FOCUS_BORDER_DP * density).roundToInt(), WS_COLOR_FOCUS)
+            outlined -> setStroke(
+                (WS_BUTTON_BORDER_DP * density).roundToInt(),
+                WS_COLOR_BUTTON_BORDER,
+            )
+        }
     }
 
     /**
@@ -10902,10 +10915,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         button.ellipsize = null
         // applyAccessibleControlDefaults 가 maxOf 로 올리기만 하므로 여기서 잡은 크기가 살아남는다.
         button.minimumHeight = (minHeightDp * density).roundToInt()
+        // PrimaryBtn 20px/700, SecBtn 18px/500.
         button.textSize = if (primary) 20f else 18f
-        button.typeface = wsTypeface(if (primary) Typeface.BOLD else Typeface.NORMAL)
-        // 주 행동만 가운데 정렬로 한 덩어리처럼 보이게 하고, 목록형 행동은 글머리를 왼쪽으로 맞춘다.
-        button.gravity = if (primary) Gravity.CENTER else Gravity.START or Gravity.CENTER_VERTICAL
+        button.typeface = wsTypeface(
+            if (primary) Typeface.BOLD else Typeface.NORMAL,
+            medium = !primary,
+        )
+        // 디자인은 주 행동과 일반 행동을 모두 가운데로 둔다(PrimaryBtn·SecBtn 둘 다
+        // justifyContent: center). 앞선 판에서 목록형을 왼쪽으로 맞췄던 것은 내 판단이었고,
+        // 토큰 표와 함께 온 화면 구성이 그렇지 않으므로 되돌린다.
+        button.gravity = Gravity.CENTER
         button.stateListAnimator = null
         button.elevation = 0f
         // accessiblePriorityUserButton 이 남긴 backgroundTintList 가 아래 드로어블을 그대로 물들인다.
@@ -10939,7 +10958,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             )
             addState(
                 intArrayOf(android.R.attr.state_focused),
-                wsButtonFace(WS_COLOR_BUTTON_FOCUSED_FILL, density),
+                wsButtonFace(
+                    if (primary) WS_COLOR_PRIMARY_ACTION_FILL else WS_COLOR_BUTTON_FILL,
+                    density,
+                    focused = true,
+                ),
             )
             addState(
                 intArrayOf(),
@@ -10966,16 +10989,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         WS_COLOR_BUTTON_DISABLED_TEXT
                     },
                     restingText,
-                    WS_COLOR_BUTTON_TEXT,
+                    restingText,
                     restingText,
                 ),
             ),
         )
+        // 디자인 padding: '0 20px'. 세로 여백은 최소 높이(56/80dp)가 만든다.
         button.setPadding(
             (20f * density).roundToInt(),
-            (14f * density).roundToInt(),
+            (10f * density).roundToInt(),
             (20f * density).roundToInt(),
-            (14f * density).roundToInt(),
+            (10f * density).roundToInt(),
         )
     }
 
@@ -12839,7 +12863,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         view.background = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = WS_CORNER_RADIUS_DP * density
-            setColor(WS_COLOR_NOTICE_FILL)
+            setColor(WS_COLOR_GROUND)
             setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
         }
         view.setPadding(
@@ -12848,9 +12872,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             (14f * density).roundToInt(),
             (12f * density).roundToInt(),
         )
+        // TermsBox: 바탕은 카드 면이 아니라 화면 바탕색이다. 카드 안에 놓였을 때 한 겹 들어가
+        // 보이게 하려는 것이다.
+        //
+        // 글자는 ver2 에서 15px → 18px 로 올라왔다. 약관 본문은 저시력 사용자가 실제로 읽어야 하는
+        // 글이라 본문 하한(18sp) 아래로 둘 수 없다. 상자 높이가 132dp 로 고정이므로 스크롤 양이
+        // 늘어나는 것은 감수한 선택이다.
         view.textSize = 18f
         view.setTextColor(WS_COLOR_NOTICE_TEXT)
-        view.setLineSpacing(0f, 1.45f)
+        view.setLineSpacing(0f, 1.75f)
         view.maxHeight = (WS_CLAUSE_BOX_MAX_HEIGHT_DP * density).roundToInt()
         view.isVerticalScrollBarEnabled = true
         view.movementMethod = ScrollingMovementMethod()
@@ -26228,30 +26258,40 @@ generation != cameraFallbackGeneration
     private companion object {
         /** 마지막 컨트롤 아래 확보할 여백. 화면 밀도에 맞춰 px 로 환산한다. */
         /** 실측 대비 기준 디자인 토큰. 흰 글자/회색 면 6.97:1, 테두리 4.08:1. */
-        const val WS_COLOR_BUTTON_FILL = 0xffefede9.toInt()
-        const val WS_COLOR_BUTTON_TEXT = 0xff1a1a1a.toInt()
-        const val WS_COLOR_BUTTON_PRESSED_FILL = 0xffd9d6d0.toInt()
+        const val WS_COLOR_BUTTON_FILL = 0xffffffff.toInt()
+        const val WS_COLOR_BUTTON_TEXT = 0xff1a1916.toInt()
+        const val WS_COLOR_BUTTON_PRESSED_FILL = 0xffe8e5df.toInt()
         const val WS_COLOR_BUTTON_FOCUSED_FILL = 0xff765d00.toInt()
-        const val WS_COLOR_BUTTON_DISABLED_FILL = 0xfff4f3f0.toInt()
-        const val WS_COLOR_BUTTON_DISABLED_TEXT = 0xff6e6b66.toInt()
+        const val WS_COLOR_BUTTON_DISABLED_FILL = 0xffe4e1db.toInt()
+        const val WS_COLOR_BUTTON_DISABLED_TEXT = 0xff8c8782.toInt()
         /** 펼쳐진 안전 고지. 카드 위 10.81:1 로 AAA 를 유지한다. */
-        const val WS_COLOR_NOTICE_TEXT = 0xff3d3b38.toInt()
-        const val WS_COLOR_NOTICE_FILL = 0xfff4f3f0.toInt()
-        const val WS_COLOR_LINE = 0xff6e6b66.toInt()
+        const val WS_COLOR_NOTICE_TEXT = 0xff5c5853.toInt()
+        const val WS_COLOR_NOTICE_FILL = 0xffffffff.toInt()
+        const val WS_COLOR_LINE = 0xffc8bfb0.toInt()
+        /** 버튼 테두리. 구분선(`WS_COLOR_LINE`)보다 진하다 — 조작할 수 있는 것의 경계이기 때문이다. */
+        const val WS_COLOR_BUTTON_BORDER = 0xff7a7570.toInt()
+        /** 화면 바탕색. 오버레이는 카메라 위에 뜨느라 알파가 붙어 있어 면 색으로는 이것을 쓴다. */
+        const val WS_COLOR_GROUND = 0xfffff9f0.toInt()
+        /** 키보드·스위치 초점. 면을 갈아끼우지 않고 테두리로 표시한다. */
+        const val WS_COLOR_FOCUS = 0xff1a4fbf.toInt()
+        /** 버튼 테두리 두께. 구분선 1dp 보다 두껍다. */
+        const val WS_BUTTON_BORDER_DP = 1.5f
+        /** 초점 테두리 두께. */
+        const val WS_FOCUS_BORDER_DP = 3f
         const val SAFETY_NOTICE_HEADING = "안전 고지"
-        const val WS_COLOR_EMPHASIS = 0xff8a5a00.toInt()
-        const val WS_COLOR_WARNING = 0xffb3341a.toInt()
+        const val WS_COLOR_EMPHASIS = 0xff0a0906.toInt()
+        const val WS_COLOR_WARNING = 0xffc0340e.toInt()
         /** 주 행동은 배경과 글자를 뒤집어 구분한다. 색이 아니라 명도 대비로 읽히게 한다. */
-        const val WS_COLOR_PRIMARY_ACTION_FILL = 0xff111111.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_TEXT = 0xffffffff.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_PRESSED_FILL = 0xff3a3a3a.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_FILL = 0xff1c1a17.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_TEXT = 0xfffff9f0.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_PRESSED_FILL = 0xff3a3730.toInt()
         /**
          * 주 행동은 첫 실행 미완료·ARCore 확인 중처럼 꺼져 있는 시간이 길다. 일반 버튼의 비활성
          * 색을 그대로 쓰면 화면에서 가장 흐린 요소가 되어 크기로 만든 위계가 뒤집힌다. 꺼져 있어도
          * 다른 버튼보다는 밝게 두어 「지금은 누를 수 없는 주 행동」으로 읽히게 한다.
          */
-        const val WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff6b6b6b.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT = 0xffffffff.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff6b6761.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT = 0xfffff9f0.toInt()
         const val WS_TOUCH_PRIMARY_DP = 56f
         /** 보행 화면 일반 행동. 온보딩 48dp 보다 크게 잡아 한 손 조작에서 빗나가지 않게 한다. */
         const val WS_TOUCH_WALK_ACTION_DP = 56f
@@ -26304,8 +26344,8 @@ generation != cameraFallbackGeneration
         const val OVERLAY_BOTTOM_PADDING_DP = 24f
         const val OVERLAY_HORIZONTAL_PADDING_DP = 20f
         const val OVERLAY_TOP_PADDING_DP = 24f
-        const val WS_COLOR_OVERLAY_FILL = 0xfaffffff.toInt()
-        const val WS_COLOR_WALK_OVERLAY_FILL = 0xf2ffffff.toInt()
+        const val WS_COLOR_OVERLAY_FILL = 0xfafff9f0.toInt()
+        const val WS_COLOR_WALK_OVERLAY_FILL = 0xf2fff9f0.toInt()
 
         val PRIVACY_STARTUP_PROCESS_LOCK = Any()
         var accountDeletionStartupResetHandoffPending = false
