@@ -101,10 +101,17 @@ class MainActivityFirstRunPreviewStaticTest {
     }
 
     @Test
-    fun previewOrderCoversTheTwelveStagesWithoutTheBlockedBranch() {
+    fun previewOrderWalksTheEmailFlowWithoutTheBlockedBranch() {
         val order = source.substringAfter("val FIRST_RUN_PREVIEW_STAGES = listOf(")
             .substringBefore(")")
-        assertEquals(12, Regex("FirstRunOnboardingStage\\.").findAll(order).count())
+
+        // 제품이 실제로 걷는 EMAIL_ACCOUNT_V4 6단계와 완료 화면. SMS 시절 12단계는 돌지 않는다.
+        assertEquals(10, Regex("FirstRunOnboardingStage\\.").findAll(order).count())
         assertFalse(order.contains("BLOCKED_UNDER_14"))
+        assertFalse(order.contains("LOCAL_CREDENTIAL_PHONE_SUBMISSION"))
+        assertFalse(order.contains("VERIFIED_SMS"))
+        assertFalse(order.contains("GUARDIAN_APPROVAL"))
+        assertTrue(order.contains("EMAIL_OTP_ENROLLMENT"))
+        assertTrue(order.contains("ACCOUNT_CREATED"))
     }
 }

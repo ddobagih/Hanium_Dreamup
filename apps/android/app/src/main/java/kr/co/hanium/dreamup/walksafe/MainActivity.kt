@@ -10692,6 +10692,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
+    /**
+     * 펼치기·접기·전문 보기 같은 부차 행동. 채운 면을 그대로 주면 화면 맨 위 토글 두 개가 본문보다
+     * 무거워져 정작 그 단계에서 할 일이 눈에 덜 띈다. 테두리만 남겨 한 단계 낮춘다.
+     */
+    private fun applyWsSecondaryButtonStyle(button: Button) {
+        val density = resources.displayMetrics.density
+        applyWsButtonStyle(button, WS_TOUCH_MIN_DP)
+        button.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = WS_CORNER_RADIUS_DP * density
+            setColor(0x00000000)
+            setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+        }
+        button.setTextColor(WS_COLOR_NOTICE_TEXT)
+        button.textSize = 16f
+    }
+
     /** 입력칸도 버튼과 같은 면 위에 놓는다. 기본 밑줄 스타일은 어두운 바탕에서 거의 보이지 않는다. */
     private fun applyWsFieldStyle(field: EditText) {
         val density = resources.displayMetrics.density
@@ -11476,8 +11493,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         firstRunOnboardingControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            addView(firstRunProgressBar)
+            // 진행 표시가 맨 위다. 이전에는 고지 토글 아래에 있어 어디까지 왔는지가 부차 정보처럼
+            // 보였다.
+            // 미리보기 컨트롤은 DEBUG 도구다. 제목과 그 단계의 컨트롤 사이를 가르지 않도록 맨 위에 둔다.
             firstRunPreviewStageButton?.let(::addView)
+            addView(firstRunProgressBar)
             addView(firstRunOnboardingStatusText)
             addView(accountAccessControls)
             addView(firstRunPurposeButton)
@@ -12383,6 +12403,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         // 트리 훑기가 모든 버튼에 기본 마감을 입힌 뒤라, 주 행동은 여기서 다시 덮어써야 한다.
         applyWsButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)
         wsEmphasisButtons.forEach { applyWsButtonStyle(it, WS_TOUCH_PRIMARY_DP, primary = true) }
+        // 펼치기·접기·전문 보기는 전부 부차 행동이다. 화면 맨 위 토글이 본문을 누르지 않게 한다.
+        listOfNotNull(
+            firstRunNoticeToggleButton,
+            firstRunPreviewStageButton,
+            privacySectionToggleButton,
+            walkReadinessToggleButton,
+            runtimeDebugControlsToggleButton,
+            accountSignupToggleButton,
+            accountConsentDisclosureToggleButton,
+            firstRunDisclosureToggleButton,
+        ).forEach(::applyWsSecondaryButtonStyle)
         walkSafetyOverlay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.START
@@ -12648,7 +12679,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         updateFirstRunOnboardingUi()
         val label = firstRunPreviewStage
-            ?.let { "${legacyFirstRunStageNumber(it)}단계 화면" }
+            ?.let { "${FIRST_RUN_PREVIEW_STAGES.indexOf(it) + 1}번째 화면" }
             ?: "실제 단계"
         speakInteraction("미리보기를 $label 로 바꿨습니다. 화면만 바뀌고 진행 상태는 그대로입니다.")
     }
@@ -12659,7 +12690,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         button.text = if (preview == null) {
             "미리보기 단계: 실제"
         } else {
-            "미리보기 단계: ${legacyFirstRunStageNumber(renderStage)}/$FIRST_RUN_STAGE_COUNT"
+            "미리보기 ${FIRST_RUN_PREVIEW_STAGES.indexOf(renderStage) + 1}/${FIRST_RUN_PREVIEW_STAGES.size}"
         }
         button.contentDescription =
             "${button.text}. 누르면 다음 단계 화면을 미리봅니다. 진행 상태는 바뀌지 않습니다."
@@ -13717,10 +13748,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountConsentChecks["training_reuse"]?.isChecked = selections.trainingReuse
     }
 
-    private fun updateEmailAccountAccessUi(snapshot: FirstRunOnboardingSnapshot) {
+    /**
+     * [renderStage] 는 화면에 그릴 단계다. DEBUG 미리보기가 없으면 실제 단계와 같다. 이것을 쓰지
+     * 않으면 미리보기가 어느 단계를 그리든 계정 입력칸이 그대로 남아 화면이 겹쳐 보인다.
+     * 실제 조작은 아래에서 snapshot 으로만 판정하므로 미리보기로는 아무것도 활성화되지 않는다.
+     */
+    private fun updateEmailAccountAccessUi(
+        snapshot: FirstRunOnboardingSnapshot,
+        renderStage: FirstRunOnboardingStage = snapshot.stage,
+    ) {
         if (!::accountAccessControls.isInitialized || !::accountSignupControls.isInitialized) return
         val emailFlow = snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4
-        val accountStage = snapshot.stage in setOf(
+        val accountStage = renderStage in setOf(
             FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT,
             FirstRunOnboardingStage.ACCOUNT_CREATED,
             FirstRunOnboardingStage.VERIFIED_LOGIN,
@@ -13914,7 +13953,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         firstRunOnboardingStatusText.text = message
         firstRunOnboardingStatusText.contentDescription = message
         applyStageHeadingStyle(message)
-        updateEmailAccountAccessUi(snapshot)
+        updateEmailAccountAccessUi(snapshot, renderStage)
         firstRunPurposeButton.visibility =
             if (renderStage == FirstRunOnboardingStage.PURPOSE_AND_SAFETY) {
                 View.VISIBLE
@@ -13980,13 +14019,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             updateFirstRunWaitingDots(active = waitingText != null)
         }
 
+        // 아래 세 판정은 「무엇을 그릴지」만 정한다. renderStage 를 쓰지 않으면 미리보기가 어느
+        // 단계를 가리켜도 준비 표면이 나타나지 않아 화면이 통째로 비어 보인다. 조작 활성화와
+        // 증거 생성은 계속 snapshot 으로만 판정한다.
         val mayTrain =
-            snapshot.stage == FirstRunOnboardingStage.FP004_TRAINING ||
+            renderStage == FirstRunOnboardingStage.FP004_TRAINING ||
                 firstRunOnboardingComplete()
         val mayCheckDevice =
             snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 &&
-                currentPostLoginDeviceCheckSessionBinding() != null &&
-                snapshot.stage in setOf(
+                (currentPostLoginDeviceCheckSessionBinding() != null || firstRunPreviewStage != null) &&
+                renderStage in setOf(
                     FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
                     FirstRunOnboardingStage.DEVICE_CHECK,
                     FirstRunOnboardingStage.FP004_TRAINING,
@@ -25696,6 +25738,8 @@ generation != cameraFallbackGeneration
         const val WS_TOUCH_PRIMARY_DP = 56f
         /** 보행 화면 일반 행동. 온보딩 48dp 보다 크게 잡아 한 손 조작에서 빗나가지 않게 한다. */
         const val WS_TOUCH_WALK_ACTION_DP = 56f
+        /** 부차 행동의 최소 터치 크기. */
+        const val WS_TOUCH_MIN_DP = 48f
         /** 보행 화면 주 행동 하나. 나머지와 무게가 같아 보이면 안 된다. */
         const val WS_TOUCH_WALK_PRIMARY_DP = 80f
         const val WS_CORNER_RADIUS_DP = 10f
@@ -25705,15 +25749,17 @@ generation != cameraFallbackGeneration
         const val FIRST_RUN_WAITING_DOT_PERIOD_MS = 750L
         const val FIRST_RUN_WAITING_DOT_STAGGER_MS = 300L
 
-        /** DEBUG 미리보기 순회 순서. 1~12단계만 돌며 BLOCKED_UNDER_14 는 진행 경로가 아니라 제외한다. */
+        /**
+         * DEBUG 미리보기 순회 순서. 제품이 실제로 걷는 EMAIL_ACCOUNT_V4 6단계와 완료 화면이다.
+         * SMS 본인확인 시절의 12단계는 이메일 대체 이후 아무도 지나가지 않으므로 돌지 않는다.
+         * 그 단계로 되돌아가면 여기부터 다시 채운다.
+         */
         val FIRST_RUN_PREVIEW_STAGES = listOf(
+            FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT,
+            FirstRunOnboardingStage.ACCOUNT_CREATED,
             FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
             FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED,
             FirstRunOnboardingStage.INTEGRATED_CONSENT,
-            FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION,
-            FirstRunOnboardingStage.VERIFIED_SMS,
-            FirstRunOnboardingStage.GUARDIAN_APPROVAL,
-            FirstRunOnboardingStage.ACCOUNT_ACTIVATION,
             FirstRunOnboardingStage.VERIFIED_LOGIN,
             FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
             FirstRunOnboardingStage.DEVICE_CHECK,
