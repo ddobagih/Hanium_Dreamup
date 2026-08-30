@@ -88,6 +88,7 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -10824,6 +10825,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
     }
 
+    /**
+     * 번들 글꼴(Pretendard)의 한 굵기. 테마가 이미 기본 글꼴을 이 family 로 잡아 두었으므로,
+     * 코드에서 굵기를 지정할 때 시스템 글꼴 이름을 쓰면 그 자리만 다른 글꼴이 된다.
+     */
+    private fun wsTypeface(style: Int, medium: Boolean = false): Typeface? =
+        ResourcesCompat.getFont(
+            this,
+            when {
+                style == Typeface.BOLD -> R.font.pretendard_bold
+                medium -> R.font.pretendard_medium
+                else -> R.font.pretendard_regular
+            },
+        )
+
     /** 한 가지 상태의 납작한 둥근 채움. 프레임워크 기본 버튼 배경은 인셋과 각진 모서리를 함께 들고 온다. */
     private fun wsButtonFace(fill: Int, density: Float): GradientDrawable = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
@@ -10844,10 +10859,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         // applyAccessibleControlDefaults 가 maxOf 로 올리기만 하므로 여기서 잡은 크기가 살아남는다.
         button.minimumHeight = (minHeightDp * density).roundToInt()
         button.textSize = if (primary) 20f else 18f
-        button.typeface = Typeface.create(
-            if (primary) "sans-serif-medium" else "sans-serif",
-            if (primary) Typeface.BOLD else Typeface.NORMAL,
-        )
+        button.typeface = wsTypeface(if (primary) Typeface.BOLD else Typeface.NORMAL)
         // 주 행동만 가운데 정렬로 한 덩어리처럼 보이게 하고, 목록형 행동은 글머리를 왼쪽으로 맞춘다.
         button.gravity = if (primary) Gravity.CENTER else Gravity.START or Gravity.CENTER_VERTICAL
         button.stateListAnimator = null
@@ -10952,7 +10964,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         text = it
                         textSize = 18f
                         setTextColor(WS_COLOR_NOTICE_TEXT)
-                        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                        typeface = wsTypeface(Typeface.NORMAL, medium = true)
                         // 한글에는 대문자가 없어 초안의 uppercase 대신 자간으로 라벨임을 알린다.
                         letterSpacing = 0.12f
                         ViewCompat.setAccessibilityHeading(this, true)
@@ -11743,7 +11755,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ViewCompat.setAccessibilityHeading(safetySummaryText, true)
         statusText = TextView(this).apply {
             textSize = 24f
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            typeface = wsTypeface(Typeface.BOLD)
             setLineSpacing(0f, 1.3f)
             setTextColor(WS_COLOR_EMPHASIS)
             contentDescription = "WalkSafe 상태"

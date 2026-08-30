@@ -3,5 +3,10 @@
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:colorAccent">#0b6b58</item>
+        <!--
+          모든 텍스트 위젯의 기본 글꼴. 코드에서 굵기를 지정하는 곳은 같은 family 의 다른 weight 를
+          쓰므로 시스템 글꼴로 되돌아가지 않는다.
+        -->
+        <item name="android:fontFamily">@font/pretendard</item>
     </style>
 </resources>

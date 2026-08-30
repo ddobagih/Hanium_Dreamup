@@ -177,4 +177,19 @@ class MainActivityWalkScreenLayoutStaticTest {
             "startupCapabilityText.contentDescription = capabilityMessage",
         ).forEach { assertTrue(source.contains(it)) }
     }
+
+    @Test
+    fun theBundledTypefaceIsUsedEverywhereWeSetAWeight() {
+        // 테마가 모든 텍스트 위젯의 기본 글꼴을 잡는다.
+        val theme = java.io.File("src/main/res/values/styles.xml").readText()
+        assertTrue(theme.contains("<item name=\"android:fontFamily\">@font/pretendard</item>"))
+
+        // 코드에서 굵기를 지정할 때 시스템 글꼴 이름으로 되돌아가면 그 자리만 다른 글꼴이 된다.
+        assertFalse(source.contains("sans-serif-medium"))
+        assertFalse(source.contains("Typeface.create(\"sans-serif"))
+        assertTrue(source.contains("private fun wsTypeface("))
+
+        // 라이선스 전문을 저장소에 함께 둔다. OFL 1.1 의 요구다.
+        assertTrue(java.io.File("../licenses/pretendard-OFL-1.1.txt").exists())
+    }
 }

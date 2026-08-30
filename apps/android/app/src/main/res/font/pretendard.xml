@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pretendard v1.3.9, SIL Open Font License 1.1. 전문은 apps/android/licenses/pretendard-OFL-1.1.txt.
+  시스템 한국어 글꼴(Noto Sans CJK KR)보다 자간이 좁고 굵기 대비가 뚜렷해, 같은 크기에서 제목과
+  본문이 눈으로 갈린다. 접근성 최소 글자 크기 판정은 이 글꼴과 무관하게 그대로다.
+-->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font android:fontStyle="normal" android:fontWeight="400" android:font="@font/pretendard_regular" />
+    <font android:fontStyle="normal" android:fontWeight="500" android:font="@font/pretendard_medium" />
+    <font android:fontStyle="normal" android:fontWeight="700" android:font="@font/pretendard_bold" />
+</font-family>
