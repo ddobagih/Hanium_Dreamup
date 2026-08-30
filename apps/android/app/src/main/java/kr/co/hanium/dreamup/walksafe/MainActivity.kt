@@ -494,6 +494,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var accountSignupToggleButton: Button
     private lateinit var accountConsentDisclosureToggleButton: Button
     private var accountSignupExpanded = false
+    /**
+     * ACCOUNT_CREATED 단계에서 사용자가 직접 가입 입력을 접었는지. 그 단계는 인증번호 입력만을
+     * 위해 존재하므로 기본은 펼침이지만, 다른 계정으로 로그인하러 돌아가는 길은 남겨 둔다.
+     */
+    private var accountSignupCollapsedByUser = false
+    /** 지금 화면에 가입 입력이 펼쳐져 있는가. 토글은 저장 상태가 아니라 이것을 뒤집어야 한다. */
+    private var accountSignupOpenShown = false
     private var accountConsentDisclosureExpanded = false
     private lateinit var firstRunPurposeButton: Button
     private val firstRunAgeButtons = mutableMapOf<FirstRunAgeBand, Button>()
@@ -7049,6 +7056,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
         accountAccessNotice = "로그아웃했습니다. 이메일과 비밀번호를 다시 입력해 로그인하세요."
         accountSignupExpanded = false
+        accountSignupCollapsedByUser = false
         accountConsentDisclosureExpanded = false
         if (::accountEmailInput.isInitialized) accountEmailInput.text?.clear()
         if (::accountDateOfBirthInput.isInitialized) accountDateOfBirthInput.text?.clear()
@@ -11524,9 +11532,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             label = "새 계정 만들기",
             spokenLabel = "새 계정 만들기, 가입 입력 펼치기",
             onClick = {
-                accountSignupExpanded = !accountSignupExpanded
+                // 화면에 보이는 상태를 뒤집는다. ACCOUNT_CREATED 단계는 저장 상태가 접힘이어도
+                // 펼쳐져 보이므로, 저장 상태만 뒤집으면 「돌아가기」를 눌러도 닫히지 않는다.
+                val open = !accountSignupOpenShown
+                accountSignupExpanded = open
+                accountSignupCollapsedByUser = !open
                 accountRememberMeCheck.isChecked = false
-                updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
+                updateEmailAccountAccessUi(
+                    firstRunOnboardingSnapshot,
+                    firstRunPreviewStage ?: firstRunOnboardingSnapshot.stage,
+                )
                 if (accountSignupExpanded) {
                     val focusTarget =
                         if (
@@ -11553,7 +11568,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             spokenLabel = "가입 동의 자세히 보기, 접힘",
             onClick = {
                 accountConsentDisclosureExpanded = !accountConsentDisclosureExpanded
-                updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
+                updateEmailAccountAccessUi(
+                    firstRunOnboardingSnapshot,
+                    firstRunPreviewStage ?: firstRunOnboardingSnapshot.stage,
+                )
                 if (accountConsentDisclosureExpanded) {
                     accountConsentDisclosureText.post {
                         accountConsentDisclosureText.requestFocus()
@@ -13894,24 +13912,35 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         accountEmailInput.visibility = View.VISIBLE
         accountPasswordInput.visibility = View.VISIBLE
-        val creating = snapshot.stage == FirstRunOnboardingStage.ACCOUNT_CREATED
+        val creating = renderStage == FirstRunOnboardingStage.ACCOUNT_CREATED
         val verifiedLogin = snapshot.stage == FirstRunOnboardingStage.VERIFIED_LOGIN
         if (verifiedLogin) accountSignupExpanded = false
         val signupVisible = accountSignupExpanded && !verifiedLogin
+        // 그리는 단계를 기준으로 잊는다. 실제 흐름에서는 renderStage 가 곧 실제 단계이므로 동작이
+        // 같고, 미리보기에서도 접은 선택이 그 화면을 보는 동안 남는다.
+        if (!creating) accountSignupCollapsedByUser = false
+        // 이 단계의 제목은 인증번호를 입력하라고 말한다. 발급 직후에는 팀 코드가 이미 펼쳐 두지만,
+        // 프로세스가 다시 뜨거나 이 단계로 되돌아오면 접힌 채였고 그러면 시키는 일을 할 칸이 화면에
+        // 없었다. 저장된 상태(accountSignupExpanded)는 건드리지 않고 표시로만 연다 — 미리보기로도
+        // 아무것도 쓰이지 않으며, 사용자가 직접 접은 선택은 그 단계 동안 그대로 남는다.
+        val signupOpen =
+            (signupVisible || (creating && !accountSignupCollapsedByUser)) &&
+                renderStage != FirstRunOnboardingStage.VERIFIED_LOGIN
+        accountSignupOpenShown = signupOpen
         val busy = accountRequestFence.isInFlight()
-        accountRememberMeCheck.visibility = if (signupVisible) View.GONE else View.VISIBLE
-        accountLoginButton.visibility = if (signupVisible) View.GONE else View.VISIBLE
+        accountRememberMeCheck.visibility = if (signupOpen) View.GONE else View.VISIBLE
+        accountLoginButton.visibility = if (signupOpen) View.GONE else View.VISIBLE
         accountSignupToggleButton.visibility =
             if (verifiedLogin) View.GONE else View.VISIBLE
         accountSignupToggleButton.text =
             when {
-                signupVisible -> "로그인 화면으로 돌아가기"
+                signupOpen -> "로그인 화면으로 돌아가기"
                 creating -> "계정 만들기 계속"
                 else -> "새 계정 만들기"
             }
         accountSignupToggleButton.contentDescription =
             when {
-                signupVisible ->
+                signupOpen ->
                     "로그인 화면으로 돌아가기. 두 번 탭하여 가입 입력 접기"
                 creating ->
                     "계정 만들기 계속, 가입 입력 접힘. 두 번 탭하여 펼치기"
@@ -13919,18 +13948,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     "새 계정 만들기, 가입 입력 접힘. 두 번 탭하여 펼치기"
             }
         accountSignupControls.visibility =
-            if (signupVisible && !verifiedLogin) View.VISIBLE else View.GONE
+            if (signupOpen && !verifiedLogin) View.VISIBLE else View.GONE
         accountDateOfBirthInput.visibility =
-            if (signupVisible && !creating && !verifiedLogin) {
+            if (signupOpen && !creating && !verifiedLogin) {
                 View.VISIBLE
             } else {
                 View.GONE
             }
         accountPasswordConfirmationInput.visibility =
-            if (creating && signupVisible) View.VISIBLE else View.GONE
-        accountOtpInput.visibility = if (creating && signupVisible) View.VISIBLE else View.GONE
+            if (creating && signupOpen) View.VISIBLE else View.GONE
+        accountOtpInput.visibility = if (creating && signupOpen) View.VISIBLE else View.GONE
         accountConsentDisclosureToggleButton.visibility =
-            if (signupVisible && !creating && !verifiedLogin) View.VISIBLE else View.GONE
+            if (signupOpen && !creating && !verifiedLogin) View.VISIBLE else View.GONE
         accountConsentDisclosureToggleButton.text =
             if (accountConsentDisclosureExpanded) {
                 "가입 동의 자세히 접기"
@@ -13945,7 +13974,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         accountConsentDisclosureText.visibility =
             if (
-                signupVisible &&
+                signupOpen &&
                 !creating &&
                 !verifiedLogin &&
                 accountConsentDisclosureExpanded
@@ -13956,7 +13985,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         accountConsentChecks.values.forEach { check ->
             check.visibility =
-                if (signupVisible && !creating && !verifiedLogin) {
+                if (signupOpen && !creating && !verifiedLogin) {
                     View.VISIBLE
                 } else {
                     View.GONE
@@ -13965,7 +13994,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         accountRequestOtpButton.visibility =
             if (
-                signupVisible &&
+                signupOpen &&
                 snapshot.stage == FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT
             ) {
                 View.VISIBLE
@@ -13973,7 +14002,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 View.GONE
             }
         accountCreateButton.visibility =
-            if (creating && signupVisible) View.VISIBLE else View.GONE
+            if (creating && signupOpen) View.VISIBLE else View.GONE
         accountSessionLogoutButton.visibility = View.GONE
         accountRequestOtpButton.isEnabled = !busy && !emailEnrollmentStorageBlocked
         accountCreateButton.isEnabled = !busy && !emailEnrollmentStorageBlocked
@@ -13990,7 +14019,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             accountAccessNotice != null -> requireNotNull(accountAccessNotice)
             emailEnrollmentStorageBlocked ->
                 "가입 임시 상태를 안전하게 저장할 수 없습니다. 기존 계정 로그인만 가능합니다."
-            signupVisible && creating && partial != null ->
+            signupOpen && creating && partial != null ->
                 "인증번호가 발송되었습니다. 이메일·비밀번호·인증번호를 다시 확인하세요."
             snapshot.stage == FirstRunOnboardingStage.VERIFIED_LOGIN ->
                 "계정이 생성되었습니다. 같은 이메일과 비밀번호로 로그인하세요."

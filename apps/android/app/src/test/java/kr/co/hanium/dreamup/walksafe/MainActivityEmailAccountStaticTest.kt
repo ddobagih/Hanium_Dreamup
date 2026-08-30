@@ -148,14 +148,16 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(update.contains("accountSignupControls.visibility ="))
         assertTrue(update.contains("accountConsentDisclosureExpanded"))
         assertTrue(update.contains("accountConsentDisclosureText.visibility ="))
+        // 가입 입력이 열려 있으면 로그인 유지와 로그인 버튼을 감춘다. 열림 판정은 signupVisible 위에
+        // signupOpen 이 얹혀 있다 — ACCOUNT_CREATED 단계는 저장 상태를 쓰지 않고 표시로만 열린다.
         assertTrue(
             update.contains(
-                "accountRememberMeCheck.visibility = if (signupVisible) View.GONE else View.VISIBLE",
+                "accountRememberMeCheck.visibility = if (signupOpen) View.GONE else View.VISIBLE",
             ),
         )
         assertTrue(
             update.contains(
-                "accountLoginButton.visibility = if (signupVisible) View.GONE else View.VISIBLE",
+                "accountLoginButton.visibility = if (signupOpen) View.GONE else View.VISIBLE",
             ),
         )
         assertTrue(update.contains("로그인 화면으로 돌아가기"))
