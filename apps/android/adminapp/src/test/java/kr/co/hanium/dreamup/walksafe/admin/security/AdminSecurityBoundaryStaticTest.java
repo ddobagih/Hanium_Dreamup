@@ -70,7 +70,11 @@ public final class AdminSecurityBoundaryStaticTest {
         assertTrue(activity.contains("WindowManager.LayoutParams.FLAG_SECURE"));
         assertTrue(activity.contains("view.setSaveEnabled(false)"));
         assertTrue(activity.contains("clearSensitiveInputs()"));
-        assertFalse(activity.contains("onSaveInstanceState"));
+        assertTrue(activity.contains("onSaveInstanceState"));
+        assertTrue(activity.contains("REPORT_FILTER_ID_STATE"));
+        assertTrue(activity.contains("REPORT_SELECTED_ID_STATE"));
+        assertFalse(activity.contains("putString(\"accessToken"));
+        assertFalse(activity.contains("putString(\"recoveryToken"));
         assertFalse(activity.contains("android.util.Log"));
         assertFalse(activity.contains("FileOutputStream"));
         assertTrue(controller.contains("private String accessToken"));
@@ -92,7 +96,7 @@ public final class AdminSecurityBoundaryStaticTest {
         assertTrue(securityClient.contains("/admin/security/recovery-custody/attest"));
         assertTrue(securityClient.contains("/report-lost"));
         assertTrue(securityClient.contains("current device cannot be reported lost"));
-        assertTrue(securityClient.contains("Set.of(\"sessions\", \"devices\")"));
+        assertTrue(securityClient.contains("AdminJava8Collections.set(\"sessions\", \"devices\")"));
         assertTrue(activity.contains("활성 장치 키만 남은 기기"));
         assertFalse(activity.contains("putString(\"recovery"));
         assertTrue(readme.contains("서버 키, 앱 서명 키, 관리자 복구자료"));

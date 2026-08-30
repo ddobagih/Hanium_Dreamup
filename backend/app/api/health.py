@@ -23,6 +23,11 @@ from backend.app.services.admin_security import (
     AdminCredentialIssuerUnavailable,
     load_admin_credential_issuer_key_for_settings,
 )
+from backend.app.services.accounts import (
+    AccountServiceError,
+    account_email_crypto_for_settings,
+    assert_account_crypto_keys_bound,
+)
 from backend.app.services.detect_v2 import detect_v2_health
 from backend.app.services.privacy_lifecycle import (
     PrivacyLifecycleError,
@@ -36,18 +41,36 @@ from backend.app.services.report_image_keys import (
 from backend.app.services.report_storage import (
     validate_report_storage_database_inventory,
 )
+from backend.app.services.raw_collection_storage import (
+    lock_raw_storage_reconciliation_transaction,
+    probe_raw_object_directory,
+    validate_raw_storage_database_inventory,
+)
 from backend.app.services.tmap_pedestrian import (
     probe_tmap_dependencies,
     tmap_dependency_readiness,
 )
 
 
-EXPECTED_ALEMBIC_HEAD = "202608250002"
+EXPECTED_ALEMBIC_HEAD = "202608290016"
 READINESS_LOCAL_CHECK_TIMEOUT_SECONDS = 5.0
 TMAP_READINESS_FAILURE_COOLDOWN_SECONDS = 5.0
 ACTOR_RATE_LIMIT_GROUP_CONSTRAINT = "ck_actor_rate_limit_events_group"
 EXPECTED_ACTOR_RATE_LIMIT_GROUPS = frozenset(
-    {"report", "navigation", "detect", "export", "admin_read", "privacy"}
+    {
+        "report",
+        "navigation",
+        "detect",
+        "export",
+        "admin_read",
+        "privacy",
+        "raw_collection",
+        "account_enrollment_global",
+        "account_enrollment_ip",
+        "account_enrollment_email",
+        "account_authentication_global",
+        "account_authentication_email",
+    }
 )
 
 _SQL_QUOTED_LITERAL = re.compile(r"'((?:''|[^'])*)'")
@@ -72,7 +95,7 @@ def _exact_actor_rate_limit_group_expression(expression: object) -> bool:
     without_casts = _RATE_GROUP_CAST.sub("", without_literals)
     skeleton = re.sub(r"[\s()]", "", without_casts)
     return (
-        skeleton == "rate_group=ANYARRAY[?,?,?,?,?,?]"
+        skeleton == "rate_group=ANYARRAY[?,?,?,?,?,?,?,?,?,?,?,?]"
         and len(groups) == len(EXPECTED_ACTOR_RATE_LIMIT_GROUPS)
         and frozenset(groups) == EXPECTED_ACTOR_RATE_LIMIT_GROUPS
     )
@@ -287,6 +310,46 @@ def _privacy_hmac_binding_readiness(settings: Settings) -> dict[str, object]:
     return {"ready": True, "binding": "matched"}
 
 
+def _account_enrollment_config_readiness(settings: Settings) -> dict[str, object]:
+    if (
+        getattr(settings, "walksafe_environment", "development")
+        not in DEPLOYMENT_ENVIRONMENTS
+    ):
+        return {"ready": True, "mode": "optional_general_test"}
+    keys = (
+        settings.account_email_encryption_key,
+        settings.account_email_lookup_hmac_key,
+        settings.account_otp_hmac_key,
+    )
+    if any(key is None or len(key) != 32 for key in keys) or len(set(keys)) != 3:
+        return {"ready": False, "reason": "account_key_configuration_invalid"}
+    if not settings.account_smtp_configured:
+        return {"ready": False, "reason": "account_smtp_unconfigured"}
+    return {"ready": True, "smtp_transport": settings.account_smtp_security}
+
+
+def _account_crypto_binding_readiness(settings: Settings) -> dict[str, object]:
+    keys = (
+        settings.account_email_encryption_key,
+        settings.account_email_lookup_hmac_key,
+        settings.account_otp_hmac_key,
+    )
+    if all(key is None for key in keys) and settings.walksafe_environment in {
+        "development",
+        "test",
+    }:
+        return {"ready": True, "mode": "account_enrollment_disabled"}
+    try:
+        crypto = account_email_crypto_for_settings(settings)
+        with SessionLocal.begin() as db:
+            assert_account_crypto_keys_bound(db, crypto)
+    except AccountServiceError:
+        return {"ready": False, "reason": "account_crypto_binding_mismatch"}
+    except Exception:
+        return {"ready": False, "reason": "account_crypto_binding_unavailable"}
+    return {"ready": True, "binding": "matched"}
+
+
 def _upload_readiness(upload_dir: Path) -> dict[str, object]:
     metadata = upload_dir.stat(follow_symlinks=False)
     if not stat.S_ISDIR(metadata.st_mode) or upload_dir.is_symlink():
@@ -309,6 +372,35 @@ def _upload_readiness(upload_dir: Path) -> dict[str, object]:
         probe.unlink(missing_ok=True)
         os.close(directory_descriptor)
     return {"ready": True}
+
+
+def _raw_object_readiness(
+    settings: Settings,
+    key_manager: ReportImageKeyManager,
+) -> dict[str, object]:
+    if settings.raw_object_dir is None:
+        if not settings.raw_ingest_enabled:
+            return {"ready": True, "enabled": False}
+        return {"ready": False, "reason": "raw_object_root_unconfigured"}
+    try:
+        with SessionLocal.begin() as db:
+            lock_raw_storage_reconciliation_transaction(db)
+            try:
+                probe_raw_object_directory(settings)
+            except Exception:
+                return {"ready": False, "reason": "raw_object_root_unavailable"}
+            validate_raw_storage_database_inventory(
+                db,
+                settings.raw_object_dir,
+                key_manager=key_manager,
+            )
+    except Exception:
+        return {"ready": False, "reason": "raw_storage_inventory_invalid"}
+    return {
+        "ready": True,
+        "enabled": settings.raw_ingest_enabled,
+        "inventory": "database_and_encrypted_objects_matched",
+    }
 
 
 def _report_image_encryption_readiness(
@@ -550,8 +642,14 @@ def create_router(
     privacy_hmac_probe = _OffloadedReadinessProbe(
         lambda: _privacy_hmac_binding_readiness(settings)
     )
+    account_crypto_probe = _OffloadedReadinessProbe(
+        lambda: _account_crypto_binding_readiness(settings)
+    )
     upload_probe = _OffloadedReadinessProbe(
         lambda: _upload_readiness(settings.upload_dir)
+    )
+    raw_object_probe = _OffloadedReadinessProbe(
+        lambda: _raw_object_readiness(settings, report_image_key_manager)
     )
     detector_offload_probe = _OffloadedReadinessProbe(detector_probe.check)
     encryption_probe = _OffloadedReadinessProbe(
@@ -576,7 +674,9 @@ def create_router(
         (
             database,
             privacy_hmac_binding,
+            account_crypto_binding,
             upload_root,
+            raw_object_root,
             detector,
             navigation,
             report_image_encryption,
@@ -584,7 +684,9 @@ def create_router(
         ) = await asyncio.gather(
             database_probe.check(),
             privacy_hmac_probe.check(),
+            account_crypto_probe.check(),
             upload_probe.check(),
+            raw_object_probe.check(),
             detector_offload_probe.check(),
             navigation_probe.check(),
             encryption_probe.check(),
@@ -593,7 +695,10 @@ def create_router(
         checks: dict[str, dict[str, object]] = {
             "database": database,
             "privacy_hmac_binding": privacy_hmac_binding,
+            "account_crypto_binding": account_crypto_binding,
+            "account_enrollment": _account_enrollment_config_readiness(settings),
             "upload_root": upload_root,
+            "raw_object_root": raw_object_root,
             "detector": detector,
             "navigation": navigation,
             "report_image_encryption": report_image_encryption,

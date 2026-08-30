@@ -30,6 +30,30 @@ function allowedRouteCases(secret: string, deletionId: string): RouteCase[] {
   };
   return [
     {
+      template: "/api/account-enrollments/email-otp",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/account-enrollments/email-otp",
+        {
+          method: "POST",
+          headers: { ...headers, "content-type": "application/json" },
+          body: JSON.stringify({
+            schema_version: "walksafe.account-enrollment-email-otp.v1",
+            email: secret,
+            date_of_birth: "2000-01-01",
+            request_id: deletionId
+          })
+        }
+      )
+    },
+    {
+      template: "/api/accounts",
+      request: () => new Request("http://127.0.0.1:8081/api/accounts", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({ password: secret, enrollment_handle: secret })
+      })
+    },
+    {
       template: "/api/field-session",
       request: () => new Request("http://127.0.0.1:8081/api/field-session", { headers })
     },
@@ -61,6 +85,26 @@ function allowedRouteCases(secret: string, deletionId: string): RouteCase[] {
       })
     },
     {
+      template: "/api/speech/stt",
+      request: () => new Request("http://127.0.0.1:8081/api/speech/stt", {
+        method: "POST",
+        headers: { ...headers, "content-type": "audio/wav" },
+        body: secret
+      })
+    },
+    {
+      template: "/api/speech/tts",
+      request: () => new Request("http://127.0.0.1:8081/api/speech/tts", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({
+          schema_version: "walksafe.speech-tts-request.v1",
+          text: secret,
+          request_id: CANONICAL_REQUEST_ID
+        })
+      })
+    },
+    {
       template: "/api/navigation/walking",
       request: () => new Request("http://127.0.0.1:8081/api/navigation/walking", {
         method: "POST",
@@ -82,6 +126,92 @@ function allowedRouteCases(secret: string, deletionId: string): RouteCase[] {
         headers,
         body: secret
       })
+    },
+    {
+      template: "/api/reports/v2/{report_id}/status",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/reports/v2/11111111-1111-4111-8111-111111111111/status",
+        { headers }
+      )
+    },
+    {
+      template: "/api/reports/mine",
+      request: () => new Request("http://127.0.0.1:8081/api/reports/mine", { headers })
+    },
+    {
+      template: "/api/reports/mine/deletions/{request_id}",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/reports/mine/deletions/22222222-2222-4222-8222-222222222222",
+        { headers }
+      )
+    },
+    {
+      template: "/api/reports/mine/{report_id}",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/reports/mine/11111111-1111-4111-8111-111111111111",
+        { headers }
+      )
+    },
+    {
+      template: "/api/reports/mine/{report_id}/content",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/reports/mine/11111111-1111-4111-8111-111111111111/content",
+        { headers }
+      )
+    },
+    {
+      template: "/api/reports/mine/{report_id}/corrections",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/reports/mine/11111111-1111-4111-8111-111111111111/corrections",
+        {
+          method: "POST",
+          headers: { ...headers, "content-type": "application/json" },
+          body: JSON.stringify({
+            expected_revision: 0,
+            idempotency_key: CANONICAL_REQUEST_ID,
+            user_description: secret
+          })
+        }
+      )
+    },
+    {
+      template: "/api/reports/mine/{report_id}/requests",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/reports/mine/11111111-1111-4111-8111-111111111111/requests",
+        {
+          method: "POST",
+          headers: { ...headers, "content-type": "application/json" },
+          body: JSON.stringify({ client_request_id: deletionId })
+        }
+      )
+    },
+    {
+      template: "/api/raw-collections/{collection_id}/manifest",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/raw-collections/00000000-0000-0000-0000-000000000001/manifest",
+        { method: "PUT", headers }
+      )
+    },
+    {
+      template: "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/raw-collections/00000000-0000-0000-0000-000000000001/objects/00000000-0000-0000-0000-000000000002/chunks/2047",
+        { method: "PUT", headers }
+      )
+    },
+    {
+      template: "/api/raw-collections/{collection_id}",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/raw-collections/00000000-0000-0000-0000-000000000001",
+        { headers }
+      )
+    },
+    {
+      template: "/api/raw-collections/{collection_id}/commit",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/raw-collections/00000000-0000-0000-0000-000000000001/commit",
+        { method: "POST", headers }
+      )
     },
     {
       template: "/privacy/rights",

@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import stat
 from types import SimpleNamespace
+import uuid
 
 import pytest
 
@@ -24,6 +25,7 @@ from scripts.account_deletion_worker import (
     _maintenance_lock,
     _prepare_roots,
     _publish_manifest,
+    _read_journal,
     _remove_committed_objects,
     _restore_precommit,
     _safe_environment_file_metadata,
@@ -65,6 +67,42 @@ def test_worker_role_migration_is_least_privilege_and_guards_terminal_state(
     assert "DROP TRIGGER IF EXISTS account_deletion_items_server_terminal_worker_only" in downgrade_sql
     assert "REVOKE USAGE, CREATE ON SCHEMA public" in downgrade_sql
     assert "DROP ROLE walksafe_account_deletion_worker" not in downgrade_sql
+
+
+def test_credential_deletion_migration_fences_accounts_and_limits_worker_acl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    migration = importlib.import_module(
+        "backend.alembic.versions.202608290010_account_deletion_credentials"
+    )
+    statements: list[str] = []
+    created_tables: list[str] = []
+    monkeypatch.setattr(migration.op, "execute", statements.append)
+    monkeypatch.setattr(
+        migration.op,
+        "create_table",
+        lambda name, *_args, **_kwargs: created_tables.append(name),
+    )
+
+    migration.upgrade()
+
+    sql = "\n".join(statements)
+    assert migration.down_revision == "202608290009"
+    assert created_tables == ["account_crypto_key_bindings"]
+    assert "SET status = 'DISABLED'" in sql
+    assert "auth_epoch = account.auth_epoch + 1" in sql
+    assert "uq_account_enrollments_one_live_email" in sql
+    assert "no_synchronized_installations_at_acceptance" in sql
+    assert "GRANT UPDATE (status, auth_epoch, updated_at)" in sql
+    assert "GRANT SELECT (id, privacy_subject_hmac, account_generation" in sql
+    assert "GRANT DELETE ON TABLE public.user_accounts" in sql
+    assert "GRANT SELECT (id, email_lookup_hmac)" in sql
+    assert "GRANT DELETE ON TABLE public.account_enrollments" in sql
+    assert "GRANT SELECT (account_id)" in sql
+    assert "account_crypto_key_bindings" in sql
+    assert "walksafe_account_enrollment_purger" in sql
+    assert "GRANT SELECT (id, state, expires_at, updated_at)" in sql
+    assert "REVOKE INSERT, UPDATE, TRUNCATE" in sql
 
 
 def test_general_transition_cannot_claim_server_deletion_completion() -> None:
@@ -435,6 +473,8 @@ def _worker_main_args(tmp_path: Path, mode: str) -> list[str]:
         mode,
         "--upload-dir",
         str(tmp_path / "uploads"),
+        "--raw-object-dir",
+        str(tmp_path / "raw-objects"),
         "--journal-root",
         str(tmp_path / "worker"),
         "--maintenance-lock-path",
@@ -545,6 +585,7 @@ def test_manual_one_shot_requires_exact_authority_and_keeps_failures_secret_free
             "?sslmode=verify-full&gssencmode=disable"
         ),
         "upload_dir": tmp_path / "uploads",
+        "raw_object_dir": tmp_path / "raw-objects",
         "journal_root": tmp_path / "worker",
         "maintenance_lock_path": tmp_path / "runtime" / "maintenance.lock",
         "maintenance_lock_group_gid": 1234,
@@ -599,6 +640,351 @@ def test_manifest_is_create_only_idempotent_and_rejects_unsafe_existing_file(
     manifest_path.symlink_to(target)
     with pytest.raises(AccountDeletionWorkerError, match="unsafe"):
         _publish_manifest(manifest_path, payload)
+
+
+def test_v2_journal_rejects_raw_inventory_count_drift(tmp_path: Path) -> None:
+    tmp_path.chmod(0o700)
+    journal_path = tmp_path / "journal.json"
+    _atomic_write(
+        journal_path,
+        {
+            "schema_version": "walksafe.account-deletion-worker-journal.v2",
+            "request_id": "delete_request_0001",
+            "privacy_subject_hmac": "a" * 64,
+            "account_generation": 1,
+            "state": "PREPARED",
+            "prepared_at": "2026-08-29T00:00:00Z",
+            "deleted_at": None,
+            "report_count": 0,
+            "objects": [],
+            "raw_collection_count": 1,
+            "raw_collections": [],
+            "raw_objects": [],
+        },
+    )
+
+    with pytest.raises(AccountDeletionWorkerError, match="raw journal inventory"):
+        _read_journal(journal_path)
+
+
+def test_v2_journal_rejects_missing_or_mismatched_raw_objects(
+    tmp_path: Path,
+) -> None:
+    tmp_path.chmod(0o700)
+    journal_path = tmp_path / "journal.json"
+    collection_id = "123e4567-e89b-42d3-a456-426614174000"
+    object_id = "123e4567-e89b-42d3-a456-426614174001"
+    storage_name = f"{collection_id}.{object_id}.0.wsrc"
+    raw_collection = {
+        "collection_id": collection_id,
+        "object_id": object_id,
+        "chunk_index": 0,
+        "storage_name": storage_name,
+        "envelope_sha256": "b" * 64,
+        "envelope_size": 123,
+    }
+    mismatched_object = {
+        "collection_id": collection_id,
+        "object_id": object_id,
+        "chunk_index": 0,
+        "storage_name": storage_name,
+        "envelope_sha256": "c" * 64,
+        "envelope_size": 123,
+        "source_path": str((tmp_path / "raw" / storage_name).resolve()),
+        "quarantine_path": str(
+            (tmp_path / "quarantine" / storage_name).resolve()
+        ),
+    }
+
+    for raw_objects in ([], [mismatched_object]):
+        _atomic_write(
+            journal_path,
+            {
+                "schema_version": "walksafe.account-deletion-worker-journal.v2",
+                "request_id": "delete_request_0001",
+                "privacy_subject_hmac": "a" * 64,
+                "account_generation": 1,
+                "state": "PREPARED",
+                "prepared_at": "2026-08-29T00:00:00Z",
+                "deleted_at": None,
+                "report_count": 0,
+                "objects": [],
+                "raw_collection_count": 1,
+                "raw_collections": [raw_collection],
+                "raw_objects": raw_objects,
+            },
+        )
+        with pytest.raises(
+            AccountDeletionWorkerError,
+            match="raw journal inventory",
+        ):
+            _read_journal(journal_path)
+
+
+def test_v3_journal_validates_credential_and_retained_receipt_counts(
+    tmp_path: Path,
+) -> None:
+    tmp_path.chmod(0o700)
+    journal_path = tmp_path / "journal.json"
+    payload = {
+        "schema_version": "walksafe.account-deletion-worker-journal.v3",
+        "request_id": "delete_request_0001",
+        "privacy_subject_hmac": "a" * 64,
+        "account_generation": 1,
+        "state": "PREPARED",
+        "prepared_at": "2026-08-29T00:00:00Z",
+        "deleted_at": None,
+        "report_count": 0,
+        "objects": [],
+        "raw_collection_count": 0,
+        "raw_collections": [],
+        "raw_objects": [],
+        "credential_account_count": 1,
+        "email_lookup_hmac": "b" * 64,
+        "account_enrollment_count": 2,
+        "retained_signup_consent_receipt_count": 1,
+    }
+    _atomic_write(journal_path, payload)
+    assert _read_journal(journal_path) == payload
+
+    payload["email_lookup_hmac"] = None
+    _atomic_write(journal_path, payload)
+    with pytest.raises(
+        AccountDeletionWorkerError,
+        match="credential journal inventory",
+    ):
+        _read_journal(journal_path)
+
+
+def test_v4_journal_freezes_enrollment_ids_without_manifest_disclosure(
+    tmp_path: Path,
+) -> None:
+    tmp_path.chmod(0o700)
+    journal_path = tmp_path / "journal.json"
+    enrollment_ids = [
+        "123e4567-e89b-42d3-a456-426614174000",
+        "123e4567-e89b-42d3-a456-426614174001",
+    ]
+    payload = {
+        "schema_version": "walksafe.account-deletion-worker-journal.v4",
+        "request_id": "delete_request_0001",
+        "privacy_subject_hmac": "a" * 64,
+        "account_generation": 1,
+        "state": "DATABASE_COMMITTED",
+        "prepared_at": "2026-08-29T00:00:00Z",
+        "deleted_at": "2026-08-29T00:01:00Z",
+        "report_count": 0,
+        "objects": [],
+        "raw_collection_count": 0,
+        "raw_collections": [],
+        "raw_objects": [],
+        "credential_account_count": 1,
+        "account_enrollment_count": len(enrollment_ids),
+        "account_enrollment_ids": enrollment_ids,
+        "retained_signup_consent_receipt_count": 1,
+    }
+    _atomic_write(journal_path, payload)
+    assert _read_journal(journal_path) == payload
+
+    manifest = account_deletion_worker._final_manifest(payload)
+    serialized = json.dumps(manifest, sort_keys=True)
+    assert manifest["schema_version"] == "walksafe.account-deletion-server-manifest.v3"
+    assert manifest["account_enrollment_count"] == 2
+    assert "account_enrollment_ids" not in serialized
+    assert "email_lookup_hmac" not in serialized
+    assert all(enrollment_id not in serialized for enrollment_id in enrollment_ids)
+
+    invalid_payloads = [
+        {**payload, "account_enrollment_count": 1},
+        {
+            **payload,
+            "account_enrollment_ids": [enrollment_ids[0], enrollment_ids[0]],
+        },
+        {**payload, "account_enrollment_ids": list(reversed(enrollment_ids))},
+        {**payload, "email_lookup_hmac": "b" * 64},
+    ]
+    for invalid in invalid_payloads:
+        _atomic_write(journal_path, invalid)
+        with pytest.raises(
+            AccountDeletionWorkerError,
+            match="credential journal inventory",
+        ):
+            _read_journal(journal_path)
+
+
+def test_v4_reconciliation_counts_only_frozen_enrollment_ids() -> None:
+    credential_account_id = uuid.UUID("123e4567-e89b-42d3-a456-426614174010")
+    enrollment_ids = (
+        uuid.UUID("123e4567-e89b-42d3-a456-426614174000"),
+        uuid.UUID("123e4567-e89b-42d3-a456-426614174001"),
+    )
+    results = iter((0, 0, credential_account_id, 0, 0))
+    statements: list[object] = []
+
+    class InventoryDb:
+        @staticmethod
+        def scalar(statement):
+            statements.append(statement)
+            return next(results)
+
+    counts = account_deletion_worker._request_inventory_counts(
+        InventoryDb(),  # type: ignore[arg-type]
+        {
+            "schema_version": "walksafe.account-deletion-worker-journal.v4",
+            "request_id": "delete_request_0001",
+            "privacy_subject_hmac": "a" * 64,
+            "account_generation": 1,
+            "account_enrollment_ids": [str(value) for value in enrollment_ids],
+        },
+    )
+
+    assert counts == (0, 0, 0, 0)
+    enrollment_statement = statements[-1]
+    statement_text = str(enrollment_statement)
+    assert "account_enrollments.id IN" in statement_text
+    assert "email_lookup_hmac" not in statement_text
+    bound_values = [
+        value
+        for value in enrollment_statement.compile().params.values()
+        if isinstance(value, (list, tuple))
+    ]
+    assert len(bound_values) == 1
+    assert set(bound_values[0]) == set(enrollment_ids)
+
+
+def test_v4_commit_ack_loss_ignores_postcommit_same_email_enrollment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tmp_path.chmod(0o700)
+    root = tmp_path / "worker"
+    _prepare_roots(root)
+    request_id = "delete_request_0001"
+    journal_path, _quarantine_dir, _manifest_path = (
+        account_deletion_worker._journal_paths(root, request_id)
+    )
+    frozen_ids = [
+        "123e4567-e89b-42d3-a456-426614174000",
+        "123e4567-e89b-42d3-a456-426614174001",
+    ]
+    _atomic_write(
+        journal_path,
+        {
+            "schema_version": "walksafe.account-deletion-worker-journal.v4",
+            "request_id": request_id,
+            "privacy_subject_hmac": "a" * 64,
+            "account_generation": 1,
+            "state": "PREPARED",
+            "prepared_at": "2026-08-29T00:00:00Z",
+            "deleted_at": None,
+            "report_count": 0,
+            "objects": [],
+            "raw_collection_count": 0,
+            "raw_collections": [],
+            "raw_objects": [],
+            "credential_account_count": 1,
+            "account_enrollment_count": len(frozen_ids),
+            "account_enrollment_ids": frozen_ids,
+            "retained_signup_consent_receipt_count": 1,
+        },
+    )
+
+    class InventoryDb:
+        def __enter__(self):
+            return self
+
+        @staticmethod
+        def __exit__(_exc_type, _exc, _traceback):
+            return False
+
+        @staticmethod
+        def rollback() -> None:
+            return None
+
+        @staticmethod
+        def scalar(statement):
+            statement_text = str(statement)
+            if "account_deletion_requests.credential_account_id" in statement_text:
+                return uuid.UUID("123e4567-e89b-42d3-a456-426614174010")
+            if "account_enrollments.email_lookup_hmac" in statement_text:
+                return 1
+            return 0
+
+    finished: dict[str, object] = {}
+
+    def finish(_factory, _root, _path, journal):
+        finished.update(journal)
+        return "FINISHED"
+
+    monkeypatch.setattr(
+        account_deletion_worker,
+        "assert_account_deletion_worker_database_role",
+        lambda _db: None,
+    )
+    monkeypatch.setattr(
+        account_deletion_worker,
+        "_finish_committed_journal",
+        finish,
+    )
+
+    result = account_deletion_worker.reconcile_journal(
+        InventoryDb,  # type: ignore[arg-type]
+        root,
+        journal_path,
+    )
+
+    assert result == "FINISHED"
+    assert finished["state"] == "DATABASE_COMMITTED"
+    assert isinstance(finished["deleted_at"], str)
+    assert _read_journal(journal_path)["state"] == "DATABASE_COMMITTED"
+
+
+def test_v3_reconciliation_keeps_legacy_email_inventory_fail_closed() -> None:
+    credential_account_id = uuid.UUID("123e4567-e89b-42d3-a456-426614174010")
+    results = iter((0, 0, credential_account_id, 0, 0))
+    statements: list[object] = []
+
+    class InventoryDb:
+        @staticmethod
+        def scalar(statement):
+            statements.append(statement)
+            return next(results)
+
+    counts = account_deletion_worker._request_inventory_counts(
+        InventoryDb(),  # type: ignore[arg-type]
+        {
+            "schema_version": "walksafe.account-deletion-worker-journal.v3",
+            "request_id": "delete_request_0001",
+            "privacy_subject_hmac": "a" * 64,
+            "account_generation": 1,
+            "email_lookup_hmac": "b" * 64,
+        },
+    )
+
+    assert counts == (0, 0, 0, 0)
+    assert "account_enrollments.email_lookup_hmac" in str(statements[-1])
+
+
+def test_v3_reconciliation_preserves_accountless_journal_compatibility() -> None:
+    results = iter((0, 0, None))
+
+    class InventoryDb:
+        @staticmethod
+        def scalar(_statement):
+            return next(results)
+
+    assert account_deletion_worker._request_inventory_counts(
+        InventoryDb(),  # type: ignore[arg-type]
+        {
+            "schema_version": "walksafe.account-deletion-worker-journal.v3",
+            "request_id": "delete_request_0001",
+            "privacy_subject_hmac": "a" * 64,
+            "account_generation": 1,
+            "credential_account_count": 0,
+            "account_enrollment_count": 0,
+            "email_lookup_hmac": None,
+        },
+    ) == (0, 0, 0, 0)
 
 
 def test_manifest_publish_failure_never_exposes_a_partial_final_path(

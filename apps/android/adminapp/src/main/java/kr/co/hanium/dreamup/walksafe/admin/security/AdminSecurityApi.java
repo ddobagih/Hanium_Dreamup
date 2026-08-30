@@ -152,8 +152,8 @@ public interface AdminSecurityApi {
         private final List<DeviceInfo> devices;
 
         public DeviceInventory(List<SessionInfo> sessions, List<DeviceInfo> devices) {
-            this.sessions = List.copyOf(sessions);
-            this.devices = List.copyOf(devices);
+            this.sessions = AdminJava8Collections.copyList(sessions);
+            this.devices = AdminJava8Collections.copyList(devices);
         }
 
         public List<SessionInfo> sessions() { return sessions; }
@@ -229,6 +229,18 @@ public interface AdminSecurityApi {
         String path,
         String nonce
     ) throws IOException;
+
+    default ReauthenticationResult reauthenticate(
+        String accessToken,
+        char[] password,
+        char[] totpCode,
+        String action,
+        String method,
+        String path,
+        String nonce
+    ) throws IOException {
+        throw new IOException("mutable credential reauthentication is unavailable");
+    }
 
     RecoveryStartResult startRecovery(
         String adminId,

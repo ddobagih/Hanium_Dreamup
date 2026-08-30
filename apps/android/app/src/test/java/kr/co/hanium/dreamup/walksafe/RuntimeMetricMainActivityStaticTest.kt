@@ -17,9 +17,12 @@ class RuntimeMetricMainActivityStaticTest {
             source.contains("startupMetricPreflightButton"),
         )
         assertTrue(
-            "the preflight button must start only the preflight flow",
-            source.contains("setOnClickListener { beginRuntimeMetricPreflight() }"),
+            "the post-login check must show its JIT explanation before starting",
+            source.contains("setOnClickListener { showPostLoginDeviceCheckExplanation() }"),
         )
+        val explanation = functionBlock("private fun showPostLoginDeviceCheckExplanation()")
+        assertTrue(explanation.contains(".setPositiveButton("))
+        assertTrue(explanation.contains("beginPostLoginDeviceCheckFromUserAction(sessionBinding)"))
 
         val overlay = sourceSection(
             "val overlay = LinearLayout(this).apply",

@@ -162,7 +162,9 @@ class MainActivityOfficialEnvironmentStaticTest {
         )
         assertTrue(
             functionBlock("private fun processReportCandidate(")
-                .contains("if (!officialEnvironmentOutputsAllowed)"),
+                .contains(
+                    "if (!officialEnvironmentOutputsAllowed || !phoneMountingOutputsAllowed)",
+                ),
         )
         val preflightFrame =
             functionBlock("private fun handleRuntimeMetricPreflightFrame(")

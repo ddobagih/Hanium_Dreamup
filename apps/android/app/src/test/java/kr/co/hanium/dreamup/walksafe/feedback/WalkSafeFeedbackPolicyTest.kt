@@ -49,19 +49,26 @@ class WalkSafeFeedbackPolicyTest {
     }
 
     @Test
-    fun staleOrUntrustedDepthNeverEmits() {
+    fun staleUntrustedUncertainOrMissingDecisionNeverEmits() {
         val policy = WalkSafeFeedbackPolicy()
 
         assertNull(policy.evaluate(candidate(stale = true), true, 1_000L))
         assertNull(policy.evaluate(candidate(source = DepthSource.POLYGON_TREND_PSEUDO_DEPTH), true, 2_000L))
+        assertNull(policy.evaluate(candidate(confidence = 0.54f), true, 3_000L))
+        assertNull(policy.evaluate(null, true, 4_000L))
     }
 
     @Test
-    fun vibrationIsReservedForStopAlerts() {
-        assertNull(VibrationPatterns.forLevel(MessageLevel.WARNING))
+    fun warningUsesDistinctVibrationWhileLowerLevelsRemainSilent() {
+        val stop = VibrationPatterns.forLevel(MessageLevel.STOP)
+        val warning = VibrationPatterns.forLevel(MessageLevel.WARNING)
+
+        assertNotNull(stop)
+        assertNotNull(warning)
+        assertFalse(stop!!.contentEquals(warning!!))
         assertNull(VibrationPatterns.forLevel(MessageLevel.CAUTION))
         assertNull(VibrationPatterns.forLevel(MessageLevel.AWARE))
-        assertNotNull(VibrationPatterns.forLevel(MessageLevel.STOP))
+        assertNull(VibrationPatterns.forLevel(MessageLevel.INFO))
     }
 
     @Test
@@ -411,14 +418,15 @@ class WalkSafeFeedbackPolicyTest {
         trackStableMs: Long = 700L,
         stale: Boolean = false,
         level: MessageLevel = MessageLevel.WARNING,
-        message: String = "전방 약 2보 앞 사람. 속도를 줄이세요.",
+        message: String = "전방 약 2보 앞 사람. 멈출 준비를 하세요.",
+        confidence: Float = 0.80f,
     ): FeedbackCandidate {
         return FeedbackCandidate(
             trackId = trackId,
             message = message,
             level = level,
             source = source,
-            confidence = 0.80f,
+            confidence = confidence,
             timestampMs = 1_000L,
             trackAgeFrames = trackAgeFrames,
             trackStableMs = trackStableMs,

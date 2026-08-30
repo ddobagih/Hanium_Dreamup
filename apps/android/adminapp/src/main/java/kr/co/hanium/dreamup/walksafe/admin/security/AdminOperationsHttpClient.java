@@ -174,7 +174,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     ) throws IOException, GeneralSecurityException {
         String correlationId = UUID.randomUUID().toString();
         byte[] transmittedBody = body == null ? new byte[0] : body;
-        String emptyQuery = AdminCanonicalEncoding.canonicalQuery(java.util.List.of());
+        String emptyQuery = AdminCanonicalEncoding.canonicalQuery(AdminJava8Collections.list());
         AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
             action,
             session.adminId(),
@@ -269,20 +269,20 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         headers.put("X-WalkSafe-Device-Id", session.deviceId());
         headers.put(CORRELATION_ID_HEADER, correlationId);
         if (readPurpose != null) headers.put(READ_PURPOSE_HEADER, readPurpose);
-        return Map.copyOf(headers);
+        return AdminJava8Collections.copyMap(headers);
     }
 
     private static Map<String, String> acceptHeaders(Map<String, String> headers) {
         Map<String, String> result = new LinkedHashMap<>();
         result.put("Accept", "application/json");
         result.putAll(headers);
-        return Map.copyOf(result);
+        return AdminJava8Collections.copyMap(result);
     }
 
     private static Map<String, String> jsonHeaders(Map<String, String> headers) {
         Map<String, String> result = new LinkedHashMap<>(acceptHeaders(headers));
         result.put("Content-Type", "application/json; charset=utf-8");
-        return Map.copyOf(result);
+        return AdminJava8Collections.copyMap(result);
     }
 
     private static String requireOpaqueToken(String token) throws IOException {
@@ -303,8 +303,9 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         List<ReviewHistoryItem> result = new ArrayList<>(array.size());
         for (int index = 0; index < array.size(); index++) {
             Map<String, Object> item = array.get(index);
-            requireExactKeys(item, Set.of(
-                "id", "report_id", "revision", "decision", "reason", "duplicate_of_report_id",
+            requireExactKeys(item, AdminJava8Collections.set(
+                "id", "report_id", "revision", "decision", "reason", "user_visible_reason",
+                "duplicate_of_report_id",
                 "location_reviewed", "photo_reviewed", "privacy_reviewed", "admin_id",
                 "session_id", "device_id", "correlation_id", "decided_at", "created_at"
             ));
@@ -315,6 +316,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             if (revision != index + 1) throw new IOException("review history revisions are not append-only");
             AdminReportDecision.Decision decision = reviewDecision(requiredText(item, "decision", 16));
             String reason = requiredText(item, "reason", 500);
+            String userVisibleReason = nullableText(item, "user_visible_reason", 500);
             String duplicateId = nullableUuid(item, "duplicate_of_report_id");
             boolean locationReviewed = requiredBoolean(item, "location_reviewed");
             boolean photoReviewed = requiredBoolean(item, "photo_reviewed");
@@ -330,15 +332,25 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             } else if (duplicateId != null) {
                 throw new IOException("review history duplicate target is invalid");
             }
+            if ((decision == AdminReportDecision.Decision.APPROVED) != (userVisibleReason == null)) {
+                throw new IOException("review history user-visible reason binding is invalid");
+            }
             requiredAdminId(item, "admin_id");
             requiredUuid(item, "session_id");
             requiredDeviceId(item, "device_id");
             requiredUuid(item, "correlation_id");
             String decidedAt = requiredInstant(item, "decided_at", false);
             requiredInstant(item, "created_at", false);
-            result.add(new ReviewHistoryItem(revision, decision, reason, duplicateId, decidedAt));
+            result.add(new ReviewHistoryItem(
+                revision,
+                decision,
+                reason,
+                userVisibleReason,
+                duplicateId,
+                decidedAt
+            ));
         }
-        return List.copyOf(result);
+        return AdminJava8Collections.copyList(result);
     }
 
     private static List<DeliveryHistoryItem> parseDeliveryHistory(String body, String expectedReportId)
@@ -348,8 +360,9 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         AdminInstitutionDelivery.Status previousStatus = null;
         for (int index = 0; index < array.size(); index++) {
             Map<String, Object> item = array.get(index);
-            requireExactKeys(item, Set.of(
-                "id", "report_id", "review_decision_id", "revision", "institution", "channel",
+            requireExactKeys(item, AdminJava8Collections.set(
+                "id", "report_id", "review_decision_id", "package_id", "package_revision",
+                "revision", "institution", "channel",
                 "recipient", "status", "external_receipt_id", "reason", "evidence_sha256",
                 "observed_at", "expected_revision", "idempotency_key", "admin_id", "session_id",
                 "device_id", "correlation_id", "recorded_at"
@@ -358,6 +371,8 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             String reportId = requiredUuid(item, "report_id");
             if (!expectedReportId.equals(reportId)) throw new IOException("delivery history report binding is invalid");
             requiredUuid(item, "review_decision_id");
+            requiredUuid(item, "package_id");
+            int packageRevision = requiredInt(item, "package_revision", 1);
             int revision = requiredInt(item, "revision", 1);
             if (revision != index + 1) throw new IOException("delivery history revisions are not append-only");
             String institution = requiredText(item, "institution", 160);
@@ -389,9 +404,17 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             requiredDeviceId(item, "device_id");
             requiredUuid(item, "correlation_id");
             String recordedAt = requiredInstant(item, "recorded_at", false);
-            result.add(new DeliveryHistoryItem(revision, status, receipt, institution, observedAt, recordedAt));
+            result.add(new DeliveryHistoryItem(
+                revision,
+                packageRevision,
+                status,
+                receipt,
+                institution,
+                observedAt,
+                recordedAt
+            ));
         }
-        return List.copyOf(result);
+        return AdminJava8Collections.copyList(result);
     }
 
     private static List<Map<String, Object>> historyArray(String body) throws IOException {
@@ -419,7 +442,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
 
     private static String requiredText(Map<String, Object> value, String key, int maxLength) throws IOException {
         Object raw = value.get(key);
-        if (!(raw instanceof String text) || text.isBlank() || text.length() > maxLength
+        if (!(raw instanceof String text) || text.trim().isEmpty() || text.length() > maxLength
             || text.chars().anyMatch(character -> character < 0x20 || character == 0x7f)) {
             throw new IOException("administrator history text is invalid: " + key);
         }
@@ -429,7 +452,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     private static String nullableText(Map<String, Object> value, String key, int maxLength) throws IOException {
         Object raw = value.get(key);
         if (raw == null) return null;
-        if (!(raw instanceof String text) || text.isBlank() || text.length() > maxLength
+        if (!(raw instanceof String text) || text.trim().isEmpty() || text.length() > maxLength
             || text.chars().anyMatch(character -> character < 0x20 || character == 0x7f)) {
             throw new IOException("administrator history nullable text is invalid: " + key);
         }

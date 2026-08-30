@@ -237,6 +237,7 @@ def test_application_lifespan_closes_the_inference_runner(monkeypatch) -> None:
         lambda: None,
     )
     monkeypatch.setattr(main_app, "bind_privacy_hmac_key", lambda: None)
+    monkeypatch.setattr(main_app, "bind_account_crypto_keys", lambda: None)
     monkeypatch.setattr(main_app, "reconcile_report_storage", lambda: None)
 
     async def exercise_lifespan() -> None:

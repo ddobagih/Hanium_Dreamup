@@ -79,7 +79,7 @@ export async function readBoundedJsonBody(
   timeoutMs = DEFAULT_BODY_READ_TIMEOUT_MS
 ): Promise<BoundedJsonResult> {
   const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
-  if (!contentType.startsWith("application/json")) {
+  if (contentType.split(";", 1)[0]?.trim() !== "application/json") {
     return { error: bodyError(415, "json_content_type_required") };
   }
   const bounded = await readBoundedTextBody(request, maxBytes, timeoutMs);

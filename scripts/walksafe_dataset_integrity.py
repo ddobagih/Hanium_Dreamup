@@ -4,10 +4,15 @@
 from __future__ import annotations
 
 import csv
+from datetime import UTC, datetime
 import hashlib
+import hmac
+import json
+import os
 import re
 from pathlib import Path
 from typing import Any
+import uuid
 
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -24,6 +29,127 @@ ALLOWED_SPLITS = frozenset({"train", "val", "test"})
 
 class DatasetIntegrityError(ValueError):
     pass
+
+
+APPROVED_DATASET_SCHEMA = "walksafe.approved-training-dataset.v1"
+
+
+def verify_approved_dataset_gate(
+    receipt_path: Path,
+    *,
+    manifest_path: Path,
+    as_of: datetime | None = None,
+    hmac_key: bytes | None = None,
+) -> dict[str, Any]:
+    """Verify a short-lived DB-issued gate bound to one approved manifest."""
+
+    try:
+        raw = receipt_path.read_bytes()
+        payload = json.loads(raw.decode("ascii"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise DatasetIntegrityError("approved dataset gate is unreadable") from exc
+    required = {
+        "schema_version",
+        "dataset_id",
+        "revision",
+        "state",
+        "manifest_sha256",
+        "member_set_sha256",
+        "dataset_expires_at",
+        "gate_expires_at",
+        "withdrawn_at",
+        "receipt_sha256",
+    }
+    if not isinstance(payload, dict) or set(payload) != required:
+        raise DatasetIntegrityError("approved dataset gate shape is invalid")
+    if (
+        payload["schema_version"] != APPROVED_DATASET_SCHEMA
+        or payload["state"] != "APPROVED"
+        or payload["withdrawn_at"] is not None
+        or type(payload["revision"]) is not int
+        or payload["revision"] < 1
+        or any(
+            not isinstance(payload[field], str)
+            or SHA256.fullmatch(payload[field]) is None
+            for field in ("manifest_sha256", "member_set_sha256", "receipt_sha256")
+        )
+    ):
+        raise DatasetIntegrityError("dataset revision is not approved")
+    try:
+        uuid.UUID(payload["dataset_id"])
+        dataset_expires_at = datetime.fromisoformat(
+            payload["dataset_expires_at"].replace("Z", "+00:00")
+        )
+        gate_expires_at = datetime.fromisoformat(
+            payload["gate_expires_at"].replace("Z", "+00:00")
+        )
+    except (TypeError, ValueError) as exc:
+        raise DatasetIntegrityError("approved dataset gate identity or time is invalid") from exc
+    now = (as_of or datetime.now(UTC)).astimezone(UTC)
+    if dataset_expires_at.tzinfo is None or gate_expires_at.tzinfo is None:
+        raise DatasetIntegrityError("approved dataset gate times must be timezone-aware")
+    if now >= dataset_expires_at or now >= gate_expires_at:
+        raise DatasetIntegrityError("approved dataset gate is expired")
+    actual_manifest_sha = sha256_file(manifest_path)
+    if actual_manifest_sha != payload["manifest_sha256"]:
+        raise DatasetIntegrityError("approved dataset gate does not bind this manifest")
+    receipt_body = {key: value for key, value in payload.items() if key != "receipt_sha256"}
+    canonical = json.dumps(
+        receipt_body, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    ).encode("ascii")
+    if hmac_key is None:
+        encoded_key = os.getenv("WALKSAFE_TRAINING_GATE_HMAC_KEY", "")
+        try:
+            hmac_key = bytes.fromhex(encoded_key)
+        except ValueError as exc:
+            raise DatasetIntegrityError("training gate HMAC key is invalid") from exc
+    if len(hmac_key) < 32:
+        raise DatasetIntegrityError("training gate HMAC key is required")
+    expected_receipt = hmac.new(
+        hmac_key,
+        b"walksafe/approved-training-dataset/v1\0" + canonical,
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected_receipt, payload["receipt_sha256"]):
+        raise DatasetIntegrityError("approved dataset gate receipt digest differs")
+    return payload
+
+
+def verify_current_approved_dataset_database(
+    gate: dict[str, Any], *, database_url: str
+) -> None:
+    """Recheck consent, deletion fences, revision state, and expiry at execution."""
+
+    if not database_url:
+        raise DatasetIntegrityError(
+            "WALKSAFE_TRAINING_LIFECYCLE_DATABASE_URL is required"
+        )
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.exc import SQLAlchemyError
+        from sqlalchemy.orm import Session
+
+        from backend.app.services.training_dataset_lifecycle import (
+            TrainingDatasetLifecycleError,
+            require_current_dataset_revision,
+        )
+
+        engine = create_engine(database_url, pool_pre_ping=True)
+        try:
+            with Session(engine) as db:
+                require_current_dataset_revision(
+                    db,
+                    dataset_id=uuid.UUID(gate["dataset_id"]),
+                    revision=gate["revision"],
+                    manifest_sha256=gate["manifest_sha256"],
+                )
+                db.rollback()
+        finally:
+            engine.dispose()
+    except (KeyError, TypeError, ValueError, SQLAlchemyError, TrainingDatasetLifecycleError) as exc:
+        raise DatasetIntegrityError(
+            "dataset revision is not currently eligible in Backend"
+        ) from exc
 
 
 def sha256_file(path: Path) -> str:

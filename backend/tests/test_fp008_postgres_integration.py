@@ -18,16 +18,20 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.models import (
+    AdminOperationAudit,
     AdminDeviceKey,
     AdminSecurityAudit,
     AdminSecurityControl,
     AdminSecurityRecoveryCode,
     Base,
     Report,
+    ReportDeliveryPackage,
     ReportInstitutionDeliveryEvent,
     ReportReviewDecision,
+    ReportStatusAudit,
 )
 from backend.app.schemas import (
+    AdminReportStatusUpdateV1,
     ReportInstitutionDeliveryRequest,
     ReportReviewDecisionRequest,
 )
@@ -44,6 +48,10 @@ from backend.app.services.admin_report_workflow import (
     append_report_review_decision,
     list_report_institution_delivery_events,
     list_report_review_decisions,
+    update_admin_report_status,
+)
+from backend.app.services.admin_report_delivery_package import (
+    create_admin_report_delivery_package,
 )
 from backend.app.services.admin_security import (
     AdminSecurityError,
@@ -420,6 +428,21 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> N
             correlation_id=uuid.uuid4(),
             now=captured_at + timedelta(seconds=1),
         )
+    with SessionFactory() as db:
+        created_package = create_admin_report_delivery_package(
+            db,
+            report_id=report_id,
+            identity=identity,
+            correlation_id=uuid.uuid4(),
+            query_sha256=hashlib.sha256(b"").hexdigest(),
+        )
+    assert hashlib.sha256(created_package.package_bytes).hexdigest() == (
+        created_package.record.package_sha256
+    )
+    assert created_package.record.package_byte_count == len(
+        created_package.package_bytes
+    )
+    assert not hasattr(created_package.record, "package_bytes")
 
     first_key = uuid.uuid4()
     submitted_request = ReportInstitutionDeliveryRequest(
@@ -431,6 +454,7 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> N
         reason="관리자 외부 수동 전달 사실을 기록함",
         evidence_sha256=None,
         observed_at=_rfc3339_utc(captured_at + timedelta(seconds=2)),
+        package_revision=created_package.record.revision,
         expected_revision=0,
         idempotency_key=first_key,
     )
@@ -461,6 +485,7 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> N
         reason="기관 접수번호를 수동 확인해 상태를 기록함",
         evidence_sha256="a" * 64,
         observed_at=_rfc3339_utc(captured_at + timedelta(seconds=3)),
+        package_revision=created_package.record.revision,
         expected_revision=1,
         idempotency_key=uuid.uuid4(),
     )
@@ -478,6 +503,7 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> N
     rejected_request = ReportReviewDecisionRequest(
         decision="REJECTED",
         reason="추가 확인 결과 기관 전달 승인을 철회함",
+        user_visible_reason="검토 결과 이 신고를 처리할 수 없습니다",
         duplicate_of_report_id=None,
         location_reviewed=True,
         photo_reviewed=True,
@@ -500,6 +526,7 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> N
         reason="최신 승인 철회 후에는 전달 이력을 추가할 수 없음",
         evidence_sha256=None,
         observed_at=_rfc3339_utc(captured_at + timedelta(seconds=4)),
+        package_revision=created_package.record.revision,
         expected_revision=2,
         idempotency_key=uuid.uuid4(),
     )
@@ -526,6 +553,12 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> N
             event = db.get(ReportInstitutionDeliveryEvent, submitted.id)
             assert event is not None
             db.delete(event)
+            db.flush()
+    with pytest.raises(SQLAlchemyError):
+        with SessionFactory.begin() as db:
+            package = db.get(ReportDeliveryPackage, created_package.record.id)
+            assert package is not None
+            package.package_sha256 = "f" * 64
             db.flush()
 
     with SessionFactory() as db:
@@ -563,4 +596,81 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> N
     assert failure_audit.details["admin_alert_required"] is True
     assert failure_audit.details["alert_channel"] == "ADMIN_API_RESPONSE"
     assert failure_audit.details["correlation_id"] == str(failure_correlation_id)
+    engine.dispose()
+
+
+def test_wave5_postgres_status_version_cas_and_atomic_audit() -> None:
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex[:12]
+    identity = _identity(f"wave5.admin.{suffix}", f"wave5-device-{suffix}")
+    report_id = uuid.uuid4()
+    captured_at = datetime.now(timezone.utc)
+    with SessionFactory.begin() as db:
+        db.add(
+            Report(
+                id=report_id,
+                status="new",
+                class_id=0,
+                class_name="person",
+                confidence=0.9,
+                bbox_x=0.1,
+                bbox_y=0.1,
+                bbox_width=0.5,
+                bbox_height=0.5,
+                captured_at=captured_at,
+                source="android",
+                image_path=f"{report_id}.wse",
+                image_content_type="image/jpeg",
+                payload={},
+            )
+        )
+
+    correlation_id = uuid.uuid4()
+    with SessionFactory() as db:
+        updated = update_admin_report_status(
+            db,
+            report_id=report_id,
+            payload=AdminReportStatusUpdateV1(
+                status="reviewed",
+                expected_version=1,
+            ),
+            identity=identity,
+            correlation_id=correlation_id,
+            query_sha256=hashlib.sha256(b"").hexdigest(),
+        )
+    assert (updated.status, updated.status_version) == ("reviewed", 2)
+
+    with pytest.raises(AdminReportWorkflowError) as stale:
+        with SessionFactory() as db:
+            update_admin_report_status(
+                db,
+                report_id=report_id,
+                payload=AdminReportStatusUpdateV1(
+                    status="resolved",
+                    expected_version=1,
+                ),
+                identity=identity,
+                correlation_id=uuid.uuid4(),
+                query_sha256=hashlib.sha256(b"").hexdigest(),
+            )
+    assert stale.value.code == "report_status_version_conflict"
+    assert stale.value.latest_status["status_version"] == 2
+
+    with SessionFactory() as db:
+        status_audit = db.scalar(
+            select(ReportStatusAudit).where(
+                ReportStatusAudit.report_id == report_id,
+                ReportStatusAudit.correlation_id == correlation_id,
+            )
+        )
+        operation_audit = db.scalar(
+            select(AdminOperationAudit).where(
+                AdminOperationAudit.correlation_id == correlation_id,
+                AdminOperationAudit.operation == "admin.report.status.update",
+            )
+        )
+    assert status_audit is not None
+    assert (status_audit.previous_version, status_audit.next_version) == (1, 2)
+    assert operation_audit is not None
+    assert operation_audit.outcome == "SUCCEEDED"
     engine.dispose()

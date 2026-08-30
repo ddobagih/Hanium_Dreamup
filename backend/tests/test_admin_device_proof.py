@@ -40,6 +40,7 @@ from backend.app.services.admin_device_proof import (
     canonical_admin_query,
     canonical_admin_query_sha256,
     canonical_device_proof_json,
+    is_admin_device_proof_workflow_request,
     load_p256_spki_public_key,
     provision_admin_device_key,
     raw_body_sha256,
@@ -1087,7 +1088,7 @@ def test_postgres_expired_recovery_proof_reaches_real_cleanup_route(
             assert "test" in database_name.lower()
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608250002"
+            ).scalar_one() == "202608290011"
 
         with owner_sessions() as db:
             provision_admin_security(
@@ -1690,6 +1691,7 @@ def _run_middleware(
         settings or _settings(),
         admin_session_authorizer=authorize,
         admin_device_proof_verifier=verify,
+        admin_security_denial_recorder=lambda **_kwargs: None,
     )
     asyncio.run(
         middleware(
@@ -2347,6 +2349,33 @@ def test_fp008_actions_are_registered_standard_operations() -> None:
     delivery = classify_admin_operation("POST", f"/reports/{REPORT_ID}/deliveries")
     assert (review.action, review.risk) == ("report.review.decide", "STANDARD")
     assert (delivery.action, delivery.risk) == ("report.delivery.create", "STANDARD")
+
+
+def test_wave5_admin_report_actions_are_registered_high_risk_operations() -> None:
+    status = classify_admin_operation(
+        "PATCH", f"/admin/reports/{REPORT_ID}/status"
+    )
+    package = classify_admin_operation(
+        "POST", f"/admin/reports/{REPORT_ID}/delivery-packages"
+    )
+
+    assert status is not None
+    assert (status.action, status.risk) == ("admin.report.status.update", "HIGH")
+    assert package is not None
+    assert (package.action, package.risk) == (
+        "admin.report.delivery_package.create",
+        "HIGH",
+    )
+    assert is_admin_device_proof_workflow_request(
+        "PATCH", f"/admin/reports/{REPORT_ID}/status"
+    )
+    assert is_admin_device_proof_workflow_request(
+        "POST", f"/admin/reports/{REPORT_ID}/delivery-packages"
+    )
+    assert is_admin_device_proof_workflow_request("GET", "/admin/reports/audits")
+    assert not is_admin_device_proof_workflow_request(
+        "GET", f"/admin/reports/{REPORT_ID}/status"
+    )
 
 
 def test_openapi_exposes_exact_challenge_and_route_scoped_proof_headers() -> None:

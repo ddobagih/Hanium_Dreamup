@@ -19,8 +19,9 @@ import stat
 import sys
 import time
 from typing import Callable, Iterator, Mapping
+import uuid
 
-from sqlalchemy import create_engine, delete, func, select
+from sqlalchemy import create_engine, delete, func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -29,12 +30,18 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from backend.app.models import (  # noqa: E402
+    AccountEnrollment,
     AccountDeletionItem,
     AccountDeletionRequest,
     AccountDeletionTombstone,
     PrivacyConsentEvent,
+    RawCollection,
+    RawCollectionChunk,
+    RawCollectionObject,
     Report,
     ReportImageObject,
+    SignupConsentReceipt,
+    UserAccount,
 )
 from backend.app.config import _validate_deployment_database_transport  # noqa: E402
 from backend.app.services.privacy_lifecycle import (  # noqa: E402
@@ -46,14 +53,32 @@ from backend.app.services.privacy_lifecycle import (  # noqa: E402
 from backend.app.services.report_storage import (  # noqa: E402
     lock_report_storage_reconciliation_transaction,
 )
+from backend.app.services.raw_collection_storage import (  # noqa: E402
+    RAW_RETENTION_CLASS,
+    RawCollectionStorage,
+    lock_raw_capacity_reservation_transaction,
+    lock_raw_storage_reconciliation_transaction,
+    raw_chunk_commit_state,
+    raw_storage_has_pending_writes,
+)
 
 
-JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v1"
-MANIFEST_SCHEMA = "walksafe.account-deletion-server-manifest.v1"
+JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v4"
+CREDENTIAL_JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v3"
+RAW_JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v2"
+LEGACY_JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v1"
+MANIFEST_SCHEMA = "walksafe.account-deletion-server-manifest.v3"
+RAW_MANIFEST_SCHEMA = "walksafe.account-deletion-server-manifest.v2"
+LEGACY_MANIFEST_SCHEMA = "walksafe.account-deletion-server-manifest.v1"
 REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 STORAGE_NAME = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
     r"[89ab][0-9a-f]{3}-[0-9a-f]{12}\.wse$"
+)
+RAW_STORAGE_NAME = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\."
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\."
+    r"[0-9]{1,4}\.wsrc$"
 )
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 MAX_BATCH_SIZE = 100
@@ -73,6 +98,12 @@ FORBIDDEN_MANUAL_ENVIRONMENT_NAMES = frozenset(
 )
 _AT_FDCWD = -100
 _RENAME_NOREPLACE = 1
+_CREDENTIAL_JOURNAL_SCHEMAS = frozenset(
+    {JOURNAL_SCHEMA, CREDENTIAL_JOURNAL_SCHEMA}
+)
+_RAW_INVENTORY_JOURNAL_SCHEMAS = frozenset(
+    {JOURNAL_SCHEMA, CREDENTIAL_JOURNAL_SCHEMA, RAW_JOURNAL_SCHEMA}
+)
 
 
 class AccountDeletionWorkerError(RuntimeError):
@@ -730,6 +761,139 @@ def _publish_manifest(path: Path, payload: Mapping[str, object]) -> tuple[bytes,
     return data, hashlib.sha256(data).hexdigest()
 
 
+def _raw_journal_key(item: object) -> tuple[str, str, int]:
+    if not isinstance(item, dict):
+        raise AccountDeletionWorkerError("worker raw journal inventory is invalid")
+    collection_id = item.get("collection_id")
+    object_id = item.get("object_id")
+    chunk_index = item.get("chunk_index")
+    try:
+        parsed_collection_id = uuid.UUID(str(collection_id))
+        parsed_object_id = uuid.UUID(str(object_id))
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise AccountDeletionWorkerError(
+            "worker raw journal inventory is invalid"
+        ) from exc
+    if (
+        type(collection_id) is not str
+        or str(parsed_collection_id) != collection_id
+        or type(object_id) is not str
+        or str(parsed_object_id) != object_id
+        or type(chunk_index) is not int
+        or not 0 <= chunk_index < 2_048
+    ):
+        raise AccountDeletionWorkerError("worker raw journal inventory is invalid")
+    return collection_id, object_id, chunk_index
+
+
+def _validate_raw_journal_inventory(
+    raw_collections: list[object],
+    raw_objects: list[object],
+) -> None:
+    expected_objects: dict[tuple[str, str, int], tuple[str, str, int]] = {}
+    collection_keys: set[tuple[str, str, int]] = set()
+    for item in raw_collections:
+        key = _raw_journal_key(item)
+        if key in collection_keys:
+            raise AccountDeletionWorkerError(
+                "worker raw journal inventory is invalid"
+            )
+        collection_keys.add(key)
+        assert isinstance(item, dict)
+        storage_name = item.get("storage_name")
+        envelope_sha256 = item.get("envelope_sha256")
+        envelope_size = item.get("envelope_size")
+        if storage_name is None:
+            if envelope_sha256 is not None or envelope_size is not None:
+                raise AccountDeletionWorkerError(
+                    "worker raw journal inventory is invalid"
+                )
+            continue
+        expected_storage_name = f"{key[0]}.{key[1]}.{key[2]}.wsrc"
+        if (
+            type(storage_name) is not str
+            or storage_name != expected_storage_name
+            or RAW_STORAGE_NAME.fullmatch(storage_name) is None
+            or type(envelope_sha256) is not str
+            or SHA256.fullmatch(envelope_sha256) is None
+            or type(envelope_size) is not int
+            or envelope_size <= 0
+        ):
+            raise AccountDeletionWorkerError(
+                "worker raw journal inventory is invalid"
+            )
+        expected_objects[key] = (
+            storage_name,
+            envelope_sha256,
+            envelope_size,
+        )
+
+    actual_objects: dict[tuple[str, str, int], tuple[str, str, int]] = {}
+    for item in raw_objects:
+        key = _raw_journal_key(item)
+        if key in actual_objects or not isinstance(item, dict):
+            raise AccountDeletionWorkerError(
+                "worker raw journal inventory is invalid"
+            )
+        storage_name = item.get("storage_name")
+        envelope_sha256 = item.get("envelope_sha256")
+        envelope_size = item.get("envelope_size")
+        source_path = item.get("source_path")
+        quarantine_path = item.get("quarantine_path")
+        if (
+            type(storage_name) is not str
+            or RAW_STORAGE_NAME.fullmatch(storage_name) is None
+            or type(envelope_sha256) is not str
+            or SHA256.fullmatch(envelope_sha256) is None
+            or type(envelope_size) is not int
+            or envelope_size <= 0
+            or type(source_path) is not str
+            or type(quarantine_path) is not str
+            or not Path(source_path).is_absolute()
+            or not Path(quarantine_path).is_absolute()
+            or Path(source_path).name != storage_name
+            or Path(quarantine_path).name != storage_name
+        ):
+            raise AccountDeletionWorkerError(
+                "worker raw journal inventory is invalid"
+            )
+        actual_objects[key] = (
+            storage_name,
+            envelope_sha256,
+            envelope_size,
+        )
+    if actual_objects != expected_objects:
+        raise AccountDeletionWorkerError("worker raw journal inventory is invalid")
+
+
+def _frozen_account_enrollment_ids(value: Mapping[str, object]) -> tuple[uuid.UUID, ...]:
+    raw_ids = value.get("account_enrollment_ids")
+    if not isinstance(raw_ids, list) or len(raw_ids) > 10_000:
+        raise AccountDeletionWorkerError(
+            "worker credential journal inventory is invalid"
+        )
+    parsed: list[uuid.UUID] = []
+    canonical: list[str] = []
+    for raw_id in raw_ids:
+        try:
+            parsed_id = uuid.UUID(str(raw_id))
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise AccountDeletionWorkerError(
+                "worker credential journal inventory is invalid"
+            ) from exc
+        if type(raw_id) is not str or str(parsed_id) != raw_id:
+            raise AccountDeletionWorkerError(
+                "worker credential journal inventory is invalid"
+            )
+        parsed.append(parsed_id)
+        canonical.append(raw_id)
+    if canonical != sorted(set(canonical)):
+        raise AccountDeletionWorkerError(
+            "worker credential journal inventory is invalid"
+        )
+    return tuple(parsed)
+
+
 def _read_journal(path: Path) -> dict[str, object]:
     metadata = path.lstat()
     if (
@@ -742,7 +906,12 @@ def _read_journal(path: Path) -> dict[str, object]:
     ):
         raise AccountDeletionWorkerError("worker journal metadata is unsafe")
     value = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict) or value.get("schema_version") != JOURNAL_SCHEMA:
+    if not isinstance(value, dict) or value.get("schema_version") not in {
+        JOURNAL_SCHEMA,
+        CREDENTIAL_JOURNAL_SCHEMA,
+        RAW_JOURNAL_SCHEMA,
+        LEGACY_JOURNAL_SCHEMA,
+    }:
         raise AccountDeletionWorkerError("worker journal contract differs")
     request_id = value.get("request_id")
     if not isinstance(request_id, str) or REQUEST_ID.fullmatch(request_id) is None:
@@ -752,7 +921,81 @@ def _read_journal(path: Path) -> dict[str, object]:
     objects = value.get("objects")
     if not isinstance(objects, list) or len(objects) > 10_000:
         raise AccountDeletionWorkerError("worker journal object inventory is invalid")
+    if value["schema_version"] in _RAW_INVENTORY_JOURNAL_SCHEMAS:
+        raw_collections = value.get("raw_collections")
+        raw_objects = value.get("raw_objects")
+        if (
+            not isinstance(raw_collections, list)
+            or not isinstance(raw_objects, list)
+            or len(raw_collections) > 10_000
+            or len(raw_objects) > 10_000
+            or value.get("raw_collection_count") != len(raw_collections)
+        ):
+            raise AccountDeletionWorkerError("worker raw journal inventory is invalid")
+        _validate_raw_journal_inventory(raw_collections, raw_objects)
+    if value["schema_version"] in _CREDENTIAL_JOURNAL_SCHEMAS:
+        credential_account_count = value.get("credential_account_count")
+        account_enrollment_count = value.get("account_enrollment_count")
+        signup_receipt_count = value.get("retained_signup_consent_receipt_count")
+        if (
+            type(credential_account_count) is not int
+            or credential_account_count not in {0, 1}
+            or type(account_enrollment_count) is not int
+            or not 0 <= account_enrollment_count <= 10_000
+            or type(signup_receipt_count) is not int
+            or signup_receipt_count not in {0, 1}
+        ):
+            raise AccountDeletionWorkerError(
+                "worker credential journal inventory is invalid"
+            )
+        if value["schema_version"] == JOURNAL_SCHEMA:
+            frozen_ids = _frozen_account_enrollment_ids(value)
+            if (
+                "email_lookup_hmac" in value
+                or len(frozen_ids) != account_enrollment_count
+                or (
+                    credential_account_count == 0
+                    and (frozen_ids or signup_receipt_count != 0)
+                )
+            ):
+                raise AccountDeletionWorkerError(
+                    "worker credential journal inventory is invalid"
+                )
+        else:
+            email_lookup_hmac = value.get("email_lookup_hmac")
+            if (
+                (
+                    credential_account_count == 1
+                    and (
+                        type(email_lookup_hmac) is not str
+                        or SHA256.fullmatch(email_lookup_hmac) is None
+                    )
+                )
+                or (
+                    credential_account_count == 0
+                    and (
+                        email_lookup_hmac is not None
+                        or account_enrollment_count != 0
+                    )
+                )
+            ):
+                raise AccountDeletionWorkerError(
+                    "worker credential journal inventory is invalid"
+                )
     return value
+
+
+def _journal_objects(journal: Mapping[str, object]) -> list[dict[str, object]]:
+    report_objects = journal.get("objects")
+    if not isinstance(report_objects, list):
+        raise AccountDeletionWorkerError("worker journal object inventory is invalid")
+    raw_objects = journal.get("raw_objects", [])
+    if not isinstance(raw_objects, list):
+        raise AccountDeletionWorkerError("worker raw journal inventory is invalid")
+    combined = [*report_objects, *raw_objects]
+    if len(combined) > 20_000 or not all(isinstance(item, dict) for item in combined):
+        raise AccountDeletionWorkerError("worker journal object inventory is invalid")
+    return combined
 
 
 def _journal_paths(root: Path, request_id: str) -> tuple[Path, Path, Path]:
@@ -1161,6 +1404,203 @@ def _object_inventory(
     return reports, objects
 
 
+def _raw_inventory(
+    db: Session,
+    request: AccountDeletionRequest,
+    raw_object_dir: Path,
+    quarantine_dir: Path,
+    *,
+    raw_group_gid: int | None,
+) -> tuple[list[RawCollection], list[dict[str, object]], list[dict[str, object]]]:
+    collections = db.scalars(
+        select(RawCollection)
+        .where(
+            RawCollection.privacy_subject_hmac == request.privacy_subject_hmac,
+            RawCollection.account_generation == request.account_generation,
+        )
+        .order_by(RawCollection.collection_id)
+    ).all()
+    if len(collections) > 10_000:
+        raise AccountDeletionWorkerError("one request exceeds the local raw collection ceiling")
+    collection_ids = [collection.collection_id for collection in collections]
+    declared_objects = (
+        db.scalars(
+            select(RawCollectionObject)
+            .where(RawCollectionObject.collection_id.in_(collection_ids))
+            .order_by(RawCollectionObject.collection_id, RawCollectionObject.object_id)
+        ).all()
+        if collection_ids
+        else []
+    )
+    declared_chunks = (
+        db.scalars(
+            select(RawCollectionChunk)
+            .where(RawCollectionChunk.collection_id.in_(collection_ids))
+            .order_by(
+                RawCollectionChunk.collection_id,
+                RawCollectionChunk.object_id,
+                RawCollectionChunk.chunk_index,
+            )
+        ).all()
+        if collection_ids
+        else []
+    )
+    objects_by_collection: dict[object, list[RawCollectionObject]] = {}
+    chunks_by_collection: dict[object, list[RawCollectionChunk]] = {}
+    for item in declared_objects:
+        objects_by_collection.setdefault(item.collection_id, []).append(item)
+    for chunk in declared_chunks:
+        chunks_by_collection.setdefault(chunk.collection_id, []).append(chunk)
+
+    inventory: list[dict[str, object]] = []
+    stored_objects: list[dict[str, object]] = []
+    for collection in collections:
+        items = objects_by_collection.get(collection.collection_id, [])
+        chunks = chunks_by_collection.get(collection.collection_id, [])
+        if len(items) != 1 or len(chunks) != 1:
+            raise AccountDeletionWorkerError("raw collection inventory is incomplete")
+        item = items[0]
+        chunk = chunks[0]
+        try:
+            commit_state = raw_chunk_commit_state(collection, item, chunk)
+            receipt = RawCollectionStorage._receipt(collection, item)
+        except Exception as exc:
+            raise AccountDeletionWorkerError(
+                "raw collection persistence or receipt binding is invalid"
+            ) from exc
+        metadata = commit_state.metadata
+        record: dict[str, object] = {
+            "collection_id": str(collection.collection_id),
+            "object_id": str(item.object_id),
+            "chunk_index": chunk.chunk_index,
+            "manifest_sha256": collection.manifest_sha256,
+            "consent_receipt_sha256": collection.consent_receipt_sha256,
+            "state": collection.state,
+            "retention_class": collection.retention_class,
+            "committed_at": (
+                _iso(collection.committed_at) if collection.committed_at else None
+            ),
+            "retention_expires_at": (
+                _iso(collection.retention_expires_at)
+                if collection.retention_expires_at
+                else None
+            ),
+            "receipt_sha256": receipt.receipt_sha256 if receipt is not None else None,
+            "storage_name": metadata.storage_name if metadata is not None else None,
+            "envelope_sha256": (
+                metadata.envelope_sha256 if metadata is not None else None
+            ),
+            "envelope_size": metadata.envelope_size if metadata is not None else None,
+        }
+        inventory.append(record)
+        if metadata is None:
+            continue
+        if RAW_STORAGE_NAME.fullmatch(metadata.storage_name) is None:
+            raise AccountDeletionWorkerError("raw storage binding is invalid")
+        pending_journal = (
+            raw_object_dir
+            / ".raw-write-journal"
+            / f"{metadata.storage_name}.json"
+        )
+        if _entry_exists(pending_journal):
+            raise AccountDeletionWorkerError(
+                "raw storage has an unreconciled write journal"
+            )
+        source = raw_object_dir / metadata.storage_name
+        quarantine = quarantine_dir / metadata.storage_name
+        source_mode = 0o640 if raw_group_gid is not None else 0o600
+        source_parent_mode = 0o2750 if raw_group_gid is not None else 0o700
+        identity = _validated_object(
+            source,
+            size=metadata.envelope_size,
+            sha256=metadata.envelope_sha256,
+            expected_mode=source_mode,
+            expected_gid=raw_group_gid,
+            expected_parent_mode=source_parent_mode,
+            expected_parent_gid=raw_group_gid,
+        )
+        stored_objects.append(
+            {
+                "collection_id": str(collection.collection_id),
+                "object_id": str(item.object_id),
+                "chunk_index": chunk.chunk_index,
+                "storage_name": metadata.storage_name,
+                "envelope_sha256": metadata.envelope_sha256,
+                "envelope_size": metadata.envelope_size,
+                "source_path": str(source),
+                "quarantine_path": str(quarantine),
+                "source_identity": dict(identity),
+                "source_mode": source_mode,
+                "source_gid": raw_group_gid,
+                "source_parent_mode": source_parent_mode,
+            }
+        )
+    if set(objects_by_collection) != set(collection_ids) or set(
+        chunks_by_collection
+    ) != set(collection_ids):
+        raise AccountDeletionWorkerError("raw collection inventory is incomplete")
+    return collections, inventory, stored_objects
+
+
+def _credential_inventory(
+    db: Session,
+    request: AccountDeletionRequest,
+) -> tuple[uuid.UUID | None, list[uuid.UUID], int]:
+    if request.credential_account_id is None:
+        return None, [], 0
+    account = db.execute(
+        select(
+            UserAccount.id,
+            UserAccount.privacy_subject_hmac,
+            UserAccount.account_generation,
+            UserAccount.email_lookup_hmac,
+            UserAccount.status,
+        )
+        .where(UserAccount.id == request.credential_account_id)
+    ).one_or_none()
+    receipt_count = int(
+        db.scalar(
+            select(func.count(SignupConsentReceipt.account_id)).where(
+                SignupConsentReceipt.account_id == request.credential_account_id
+            )
+        )
+        or 0
+    )
+    if receipt_count not in {0, 1}:
+        raise AccountDeletionWorkerError("signup consent receipt inventory is invalid")
+    if account is None:
+        raise AccountDeletionWorkerError("deletion credential inventory is missing")
+    if (
+        account.privacy_subject_hmac != request.privacy_subject_hmac
+        or account.account_generation != request.account_generation
+        or account.status != "DISABLED"
+    ):
+        raise AccountDeletionWorkerError("deletion credential binding is invalid")
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+        {
+            "lock_key": (
+                "walksafe-account-enrollment-email-v1:"
+                f"{account.email_lookup_hmac}"
+            )
+        },
+    )
+    enrollment_ids = list(
+        db.scalars(
+            select(AccountEnrollment.id)
+            .where(
+                AccountEnrollment.email_lookup_hmac == account.email_lookup_hmac
+            )
+            .order_by(AccountEnrollment.id)
+        ).all()
+    )
+    if len(enrollment_ids) > 10_000:
+        raise AccountDeletionWorkerError(
+            "one request exceeds the account enrollment ceiling"
+        )
+    return account.id, enrollment_ids, receipt_count
+
+
 def _entry_exists(path: Path) -> bool:
     try:
         path.lstat()
@@ -1368,12 +1808,104 @@ def _remove_committed_objects(objects: list[dict[str, object]]) -> None:
         _fsync_directory(quarantine.parent)
 
 
-def _request_report_count(db: Session, journal: Mapping[str, object]) -> int:
-    return int(
+def _request_inventory_counts(
+    db: Session,
+    journal: Mapping[str, object],
+) -> tuple[int, int, int, int]:
+    privacy_subject = str(journal["privacy_subject_hmac"])
+    account_generation = int(journal["account_generation"])
+    report_count = int(
         db.scalar(
             select(func.count(Report.id)).where(
-                Report.privacy_subject_hmac == str(journal["privacy_subject_hmac"]),
-                Report.account_generation == int(journal["account_generation"]),
+                Report.privacy_subject_hmac == privacy_subject,
+                Report.account_generation == account_generation,
+            )
+        )
+        or 0
+    )
+    raw_collection_count = int(
+        db.scalar(
+            select(func.count(RawCollection.collection_id)).where(
+                RawCollection.privacy_subject_hmac == privacy_subject,
+                RawCollection.account_generation == account_generation,
+            )
+        )
+        or 0
+    )
+    credential_account_count = 0
+    account_enrollment_count = 0
+    if journal["schema_version"] in _CREDENTIAL_JOURNAL_SCHEMAS:
+        credential_account_id = db.scalar(
+            select(AccountDeletionRequest.credential_account_id).where(
+                AccountDeletionRequest.request_id == str(journal["request_id"])
+            )
+        )
+        if credential_account_id is not None:
+            credential_account_count = int(
+                db.scalar(
+                    select(func.count(UserAccount.id)).where(
+                        UserAccount.id == credential_account_id
+                    )
+                )
+                or 0
+            )
+        if journal["schema_version"] == JOURNAL_SCHEMA:
+            enrollment_ids = _frozen_account_enrollment_ids(journal)
+            if enrollment_ids:
+                account_enrollment_count = int(
+                    db.scalar(
+                        select(func.count(AccountEnrollment.id)).where(
+                            AccountEnrollment.id.in_(enrollment_ids)
+                        )
+                    )
+                    or 0
+                )
+        else:
+            email_lookup_hmac = journal.get("email_lookup_hmac")
+            if email_lookup_hmac is None:
+                if (
+                    journal.get("credential_account_count") != 0
+                    or journal.get("account_enrollment_count") != 0
+                ):
+                    raise AccountDeletionWorkerError(
+                        "worker credential journal inventory is invalid"
+                    )
+            elif not isinstance(email_lookup_hmac, str):
+                raise AccountDeletionWorkerError(
+                    "worker credential journal inventory is invalid"
+                )
+            else:
+                account_enrollment_count = int(
+                    db.scalar(
+                        select(func.count(AccountEnrollment.id)).where(
+                            AccountEnrollment.email_lookup_hmac == email_lookup_hmac
+                        )
+                    )
+                    or 0
+                )
+    return (
+        report_count,
+        raw_collection_count,
+        credential_account_count,
+        account_enrollment_count,
+    )
+
+
+def _retained_signup_receipt_count(
+    db: Session,
+    journal: Mapping[str, object],
+) -> int:
+    credential_account_id = db.scalar(
+        select(AccountDeletionRequest.credential_account_id).where(
+            AccountDeletionRequest.request_id == str(journal["request_id"])
+        )
+    )
+    if credential_account_id is None:
+        return 0
+    return int(
+        db.scalar(
+            select(func.count(SignupConsentReceipt.account_id)).where(
+                SignupConsentReceipt.account_id == credential_account_id
             )
         )
         or 0
@@ -1390,8 +1922,17 @@ def _final_manifest(journal: Mapping[str, object]) -> dict[str, object]:
         }
         for item in journal["objects"]  # type: ignore[index]
     ]
-    return {
-        "schema_version": MANIFEST_SCHEMA,
+    schema = str(journal["schema_version"])
+    manifest: dict[str, object] = {
+        "schema_version": (
+            MANIFEST_SCHEMA
+            if schema in _CREDENTIAL_JOURNAL_SCHEMAS
+            else (
+                RAW_MANIFEST_SCHEMA
+                if schema == RAW_JOURNAL_SCHEMA
+                else LEGACY_MANIFEST_SCHEMA
+            )
+        ),
         "request_id": str(journal["request_id"]),
         "privacy_subject_hmac": str(journal["privacy_subject_hmac"]),
         "account_generation": int(journal["account_generation"]),
@@ -1405,6 +1946,43 @@ def _final_manifest(journal: Mapping[str, object]) -> dict[str, object]:
             "server_quarantine": "NOT_APPLICABLE",
         },
     }
+    if schema in _RAW_INVENTORY_JOURNAL_SCHEMAS:
+        raw_collections = journal.get("raw_collections")
+        if not isinstance(raw_collections, list):
+            raise AccountDeletionWorkerError("worker raw journal inventory is invalid")
+        manifest["raw_collection_count"] = int(journal["raw_collection_count"])
+        manifest["raw_collections"] = [
+            {
+                "collection_id": str(item["collection_id"]),
+                "object_id": str(item["object_id"]),
+                "chunk_index": int(item["chunk_index"]),
+                "manifest_sha256": str(item["manifest_sha256"]),
+                "consent_receipt_sha256": str(item["consent_receipt_sha256"]),
+                "state": str(item["state"]),
+                "retention_class": str(item["retention_class"]),
+                "committed_at": item["committed_at"],
+                "retention_expires_at": item["retention_expires_at"],
+                "receipt_sha256": item["receipt_sha256"],
+                "storage_name": item["storage_name"],
+                "envelope_sha256": item["envelope_sha256"],
+                "envelope_size": item["envelope_size"],
+            }
+            for item in raw_collections
+        ]
+    if schema in _CREDENTIAL_JOURNAL_SCHEMAS:
+        manifest["credential_account_count"] = int(
+            journal["credential_account_count"]
+        )
+        manifest["account_enrollment_count"] = int(
+            journal["account_enrollment_count"]
+        )
+        manifest["retained_evidence"] = {
+            "account_deletion_ledger": "RETAINED",
+            "signup_consent_receipt_count": int(
+                journal["retained_signup_consent_receipt_count"]
+            ),
+        }
+    return manifest
 
 
 def _finish_committed_journal(
@@ -1413,13 +1991,13 @@ def _finish_committed_journal(
     journal_path: Path,
     journal: dict[str, object],
 ) -> str:
-    objects = journal["objects"]
-    assert isinstance(objects, list)
+    objects = _journal_objects(journal)
     _remove_committed_objects(objects)
     with SessionFactory() as db:
         assert_account_deletion_worker_database_role(db)
-        if _request_report_count(db, journal) != 0:
-            raise AccountDeletionWorkerError("server report inventory is not empty after commit")
+        counts = _request_inventory_counts(db, journal)
+        if any(counts):
+            raise AccountDeletionWorkerError("server object inventory is not empty after commit")
         tombstone_count = db.scalar(
             select(func.count(AccountDeletionTombstone.tombstone_id)).where(
                 AccountDeletionTombstone.privacy_subject_hmac
@@ -1435,6 +2013,14 @@ def _finish_committed_journal(
         )
         if tombstone_count != 1 or item_count != 9:
             raise AccountDeletionWorkerError("retained deletion ledger is incomplete")
+        if journal["schema_version"] in _CREDENTIAL_JOURNAL_SCHEMAS:
+            retained_receipt_count = _retained_signup_receipt_count(db, journal)
+            if retained_receipt_count != int(
+                journal["retained_signup_consent_receipt_count"]
+            ):
+                raise AccountDeletionWorkerError(
+                    "retained signup consent receipt inventory differs"
+                )
         db.rollback()
     _journal_path, quarantine_dir, manifest_path = _journal_paths(
         root, str(journal["request_id"])
@@ -1465,13 +2051,13 @@ def _finish_committed_journal(
         if consent_count is None:
             raise AccountDeletionWorkerError("privacy consent ledger verification failed")
         db.rollback()
-    journal_path.unlink()
-    _fsync_directory(journal_path.parent)
     try:
         quarantine_dir.rmdir()
         _fsync_directory(quarantine_dir.parent)
     except FileNotFoundError:
         pass
+    journal_path.unlink()
+    _fsync_directory(journal_path.parent)
     return manifest_sha256
 
 
@@ -1481,18 +2067,33 @@ def reconcile_journal(
     journal_path: Path,
 ) -> str:
     journal = _read_journal(journal_path)
-    objects = journal["objects"]
-    assert isinstance(objects, list)
+    objects = _journal_objects(journal)
     with SessionFactory() as db:
         assert_account_deletion_worker_database_role(db)
-        report_count = _request_report_count(db, journal)
+        counts = _request_inventory_counts(db, journal)
         db.rollback()
-    if report_count:
-        if report_count != int(journal["report_count"]) or journal["state"] != "PREPARED":
+    report_count, raw_collection_count, credential_count, enrollment_count = counts
+    if journal["schema_version"] == LEGACY_JOURNAL_SCHEMA and raw_collection_count:
+        raise AccountDeletionWorkerError(
+            "legacy deletion journal cannot omit a raw collection inventory"
+        )
+    expected_raw_count = int(journal.get("raw_collection_count", 0))
+    expected_counts = (
+        int(journal["report_count"]),
+        expected_raw_count,
+        int(journal.get("credential_account_count", 0)),
+        int(journal.get("account_enrollment_count", 0)),
+    )
+    current_counts = (
+        report_count,
+        raw_collection_count,
+        credential_count,
+        enrollment_count,
+    )
+    if any(current_counts):
+        if current_counts != expected_counts or journal["state"] != "PREPARED":
             raise AccountDeletionWorkerError("partial database deletion cannot be reconciled")
         _restore_precommit(objects)
-        journal_path.unlink()
-        _fsync_directory(journal_path.parent)
         _journal_path, quarantine_dir, _manifest = _journal_paths(
             root, str(journal["request_id"])
         )
@@ -1501,6 +2102,8 @@ def reconcile_journal(
             _fsync_directory(quarantine_dir.parent)
         except FileNotFoundError:
             pass
+        journal_path.unlink()
+        _fsync_directory(journal_path.parent)
         return "RESTORED"
     if journal["state"] == "PREPARED":
         journal["state"] = "DATABASE_COMMITTED"
@@ -1514,6 +2117,7 @@ def process_request(
     *,
     request_id: str,
     upload_dir: Path,
+    raw_object_dir: Path,
     upload_group_gid: int | None = None,
     root: Path,
     fault: Callable[[str], None] | None = None,
@@ -1523,23 +2127,51 @@ def process_request(
         return reconcile_journal(SessionFactory, root, journal_path)
     _secure_directory(quarantine_dir, create=True)
     committed = False
+    commit_attempted = False
     journal: dict[str, object] | None = None
     try:
         with SessionFactory() as db:
             assert_account_deletion_worker_database_role(db)
+            candidate = db.scalar(
+                select(AccountDeletionRequest)
+                .where(AccountDeletionRequest.request_id == request_id)
+            )
+            if candidate is None:
+                raise AccountDeletionWorkerError("deletion request does not exist")
+            expected_subject = candidate.privacy_subject_hmac
+            expected_generation = candidate.account_generation
+            lock_report_deletion_transaction(
+                db,
+                expected_subject,
+                expected_generation,
+            )
+            db.expire_all()
             request = db.scalar(
                 select(AccountDeletionRequest)
                 .where(AccountDeletionRequest.request_id == request_id)
                 .with_for_update()
             )
-            if request is None:
-                raise AccountDeletionWorkerError("deletion request does not exist")
-            lock_report_deletion_transaction(
-                db,
-                request.privacy_subject_hmac,
-                request.account_generation,
-            )
+            if (
+                request is None
+                or request.privacy_subject_hmac != expected_subject
+                or request.account_generation != expected_generation
+            ):
+                raise AccountDeletionWorkerError("deletion request identity changed")
             lock_report_storage_reconciliation_transaction(db)
+            lock_raw_storage_reconciliation_transaction(db)
+            lock_raw_capacity_reservation_transaction(db)
+            try:
+                has_pending_raw_writes = raw_storage_has_pending_writes(
+                    raw_object_dir
+                )
+            except OSError as exc:
+                raise AccountDeletionWorkerError(
+                    "raw storage journal cannot be inspected safely"
+                ) from exc
+            if has_pending_raw_writes:
+                raise AccountDeletionWorkerError(
+                    "raw storage has an unreconciled write journal"
+                )
             reports, objects = _object_inventory(
                 db,
                 request,
@@ -1547,6 +2179,18 @@ def process_request(
                 quarantine_dir,
                 upload_group_gid=upload_group_gid,
             )
+            raw_collections, raw_inventory, raw_objects = _raw_inventory(
+                db,
+                request,
+                raw_object_dir,
+                quarantine_dir,
+                raw_group_gid=upload_group_gid,
+            )
+            (
+                credential_account_id,
+                account_enrollment_ids,
+                signup_receipt_count,
+            ) = _credential_inventory(db, request)
             journal = {
                 "schema_version": JOURNAL_SCHEMA,
                 "request_id": request.request_id,
@@ -1557,18 +2201,55 @@ def process_request(
                 "deleted_at": None,
                 "report_count": len(reports),
                 "objects": objects,
+                "raw_collection_count": len(raw_collections),
+                "raw_collections": raw_inventory,
+                "raw_objects": raw_objects,
+                "credential_account_count": (
+                    1 if credential_account_id is not None else 0
+                ),
+                "account_enrollment_count": len(account_enrollment_ids),
+                "account_enrollment_ids": sorted(
+                    str(enrollment_id) for enrollment_id in account_enrollment_ids
+                ),
+                "retained_signup_consent_receipt_count": signup_receipt_count,
             }
             _atomic_write(journal_path, journal)
-            _move_to_quarantine(objects)
+            _move_to_quarantine(_journal_objects(journal))
             if fault is not None:
                 fault("after_quarantine")
             if reports:
                 db.execute(delete(Report).where(Report.id.in_([report.id for report in reports])))
-            if _request_report_count(db, journal) != 0:
-                raise AccountDeletionWorkerError("database report deletion did not reach zero")
+            if raw_collections:
+                db.execute(
+                    delete(RawCollection).where(
+                        RawCollection.collection_id.in_(
+                            [collection.collection_id for collection in raw_collections]
+                        )
+                    )
+                )
+            if account_enrollment_ids:
+                db.execute(
+                    delete(AccountEnrollment).where(
+                        AccountEnrollment.id.in_(account_enrollment_ids)
+                    )
+                )
+            if credential_account_id is not None:
+                db.execute(
+                    delete(UserAccount).where(
+                        UserAccount.id == credential_account_id
+                    )
+                )
+            counts = _request_inventory_counts(db, journal)
+            if any(counts):
+                raise AccountDeletionWorkerError(
+                    "database server inventory deletion did not reach zero"
+                )
             if fault is not None:
                 fault("before_database_commit")
+            commit_attempted = True
             db.commit()
+            if fault is not None:
+                fault("after_database_commit_before_ack")
             committed = True
         if fault is not None:
             fault("after_database_commit")
@@ -1580,16 +2261,16 @@ def process_request(
             fault("before_object_removal")
         return _finish_committed_journal(SessionFactory, root, journal_path, journal)
     except Exception:
-        if not committed and journal is not None:
-            _restore_precommit(journal["objects"])  # type: ignore[arg-type]
-            try:
-                journal_path.unlink()
-                _fsync_directory(journal_path.parent)
-            except FileNotFoundError:
-                pass
+        if not committed and not commit_attempted and journal is not None:
+            _restore_precommit(_journal_objects(journal))
             try:
                 quarantine_dir.rmdir()
                 _fsync_directory(quarantine_dir.parent)
+            except FileNotFoundError:
+                pass
+            try:
+                journal_path.unlink()
+                _fsync_directory(journal_path.parent)
             except FileNotFoundError:
                 pass
         raise
@@ -1622,6 +2303,7 @@ def run_once(
     *,
     database_url: str,
     upload_dir: Path,
+    raw_object_dir: Path,
     journal_root: Path,
     maintenance_lock_path: Path,
     maintenance_lock_group_gid: int | None = None,
@@ -1638,9 +2320,21 @@ def run_once(
         upload_dir,
         expected_group_gid=upload_backup_reader_group_gid,
     )
+    raw_object_dir = _upload_directory(
+        raw_object_dir,
+        expected_group_gid=upload_backup_reader_group_gid,
+    )
     _prepare_roots(journal_root, create=create_runtime_paths)
-    if upload_dir.stat().st_dev != journal_root.stat().st_dev:
-        raise AccountDeletionWorkerError("upload and worker journal directories must share a filesystem")
+    if len(
+        {
+            upload_dir.stat().st_dev,
+            raw_object_dir.stat().st_dev,
+            journal_root.stat().st_dev,
+        }
+    ) != 1:
+        raise AccountDeletionWorkerError(
+            "upload, raw object, and worker journal directories must share a filesystem"
+        )
     engine = create_engine(database_url, pool_pre_ping=True)
     SessionFactory = sessionmaker(engine, expire_on_commit=False)
     completed: list[str] = []
@@ -1661,6 +2355,7 @@ def run_once(
                         SessionFactory,
                         request_id=request_id,
                         upload_dir=upload_dir,
+                        raw_object_dir=raw_object_dir,
                         upload_group_gid=upload_backup_reader_group_gid,
                         root=journal_root,
                     )
@@ -1677,6 +2372,7 @@ def _parser() -> argparse.ArgumentParser:
     mode.add_argument("--manual-one-shot", action="store_true")
     parser.add_argument("--environment-file", type=Path)
     parser.add_argument("--upload-dir", type=Path, required=True)
+    parser.add_argument("--raw-object-dir", type=Path, required=True)
     parser.add_argument("--journal-root", type=Path, required=True)
     parser.add_argument("--maintenance-lock-path", type=Path, required=True)
     parser.add_argument("--batch-size", type=int, default=10)
@@ -1770,6 +2466,7 @@ def main(argv: list[str] | None = None) -> int:
         results = run_once(
             database_url=database_url,
             upload_dir=args.upload_dir,
+            raw_object_dir=args.raw_object_dir,
             journal_root=args.journal_root,
             maintenance_lock_path=args.maintenance_lock_path,
             maintenance_lock_group_gid=maintenance_lock_group_gid,

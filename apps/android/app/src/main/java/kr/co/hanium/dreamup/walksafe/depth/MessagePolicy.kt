@@ -101,7 +101,7 @@ class MessagePolicy(
             steps <= 4 -> "전방 약 ${steps}보 앞 $target"
             else -> "전방 $target"
         }
-        val action = if (level == MessageLevel.STOP) "멈추세요." else "속도를 줄이세요."
+        val action = if (level == MessageLevel.STOP) "멈추세요. 주변을 확인하세요." else "멈출 준비를 하세요."
         return MessagePolicyDecision(
             userFacing = UserFacingDepth(stepsAhead = steps, messageLevel = level, message = "$phrase. $action"),
             purpose = MessagePurpose.OBSTACLE_WARNING,
@@ -148,7 +148,7 @@ class MessagePolicy(
                 userFacing = UserFacingDepth(
                     stepsAhead = null,
                     messageLevel = MessageLevel.CAUTION,
-                    message = "전방 ${target}와의 거리가 줄어드는 것 같습니다. 주의하세요.",
+                    message = "전방 ${target}와의 거리가 줄어드는 것 같습니다. 속도를 늦추고 주변을 확인하세요.",
                 ),
                 purpose = MessagePurpose.APPROACH_CAUTION,
                 reason = "pseudo-depth approaching",
@@ -159,7 +159,7 @@ class MessagePolicy(
                 userFacing = UserFacingDepth(
                     stepsAhead = null,
                     messageLevel = MessageLevel.CAUTION,
-                    message = "전방 가까운 $target 가능성. 주의하세요.",
+                    message = "전방 가까운 $target 가능성. 속도를 늦추고 주변을 확인하세요.",
                 ),
                 purpose = MessagePurpose.APPROACH_CAUTION,
                 reason = "metric source confidence below warning threshold",

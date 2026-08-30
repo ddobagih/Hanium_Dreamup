@@ -54,10 +54,17 @@ class PermissionSessionLifecycleStaticTest {
             functionBlock("private fun requestRoute(")
                 .contains("isGatewayNetworkAllowed(reason = \"walking_route\")"),
         )
-        assertTrue(
-            functionBlock("private fun processReportCandidate(")
-                .contains("isGatewayNetworkAllowed(reason = \"report\""),
-        )
+        val process = functionBlock("private fun processReportCandidate(")
+        assertTrue(process.contains("reportQueueStore.enqueue("))
+        assertFalse(process.contains("uploadCall("))
+        val capture = functionBlock("private fun captureReportQueueDrainTriggerBeforeTransition(")
+        assertTrue(capture.contains("AndroidNetworkTransferPolicy.isAllowed("))
+        assertTrue(capture.contains("currentIntegratedConsentBinding() ?: return null"))
+        assertTrue(capture.contains("networkBinding.matches(networkTransport)"))
+        val context = functionBlock("private fun reportQueueDrainContext(")
+        assertTrue(context.contains("trigger.networkBinding.isSameNetworkBinding(currentBinding)"))
+        assertTrue(context.contains("AndroidNetworkTransferPolicy.isAllowed("))
+        assertTrue(context.contains("runtime.networkGeneration == trigger.networkGeneration"))
     }
 
     @Test
@@ -149,14 +156,25 @@ class PermissionSessionLifecycleStaticTest {
     }
 
     @Test
-    fun reportBoundaryRechecksCurrentAndroidPermissions() {
+    fun reportBoundaryChecksPermissionsBeforeFreezingAndUsesGatedQueueDrain() {
         val prepare = functionBlock("private fun prepareReportCandidate(")
         val process = functionBlock("private fun processReportCandidate(")
-        val terminal = functionBlock("private fun isReportUploadTerminalCurrent(")
+        val drain = functionBlock("private fun drainInitialExactReportQueue(")
 
         assertTrue(prepare.contains("reportPermissionsAllowWork()"))
         assertTrue(process.contains("reportPermissionsAllowWork()"))
-        assertTrue(terminal.contains("reportPermissionsAllowWork()"))
+        val permissionGate = process.indexOf("reportPermissionsAllowWork()")
+        val enqueue = process.indexOf("reportQueueStore.enqueue(")
+        assertTrue(
+            permissionGate >= 0 && enqueue > permissionGate,
+        )
+        assertFalse(process.contains("uploadCall("))
+        assertTrue(drain.contains("AndroidReportQueueTransport("))
+        val baseGate = drain.indexOf("if (!context.allRequiredBaseGatesAllowed()) break")
+        val startNext = drain.indexOf("reportQueueDrainCoordinator.startNext(")
+        val execute = drain.indexOf("call.execute()")
+        assertTrue(baseGate >= 0 && startNext > baseGate)
+        assertTrue(execute > startNext)
     }
 
     @Test

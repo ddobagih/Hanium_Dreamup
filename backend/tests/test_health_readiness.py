@@ -35,17 +35,58 @@ def isolate_report_storage_inventory_probe(monkeypatch: pytest.MonkeyPatch) -> N
         "_privacy_hmac_binding_readiness",
         lambda _settings: {"ready": True, "binding": "matched"},
     )
+    monkeypatch.setattr(
+        health_api,
+        "_account_crypto_binding_readiness",
+        lambda _settings: {"ready": True, "binding": "matched"},
+    )
 
 
 async def _navigation_ready(_settings) -> dict[str, object]:
     return {"ready": True, "provider": "tmap_pedestrian", "evidence": "recent_success"}
 
 
+def _isolate_raw_inventory(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    validate=lambda _db, _root, **_kwargs: None,
+):
+    class Transaction:
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+    monkeypatch.setattr(
+        health_api,
+        "SessionLocal",
+        SimpleNamespace(begin=lambda: Transaction()),
+    )
+    monkeypatch.setattr(
+        health_api,
+        "lock_raw_storage_reconciliation_transaction",
+        lambda _db: None,
+    )
+    monkeypatch.setattr(
+        health_api,
+        "validate_raw_storage_database_inventory",
+        validate,
+    )
+    return object()
+
+
 _EXACT_RATE_GROUP_EXPRESSION = (
     "((rate_group)::text = ANY ((ARRAY["
     "'report'::character varying, 'navigation'::character varying, "
     "'detect'::character varying, 'export'::character varying, "
-    "'admin_read'::character varying, 'privacy'::character varying"
+    "'admin_read'::character varying, 'privacy'::character varying, "
+    "'raw_collection'::character varying, "
+    "'account_enrollment_global'::character varying, "
+    "'account_enrollment_ip'::character varying, "
+    "'account_enrollment_email'::character varying, "
+    "'account_authentication_global'::character varying, "
+    "'account_authentication_email'::character varying"
     "])::text[]))"
 )
 
@@ -79,7 +120,7 @@ def test_rate_limit_group_constraint_catalog_contract_is_exact() -> None:
         [
             _rate_group_constraint_row(
                 expression=_EXACT_RATE_GROUP_EXPRESSION.replace(
-                    ", 'privacy'::character varying",
+                    ", 'raw_collection'::character varying",
                     "",
                 )
             )
@@ -636,6 +677,219 @@ def test_upload_readiness_proves_file_and_directory_fsync(tmp_path: Path, monkey
     assert health_api._upload_readiness(tmp_path) == {"ready": True}
     assert len(fsync_calls) == 3
     assert list(tmp_path.iterdir()) == []
+
+
+def test_raw_object_readiness_is_not_required_when_ingest_is_disabled() -> None:
+    settings = SimpleNamespace(raw_ingest_enabled=False, raw_object_dir=None)
+
+    assert health_api._raw_object_readiness(settings, object()) == {
+        "ready": True,
+        "enabled": False,
+    }
+
+
+def test_raw_object_readiness_probes_enabled_private_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = SimpleNamespace(
+        raw_ingest_enabled=True,
+        raw_object_dir=tmp_path,
+        walksafe_environment="test",
+    )
+    probes: list[Path] = []
+    manager = _isolate_raw_inventory(monkeypatch)
+
+    def record_probe(received) -> None:
+        probes.append(received.raw_object_dir)
+
+    monkeypatch.setattr(health_api, "probe_raw_object_directory", record_probe)
+
+    assert health_api._raw_object_readiness(settings, manager) == {
+        "ready": True,
+        "enabled": True,
+        "inventory": "database_and_encrypted_objects_matched",
+    }
+    assert probes == [tmp_path]
+
+
+def test_raw_object_readiness_probes_configured_root_while_ingest_is_disabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = SimpleNamespace(
+        raw_ingest_enabled=False,
+        raw_object_dir=tmp_path,
+        walksafe_environment="test",
+    )
+    probes: list[Path] = []
+    manager = _isolate_raw_inventory(monkeypatch)
+
+    def record_probe(received) -> None:
+        probes.append(received.raw_object_dir)
+
+    monkeypatch.setattr(health_api, "probe_raw_object_directory", record_probe)
+
+    assert health_api._raw_object_readiness(settings, manager) == {
+        "ready": True,
+        "enabled": False,
+        "inventory": "database_and_encrypted_objects_matched",
+    }
+    assert probes == [tmp_path]
+
+
+@pytest.mark.parametrize("drift", ["missing", "mode"])
+def test_raw_object_readiness_rejects_real_post_start_root_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift: str,
+) -> None:
+    root = tmp_path / "raw-objects"
+    if drift == "mode":
+        root.mkdir(mode=0o700)
+        root.chmod(0o755)
+    settings = SimpleNamespace(
+        raw_ingest_enabled=True,
+        raw_object_dir=root,
+        walksafe_environment="test",
+    )
+
+    manager = _isolate_raw_inventory(monkeypatch)
+
+    result = health_api._raw_object_readiness(settings, manager)
+
+    assert result == {
+        "ready": False,
+        "reason": "raw_object_root_unavailable",
+    }
+    assert str(root) not in str(result)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [FileNotFoundError("missing"), PermissionError("denied"), ValueError("acl drift")],
+    ids=["missing", "unwritable", "metadata-drift"],
+)
+def test_raw_object_readiness_normalizes_storage_failures_without_path_leak(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: Exception,
+) -> None:
+    settings = SimpleNamespace(
+        raw_ingest_enabled=True,
+        raw_object_dir=tmp_path / "secret-raw-root",
+        walksafe_environment="test",
+    )
+
+    def fail_probe(_settings) -> None:
+        raise failure
+
+    manager = _isolate_raw_inventory(monkeypatch)
+    monkeypatch.setattr(health_api, "probe_raw_object_directory", fail_probe)
+
+    result = health_api._raw_object_readiness(settings, manager)
+
+    assert result == {
+        "ready": False,
+        "reason": "raw_object_root_unavailable",
+    }
+    assert "secret-raw-root" not in str(result)
+
+
+def test_raw_object_readiness_rejects_post_start_inventory_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = SimpleNamespace(
+        raw_ingest_enabled=False,
+        raw_object_dir=tmp_path,
+        walksafe_environment="test",
+    )
+
+    def fail_inventory(_db, _root, **_kwargs) -> None:
+        raise RuntimeError("secret raw inventory detail")
+
+    manager = _isolate_raw_inventory(monkeypatch, validate=fail_inventory)
+    monkeypatch.setattr(
+        health_api,
+        "probe_raw_object_directory",
+        lambda _settings: None,
+    )
+
+    result = health_api._raw_object_readiness(settings, manager)
+
+    assert result == {
+        "ready": False,
+        "reason": "raw_storage_inventory_invalid",
+    }
+    assert "secret" not in str(result)
+
+
+def test_readiness_returns_503_for_enabled_raw_root_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = SimpleNamespace(
+        raw_ingest_enabled=True,
+        raw_object_dir=Path("/not/exposed"),
+        upload_dir=Path("/unused"),
+        walksafe_source_commit=None,
+    )
+    manager = SimpleNamespace(keyring=SimpleNamespace(slots=()))
+    monkeypatch.setattr(
+        health_api,
+        "_database_and_admin_readiness",
+        lambda _settings: {"ready": True},
+    )
+    monkeypatch.setattr(
+        health_api,
+        "_privacy_hmac_binding_readiness",
+        lambda _settings: {"ready": True},
+    )
+    monkeypatch.setattr(
+        health_api,
+        "_upload_readiness",
+        lambda _path: {"ready": True},
+    )
+    monkeypatch.setattr(
+        health_api,
+        "_raw_object_readiness",
+        lambda _settings, _manager: {
+            "ready": False,
+            "reason": "raw_object_root_unavailable",
+        },
+    )
+    monkeypatch.setattr(
+        health_api,
+        "_detector_readiness",
+        lambda _settings, _warmup: {"ready": True},
+    )
+    monkeypatch.setattr(health_api, "_navigation_readiness", _navigation_ready)
+    monkeypatch.setattr(
+        health_api,
+        "_report_image_encryption_readiness",
+        lambda _settings, _manager: {"ready": True},
+    )
+    monkeypatch.setattr(
+        health_api,
+        "_report_storage_inventory_readiness",
+        lambda _settings, _manager: {"ready": True},
+    )
+    isolated_app = FastAPI()
+    isolated_app.include_router(
+        health_api.create_router(
+            settings,  # type: ignore[arg-type]
+            lambda: None,
+            manager,  # type: ignore[arg-type]
+        )
+    )
+
+    response = ASGITestClient(isolated_app).get("/ready")
+
+    assert response.status_code == 503
+    assert response.json()["checks"]["raw_object_root"] == {
+        "ready": False,
+        "reason": "raw_object_root_unavailable",
+    }
 
 
 @pytest.mark.parametrize(

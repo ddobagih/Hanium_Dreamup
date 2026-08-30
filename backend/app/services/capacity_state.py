@@ -469,6 +469,35 @@ def _filesystem_used_percent(upload_dir: Path) -> Decimal:
     return Decimal(total_blocks - available_blocks) * Decimal(100) / Decimal(total_blocks)
 
 
+def require_same_capacity_filesystem(upload_dir: Path, raw_object_dir: Path) -> None:
+    """Ensure one local monitor observes report and raw object consumption."""
+
+    devices: list[int] = []
+    for path in (upload_dir, raw_object_dir):
+        before = os.stat(path, follow_symlinks=False)
+        descriptor = os.open(
+            path,
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+        )
+        try:
+            opened = os.fstat(descriptor)
+            after = os.stat(path, follow_symlinks=False)
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+                or (opened.st_dev, opened.st_ino) != (after.st_dev, after.st_ino)
+            ):
+                raise ValueError("capacity filesystem directory changed")
+            devices.append(opened.st_dev)
+        finally:
+            os.close(descriptor)
+    if devices[0] != devices[1]:
+        raise ValueError("capacity monitor and raw object root must share a filesystem")
+
+
 def _rfc3339_utc(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
@@ -484,4 +513,5 @@ __all__ = [
     "CapacityStateUnavailable",
     "FilesystemCapacityMonitor",
     "capacity_state_from_environment",
+    "require_same_capacity_filesystem",
 ]

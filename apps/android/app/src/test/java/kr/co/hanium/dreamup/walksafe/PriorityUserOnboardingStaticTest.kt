@@ -142,8 +142,7 @@ class PriorityUserOnboardingStaticTest {
         assertTrue(bindActor.contains("clearGatewaySession(logoutRemote = true)"))
         assertTrue(reporter.contains("priorityUserOnboardingPolicy.accountBlockReason() == null"))
         assertTrue(source.contains("priorityUserOnboardingActorId == session.actorId"))
-        val gatewayLogin = source.substringAfter("val session = gatewaySessionClient.login")
-            .substringBefore("} catch (error: GatewaySessionHttpException)")
+        val gatewayLogin = functionBlock("private fun onGatewaySessionButtonClicked()")
         assertInOrder(
             gatewayLogin,
             "priorityUserOnboardingActorId == session.actorId",

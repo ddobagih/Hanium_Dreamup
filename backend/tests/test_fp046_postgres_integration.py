@@ -22,6 +22,11 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from asgi_client import ASGITestClient
+from backend.app.account_schemas import (
+    AccountAuthenticateRequestV1,
+    AccountCreateRequestV1,
+    EmailOtpEnrollmentRequestV1,
+)
 from backend.app.main import app
 from backend.app.main import settings as app_settings
 from backend.app.api.health import _privacy_hmac_binding_readiness
@@ -33,16 +38,25 @@ from backend.app.models import (
     AccountDeletionReceipt,
     AccountDeletionRequest,
     AccountDeletionTombstone,
+    AccountEnrollment,
     Base,
     PrivacyConsentEvent,
     PrivacyHmacKeyBinding,
+    RawCollection,
+    RawCollectionChunk,
+    RawCollectionObject,
     Report,
     ReportImageObject,
+    SignupConsentReceipt,
+    UserAccount,
 )
 from backend.app.schemas import (
     AccountDeletionRequestV2,
     AccountDeletionStatusV2,
     DeviceDeletionEvidenceV2,
+    RawCollectionCommitV1,
+    RawCollectionManifestV1,
+    raw_collection_manifest_sha256,
 )
 from backend.app.field_test_security import (
     FieldTestAccess,
@@ -50,6 +64,8 @@ from backend.app.field_test_security import (
     create_privacy_deletion_assertion,
 )
 import backend.app.services.privacy_lifecycle as privacy_lifecycle
+from backend.app.services.capacity_state import CapacityLevel
+from backend.app.services.accounts import AccountService, AccountServiceError, utc_now
 from backend.app.services.privacy_lifecycle import (
     DELETION_ITEM_KEYS,
     EXTERNAL_ITEM_KEYS,
@@ -71,7 +87,13 @@ from backend.app.services.privacy_lifecycle import (
     transition_deletion_item,
     bind_or_verify_privacy_hmac_key,
 )
+from backend.app.services.raw_collection_ingest import RawCollectionAdmission
+from backend.app.services.raw_collection_storage import (
+    RawCollectionStorage,
+    pending_raw_journal_directory,
+)
 from scripts.account_deletion_worker import (
+    _atomic_write as write_account_deletion_worker_journal,
     _prepare_roots as prepare_account_deletion_worker_roots,
     process_request as process_account_deletion_request,
     reconcile_journal as reconcile_account_deletion_journal,
@@ -307,7 +329,7 @@ def test_fp046_schema_migration_constraints_and_append_only_evidence() -> None:
         return table is not None and table.name in privacy_tables
 
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "202608250002"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "202608290011"
         assert compare_metadata(
             MigrationContext.configure(
                 connection,
@@ -1068,7 +1090,7 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
     object_path.chmod(0o600)
     tmp_path.chmod(0o700)
 
-    _record_consent(SessionFactory, actor_id=actor_id)
+    consent = _record_consent(SessionFactory, actor_id=actor_id)
     with SessionFactory.begin() as db:
         db.add(
             Report(
@@ -1106,6 +1128,156 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
                 content_type="image/jpeg",
             )
         )
+
+    raw_content = (b"walksafe-worker-raw-" + suffix.encode("ascii")) * 3
+    raw_digest = hashlib.sha256(raw_content).hexdigest()
+    raw_collection_id = uuid.uuid4()
+    raw_object_id = uuid.uuid4()
+    raw_walk_id = uuid.uuid4()
+    raw_manifest_value: dict[str, object] = {
+        "schema_version": "walksafe.raw-collection-manifest.v1",
+        "collection_id": str(raw_collection_id),
+        "walk_id": str(raw_walk_id),
+        "segment_id": str(uuid.uuid4()),
+        "purpose": "GENERAL_RAW",
+        "captured_started_at": "2026-08-29T00:00:00Z",
+        "captured_ended_at": "2026-08-29T00:00:05Z",
+        "consent_receipt_sha256": consent.event.receipt_sha256,
+        "object_count": 1,
+        "chunk_count": 1,
+        "total_bytes": len(raw_content),
+        "objects": [
+            {
+                "object_id": str(raw_object_id),
+                "kind": "SENSOR",
+                "content_type": "application/octet-stream",
+                "size_bytes": len(raw_content),
+                "sha256": raw_digest,
+                "chunks": [
+                    {
+                        "index": 0,
+                        "size_bytes": len(raw_content),
+                        "sha256": raw_digest,
+                    }
+                ],
+            }
+        ],
+    }
+    raw_manifest_value["manifest_sha256"] = raw_collection_manifest_sha256(
+        raw_manifest_value
+    )
+    raw_manifest = RawCollectionManifestV1.model_validate(raw_manifest_value)
+    raw_admission = RawCollectionAdmission(
+        actor_id=actor_id,
+        account_generation=1,
+        privacy_subject_hmac=subject,
+        purpose="GENERAL_RAW",
+        consent_receipt_sha256=consent.event.receipt_sha256,
+    )
+    raw_object_dir = tmp_path / "raw-objects"
+    raw_object_dir.mkdir(mode=0o700)
+
+    class WorkerRawKeyManager:
+        def synchronize(self, _db) -> None:
+            return None
+
+        def encryption_slot(self) -> SimpleNamespace:
+            return SimpleNamespace(key_id="worker-raw-key-v1", material=bytes(range(32)))
+
+        def decryption_key(self, key_id: str) -> bytes:
+            assert key_id == "worker-raw-key-v1"
+            return bytes(range(32))
+
+    raw_storage = RawCollectionStorage(
+        raw_object_dir=raw_object_dir,
+        privacy_hmac_secret=PRIVACY_SECRET,
+        key_manager=WorkerRawKeyManager(),  # type: ignore[arg-type]
+        capacity_state=SimpleNamespace(
+            current=lambda: SimpleNamespace(level=CapacityLevel.NORMAL)
+        ),
+    )
+    with SessionFactory() as db:
+        raw_storage.put_manifest(db, raw_admission, raw_manifest)
+    with SessionFactory() as db:
+        raw_storage.put_chunk(
+            db,
+            raw_admission,
+            collection_id=raw_manifest.collection_id,
+            object_id=raw_manifest.objects[0].object_id,
+            index=0,
+            walk_id=raw_manifest.walk_id,
+            manifest_sha256=raw_manifest.manifest_sha256,
+            content=raw_content,
+            content_sha256=raw_digest,
+        )
+    raw_commit = RawCollectionCommitV1.model_validate(
+        {
+            "schema_version": "walksafe.raw-collection-commit.v1",
+            "collection_id": raw_manifest.collection_id,
+            "manifest_sha256": raw_manifest.manifest_sha256,
+            "object_count": 1,
+            "chunk_count": 1,
+            "total_bytes": len(raw_content),
+        }
+    )
+    with SessionFactory() as db:
+        raw_receipt = raw_storage.commit(
+            db,
+            raw_admission,
+            raw_commit,
+            walk_id=raw_manifest.walk_id,
+        )
+    with SessionFactory() as db:
+        raw_chunk = db.scalar(
+            select(RawCollectionChunk).where(
+                RawCollectionChunk.collection_id == raw_collection_id
+            )
+        )
+        assert raw_chunk is not None
+        assert raw_chunk.storage_name is not None
+        raw_object_path = raw_object_dir / raw_chunk.storage_name
+    assert raw_object_path.is_file()
+
+    pending_content = b"walksafe-worker-pending-raw-" + suffix.encode("ascii")
+    pending_digest = hashlib.sha256(pending_content).hexdigest()
+    pending_collection_id = uuid.uuid4()
+    pending_object_id = uuid.uuid4()
+    pending_manifest_value: dict[str, object] = {
+        "schema_version": "walksafe.raw-collection-manifest.v1",
+        "collection_id": str(pending_collection_id),
+        "walk_id": str(uuid.uuid4()),
+        "segment_id": str(uuid.uuid4()),
+        "purpose": "GENERAL_RAW",
+        "captured_started_at": "2026-08-29T00:00:10Z",
+        "captured_ended_at": "2026-08-29T00:00:15Z",
+        "consent_receipt_sha256": consent.event.receipt_sha256,
+        "object_count": 1,
+        "chunk_count": 1,
+        "total_bytes": len(pending_content),
+        "objects": [
+            {
+                "object_id": str(pending_object_id),
+                "kind": "SENSOR",
+                "content_type": "application/octet-stream",
+                "size_bytes": len(pending_content),
+                "sha256": pending_digest,
+                "chunks": [
+                    {
+                        "index": 0,
+                        "size_bytes": len(pending_content),
+                        "sha256": pending_digest,
+                    }
+                ],
+            }
+        ],
+    }
+    pending_manifest_value["manifest_sha256"] = raw_collection_manifest_sha256(
+        pending_manifest_value
+    )
+    pending_manifest = RawCollectionManifestV1.model_validate(pending_manifest_value)
+    with SessionFactory() as db:
+        raw_storage.put_manifest(db, raw_admission, pending_manifest)
+
     accepted = _accept(
         SessionFactory,
         actor_id=actor_id,
@@ -1181,11 +1353,69 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
         worker_engine = create_engine(worker_url, pool_pre_ping=True)
         WorkerSessionFactory = sessionmaker(worker_engine, expire_on_commit=False)
 
-        class SimulatedCrash(BaseException):
+        legacy_journal_path = (
+            journal_root
+            / "journals"
+            / f"{hashlib.sha256(request_id.encode('ascii')).hexdigest()}.json"
+        )
+        write_account_deletion_worker_journal(
+            legacy_journal_path,
+            {
+                "schema_version": "walksafe.account-deletion-worker-journal.v1",
+                "request_id": request_id,
+                "privacy_subject_hmac": subject,
+                "account_generation": 1,
+                "state": "PREPARED",
+                "prepared_at": datetime.now(timezone.utc).isoformat(),
+                "deleted_at": None,
+                "report_count": 1,
+                "objects": [],
+            },
+        )
+        with pytest.raises(
+            RuntimeError,
+            match="legacy deletion journal cannot omit a raw collection inventory",
+        ):
+            reconcile_account_deletion_journal(
+                WorkerSessionFactory,
+                journal_root.resolve(),
+                legacy_journal_path,
+            )
+        legacy_journal_path.unlink()
+
+        raw_journal_dir = pending_raw_journal_directory(raw_object_dir)
+        raw_journal_dir.mkdir(mode=0o700)
+        pending_raw_journal = raw_journal_dir / (
+            f"{pending_collection_id}.{pending_object_id}.0.wsrc.json"
+        )
+        write_account_deletion_worker_journal(
+            pending_raw_journal,
+            {"state": "PENDING_DATABASE_COMMIT"},
+        )
+        with pytest.raises(
+            RuntimeError,
+            match="raw storage has an unreconciled write journal",
+        ):
+            process_account_deletion_request(
+                WorkerSessionFactory,
+                request_id=request_id,
+                upload_dir=upload_dir.resolve(),
+                raw_object_dir=raw_object_dir.resolve(),
+                root=journal_root.resolve(),
+            )
+        assert object_path.is_file()
+        assert raw_object_path.is_file()
+        assert pending_raw_journal.is_file()
+        with WorkerSessionFactory() as db:
+            assert db.get(Report, report_id) is not None
+            assert db.get(RawCollection, pending_collection_id) is not None
+        pending_raw_journal.unlink()
+
+        class SimulatedCrash(Exception):
             pass
 
         def crash_after_database_commit(point: str) -> None:
-            if point == "after_database_commit":
+            if point == "after_database_commit_before_ack":
                 raise SimulatedCrash
 
         try:
@@ -1194,12 +1424,14 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
                     WorkerSessionFactory,
                     request_id=request_id,
                     upload_dir=upload_dir.resolve(),
+                    raw_object_dir=raw_object_dir.resolve(),
                     root=journal_root.resolve(),
                     fault=crash_after_database_commit,
                 )
         finally:
             worker_engine.dispose()
         assert not object_path.exists()
+        assert not raw_object_path.exists()
         journal_path = next((journal_root / "journals").glob("*.json"))
 
         worker_engine = create_engine(worker_url, pool_pre_ping=True)
@@ -1223,12 +1455,72 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
         assert repeated.overall_status == "COMPLETED"
         assert repeated.completion_receipt_sha256 is not None
         assert not object_path.exists()
+        assert not raw_object_path.exists()
         manifest_path = journal_root / "manifests" / f"{request_id}.json"
         assert manifest_path.is_file()
         assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == manifest_digest
+        deletion_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert deletion_manifest["schema_version"] == (
+            "walksafe.account-deletion-server-manifest.v3"
+        )
+        assert deletion_manifest["credential_account_count"] == 0
+        assert deletion_manifest["account_enrollment_count"] == 0
+        assert deletion_manifest["retained_evidence"] == {
+            "account_deletion_ledger": "RETAINED",
+            "signup_consent_receipt_count": 0,
+        }
+        assert deletion_manifest["raw_collection_count"] == 2
+        raw_deletions = {
+            item["collection_id"]: item
+            for item in deletion_manifest["raw_collections"]
+        }
+        assert raw_deletions[str(raw_collection_id)] == {
+            "collection_id": str(raw_collection_id),
+            "object_id": str(raw_object_id),
+            "chunk_index": 0,
+            "manifest_sha256": raw_manifest.manifest_sha256,
+            "consent_receipt_sha256": consent.event.receipt_sha256,
+            "state": "COMMITTED",
+            "retention_class": "RAW_ORIGINAL_180D",
+            "committed_at": raw_receipt.committed_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "retention_expires_at": raw_receipt.retention_expires_at.strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+            "receipt_sha256": raw_receipt.receipt_sha256,
+            "storage_name": raw_chunk.storage_name,
+            "envelope_sha256": raw_chunk.envelope_sha256,
+            "envelope_size": raw_chunk.envelope_size,
+        }
+        assert raw_deletions[str(pending_collection_id)] == {
+            "collection_id": str(pending_collection_id),
+            "object_id": str(pending_object_id),
+            "chunk_index": 0,
+            "manifest_sha256": pending_manifest.manifest_sha256,
+            "consent_receipt_sha256": consent.event.receipt_sha256,
+            "state": "MANIFEST_ACCEPTED",
+            "retention_class": "RAW_ORIGINAL_180D",
+            "committed_at": None,
+            "retention_expires_at": None,
+            "receipt_sha256": None,
+            "storage_name": None,
+            "envelope_sha256": None,
+            "envelope_size": None,
+        }
         with SessionFactory() as db:
             assert db.get(Report, report_id) is None
             assert db.get(ReportImageObject, report_id) is None
+            assert db.get(RawCollection, raw_collection_id) is None
+            assert db.get(RawCollection, pending_collection_id) is None
+            assert db.scalar(
+                select(RawCollectionObject).where(
+                    RawCollectionObject.collection_id == raw_collection_id
+                )
+            ) is None
+            assert db.scalar(
+                select(RawCollectionChunk).where(
+                    RawCollectionChunk.collection_id == raw_collection_id
+                )
+            ) is None
             assert db.scalar(
                 select(AccountDeletionTombstone).where(
                     AccountDeletionTombstone.privacy_subject_hmac == subject,
@@ -1267,6 +1559,58 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
                     text(f"REVOKE walksafe_account_deletion_worker FROM {role_name}")
                 )
                 connection.execute(text(f"DROP ROLE {role_name}"))
+        engine.dispose()
+
+
+def test_fp046_account_deletion_worker_reconciles_legacy_empty_inventory(
+    tmp_path: Path,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex[:12]
+    actor_id = f"worker-legacy.{suffix}"
+    request_id = f"delete_worker_legacy_{suffix}"
+    subject = privacy_subject_hmac(actor_id, 1, PRIVACY_SECRET)
+    _record_consent(SessionFactory, actor_id=actor_id)
+    _accept(SessionFactory, actor_id=actor_id, request_id=request_id)
+    journal_root = tmp_path / "worker"
+    tmp_path.chmod(0o700)
+    prepare_account_deletion_worker_roots(journal_root.resolve())
+    journal_path = (
+        journal_root
+        / "journals"
+        / f"{hashlib.sha256(request_id.encode('ascii')).hexdigest()}.json"
+    )
+    write_account_deletion_worker_journal(
+        journal_path,
+        {
+            "schema_version": "walksafe.account-deletion-worker-journal.v1",
+            "request_id": request_id,
+            "privacy_subject_hmac": subject,
+            "account_generation": 1,
+            "state": "PREPARED",
+            "prepared_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "deleted_at": None,
+            "report_count": 0,
+            "objects": [],
+        },
+    )
+
+    try:
+        with _worker_session_factory(engine, suffix) as WorkerSessionFactory:
+            manifest_digest = reconcile_account_deletion_journal(
+                WorkerSessionFactory,
+                journal_root.resolve(),
+                journal_path,
+            )
+        manifest_path = journal_root / "manifests" / f"{request_id}.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == manifest_digest
+        assert manifest["schema_version"] == (
+            "walksafe.account-deletion-server-manifest.v1"
+        )
+        assert "raw_collection_count" not in manifest
+        assert "raw_collections" not in manifest
+    finally:
         engine.dispose()
 
 
@@ -1440,6 +1784,29 @@ def test_fp046_account_deletion_worker_role_rejects_privilege_escalation() -> No
         with engine.begin() as connection:
             connection.execute(
                 text(f"REVOKE DELETE ON TABLE public.reports FROM {role_name}")
+            )
+
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "GRANT DELETE ON TABLE public.raw_collection_objects "
+                    f"TO {role_name}"
+                )
+            )
+        raw_child_delete_engine = create_engine(worker_url, pool_pre_ping=True)
+        try:
+            with Session(raw_child_delete_engine) as db:
+                with pytest.raises(PrivacyLifecycleError) as raw_child_delete:
+                    assert_account_deletion_worker_database_role(db)
+            assert raw_child_delete.value.code == "account_deletion_worker_role_unsafe"
+        finally:
+            raw_child_delete_engine.dispose()
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "REVOKE DELETE ON TABLE public.raw_collection_objects "
+                    f"FROM {role_name}"
+                )
             )
 
         with engine.begin() as connection:
@@ -1686,6 +2053,246 @@ def test_fp046_report_ingest_and_tombstone_use_one_actor_generation_lock() -> No
             lock_report_ingest_transaction(db, subject, 1)
     assert post_tombstone.value.code == "account_generation_tombstoned"
     engine.dispose()
+
+
+def test_fresh_email_account_deletion_fences_auth_and_preserves_postcommit_reenrollment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    service = AccountService(app_settings)
+    suffix = uuid.uuid4().hex[:12]
+    email = f"delete-fresh-{suffix}@example.com"
+    issued_at = utc_now()
+    enrollment_request = EmailOtpEnrollmentRequestV1.model_validate(
+        {
+            "schema_version": "walksafe.account-enrollment-email-otp.v1",
+            "email": email,
+            "date_of_birth": "2000-01-01",
+            "request_id": f"fresh_enrollment_{suffix}",
+        }
+    )
+    with SessionFactory() as db:
+        issued = service.issue_email_otp(db, enrollment_request, now=issued_at)
+    assert issued.delivery is not None
+    with SessionFactory() as db:
+        service.mark_delivery_sent(db, issued.delivery, now=issued_at)
+    create_payload = AccountCreateRequestV1.model_validate(
+        {
+            "schema_version": "walksafe.account-create.v1",
+            "enrollment_handle": issued.response.enrollment_handle,
+            "otp_code": issued.delivery.code,
+            "password": "correct horse battery",
+            "consent": {
+                "schema_version": "walksafe.signup-consent.v1",
+                "document_versions": dict(
+                    app_settings.account_signup_document_versions
+                ),
+                "selections": {
+                    "terms_of_service": True,
+                    "privacy_notice": True,
+                    "location_terms": True,
+                },
+            },
+        }
+    )
+    with SessionFactory() as db:
+        created = service.create_account(db, create_payload, now=issued_at)
+
+    resend_at = issued_at + timedelta(
+        seconds=app_settings.account_otp_resend_cooldown_seconds + 1
+    )
+    with SessionFactory() as db:
+        post_signup_issue = service.issue_email_otp(
+            db,
+            enrollment_request.model_copy(
+                update={"request_id": f"fresh_existing_{suffix}"}
+            ),
+            now=resend_at,
+        )
+    assert post_signup_issue.delivery is not None
+    with SessionFactory() as db:
+        service.mark_delivery_sent(db, post_signup_issue.delivery, now=resend_at)
+        account = db.scalar(
+            select(UserAccount).where(UserAccount.actor_id == created.actor_id)
+        )
+        assert account is not None
+        account_id = account.id
+        email_lookup_hmac = account.email_lookup_hmac
+
+    verification_started = threading.Event()
+    deletion_committed = threading.Event()
+
+    def paused_password_verification(_password: str, _encoded: str) -> bool:
+        verification_started.set()
+        assert deletion_committed.wait(timeout=10)
+        return True
+
+    monkeypatch.setattr(
+        "backend.app.services.accounts.verify_account_password",
+        paused_password_verification,
+    )
+
+    def racing_authentication():
+        try:
+            with SessionFactory() as db:
+                return service.authenticate(
+                    db,
+                    AccountAuthenticateRequestV1(
+                        schema_version="walksafe.account-authenticate.v1",
+                        email=email,
+                        password="correct horse battery",
+                    ),
+                )
+        except AccountServiceError as exc:
+            return exc
+
+    request_id = f"delete_fresh_account_{suffix}"
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending_auth = pool.submit(racing_authentication)
+        assert verification_started.wait(timeout=10)
+        with SessionFactory() as db:
+            accepted = accept_account_deletion(
+                db,
+                payload=_request(request_id),
+                actor_id=created.actor_id,
+                account_generation=created.account_generation,
+                access_pre_digest="a" * 64,
+                tombstone_id=None,
+                secret=PRIVACY_SECRET,
+            )
+        deletion_committed.set()
+        raced_auth = pending_auth.result(timeout=10)
+    assert isinstance(raced_auth, AccountServiceError)
+    assert raced_auth.code == "account_authentication_failed"
+    assert accepted.created is True
+    device_item = next(
+        item
+        for item in accepted.status.items
+        if item.key == "device_untransmitted_data"
+    )
+    assert device_item.status == "NOT_APPLICABLE"
+    assert (
+        device_item.disposition_basis
+        == "no_synchronized_installations_at_acceptance"
+    )
+
+    with SessionFactory() as db:
+        disabled = db.get(UserAccount, account_id)
+        assert disabled is not None
+        assert disabled.status == "DISABLED"
+        assert disabled.auth_epoch == 2
+        replayed = accept_account_deletion(
+            db,
+            payload=_request(request_id),
+            actor_id=created.actor_id,
+            account_generation=created.account_generation,
+            access_pre_digest="a" * 64,
+            tombstone_id=accepted.status.tombstone_id,
+            secret=PRIVACY_SECRET,
+        )
+        assert replayed.created is False
+        assert db.get(UserAccount, account_id).auth_epoch == 2
+
+    tmp_path.chmod(0o700)
+    upload_dir = tmp_path / "uploads"
+    raw_object_dir = tmp_path / "raw-objects"
+    journal_root = tmp_path / "worker"
+    upload_dir.mkdir(mode=0o700)
+    raw_object_dir.mkdir(mode=0o700)
+    prepare_account_deletion_worker_roots(journal_root.resolve())
+    postcommit_enrollment_ids: list[uuid.UUID] = []
+
+    class SimulatedCrash(Exception):
+        pass
+
+    def lose_database_commit_ack(stage: str) -> None:
+        if stage == "after_database_commit_before_ack":
+            raise SimulatedCrash
+
+    try:
+        with _worker_session_factory(engine, suffix) as WorkerSessionFactory:
+            with pytest.raises(SimulatedCrash):
+                process_account_deletion_request(
+                    WorkerSessionFactory,
+                    request_id=request_id,
+                    upload_dir=upload_dir.resolve(),
+                    raw_object_dir=raw_object_dir.resolve(),
+                    root=journal_root.resolve(),
+                    fault=lose_database_commit_ack,
+                )
+
+        journal_path = next((journal_root / "journals").glob("*.json"))
+        prepared_journal = json.loads(journal_path.read_text(encoding="utf-8"))
+        assert prepared_journal["schema_version"] == (
+            "walksafe.account-deletion-worker-journal.v4"
+        )
+        assert prepared_journal["state"] == "PREPARED"
+        assert prepared_journal["account_enrollment_count"] == 2
+        assert len(prepared_journal["account_enrollment_ids"]) == 2
+        assert "email_lookup_hmac" not in prepared_journal
+
+        reenroll_at = resend_at + timedelta(
+            seconds=app_settings.account_otp_resend_cooldown_seconds + 1
+        )
+        with SessionFactory() as db:
+            reenrollment = service.issue_email_otp(
+                db,
+                enrollment_request.model_copy(
+                    update={"request_id": f"fresh_reenrollment_{suffix}"}
+                ),
+                now=reenroll_at,
+            )
+            assert reenrollment.delivery is not None
+            service.mark_delivery_sent(db, reenrollment.delivery, now=reenroll_at)
+            postcommit_enrollment_ids.append(reenrollment.delivery.enrollment_id)
+
+        with _worker_session_factory(engine, suffix) as WorkerSessionFactory:
+            reconcile_account_deletion_journal(
+                WorkerSessionFactory,
+                journal_root.resolve(),
+                journal_path,
+            )
+
+        manifest_text = (
+            journal_root / "manifests" / f"{request_id}.json"
+        ).read_text(encoding="utf-8")
+        manifest = json.loads(manifest_text)
+        assert manifest["schema_version"] == (
+            "walksafe.account-deletion-server-manifest.v3"
+        )
+        assert manifest["credential_account_count"] == 1
+        assert manifest["account_enrollment_count"] == 2
+        assert manifest["retained_evidence"] == {
+            "account_deletion_ledger": "RETAINED",
+            "signup_consent_receipt_count": 1,
+        }
+        assert "account_enrollment_ids" not in manifest_text
+        assert email_lookup_hmac not in manifest_text
+        assert len(postcommit_enrollment_ids) == 1
+        assert not journal_path.exists()
+        with SessionFactory() as db:
+            assert db.get(UserAccount, account_id) is None
+            remaining_enrollment_ids = list(db.scalars(
+                select(AccountEnrollment.id).where(
+                    AccountEnrollment.email_lookup_hmac == email_lookup_hmac
+                )
+            ).all())
+            assert remaining_enrollment_ids == postcommit_enrollment_ids
+            assert db.scalar(
+                select(SignupConsentReceipt).where(
+                    SignupConsentReceipt.account_id == account_id
+                )
+            ) is not None
+            assert db.get(AccountDeletionRequest, request_id) is not None
+            assert db.scalar(
+                select(AccountDeletionTombstone).where(
+                    AccountDeletionTombstone.privacy_subject_hmac
+                    == privacy_subject_hmac(created.actor_id, 1, PRIVACY_SECRET)
+                )
+            ) is not None
+    finally:
+        engine.dispose()
 
 
 def test_fp046_status_refreshes_rows_after_waiting_for_subject_lock(
@@ -2381,7 +2988,7 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
             "account_deletion_items",
             "account_deletion_device_targets",
         }
-        assert len(app_table_privileges) == 30
+        assert len(app_table_privileges) == 37
         assert {
             table_name
             for table_name, row in app_table_privileges.items()
@@ -2389,6 +2996,7 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
         } == {
             "admin_security_recovery_codes",
             "admin_security_recovery_transactions",
+            "report_user_request_status_events",
             "walksafe_recovery_custody_capabilities",
             "walksafe_recovery_custody_markers",
         }

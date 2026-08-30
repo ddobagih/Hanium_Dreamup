@@ -7,9 +7,13 @@ metadata expectations.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+import hashlib
+import hmac
+import json
 import re
-from typing import Annotated, Any, Dict, List, Literal, Optional
+import unicodedata
+from typing import Annotated, Any, Dict, List, Literal, Mapping, Optional
 import uuid
 
 from pydantic import (
@@ -17,6 +21,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StrictBool,
     StringConstraints,
     field_serializer,
     field_validator,
@@ -47,8 +52,34 @@ ReportCoordinateGateStatus = Literal["pass", "pending", "failed", "gps_missing"]
 ReportReviewFlag = Annotated[str, StringConstraints(min_length=1, max_length=64, pattern=r"^[a-z0-9_:-]+$")]
 ReportOriginalAccessPurpose = Literal["report_review", "security_incident", "data_subject_request"]
 ReportReviewDecisionValue = Literal["APPROVED", "REJECTED", "DUPLICATE"]
+ReportUserStatus = Literal["RECEIVED", "INSTITUTION_SUBMITTED", "REJECTED", "RESOLVED"]
+ReportUserRequestType = Literal["CORRECTION", "DELETE"]
+ReportUserRequestStatus = Literal["RECEIVED", "ACKNOWLEDGED", "RESOLVED", "REJECTED"]
+ReportDeletionState = Literal["PENDING", "LEGAL_HOLD", "REJECTED", "DELETED"]
+ReportContentCategoryHint = Literal[
+    "SIDEWALK_OBSTRUCTION",
+    "ROAD_DAMAGE",
+    "ACCESSIBILITY_BARRIER",
+    "OTHER",
+]
 ReportInstitutionDeliveryStatus = Literal["SUBMITTED", "ACKNOWLEDGED", "RESOLVED", "FAILED"]
+AdminAuditEventType = Literal["SECURITY", "READ", "STATUS", "REVIEW", "EXPORT", "DELIVERY"]
+AdminAuditOutcome = Literal["SUCCEEDED", "DENIED", "ERROR"]
+CriticalIncidentSeverity = Literal["CRITICAL"]
+CriticalIncidentStatus = Literal["OPEN", "ACKNOWLEDGED", "RESOLVED", "REOPENED"]
+CriticalIncidentMutationState = Literal["ACKNOWLEDGED", "RESOLVED", "REOPENED"]
+CriticalIncidentEventType = Literal["OPENED", "ACKNOWLEDGED", "RESOLVED", "REOPENED"]
+CriticalIncidentReasonCode = Literal[
+    "USER_SAFETY_RISK",
+    "PERSONAL_DATA_BREACH",
+    "DELETION_INTEGRITY_FAILURE",
+    "CORE_SERVICE_TOTAL_OUTAGE",
+    "IRREVERSIBLE_DATA_LOSS",
+]
 ReportReviewReason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+ReportUserVisibleReason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+ReportUserRequestText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+ReportUserRequestResponse = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 ReportInstitution = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 ReportDeliveryChannel = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
 ReportDeliveryRecipient = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
@@ -309,6 +340,16 @@ class ReportStatusUpdate(BaseModel):
     expected_updated_at: Optional[AwareDatetime] = None
 
 
+class ReportTransportReceiptV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    marker: Literal["DATABASE_AND_ENCRYPTED_IMAGE_STORE"]
+    report_id: uuid.UUID
+    persistence_marker: uuid.UUID
+    payload_sha256: Sha256LowerHex
+    payload_bytes: int = Field(gt=0)
+
+
 class ReportResponse(BaseModel):
     id: str
     status: ReportStatus
@@ -329,6 +370,453 @@ class ReportResponse(BaseModel):
     duplicate_count: int = Field(default=0, ge=0)
     created_at: datetime
     updated_at: datetime
+    transport_receipt: Optional[ReportTransportReceiptV1] = None
+
+
+class ReportTransportStatusV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    persistence_state: Literal["PERSISTED"]
+    user_status: Literal["RECEIVED", "IN_REVIEW", "COMPLETED"]
+    transport_receipt: ReportTransportReceiptV1
+
+
+class ReportUserRequestCreateV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    client_request_id: uuid.UUID
+    request_type: ReportUserRequestType
+    request_text: ReportUserRequestText
+
+    @field_validator("client_request_id", mode="before")
+    @classmethod
+    def require_canonical_client_request_id(cls, value: object) -> object:
+        if isinstance(value, uuid.UUID):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("client_request_id must be a canonical UUID")
+        try:
+            parsed = uuid.UUID(value)
+        except ValueError as exc:
+            raise ValueError("client_request_id must be a canonical UUID") from exc
+        if str(parsed) != value:
+            raise ValueError("client_request_id must be a canonical UUID")
+        return parsed
+
+
+class ReportContentCorrectionRequestV1(BaseModel):
+    """Structured patch; an explicit null clears a field and omission preserves it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=0, strict=True)
+    idempotency_key: uuid.UUID
+    user_description: str | None = None
+    category_hint: ReportContentCategoryHint | None = None
+
+    @field_validator("idempotency_key", mode="before")
+    @classmethod
+    def require_canonical_idempotency_key(cls, value: object) -> object:
+        if isinstance(value, uuid.UUID):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("idempotency_key must be a canonical UUID")
+        try:
+            parsed = uuid.UUID(value)
+        except ValueError as exc:
+            raise ValueError("idempotency_key must be a canonical UUID") from exc
+        if str(parsed) != value:
+            raise ValueError("idempotency_key must be a canonical UUID")
+        return parsed
+
+    @field_validator("user_description", mode="before")
+    @classmethod
+    def canonicalize_user_description(cls, value: object) -> object:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("user_description must be text or null")
+        normalized = unicodedata.normalize("NFC", value)
+        if any(unicodedata.category(char).startswith("C") for char in normalized):
+            raise ValueError("user_description cannot contain control characters")
+        normalized = " ".join(normalized.split())
+        if not 1 <= len(normalized) <= 500:
+            raise ValueError("user_description must contain 1 to 500 characters")
+        return normalized
+
+    @model_validator(mode="after")
+    def require_structured_patch(self) -> "ReportContentCorrectionRequestV1":
+        if not self.model_fields_set.intersection(
+            {"user_description", "category_hint"}
+        ):
+            raise ValueError("at least one correction field is required")
+        return self
+
+
+class ReportContentCurrentV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.report-content-current.v1"]
+    report_id: uuid.UUID
+    revision: int = Field(ge=0)
+    content_sha256: Sha256LowerHex
+    user_description: str | None = Field(default=None, min_length=1, max_length=500)
+    category_hint: ReportContentCategoryHint | None
+    corrected_at: AwareDatetime | None
+
+
+class ReportContentRevisionV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.report-content-revision.v1"]
+    report_id: uuid.UUID
+    revision: int = Field(ge=1)
+    expected_revision: int = Field(ge=0)
+    idempotency_key: uuid.UUID
+    content_sha256: Sha256LowerHex
+    user_description: str | None = Field(default=None, min_length=1, max_length=500)
+    category_hint: ReportContentCategoryHint | None
+    corrected_at: AwareDatetime
+
+
+class ReportUserRequestSummaryV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: uuid.UUID
+    request_type: ReportUserRequestType
+    status: ReportUserRequestStatus
+    status_version: int = Field(ge=1)
+    public_response: str | None = Field(default=None, min_length=1, max_length=500)
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
+
+class ReportDeletionStatusV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.report-deletion-status.v1"]
+    request_id: uuid.UUID
+    report_id: uuid.UUID
+    state: ReportDeletionState
+    request_status_version: int = Field(ge=1)
+    external_copy_count: int = Field(ge=0)
+    updated_at: AwareDatetime
+
+
+class UserReportSummaryV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    report_id: uuid.UUID
+    created_at: AwareDatetime
+    user_status: ReportUserStatus
+    public_rejection_reason: str | None = Field(
+        default=None, min_length=1, max_length=500
+    )
+    latest_request: ReportUserRequestSummaryV1 | None
+
+
+class UserReportListPageV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.user-report-list.v1"]
+    items: List[UserReportSummaryV1] = Field(max_length=100)
+    next_cursor: str | None = Field(default=None, min_length=1, max_length=1024)
+
+
+class UserReportDetailV1(UserReportSummaryV1):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.user-report-detail.v1"]
+
+
+class AdminReportUserRequestSummaryV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: uuid.UUID
+    report_id: uuid.UUID
+    request_type: ReportUserRequestType
+    status: ReportUserRequestStatus
+    status_version: int = Field(ge=1)
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
+
+class AdminReportUserRequestListPageV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-report-request-list.v1"]
+    items: List[AdminReportUserRequestSummaryV1] = Field(max_length=100)
+    next_cursor: str | None = Field(default=None, min_length=1, max_length=1024)
+
+
+class AdminReportUserRequestDetailV1(AdminReportUserRequestSummaryV1):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-report-request-detail.v1"]
+    request_text: ReportUserRequestText
+    public_response: str | None = Field(default=None, min_length=1, max_length=500)
+    internal_note: str | None = Field(default=None, min_length=1, max_length=500)
+
+
+class AdminReportUserRequestStatusUpdateV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: ReportUserRequestStatus
+    expected_version: int = Field(ge=1, strict=True)
+    public_response: ReportUserRequestResponse | None = None
+    internal_note: ReportUserRequestResponse | None = None
+
+
+class AdminReportUserRequestStatusV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-report-request-status.v1"]
+    request_id: uuid.UUID
+    report_id: uuid.UUID
+    status: ReportUserRequestStatus
+    status_version: int = Field(ge=1)
+    allowed_next_statuses: List[ReportUserRequestStatus] = Field(max_length=2)
+    public_response: str | None = Field(default=None, min_length=1, max_length=500)
+    updated_at: AwareDatetime
+
+
+class AdminReportSummaryV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: uuid.UUID
+    status: ReportStatus
+    status_version: int = Field(default=1, ge=1)
+    class_name: ClassName
+    confidence: float = Field(ge=0, le=1, allow_inf_nan=False)
+    location_quality: LocationQuality
+    duplicate_count: int = Field(ge=0)
+    captured_at: AwareDatetime
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
+
+class AdminReportListPageV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-report-list.v1"]
+    items: List[AdminReportSummaryV1] = Field(max_length=100)
+    next_cursor: Optional[str] = Field(default=None, min_length=1, max_length=1024)
+
+
+class AdminReportReviewSummaryV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    revision: int = Field(ge=1)
+    decision: ReportReviewDecisionValue
+    user_visible_reason: str | None = Field(default=None, min_length=1, max_length=500)
+    duplicate_of_report_id: uuid.UUID | None
+    location_reviewed: bool
+    photo_reviewed: bool
+    privacy_reviewed: bool
+    decided_at: AwareDatetime
+
+
+class AdminReportDeliverySummaryV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    revision: int = Field(ge=1)
+    package_revision: int | None = Field(default=None, ge=1)
+    status: ReportInstitutionDeliveryStatus
+    external_receipt_present: bool
+    evidence_present: bool
+    observed_at: AwareDatetime
+    recorded_at: AwareDatetime
+
+
+class AdminReportCapabilitiesV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    review_decisions_path: str = Field(min_length=1, max_length=512)
+    deliveries_path: str = Field(min_length=1, max_length=512)
+    original_access_grants_path: str = Field(min_length=1, max_length=512)
+    status_path: str | None = Field(default=None, min_length=1, max_length=512)
+    delivery_packages_path: str | None = Field(default=None, min_length=1, max_length=512)
+
+
+class AdminReportDetailV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-report-detail.v1"]
+    id: uuid.UUID
+    status: ReportStatus
+    status_version: int = Field(default=1, ge=1)
+    allowed_next_statuses: List[ReportStatus] = Field(default_factory=list, max_length=2)
+    class_name: ClassName
+    confidence: float = Field(ge=0, le=1, allow_inf_nan=False)
+    location_quality: LocationQuality
+    captured_at: AwareDatetime
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+    current_review: AdminReportReviewSummaryV1 | None
+    current_delivery: AdminReportDeliverySummaryV1 | None
+    capabilities: AdminReportCapabilitiesV1
+
+
+class AdminReportStatusUpdateV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: ReportStatus
+    expected_version: int = Field(ge=1, strict=True)
+    note: Optional[str] = Field(default=None, max_length=500)
+    resolution_reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class AdminReportStatusV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-report-status.v1"]
+    id: uuid.UUID
+    status: ReportStatus
+    status_version: int = Field(ge=1)
+    allowed_next_statuses: List[ReportStatus] = Field(max_length=2)
+    updated_at: AwareDatetime
+
+
+class AdminIncidentSummaryV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    incident_id: uuid.UUID
+    severity: CriticalIncidentSeverity
+    status: CriticalIncidentStatus
+    status_version: int = Field(ge=1, le=256)
+    reason_code: CriticalIncidentReasonCode
+    summary: str = Field(min_length=1, max_length=200)
+    started_at: AwareDatetime
+    detected_at: AwareDatetime
+    updated_at: AwareDatetime
+
+
+class AdminIncidentListPageV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-incident-list.v1"]
+    items: List[AdminIncidentSummaryV1] = Field(max_length=100)
+    next_cursor: str | None = Field(min_length=1, max_length=1024)
+
+
+class AdminIncidentEventV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: uuid.UUID
+    revision: int = Field(ge=1, le=256)
+    event_type: CriticalIncidentEventType
+    previous_state: CriticalIncidentStatus | None
+    next_state: CriticalIncidentStatus
+    reason: str = Field(min_length=8, max_length=500)
+    observation: str = Field(min_length=8, max_length=500)
+    evidence_sha256: Sha256LowerHex
+    observed_at: AwareDatetime
+    recorded_at: AwareDatetime
+    actor_id: str | None = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$",
+    )
+
+
+class AdminIncidentDetailV1(AdminIncidentSummaryV1):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-incident-detail.v1"]
+    allowed_next_states: List[CriticalIncidentStatus] = Field(
+        min_length=1,
+        max_length=1,
+    )
+    events: List[AdminIncidentEventV1] = Field(min_length=1, max_length=256)
+
+
+class AdminIncidentStatusUpdateV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    next_state: CriticalIncidentMutationState
+    expected_version: int = Field(ge=1, le=256, strict=True)
+    idempotency_key: uuid.UUID
+    reason: str = Field(min_length=8, max_length=500)
+    observation: str = Field(min_length=8, max_length=500)
+    evidence_sha256: Sha256LowerHex
+
+    @field_validator("idempotency_key", mode="before")
+    @classmethod
+    def require_canonical_idempotency_key(cls, value: object) -> object:
+        if isinstance(value, uuid.UUID):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("idempotency_key must be a canonical UUID")
+        try:
+            parsed = uuid.UUID(value)
+        except ValueError as exc:
+            raise ValueError("idempotency_key must be a canonical UUID") from exc
+        if str(parsed) != value:
+            raise ValueError("idempotency_key must be a canonical UUID")
+        return parsed
+
+    @field_validator("reason", "observation")
+    @classmethod
+    def normalize_bounded_incident_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not 8 <= len(normalized) <= 500 or any(
+            ord(character) < 0x20 or ord(character) == 0x7F
+            for character in normalized
+        ):
+            raise ValueError("incident text must contain 8 to 500 safe characters")
+        return normalized
+
+
+class AdminIncidentStatusV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-incident-status.v1"]
+    incident_id: uuid.UUID
+    status: CriticalIncidentStatus
+    status_version: int = Field(ge=1, le=256)
+    allowed_next_states: List[CriticalIncidentStatus] = Field(
+        min_length=1,
+        max_length=1,
+    )
+    updated_at: AwareDatetime
+
+
+class AdminReportDeliveryPackageV1(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    schema_version: Literal["walksafe.admin-report-delivery-package.v1"]
+    package_id: uuid.UUID
+    report_id: uuid.UUID
+    review_decision_id: uuid.UUID
+    revision: int = Field(ge=1)
+    export_audit_id: uuid.UUID
+    csv_sha256: Sha256LowerHex
+    manifest_sha256: Sha256LowerHex
+    package_sha256: Sha256LowerHex
+    generated_at: AwareDatetime
+
+
+class AdminAuditEventV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: str = Field(min_length=1, max_length=160)
+    event_type: AdminAuditEventType
+    action: str = Field(min_length=1, max_length=64)
+    outcome: AdminAuditOutcome
+    actor_id: str | None = Field(default=None, max_length=64)
+    resource_type: str = Field(min_length=1, max_length=32)
+    resource_id: str = Field(min_length=1, max_length=160)
+    occurred_at: AwareDatetime
+    correlation_id: uuid.UUID | None
+
+
+class AdminAuditListPageV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-audit-list.v1"]
+    items: List[AdminAuditEventV1] = Field(max_length=100)
+    next_cursor: str | None = Field(default=None, min_length=1, max_length=1024)
 
 
 class ReportOriginalAccessGrantRequest(BaseModel):
@@ -360,14 +848,18 @@ class ReportReviewDecisionRequest(BaseModel):
 
     decision: ReportReviewDecisionValue
     reason: ReportReviewReason
+    user_visible_reason: ReportUserVisibleReason | None = None
     duplicate_of_report_id: uuid.UUID | None
     location_reviewed: bool = Field(strict=True)
     photo_reviewed: bool = Field(strict=True)
     privacy_reviewed: bool = Field(strict=True)
+    content_revision: int = Field(default=0, ge=0, strict=True)
 
     @model_validator(mode="after")
     def validate_decision_evidence(self) -> "ReportReviewDecisionRequest":
         if self.decision == "APPROVED":
+            if self.user_visible_reason is not None:
+                raise ValueError("APPROVED decisions cannot have a user-visible reason")
             if self.duplicate_of_report_id is not None:
                 raise ValueError("APPROVED decisions cannot reference a duplicate report")
             if not (
@@ -381,6 +873,8 @@ class ReportReviewDecisionRequest(BaseModel):
                 raise ValueError("DUPLICATE decisions require duplicate_of_report_id")
         elif self.duplicate_of_report_id is not None:
             raise ValueError("REJECTED decisions cannot reference a duplicate report")
+        if self.decision in {"REJECTED", "DUPLICATE"} and self.user_visible_reason is None:
+            raise ValueError("REJECTED and DUPLICATE decisions require a user-visible reason")
         return self
 
 
@@ -390,8 +884,10 @@ class ReportReviewDecisionResponse(BaseModel):
     id: uuid.UUID
     report_id: uuid.UUID
     revision: int = Field(ge=1)
+    content_revision: int = Field(ge=0)
     decision: ReportReviewDecisionValue
     reason: str
+    user_visible_reason: str | None
     duplicate_of_report_id: uuid.UUID | None
     location_reviewed: bool
     photo_reviewed: bool
@@ -417,6 +913,7 @@ class ReportInstitutionDeliveryRequest(BaseModel):
     observed_at: AwareDatetime = Field(
         json_schema_extra={"pattern": _RFC3339_UTC_PATTERN.pattern}
     )
+    package_revision: int = Field(ge=1, strict=True)
     expected_revision: int = Field(ge=0, strict=True)
     idempotency_key: uuid.UUID
 
@@ -462,6 +959,8 @@ class ReportInstitutionDeliveryResponse(BaseModel):
     id: uuid.UUID
     report_id: uuid.UUID
     review_decision_id: uuid.UUID
+    package_id: uuid.UUID | None
+    package_revision: int | None = Field(default=None, ge=1)
     revision: int = Field(ge=1)
     institution: str
     channel: str
@@ -605,22 +1104,22 @@ class AccountDeletionRequestV2(BaseModel):
     confirmation: Literal["DELETE_MY_ACCOUNT"]
 
 
-PRIVACY_CONSENT_POLICY_VERSION = "FP-013-1.0.0"
+PRIVACY_CONSENT_POLICY_VERSION = "FP-013-1.1.0"
 PRIVACY_CONSENT_ITEM_VERSIONS = {
-    "raw_source_collection": "FP-013-RAW-1.0.0",
-    "automatic_reporting": "FP-013-AUTO-1.0.0",
+    "raw_source_collection": "FP-013-RAW-1.1.0",
+    "automatic_reporting": "FP-013-AUTO-1.1.0",
     "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
-    "training_reuse": "FP-013-TRAINING-1.0.0",
+    "training_reuse": "FP-013-TRAINING-1.1.0",
 }
 
 
 class PrivacyConsentItemVersionsV2(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    raw_source_collection: Literal["FP-013-RAW-1.0.0"]
-    automatic_reporting: Literal["FP-013-AUTO-1.0.0"]
+    raw_source_collection: Literal["FP-013-RAW-1.1.0"]
+    automatic_reporting: Literal["FP-013-AUTO-1.1.0"]
     mobile_network_transfer: Literal["FP-013-MOBILE-1.0.0"]
-    training_reuse: Literal["FP-013-TRAINING-1.0.0"]
+    training_reuse: Literal["FP-013-TRAINING-1.1.0"]
 
 
 class PrivacyConsentEventV2(BaseModel):
@@ -630,12 +1129,68 @@ class PrivacyConsentEventV2(BaseModel):
     installation_id: PrivacyEvidenceId
     request_id: AccountDeletionRequestId
     client_revision: int = Field(ge=1, le=9_223_372_036_854_775_807)
-    policy_version: Literal["FP-013-1.0.0"]
+    policy_version: Literal["FP-013-1.1.0"]
     item_versions: PrivacyConsentItemVersionsV2
-    raw_source_collection: bool
-    automatic_reporting: bool
-    mobile_network_transfer: bool
-    training_reuse: bool
+    raw_source_collection: StrictBool
+    automatic_reporting: StrictBool
+    mobile_network_transfer: StrictBool
+    training_reuse: StrictBool
+    expected_previous_backend_receipt_sha256: Optional[Sha256LowerHex]
+
+
+class PrivacyConsentSelectionsV2(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    raw_source_collection: StrictBool
+    automatic_reporting: StrictBool
+    mobile_network_transfer: StrictBool
+    training_reuse: StrictBool
+
+
+class PrivacyConsentBootstrapV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.integrated-consent-bootstrap.v1"]
+    status: Literal["READY", "RECONSENT_REQUIRED"]
+    source: Literal["CURRENT_CONSENT", "SIGNUP_CONSENT", "NONE"]
+    installation_id: PrivacyEvidenceId
+    policy_version: Literal["FP-013-1.1.0"]
+    item_versions: PrivacyConsentItemVersionsV2
+    client_revision_floor: int = Field(ge=0, le=9_223_372_036_854_775_807)
+    selections: Optional[PrivacyConsentSelectionsV2]
+    source_receipt_sha256: Optional[Sha256LowerHex]
+    expected_previous_backend_receipt_sha256: Optional[Sha256LowerHex]
+
+    @model_validator(mode="after")
+    def require_consistent_source(self) -> "PrivacyConsentBootstrapV1":
+        if (
+            self.expected_previous_backend_receipt_sha256 is None
+            and self.client_revision_floor != 0
+        ):
+            raise ValueError("a nonzero installation floor requires a previous event")
+        if self.status == "RECONSENT_REQUIRED":
+            if (
+                self.source != "NONE"
+                or self.selections is not None
+                or self.source_receipt_sha256 is not None
+            ):
+                raise ValueError("reconsent-required bootstrap cannot expose a source")
+            return self
+        if (
+            self.source == "NONE"
+            or self.selections is None
+            or self.source_receipt_sha256 is None
+        ):
+            raise ValueError("ready bootstrap requires an exact consent source")
+        if self.source == "SIGNUP_CONSENT":
+            if self.expected_previous_backend_receipt_sha256 is not None:
+                raise ValueError("signup bootstrap cannot have a previous backend event")
+        elif not hmac.compare_digest(
+            self.source_receipt_sha256,
+            self.expected_previous_backend_receipt_sha256 or "",
+        ):
+            raise ValueError("current bootstrap receipts must match")
+        return self
 
 
 class PrivacyConsentReceiptV2(BaseModel):
@@ -791,3 +1346,640 @@ class AccountDeletionStatusV2(BaseModel):
         if self.updated_at < self.accepted_at:
             raise ValueError("updated_at cannot precede accepted_at")
         return self
+
+
+# EPIC-07 B1a freezes the public raw-ingest contract before any persistence
+# implementation is enabled. These limits are deliberately fixed contract
+# values rather than operator-tunable knobs.
+RAW_COLLECTION_MAX_OBJECTS = 64
+RAW_COLLECTION_MAX_CHUNKS = 2_048
+RAW_CHUNK_MAX_BYTES = 8 * 1024 * 1024
+RAW_COLLECTION_MAX_TOTAL_BYTES = RAW_COLLECTION_MAX_CHUNKS * RAW_CHUNK_MAX_BYTES
+RAW_RETENTION_DAYS = 180
+RAW_QUARANTINE_DAYS = 14
+RAW_CANONICAL_UUID_PATTERN = (
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+    r"[0-9a-f]{4}-[0-9a-f]{12}$"
+)
+_RAW_UTC_PATTERN = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"
+)
+_RAW_CONTENT_TYPE_PATTERN = (
+    r"^[a-z0-9][a-z0-9!#$&^_.+-]{0,63}/"
+    r"[a-z0-9][a-z0-9!#$&^_.+-]{0,63}$"
+)
+
+RawCanonicalUuid = Annotated[
+    str,
+    StringConstraints(min_length=36, max_length=36, pattern=RAW_CANONICAL_UUID_PATTERN),
+]
+RawCollectionPurpose = Literal["GENERAL_RAW", "AUTO_REPORT"]
+RawCollectionObjectKind = Literal[
+    "VIDEO",
+    "AUDIO",
+    "EXACT_LOCATION",
+    "SENSOR",
+    "ROUTE",
+    "DETECTION",
+    "REPORT",
+    "PERFORMANCE",
+]
+RawCollectionState = Literal[
+    "MANIFEST_ACCEPTED",
+    "RECEIVING",
+    "READY_TO_COMMIT",
+    "COMMITTED",
+    "QUARANTINED",
+]
+RawContentType = Annotated[
+    str,
+    StringConstraints(
+        min_length=3,
+        max_length=128,
+        pattern=_RAW_CONTENT_TYPE_PATTERN,
+    ),
+]
+
+
+def _raw_contract_sha256(
+    domain: bytes,
+    payload: Mapping[str, object] | BaseModel,
+    *,
+    digest_field: str,
+) -> str:
+    value = (
+        payload.model_dump(mode="json")
+        if isinstance(payload, BaseModel)
+        else dict(payload)
+    )
+    value.pop(digest_field, None)
+    canonical = json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(domain + canonical).hexdigest()
+
+
+def raw_collection_manifest_sha256(
+    payload: Mapping[str, object] | BaseModel,
+) -> str:
+    return _raw_contract_sha256(
+        b"walksafe/raw-collection-manifest/v1\0",
+        payload,
+        digest_field="manifest_sha256",
+    )
+
+
+def raw_collection_receipt_sha256(
+    payload: Mapping[str, object] | BaseModel,
+) -> str:
+    return _raw_contract_sha256(
+        b"walksafe/raw-collection-receipt/v1\0",
+        payload,
+        digest_field="receipt_sha256",
+    )
+
+
+def raw_collection_receipt_v2_sha256(
+    payload: Mapping[str, object] | BaseModel,
+) -> str:
+    return _raw_contract_sha256(
+        b"walksafe/raw-collection-receipt/v2\0",
+        payload,
+        digest_field="receipt_sha256",
+    )
+
+
+def raw_collection_commit_sha256(
+    payload: Mapping[str, object] | BaseModel,
+) -> str:
+    return _raw_contract_sha256(
+        b"walksafe/raw-collection-commit/v1\0",
+        payload,
+        digest_field="commit_sha256",
+    )
+
+
+class RawCollectionChunkV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    index: int = Field(ge=0, lt=RAW_COLLECTION_MAX_CHUNKS)
+    size_bytes: int = Field(ge=1, le=RAW_CHUNK_MAX_BYTES)
+    sha256: Sha256LowerHex
+
+
+class RawCollectionErrorDetailV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    code: str = Field(min_length=1, max_length=128)
+    message: str = Field(min_length=1, max_length=500)
+    max_bytes: Optional[int] = Field(default=None, ge=1)
+
+
+class RawCollectionErrorResponseV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    detail: RawCollectionErrorDetailV1
+
+
+class RawCollectionObjectV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    object_id: RawCanonicalUuid
+    kind: RawCollectionObjectKind
+    content_type: RawContentType
+    size_bytes: int = Field(ge=1, le=RAW_COLLECTION_MAX_TOTAL_BYTES)
+    sha256: Sha256LowerHex
+    chunks: List[RawCollectionChunkV1] = Field(
+        min_length=1,
+        max_length=RAW_COLLECTION_MAX_CHUNKS,
+    )
+
+    @model_validator(mode="after")
+    def require_canonical_chunks(self) -> "RawCollectionObjectV1":
+        indices = tuple(chunk.index for chunk in self.chunks)
+        if indices != tuple(range(len(self.chunks))):
+            raise ValueError("chunks must be contiguous and ordered from index 0")
+        if sum(chunk.size_bytes for chunk in self.chunks) != self.size_bytes:
+            raise ValueError("chunk sizes must equal the declared object size")
+        return self
+
+
+class RawCollectionManifestV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    schema_version: Literal["walksafe.raw-collection-manifest.v1"]
+    collection_id: RawCanonicalUuid
+    walk_id: RawCanonicalUuid
+    segment_id: RawCanonicalUuid
+    purpose: RawCollectionPurpose
+    captured_started_at: AwareDatetime = Field(
+        strict=False,
+        json_schema_extra={"pattern": _RAW_UTC_PATTERN.pattern}
+    )
+    captured_ended_at: AwareDatetime = Field(
+        strict=False,
+        json_schema_extra={"pattern": _RAW_UTC_PATTERN.pattern}
+    )
+    consent_receipt_sha256: Sha256LowerHex
+    object_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_OBJECTS)
+    chunk_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_CHUNKS)
+    total_bytes: int = Field(ge=1, le=RAW_COLLECTION_MAX_TOTAL_BYTES)
+    objects: List[RawCollectionObjectV1] = Field(
+        min_length=1,
+        max_length=RAW_COLLECTION_MAX_OBJECTS,
+    )
+    manifest_sha256: Sha256LowerHex
+
+    @field_validator("captured_started_at", "captured_ended_at", mode="before")
+    @classmethod
+    def require_canonical_utc_text(cls, value: object) -> object:
+        if type(value) is not str or _RAW_UTC_PATTERN.fullmatch(value) is None:
+            raise ValueError("raw collection timestamps must be canonical UTC text ending in Z")
+        return value
+
+    @field_serializer("captured_started_at", "captured_ended_at")
+    def canonical_capture_time(self, value: datetime) -> str:
+        return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    @model_validator(mode="after")
+    def require_canonical_inventory(self) -> "RawCollectionManifestV1":
+        if self.captured_ended_at < self.captured_started_at:
+            raise ValueError("captured_ended_at cannot precede captured_started_at")
+        object_ids = tuple(item.object_id for item in self.objects)
+        if object_ids != tuple(sorted(object_ids)) or len(set(object_ids)) != len(object_ids):
+            raise ValueError("objects must have unique IDs in canonical lexical order")
+        observed_chunks = sum(len(item.chunks) for item in self.objects)
+        observed_bytes = sum(item.size_bytes for item in self.objects)
+        if self.object_count != len(self.objects):
+            raise ValueError("object_count does not match objects")
+        if self.chunk_count != observed_chunks:
+            raise ValueError("chunk_count does not match objects")
+        if self.total_bytes != observed_bytes:
+            raise ValueError("total_bytes does not match objects")
+        expected = raw_collection_manifest_sha256(self)
+        if not hmac.compare_digest(self.manifest_sha256, expected):
+            raise ValueError("manifest_sha256 does not match the canonical manifest")
+        return self
+
+
+class RawCollectionCommitV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    schema_version: Literal["walksafe.raw-collection-commit.v1"]
+    collection_id: RawCanonicalUuid
+    manifest_sha256: Sha256LowerHex
+    object_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_OBJECTS)
+    chunk_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_CHUNKS)
+    total_bytes: int = Field(ge=1, le=RAW_COLLECTION_MAX_TOTAL_BYTES)
+
+
+class RawCollectionMissingRangeV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    start: int = Field(ge=0, lt=RAW_COLLECTION_MAX_CHUNKS)
+    end: int = Field(ge=0, lt=RAW_COLLECTION_MAX_CHUNKS)
+
+    @model_validator(mode="after")
+    def require_ordered_range(self) -> "RawCollectionMissingRangeV1":
+        if self.end < self.start:
+            raise ValueError("missing range end cannot precede start")
+        return self
+
+
+class RawCollectionObjectStatusV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    object_id: RawCanonicalUuid
+    kind: RawCollectionObjectKind
+    sha256: Sha256LowerHex
+    chunk_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_CHUNKS)
+    received_chunk_count: int = Field(ge=0, le=RAW_COLLECTION_MAX_CHUNKS)
+    size_bytes: int = Field(ge=1, le=RAW_COLLECTION_MAX_TOTAL_BYTES)
+    received_bytes: int = Field(ge=0, le=RAW_COLLECTION_MAX_TOTAL_BYTES)
+    missing_ranges: List[RawCollectionMissingRangeV1] = Field(
+        max_length=RAW_COLLECTION_MAX_CHUNKS
+    )
+
+    @model_validator(mode="after")
+    def require_compact_missing_ranges(self) -> "RawCollectionObjectStatusV1":
+        if self.received_chunk_count > self.chunk_count or self.received_bytes > self.size_bytes:
+            raise ValueError("received counters cannot exceed declared counters")
+        if (self.received_chunk_count == 0) != (self.received_bytes == 0):
+            raise ValueError("zero received chunks and bytes must agree")
+        if 0 < self.received_chunk_count < self.chunk_count and not (
+            0 < self.received_bytes < self.size_bytes
+        ):
+            raise ValueError("partial chunk progress requires partial byte progress")
+        previous_end = -2
+        missing_count = 0
+        for item in self.missing_ranges:
+            if item.end >= self.chunk_count:
+                raise ValueError("missing ranges must stay within object chunk_count")
+            if item.start <= previous_end + 1:
+                raise ValueError("missing ranges must be ordered, disjoint, and compact")
+            previous_end = item.end
+            missing_count += item.end - item.start + 1
+        if missing_count != self.chunk_count - self.received_chunk_count:
+            raise ValueError("missing ranges do not match received_chunk_count")
+        complete = self.received_chunk_count == self.chunk_count
+        if complete != (self.received_bytes == self.size_bytes):
+            raise ValueError("complete chunk and byte counters must agree")
+        return self
+
+
+class RawCollectionReceiptObjectV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    object_id: RawCanonicalUuid
+    kind: RawCollectionObjectKind
+    size_bytes: int = Field(ge=1, le=RAW_COLLECTION_MAX_TOTAL_BYTES)
+    sha256: Sha256LowerHex
+    chunk_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_CHUNKS)
+
+
+class RawCollectionReceiptV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    schema_version: Literal["walksafe.raw-collection-receipt.v1"]
+    collection_id: RawCanonicalUuid
+    manifest_sha256: Sha256LowerHex
+    purpose: RawCollectionPurpose
+    persistence_marker: Literal["DATABASE_AND_ENCRYPTED_CHUNK_STORE"]
+    object_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_OBJECTS)
+    chunk_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_CHUNKS)
+    total_bytes: int = Field(ge=1, le=RAW_COLLECTION_MAX_TOTAL_BYTES)
+    objects: List[RawCollectionReceiptObjectV1] = Field(
+        min_length=1,
+        max_length=RAW_COLLECTION_MAX_OBJECTS,
+    )
+    retention_class: Literal["RAW_ORIGINAL_180D"]
+    committed_at: AwareDatetime = Field(
+        strict=False,
+        json_schema_extra={"pattern": _RAW_UTC_PATTERN.pattern}
+    )
+    retention_expires_at: AwareDatetime = Field(
+        strict=False,
+        json_schema_extra={"pattern": _RAW_UTC_PATTERN.pattern}
+    )
+    receipt_sha256: Sha256LowerHex
+
+    @field_validator("committed_at", "retention_expires_at", mode="before")
+    @classmethod
+    def require_canonical_receipt_time(cls, value: object) -> object:
+        if type(value) is not str or _RAW_UTC_PATTERN.fullmatch(value) is None:
+            raise ValueError("receipt timestamps must be canonical UTC text ending in Z")
+        return value
+
+    @field_serializer("committed_at", "retention_expires_at")
+    def canonical_receipt_time(self, value: datetime) -> str:
+        return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    @model_validator(mode="after")
+    def require_receipt_inventory(self) -> "RawCollectionReceiptV1":
+        object_ids = tuple(item.object_id for item in self.objects)
+        if object_ids != tuple(sorted(object_ids)) or len(set(object_ids)) != len(object_ids):
+            raise ValueError("receipt objects must have unique IDs in canonical lexical order")
+        if self.object_count != len(self.objects):
+            raise ValueError("receipt object_count does not match objects")
+        if self.chunk_count != sum(item.chunk_count for item in self.objects):
+            raise ValueError("receipt chunk_count does not match objects")
+        if self.total_bytes != sum(item.size_bytes for item in self.objects):
+            raise ValueError("receipt total_bytes does not match objects")
+        if self.retention_expires_at != self.committed_at + timedelta(days=RAW_RETENTION_DAYS):
+            raise ValueError("raw receipt retention must be exactly 180 days")
+        expected = raw_collection_receipt_sha256(self)
+        if not hmac.compare_digest(self.receipt_sha256, expected):
+            raise ValueError("receipt_sha256 does not match the canonical receipt")
+        return self
+
+
+class RawCollectionReceiptV2(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    schema_version: Literal["walksafe.raw-collection-receipt.v2"]
+    collection_id: RawCanonicalUuid
+    manifest_sha256: Sha256LowerHex
+    purpose: RawCollectionPurpose
+    persistence_marker: Literal["DATABASE_AND_ENCRYPTED_CHUNK_STORE"]
+    object_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_OBJECTS)
+    chunk_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_CHUNKS)
+    total_bytes: int = Field(ge=1, le=RAW_COLLECTION_MAX_TOTAL_BYTES)
+    objects: List[RawCollectionReceiptObjectV1] = Field(min_length=1, max_length=RAW_COLLECTION_MAX_OBJECTS)
+    retention_class: Literal["RAW_QUARANTINE_14D"]
+    committed_at: AwareDatetime = Field(strict=False, json_schema_extra={"pattern": _RAW_UTC_PATTERN.pattern})
+    quarantine_expires_at: AwareDatetime = Field(strict=False, json_schema_extra={"pattern": _RAW_UTC_PATTERN.pattern})
+    receipt_sha256: Sha256LowerHex
+
+    @field_validator("committed_at", "quarantine_expires_at", mode="before")
+    @classmethod
+    def require_canonical_receipt_time(cls, value: object) -> object:
+        if type(value) is not str or _RAW_UTC_PATTERN.fullmatch(value) is None:
+            raise ValueError("receipt timestamps must be canonical UTC text ending in Z")
+        return value
+
+    @field_serializer("committed_at", "quarantine_expires_at")
+    def canonical_receipt_time(self, value: datetime) -> str:
+        return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    @model_validator(mode="after")
+    def require_receipt_inventory(self) -> "RawCollectionReceiptV2":
+        object_ids = tuple(item.object_id for item in self.objects)
+        if object_ids != tuple(sorted(object_ids)) or len(set(object_ids)) != len(object_ids):
+            raise ValueError("receipt objects must have unique IDs in canonical lexical order")
+        if self.object_count != len(self.objects):
+            raise ValueError("receipt object_count does not match objects")
+        if self.chunk_count != sum(item.chunk_count for item in self.objects):
+            raise ValueError("receipt chunk_count does not match objects")
+        if self.total_bytes != sum(item.size_bytes for item in self.objects):
+            raise ValueError("receipt total_bytes does not match objects")
+        if self.quarantine_expires_at != self.committed_at + timedelta(days=RAW_QUARANTINE_DAYS):
+            raise ValueError("raw quarantine must be exactly 14 days")
+        expected = raw_collection_receipt_v2_sha256(self)
+        if not hmac.compare_digest(self.receipt_sha256, expected):
+            raise ValueError("receipt_sha256 does not match the canonical receipt")
+        return self
+
+
+class RawCollectionStatusV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    schema_version: Literal["walksafe.raw-collection-status.v1"]
+    collection_id: RawCanonicalUuid
+    manifest_sha256: Sha256LowerHex
+    purpose: RawCollectionPurpose
+    state: RawCollectionState
+    object_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_OBJECTS)
+    chunk_count: int = Field(ge=1, le=RAW_COLLECTION_MAX_CHUNKS)
+    total_bytes: int = Field(ge=1, le=RAW_COLLECTION_MAX_TOTAL_BYTES)
+    received_chunk_count: int = Field(ge=0, le=RAW_COLLECTION_MAX_CHUNKS)
+    received_bytes: int = Field(ge=0, le=RAW_COLLECTION_MAX_TOTAL_BYTES)
+    objects: List[RawCollectionObjectStatusV1] = Field(
+        min_length=1,
+        max_length=RAW_COLLECTION_MAX_OBJECTS,
+    )
+    receipt: Optional[RawCollectionReceiptV1 | RawCollectionReceiptV2]
+
+    @model_validator(mode="after")
+    def require_status_inventory(self) -> "RawCollectionStatusV1":
+        object_ids = tuple(item.object_id for item in self.objects)
+        if object_ids != tuple(sorted(object_ids)) or len(set(object_ids)) != len(object_ids):
+            raise ValueError("status objects must have unique IDs in canonical lexical order")
+        if self.object_count != len(self.objects):
+            raise ValueError("status object_count does not match objects")
+        if self.chunk_count != sum(item.chunk_count for item in self.objects):
+            raise ValueError("status chunk_count does not match objects")
+        if self.total_bytes != sum(item.size_bytes for item in self.objects):
+            raise ValueError("status total_bytes does not match objects")
+        if self.received_chunk_count != sum(
+            item.received_chunk_count for item in self.objects
+        ):
+            raise ValueError("status received_chunk_count does not match objects")
+        if self.received_bytes != sum(item.received_bytes for item in self.objects):
+            raise ValueError("status received_bytes does not match objects")
+        complete = (
+            self.received_chunk_count == self.chunk_count
+            and self.received_bytes == self.total_bytes
+        )
+        if self.state in {"READY_TO_COMMIT", "COMMITTED", "QUARANTINED"} and not complete:
+            raise ValueError("ready and committed states require a complete inventory")
+        if self.state == "MANIFEST_ACCEPTED" and (
+            self.received_chunk_count != 0 or self.received_bytes != 0
+        ):
+            raise ValueError("manifest-accepted state cannot contain received bytes")
+        if self.state == "RECEIVING" and (
+            self.received_chunk_count == 0 or complete
+        ):
+            raise ValueError("receiving state requires a partial inventory")
+        if (self.state in {"COMMITTED", "QUARANTINED"}) != (self.receipt is not None):
+            raise ValueError("only terminal committed status contains a receipt")
+        if self.state == "COMMITTED" and not isinstance(self.receipt, RawCollectionReceiptV1):
+            raise ValueError("legacy COMMITTED status requires receipt v1")
+        if self.state == "QUARANTINED" and not isinstance(self.receipt, RawCollectionReceiptV2):
+            raise ValueError("QUARANTINED status requires receipt v2")
+        if self.receipt is not None and (
+            self.receipt.collection_id != self.collection_id
+            or self.receipt.manifest_sha256 != self.manifest_sha256
+            or self.receipt.purpose != self.purpose
+            or self.receipt.object_count != self.object_count
+            or self.receipt.chunk_count != self.chunk_count
+            or self.receipt.total_bytes != self.total_bytes
+        ):
+            raise ValueError("receipt does not bind the status inventory")
+        if self.receipt is not None:
+            status_inventory = tuple(
+                (
+                    item.object_id,
+                    item.kind,
+                    item.size_bytes,
+                    item.sha256,
+                    item.chunk_count,
+                )
+                for item in self.objects
+            )
+            receipt_inventory = tuple(
+                (
+                    item.object_id,
+                    item.kind,
+                    item.size_bytes,
+                    item.sha256,
+                    item.chunk_count,
+                )
+                for item in self.receipt.objects
+            )
+            if receipt_inventory != status_inventory:
+                raise ValueError("receipt objects do not bind the status objects")
+        return self
+
+
+class RawCollectionChunkAckV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    schema_version: Literal["walksafe.raw-collection-chunk-ack.v1"]
+    collection_id: RawCanonicalUuid
+    object_id: RawCanonicalUuid
+    index: int = Field(ge=0, lt=RAW_COLLECTION_MAX_CHUNKS)
+    size_bytes: int = Field(ge=1, le=RAW_CHUNK_MAX_BYTES)
+    sha256: Sha256LowerHex
+    state: RawCollectionState
+    stored_at: AwareDatetime = Field(
+        strict=False,
+        json_schema_extra={"pattern": _RAW_UTC_PATTERN.pattern}
+    )
+
+    @field_validator("stored_at", mode="before")
+    @classmethod
+    def require_canonical_stored_time(cls, value: object) -> object:
+        if type(value) is not str or _RAW_UTC_PATTERN.fullmatch(value) is None:
+            raise ValueError("stored_at must be canonical UTC text ending in Z")
+        return value
+
+    @field_serializer("stored_at")
+    def canonical_stored_at(self, value: datetime) -> str:
+        return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class RawPurposeDecisionRequestV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scope: Literal["REPORT", "TRAINING"]
+    decision: Literal["APPROVED", "REJECTED"]
+    expected_revision: int = Field(ge=0)
+    idempotency_key: uuid.UUID
+    reason: str = Field(min_length=1, max_length=500)
+    training_consent_receipt_sha256: Optional[Sha256LowerHex] = None
+    deidentification_receipt_sha256: Optional[Sha256LowerHex] = None
+    sanitized_manifest_sha256: Optional[Sha256LowerHex] = None
+    target_dataset_id: Optional[uuid.UUID] = None
+    exact_location_excluded: bool = False
+    raw_audio_excluded: bool = False
+    third_party_faces_excluded: bool = False
+
+    @model_validator(mode="after")
+    def require_training_approval_evidence(self) -> "RawPurposeDecisionRequestV1":
+        evidence = (
+            self.training_consent_receipt_sha256,
+            self.deidentification_receipt_sha256,
+            self.sanitized_manifest_sha256,
+            self.target_dataset_id,
+        )
+        flags = (
+            self.exact_location_excluded,
+            self.raw_audio_excluded,
+            self.third_party_faces_excluded,
+        )
+        if self.scope == "TRAINING" and self.decision == "APPROVED":
+            if any(value is None for value in evidence) or not all(flags):
+                raise ValueError("TRAINING approval requires consent, de-identification, sanitized manifest, target dataset, and all exclusions")
+        elif any(value is not None for value in evidence) or any(flags):
+            raise ValueError("training approval evidence is exclusive to an approved TRAINING decision")
+        return self
+
+
+class RawPurposeDecisionResponseV1(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    collection_id: uuid.UUID
+    scope: Literal["REPORT", "TRAINING"]
+    revision: int
+    expected_revision: int
+    idempotency_key: uuid.UUID
+    decision: Literal["APPROVED", "REJECTED"]
+    reason: str
+    source_manifest_sha256: Sha256LowerHex
+    source_receipt_sha256: Sha256LowerHex
+    training_consent_receipt_sha256: Optional[Sha256LowerHex]
+    deidentification_receipt_sha256: Optional[Sha256LowerHex]
+    sanitized_manifest_sha256: Optional[Sha256LowerHex]
+    target_dataset_id: Optional[uuid.UUID]
+    exact_location_excluded: bool
+    raw_audio_excluded: bool
+    third_party_faces_excluded: bool
+    admin_id: str
+    decided_at: AwareDatetime
+
+
+class RawLegalHoldRequestV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["APPLY", "RELEASE"]
+    expected_revision: int = Field(ge=0)
+    idempotency_key: uuid.UUID
+    reason: str = Field(min_length=1, max_length=500)
+    legal_basis: Optional[str] = Field(default=None, min_length=1, max_length=500)
+    authority_reference: Optional[str] = Field(default=None, min_length=1, max_length=160)
+    contact: Optional[str] = Field(default=None, min_length=1, max_length=160)
+    expires_at: Optional[AwareDatetime] = None
+
+    @model_validator(mode="after")
+    def require_apply_fields(self) -> "RawLegalHoldRequestV1":
+        fields = (self.legal_basis, self.authority_reference, self.contact, self.expires_at)
+        if self.action == "APPLY" and any(value is None for value in fields):
+            raise ValueError("APPLY requires legal basis, authority reference, contact, and expiry")
+        if self.action == "RELEASE" and any(value is not None for value in fields):
+            raise ValueError("RELEASE cannot carry apply-only legal-hold fields")
+        return self
+
+
+class RawLegalHoldResponseV1(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    collection_id: uuid.UUID
+    revision: int
+    expected_revision: int
+    idempotency_key: uuid.UUID
+    action: Literal["APPLY", "RELEASE"]
+    reason: str
+    legal_basis: Optional[str]
+    authority_reference: Optional[str]
+    contact: Optional[str]
+    expires_at: Optional[AwareDatetime]
+    admin_id: str
+    recorded_at: AwareDatetime
+
+
+class AdminRawCollectionSummaryV1(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    collection_id: uuid.UUID
+    purpose: RawCollectionPurpose
+    state: RawCollectionState
+    manifest_sha256: Sha256LowerHex
+    receipt_sha256: Optional[Sha256LowerHex]
+    object_count: int
+    total_bytes: int
+    committed_at: Optional[AwareDatetime]
+    quarantine_expires_at: Optional[AwareDatetime]
+    report_decision: Optional[Literal["APPROVED", "REJECTED"]]
+    training_decision: Optional[Literal["APPROVED", "REJECTED"]]
+    legal_hold_active: bool
+
+
+class AdminRawCollectionListV1(BaseModel):
+    schema_version: Literal["walksafe.admin-raw-collection-list.v1"]
+    items: List[AdminRawCollectionSummaryV1]

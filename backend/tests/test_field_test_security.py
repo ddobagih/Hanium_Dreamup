@@ -30,6 +30,8 @@ from backend.app.field_test_security import (  # noqa: E402
     _request_body_error_response,
     create_actor_assertion,
     required_field_test_access,
+    requires_account_generation,
+    requires_actor_identity,
     verify_actor_assertion,
 )
 from backend.app.main import app, settings as app_settings  # noqa: E402
@@ -63,6 +65,22 @@ def test_route_access_matrix_separates_field_and_admin_operations() -> None:
     assert required_field_test_access("/detect/v2/health", "GET") is FieldTestAccess.ADMIN
     assert required_field_test_access("/navigation/walking", "POST") is FieldTestAccess.FIELD
     assert required_field_test_access("/reports/v2", "POST") is FieldTestAccess.FIELD
+    deletion_status_path = (
+        "/reports/mine/deletions/00000000-0000-0000-0000-000000000001"
+    )
+    assert (
+        required_field_test_access(deletion_status_path, "GET")
+        is FieldTestAccess.FIELD
+    )
+    assert requires_actor_identity(deletion_status_path, "GET")
+    assert requires_account_generation(deletion_status_path, "GET")
+    assert (
+        required_field_test_access(
+            "/reports/mine/deletions/{request_id}",
+            "GET",
+        )
+        is FieldTestAccess.FIELD
+    )
     assert (
         required_field_test_access(
             "/privacy/account-deletions/{request_id}/status",
@@ -282,6 +300,10 @@ def test_readiness_is_available_to_field_role_without_sensitive_details(
     )
     monkeypatch.setattr(
         "backend.app.api.health._privacy_hmac_binding_readiness",
+        lambda _settings: {"ready": True, "binding": "matched"},
+    )
+    monkeypatch.setattr(
+        "backend.app.api.health._account_crypto_binding_readiness",
         lambda _settings: {"ready": True, "binding": "matched"},
     )
     async def navigation_ready(_settings):

@@ -25,6 +25,8 @@ from backend.app.models import (
     PrivacyHmacKeyBinding,
     PrivacyConsentEvent,
     Report,
+    SignupConsentReceipt,
+    UserAccount,
 )
 from backend.app.schemas import (
     AccountDeletionRequestV2,
@@ -32,6 +34,7 @@ from backend.app.schemas import (
     DeviceDeletionEvidenceV2,
     PRIVACY_CONSENT_ITEM_VERSIONS,
     PRIVACY_CONSENT_POLICY_VERSION,
+    PrivacyConsentBootstrapV1,
 )
 
 
@@ -87,6 +90,8 @@ ITEM_SLA = {
 }
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_MAX_SAFE_INTEGER = 9_007_199_254_740_991
+_ACCOUNT_ONLY_DEVICE_BASIS = "no_synchronized_installations_at_acceptance"
 
 
 class PrivacyLifecycleError(RuntimeError):
@@ -115,6 +120,55 @@ class DeletionAcceptance:
 class ConsentRecording:
     event: PrivacyConsentEvent
     created: bool
+
+
+def _same_optional_digest(left: str | None, right: str | None) -> bool:
+    if left is None or right is None:
+        return left is right
+    return compare_digest(left, right)
+
+
+def consent_event_is_current(event: PrivacyConsentEvent) -> bool:
+    return (
+        event.policy_version == PRIVACY_CONSENT_POLICY_VERSION
+        and dict(event.item_versions) == PRIVACY_CONSENT_ITEM_VERSIONS
+    )
+
+
+def _consent_receipt_sha256(
+    *,
+    account_generation: int,
+    automatic_reporting: bool,
+    client_revision: int,
+    installation_subject_hmac: str,
+    item_versions: Mapping[str, str],
+    mobile_network_transfer: bool,
+    policy_version: str,
+    privacy_subject_hmac: str,
+    raw_source_collection: bool,
+    request_id: str,
+    subject_revision: int,
+    training_reuse: bool,
+) -> str:
+    return hashlib.sha256(
+        b"walksafe/privacy-consent-event/v2\0"
+        + _canonical_json(
+            {
+                "account_generation": account_generation,
+                "automatic_reporting": automatic_reporting,
+                "client_revision": client_revision,
+                "installation_subject_hmac": installation_subject_hmac,
+                "item_versions": dict(item_versions),
+                "mobile_network_transfer": mobile_network_transfer,
+                "policy_version": policy_version,
+                "privacy_subject_hmac": privacy_subject_hmac,
+                "raw_source_collection": raw_source_collection,
+                "request_id": request_id,
+                "subject_revision": subject_revision,
+                "training_reuse": training_reuse,
+            }
+        )
+    ).hexdigest()
 
 
 def _canonical_json(value: object) -> bytes:
@@ -417,6 +471,40 @@ def assert_account_deletion_worker_database_role(db: Session) -> None:
             "has_schema_privilege(current_user, 'public', 'CREATE') AS can_create, "
             "has_table_privilege(current_user, 'public.reports', 'DELETE') "
             "AS can_delete_reports, "
+            "(has_table_privilege(current_user, 'public.raw_collections', 'SELECT') "
+            "AND has_table_privilege(current_user, 'public.raw_collection_objects', 'SELECT') "
+            "AND has_table_privilege(current_user, 'public.raw_collection_chunks', 'SELECT')) "
+            "AS can_read_raw_inventory, "
+            "has_table_privilege(current_user, 'public.raw_collections', 'DELETE') "
+            "AS can_delete_raw_collections, "
+            "(has_table_privilege(current_user, 'public.raw_collection_objects', 'DELETE') "
+            "OR has_table_privilege(current_user, 'public.raw_collection_chunks', 'DELETE')) "
+            "AS can_delete_raw_children, "
+            "(has_column_privilege(current_user, 'public.user_accounts', 'id', 'SELECT') "
+            "AND has_column_privilege(current_user, 'public.user_accounts', "
+            "'privacy_subject_hmac', 'SELECT') "
+            "AND has_column_privilege(current_user, 'public.user_accounts', "
+            "'account_generation', 'SELECT') "
+            "AND has_column_privilege(current_user, 'public.user_accounts', "
+            "'email_lookup_hmac', 'SELECT') "
+            "AND has_column_privilege(current_user, 'public.user_accounts', "
+            "'status', 'SELECT')) AS can_read_user_account_inventory, "
+            "has_table_privilege(current_user, 'public.user_accounts', 'SELECT') "
+            "AS can_read_all_user_accounts, "
+            "has_table_privilege(current_user, 'public.user_accounts', 'DELETE') "
+            "AS can_delete_user_accounts, "
+            "(has_column_privilege(current_user, 'public.account_enrollments', "
+            "'id', 'SELECT') AND has_column_privilege(current_user, "
+            "'public.account_enrollments', 'email_lookup_hmac', 'SELECT')) "
+            "AS can_read_account_enrollment_inventory, "
+            "has_table_privilege(current_user, 'public.account_enrollments', 'SELECT') "
+            "AS can_read_all_account_enrollments, "
+            "has_table_privilege(current_user, 'public.account_enrollments', 'DELETE') "
+            "AS can_delete_account_enrollments, "
+            "has_column_privilege(current_user, 'public.signup_consent_receipts', "
+            "'account_id', 'SELECT') AS can_read_signup_receipt_inventory, "
+            "has_table_privilege(current_user, 'public.signup_consent_receipts', "
+            "'SELECT') AS can_read_all_signup_receipts, "
             "has_table_privilege(current_user, 'public.account_deletion_items', 'UPDATE') "
             "AS can_update_items, "
             "has_table_privilege(current_user, 'public.account_deletion_events', 'INSERT') "
@@ -428,7 +516,8 @@ def assert_account_deletion_worker_database_role(db: Session) -> None:
             "OR has_table_privilege(current_user, 'public.account_deletion_items', 'DELETE') "
             "OR has_table_privilege(current_user, 'public.account_deletion_events', 'DELETE') "
             "OR has_table_privilege(current_user, 'public.account_deletion_receipts', 'DELETE') "
-            "OR has_table_privilege(current_user, 'public.privacy_consent_events', 'DELETE')) "
+            "OR has_table_privilege(current_user, 'public.privacy_consent_events', 'DELETE') "
+            "OR has_table_privilege(current_user, 'public.signup_consent_receipts', 'DELETE')) "
             "AS can_delete_retained_ledger, "
             "EXISTS (SELECT 1 FROM pg_class AS grantable_class "
             "JOIN pg_namespace AS grantable_namespace "
@@ -523,7 +612,8 @@ def assert_account_deletion_worker_database_role(db: Session) -> None:
             "'reports', 'report_image_objects', 'account_deletion_tombstones', "
             "'account_deletion_requests', 'account_deletion_items', "
             "'account_deletion_events', 'account_deletion_receipts', "
-            "'account_deletion_device_targets', 'privacy_consent_events')) "
+            "'account_deletion_device_targets', 'privacy_consent_events', "
+            "'raw_collections', 'raw_collection_objects', 'raw_collection_chunks')) "
             "OR (has_table_privilege(current_user, application_class.oid, 'INSERT') "
             "AND application_class.relname NOT IN ("
             "'account_deletion_events', 'account_deletion_receipts')) "
@@ -531,7 +621,8 @@ def assert_account_deletion_worker_database_role(db: Session) -> None:
             "AND application_class.relname NOT IN ("
             "'account_deletion_requests', 'account_deletion_items')) "
             "OR (has_table_privilege(current_user, application_class.oid, 'DELETE') "
-            "AND application_class.relname <> 'reports') "
+            "AND application_class.relname NOT IN ("
+            "'reports', 'raw_collections', 'user_accounts', 'account_enrollments')) "
             "OR has_table_privilege(current_user, application_class.oid, 'TRUNCATE') "
             "OR has_table_privilege(current_user, application_class.oid, 'REFERENCES') "
             "OR has_table_privilege(current_user, application_class.oid, 'TRIGGER'))) "
@@ -576,6 +667,17 @@ def assert_account_deletion_worker_database_role(db: Session) -> None:
         or role["is_purger_member"]
         or role["can_create"]
         or not role["can_delete_reports"]
+        or not role["can_read_raw_inventory"]
+        or not role["can_delete_raw_collections"]
+        or role["can_delete_raw_children"]
+        or not role["can_read_user_account_inventory"]
+        or role["can_read_all_user_accounts"]
+        or not role["can_delete_user_accounts"]
+        or not role["can_read_account_enrollment_inventory"]
+        or role["can_read_all_account_enrollments"]
+        or not role["can_delete_account_enrollments"]
+        or not role["can_read_signup_receipt_inventory"]
+        or role["can_read_all_signup_receipts"]
         or not role["can_update_items"]
         or not role["can_insert_events"]
         or not role["can_read_device_targets"]
@@ -762,7 +864,19 @@ def assert_report_consent_active(
         .order_by(PrivacyConsentEvent.subject_revision.desc())
         .limit(1)
     )
-    if latest is None or latest.raw_source_collection is not True:
+    if latest is None:
+        raise PrivacyLifecycleError(
+            "raw_source_collection_consent_required",
+            "Current raw-source collection consent is required for reports.",
+            status_code=409,
+        )
+    if not consent_event_is_current(latest):
+        raise PrivacyLifecycleError(
+            "privacy_consent_reconsent_required",
+            "Current integrated consent is required.",
+            status_code=409,
+        )
+    if latest.raw_source_collection is not True:
         raise PrivacyLifecycleError(
             "raw_source_collection_consent_required",
             "Current raw-source collection consent is required for reports.",
@@ -967,6 +1081,26 @@ def _request_receipt_sha256(
     ).hexdigest()
 
 
+def _account_only_device_evidence_sha256(
+    *,
+    privacy_subject: str,
+    account_generation: int,
+    request_id: str,
+    accepted_at: datetime,
+) -> str:
+    return hashlib.sha256(
+        b"walksafe/account-deletion-account-only-device-evidence/v1\0"
+        + _canonical_json(
+            {
+                "accepted_at": _iso(accepted_at),
+                "account_generation": account_generation,
+                "privacy_subject_hmac": privacy_subject,
+                "request_id": request_id,
+            }
+        )
+    ).hexdigest()
+
+
 def accept_account_deletion(
     db: Session,
     *,
@@ -1003,6 +1137,18 @@ def accept_account_deletion(
                 "The request identifier was already used with different content.",
                 status_code=409,
             )
+        if authorized.credential_account_id is not None:
+            linked_account = db.scalar(
+                select(UserAccount)
+                .where(UserAccount.id == authorized.credential_account_id)
+                .with_for_update()
+            )
+            if linked_account is not None and linked_account.status != "DISABLED":
+                raise PrivacyLifecycleError(
+                    "account_deletion_credential_fence_invalid",
+                    "The deletion credential fence is inconsistent.",
+                    status_code=503,
+                )
         response = _status(db, authorized)
         db.commit()
         return DeletionAcceptance(status=response, created=False)
@@ -1020,6 +1166,14 @@ def accept_account_deletion(
             status_code=409,
         )
 
+    credential_account = db.scalar(
+        select(UserAccount)
+        .where(
+            UserAccount.privacy_subject_hmac == privacy_subject,
+            UserAccount.account_generation == account_generation,
+        )
+        .with_for_update()
+    )
     installation_targets = tuple(
         db.scalars(
             select(PrivacyConsentEvent.installation_subject_hmac)
@@ -1031,10 +1185,10 @@ def accept_account_deletion(
             .order_by(PrivacyConsentEvent.installation_subject_hmac)
         ).all()
     )
-    if not installation_targets:
+    if not installation_targets and credential_account is None:
         raise PrivacyLifecycleError(
             "account_deletion_installation_inventory_missing",
-            "At least one synchronized installation is required before deletion.",
+            "A synchronized installation or bound credential is required before deletion.",
             status_code=409,
         )
 
@@ -1058,6 +1212,30 @@ def accept_account_deletion(
         access_pre_digest=access_pre_digest,
         secret=secret,
     )
+    credential_account_id = (
+        credential_account.id if credential_account is not None else None
+    )
+    if credential_account is not None:
+        if credential_account.auth_epoch >= _MAX_SAFE_INTEGER:
+            raise PrivacyLifecycleError(
+                "account_deletion_auth_epoch_exhausted",
+                "The account credential cannot be fenced safely.",
+                status_code=409,
+            )
+        credential_account.status = "DISABLED"
+        credential_account.auth_epoch += 1
+        credential_account.updated_at = accepted_at
+
+    account_only_device_evidence = (
+        _account_only_device_evidence_sha256(
+            privacy_subject=privacy_subject,
+            account_generation=account_generation,
+            request_id=payload.request_id,
+            accepted_at=accepted_at,
+        )
+        if not installation_targets
+        else None
+    )
 
     tombstone = AccountDeletionTombstone(
         tombstone_id=canonical_tombstone_id,
@@ -1068,6 +1246,7 @@ def accept_account_deletion(
     )
     request = AccountDeletionRequest(
         request_id=payload.request_id,
+        credential_account_id=credential_account_id,
         tombstone_id=canonical_tombstone_id,
         privacy_subject_hmac=privacy_subject,
         account_generation=account_generation,
@@ -1097,21 +1276,32 @@ def accept_account_deletion(
             )
         )
     for item_key in DELETION_ITEM_KEYS:
+        account_only_device = (
+            item_key == "device_untransmitted_data" and not installation_targets
+        )
         db.add(
             AccountDeletionItem(
                 request_id=payload.request_id,
                 item_key=item_key,
-                state=("EXTERNAL_PENDING" if item_key in EXTERNAL_ITEM_KEYS else "PENDING"),
+                state=(
+                    "NOT_APPLICABLE"
+                    if account_only_device
+                    else ("EXTERNAL_PENDING" if item_key in EXTERNAL_ITEM_KEYS else "PENDING")
+                ),
                 item_revision=1,
                 due_at=accepted_at + ITEM_SLA[item_key],
                 updated_at=accepted_at,
-                evidence_sha256=None,
-                disposition_basis=None,
+                evidence_sha256=(
+                    account_only_device_evidence if account_only_device else None
+                ),
+                disposition_basis=(
+                    _ACCOUNT_ONLY_DEVICE_BASIS if account_only_device else None
+                ),
                 retry_after=None,
                 restriction_reason=None,
                 legal_hold_review_at=None,
                 legal_hold_contact=None,
-                terminal_at=None,
+                terminal_at=accepted_at if account_only_device else None,
             )
         )
     db.flush()
@@ -1865,6 +2055,131 @@ def complete_server_deletion_inventory_from_manifest(
     return response
 
 
+def get_consent_bootstrap(
+    db: Session,
+    *,
+    actor_id: str,
+    account_generation: int,
+    installation_id: str,
+    policy_version: str,
+    signup_document_versions: Mapping[str, str],
+    secret: str,
+    key_version: int = 1,
+) -> PrivacyConsentBootstrapV1:
+    if policy_version != PRIVACY_CONSENT_POLICY_VERSION:
+        raise PrivacyLifecycleError(
+            "privacy_consent_policy_version_unsupported",
+            "The consent policy version must match the current approved version.",
+            status_code=422,
+        )
+    bind_or_verify_privacy_hmac_key(db, secret=secret, key_version=key_version)
+    privacy_subject = privacy_subject_hmac(actor_id, account_generation, secret)
+    installation_hmac = installation_subject_hmac(
+        installation_id,
+        privacy_subject,
+        secret,
+    )
+    lock_privacy_subject_shared(db, privacy_subject, account_generation)
+    assert_report_ingest_active(db, privacy_subject, account_generation)
+    latest_subject = db.scalar(
+        select(PrivacyConsentEvent)
+        .where(
+            PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
+            PrivacyConsentEvent.account_generation == account_generation,
+        )
+        .order_by(PrivacyConsentEvent.subject_revision.desc())
+        .limit(1)
+    )
+    latest_installation = db.scalar(
+        select(PrivacyConsentEvent)
+        .where(
+            PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
+            PrivacyConsentEvent.account_generation == account_generation,
+            PrivacyConsentEvent.installation_subject_hmac == installation_hmac,
+        )
+        .order_by(PrivacyConsentEvent.client_revision.desc())
+        .limit(1)
+    )
+    client_revision_floor = (
+        0 if latest_installation is None else latest_installation.client_revision
+    )
+
+    if latest_subject is not None:
+        current = consent_event_is_current(latest_subject)
+        return PrivacyConsentBootstrapV1(
+            schema_version="walksafe.integrated-consent-bootstrap.v1",
+            status="READY" if current else "RECONSENT_REQUIRED",
+            source="CURRENT_CONSENT" if current else "NONE",
+            installation_id=installation_id,
+            policy_version=PRIVACY_CONSENT_POLICY_VERSION,
+            item_versions=PRIVACY_CONSENT_ITEM_VERSIONS,
+            client_revision_floor=client_revision_floor,
+            selections=(
+                {
+                    "raw_source_collection": latest_subject.raw_source_collection,
+                    "automatic_reporting": latest_subject.automatic_reporting,
+                    "mobile_network_transfer": latest_subject.mobile_network_transfer,
+                    "training_reuse": latest_subject.training_reuse,
+                }
+                if current
+                else None
+            ),
+            source_receipt_sha256=(latest_subject.receipt_sha256 if current else None),
+            expected_previous_backend_receipt_sha256=latest_subject.receipt_sha256,
+        )
+
+    account = db.scalar(
+        select(UserAccount).where(
+            UserAccount.actor_id == actor_id,
+            UserAccount.privacy_subject_hmac == privacy_subject,
+            UserAccount.account_generation == account_generation,
+            UserAccount.status == "ACTIVE",
+        )
+    )
+    signup_receipt = None
+    if account is not None:
+        signup_receipt = db.scalar(
+            select(SignupConsentReceipt).where(
+                SignupConsentReceipt.account_id == account.id
+            )
+        )
+    signup_current = (
+        signup_receipt is not None
+        and all(
+            signup_receipt.document_versions[key] == signup_document_versions[key]
+            for key in (
+                "raw_original",
+                "automatic_reporting",
+                "training_reuse",
+            )
+        )
+    )
+    signup_selections = None if signup_receipt is None else signup_receipt.selections
+    return PrivacyConsentBootstrapV1(
+        schema_version="walksafe.integrated-consent-bootstrap.v1",
+        status="READY" if signup_current else "RECONSENT_REQUIRED",
+        source="SIGNUP_CONSENT" if signup_current else "NONE",
+        installation_id=installation_id,
+        policy_version=PRIVACY_CONSENT_POLICY_VERSION,
+        item_versions=PRIVACY_CONSENT_ITEM_VERSIONS,
+        client_revision_floor=client_revision_floor,
+        selections=(
+            {
+                "raw_source_collection": bool(signup_selections["raw_original"]),
+                "automatic_reporting": bool(signup_selections["automatic_reporting"]),
+                "mobile_network_transfer": False,
+                "training_reuse": bool(signup_selections["training_reuse"]),
+            }
+            if signup_current and signup_selections is not None
+            else None
+        ),
+        source_receipt_sha256=(
+            signup_receipt.receipt_sha256 if signup_current else None
+        ),
+        expected_previous_backend_receipt_sha256=None,
+    )
+
+
 def record_consent_event(
     db: Session,
     *,
@@ -1880,8 +2195,9 @@ def record_consent_event(
     mobile_network_transfer: bool,
     training_reuse: bool,
     secret: str,
+    expected_previous_backend_receipt_sha256: str | None = None,
     key_version: int = 1,
-) -> PrivacyConsentEvent:
+) -> ConsentRecording:
     normalized_item_versions = dict(item_versions)
     if (
         policy_version != PRIVACY_CONSENT_POLICY_VERSION
@@ -1909,26 +2225,37 @@ def record_consent_event(
         )
     )
     if existing is not None:
-        replay_receipt = hashlib.sha256(
-            b"walksafe/privacy-consent-event/v2\0"
-            + _canonical_json(
-                {
-                    "account_generation": account_generation,
-                    "automatic_reporting": automatic_reporting,
-                    "client_revision": client_revision,
-                    "installation_subject_hmac": installation_hmac,
-                    "item_versions": normalized_item_versions,
-                    "mobile_network_transfer": mobile_network_transfer,
-                    "policy_version": policy_version,
-                    "privacy_subject_hmac": privacy_subject,
-                    "raw_source_collection": raw_source_collection,
-                    "request_id": request_id,
-                    "subject_revision": existing.subject_revision,
-                    "training_reuse": training_reuse,
-                }
+        previous_event = None
+        if existing.subject_revision > 1:
+            previous_event = db.scalar(
+                select(PrivacyConsentEvent).where(
+                    PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
+                    PrivacyConsentEvent.account_generation == account_generation,
+                    PrivacyConsentEvent.subject_revision
+                    == existing.subject_revision - 1,
+                )
             )
-        ).hexdigest()
-        if not compare_digest(existing.receipt_sha256, replay_receipt):
+        replay_receipt = _consent_receipt_sha256(
+            account_generation=account_generation,
+            automatic_reporting=automatic_reporting,
+            client_revision=client_revision,
+            installation_subject_hmac=installation_hmac,
+            item_versions=normalized_item_versions,
+            mobile_network_transfer=mobile_network_transfer,
+            policy_version=policy_version,
+            privacy_subject_hmac=privacy_subject,
+            raw_source_collection=raw_source_collection,
+            request_id=request_id,
+            subject_revision=existing.subject_revision,
+            training_reuse=training_reuse,
+        )
+        if (
+            not compare_digest(existing.receipt_sha256, replay_receipt)
+            or not _same_optional_digest(
+                None if previous_event is None else previous_event.receipt_sha256,
+                expected_previous_backend_receipt_sha256,
+            )
+        ):
             raise PrivacyLifecycleError(
                 "privacy_consent_request_conflict",
                 "The consent request identifier was already used.",
@@ -1937,6 +2264,25 @@ def record_consent_event(
         db.commit()
         db.refresh(existing)
         return ConsentRecording(event=existing, created=False)
+    latest_subject = db.scalar(
+        select(PrivacyConsentEvent)
+        .where(
+            PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
+            PrivacyConsentEvent.account_generation == account_generation,
+        )
+        .order_by(PrivacyConsentEvent.subject_revision.desc())
+        .limit(1)
+    )
+    latest_receipt = None if latest_subject is None else latest_subject.receipt_sha256
+    if not _same_optional_digest(
+        latest_receipt,
+        expected_previous_backend_receipt_sha256,
+    ):
+        raise PrivacyLifecycleError(
+            "privacy_consent_previous_receipt_conflict",
+            "The previous backend consent receipt does not match the latest event.",
+            status_code=409,
+        )
     latest_installation = db.scalar(
         select(PrivacyConsentEvent)
         .where(
@@ -1956,35 +2302,21 @@ def record_consent_event(
             "Consent revisions must be monotonic without gaps.",
             status_code=409,
         )
-    latest_subject = db.scalar(
-        select(PrivacyConsentEvent)
-        .where(
-            PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
-            PrivacyConsentEvent.account_generation == account_generation,
-        )
-        .order_by(PrivacyConsentEvent.subject_revision.desc())
-        .limit(1)
-    )
     subject_revision = 1 if latest_subject is None else latest_subject.subject_revision + 1
-    receipt_sha256 = hashlib.sha256(
-        b"walksafe/privacy-consent-event/v2\0"
-        + _canonical_json(
-            {
-                "account_generation": account_generation,
-                "automatic_reporting": automatic_reporting,
-                "client_revision": client_revision,
-                "installation_subject_hmac": installation_hmac,
-                "item_versions": normalized_item_versions,
-                "mobile_network_transfer": mobile_network_transfer,
-                "policy_version": policy_version,
-                "privacy_subject_hmac": privacy_subject,
-                "raw_source_collection": raw_source_collection,
-                "request_id": request_id,
-                "subject_revision": subject_revision,
-                "training_reuse": training_reuse,
-            }
-        )
-    ).hexdigest()
+    receipt_sha256 = _consent_receipt_sha256(
+        account_generation=account_generation,
+        automatic_reporting=automatic_reporting,
+        client_revision=client_revision,
+        installation_subject_hmac=installation_hmac,
+        item_versions=normalized_item_versions,
+        mobile_network_transfer=mobile_network_transfer,
+        policy_version=policy_version,
+        privacy_subject_hmac=privacy_subject,
+        raw_source_collection=raw_source_collection,
+        request_id=request_id,
+        subject_revision=subject_revision,
+        training_reuse=training_reuse,
+    )
     event = PrivacyConsentEvent(
         request_id=request_id,
         privacy_subject_hmac=privacy_subject,
@@ -2026,7 +2358,11 @@ def training_ingest_allowed(
         .order_by(PrivacyConsentEvent.subject_revision.desc())
         .limit(1)
     )
-    return latest is not None and latest.training_reuse is True
+    return (
+        latest is not None
+        and consent_event_is_current(latest)
+        and latest.training_reuse is True
+    )
 
 
 __all__ = [
@@ -2044,9 +2380,11 @@ __all__ = [
     "assert_report_ingest_active",
     "bind_or_verify_privacy_hmac_key",
     "bound_deletion_access_digest",
+    "consent_event_is_current",
     "deletion_evidence_sha256",
     "deletion_request_body_sha256",
     "get_account_deletion_status",
+    "get_consent_bootstrap",
     "installation_subject_hmac",
     "lock_privacy_subject_exclusive",
     "lock_privacy_subject_shared",

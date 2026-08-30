@@ -98,6 +98,10 @@ def test_backup_identity_and_shared_paths_are_statically_provisioned() -> None:
         "walksafe-backup-readers -"
     ) in tmpfiles
     assert (
+        "d /var/lib/walksafe/raw-objects 2750 walksafe-backend "
+        "walksafe-backup-readers -"
+    ) in tmpfiles
+    assert (
         "d /run/walksafe-maintenance-lock 0750 root "
         "walksafe-maintenance-lock -"
     ) in tmpfiles

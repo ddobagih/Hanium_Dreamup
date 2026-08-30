@@ -13,6 +13,7 @@ class TwoModelRuntimeConfigTest {
         val json = File("src/main/assets/model-config/two_model_runtime.json").readText()
         val config = TwoModelRuntimeConfig.parse(json)
 
+        assertEquals("walksafe-android-runtime-unified-768-primary-20260711", config.bundleVersion)
         assertEquals(TwoModelRuntimeConfig.UNIFIED_MODEL_KEY, config.primaryModelKey)
         assertEquals(TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY, config.fallbackModelKey)
         assertEquals("models/walksafe_unified_yolo26n_768_float32.tflite", config.unifiedWalksafe?.asset)
@@ -79,6 +80,7 @@ class TwoModelRuntimeConfigTest {
     fun parsesUnifiedOnlyConfigWithoutLegacyModelConfigs() {
         val json = """
             {
+              "version": "unified-only-v1",
               "primary_model": "unified_walksafe",
               "fallback_model": null,
               "models": {
@@ -113,6 +115,7 @@ class TwoModelRuntimeConfigTest {
     fun enabledUnifiedConfigRejectsMissingArtifactProvenance() {
         val json = """
             {
+              "version": "missing-provenance-v1",
               "primary_model": "unified_walksafe",
               "fallback_model": null,
               "models": {
@@ -143,6 +146,30 @@ class TwoModelRuntimeConfigTest {
 
         assertThrows(IllegalArgumentException::class.java) {
             TwoModelRuntimeConfig.parse(json)
+        }
+    }
+
+    @Test
+    fun bundleVersionIsRequiredAndMustBeNonBlankWithoutSurroundingWhitespace() {
+        val json = File("src/main/assets/model-config/two_model_runtime.json").readText()
+        listOf(
+            json.replace(Regex("\\s*\\\"version\\\"\\s*:\\s*\\\"[^\\\"]+\\\",?"), ""),
+            json.replace(
+                "\"version\": \"walksafe-android-runtime-unified-768-primary-20260711\"",
+                "\"version\": 1",
+            ),
+            json.replace(
+                "walksafe-android-runtime-unified-768-primary-20260711",
+                " ",
+            ),
+            json.replace(
+                "walksafe-android-runtime-unified-768-primary-20260711",
+                " version-with-space ",
+            ),
+        ).forEach { invalid ->
+            assertThrows(RuntimeException::class.java) {
+                TwoModelRuntimeConfig.parse(invalid)
+            }
         }
     }
 }

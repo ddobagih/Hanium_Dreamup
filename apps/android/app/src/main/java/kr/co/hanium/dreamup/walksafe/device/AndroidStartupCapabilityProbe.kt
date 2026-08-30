@@ -66,6 +66,7 @@ class AndroidStartupCapabilityProbe(
         metricDistanceOverride: Boolean? = null,
         onDeviceSpeechRecognitionOverride: Boolean? = null,
         offlineKoreanTextToSpeechOverride: Boolean? = null,
+        approvedDeviceProfileRequired: Boolean = true,
     ): WalkSafeStartupCapabilityDecision {
         val input = snapshot()
         val effectiveInput = input.copy(
@@ -75,7 +76,10 @@ class AndroidStartupCapabilityProbe(
             offlineKoreanTextToSpeechAvailable =
                 offlineKoreanTextToSpeechOverride ?: input.offlineKoreanTextToSpeechAvailable,
         )
-        return WalkSafeStartupCapabilityResolver.resolve(effectiveInput)
+        return WalkSafeStartupCapabilityResolver.resolve(
+            effectiveInput,
+            approvedDeviceProfileRequired = approvedDeviceProfileRequired,
+        )
     }
 
     private fun onDeviceSpeechRecognitionAvailable(): Boolean {

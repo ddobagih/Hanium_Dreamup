@@ -464,6 +464,7 @@ test("tombstone rejects old access and refresh before replay retries revocation"
         policy_version: INTEGRATED_CONSENT_POLICY_VERSION,
         item_versions: INTEGRATED_CONSENT_ITEM_VERSIONS,
         client_revision: 1,
+        expected_previous_backend_receipt_sha256: null,
         selections: {
           raw_source_collection: true,
           automatic_reporting: false,
@@ -502,7 +503,7 @@ test("tombstone rejects old access and refresh before replay retries revocation"
     [CONSENT_NETWORK_TRANSPORT_HEADER]: "wifi",
     [CONSENT_POLICY_HEADER]: consent.policy_version,
     [CONSENT_REVISION_HEADER]: String(consent.revision),
-    [CONSENT_RECEIPT_HEADER]: consent.receipt_sha256
+    [CONSENT_RECEIPT_HEADER]: consent.backend_consent_receipt_sha256
   };
   const reportForm = (autoReported: boolean): FormData => {
     const value = new FormData();

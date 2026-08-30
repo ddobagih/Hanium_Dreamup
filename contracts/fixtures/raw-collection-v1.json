@@ -1,0 +1,223 @@
+{
+  "chunk": {
+    "content_base64": "d2Fsa3NhZmUgcmF3IGZpeHR1cmUK",
+    "sha256": "25317bd64c95c9301bbc7192caab0d7cda6a6980140bb7ccc15c591236fccd90",
+    "size_bytes": 21
+  },
+  "chunk_ack": {
+    "collection_id": "123e4567-e89b-42d3-a456-426614174000",
+    "index": 0,
+    "object_id": "123e4567-e89b-42d3-a456-426614174001",
+    "schema_version": "walksafe.raw-collection-chunk-ack.v1",
+    "sha256": "25317bd64c95c9301bbc7192caab0d7cda6a6980140bb7ccc15c591236fccd90",
+    "size_bytes": 21,
+    "state": "READY_TO_COMMIT",
+    "stored_at": "2026-08-29T00:00:06Z"
+  },
+  "commit": {
+    "chunk_count": 1,
+    "collection_id": "123e4567-e89b-42d3-a456-426614174000",
+    "manifest_sha256": "30f252c11fc70f8f3a87140b0f0f4ee5f4a3fcc58928b53cbc578e08f26cb682",
+    "object_count": 1,
+    "schema_version": "walksafe.raw-collection-commit.v1",
+    "total_bytes": 21
+  },
+  "commit_sha256": "d38793ffd12839d4f6150517ad1e4e381b27acfa4730e92a0ae286debe8954ff",
+  "committed_status": {
+    "chunk_count": 1,
+    "collection_id": "123e4567-e89b-42d3-a456-426614174000",
+    "manifest_sha256": "30f252c11fc70f8f3a87140b0f0f4ee5f4a3fcc58928b53cbc578e08f26cb682",
+    "object_count": 1,
+    "objects": [
+      {
+        "chunk_count": 1,
+        "kind": "SENSOR",
+        "missing_ranges": [],
+        "object_id": "123e4567-e89b-42d3-a456-426614174001",
+        "received_bytes": 21,
+        "received_chunk_count": 1,
+        "sha256": "25317bd64c95c9301bbc7192caab0d7cda6a6980140bb7ccc15c591236fccd90",
+        "size_bytes": 21
+      }
+    ],
+    "purpose": "GENERAL_RAW",
+    "receipt": {
+      "chunk_count": 1,
+      "collection_id": "123e4567-e89b-42d3-a456-426614174000",
+      "committed_at": "2026-08-29T00:01:00Z",
+      "manifest_sha256": "30f252c11fc70f8f3a87140b0f0f4ee5f4a3fcc58928b53cbc578e08f26cb682",
+      "object_count": 1,
+      "objects": [
+        {
+          "chunk_count": 1,
+          "kind": "SENSOR",
+          "object_id": "123e4567-e89b-42d3-a456-426614174001",
+          "sha256": "25317bd64c95c9301bbc7192caab0d7cda6a6980140bb7ccc15c591236fccd90",
+          "size_bytes": 21
+        }
+      ],
+      "persistence_marker": "DATABASE_AND_ENCRYPTED_CHUNK_STORE",
+      "purpose": "GENERAL_RAW",
+      "quarantine_expires_at": "2026-09-12T00:01:00Z",
+      "receipt_sha256": "765cc4c8cecebc2930577e68d487f3c72b3ae47ef5859fedca07d0c1a2f9df2a",
+      "retention_class": "RAW_QUARANTINE_14D",
+      "schema_version": "walksafe.raw-collection-receipt.v2",
+      "total_bytes": 21
+    },
+    "received_bytes": 21,
+    "received_chunk_count": 1,
+    "schema_version": "walksafe.raw-collection-status.v1",
+    "state": "QUARANTINED",
+    "total_bytes": 21
+  },
+  "fixture_kind": "protocol-golden-only-no-runtime-persistence",
+  "manifest": {
+    "captured_ended_at": "2026-08-29T00:00:05Z",
+    "captured_started_at": "2026-08-29T00:00:00Z",
+    "chunk_count": 1,
+    "collection_id": "123e4567-e89b-42d3-a456-426614174000",
+    "consent_receipt_sha256": "460bf078aebf6c1ff5a1d51575317c1ef4dd57b75296a0778b428f4ad6b606e0",
+    "manifest_sha256": "30f252c11fc70f8f3a87140b0f0f4ee5f4a3fcc58928b53cbc578e08f26cb682",
+    "object_count": 1,
+    "objects": [
+      {
+        "chunks": [
+          {
+            "index": 0,
+            "sha256": "25317bd64c95c9301bbc7192caab0d7cda6a6980140bb7ccc15c591236fccd90",
+            "size_bytes": 21
+          }
+        ],
+        "content_type": "application/octet-stream",
+        "kind": "SENSOR",
+        "object_id": "123e4567-e89b-42d3-a456-426614174001",
+        "sha256": "25317bd64c95c9301bbc7192caab0d7cda6a6980140bb7ccc15c591236fccd90",
+        "size_bytes": 21
+      }
+    ],
+    "purpose": "GENERAL_RAW",
+    "schema_version": "walksafe.raw-collection-manifest.v1",
+    "segment_id": "123e4567-e89b-42d3-a456-426614174003",
+    "total_bytes": 21,
+    "walk_id": "123e4567-e89b-42d3-a456-426614174002"
+  },
+  "manifest_status": {
+    "chunk_count": 1,
+    "collection_id": "123e4567-e89b-42d3-a456-426614174000",
+    "manifest_sha256": "30f252c11fc70f8f3a87140b0f0f4ee5f4a3fcc58928b53cbc578e08f26cb682",
+    "object_count": 1,
+    "objects": [
+      {
+        "chunk_count": 1,
+        "kind": "SENSOR",
+        "missing_ranges": [
+          {
+            "end": 0,
+            "start": 0
+          }
+        ],
+        "object_id": "123e4567-e89b-42d3-a456-426614174001",
+        "received_bytes": 0,
+        "received_chunk_count": 0,
+        "sha256": "25317bd64c95c9301bbc7192caab0d7cda6a6980140bb7ccc15c591236fccd90",
+        "size_bytes": 21
+      }
+    ],
+    "purpose": "GENERAL_RAW",
+    "receipt": null,
+    "received_bytes": 0,
+    "received_chunk_count": 0,
+    "schema_version": "walksafe.raw-collection-status.v1",
+    "state": "MANIFEST_ACCEPTED",
+    "total_bytes": 21
+  },
+  "proof_vectors": {
+    "hmac_key_base64": "d2Fsa3NhZmUtY29udHJhY3QtcmF3LXByb29mLWtleS12MS1ub3QtZm9yLXJ1bnRpbWU=",
+    "issued_at": 1787961600,
+    "max_future_skew_seconds": 5,
+    "operations": {
+      "COMMIT": {
+        "canonical_json_base64": "eyJhY2NvdW50X2dlbmVyYXRpb24iOjEsImFjdG9yX2lkIjoiY29udHJhY3QucmF3LmFjdG9yIiwiY2h1bmtfc2hhMjU2IjpudWxsLCJjb21taXRfc2hhMjU2IjoiZDM4NzkzZmZkMTI4MzlkNGY2MTUwNTE3YWQxZTRlMzgxYjI3YWNmYTQ3MzBlOTJhMGFlMjg2ZGViZTg5NTRmZiIsImNvbnNlbnRfcmVjZWlwdF9zaGEyNTYiOiI0NjBiZjA3OGFlYmY2YzFmZjVhMWQ1MTU3NTMxN2MxZWY0ZGQ1N2I3NTI5NmEwNzc4YjQyOGY0YWQ2YjYwNmUwIiwiaXNzdWVkX2F0IjoxNzg3OTYxNjAwLCJtYW5pZmVzdF9zaGEyNTYiOiIzMGYyNTJjMTFmYzcwZjhmM2E4NzE0MGIwZjBmNGVlNWY0YTNmY2M1ODkyOGI1M2NiYzU3OGUwOGYyNmNiNjgyIiwibWV0aG9kIjoiUE9TVCIsIm9wZXJhdGlvbiI6IkNPTU1JVCIsInBhdGgiOiIvcmF3LWNvbGxlY3Rpb25zLzEyM2U0NTY3LWU4OWItNDJkMy1hNDU2LTQyNjYxNDE3NDAwMC9jb21taXQiLCJwdXJwb3NlIjoiR0VORVJBTF9SQVciLCJ2ZXJzaW9uIjoxLCJ3YWxrX2lkIjoiMTIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAyIn0=",
+        "message_base64": "d2Fsa3NhZmUvcmF3LWNvbGxlY3Rpb24tcmVxdWVzdC1wcm9vZi92MQB7ImFjY291bnRfZ2VuZXJhdGlvbiI6MSwiYWN0b3JfaWQiOiJjb250cmFjdC5yYXcuYWN0b3IiLCJjaHVua19zaGEyNTYiOm51bGwsImNvbW1pdF9zaGEyNTYiOiJkMzg3OTNmZmQxMjgzOWQ0ZjYxNTA1MTdhZDFlNGUzODFiMjdhY2ZhNDczMGU5MmEwYWUyODZkZWJlODk1NGZmIiwiY29uc2VudF9yZWNlaXB0X3NoYTI1NiI6IjQ2MGJmMDc4YWViZjZjMWZmNWExZDUxNTc1MzE3YzFlZjRkZDU3Yjc1Mjk2YTA3NzhiNDI4ZjRhZDZiNjA2ZTAiLCJpc3N1ZWRfYXQiOjE3ODc5NjE2MDAsIm1hbmlmZXN0X3NoYTI1NiI6IjMwZjI1MmMxMWZjNzBmOGYzYTg3MTQwYjBmMGY0ZWU1ZjRhM2ZjYzU4OTI4YjUzY2JjNTc4ZTA4ZjI2Y2I2ODIiLCJtZXRob2QiOiJQT1NUIiwib3BlcmF0aW9uIjoiQ09NTUlUIiwicGF0aCI6Ii9yYXctY29sbGVjdGlvbnMvMTIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAwL2NvbW1pdCIsInB1cnBvc2UiOiJHRU5FUkFMX1JBVyIsInZlcnNpb24iOjEsIndhbGtfaWQiOiIxMjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDIifQ==",
+        "proof": "v1.1787961600.ruDJ66d_Pse5dQreGF0pXAgWIJLrDNrXXCWApDA8zY0",
+        "signed_payload": {
+          "account_generation": 1,
+          "actor_id": "contract.raw.actor",
+          "chunk_sha256": null,
+          "commit_sha256": "d38793ffd12839d4f6150517ad1e4e381b27acfa4730e92a0ae286debe8954ff",
+          "consent_receipt_sha256": "460bf078aebf6c1ff5a1d51575317c1ef4dd57b75296a0778b428f4ad6b606e0",
+          "issued_at": 1787961600,
+          "manifest_sha256": "30f252c11fc70f8f3a87140b0f0f4ee5f4a3fcc58928b53cbc578e08f26cb682",
+          "method": "POST",
+          "operation": "COMMIT",
+          "path": "/raw-collections/123e4567-e89b-42d3-a456-426614174000/commit",
+          "purpose": "GENERAL_RAW",
+          "version": 1,
+          "walk_id": "123e4567-e89b-42d3-a456-426614174002"
+        }
+      },
+      "GET_STATUS": {
+        "canonical_json_base64": "eyJhY2NvdW50X2dlbmVyYXRpb24iOjEsImFjdG9yX2lkIjoiY29udHJhY3QucmF3LmFjdG9yIiwiY2h1bmtfc2hhMjU2IjpudWxsLCJjb21taXRfc2hhMjU2IjpudWxsLCJjb25zZW50X3JlY2VpcHRfc2hhMjU2IjpudWxsLCJpc3N1ZWRfYXQiOjE3ODc5NjE2MDAsIm1hbmlmZXN0X3NoYTI1NiI6IjMwZjI1MmMxMWZjNzBmOGYzYTg3MTQwYjBmMGY0ZWU1ZjRhM2ZjYzU4OTI4YjUzY2JjNTc4ZTA4ZjI2Y2I2ODIiLCJtZXRob2QiOiJHRVQiLCJvcGVyYXRpb24iOiJHRVRfU1RBVFVTIiwicGF0aCI6Ii9yYXctY29sbGVjdGlvbnMvMTIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAwIiwicHVycG9zZSI6IkdFTkVSQUxfUkFXIiwidmVyc2lvbiI6MSwid2Fsa19pZCI6IjEyM2U0NTY3LWU4OWItNDJkMy1hNDU2LTQyNjYxNDE3NDAwMiJ9",
+        "message_base64": "d2Fsa3NhZmUvcmF3LWNvbGxlY3Rpb24tcmVxdWVzdC1wcm9vZi92MQB7ImFjY291bnRfZ2VuZXJhdGlvbiI6MSwiYWN0b3JfaWQiOiJjb250cmFjdC5yYXcuYWN0b3IiLCJjaHVua19zaGEyNTYiOm51bGwsImNvbW1pdF9zaGEyNTYiOm51bGwsImNvbnNlbnRfcmVjZWlwdF9zaGEyNTYiOm51bGwsImlzc3VlZF9hdCI6MTc4Nzk2MTYwMCwibWFuaWZlc3Rfc2hhMjU2IjoiMzBmMjUyYzExZmM3MGY4ZjNhODcxNDBiMGYwZjRlZTVmNGEzZmNjNTg5MjhiNTNjYmM1NzhlMDhmMjZjYjY4MiIsIm1ldGhvZCI6IkdFVCIsIm9wZXJhdGlvbiI6IkdFVF9TVEFUVVMiLCJwYXRoIjoiL3Jhdy1jb2xsZWN0aW9ucy8xMjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDAiLCJwdXJwb3NlIjoiR0VORVJBTF9SQVciLCJ2ZXJzaW9uIjoxLCJ3YWxrX2lkIjoiMTIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAyIn0=",
+        "proof": "v1.1787961600.olF1-YE4s2ds_TiUczk98gcYdLkNQdVphgWaDq3Ahko",
+        "signed_payload": {
+          "account_generation": 1,
+          "actor_id": "contract.raw.actor",
+          "chunk_sha256": null,
+          "commit_sha256": null,
+          "consent_receipt_sha256": null,
+          "issued_at": 1787961600,
+          "manifest_sha256": "30f252c11fc70f8f3a87140b0f0f4ee5f4a3fcc58928b53cbc578e08f26cb682",
+          "method": "GET",
+          "operation": "GET_STATUS",
+          "path": "/raw-collections/123e4567-e89b-42d3-a456-426614174000",
+          "purpose": "GENERAL_RAW",
+          "version": 1,
+          "walk_id": "123e4567-e89b-42d3-a456-426614174002"
+        }
+      },
+      "PUT_CHUNK": {
+        "canonical_json_base64": "eyJhY2NvdW50X2dlbmVyYXRpb24iOjEsImFjdG9yX2lkIjoiY29udHJhY3QucmF3LmFjdG9yIiwiY2h1bmtfc2hhMjU2IjoiMjUzMTdiZDY0Yzk1YzkzMDFiYmM3MTkyY2FhYjBkN2NkYTZhNjk4MDE0MGJiN2NjYzE1YzU5MTIzNmZjY2Q5MCIsImNvbW1pdF9zaGEyNTYiOm51bGwsImNvbnNlbnRfcmVjZWlwdF9zaGEyNTYiOiI0NjBiZjA3OGFlYmY2YzFmZjVhMWQ1MTU3NTMxN2MxZWY0ZGQ1N2I3NTI5NmEwNzc4YjQyOGY0YWQ2YjYwNmUwIiwiaXNzdWVkX2F0IjoxNzg3OTYxNjAwLCJtYW5pZmVzdF9zaGEyNTYiOiIzMGYyNTJjMTFmYzcwZjhmM2E4NzE0MGIwZjBmNGVlNWY0YTNmY2M1ODkyOGI1M2NiYzU3OGUwOGYyNmNiNjgyIiwibWV0aG9kIjoiUFVUIiwib3BlcmF0aW9uIjoiUFVUX0NIVU5LIiwicGF0aCI6Ii9yYXctY29sbGVjdGlvbnMvMTIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAwL29iamVjdHMvMTIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAxL2NodW5rcy8wIiwicHVycG9zZSI6IkdFTkVSQUxfUkFXIiwidmVyc2lvbiI6MSwid2Fsa19pZCI6IjEyM2U0NTY3LWU4OWItNDJkMy1hNDU2LTQyNjYxNDE3NDAwMiJ9",
+        "message_base64": "d2Fsa3NhZmUvcmF3LWNvbGxlY3Rpb24tcmVxdWVzdC1wcm9vZi92MQB7ImFjY291bnRfZ2VuZXJhdGlvbiI6MSwiYWN0b3JfaWQiOiJjb250cmFjdC5yYXcuYWN0b3IiLCJjaHVua19zaGEyNTYiOiIyNTMxN2JkNjRjOTVjOTMwMWJiYzcxOTJjYWFiMGQ3Y2RhNmE2OTgwMTQwYmI3Y2NjMTVjNTkxMjM2ZmNjZDkwIiwiY29tbWl0X3NoYTI1NiI6bnVsbCwiY29uc2VudF9yZWNlaXB0X3NoYTI1NiI6IjQ2MGJmMDc4YWViZjZjMWZmNWExZDUxNTc1MzE3YzFlZjRkZDU3Yjc1Mjk2YTA3NzhiNDI4ZjRhZDZiNjA2ZTAiLCJpc3N1ZWRfYXQiOjE3ODc5NjE2MDAsIm1hbmlmZXN0X3NoYTI1NiI6IjMwZjI1MmMxMWZjNzBmOGYzYTg3MTQwYjBmMGY0ZWU1ZjRhM2ZjYzU4OTI4YjUzY2JjNTc4ZTA4ZjI2Y2I2ODIiLCJtZXRob2QiOiJQVVQiLCJvcGVyYXRpb24iOiJQVVRfQ0hVTksiLCJwYXRoIjoiL3Jhdy1jb2xsZWN0aW9ucy8xMjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDAvb2JqZWN0cy8xMjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDEvY2h1bmtzLzAiLCJwdXJwb3NlIjoiR0VORVJBTF9SQVciLCJ2ZXJzaW9uIjoxLCJ3YWxrX2lkIjoiMTIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAyIn0=",
+        "proof": "v1.1787961600.5e3niwW_q45SiElL3zEMR0emQt_s2A-MeZ-SeFrtLDU",
+        "signed_payload": {
+          "account_generation": 1,
+          "actor_id": "contract.raw.actor",
+          "chunk_sha256": "25317bd64c95c9301bbc7192caab0d7cda6a6980140bb7ccc15c591236fccd90",
+          "commit_sha256": null,
+          "consent_receipt_sha256": "460bf078aebf6c1ff5a1d51575317c1ef4dd57b75296a0778b428f4ad6b606e0",
+          "issued_at": 1787961600,
+          "manifest_sha256": "30f252c11fc70f8f3a87140b0f0f4ee5f4a3fcc58928b53cbc578e08f26cb682",
+          "method": "PUT",
+          "operation": "PUT_CHUNK",
+          "path": "/raw-collections/123e4567-e89b-42d3-a456-426614174000/objects/123e4567-e89b-42d3-a456-426614174001/chunks/0",
+          "purpose": "GENERAL_RAW",
+          "version": 1,
+          "walk_id": "123e4567-e89b-42d3-a456-426614174002"
+        }
+      },
+      "PUT_MANIFEST": {
+        "canonical_json_base64": "eyJhY2NvdW50X2dlbmVyYXRpb24iOjEsImFjdG9yX2lkIjoiY29udHJhY3QucmF3LmFjdG9yIiwiY2h1bmtfc2hhMjU2IjpudWxsLCJjb21taXRfc2hhMjU2IjpudWxsLCJjb25zZW50X3JlY2VpcHRfc2hhMjU2IjoiNDYwYmYwNzhhZWJmNmMxZmY1YTFkNTE1NzUzMTdjMWVmNGRkNTdiNzUyOTZhMDc3OGI0MjhmNGFkNmI2MDZlMCIsImlzc3VlZF9hdCI6MTc4Nzk2MTYwMCwibWFuaWZlc3Rfc2hhMjU2IjoiMzBmMjUyYzExZmM3MGY4ZjNhODcxNDBiMGYwZjRlZTVmNGEzZmNjNTg5MjhiNTNjYmM1NzhlMDhmMjZjYjY4MiIsIm1ldGhvZCI6IlBVVCIsIm9wZXJhdGlvbiI6IlBVVF9NQU5JRkVTVCIsInBhdGgiOiIvcmF3LWNvbGxlY3Rpb25zLzEyM2U0NTY3LWU4OWItNDJkMy1hNDU2LTQyNjYxNDE3NDAwMC9tYW5pZmVzdCIsInB1cnBvc2UiOiJHRU5FUkFMX1JBVyIsInZlcnNpb24iOjEsIndhbGtfaWQiOiIxMjNlNDU2Ny1lODliLTQyZDMtYTQ1Ni00MjY2MTQxNzQwMDIifQ==",
+        "message_base64": "d2Fsa3NhZmUvcmF3LWNvbGxlY3Rpb24tcmVxdWVzdC1wcm9vZi92MQB7ImFjY291bnRfZ2VuZXJhdGlvbiI6MSwiYWN0b3JfaWQiOiJjb250cmFjdC5yYXcuYWN0b3IiLCJjaHVua19zaGEyNTYiOm51bGwsImNvbW1pdF9zaGEyNTYiOm51bGwsImNvbnNlbnRfcmVjZWlwdF9zaGEyNTYiOiI0NjBiZjA3OGFlYmY2YzFmZjVhMWQ1MTU3NTMxN2MxZWY0ZGQ1N2I3NTI5NmEwNzc4YjQyOGY0YWQ2YjYwNmUwIiwiaXNzdWVkX2F0IjoxNzg3OTYxNjAwLCJtYW5pZmVzdF9zaGEyNTYiOiIzMGYyNTJjMTFmYzcwZjhmM2E4NzE0MGIwZjBmNGVlNWY0YTNmY2M1ODkyOGI1M2NiYzU3OGUwOGYyNmNiNjgyIiwibWV0aG9kIjoiUFVUIiwib3BlcmF0aW9uIjoiUFVUX01BTklGRVNUIiwicGF0aCI6Ii9yYXctY29sbGVjdGlvbnMvMTIzZTQ1NjctZTg5Yi00MmQzLWE0NTYtNDI2NjE0MTc0MDAwL21hbmlmZXN0IiwicHVycG9zZSI6IkdFTkVSQUxfUkFXIiwidmVyc2lvbiI6MSwid2Fsa19pZCI6IjEyM2U0NTY3LWU4OWItNDJkMy1hNDU2LTQyNjYxNDE3NDAwMiJ9",
+        "proof": "v1.1787961600.BIe9l6kKPbUvJ_cFraXsM5JkYvD8AbbANo4lWqexV0E",
+        "signed_payload": {
+          "account_generation": 1,
+          "actor_id": "contract.raw.actor",
+          "chunk_sha256": null,
+          "commit_sha256": null,
+          "consent_receipt_sha256": "460bf078aebf6c1ff5a1d51575317c1ef4dd57b75296a0778b428f4ad6b606e0",
+          "issued_at": 1787961600,
+          "manifest_sha256": "30f252c11fc70f8f3a87140b0f0f4ee5f4a3fcc58928b53cbc578e08f26cb682",
+          "method": "PUT",
+          "operation": "PUT_MANIFEST",
+          "path": "/raw-collections/123e4567-e89b-42d3-a456-426614174000/manifest",
+          "purpose": "GENERAL_RAW",
+          "version": 1,
+          "walk_id": "123e4567-e89b-42d3-a456-426614174002"
+        }
+      }
+    },
+    "replay_rule": "The exact bound request may replay only within TTL; any binding change or expired/future proof is rejected.",
+    "ttl_seconds": 30
+  }
+}

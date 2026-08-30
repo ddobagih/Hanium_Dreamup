@@ -59,6 +59,7 @@ _LOGICAL_IMAGE_PATH_PATTERN = re.compile(
     r"[89ab][0-9a-f]{3}-[0-9a-f]{12})\.(?P<suffix>jpg|png|webp)$"
 )
 RETENTION_QUARANTINE_DIRECTORY_NAME = ".retention-quarantine"
+REPORT_DELETION_QUARANTINE_DIRECTORY_NAME = ".report-deletion-quarantine"
 
 
 @dataclass(frozen=True)
@@ -545,6 +546,13 @@ def _opened_flat_upload_inventory(upload_root: Path) -> Iterator[dict[str, Path]
                     descriptor,
                     name,
                     label="report retention quarantine",
+                )
+                continue
+            if name == REPORT_DELETION_QUARANTINE_DIRECTORY_NAME:
+                _validate_empty_private_directory_at(
+                    descriptor,
+                    name,
+                    label="report deletion quarantine",
                 )
                 continue
             metadata = os.stat(name, dir_fd=descriptor, follow_symlinks=False)

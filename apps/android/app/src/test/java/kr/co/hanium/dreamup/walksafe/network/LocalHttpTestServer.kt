@@ -49,11 +49,18 @@ internal fun Socket.writeFixedResponse(
     statusCode: Int,
     body: ByteArray,
     declaredLength: Long = body.size.toLong(),
+    headers: Map<String, String> = emptyMap(),
 ) {
     val output = getOutputStream()
+    val extraHeaders = headers.entries.joinToString(separator = "") { (name, value) ->
+        "$name: $value\r\n"
+    }
     output.write(
-        "HTTP/1.1 $statusCode Test\r\nContent-Type: application/json\r\nContent-Length: $declaredLength\r\nConnection: close\r\n\r\n"
-            .toByteArray(Charsets.US_ASCII),
+        (
+            "HTTP/1.1 $statusCode Test\r\nContent-Type: application/json\r\n" +
+                "Content-Length: $declaredLength\r\n$extraHeaders" +
+                "Connection: close\r\n\r\n"
+            ).toByteArray(Charsets.US_ASCII),
     )
     output.write(body)
     output.flush()

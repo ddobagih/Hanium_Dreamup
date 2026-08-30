@@ -31,6 +31,7 @@ from backend.app.services.capacity_state import (
     CapacityStateUnavailable,
     FilesystemCapacityMonitor,
     capacity_state_from_environment,
+    require_same_capacity_filesystem,
 )
 from asgi_client import ASGITestClient
 
@@ -340,6 +341,53 @@ def test_filesystem_monitor_uses_the_real_upload_filesystem_once(tmp_path: Path)
     assert snapshot.version == 1
     assert snapshot.level in CapacityLevel
     assert version_path.read_bytes() == b"1\n"
+
+
+def test_report_and_raw_roots_must_share_the_capacity_filesystem(
+    tmp_path: Path,
+) -> None:
+    upload_dir = tmp_path / "uploads"
+    raw_object_dir = tmp_path / "raw-objects"
+    upload_dir.mkdir(mode=0o700)
+    raw_object_dir.mkdir(mode=0o700)
+
+    require_same_capacity_filesystem(upload_dir, raw_object_dir)
+
+
+def test_report_and_raw_roots_reject_distinct_capacity_filesystems(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    upload_dir = tmp_path / "uploads"
+    raw_object_dir = tmp_path / "raw-objects"
+    upload_dir.mkdir(mode=0o700)
+    raw_object_dir.mkdir(mode=0o700)
+    descriptors = {upload_dir: 101, raw_object_dir: 102}
+    metadata = {
+        upload_dir: SimpleNamespace(st_dev=1, st_ino=11, st_mode=stat.S_IFDIR | 0o700),
+        raw_object_dir: SimpleNamespace(
+            st_dev=2,
+            st_ino=12,
+            st_mode=stat.S_IFDIR | 0o700,
+        ),
+    }
+
+    fake_os = SimpleNamespace(
+        O_RDONLY=os.O_RDONLY,
+        O_CLOEXEC=getattr(os, "O_CLOEXEC", 0),
+        O_DIRECTORY=getattr(os, "O_DIRECTORY", 0),
+        O_NOFOLLOW=getattr(os, "O_NOFOLLOW", 0),
+        stat=lambda path, *, follow_symlinks: metadata[Path(path)],
+        open=lambda path, _flags: descriptors[Path(path)],
+        fstat=lambda descriptor: metadata[
+            upload_dir if descriptor == descriptors[upload_dir] else raw_object_dir
+        ],
+        close=lambda _descriptor: None,
+    )
+    monkeypatch.setattr(capacity_service, "os", fake_os)
+
+    with pytest.raises(ValueError, match="must share a filesystem"):
+        require_same_capacity_filesystem(upload_dir, raw_object_dir)
 
 
 def test_filesystem_monitor_version_increases_after_restart(
@@ -667,6 +715,7 @@ def test_main_lifespan_takes_first_sample_retries_and_cancels_without_error_deta
     monkeypatch.setattr(main_app, "capacity_monitor", monitor)
     monkeypatch.setattr(main_app, "validate_admin_credential_issuer_binding", lambda: None)
     monkeypatch.setattr(main_app, "bind_privacy_hmac_key", lambda: None)
+    monkeypatch.setattr(main_app, "bind_account_crypto_keys", lambda: None)
     monkeypatch.setattr(main_app, "reconcile_report_storage", lambda: None)
     monkeypatch.setattr(main_app, "inference_runner", None)
     caplog.set_level("WARNING", logger="backend.app.main")
@@ -716,6 +765,7 @@ def test_main_lifespan_waits_for_an_inflight_capacity_measurement(
     monkeypatch.setattr(main_app, "capacity_monitor", monitor)
     monkeypatch.setattr(main_app, "validate_admin_credential_issuer_binding", lambda: None)
     monkeypatch.setattr(main_app, "bind_privacy_hmac_key", lambda: None)
+    monkeypatch.setattr(main_app, "bind_account_crypto_keys", lambda: None)
     monkeypatch.setattr(main_app, "reconcile_report_storage", lambda: None)
     monkeypatch.setattr(main_app, "inference_runner", None)
 

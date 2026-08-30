@@ -9,6 +9,7 @@ import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
 import java.time.Instant
+import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
@@ -30,6 +31,7 @@ data class GatewaySessionLease(
     val deviceId: String,
     val familyId: String?,
     val rotation: Long?,
+    internal val backendAccountGeneration: Long? = null,
 )
 
 data class GatewaySessionVersion(
@@ -51,6 +53,7 @@ class GatewayFieldSession private constructor(
     val deviceId: String,
     val familyId: String?,
     val rotation: Long?,
+    internal val backendAccountGeneration: Long? = null,
     private val cookiePair: String,
     private val refreshToken: String?,
     val accessExpiresAtEpochMs: Long,
@@ -72,6 +75,7 @@ class GatewayFieldSession private constructor(
         deviceId = deviceId,
         familyId = familyId,
         rotation = rotation,
+        backendAccountGeneration = backendAccountGeneration,
     )
 
     internal val versionOrNull: GatewaySessionVersion?
@@ -89,6 +93,13 @@ class GatewayFieldSession private constructor(
 
     internal val isLongLived: Boolean
         get() = familyId != null && rotation != null && refreshToken != null
+
+    internal val isBackendAccountDeviceBound: Boolean
+        get() =
+            backendAccountGeneration != null &&
+                familyId != null &&
+                rotation != null &&
+                refreshToken == null
 
     fun requestHeaders(
         nowEpochMs: Long = System.currentTimeMillis(),
@@ -145,6 +156,58 @@ class GatewayFieldSession private constructor(
             accessExpiresAtEpochMs = accessExpiresAtEpochMs,
             idleExpiresAtEpochMs = idleExpiresAtEpochMs,
             absoluteExpiresAtEpochMs = absoluteExpiresAtEpochMs,
+        )
+    }
+
+    internal fun backendDevicePersistenceSnapshotOrNull(
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): GatewayBackendDeviceSessionPersistence? = backendDeviceSnapshotOrNull(
+        requiredVerificationState = GatewaySessionVerificationState.VERIFIED,
+        nowEpochMs = nowEpochMs,
+    )
+
+    internal fun backendDeviceRevalidationSnapshotOrNull(
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): GatewayBackendDeviceSessionPersistence? = backendDeviceSnapshotOrNull(
+        requiredVerificationState = GatewaySessionVerificationState.RESTORED_UNVERIFIED,
+        nowEpochMs = nowEpochMs,
+    )
+
+    private fun backendDeviceSnapshotOrNull(
+        requiredVerificationState: GatewaySessionVerificationState,
+        nowEpochMs: Long,
+    ): GatewayBackendDeviceSessionPersistence? {
+        if (
+            !active.get() ||
+            verificationState != requiredVerificationState ||
+            !isBackendAccountDeviceBound ||
+            nowEpochMs >= accessExpiresAtEpochMs
+        ) {
+            return null
+        }
+        val binding = parseBackendAccountDeviceCookieBinding(
+            cookiePair = cookiePair,
+            expectedDeviceId = deviceId,
+            nowEpochMs = nowEpochMs,
+        ) ?: return null
+        if (
+            binding.actorId != actorId ||
+            binding.accountGeneration != backendAccountGeneration ||
+            binding.authEpoch != rotation ||
+            binding.sessionId != familyId ||
+            binding.expiresAtEpochMs != accessExpiresAtEpochMs
+        ) {
+            return null
+        }
+        return GatewayBackendDeviceSessionPersistence(
+            gatewayBaseUrl = gatewayBaseUrl,
+            actorId = binding.actorId,
+            accountGeneration = binding.accountGeneration,
+            authEpoch = binding.authEpoch,
+            deviceId = binding.deviceId,
+            sessionId = binding.sessionId,
+            accessCookiePair = cookiePair,
+            expiresAtEpochMs = binding.expiresAtEpochMs,
         )
     }
 
@@ -212,6 +275,27 @@ class GatewayFieldSession private constructor(
             absoluteExpiresAtEpochMs = expiresAtEpochMs,
             verificationState = GatewaySessionVerificationState.VERIFIED,
             sessionScope = sessionScope,
+        )
+
+        private fun backendAccountDeviceVerified(
+            gatewayBaseUrl: String,
+            binding: BackendAccountDeviceCookieBinding,
+            cookiePair: String,
+            expiresAtEpochMs: Long,
+        ): GatewayFieldSession = GatewayFieldSession(
+            gatewayBaseUrl = gatewayBaseUrl,
+            actorId = binding.actorId,
+            deviceId = binding.deviceId,
+            familyId = binding.sessionId,
+            rotation = binding.authEpoch,
+            backendAccountGeneration = binding.accountGeneration,
+            cookiePair = cookiePair,
+            refreshToken = null,
+            accessExpiresAtEpochMs = expiresAtEpochMs,
+            idleExpiresAtEpochMs = expiresAtEpochMs,
+            absoluteExpiresAtEpochMs = expiresAtEpochMs,
+            verificationState = GatewaySessionVerificationState.VERIFIED,
+            sessionScope = GatewaySessionScope.GENERAL,
         )
 
         private fun longLivedVerified(
@@ -305,6 +389,51 @@ class GatewayFieldSession private constructor(
             )
         }
 
+        internal fun restoreBackendAccountDevice(
+            snapshot: GatewayBackendDeviceSessionPersistence,
+            expectedGatewayBaseUrl: String,
+            expectedActorId: String,
+            expectedDeviceId: String,
+            nowEpochMs: Long = System.currentTimeMillis(),
+        ): GatewayFieldSession? {
+            if (
+                snapshot.gatewayBaseUrl != expectedGatewayBaseUrl ||
+                snapshot.actorId != expectedActorId ||
+                snapshot.deviceId != expectedDeviceId
+            ) {
+                return null
+            }
+            val binding = parseBackendAccountDeviceCookieBinding(
+                cookiePair = snapshot.accessCookiePair,
+                expectedDeviceId = expectedDeviceId,
+                nowEpochMs = nowEpochMs,
+            ) ?: return null
+            if (
+                binding.actorId != snapshot.actorId ||
+                binding.accountGeneration != snapshot.accountGeneration ||
+                binding.authEpoch != snapshot.authEpoch ||
+                binding.sessionId != snapshot.sessionId ||
+                binding.expiresAtEpochMs != snapshot.expiresAtEpochMs
+            ) {
+                return null
+            }
+            return GatewayFieldSession(
+                gatewayBaseUrl = snapshot.gatewayBaseUrl,
+                actorId = binding.actorId,
+                deviceId = binding.deviceId,
+                familyId = binding.sessionId,
+                rotation = binding.authEpoch,
+                backendAccountGeneration = binding.accountGeneration,
+                cookiePair = snapshot.accessCookiePair,
+                refreshToken = null,
+                accessExpiresAtEpochMs = binding.expiresAtEpochMs,
+                idleExpiresAtEpochMs = binding.expiresAtEpochMs,
+                absoluteExpiresAtEpochMs = binding.expiresAtEpochMs,
+                verificationState = GatewaySessionVerificationState.RESTORED_UNVERIFIED,
+                sessionScope = GatewaySessionScope.GENERAL,
+            )
+        }
+
         internal fun longLivedSession(
             gatewayBaseUrl: String,
             actorId: String,
@@ -327,6 +456,18 @@ class GatewayFieldSession private constructor(
             accessExpiresAtEpochMs,
             idleExpiresAtEpochMs,
             absoluteExpiresAtEpochMs,
+        )
+
+        internal fun backendAccountDeviceSession(
+            gatewayBaseUrl: String,
+            binding: BackendAccountDeviceCookieBinding,
+            cookiePair: String,
+            expiresAtEpochMs: Long,
+        ): GatewayFieldSession = backendAccountDeviceVerified(
+            gatewayBaseUrl = gatewayBaseUrl,
+            binding = binding,
+            cookiePair = cookiePair,
+            expiresAtEpochMs = expiresAtEpochMs,
         )
 
         private fun isValidPersistedCookiePair(value: String): Boolean {
@@ -355,6 +496,20 @@ internal class GatewayFieldSessionPersistence(
 ) {
     override fun toString(): String =
         "GatewayFieldSessionPersistence(actorId=$actorId, deviceId=$deviceId, rotation=$rotation, credentials=redacted)"
+}
+
+internal data class GatewayBackendDeviceSessionPersistence(
+    val gatewayBaseUrl: String,
+    val actorId: String,
+    val accountGeneration: Long,
+    val authEpoch: Long,
+    val deviceId: String,
+    val sessionId: String,
+    val accessCookiePair: String,
+    val expiresAtEpochMs: Long,
+) {
+    override fun toString(): String =
+        "GatewayBackendDeviceSessionPersistence(actorId=$actorId, deviceId=$deviceId, credentials=redacted)"
 }
 
 internal class GatewaySessionRenewalProof(
@@ -576,6 +731,146 @@ class GatewayFieldSessionClient(
         )
     }
 
+    fun loginWithPassword(
+        gatewayBaseUrl: String,
+        email: String,
+        password: String,
+        rememberMe: Boolean,
+        deviceId: String = GatewayCredentialPolicy.newDeviceId(),
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): GatewayFieldSession {
+        if (
+            !GatewayAccountInputPolicy.validEmail(email) ||
+            !GatewayAccountInputPolicy.validPassword(password)
+        ) {
+            throw GatewaySessionHttpException(0, "invalid_account_credentials")
+        }
+        val approvedOrigin = GatewayEndpointPolicy.debugOriginOrNull(gatewayBaseUrl)
+        if (approvedOrigin == null || approvedOrigin != gatewayBaseUrl.trimEnd('/')) {
+            throw GatewaySessionHttpException(0, "invalid_gateway_url")
+        }
+        val device = GatewayCredentialPolicy.normalizedDeviceIdOrNull(deviceId)
+            ?.takeIf { it == deviceId }
+            ?: throw GatewaySessionHttpException(0, "invalid_gateway_device")
+        val requireSecure = runCatching {
+            URI(approvedOrigin).scheme.equals("https", ignoreCase = true)
+        }.getOrElse {
+            throw GatewaySessionHttpException(0, "invalid_gateway_url")
+        }
+        val endpoint = "$approvedOrigin/api/field-session"
+        val login = transport.postJson(
+            endpoint,
+            JSONObject()
+                .put("grant_type", "password")
+                .put("email", email)
+                .put("password", password)
+                .put("remember_me", rememberMe)
+                .put("device_id", device)
+                .toString(),
+        )
+        if (login.statusCode != 200) {
+            throw login.toSessionException("account_password_login_failed")
+        }
+        val loginJson = runCatching { JSONObject(login.responseBody) }.getOrNull()
+        if (
+            loginJson == null ||
+            loginJson.jsonKeySet() != setOf("session_scope") ||
+            loginJson.optString("session_scope") != GatewaySessionScope.GENERAL.wireValue
+        ) {
+            throw GatewaySessionHttpException(0, "gateway_session_scope_binding_failed")
+        }
+        val parsedCookie = parseGatewayCookie(
+            header = login.header("Set-Cookie"),
+            requireSecure = requireSecure,
+            allowSessionCookie = !rememberMe,
+        ) ?: throw GatewaySessionHttpException(0, "invalid_gateway_cookie")
+        val backendBinding = parseBackendAccountDeviceCookieBinding(
+            cookiePair = parsedCookie.cookiePair,
+            expectedDeviceId = device,
+            nowEpochMs = nowEpochMs,
+        ) ?: throw GatewaySessionHttpException(0, "invalid_gateway_cookie")
+        val cookieHeaders = mapOf(GatewayFieldSession.COOKIE_HEADER to parsedCookie.cookiePair)
+        val status = transport.get(endpoint, cookieHeaders)
+        if (status.statusCode !in 200..299) {
+            runCatching { transport.delete(endpoint, cookieHeaders) }
+            throw status.toSessionException("gateway_status_failed")
+        }
+        val statusJson = runCatching { JSONObject(status.responseBody) }.getOrNull()
+        val expectedStatusFields =
+            setOf("required", "authenticated", "actor_id", "session_scope")
+        val actor = statusJson?.optString("actor_id")
+        if (
+            statusJson == null ||
+            statusJson.jsonKeySet() != expectedStatusFields ||
+            statusJson.opt("required") !is Boolean ||
+            statusJson.opt("authenticated") !is Boolean ||
+            !statusJson.getBoolean("required") ||
+            !statusJson.getBoolean("authenticated") ||
+            actor == null ||
+            !BACKEND_ACCOUNT_ACTOR_ID.matches(actor) ||
+            actor != backendBinding.actorId ||
+            statusJson.optString("session_scope") != GatewaySessionScope.GENERAL.wireValue
+        ) {
+            runCatching { transport.delete(endpoint, cookieHeaders) }
+            throw GatewaySessionHttpException(0, "gateway_actor_binding_failed")
+        }
+        return GatewayFieldSession.backendAccountDeviceSession(
+            gatewayBaseUrl = approvedOrigin,
+            binding = backendBinding,
+            cookiePair = parsedCookie.cookiePair,
+            expiresAtEpochMs = backendBinding.expiresAtEpochMs,
+        )
+    }
+
+    fun revalidateBackendAccountDeviceSession(
+        session: GatewayFieldSession,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): GatewayFieldSession {
+        val snapshot = session.backendDeviceRevalidationSnapshotOrNull(nowEpochMs)
+            ?: throw GatewaySessionHttpException(0, "gateway_backend_device_restore_invalid")
+        val headers = mapOf(
+            GatewayFieldSession.COOKIE_HEADER to snapshot.accessCookiePair,
+        )
+        val response = transport.get(
+            session.gatewayBaseUrl.trimEnd('/') + "/api/field-session",
+            headers,
+        )
+        val status = runCatching { JSONObject(response.responseBody) }.getOrNull()
+        if (
+            response.statusCode !in 200..299 ||
+            status == null ||
+            status.jsonKeySet() !=
+            setOf("required", "authenticated", "actor_id", "session_scope") ||
+            status.opt("required") !is Boolean ||
+            status.opt("authenticated") !is Boolean ||
+            !status.getBoolean("required") ||
+            !status.getBoolean("authenticated") ||
+            status.optString("actor_id") != snapshot.actorId ||
+            status.optString("session_scope") != GatewaySessionScope.GENERAL.wireValue
+        ) {
+            session.invalidate()
+            throw GatewaySessionHttpException(
+                response.statusCode,
+                "gateway_backend_device_restore_rejected",
+            )
+        }
+        val verified = GatewayFieldSession.backendAccountDeviceSession(
+            gatewayBaseUrl = snapshot.gatewayBaseUrl,
+            binding = BackendAccountDeviceCookieBinding(
+                actorId = snapshot.actorId,
+                accountGeneration = snapshot.accountGeneration,
+                authEpoch = snapshot.authEpoch,
+                deviceId = snapshot.deviceId,
+                sessionId = snapshot.sessionId,
+                expiresAtEpochMs = snapshot.expiresAtEpochMs,
+            ),
+            cookiePair = snapshot.accessCookiePair,
+            expiresAtEpochMs = snapshot.expiresAtEpochMs,
+        )
+        session.invalidate()
+        return verified
+    }
+
     fun renew(
         session: GatewayFieldSession,
         actorId: String?,
@@ -773,7 +1068,10 @@ class GatewayFieldSessionClient(
             ?.coerceIn(1L, MAX_RETRY_AFTER_MS / 1_000L)
             ?.times(1_000L)
         val serverCode = runCatching {
-            JSONObject(responseBody).optString("code")
+            val response = JSONObject(responseBody)
+            val code = response.optJSONObject("detail")?.optString("code")
+                ?: response.optString("code")
+            code
                 .takeIf(ALLOWED_SERVER_ERROR_CODES::contains)
         }.getOrNull()
         return GatewaySessionHttpException(
@@ -926,7 +1224,72 @@ class GatewaySessionHttpException(
     val serverCode: String? = null,
 ) : IllegalStateException("gateway session request failed: $reason status=$statusCode")
 
+internal data class BackendAccountDeviceCookieBinding(
+    val actorId: String,
+    val accountGeneration: Long,
+    val authEpoch: Long,
+    val deviceId: String,
+    val sessionId: String,
+    val expiresAtEpochMs: Long,
+)
+
 private data class ParsedGatewayCookie(val cookiePair: String, val maxAgeSeconds: Long)
+
+private fun parseBackendAccountDeviceCookieBinding(
+    cookiePair: String,
+    expectedDeviceId: String,
+    nowEpochMs: Long,
+): BackendAccountDeviceCookieBinding? {
+    val prefix = "${GatewayFieldSession.COOKIE_NAME}="
+    if (!cookiePair.startsWith(prefix)) return null
+    val parts = cookiePair.substring(prefix.length).split('.')
+    if (parts.size != 9 || parts[0] != "v7") return null
+    val actorId = canonicalBase64UrlUtf8OrNull(parts[1]) ?: return null
+    val accountGeneration = positiveCanonicalLongOrNull(parts[2]) ?: return null
+    val authEpoch = positiveCanonicalLongOrNull(parts[3]) ?: return null
+    val deviceId = canonicalBase64UrlUtf8OrNull(parts[4]) ?: return null
+    if (
+        !BACKEND_ACCOUNT_ACTOR_ID.matches(actorId) ||
+        deviceId != expectedDeviceId ||
+        GatewayCredentialPolicy.normalizedDeviceIdOrNull(deviceId) != deviceId ||
+        parts[5] != GatewaySessionScope.GENERAL.wireValue ||
+        !BACKEND_SESSION_ID.matches(parts[7]) ||
+        !BACKEND_SESSION_SIGNATURE.matches(parts[8])
+    ) {
+        return null
+    }
+    val expiresAtSeconds = positiveCanonicalLongOrNull(parts[6]) ?: return null
+    val expiresAtEpochMs = runCatching { Math.multiplyExact(expiresAtSeconds, 1_000L) }
+        .getOrNull() ?: return null
+    if (
+        expiresAtEpochMs <= nowEpochMs ||
+        expiresAtEpochMs > safeExpiryBound(nowEpochMs, MAX_SESSION_AGE_SECONDS)
+    ) {
+        return null
+    }
+    return BackendAccountDeviceCookieBinding(
+        actorId = actorId,
+        accountGeneration = accountGeneration,
+        authEpoch = authEpoch,
+        deviceId = deviceId,
+        sessionId = parts[7],
+        expiresAtEpochMs = expiresAtEpochMs,
+    )
+}
+
+private fun canonicalBase64UrlUtf8OrNull(value: String): String? {
+    if (!BASE64_URL_NO_PADDING.matches(value)) return null
+    val decoded = runCatching { Base64.getUrlDecoder().decode(value) }.getOrNull() ?: return null
+    val decodedText = String(decoded, Charsets.UTF_8)
+    val canonical = Base64.getUrlEncoder().withoutPadding()
+        .encodeToString(decodedText.toByteArray(Charsets.UTF_8))
+    return decodedText.takeIf { canonical == value }
+}
+
+private fun positiveCanonicalLongOrNull(value: String): Long? {
+    if (!POSITIVE_CANONICAL_INTEGER.matches(value)) return null
+    return value.toLongOrNull()?.takeIf { it > 0L }
+}
 
 private fun ParsedGatewayCookie.expiresAtEpochMs(nowEpochMs: Long): Long {
     return runCatching {
@@ -936,7 +1299,11 @@ private fun ParsedGatewayCookie.expiresAtEpochMs(nowEpochMs: Long): Long {
     }
 }
 
-private fun parseGatewayCookie(header: String?, requireSecure: Boolean): ParsedGatewayCookie? {
+private fun parseGatewayCookie(
+    header: String?,
+    requireSecure: Boolean,
+    allowSessionCookie: Boolean = false,
+): ParsedGatewayCookie? {
     val parts = header?.split(';')?.map(String::trim)?.filter(String::isNotEmpty) ?: return null
     val pair = parts.firstOrNull() ?: return null
     val separator = pair.indexOf('=')
@@ -949,11 +1316,13 @@ private fun parseGatewayCookie(header: String?, requireSecure: Boolean): ParsedG
     if (attributes.none { it.equals("SameSite=Strict", ignoreCase = true) }) return null
     if (requireSecure && attributes.none { it.equals("Secure", ignoreCase = true) }) return null
     if (attributes.any { it.startsWith("Domain=", ignoreCase = true) }) return null
-    val maxAge = attributes.firstNotNullOfOrNull { attribute ->
+    val declaredMaxAge = attributes.firstNotNullOfOrNull { attribute ->
         attribute.substringAfter("Max-Age=", missingDelimiterValue = "")
             .takeIf { it.isNotEmpty() && attribute.startsWith("Max-Age=", ignoreCase = true) }
             ?.toLongOrNull()
-    } ?: return null
+    }
+    val maxAge = declaredMaxAge ?: PASSWORD_SESSION_LOCAL_TTL_SECONDS
+    if (declaredMaxAge == null && !allowSessionCookie) return null
     if (maxAge !in 1L..MAX_SESSION_AGE_SECONDS) return null
     return ParsedGatewayCookie("${GatewayFieldSession.COOKIE_NAME}=$value", maxAge)
 }
@@ -1076,6 +1445,7 @@ private fun safeExpiryBound(nowEpochMs: Long, ttlSeconds: Long): Long =
     }.getOrDefault(Long.MAX_VALUE)
 
 private const val MAX_SESSION_AGE_SECONDS = 12L * 60L * 60L
+private const val PASSWORD_SESSION_LOCAL_TTL_SECONDS = 30L * 60L
 private const val MAX_ACCESS_TTL_SECONDS = 60L * 60L
 private const val MAX_REFRESH_IDLE_TTL_SECONDS = 90L * 24L * 60L * 60L
 private const val MAX_REFRESH_ABSOLUTE_TTL_SECONDS = 365L * 24L * 60L * 60L
@@ -1091,9 +1461,16 @@ private val ALLOWED_SERVER_ERROR_CODES = setOf(
     "field_session_storage_outcome_unknown",
     "field_session_storage_unavailable",
     "gateway_auth_required",
+    "invalid_account_credentials",
     "invalid_refresh_token",
     "refresh_rotation_limit_reached",
     "refresh_token_absolute_expired",
     "refresh_token_idle_expired",
     "refresh_token_reuse_detected",
 )
+private val BACKEND_ACCOUNT_ACTOR_ID =
+    Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+private val BASE64_URL_NO_PADDING = Regex("^[A-Za-z0-9_-]+$")
+private val POSITIVE_CANONICAL_INTEGER = Regex("^[1-9][0-9]{0,18}$")
+private val BACKEND_SESSION_ID = Regex("^[A-Za-z0-9_-]{32,128}$")
+private val BACKEND_SESSION_SIGNATURE = Regex("^[A-Za-z0-9_-]{43}$")

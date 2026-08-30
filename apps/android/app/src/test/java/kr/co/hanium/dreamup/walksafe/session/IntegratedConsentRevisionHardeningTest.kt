@@ -359,7 +359,7 @@ class IntegratedConsentRevisionHardeningTest {
 
         val equalGrant = denied.copy(
             selections = denied.selections.copy(rawSourceCollection = true),
-            receiptSha256 = "3".repeat(64),
+            backendConsentReceiptSha256 = "3".repeat(64),
         )
         assertFalse(restarted.accept(equalGrant))
         assertEquals(
@@ -382,10 +382,12 @@ class IntegratedConsentRevisionHardeningTest {
 
         val mutation = PendingIntegratedConsentMutation(
             installationId = INSTALLATION_ID,
+            actorSha256 = "a".repeat(64),
             requestId = "consent_request_00000002",
             policyVersion = POLICY_VERSION,
             clientRevision = 2L,
             previousServerRevision = 1L,
+            expectedPreviousBackendReceiptSha256 = "1".repeat(64),
             desiredSelections = granted.selections.copy(rawSourceCollection = false),
             withdrawalItems = setOf(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
             createdAtEpochMs = 1L,
@@ -412,7 +414,7 @@ class IntegratedConsentRevisionHardeningTest {
 
         val equalRevisionConflict = denied.copy(
             selections = denied.selections.copy(rawSourceCollection = true),
-            receiptSha256 = "3".repeat(64),
+            backendConsentReceiptSha256 = "3".repeat(64),
         )
         assertFalse(session.accept(equalRevisionConflict))
         assertEquals(
@@ -429,7 +431,7 @@ class IntegratedConsentRevisionHardeningTest {
         receipt: String,
     ): IntegratedConsentConfirmation =
         IntegratedConsentConfirmation(
-            schemaVersion = "walksafe.integrated-consent-confirmation.v1",
+            schemaVersion = "walksafe.integrated-consent-confirmation.v2",
             policyVersion = POLICY_VERSION,
             installationId = INSTALLATION_ID,
             requestId = requestId,
@@ -443,7 +445,8 @@ class IntegratedConsentRevisionHardeningTest {
                 trainingReuse = false,
             ),
             confirmedAt = "2026-07-25T00:00:00Z",
-            receiptSha256 = receipt,
+            gatewayAuditRecordSha256 = "9".repeat(64),
+            backendConsentReceiptSha256 = receipt,
             controlSecret = "c".repeat(64),
         )
 
@@ -456,10 +459,12 @@ class IntegratedConsentRevisionHardeningTest {
     ): PendingIntegratedConsentMutation =
         PendingIntegratedConsentMutation(
             installationId = installationId,
+            actorSha256 = "a".repeat(64),
             requestId = requestId,
             policyVersion = POLICY_VERSION,
             clientRevision = clientRevision,
             previousServerRevision = previousServerRevision,
+            expectedPreviousBackendReceiptSha256 = "1".repeat(64),
             desiredSelections = selections,
             withdrawalItems = emptySet(),
             createdAtEpochMs = 1L,
@@ -467,6 +472,6 @@ class IntegratedConsentRevisionHardeningTest {
 
     private companion object {
         const val INSTALLATION_ID = "install-test-0001"
-        const val POLICY_VERSION = "FP-013-1.0.0"
+        const val POLICY_VERSION = "FP-013-1.1.0"
     }
 }

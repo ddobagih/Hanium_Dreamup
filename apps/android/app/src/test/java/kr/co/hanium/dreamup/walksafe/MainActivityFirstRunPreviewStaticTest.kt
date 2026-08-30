@@ -28,8 +28,9 @@ class MainActivityFirstRunPreviewStaticTest {
 
         // 표시 경로는 renderStage 를 쓴다.
         assertTrue(render.contains("val renderStage = firstRunPreviewStage ?: snapshot.stage"))
-        assertTrue(render.contains("val stageNumber = firstRunStageNumber(renderStage)"))
         assertTrue(render.contains("val message = when (renderStage)"))
+        // 진행 번호는 미리보기를 따르지 않는다. 실제 단계 그대로다.
+        assertTrue(render.contains("val stageNumber = firstRunStageNumber(snapshot)"))
 
         // 조작 활성화는 실제 단계로만 판정한다.
         Regex("""isEnabled\s*=\s*\n?\s*(renderStage|firstRunPreviewStage)""")

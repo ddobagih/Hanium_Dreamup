@@ -63,7 +63,10 @@ data class WalkSafeStartupCapabilityDecision(
 }
 
 object WalkSafeStartupCapabilityResolver {
-    fun resolve(input: WalkSafeStartupCapabilityInput): WalkSafeStartupCapabilityDecision {
+    fun resolve(
+        input: WalkSafeStartupCapabilityInput,
+        approvedDeviceProfileRequired: Boolean = true,
+    ): WalkSafeStartupCapabilityDecision {
         val approvedProfileStatus = when (input.approvedDesignatedDeviceProfile) {
             null -> null
             false -> false
@@ -81,8 +84,10 @@ object WalkSafeStartupCapabilityResolver {
             WalkSafeStartupRequirement.ON_DEVICE_STT to input.onDeviceSpeechRecognitionAvailable,
             WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS to input.offlineKoreanTextToSpeechAvailable,
             WalkSafeStartupRequirement.METRIC_DISTANCE to input.metricDistanceAvailable,
-            WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE to approvedProfileStatus,
         )
+        if (approvedDeviceProfileRequired) {
+            statuses[WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE] = approvedProfileStatus
+        }
         val pending = statuses.filterValues { it == null }.keys.toList()
         val unavailable = statuses.filterValues { it == false }.keys.toList()
         val fullOnlyRequirements = setOf(
@@ -125,14 +130,6 @@ object WalkSafeStartupCapabilityResolver {
                 unavailableRequirements = unavailable,
                 pendingRequirements = pending,
                 noticeKo = "기기 기능을 확인하는 중입니다: ${pendingFullOnly.labelsKo()}",
-            )
-        }
-        if (approvedProfileStatus == false) {
-            return WalkSafeStartupCapabilityDecision(
-                tier = WalkSafeStartupCapabilityTier.LIMITED,
-                unavailableRequirements = listOf(WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE),
-                pendingRequirements = emptyList(),
-                noticeKo = WALKSAFE_LIMITED_DISTANCE_NOTICE_KO,
             )
         }
         return WalkSafeStartupCapabilityDecision(

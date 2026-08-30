@@ -53,6 +53,21 @@ CLI는 공개키에서 계산한 SHA-256 marker가 descriptor의 `--expected-key
 
 DB 호환성이 별도로 입증되지 않은 app-only rollback은 금지한다. 이 절은 전환 절차이며 실제 배포·복구훈련을 수행했다는 증거가 아니다.
 
+## 중대 사고 기록
+
+관리자 앱은 Backend가 실제 허용된 내부 producer로부터 받은 `CRITICAL` 사고만
+`GET /admin/incidents`와 `GET /admin/incidents/{incident_id}`로 조회한다. 앱에는 사고를
+임의 생성하거나 장애를 흉내 내는 버튼이 없다. 목록과 상세는 상태와 문자 표기를 함께
+사용하며, append-only 상태 이력에는 민감자료 원문 대신 관찰 요약과 근거 SHA-256만
+표시한다.
+
+상태 기록은 `OPEN -> ACKNOWLEDGED -> RESOLVED`와 동일 사고의
+`RESOLVED -> REOPENED -> ACKNOWLEDGED -> RESOLVED`만 허용한다. 매 변경은
+`admin.incident.status.update` exact-path 기기 증명과 비밀번호·TOTP 일회성 재인증을
+거쳐 `PATCH /admin/incidents/{incident_id}/status`에 기록한다. version 충돌은 자동으로
+재제출하지 않고 최신 상세를 다시 조회한다. `RESOLVED`는 운영자가 확인한 기록 상태일
+뿐이며 앱은 자동 복구, 자동 제어, 서비스 재시작 또는 외부 통지를 수행하지 않는다.
+
 ## 내부 검증 빌드
 
 신고 검토·전달 화면은 기본과 release에서 항상 잠겨 있다. 로컬 debug 검증에서만 `WALKSAFE_ADMIN_OPERATIONAL_DEBUG=true`를 명시해 연다.

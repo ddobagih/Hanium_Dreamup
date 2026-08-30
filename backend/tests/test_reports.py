@@ -22,7 +22,12 @@ sys.path.insert(0, str(ROOT))
 from backend.app.config import get_settings  # noqa: E402
 from backend.app.database import SessionLocal  # noqa: E402
 from backend.app.main import app, settings as app_settings  # noqa: E402
-from backend.app.models import ReportImageObject, ReportReadAudit  # noqa: E402
+from backend.app.models import (  # noqa: E402
+    Report,
+    ReportImageObject,
+    ReportReadAudit,
+    ReportStatusAudit,
+)
 from asgi_client import ASGITestClient  # noqa: E402
 
 
@@ -383,6 +388,19 @@ def test_report_status_sequential_transition(client: ASGITestClient) -> None:
     detail = client.get(f"/reports/{report_id}")
     assert detail.status_code == 200
     assert detail.json()["status"] == "resolved"
+    with SessionLocal() as db:
+        stored = db.get(Report, uuid.UUID(report_id))
+        audits = db.scalars(
+            select(ReportStatusAudit)
+            .where(ReportStatusAudit.report_id == uuid.UUID(report_id))
+            .order_by(ReportStatusAudit.created_at)
+        ).all()
+    assert stored is not None
+    assert stored.status_version == 3
+    assert [(item.previous_version, item.next_version) for item in audits] == [
+        (1, 2),
+        (2, 3),
+    ]
 
 
 def test_report_status_write_fails_closed_during_maintenance(

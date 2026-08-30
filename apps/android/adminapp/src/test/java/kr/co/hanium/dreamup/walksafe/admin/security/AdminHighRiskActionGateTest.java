@@ -180,4 +180,40 @@ public final class AdminHighRiskActionGateTest {
             );
         }
     }
+
+    @Test
+    public void reportRequestStatusRequiresExactStepUpBinding() {
+        String requestId = "88888888-8888-4888-8888-888888888888";
+        AdminHighRiskActionGate.Operation operation =
+            AdminHighRiskActionGate.reportRequestStatus(requestId);
+        assertEquals("admin.report_request.status.update", operation.reauthenticationAction());
+        assertEquals("PATCH", operation.method());
+        assertEquals("/admin/report-requests/" + requestId + "/status", operation.path());
+
+        var withoutStepUp = AdminHighRiskActionGate.evaluate(
+            operation,
+            AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED,
+            (AdminHighRiskActionGate.Binding) null,
+            10_000L,
+            true
+        );
+        assertFalse(withoutStepUp.isAllowed());
+        assertEquals("reconfirmation_binding_required", withoutStepUp.reason());
+    }
+
+    @Test
+    public void incidentStatusUsesOnlyTheCanonicalHighRiskBinding() {
+        String incidentId = "99999999-9999-4999-8999-999999999999";
+        AdminHighRiskActionGate.Operation operation =
+            AdminHighRiskActionGate.incidentStatus(incidentId);
+
+        assertEquals("admin.incident.status.update", operation.reauthenticationAction());
+        assertEquals("PATCH", operation.method());
+        assertEquals("/admin/incidents/" + incidentId + "/status", operation.path());
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> AdminHighRiskActionGate.incidentStatus("not-a-canonical-uuid")
+        );
+    }
 }

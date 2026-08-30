@@ -75,6 +75,34 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _ADMIN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
 _DEVICE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 _READ_PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9_.:-]{2,63}$")
+_ADMIN_REPORT_LIST_PATH = "/admin/reports"
+_ADMIN_REPORT_DETAIL_PATH_PATTERN = re.compile(
+    r"^/admin/reports/[^/?#]{1,128}$"
+)
+_ADMIN_REPORT_ACTION_PATH_PATTERN = re.compile(
+    r"^/admin/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
+    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/"
+    r"(?:status|delivery-packages)$"
+)
+_ADMIN_REPORT_REQUEST_LIST_PATH = "/admin/report-requests"
+_ADMIN_REPORT_REQUEST_DETAIL_PATH_PATTERN = re.compile(
+    r"^/admin/report-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+)
+_ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN = re.compile(
+    r"^/admin/report-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
+    r"[0-9a-fA-F]{12}/status$"
+)
+_ADMIN_INCIDENT_LIST_PATH = "/admin/incidents"
+_ADMIN_INCIDENT_DETAIL_PATH_PATTERN = re.compile(
+    r"^/admin/incidents/[^/?#]{1,128}$"
+)
+_ADMIN_INCIDENT_STATUS_PATH_PATTERN = re.compile(
+    r"^/admin/incidents/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
+    r"[0-9a-fA-F]{12}/status$"
+)
 _REPORT_WORKFLOW_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/"
@@ -291,6 +319,24 @@ def is_admin_device_proof_workflow_request(method: str, path: str) -> bool:
     if not isinstance(method, str) or not isinstance(path, str):
         return False
     normalized_method = method.upper()
+    if path == _ADMIN_REPORT_LIST_PATH:
+        return normalized_method == "GET"
+    if _ADMIN_REPORT_DETAIL_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "GET"
+    if _ADMIN_REPORT_ACTION_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method in {"PATCH", "POST"}
+    if path == _ADMIN_REPORT_REQUEST_LIST_PATH:
+        return normalized_method == "GET"
+    if _ADMIN_REPORT_REQUEST_DETAIL_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "GET"
+    if _ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "PATCH"
+    if path == _ADMIN_INCIDENT_LIST_PATH:
+        return normalized_method == "GET"
+    if _ADMIN_INCIDENT_DETAIL_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "GET"
+    if _ADMIN_INCIDENT_STATUS_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "PATCH"
     if _REPORT_WORKFLOW_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method in {"GET", "POST"}
     return (

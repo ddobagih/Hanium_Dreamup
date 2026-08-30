@@ -7,6 +7,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -234,6 +235,32 @@ class AndroidNetworkTransferPolicyTest {
             ActivityOriginalMotionState.UNKNOWN,
             evidence.motionStateAt(30_000L),
         )
+    }
+
+    @Test
+    fun stationarySnapshotRequiresActiveSessionRealSampleAndExistingThreshold() {
+        val controller = ActivityOriginalUploadAdmissionController(
+            stationaryConfirmationMs = 5_000L,
+        )
+        assertNull(controller.stationarySnapshot(10_000L))
+
+        controller.onSessionActiveChanged(active = true, observedAtMs = 0L) {}
+        controller.onTrackingStarted(observedAtMs = 0L) {}
+        assertNull(controller.stationarySnapshot(10_000L))
+
+        controller.onSensorSample(stepCount = 7, observedAtMs = 10_000L) {}
+        assertNull(controller.stationarySnapshot(-1L))
+        assertNull(controller.stationarySnapshot(9_999L))
+        assertNull(controller.stationarySnapshot(14_999L))
+        assertEquals(
+            ActivityOriginalStationarySnapshot(stepCount = 7, observedAtMs = 15_000L),
+            controller.stationarySnapshot(15_000L),
+        )
+
+        controller.onSensorSample(stepCount = 8, observedAtMs = 15_001L) {}
+        assertNull(controller.stationarySnapshot(15_001L))
+        controller.onSessionActiveChanged(active = false, observedAtMs = 20_001L) {}
+        assertNull(controller.stationarySnapshot(30_000L))
     }
 
     @Test

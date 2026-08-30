@@ -12,7 +12,7 @@ class PersistentReportQueueDisabledStaticTest {
         val source = ReportStaticSourceInspector.read(MAIN_ACTIVITY_PATH)
 
         assertTrue(
-            "Persistent retry must remain explicitly feature-disabled.",
+            "Removed legacy retry storage must remain explicitly purge-only.",
             Regex(
                 """\bconst\s+val\s+PERSISTENT_REPORT_QUEUE_ENABLED\s*=\s*false\b""",
             ).containsMatchIn(source),
@@ -57,9 +57,26 @@ class PersistentReportQueueDisabledStaticTest {
             )
         }
 
+        val process = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun processReportCandidate",
+        )
         assertTrue(
-            "Fail-disabling persistence must not disable direct upload of a new report.",
-            source.contains("reportUploader.uploadCall("),
+            "ACTIVE report creation must only offer the frozen payload to the U5 queue.",
+            process.contains("reportQueueStore.enqueue("),
+        )
+        assertFalse(process.contains("uploadCall("))
+        val queueContract = ReportStaticSourceInspector.read(REPORT_QUEUE_CONTRACT_PATH)
+        val buildScript = ReportStaticSourceInspector.read(BUILD_SCRIPT_PATH)
+        assertTrue(
+            "The production queue must be constructed only from validated BuildConfig inputs.",
+            queueContract.contains("approvedReportQueueCapacityProfile(") &&
+                queueContract.contains("BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED"),
+        )
+        assertTrue(buildScript.contains("null, \"false\" -> false"))
+        assertTrue(buildScript.contains("automatic entry limit below the total entry limit"))
+        assertTrue(
+            buildScript.contains("automatic capacity plus one max stored explicit entry reserve"),
         )
     }
 
@@ -68,7 +85,7 @@ class PersistentReportQueueDisabledStaticTest {
         val source = ReportStaticSourceInspector.read(MAIN_ACTIVITY_PATH)
         assertTrue(
             Regex(
-                """private\s+val\s+reportUploaderExecutor\s*=\s*Executors\.newSingleThreadExecutor""",
+                """private\s+val\s+reportQueueDrainExecutor\s*=\s*Executors\.newSingleThreadExecutor""",
             ).containsMatchIn(source),
         )
         assertTrue(
@@ -84,8 +101,8 @@ class PersistentReportQueueDisabledStaticTest {
             )
         assertTrue(helper.contains("reportCleanupExecutor.execute"))
         assertFalse(
-            "Keystore/filesystem cleanup must not share the report upload executor.",
-            helper.contains("reportUploaderExecutor"),
+            "Keystore/filesystem cleanup must not share the report drain executor.",
+            helper.contains("reportQueueDrainExecutor"),
         )
         assertTrue(
             "Cleanup executor must delegate to the bounded cleanup worker.",
@@ -160,7 +177,7 @@ class PersistentReportQueueDisabledStaticTest {
         val rawWithdrawal =
             ReportStaticSourceInspector.blockAfter(
                 consentWithdrawals,
-                "IntegratedConsentItem.RAW_SOURCE_COLLECTION",
+                "IntegratedConsentItem.RAW_SOURCE_COLLECTION ->",
             )
         val automaticWithdrawal =
             ReportStaticSourceInspector.blockAfter(
@@ -194,14 +211,21 @@ class PersistentReportQueueDisabledStaticTest {
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 onDestroy,
+                "cancelReportQueueDrain()",
+                "reportQueueDrainExecutor.shutdownNow()",
+            ),
+        )
+        assertTrue(
+            ReportStaticSourceInspector.appearsInOrder(
+                onDestroy,
                 "reportCleanupDestroyed = true",
                 "reportCleanupGeneration += 1L",
                 "legacyPendingReportQueuePurgeInFlight = false",
                 "legacyPendingReportQueuePurgeWaiters.clear()",
                 "reportCleanupExecutor.shutdownNow()",
-                "reportUploaderExecutor.shutdownNow()",
             ),
         )
+        assertFalse(onDestroy.contains("reportUploaderExecutor"))
     }
 
     @Test
@@ -334,6 +358,10 @@ class PersistentReportQueueDisabledStaticTest {
     private companion object {
         const val MAIN_ACTIVITY_PATH =
             "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"
+        const val REPORT_QUEUE_CONTRACT_PATH =
+            "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/" +
+                "ReportQueueContract.kt"
+        const val BUILD_SCRIPT_PATH = "apps/android/app/build.gradle.kts"
         const val STORE_PATH =
             "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/" +
                 "AndroidPendingReportStore.kt"

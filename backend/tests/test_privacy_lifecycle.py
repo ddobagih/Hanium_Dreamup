@@ -150,6 +150,7 @@ def test_consent_contract_accepts_only_the_approved_exact_version_set() -> None:
         "automatic_reporting": False,
         "mobile_network_transfer": False,
         "training_reuse": False,
+        "expected_previous_backend_receipt_sha256": None,
     }
     consent = PrivacyConsentEventV2.model_validate(valid)
     assert consent.item_versions.model_dump() == PRIVACY_CONSENT_ITEM_VERSIONS

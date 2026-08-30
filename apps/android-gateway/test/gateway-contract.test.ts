@@ -7,6 +7,7 @@ import { after, before, test } from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 
 import {
+  establishBackendGatewaySession,
   isGatewayAccessConfigured,
   SHORT_SESSION_MAX_PLAINTEXT_BYTES
 } from "../src/auth.js";
@@ -33,7 +34,13 @@ import {
   resolveBindAddress,
   resolvePrivacyRightsRequestUrl
 } from "../src/config.js";
-import { handleGatewayRequest, PUBLIC_GATEWAY_ROUTES } from "../src/routes.js";
+import {
+  handleGatewayRequest,
+  PUBLIC_GATEWAY_ROUTES,
+  REPORT_ID_HEADER,
+  REPORT_PAYLOAD_BYTES_HEADER,
+  REPORT_PAYLOAD_SHA256_HEADER
+} from "../src/routes.js";
 import {
   CONSENT_CONTROL_SECRET_HEADER,
   CONSENT_INSTALLATION_HEADER,
@@ -51,6 +58,11 @@ import {
   DELETION_ACCESS_SECRET_HEADER,
   type AccountDeletionStatusV2
 } from "../src/privacy-deletion-v2.js";
+import {
+  abortPrivacyOperationsForAccountDeletion,
+  bindBackendActorGeneration,
+  currentActorGeneration
+} from "../src/privacy-rights.js";
 
 const ACTOR_ID = "field-operator";
 const ACCOUNT_TOKEN = "field-account-token-12345678901234567890";
@@ -105,6 +117,26 @@ async function login(extraHeaders: HeadersInit = {}): Promise<string> {
   return setCookie.split(";", 1)[0]!;
 }
 
+function backendAccountSessionCookie(deviceId: string | null): string {
+  bindBackendActorGeneration(ACTOR_ID, 1);
+  const response = establishBackendGatewaySession(
+    new Request("https://walksafe.example/api/field-session"),
+    {
+      actorId: ACTOR_ID,
+      accountGeneration: 1,
+      authEpoch: 1,
+      ...(deviceId === null ? {} : { deviceId })
+    },
+    false
+  );
+  assert.equal(response.status, 200);
+  const setCookie = response.headers.get("set-cookie") ?? "";
+  assert.match(setCookie, deviceId === null
+    ? /^walksafe_field_session=v6\./
+    : /^walksafe_field_session=v7\./);
+  return setCookie.split(";", 1)[0]!;
+}
+
 async function holdExclusiveLock(lockPath: string): Promise<() => Promise<void>> {
   let markAcquired!: () => void;
   let rejectAcquired!: (error: unknown) => void;
@@ -146,6 +178,7 @@ async function reportConsentHeaders(cookie: string): Promise<Record<string, stri
         policy_version: INTEGRATED_CONSENT_POLICY_VERSION,
         item_versions: INTEGRATED_CONSENT_ITEM_VERSIONS,
         client_revision: 1,
+        expected_previous_backend_receipt_sha256: null,
         selections: {
           raw_source_collection: true,
           automatic_reporting: true,
@@ -185,7 +218,7 @@ async function reportConsentHeaders(cookie: string): Promise<Record<string, stri
     "x-walksafe-report-purpose": "explicit",
     [CONSENT_POLICY_HEADER]: confirmation.policy_version,
     [CONSENT_REVISION_HEADER]: String(confirmation.revision),
-    [CONSENT_RECEIPT_HEADER]: confirmation.receipt_sha256
+    [CONSENT_RECEIPT_HEADER]: confirmation.backend_consent_receipt_sha256
   };
 }
 
@@ -197,11 +230,26 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     components: { schemas: Record<string, unknown> };
   };
   const expected = [
+    "/api/account-enrollments/email-otp",
+    "/api/accounts",
     "/api/field-session",
     "/api/field-walk",
+    "/api/speech/stt",
+    "/api/speech/tts",
     "/api/navigation/walking",
     "/api/navigation/destinations/search",
     "/api/reports/v2",
+    "/api/reports/v2/{report_id}/status",
+    "/api/reports/mine",
+    "/api/reports/mine/deletions/{request_id}",
+    "/api/reports/mine/{report_id}",
+    "/api/reports/mine/{report_id}/content",
+    "/api/reports/mine/{report_id}/corrections",
+    "/api/reports/mine/{report_id}/requests",
+    "/api/raw-collections/{collection_id}/manifest",
+    "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}",
+    "/api/raw-collections/{collection_id}",
+    "/api/raw-collections/{collection_id}/commit",
     "/privacy/rights",
     "/privacy/account-deletions",
     "/privacy/account-deletions/{request_id}/status",
@@ -209,16 +257,55 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
   ];
   assert.deepEqual(Object.keys(contract.paths), expected);
   assert.deepEqual(PUBLIC_GATEWAY_ROUTES, expected);
-  assert.deepEqual(Object.keys(contract.paths[expected[0]!]!).sort(), ["delete", "get", "post"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[1]!]!).sort(), ["get", "post"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[2]!]!), ["post"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[3]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[0]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[1]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[2]!]!).sort(), ["delete", "get", "post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[3]!]!).sort(), ["get", "post"]);
   assert.deepEqual(Object.keys(contract.paths[expected[4]!]!), ["post"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[5]!]!).sort(), ["get", "put"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[5]!]!), ["post"]);
   assert.deepEqual(Object.keys(contract.paths[expected[6]!]!), ["post"]);
   assert.deepEqual(Object.keys(contract.paths[expected[7]!]!), ["get"]);
   assert.deepEqual(Object.keys(contract.paths[expected[8]!]!), ["post"]);
-  assert.equal(contract.info.version, "0.7.0");
+  assert.deepEqual(Object.keys(contract.paths[expected[9]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[10]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[11]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[12]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[13]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[14]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[15]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[16]!]!), ["put"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[17]!]!), ["put"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[18]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[19]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[20]!]!).sort(), ["get", "put"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[21]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[22]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[23]!]!), ["post"]);
+  assert.equal(contract.info.version, "0.11.0");
+  const rawManifest = contract.paths[expected[16]!]!.put as {
+    "x-max-body-bytes": number;
+    parameters: Array<{ $ref: string }>;
+  };
+  const rawChunk = contract.paths[expected[17]!]!.put as {
+    "x-max-body-bytes": number;
+    parameters: Array<{ $ref: string }>;
+  };
+  const rawStatus = contract.paths[expected[18]!]!.get as {
+    parameters: Array<{ $ref: string }>;
+  };
+  const rawCommit = contract.paths[expected[19]!]!.post as {
+    "x-max-body-bytes": number;
+    parameters: Array<{ $ref: string }>;
+  };
+  assert.equal(rawManifest["x-max-body-bytes"], 512 * 1024);
+  assert.equal(rawChunk["x-max-body-bytes"], 8 * 1024 * 1024);
+  assert.equal(rawCommit["x-max-body-bytes"], 16 * 1024);
+  assert.equal(rawManifest.parameters.some(item =>
+    item.$ref.endsWith("/RawConsentReceiptSha256")), true);
+  assert.equal(rawChunk.parameters.some(item => item.$ref.endsWith("/RawChunkSha256")), true);
+  assert.equal(rawCommit.parameters.some(item => item.$ref.endsWith("/RawCommitSha256")), true);
+  assert.equal(rawStatus.parameters.some(item =>
+    item.$ref.endsWith("/RawConsentReceiptSha256")), false);
   const reportOperation = (
     contract as unknown as {
       paths: Record<string, {
@@ -243,6 +330,14 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
   ]) {
     assert.ok(requiredReportHeaders.includes(header));
   }
+  const optionalReportHeaders = (reportOperation.parameters ?? [])
+    .filter((parameter) => parameter.in === "header" && !parameter.required)
+    .map((parameter) => parameter.name.toLowerCase());
+  assert.deepEqual(optionalReportHeaders, [
+    "x-walksafe-report-id",
+    "x-walksafe-report-payload-sha256",
+    "x-walksafe-report-payload-bytes"
+  ]);
   assert.ok(Object.hasOwn(reportOperation.responses ?? {}, "428"));
   for (const schema of [
     "FieldShortSession",
@@ -264,8 +359,22 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
       properties: { purpose: { const: "account_deletion_recovery" } }
     }
   }]);
+  const passwordLoginSchema = contract.components.schemas.AccountPasswordSessionLogin as {
+    required?: string[];
+    properties?: Record<string, { pattern?: string }>;
+    additionalProperties?: boolean;
+  };
+  assert.deepEqual(passwordLoginSchema.required, [
+    "grant_type", "email", "password", "remember_me"
+  ]);
+  assert.equal(
+    passwordLoginSchema.properties?.device_id?.pattern,
+    "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+  );
+  assert.equal(passwordLoginSchema.additionalProperties, false);
   const detailed = contract as unknown as {
     paths: Record<string, Record<string, {
+      description?: string;
       security?: Array<Record<string, unknown>>;
       parameters?: Array<{ name: string; in: string; required?: boolean }>;
       responses?: Record<string, { $ref?: string }>;
@@ -296,7 +405,138 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
       { name: "policy_version", in: "query", required: true }
     ]
   );
-  assert.deepEqual(consentGet.security, [{ consentControlSecret: [] }]);
+  const reportStatus = detailed.paths["/api/reports/v2/{report_id}/status"]!.get!;
+  assert.deepEqual(reportStatus.security, [{ fieldSession: [] }]);
+  assert.equal(
+    reportStatus.responses?.["200"]?.$ref,
+    "#/components/responses/ReportTransportStatus"
+  );
+  assert.equal(
+    detailed.components.schemas.ReportTransportReceipt!.additionalProperties,
+    false
+  );
+  assert.equal(
+    detailed.components.schemas.ReportTransportStatus!.additionalProperties,
+    false
+  );
+  const userList = detailed.paths["/api/reports/mine"]!.get!;
+  const userDeletion = detailed.paths["/api/reports/mine/deletions/{request_id}"]!.get!;
+  const userDetail = detailed.paths["/api/reports/mine/{report_id}"]!.get!;
+  const userContent = detailed.paths["/api/reports/mine/{report_id}/content"]!.get!;
+  const userCorrection = detailed.paths["/api/reports/mine/{report_id}/corrections"]!.post!;
+  const userRequest = detailed.paths["/api/reports/mine/{report_id}/requests"]!.post!;
+  for (const operation of [
+    userList,
+    userDeletion,
+    userDetail,
+    userContent,
+    userCorrection,
+    userRequest
+  ]) {
+    assert.deepEqual(operation.security, [{ fieldSession: [] }]);
+    assert.match(operation.description ?? "", /current v7/i);
+    assert.match(operation.description ?? "", /consent is not required/i);
+    assert.doesNotMatch(
+      JSON.stringify(operation.parameters ?? []),
+      /x-walksafe-consent|consentControlSecret/i
+    );
+  }
+  assert.equal(userList.responses?.["200"]?.$ref, "#/components/responses/UserReportList");
+  assert.equal(
+    userDeletion.responses?.["200"]?.$ref,
+    "#/components/responses/ReportDeletionStatus"
+  );
+  assert.equal(userDetail.responses?.["200"]?.$ref, "#/components/responses/UserReportDetail");
+  assert.equal(
+    userContent.responses?.["200"]?.$ref,
+    "#/components/responses/ReportContentCurrent"
+  );
+  assert.equal(
+    userCorrection.responses?.["200"]?.$ref,
+    "#/components/responses/ReportContentRevision"
+  );
+  assert.equal(
+    userCorrection.responses?.["201"]?.$ref,
+    "#/components/responses/ReportContentRevision"
+  );
+  assert.equal(userRequest.responses?.["201"]?.$ref, "#/components/responses/ReportUserRequest");
+  for (const schemaName of [
+    "ReportUserRequest",
+    "UserReport",
+    "UserReportList",
+    "UserReportDetail",
+    "ReportUserRequestCreate",
+    "ReportContentCurrent",
+    "ReportContentCorrectionRequest",
+    "ReportContentRevision",
+    "ReportDeletionStatus"
+  ]) {
+    assert.equal(detailed.components.schemas[schemaName]!.additionalProperties, false);
+  }
+  const requestContract = contract.paths["/api/reports/mine/{report_id}/requests"]!
+    .post as {
+      "x-max-body-bytes"?: number;
+      requestBody?: { content?: { "application/json"?: { schema?: { $ref?: string } } } };
+    };
+  assert.equal(requestContract["x-max-body-bytes"], 4096);
+  assert.equal(
+    requestContract.requestBody?.content?.["application/json"]?.schema?.$ref,
+    "#/components/schemas/ReportUserRequestCreate"
+  );
+  assert.equal(
+    (detailed.components.schemas.ReportUserRequestCreate!.properties!
+      .request_text as unknown as { maxLength: number }).maxLength,
+    500
+  );
+  const correctionContract = contract.paths["/api/reports/mine/{report_id}/corrections"]!
+    .post as {
+      "x-max-body-bytes"?: number;
+      requestBody?: { content?: { "application/json"?: { schema?: { $ref?: string } } } };
+    };
+  assert.equal(correctionContract["x-max-body-bytes"], 4096);
+  assert.equal(
+    correctionContract.requestBody?.content?.["application/json"]?.schema?.$ref,
+    "#/components/schemas/ReportContentCorrectionRequest"
+  );
+  const correctionSchema = contract.components.schemas.ReportContentCorrectionRequest as {
+    required?: string[];
+    anyOf?: Array<{ required?: string[] }>;
+  };
+  assert.deepEqual(correctionSchema.required, ["expected_revision", "idempotency_key"]);
+  assert.deepEqual(correctionSchema.anyOf, [
+    { required: ["user_description"] },
+    { required: ["category_hint"] }
+  ]);
+  const reportRightsResponses = (contract as unknown as {
+    components: {
+      responses: Record<string, {
+        headers?: Record<string, { $ref?: string }>;
+        content?: { "application/json"?: { schema?: { $ref?: string } } };
+      }>;
+    };
+  }).components.responses;
+  for (const [name, schemaName] of [
+    ["ReportContentCurrent", "ReportContentCurrent"],
+    ["ReportContentRevision", "ReportContentRevision"],
+    ["ReportDeletionStatus", "ReportDeletionStatus"]
+  ] as const) {
+    assert.equal(
+      reportRightsResponses[name]!.headers?.["Cache-Control"]?.$ref,
+      "#/components/headers/NoStore"
+    );
+    assert.equal(
+      reportRightsResponses[name]!.content?.["application/json"]?.schema?.$ref,
+      `#/components/schemas/${schemaName}`
+    );
+  }
+  assert.deepEqual(consentGet.security, [
+    { fieldSession: [], consentControlSecret: [] },
+    { fieldSession: [] }
+  ]);
+  assert.equal(
+    consentGet.responses?.["200"]?.$ref,
+    "#/components/responses/IntegratedConsentRead"
+  );
   assert.deepEqual(consentPut.security, [{
     fieldSession: [],
     consentControlSecret: []
@@ -319,6 +559,7 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     "IntegratedConsentItemVersions",
     "IntegratedConsentSelections",
     "IntegratedConsentRequest",
+    "IntegratedConsentBootstrap",
     "IntegratedConsentConfirmation"
   ]) {
     assert.equal(
@@ -335,7 +576,23 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
       "policy_version",
       "item_versions",
       "client_revision",
+      "expected_previous_backend_receipt_sha256",
       "selections"
+    ]
+  );
+  assert.deepEqual(
+    detailed.components.schemas.IntegratedConsentBootstrap!.required,
+    [
+      "schema_version",
+      "status",
+      "source",
+      "installation_id",
+      "policy_version",
+      "item_versions",
+      "client_revision_floor",
+      "selections",
+      "source_receipt_sha256",
+      "expected_previous_backend_receipt_sha256"
     ]
   );
   assert.deepEqual(
@@ -351,16 +608,17 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
       "revision",
       "selections",
       "confirmed_at",
-      "receipt_sha256"
+      "gateway_audit_record_sha256",
+      "backend_consent_receipt_sha256"
     ]
   );
   assert.deepEqual(
     detailed.components.schemas.IntegratedConsentItemVersions!.properties,
     {
-      raw_source_collection: { type: "string", const: "FP-013-RAW-1.0.0" },
-      automatic_reporting: { type: "string", const: "FP-013-AUTO-1.0.0" },
+      raw_source_collection: { type: "string", const: "FP-013-RAW-1.1.0" },
+      automatic_reporting: { type: "string", const: "FP-013-AUTO-1.1.0" },
       mobile_network_transfer: { type: "string", const: "FP-013-MOBILE-1.0.0" },
-      training_reuse: { type: "string", const: "FP-013-TRAINING-1.0.0" }
+      training_reuse: { type: "string", const: "FP-013-TRAINING-1.1.0" }
     }
   );
   const evidence409 = detailed.paths[
@@ -1065,6 +1323,9 @@ test("report multipart is bounded and proxied only after field authentication", 
     const headers = new Headers(init.headers);
     assert.equal(headers.get(FIELD_TEST_TOKEN_HEADER), INTERNAL_TOKEN);
     assert.equal(headers.get("content-type"), null);
+    assert.equal(headers.get(REPORT_ID_HEADER), null);
+    assert.equal(headers.get(REPORT_PAYLOAD_SHA256_HEADER), null);
+    assert.equal(headers.get(REPORT_PAYLOAD_BYTES_HEADER), null);
     return Response.json({ id: "report-id" }, { status: 201 });
   };
   const form = new FormData();
@@ -1164,6 +1425,593 @@ test("multipart part counting ignores boundary text inside a payload", () => {
     "utf8"
   );
   assert.equal(countMultipartDelimiters(body, boundary), 3);
+});
+
+test("report transport headers are all-or-none and only exact values reach backend", async () => {
+  resetImageUploadAdmissionForTests();
+  const cookie = await login();
+  const consentHeaders = await reportConsentHeaders(cookie);
+  const reportId = "aaaaaaaa-1111-4111-8111-111111111111";
+  const payloadSha256 = "a".repeat(64);
+  const payloadBytes = "123";
+  let calls = 0;
+  const form = (): FormData => {
+    const value = new FormData();
+    value.set("metadata", "{\"source\":\"android\",\"auto_reported\":false}");
+    value.set(
+      "image",
+      new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" }),
+      "report.jpg"
+    );
+    return value;
+  };
+  const fetchImpl: GatewayFetch = async (_input, init) => {
+    calls += 1;
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get(REPORT_ID_HEADER), reportId);
+    assert.equal(headers.get(REPORT_PAYLOAD_SHA256_HEADER), payloadSha256);
+    assert.equal(headers.get(REPORT_PAYLOAD_BYTES_HEADER), payloadBytes);
+    assert.equal(headers.get(ACTOR_ID_HEADER), ACTOR_ID);
+    assert.equal(headers.get("x-walksafe-admin-token"), null);
+    assert.equal(headers.get("x-walksafe-read-purpose"), null);
+    return Response.json({ id: reportId }, { status: 201 });
+  };
+
+  for (const headers of [
+    { [REPORT_ID_HEADER]: reportId },
+    {
+      [REPORT_ID_HEADER]: reportId.toUpperCase(),
+      [REPORT_PAYLOAD_SHA256_HEADER]: payloadSha256,
+      [REPORT_PAYLOAD_BYTES_HEADER]: payloadBytes
+    },
+    {
+      [REPORT_ID_HEADER]: reportId,
+      [REPORT_PAYLOAD_SHA256_HEADER]: payloadSha256.toUpperCase(),
+      [REPORT_PAYLOAD_BYTES_HEADER]: "0"
+    }
+  ]) {
+    const rejected = await handleGatewayRequest(
+      new Request("http://127.0.0.1:8081/api/reports/v2", {
+        method: "POST",
+        headers: {
+          cookie,
+          "cf-connecting-ip": nextClientIp(),
+          ...consentHeaders,
+          ...headers
+        },
+        body: form()
+      }),
+      { fetchImpl }
+    );
+    assert.equal(rejected.status, 422);
+  }
+  assert.equal(calls, 0);
+
+  const accepted = await handleGatewayRequest(
+    new Request("http://127.0.0.1:8081/api/reports/v2", {
+      method: "POST",
+      headers: {
+        cookie,
+        "cf-connecting-ip": nextClientIp(),
+        ...consentHeaders,
+        [REPORT_ID_HEADER]: reportId,
+        [REPORT_PAYLOAD_SHA256_HEADER]: payloadSha256,
+        [REPORT_PAYLOAD_BYTES_HEADER]: payloadBytes,
+        [ACTOR_ID_HEADER]: "spoofed-actor",
+        "x-walksafe-admin-token": "must-not-forward",
+        "x-walksafe-read-purpose": "must-not-forward"
+      },
+      body: form()
+    }),
+    { fetchImpl }
+  );
+  assert.equal(accepted.status, 201);
+  assert.equal(calls, 1);
+});
+
+test("report status is actor-bound, bounded, strict, and no-store", async () => {
+  const cookie = await login();
+  const reportId = "11111111-1111-4111-8111-111111111111";
+  const marker = "22222222-2222-4222-8222-222222222222";
+  const statusUrl = `http://127.0.0.1:8081/api/reports/v2/${reportId}/status`;
+  let calls = 0;
+  const fetchImpl: GatewayFetch = async (input, init) => {
+    calls += 1;
+    assert.equal(String(input), `http://127.0.0.1:8000/reports/v2/${reportId}/status`);
+    assert.equal(init?.method, "GET");
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get(ACTOR_ID_HEADER), ACTOR_ID);
+    assert.equal(headers.get(ACCOUNT_GENERATION_HEADER), "1");
+    assert.match(headers.get(ACTOR_ASSERTION_HEADER) ?? "", /^v2\.\d+\.[A-Za-z0-9_-]+$/);
+    assert.equal(headers.get(REPORT_ID_HEADER), null);
+    assert.equal(headers.get("x-walksafe-admin-token"), null);
+    return Response.json({
+      persistence_state: "PERSISTED",
+      user_status: "RECEIVED",
+      transport_receipt: {
+        marker: "DATABASE_AND_ENCRYPTED_IMAGE_STORE",
+        report_id: reportId,
+        persistence_marker: marker,
+        payload_sha256: "a".repeat(64),
+        payload_bytes: 123
+      }
+    });
+  };
+
+  const missing = await handleGatewayRequest(new Request(statusUrl), { fetchImpl });
+  assert.equal(missing.status, 404);
+  assert.equal(calls, 0);
+
+  const status = await handleGatewayRequest(
+    new Request(statusUrl, {
+      headers: {
+        cookie,
+        [ACTOR_ID_HEADER]: "spoofed-actor",
+        [REPORT_ID_HEADER]: "33333333-3333-4333-8333-333333333333",
+        "x-walksafe-admin-token": "must-not-forward"
+      }
+    }),
+    { fetchImpl }
+  );
+  assert.equal(status.status, 200);
+  assert.equal(status.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await status.json(), {
+    persistence_state: "PERSISTED",
+    user_status: "RECEIVED",
+    transport_receipt: {
+      marker: "DATABASE_AND_ENCRYPTED_IMAGE_STORE",
+      report_id: reportId,
+      persistence_marker: marker,
+      payload_sha256: "a".repeat(64),
+      payload_bytes: 123
+    }
+  });
+  assert.equal(calls, 1);
+
+  const hidden = await handleGatewayRequest(
+    new Request(statusUrl, { headers: { cookie } }),
+    { fetchImpl: async () => Response.json({ private_actor: "other@example.org" }, { status: 404 }) }
+  );
+  assert.equal(hidden.status, 404);
+  assert.deepEqual(await hidden.json(), {
+    detail: { code: "report_transport_status_not_found" }
+  });
+
+  const upstreamDenied = await handleGatewayRequest(
+    new Request(statusUrl, { headers: { cookie } }),
+    {
+      fetchImpl: async () => Response.json(
+        { private_actor: "other@example.org" },
+        { status: 403 }
+      )
+    }
+  );
+  assert.equal(upstreamDenied.status, 404);
+  assert.deepEqual(await upstreamDenied.json(), {
+    detail: { code: "report_transport_status_not_found" }
+  });
+
+  const invalidUpstream = await handleGatewayRequest(
+    new Request(statusUrl, { headers: { cookie } }),
+    {
+      fetchImpl: async () => Response.json({
+        persistence_state: "PERSISTED",
+        user_status: "RECEIVED",
+        gps: { latitude: 37.5 },
+        transport_receipt: {
+          marker: "DATABASE_AND_ENCRYPTED_IMAGE_STORE",
+          report_id: reportId,
+          persistence_marker: marker,
+          payload_sha256: "a".repeat(64),
+          payload_bytes: 123
+        }
+      })
+    }
+  );
+  assert.equal(invalidUpstream.status, 502);
+  assert.doesNotMatch(await invalidUpstream.text(), /latitude|private_actor|other@example/);
+
+  const fenced = await handleGatewayRequest(
+    new Request(statusUrl, { headers: { cookie } }),
+    {
+      fetchImpl: async () => {
+        const generation = currentActorGeneration(ACTOR_ID);
+        assert.notEqual(generation, null);
+        abortPrivacyOperationsForAccountDeletion(ACTOR_ID, generation!);
+        return Response.json({ private_actor: "must-not-leak" });
+      }
+    }
+  );
+  assert.equal(fenced.status, 404);
+  assert.deepEqual(await fenced.json(), {
+    detail: { code: "report_transport_status_not_found" }
+  });
+});
+
+test("user report routes bind actor generation and expose only strict minimum JSON", async () => {
+  const cookie = backendAccountSessionCookie("android-report-rights-device");
+  const reportId = "44444444-4444-4444-8444-444444444444";
+  const requestId = "55555555-5555-4555-8555-555555555555";
+  const correctionId = "66666666-6666-4666-8666-666666666666";
+  const clearCorrectionId = "77777777-7777-4777-8777-777777777777";
+  const deletionRequestId = "88888888-8888-4888-8888-888888888888";
+  const createdAt = "2026-08-29T01:02:03Z";
+  const initialContent = {
+    schema_version: "walksafe.report-content-current.v1",
+    report_id: reportId,
+    revision: 0,
+    content_sha256: "a".repeat(64),
+    user_description: null,
+    category_hint: null,
+    corrected_at: null
+  };
+  const deletionStatus = {
+    schema_version: "walksafe.report-deletion-status.v1",
+    request_id: deletionRequestId,
+    report_id: reportId,
+    state: "PENDING",
+    request_status_version: 1,
+    external_copy_count: 0,
+    updated_at: createdAt
+  };
+  const baseItem = {
+    report_id: reportId,
+    created_at: createdAt,
+    user_status: "RECEIVED",
+    public_rejection_reason: null,
+    latest_request: null
+  };
+  const calls: string[] = [];
+  const fetchImpl: GatewayFetch = async (input, init) => {
+    const url = String(input);
+    calls.push(url);
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get(ACTOR_ID_HEADER), ACTOR_ID);
+    assert.equal(headers.get(ACCOUNT_GENERATION_HEADER), "1");
+    assert.match(headers.get(ACTOR_ASSERTION_HEADER) ?? "", /^v2\.\d+\.[A-Za-z0-9_-]+$/);
+    assert.equal(headers.get("x-walksafe-admin-token"), null);
+    for (const header of [
+      CONSENT_CONTROL_SECRET_HEADER,
+      CONSENT_INSTALLATION_HEADER,
+      CONSENT_NETWORK_TRANSPORT_HEADER,
+      CONSENT_POLICY_HEADER,
+      CONSENT_RECEIPT_HEADER,
+      CONSENT_REVISION_HEADER,
+      "x-walksafe-report-purpose",
+      "x-walksafe-gateway-audit-record-sha256"
+    ]) {
+      assert.equal(headers.get(header), null);
+    }
+    if (url.endsWith("/content")) {
+      assert.equal(init?.method, "GET");
+      return Response.json(initialContent);
+    }
+    if (url.endsWith("/corrections")) {
+      assert.equal(init?.method, "POST");
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      if (body.idempotency_key === correctionId) {
+        assert.deepEqual(body, {
+          expected_revision: 0,
+          idempotency_key: correctionId,
+          user_description: "표면 손상 범위"
+        });
+        return Response.json({
+          schema_version: "walksafe.report-content-revision.v1",
+          report_id: reportId,
+          revision: 1,
+          expected_revision: 0,
+          idempotency_key: correctionId,
+          content_sha256: "b".repeat(64),
+          user_description: "표면 손상 범위",
+          category_hint: null,
+          corrected_at: createdAt
+        }, { status: 201 });
+      }
+      assert.deepEqual(body, {
+        expected_revision: 1,
+        idempotency_key: clearCorrectionId,
+        category_hint: null
+      });
+      return Response.json({
+        schema_version: "walksafe.report-content-revision.v1",
+        report_id: reportId,
+        revision: 2,
+        expected_revision: 1,
+        idempotency_key: clearCorrectionId,
+        content_sha256: "c".repeat(64),
+        user_description: "표면 손상 범위",
+        category_hint: null,
+        corrected_at: createdAt
+      });
+    }
+    if (url.includes("/reports/mine/deletions/")) {
+      assert.equal(init?.method, "GET");
+      return Response.json(deletionStatus);
+    }
+    if (url.endsWith("/requests")) {
+      assert.equal(init?.method, "POST");
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        client_request_id: requestId,
+        request_type: "CORRECTION",
+        request_text: "표면 손상 범위를 정정해 주세요."
+      });
+      return Response.json({
+        request_id: requestId,
+        request_type: "CORRECTION",
+        status: "RECEIVED",
+        status_version: 1,
+        public_response: null,
+        created_at: createdAt,
+        updated_at: createdAt
+      }, { status: 201 });
+    }
+    assert.equal(url, "http://127.0.0.1:8000/reports/mine?limit=25");
+    assert.equal(init?.method, "GET");
+    return Response.json({
+      schema_version: "walksafe.user-report-list.v1",
+      items: [baseItem],
+      next_cursor: null
+    });
+  };
+
+  const list = await handleGatewayRequest(
+    new Request("http://127.0.0.1:8081/api/reports/mine?limit=25", {
+      headers: { cookie, [ACTOR_ID_HEADER]: "spoofed", "x-walksafe-admin-token": "secret" }
+    }),
+    { fetchImpl }
+  );
+  assert.equal(list.status, 200);
+  assert.equal(list.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await list.json(), {
+    schema_version: "walksafe.user-report-list.v1",
+    items: [baseItem],
+    next_cursor: null
+  });
+  assert.equal(calls[0], "http://127.0.0.1:8000/reports/mine?limit=25");
+
+  const content = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/content`, {
+      headers: { cookie }
+    }),
+    { fetchImpl }
+  );
+  assert.equal(content.status, 200);
+  assert.equal(content.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await content.json(), initialContent);
+
+  const corrected = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/corrections`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        expected_revision: 0,
+        idempotency_key: correctionId,
+        user_description: "  표면   손상  범위  "
+      })
+    }),
+    { fetchImpl }
+  );
+  assert.equal(corrected.status, 201);
+  assert.deepEqual(await corrected.json(), {
+    schema_version: "walksafe.report-content-revision.v1",
+    report_id: reportId,
+    revision: 1,
+    expected_revision: 0,
+    idempotency_key: correctionId,
+    content_sha256: "b".repeat(64),
+    user_description: "표면 손상 범위",
+    category_hint: null,
+    corrected_at: createdAt
+  });
+
+  const clearedCategory = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/corrections`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        expected_revision: 1,
+        idempotency_key: clearCorrectionId,
+        category_hint: null
+      })
+    }),
+    { fetchImpl }
+  );
+  assert.equal(clearedCategory.status, 200);
+  assert.equal(
+    (await clearedCategory.json() as { category_hint: unknown }).category_hint,
+    null
+  );
+
+  const deletion = await handleGatewayRequest(
+    new Request(
+      `http://127.0.0.1:8081/api/reports/mine/deletions/${deletionRequestId}`,
+      { headers: { cookie } }
+    ),
+    { fetchImpl }
+  );
+  assert.equal(deletion.status, 200);
+  assert.equal(deletion.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await deletion.json(), deletionStatus);
+
+  const created = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/requests`, {
+      method: "POST",
+      headers: {
+        cookie,
+        "content-type": "application/json",
+        [ACTOR_ID_HEADER]: "spoofed",
+        "x-walksafe-admin-token": "secret"
+      },
+      body: JSON.stringify({
+        client_request_id: requestId,
+        request_type: "CORRECTION",
+        request_text: "표면 손상 범위를 정정해 주세요."
+      })
+    }),
+    { fetchImpl }
+  );
+  assert.equal(created.status, 201);
+  assert.equal((await created.json() as { request_id: string }).request_id, requestId);
+
+  const invalidBody = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/requests`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        client_request_id: requestId,
+        request_type: "DELETE",
+        request_text: "삭제해 주세요.",
+        internal_note: "must-not-forward"
+      })
+    }),
+    { fetchImpl: async () => assert.fail("invalid request must not reach backend") }
+  );
+  assert.equal(invalidBody.status, 422);
+
+  for (const body of [
+    {
+      expected_revision: 2,
+      idempotency_key: "99999999-9999-4999-8999-999999999999"
+    },
+    {
+      expected_revision: 2,
+      idempotency_key: "99999999-9999-4999-8999-999999999999",
+      user_description: "control\u0000text"
+    },
+    {
+      expected_revision: 2,
+      idempotency_key: "99999999-9999-4999-8999-999999999999",
+      category_hint: "ROAD_DAMAGE",
+      internal_note: "must-not-forward"
+    }
+  ]) {
+    const invalidCorrection = await handleGatewayRequest(
+      new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/corrections`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify(body)
+      }),
+      { fetchImpl: async () => assert.fail("invalid correction must not reach backend") }
+    );
+    assert.equal(invalidCorrection.status, 422);
+    assert.deepEqual(await invalidCorrection.json(), {
+      detail: { code: "report_content_correction_invalid" }
+    });
+  }
+
+  const oversizedBody = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/requests`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        client_request_id: requestId,
+        request_type: "CORRECTION",
+        request_text: "x".repeat(5000)
+      })
+    }),
+    { fetchImpl: async () => assert.fail("oversized request must not reach backend") }
+  );
+  assert.equal(oversizedBody.status, 413);
+  assert.equal(oversizedBody.headers.get("cache-control"), "no-store");
+
+  const leakCorrectionId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  for (const leakCase of [
+    {
+      url: `http://127.0.0.1:8081/api/reports/mine/${reportId}/content`,
+      init: { headers: { cookie } },
+      payload: { ...initialContent, private_actor: ACTOR_ID },
+      upstreamStatus: 200
+    },
+    {
+      url: `http://127.0.0.1:8081/api/reports/mine/${reportId}/corrections`,
+      init: {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          expected_revision: 0,
+          idempotency_key: leakCorrectionId,
+          category_hint: "ROAD_DAMAGE"
+        })
+      },
+      payload: {
+        schema_version: "walksafe.report-content-revision.v1",
+        report_id: reportId,
+        revision: 1,
+        expected_revision: 0,
+        idempotency_key: leakCorrectionId,
+        content_sha256: "d".repeat(64),
+        user_description: null,
+        category_hint: "ROAD_DAMAGE",
+        corrected_at: createdAt,
+        private_actor: ACTOR_ID
+      },
+      upstreamStatus: 201
+    },
+    {
+      url: `http://127.0.0.1:8081/api/reports/mine/deletions/${deletionRequestId}`,
+      init: { headers: { cookie } },
+      payload: { ...deletionStatus, private_actor: ACTOR_ID },
+      upstreamStatus: 200
+    }
+  ]) {
+    const leaked = await handleGatewayRequest(
+      new Request(leakCase.url, leakCase.init),
+      {
+        fetchImpl: async () => Response.json(
+          leakCase.payload,
+          { status: leakCase.upstreamStatus }
+        )
+      }
+    );
+    assert.equal(leaked.status, 502);
+    assert.doesNotMatch(await leaked.text(), /private_actor|field-operator/);
+  }
+
+  const leakedDetail = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}`, {
+      headers: { cookie }
+    }),
+    {
+      fetchImpl: async () => Response.json({
+        schema_version: "walksafe.user-report-detail.v1",
+        ...baseItem,
+        latitude: 37.5,
+        internal_reason: "private"
+      })
+    }
+  );
+  assert.equal(leakedDetail.status, 502);
+  assert.doesNotMatch(await leakedDetail.text(), /latitude|internal_reason|private/);
+
+  const fenced = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}`, {
+      headers: { cookie }
+    }),
+    {
+      fetchImpl: async () => {
+        const generation = currentActorGeneration(ACTOR_ID);
+        assert.notEqual(generation, null);
+        abortPrivacyOperationsForAccountDeletion(ACTOR_ID, generation!);
+        return Response.json({ private_actor: "must-not-leak" });
+      }
+    }
+  );
+  assert.equal(fenced.status, 404);
+  assert.deepEqual(await fenced.json(), {
+    detail: { code: "report_not_found" }
+  });
+
+  const v6Cookie = backendAccountSessionCookie(null);
+  const v6Rejected = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/content`, {
+      headers: { cookie: v6Cookie }
+    }),
+    { fetchImpl: async () => assert.fail("v6 session must not reach backend") }
+  );
+  assert.equal(v6Rejected.status, 404);
+  assert.deepEqual(await v6Rejected.json(), {
+    detail: { code: "report_not_found" }
+  });
 });
 
 test("report authentication and busy admission reject before opening the body", async () => {

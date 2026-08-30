@@ -20,7 +20,7 @@ Phase D 기준 Android 사용자 앱은 `/api/field-session`, `/api/navigation/w
 - `systemd/walksafe-android-gateway.service`
 - `nginx/walksafe-android-gateway.conf.example`
 
-예제의 잠긴 Node v22.23.1 서비스는 `/srv/walksafe/apps/android-gateway/dist/server.js`를 전용 비권한 계정으로 한 프로세스만 실행하고 `127.0.0.1:8081`에만 결속합니다. upstream은 `http://127.0.0.1:8000`의 보호 backend 하나이며 Next/Web fallback은 없습니다. nginx 예제는 TLS 뒤에서 정확한 여덟 Android API 경로와 로그인 없는 `/privacy/rights` 안내 화면만 `127.0.0.1:8081`로 전달하고 나머지 경로를 차단합니다. 계정 삭제는 exact 요청 경로와 16~128자 request ID를 제한하는 두 anchored 정규식 경로만 열며, 요청·상태·기기증거 본문 상한은 각각 4 KiB·1 KiB·16 KiB입니다. 목적지 검색어와 정확 좌표가 query string에 있으므로 기본 combined access log 상속을 끄며, 실제 배포 검토에서 필요하면 query를 제외한 `$uri` 기반 최소 형식과 보존기간을 별도로 승인해야 합니다.
+예제의 잠긴 Node v22.23.1 서비스는 `/srv/walksafe/apps/android-gateway/dist/server.js`를 전용 비권한 계정으로 한 프로세스만 실행하고 `127.0.0.1:8081`에만 결속합니다. upstream은 loopback의 보호 Backend와 명시적으로 활성화한 Voice뿐이며 Next/Web fallback은 없습니다. Voice token은 Gateway 환경에만 두고 APK에는 넣지 않습니다. nginx 예제는 TLS 뒤에서 열거한 Android API 경로와 로그인 없는 `/privacy/rights` 안내 화면만 `127.0.0.1:8081`로 전달하고 나머지 경로를 차단합니다. STT/TTS는 각각 10 MiB/2 KiB ingress 상한과 40초/70초 upstream 상한을 둡니다. 계정 삭제는 exact 요청 경로와 16~128자 request ID를 제한하는 두 anchored 정규식 경로만 열며, 요청·상태·기기증거 본문 상한은 각각 4 KiB·1 KiB·16 KiB입니다. 목적지 검색어와 정확 좌표가 query string에 있으므로 기본 combined access log 상속을 끄며, 실제 배포 검토에서 필요하면 query를 제외한 `$uri` 기반 최소 형식과 보존기간을 별도로 승인해야 합니다.
 
 이 예제는 실제 계정·디렉터리·Node 22·빌드·환경파일·인증서가 준비됐다는 뜻이 아닙니다. 별도 배포 검토 전에는 파일을 `/etc`에 복사하거나 systemd unit을 설치·enable·start하거나 nginx 설정을 적용·reload하지 않습니다. 향후 적용한다면 환경파일은 `root:root`와 `0600`, rate-limit 상태 디렉터리는 서비스 계정 전용 `0700`을 확인하고, 실제 비밀값·도메인·인증서는 Git 밖에서 프로비저닝해야 합니다.
 
@@ -31,10 +31,10 @@ Phase D 기준 Android 사용자 앱은 `/api/field-session`, `/api/navigation/w
 기존 upload 자료가 있는 host에서는 다음 순서를 모두 정지된 서비스 상태에서 수행해야 합니다.
 
 1. Backend, 삭제 worker, retention, backup이 모두 멈췄고 lock 보유자가 없음을 확인한다.
-2. sysusers·tmpfiles를 적용하기 **전에** 기존 `walksafe-backup` UID/GID·home·shell·추가 group과 upload/lock 경로의 owner·mode·access/default ACL을 읽기 전용으로 검사한다. 이름이 같은 기존 계정이 있거나 예상 밖 group·ACL·symlink·hardlink가 하나라도 있으면 적용을 중단한다.
-3. 2단계를 통과한 host에만 sysusers와 tmpfiles를 적용해 전용 계정·그룹, upload root `walksafe-backend:walksafe-backup-readers 2750`, lock parent `root:walksafe-maintenance-lock 0750`, lock leaf `root:walksafe-maintenance-lock 0440`을 만든다. tmpfiles가 기존 ACL을 제거한다고 가정하지 않는다.
-4. upload root와 바로 아래의 각 항목을 symlink를 따라가지 않고 다시 검사한다. root에는 access/default ACL이 없어야 하며, UUID 형식의 flat `.wse`도 ACL이 없는 `walksafe-backend` 소유 regular file, link count 1, 기존 mode `0600` 또는 이미 전환된 `0640`만 허용한다. 하나라도 다르면 적용을 중단한다.
+2. sysusers·tmpfiles를 적용하기 **전에** 기존 `walksafe-backup` UID/GID·home·shell·추가 group과 upload/raw-object/lock 경로의 owner·mode·access/default ACL을 읽기 전용으로 검사한다. 이름이 같은 기존 계정이 있거나 예상 밖 group·ACL·symlink·hardlink가 하나라도 있으면 적용을 중단한다.
+3. 2단계를 통과한 host에만 sysusers와 tmpfiles를 적용해 전용 계정·그룹, upload/raw-object root `walksafe-backend:walksafe-backup-readers 2750`, lock parent `root:walksafe-maintenance-lock 0750`, lock leaf `root:walksafe-maintenance-lock 0440`을 만든다. tmpfiles가 기존 ACL을 제거한다고 가정하지 않는다.
+4. upload/raw-object root와 바로 아래의 각 항목을 symlink를 따라가지 않고 다시 검사한다. root에는 access/default ACL이 없어야 하며, UUID 형식의 flat `.wse`와 canonical `.wsrc`도 ACL이 없는 `walksafe-backend` 소유 regular file, link count 1, 기존 mode `0600` 또는 이미 전환된 `0640`만 허용한다. 하나라도 다르면 적용을 중단한다.
 5. 4단계에서 검증한 파일만 group을 `walksafe-backup-readers`, mode를 `0640`으로 바꾼다. 재귀 `chgrp`·`chmod`로 legacy 파일, symlink, hardlink, 작업 journal을 함께 바꾸지 않는다.
-6. `stat`, Backend 저장소 사전검사, backup source 사전검사와 각 systemd unit 검증을 통과한 뒤에만 Backend를 시작한다. backup 실행기는 `walksafe-backup`의 exact UID/GID와 세 group 외 예상 밖 effective group이 없음을 다시 검사한다. backup timer는 격리 backup→restore와 별도 승인 전까지 비활성으로 둔다.
+6. upload root, raw-object root, account-deletion journal root가 같은 filesystem인지와 `stat`, Backend 저장소 사전검사, backup source 사전검사, 각 systemd unit 검증을 통과한 뒤에만 Backend를 시작한다. backup 실행기는 `walksafe-backup`의 exact UID/GID와 세 group 외 예상 밖 effective group이 없음을 다시 검사한다. raw 원본 backup은 이 B1e 예제의 완료 범위가 아니며, backup timer는 격리 backup→restore와 별도 승인 전까지 비활성으로 둔다.
 
 이 저장소에는 실제 host의 계정·기존 객체·비밀값·승인 표식이 없으므로 위 마이그레이션과 서비스 시작은 실행하지 않았습니다.

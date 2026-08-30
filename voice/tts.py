@@ -25,6 +25,10 @@ from voice.model_integrity import verify_model_snapshot
 DEFAULT_TTS_MODEL_ID = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
 OPTIONAL_TTS_MODEL_ID = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
 DEFAULT_VOICE_INSTRUCT = "차분하고 명확한 한국어 보행 안전 안내 음성. 너무 빠르지 않게 말하세요."
+DEFAULT_TTS_SPEAKER = "Sohee"
+SUPPORTED_TTS_SPEAKERS = frozenset(
+    {"Vivian", "Serena", "Uncle_Fu", "Dylan", "Eric", "Ryan", "Aiden", "Ono_Anna", "Sohee"}
+)
 TTSMode = Literal["custom", "design", "clone"]
 
 
@@ -36,6 +40,8 @@ class TTSResult:
     model: str
     cached: bool
     mode: TTSMode
+    model_revision: str | None = None
+    transient: bool = False
 
 
 class LocalTTSEngine:
@@ -53,7 +59,7 @@ class LocalTTSEngine:
         language: str = "Korean",
         mode: TTSMode = "custom",
         voice_instruct: str = DEFAULT_VOICE_INSTRUCT,
-        speaker: str | None = None,
+        speaker: str | None = DEFAULT_TTS_SPEAKER,
         ref_audio: str | None = None,
         ref_text: str | None = None,
         cache_dir: str | Path = "outputs/voice/cache",
@@ -67,6 +73,8 @@ class LocalTTSEngine:
             raise ValueError(f"Unsupported TTS mode: {mode!r}")
         if not hasattr(torch, dtype):
             raise ValueError(f"Unsupported torch dtype: {dtype!r}")
+        if mode == "custom" and speaker not in SUPPORTED_TTS_SPEAKERS:
+            raise ValueError("Custom voice speaker must be one of the supported Qwen3-TTS presets")
         self.model_id = model_id
         self.model_revision = model_revision
         self.model_manifest_path = model_manifest_path
@@ -93,6 +101,7 @@ class LocalTTSEngine:
         self.cache_max_files = max(1, cache_max_files)
         self.cache_max_bytes = max(1024 * 1024, cache_max_bytes)
         self._model = None
+        self._loaded_revision: str | None = None
         self._load_lock = Lock()
 
     def _model_load_path(self) -> str:
@@ -131,6 +140,7 @@ class LocalTTSEngine:
             if self.attn_implementation:
                 kwargs["attn_implementation"] = self.attn_implementation
             self._model = Qwen3TTSModel.from_pretrained(model_path, **kwargs)
+            self._loaded_revision = self.model_revision
 
     def _prune_cache(self, protected: Path) -> None:
         lock_path = self.cache_dir / ".cache-retention.lock"
@@ -194,29 +204,48 @@ class LocalTTSEngine:
         self,
         text: str,
         output_path: str | Path | None = None,
-        use_cache: bool = True,
+        use_cache: bool = False,
         mode: TTSMode | None = None,
         voice_instruct: str | None = None,
         ref_audio: str | None = None,
         ref_text: str | None = None,
     ) -> TTSResult:
         synth_mode: TTSMode = mode or self.mode
-        output = (
-            Path(output_path)
-            if output_path
-            else self._cache_path(
-                text,
-                synth_mode,
-                voice_instruct=voice_instruct,
-                ref_audio=ref_audio,
-                ref_text=ref_text,
+        transient = output_path is None and not use_cache
+        if transient:
+            descriptor, transient_name = tempfile.mkstemp(
+                dir=self.cache_dir,
+                prefix=".tts-request-",
+                suffix=".wav",
             )
-        )
+            os.close(descriptor)
+            output = Path(transient_name)
+            output.unlink(missing_ok=True)
+        else:
+            output = (
+                Path(output_path)
+                if output_path
+                else self._cache_path(
+                    text,
+                    synth_mode,
+                    voice_instruct=voice_instruct,
+                    ref_audio=ref_audio,
+                    ref_text=ref_text,
+                )
+            )
         output.parent.mkdir(parents=True, exist_ok=True)
         if use_cache and output.exists() and output.stat().st_size > 0:
             if output.parent.resolve() == self.cache_dir.resolve():
                 self._prune_cache(output)
-            return TTSResult(output, sample_rate=0, duration_sec=0.0, model=self.model_id, cached=True, mode=synth_mode)
+            return TTSResult(
+                output,
+                sample_rate=0,
+                duration_sec=0.0,
+                model=self.model_id,
+                cached=True,
+                mode=synth_mode,
+                model_revision=self.model_revision,
+            )
 
         if output.parent.resolve() == self.cache_dir.resolve():
             lock_bucket = hashlib.sha256(output.name.encode("utf-8")).hexdigest()[:2]
@@ -230,11 +259,20 @@ class LocalTTSEngine:
         )
         fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
         temporary_path: Path | None = None
+        synthesis_complete = False
         try:
             if use_cache and output.exists() and output.stat().st_size > 0:
                 if output.parent.resolve() == self.cache_dir.resolve():
                     self._prune_cache(output)
-                return TTSResult(output, sample_rate=0, duration_sec=0.0, model=self.model_id, cached=True, mode=synth_mode)
+                return TTSResult(
+                    output,
+                    sample_rate=0,
+                    duration_sec=0.0,
+                    model=self.model_id,
+                    cached=True,
+                    mode=synth_mode,
+                    model_revision=self.model_revision,
+                )
 
             self.load()
             assert self._model is not None
@@ -246,15 +284,8 @@ class LocalTTSEngine:
             start = time.perf_counter()
             if synth_mode == "custom":
                 speaker = self.speaker
-                if not speaker and hasattr(self._model, "get_supported_speakers"):
-                    speakers = self._model.get_supported_speakers()
-                    if speakers:
-                        speaker = sorted(speakers)[0]
-                if not speaker:
-                    raise RuntimeError(
-                        "Custom voice mode requires a supported speaker; "
-                        "set --speaker or use a CustomVoice model."
-                    )
+                if speaker not in SUPPORTED_TTS_SPEAKERS:
+                    raise RuntimeError("Configured CustomVoice speaker is not supported")
                 wavs, sample_rate = self._model.generate_custom_voice(
                     text=text,
                     speaker=speaker,
@@ -298,11 +329,23 @@ class LocalTTSEngine:
                 os.fsync(directory_fd)
             finally:
                 os.close(directory_fd)
-            if output.parent.resolve() == self.cache_dir.resolve():
+            if not transient and output.parent.resolve() == self.cache_dir.resolve():
                 self._prune_cache(output)
-            return TTSResult(output, sample_rate=sample_rate, duration_sec=elapsed, model=self.model_id, cached=False, mode=synth_mode)
+            synthesis_complete = True
+            return TTSResult(
+                output,
+                sample_rate=sample_rate,
+                duration_sec=elapsed,
+                model=self.model_id,
+                cached=False,
+                mode=synth_mode,
+                model_revision=self._loaded_revision,
+                transient=transient,
+            )
         finally:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
+            if transient and not synthesis_complete:
+                output.unlink(missing_ok=True)
             fcntl.flock(lock_descriptor, fcntl.LOCK_UN)
             os.close(lock_descriptor)

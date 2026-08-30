@@ -18,20 +18,36 @@ class AndroidGatewaySessionStoreStaticTest {
             .readText()
 
     @Test
-    fun v3DelegatesToExactVersionedAndroidKeyStoreAead() {
+    fun v4DelegatesToExactVersionedAndroidKeyStoreAead() {
         assertTrue(source.contains("AndroidKeyStoreAead(SESSION_KEY_POLICY)"))
         assertTrue(source.contains("AndroidKeyStoreAead(INSTALL_ID_KEY_POLICY)"))
         assertTrue(source.contains("sessionAead.open(encoded, STATE_AAD, STATE_LIMITS)"))
         assertTrue(source.contains("sessionAead.seal(payload, STATE_AAD, STATE_LIMITS)"))
         assertTrue(source.contains("installIdAead.open(encoded, INSTALL_ID_AAD, INSTALL_ID_LIMITS)"))
         assertTrue(source.contains("installIdAead.seal(payload, INSTALL_ID_AAD, INSTALL_ID_LIMITS)"))
-        assertTrue(source.contains("const val STATE_FORMAT_VERSION = 3"))
+        assertTrue(source.contains("const val STATE_FORMAT_VERSION = 4"))
         assertTrue(source.contains("aliasPrefix = \"walksafe_gateway_login_bundle_v\""))
         assertTrue(source.contains("aliasPrefix = \"walksafe_gateway_install_id_v\""))
         assertFalse(source.contains("private fun encryptionKey"))
         assertFalse(source.contains("KeyGenerator"))
         assertFalse(source.contains("Cipher.getInstance"))
         assertFalse(source.contains(".putString(STATE_PREF_KEY, payload.toString())"))
+    }
+
+    @Test
+    fun completedV3StateMigratesOnlyAsExplicitLegacyFlow() {
+        assertTrue(source.contains("private fun migrateCompletedV3StateLocked()"))
+        assertTrue(source.contains("v3SessionAead.open(encoded, V3_STATE_AAD, STATE_LIMITS)"))
+        assertTrue(source.contains("private fun decodeV3State(payload: JSONObject)"))
+        assertTrue(source.contains("firstRun.jsonKeys() == V3_FIRST_RUN_FIELDS"))
+        assertTrue(source.contains("V3_MIN_COMPLETE_EVIDENCE_COUNT..MAX_COMPLETE_EVIDENCE_COUNT"))
+        assertTrue(source.contains("firstRunFlow = FirstRunOnboardingFlow.LEGACY_PHONE_V3"))
+        assertFalse(
+            source.substringAfter("private fun decodeV3Bundle(")
+                .substringBefore("private fun encodeEvidence(")
+                .contains("EMAIL_ACCOUNT_V4"),
+        )
+        assertTrue(source.contains("preferences.contains(V3_FAIL_CLOSED_PREF_KEY)"))
     }
 
     @Test
@@ -162,7 +178,8 @@ class AndroidGatewaySessionStoreStaticTest {
     }
 
     @Test
-    fun legacyV2AndV1StateFailClosedAndUnsafeApisAreGone() {
+    fun unsupportedLegacyAndV3FailClosedMarkersBlockAndUnsafeApisAreGone() {
+        assertTrue(source.contains("V3_FAIL_CLOSED_PREF_KEY"))
         assertTrue(source.contains("V2_STATE_PREF_KEY"))
         assertTrue(source.contains("V1_STATE_PREF_KEY"))
         assertTrue(source.contains("preferences.contains(V2_STATE_PREF_KEY)"))

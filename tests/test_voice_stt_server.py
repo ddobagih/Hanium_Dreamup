@@ -12,7 +12,7 @@ import wave
 import time
 
 import pytest
-from fastapi import Response, status
+from fastapi import HTTPException, Response, status
 from fastapi.testclient import TestClient
 
 import voice.server as voice_server
@@ -27,6 +27,7 @@ CLEAR_ACOUSTIC_EVIDENCE = STTAcousticEvidence(
     confidence=0.76,
     execution_allowed=True,
 )
+MODEL_REVISION = "a" * 40
 
 
 class _DirectSTTPool:
@@ -87,6 +88,7 @@ def _stt_result(transcript: str = "주변 설명해줘") -> STTResult:
         duration_sec=0.01,
         segments=[],
         model="test",
+        model_revision=MODEL_REVISION,
         acoustic=CLEAR_ACOUSTIC_EVIDENCE,
     )
 
@@ -115,6 +117,7 @@ def test_stt_inference_runs_off_the_event_loop_thread(monkeypatch) -> None:
                 duration_sec=0.01,
                 segments=[],
                 model="test",
+                model_revision=MODEL_REVISION,
                 acoustic=CLEAR_ACOUSTIC_EVIDENCE,
             )
 
@@ -124,6 +127,33 @@ def test_stt_inference_runs_off_the_event_loop_thread(monkeypatch) -> None:
 
     assert response["transcript"] == "주변 설명해줘"
     assert inference_threads and inference_threads[0] != caller_thread
+
+
+def test_stt_response_revision_is_bound_to_the_worker_result(monkeypatch) -> None:
+    class _Engine:
+        def transcribe_file(self, _path) -> STTResult:
+            return _stt_result()
+
+    monkeypatch.setenv("VOICE_STT_MODEL_REVISION", "b" * 40)
+    monkeypatch.setattr("voice.server.get_stt_engine", lambda: _Engine())
+
+    response = asyncio.run(speech_stt(_ConnectedRequest(), _AudioUpload(_wav_bytes())))
+
+    assert response["model_revision"] == MODEL_REVISION
+
+
+def test_stt_missing_model_integrity_configuration_returns_controlled_503(monkeypatch) -> None:
+    class _Engine:
+        def transcribe_file(self, _path) -> STTResult:
+            raise ValueError("immutable revision and manifest are missing")
+
+    monkeypatch.setattr("voice.server.get_stt_engine", lambda: _Engine())
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(speech_stt(_ConnectedRequest(), _AudioUpload(_wav_bytes())))
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail["code"] == "stt_unavailable"
 
 
 def test_stt_destination_change_without_name_returns_safe_reprompt(monkeypatch) -> None:
@@ -138,6 +168,7 @@ def test_stt_destination_change_without_name_returns_safe_reprompt(monkeypatch) 
                 duration_sec=0.2,
                 segments=[],
                 model="test",
+                model_revision=MODEL_REVISION,
                 acoustic=CLEAR_ACOUSTIC_EVIDENCE,
             )
 
@@ -164,6 +195,7 @@ def test_stt_low_acoustic_evidence_blocks_report_execution(monkeypatch) -> None:
                 duration_sec=0.2,
                 segments=[],
                 model="test",
+                model_revision=MODEL_REVISION,
                 acoustic=STTAcousticEvidence(
                     avg_logprob=-1.2,
                     no_speech_probability=0.1,

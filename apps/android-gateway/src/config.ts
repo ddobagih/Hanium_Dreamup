@@ -2,6 +2,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 
 const EXPECTED_BACKEND_API_BASE_URL = "http://127.0.0.1:8000";
+const EXPECTED_VOICE_API_BASE_URL = "http://127.0.0.1:9001";
 const EXPECTED_GATEWAY_HOST = "127.0.0.1";
 const DEFAULT_GATEWAY_PORT = 8081;
 const MIN_FIELD_ACCESS_TTL_SECONDS = 60;
@@ -75,6 +76,59 @@ export function resolveBackendBaseUrl(rawValue = process.env.BACKEND_API_BASE_UR
     throw new Error(`BACKEND_API_BASE_URL must be exactly ${EXPECTED_BACKEND_API_BASE_URL}`);
   }
   return EXPECTED_BACKEND_API_BASE_URL;
+}
+
+export type VoiceServiceConfig = Readonly<{
+  baseUrl: typeof EXPECTED_VOICE_API_BASE_URL;
+  serviceToken: string;
+}>;
+
+export function resolveVoiceServiceConfig(
+  environment: NodeJS.ProcessEnv = process.env
+): VoiceServiceConfig | null {
+  if (environment.WALKSAFE_VOICE_ENABLED?.trim() !== "true") return null;
+  const value = environment.WALKSAFE_VOICE_API_BASE_URL?.trim() ?? "";
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`WALKSAFE_VOICE_API_BASE_URL must be exactly ${EXPECTED_VOICE_API_BASE_URL}`);
+  }
+  if (
+    value !== EXPECTED_VOICE_API_BASE_URL ||
+    parsed.protocol !== "http:" ||
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    parsed.hostname !== "127.0.0.1" ||
+    parsed.port !== "9001" ||
+    parsed.pathname !== "/" ||
+    parsed.search !== "" ||
+    parsed.hash !== ""
+  ) {
+    throw new Error(`WALKSAFE_VOICE_API_BASE_URL must be exactly ${EXPECTED_VOICE_API_BASE_URL}`);
+  }
+  const serviceToken = environment.WALKSAFE_VOICE_SERVICE_TOKEN?.trim() ?? "";
+  const separatedCredentials = [
+    environment.WALKSAFE_FIELD_TEST_TOKEN?.trim() ?? "",
+    environment.WALKSAFE_GATEWAY_SESSION_SECRET?.trim() ?? ""
+  ].filter(Boolean);
+  try {
+    const accounts = JSON.parse(environment.WALKSAFE_FIELD_ACCOUNTS_JSON ?? "[]") as unknown;
+    if (Array.isArray(accounts)) {
+      for (const account of accounts) {
+        if (typeof account === "object" && account !== null &&
+          typeof (account as { token?: unknown }).token === "string") {
+          separatedCredentials.push((account as { token: string }).token.trim());
+        }
+      }
+    }
+  } catch {
+    // Account configuration has its own fail-closed validation path.
+  }
+  if (serviceToken.length < 24 || separatedCredentials.includes(serviceToken)) {
+    throw new Error("WALKSAFE_VOICE_SERVICE_TOKEN must be a dedicated secret of at least 24 characters");
+  }
+  return { baseUrl: EXPECTED_VOICE_API_BASE_URL, serviceToken };
 }
 
 export type BindAddress = { host: string; port: number };

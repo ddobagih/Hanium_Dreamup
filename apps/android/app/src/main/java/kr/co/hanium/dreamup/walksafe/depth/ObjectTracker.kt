@@ -46,11 +46,7 @@ class TrackState(
 
     fun markSeen(geometry: ObjectGeometry, timestampMs: Long, minStableAgeFrames: Int) {
         latestGeometry?.let { previous ->
-            if (centerDistance(previous.centerNorm, geometry.centerNorm) > 0.35f) idSwitchSuspected = true
-            val oldArea = previous.maskAreaNorm.coerceAtLeast(0.0001f)
-            val newArea = geometry.maskAreaNorm.coerceAtLeast(0.0001f)
-            val ratio = max(oldArea, newArea) / min(oldArea, newArea)
-            if (ratio > 4f) idSwitchSuspected = true
+            if (continuityIsUncertain(previous, geometry)) idSwitchSuspected = true
         }
         latestGeometry = geometry
         lastSeenAtMs = timestampMs
@@ -80,7 +76,7 @@ class TrackState(
 }
 
 /**
- * Maintains short-lived, class-preserving tracks with greedy IoU/center matching.
+ * Maintains short-lived, class-preserving tracks with conservative IoU/center matching.
  * Only metric distance enters kinematics, and suspicious geometry/depth jumps invalidate stability.
  */
 class ObjectTracker(
@@ -97,24 +93,65 @@ class ObjectTracker(
     fun update(geometries: List<ObjectGeometry>, timestampMs: Long): List<TrackState> {
         // A detector stall must not connect old observations into a seemingly continuous track.
         tracks.removeAll { track -> timestampMs - track.lastSeenAtMs > maxObservationGapMs }
-        val unmatchedTracks = tracks.toMutableList()
-        val unmatchedGeometries = geometries.toMutableList()
-        val matches = mutableListOf<Pair<TrackState, ObjectGeometry>>()
-
-        while (true) {
-            val best = unmatchedTracks.flatMap { track ->
-                unmatchedGeometries.mapNotNull { geometry ->
-                    matchingCost(track, geometry)?.let { cost -> Triple(track, geometry, cost) }
+        val candidates = tracks.flatMapIndexed { trackIndex, track ->
+            geometries.mapIndexedNotNull { geometryIndex, geometry ->
+                plausibleMatchIoU(track, geometry)?.let { iou ->
+                    MatchingCandidate(trackIndex, geometryIndex, iou)
                 }
-            }.minByOrNull { it.third } ?: break
-            matches += best.first to best.second
-            unmatchedTracks.remove(best.first)
-            unmatchedGeometries.remove(best.second)
+            }
+        }
+        val eligibleTrackIndicesByClass = tracks.indices
+            .filter { tracks[it].missedFrames == 0 }
+            .groupBy { tracks[it].className }
+        val geometryIndicesByClass = geometries.indices.groupBy { geometries[it].className }
+        val matchedTracks = BooleanArray(tracks.size)
+        val matchedGeometries = BooleanArray(geometries.size)
+        val mutuallyUniqueAnchoredMatches = mutualUniqueMatches(
+            candidates = candidates.filter { it.iou >= minIoU },
+            trackCount = tracks.size,
+            geometryCount = geometries.size,
+        )
+        val anchoredMatchesByClass = mutuallyUniqueAnchoredMatches.groupBy { candidate ->
+            tracks[candidate.trackIndex].className
+        }
+        val completeAnchoredClasses =
+            (eligibleTrackIndicesByClass.keys + geometryIndicesByClass.keys).filter { className ->
+                val eligibleTrackIndices = eligibleTrackIndicesByClass[className].orEmpty()
+                val currentGeometryIndices = geometryIndicesByClass[className].orEmpty()
+                val classMatches = anchoredMatchesByClass[className].orEmpty()
+                eligibleTrackIndices.size == currentGeometryIndices.size &&
+                    classMatches.map { it.trackIndex }.toSet() == eligibleTrackIndices.toSet() &&
+                    classMatches.map { it.geometryIndex }.toSet() == currentGeometryIndices.toSet()
+            }.toSet()
+        val anchoredMatches = mutuallyUniqueAnchoredMatches.filter { candidate ->
+            tracks[candidate.trackIndex].className in completeAnchoredClasses
+        }
+        anchoredMatches.forEach { candidate ->
+            matchedTracks[candidate.trackIndex] = true
+            matchedGeometries[candidate.geometryIndex] = true
+        }
+        val remainingMatches = mutualUniqueMatches(
+            candidates = candidates.filter { candidate ->
+                !matchedTracks[candidate.trackIndex] && !matchedGeometries[candidate.geometryIndex]
+            },
+            trackCount = tracks.size,
+            geometryCount = geometries.size,
+        )
+        (anchoredMatches + remainingMatches).forEach { candidate ->
+            tracks[candidate.trackIndex].markSeen(
+                geometries[candidate.geometryIndex],
+                timestampMs,
+                minStableAgeFrames,
+            )
+            matchedTracks[candidate.trackIndex] = true
+            matchedGeometries[candidate.geometryIndex] = true
         }
 
-        matches.forEach { (track, geometry) -> track.markSeen(geometry, timestampMs, minStableAgeFrames) }
-        unmatchedTracks.forEach { it.markMissed() }
-        unmatchedGeometries.forEach { geometry ->
+        tracks.forEachIndexed { index, track ->
+            if (!matchedTracks[index]) track.markMissed()
+        }
+        geometries.forEachIndexed { index, geometry ->
+            if (matchedGeometries[index]) return@forEachIndexed
             val track = TrackState(
                 trackId = "track-${nextTrackNumber++}",
                 className = geometry.className,
@@ -173,14 +210,51 @@ class ObjectTracker(
         )
     }
 
-    private fun matchingCost(track: TrackState, geometry: ObjectGeometry): Float? {
+    private fun plausibleMatchIoU(track: TrackState, geometry: ObjectGeometry): Float? {
         if (track.className != geometry.className) return null
+        if (track.missedFrames > 0) return null
         val previous = track.latestGeometry ?: return null
+        if (continuityIsUncertain(previous, geometry)) return null
         val iou = bboxIoU(previous.bboxNorm, geometry.bboxNorm)
         val centerMove = centerDistance(previous.centerNorm, geometry.centerNorm)
         if (iou < minIoU && centerMove > maxCenterMoveNorm) return null
-        return (1f - iou) * 0.70f + centerMove * 0.30f
+        return iou
     }
+
+    private fun mutualUniqueMatches(
+        candidates: List<MatchingCandidate>,
+        trackCount: Int,
+        geometryCount: Int,
+    ): List<MatchingCandidate> {
+        val trackDegrees = IntArray(trackCount)
+        val geometryDegrees = IntArray(geometryCount)
+        candidates.forEach { candidate ->
+            trackDegrees[candidate.trackIndex] += 1
+            geometryDegrees[candidate.geometryIndex] += 1
+        }
+        return candidates.filter { candidate ->
+            trackDegrees[candidate.trackIndex] == 1 && geometryDegrees[candidate.geometryIndex] == 1
+        }
+    }
+
+    private data class MatchingCandidate(
+        val trackIndex: Int,
+        val geometryIndex: Int,
+        val iou: Float,
+    )
+}
+
+private fun continuityIsUncertain(
+    previous: ObjectGeometry,
+    current: ObjectGeometry,
+): Boolean {
+    if (centerDistance(previous.centerNorm, current.centerNorm) > MAX_CONTINUOUS_CENTER_MOVE_NORM) {
+        return true
+    }
+    val previousArea = previous.maskAreaNorm.coerceAtLeast(MIN_COMPARABLE_AREA_NORM)
+    val currentArea = current.maskAreaNorm.coerceAtLeast(MIN_COMPARABLE_AREA_NORM)
+    return max(previousArea, currentArea) / min(previousArea, currentArea) >
+        MAX_CONTINUOUS_AREA_RATIO
 }
 
 fun bboxIoU(a: RectNorm, b: RectNorm): Float {
@@ -219,3 +293,7 @@ private fun <T> MutableList<T>.addCapped(value: T, maxSize: Int) {
     add(value)
     while (size > maxSize) removeAt(0)
 }
+
+private const val MAX_CONTINUOUS_CENTER_MOVE_NORM = 0.35f
+private const val MAX_CONTINUOUS_AREA_RATIO = 4f
+private const val MIN_COMPARABLE_AREA_NORM = 0.0001f

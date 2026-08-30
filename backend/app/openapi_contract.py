@@ -7,8 +7,11 @@ from typing import Any
 from fastapi import FastAPI
 
 from backend.app.field_test_security import (
+    ADMIN_RECONFIRM_NONCE_HEADER_NAME,
     FieldTestAccess,
     PUBLIC_ADMIN_SECURITY_ROUTES,
+    RawCollectionOperation,
+    raw_collection_operation,
     required_field_test_access,
     requires_account_generation,
     requires_actor_identity,
@@ -29,6 +32,48 @@ _DEVICE_PROOF_PUBLIC_PURPOSES = {
     ("post", "/admin/security/recovery/complete"): "RECOVERY_COMPLETE",
 }
 _DEVICE_PROOF_WORKFLOW_PATHS = {
+    "/admin/raw-collections/quarantine": {
+        "get": (None, "admin.raw_collection.list"),
+    },
+    "/admin/raw-collections/{collection_id}/decisions": {
+        "post": ("admin.raw_collection.purpose_decide", None),
+    },
+    "/admin/raw-collections/{collection_id}/legal-holds": {
+        "post": ("admin.raw_collection.legal_hold", None),
+    },
+    "/admin/reports": {
+        "get": (None, "admin.report.list"),
+    },
+    "/admin/reports/{report_id}": {
+        "get": (None, "admin.report.detail"),
+    },
+    "/admin/reports/audits": {
+        "get": (None, "admin.audit.list"),
+    },
+    "/admin/reports/{report_id}/status": {
+        "patch": ("admin.report.status.update", None),
+    },
+    "/admin/reports/{report_id}/delivery-packages": {
+        "post": ("admin.report.delivery_package.create", None),
+    },
+    "/admin/report-requests": {
+        "get": (None, "admin.report_request.list"),
+    },
+    "/admin/report-requests/{request_id}": {
+        "get": (None, "admin.report_request.detail"),
+    },
+    "/admin/report-requests/{request_id}/status": {
+        "patch": ("admin.report_request.status.update", None),
+    },
+    "/admin/incidents": {
+        "get": (None, "admin.incident.list"),
+    },
+    "/admin/incidents/{incident_id}": {
+        "get": (None, "admin.incident.detail"),
+    },
+    "/admin/incidents/{incident_id}/status": {
+        "patch": ("admin.incident.status.update", None),
+    },
     "/admin/security/recovery-custody/attest": {
         "post": ("recovery.custody.attest", None),
     },
@@ -42,6 +87,44 @@ _DEVICE_PROOF_WORKFLOW_PATHS = {
     "/reports/{report_id}/deliveries": {
         "post": ("report.delivery.create", None),
         "get": (None, "report.delivery_events"),
+    },
+}
+_HIGH_RISK_DEVICE_PROOF_WORKFLOWS = {
+    (
+        "post",
+        "/admin/raw-collections/{collection_id}/decisions",
+    ): "admin.raw_collection.purpose_decide",
+    (
+        "post",
+        "/admin/raw-collections/{collection_id}/legal-holds",
+    ): "admin.raw_collection.legal_hold",
+    ("patch", "/admin/reports/{report_id}/status"): "admin.report.status.update",
+    (
+        "post",
+        "/admin/reports/{report_id}/delivery-packages",
+    ): "admin.report.delivery_package.create",
+    (
+        "patch",
+        "/admin/report-requests/{request_id}/status",
+    ): "admin.report_request.status.update",
+    (
+        "patch",
+        "/admin/incidents/{incident_id}/status",
+    ): "admin.incident.status.update",
+}
+_ADMIN_RECONFIRMATION_PARAMETER = {
+    "name": ADMIN_RECONFIRM_NONCE_HEADER_NAME,
+    "in": "header",
+    "required": True,
+    "description": (
+        "One-time canonical unpadded Base64url encoding of exactly 16 random "
+        "bytes, bound by administrator reauthentication to this operation."
+    ),
+    "schema": {
+        "type": "string",
+        "minLength": 22,
+        "maxLength": 22,
+        "pattern": "^[A-Za-z0-9_-]{22}$",
     },
 }
 _SHA256_SCHEMA = {"type": "string", "pattern": "^[0-9a-f]{64}$"}
@@ -190,6 +273,15 @@ def install_walksafe_openapi_contract(app: FastAPI, settings: Any) -> None:
                 "name": "X-WalkSafe-Account-Generation",
                 "description": "Positive account generation bound by the gateway actor assertion.",
             },
+            "WalkSafeRawRequestProof": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-WalkSafe-Raw-Request-Proof",
+                "description": (
+                    "Short-lived Gateway HMAC proof binding one exact raw "
+                    "collection request and its manifest or chunk digest."
+                ),
+            },
             "WalkSafeDeletionAccessPreDigest": {
                 "type": "apiKey",
                 "in": "header",
@@ -326,6 +418,61 @@ def install_walksafe_openapi_contract(app: FastAPI, settings: Any) -> None:
                         "x-walksafe-when-purpose": "RECOVERY_COMPLETE",
                     }
                 access = required_field_test_access(path, method)
+                if path.startswith("/raw-collections/"):
+                    raw_operation = raw_collection_operation(path, method)
+                    operation["x-walksafe-gateway-actor-assertion-required"] = True
+                    operation["x-walksafe-raw-ingest-default-enabled"] = False
+                    operation["x-walksafe-raw-storage-handler"] = (
+                        "B1C_IMMUTABLE_COMMIT_RECEIPT"
+                        if raw_operation is RawCollectionOperation.COMMIT
+                        else "B1B_ENCRYPTED_SINGLE_OBJECT_SINGLE_CHUNK"
+                    )
+                    operation["x-walksafe-raw-request-proof"] = {
+                        "operation": (
+                            raw_operation.value if raw_operation is not None else None
+                        ),
+                        "binds": [
+                            "method",
+                            "exact_path",
+                            "actor_id",
+                            "account_generation",
+                            "purpose",
+                            "walk_id",
+                            "manifest_sha256",
+                            "consent_receipt_sha256",
+                            "chunk_sha256",
+                            "commit_sha256",
+                        ],
+                    }
+                    for error_status in (
+                        "400",
+                        "401",
+                        "403",
+                        "404",
+                        "409",
+                        "413",
+                        "415",
+                        "422",
+                        "429",
+                        "503",
+                    ):
+                        error_response = operation.setdefault(
+                            "responses",
+                            {},
+                        ).setdefault(
+                            error_status,
+                            {"description": "Raw collection request failed"},
+                        )
+                        error_response["content"] = {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": (
+                                        "#/components/schemas/"
+                                        "RawCollectionErrorResponseV1"
+                                    )
+                                }
+                            }
+                        }
                 if access is None:
                     is_public_admin_auth = (
                         method.upper(), path
@@ -389,6 +536,18 @@ def install_walksafe_openapi_contract(app: FastAPI, settings: Any) -> None:
                             "read_purpose": read_purpose,
                             "session_id": "authenticated-admin-session",
                         }
+                        high_risk_action = _HIGH_RISK_DEVICE_PROOF_WORKFLOWS.get(
+                            (method, path)
+                        )
+                        if high_risk_action is not None:
+                            operation["x-walksafe-high-risk-action"] = high_risk_action
+                            parameters = operation.setdefault("parameters", [])
+                            if not any(
+                                item.get("in") == "header"
+                                and item.get("name") == ADMIN_RECONFIRM_NONCE_HEADER_NAME
+                                for item in parameters
+                            ):
+                                parameters.append(dict(_ADMIN_RECONFIRMATION_PARAMETER))
                 else:
                     token_scheme = (
                         "WalkSafeFieldToken"
@@ -407,6 +566,8 @@ def install_walksafe_openapi_contract(app: FastAPI, settings: Any) -> None:
                     )
                 if requires_account_generation(path, method):
                     requirement["WalkSafeAccountGeneration"] = []
+                if path.startswith("/raw-collections/"):
+                    requirement["WalkSafeRawRequestProof"] = []
                 if path.startswith("/privacy/account-deletions"):
                     requirement["WalkSafeDeletionAccessPreDigest"] = []
                     if path != "/privacy/account-deletions":
@@ -416,7 +577,7 @@ def install_walksafe_openapi_contract(app: FastAPI, settings: Any) -> None:
                 operation["x-walksafe-required-role"] = access.value
                 operation["x-walksafe-actor-identity-required"] = actor_required
 
-        schema["x-walksafe-security-contract-version"] = "walksafe.middleware-auth.v2"
+        schema["x-walksafe-security-contract-version"] = "walksafe.middleware-auth.v3"
         app.openapi_schema = schema
         return schema
 

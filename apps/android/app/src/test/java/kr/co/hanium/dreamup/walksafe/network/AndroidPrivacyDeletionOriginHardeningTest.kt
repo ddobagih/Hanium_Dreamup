@@ -31,6 +31,21 @@ class AndroidPrivacyDeletionOriginHardeningTest {
                     requestId = "integrated_consent_request_0001",
                     clientRevision = 1L,
                     selections = IntegratedConsentSelections(),
+                    expectedPreviousBackendReceiptSha256 = null,
+                )
+            } catch (_: IllegalArgumentException) {
+                rejected = true
+            }
+            assertTrue(rejected)
+
+            rejected = false
+            try {
+                AndroidIntegratedConsentClient().fetchCurrentCall(
+                    gatewayBaseUrl =
+                    "http://127.0.0.1:${attacker.localPort}",
+                    session = session,
+                    installationId = "install-test-0001",
+                    controlSecret = "b".repeat(64),
                 )
             } catch (_: IllegalArgumentException) {
                 rejected = true

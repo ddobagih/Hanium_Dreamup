@@ -31,7 +31,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 ReadOnlyPaths=/etc/walksafe/report-image-keyring.json /etc/walksafe/admin-credential-issuer.key /run/walksafe-maintenance-lock
 InaccessiblePaths=/etc/walksafe/backend-migration.env /etc/walksafe/backend.env /etc/walksafe/backup.env /etc/walksafe/backup-key-control.json /etc/walksafe/backup-key-control.json.sig /etc/walksafe/backup-key-control.lock -/var/lib/walksafe-backup -/var/lib/walksafe-backup-gnupg -/run/walksafe-backup
-ReadWritePaths=/var/lib/walksafe/uploads /var/lib/walksafe/android-debug-logs /var/lib/walksafe/capacity /run/walksafe-backend
+ReadWritePaths=/var/lib/walksafe/uploads /var/lib/walksafe/raw-objects /var/lib/walksafe/android-debug-logs /var/lib/walksafe/capacity /run/walksafe-backend
 
 [Install]
 WantedBy=multi-user.target

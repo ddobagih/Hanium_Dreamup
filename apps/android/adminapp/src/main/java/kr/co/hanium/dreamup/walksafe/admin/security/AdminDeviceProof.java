@@ -28,7 +28,7 @@ public final class AdminDeviceProof {
     }
 
     public static final class Intent {
-        private static final Set<String> EXACT_KEYS = Set.of(
+        private static final Set<String> EXACT_KEYS = AdminJava8Collections.set(
             "action",
             "admin_id",
             "body_sha256",
@@ -134,18 +134,30 @@ public final class AdminDeviceProof {
             if (sessionId == null) throw new IllegalArgumentException("ACTION proof requires session_id");
             if ("GET".equals(method)) {
                 if (action != null
-                    || !("report.review_decisions".equals(readPurpose)
-                    || "report.delivery_events".equals(readPurpose))) {
+                || !("report.review_decisions".equals(readPurpose)
+                    || "report.delivery_events".equals(readPurpose)
+                    || "admin.report.list".equals(readPurpose)
+                    || "admin.report.detail".equals(readPurpose)
+                    || "admin.report_request.list".equals(readPurpose)
+                    || "admin.report_request.detail".equals(readPurpose)
+                    || "admin.incident.list".equals(readPurpose)
+                    || "admin.incident.detail".equals(readPurpose)
+                    || "admin.audit.list".equals(readPurpose))) {
                     throw new IllegalArgumentException("protected read proof fields do not match the contract");
                 }
                 return;
             }
-            if (!"POST".equals(method)
-                || readPurpose != null
-                || !("report.review.decide".equals(action)
-                || "report.delivery.create".equals(action)
-                || "recovery.custody.attest".equals(action)
-                || "device.report_lost".equals(action))) {
+            boolean statusUpdate = "PATCH".equals(method)
+                && ("admin.report.status.update".equals(action)
+                    || "admin.report_request.status.update".equals(action)
+                    || "admin.incident.status.update".equals(action));
+            boolean postAction = "POST".equals(method)
+                && ("report.review.decide".equals(action)
+                    || "report.delivery.create".equals(action)
+                    || "admin.report.delivery_package.create".equals(action)
+                    || "recovery.custody.attest".equals(action)
+                    || "device.report_lost".equals(action));
+            if (readPurpose != null || !(statusUpdate || postAction)) {
                 throw new IllegalArgumentException("administrator action proof fields do not match the contract");
             }
         }
@@ -167,14 +179,14 @@ public final class AdminDeviceProof {
         public String encodedSignature() { return encodedSignature; }
 
         public Map<String, String> proofHeaders() {
-            return Map.of(
+            return AdminJava8Collections.map(
                 CHALLENGE_ID_HEADER, challengeId,
                 SIGNATURE_HEADER, encodedSignature
             );
         }
     }
 
-    private static final Set<String> EXACT_RESPONSE_KEYS = Set.of(
+    private static final Set<String> EXACT_RESPONSE_KEYS = AdminJava8Collections.set(
         "action",
         "admin_id",
         "body_sha256",
@@ -357,7 +369,7 @@ public final class AdminDeviceProof {
     }
 
     private static String method(String value) {
-        if (value == null || !(value.equals("GET") || value.equals("POST"))) {
+        if (value == null || !(value.equals("GET") || value.equals("POST") || value.equals("PATCH"))) {
             throw new IllegalArgumentException("method is outside the administrator proof contract");
         }
         return value;

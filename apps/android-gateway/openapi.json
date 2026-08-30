@@ -2,10 +2,126 @@
   "openapi": "3.1.0",
   "info": {
     "title": "WalkSafe Android Gateway API",
-    "version": "0.7.0",
-    "description": "Single-process Android gateway contract, including server-confirmed integrated consent and durable account-deletion v2 fencing with capability recovery. Every response is Cache-Control: no-store."
+    "version": "0.11.0",
+    "description": "Single-process Android gateway contract, including bounded email signup relays, Backend-bound password sessions, bounded authenticated STT/TTS relays, fixed report transport receipts, v7 actor/generation-bound report content rights, authenticated integrated-consent bootstrap with Backend CAS, and durable account-deletion v2 fencing with capability recovery. Every response is Cache-Control: no-store."
   },
   "paths": {
+    "/api/account-enrollments/email-otp": {
+      "post": {
+        "operationId": "requestAccountEnrollmentEmailOtp",
+        "description": "Public bounded relay. The JSON body is limited to 4096 bytes and exact-key validated before Backend service authentication. Backend responses are limited to 16384 bytes and projected through strict success and error allowlists.",
+        "x-max-body-bytes": 4096,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountEnrollmentEmailOtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/AccountEnrollmentEmailOtp"
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        }
+      }
+    },
+    "/api/accounts": {
+      "post": {
+        "operationId": "createAccount",
+        "description": "Public bounded relay. The JSON body is limited to 16384 bytes and requires exact consent document-version and selection keys. Password, OTP, email, and enrollment handles are never included in Gateway telemetry.",
+        "x-max-body-bytes": 16384,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/AccountCreated"
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        }
+      }
+    },
     "/api/field-session": {
       "get": {
         "operationId": "getFieldSession",
@@ -69,6 +185,9 @@
                 "oneOf": [
                   {
                     "$ref": "#/components/schemas/FieldSessionLogin"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AccountPasswordSessionLogin"
                   },
                   {
                     "$ref": "#/components/schemas/FieldSessionRefresh"
@@ -297,6 +416,119 @@
         }
       }
     },
+    "/api/speech/stt": {
+      "post": {
+        "operationId": "transcribeSpeech",
+        "description": "General field session required. Accepts one bounded raw audio body, relays it to the loopback Voice service with a dedicated internal token, and removes intent, action, slots, segments, and timestamps from the mobile response.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "x-max-body-bytes": 10485760,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "audio/wav": { "schema": { "type": "string", "format": "binary" } },
+            "audio/mpeg": { "schema": { "type": "string", "format": "binary" } },
+            "audio/mp4": { "schema": { "type": "string", "format": "binary" } },
+            "audio/flac": { "schema": { "type": "string", "format": "binary" } },
+            "audio/ogg": { "schema": { "type": "string", "format": "binary" } },
+            "audio/webm": { "schema": { "type": "string", "format": "binary" } },
+            "audio/aac": { "schema": { "type": "string", "format": "binary" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded transcript and acoustic execution evidence",
+            "headers": { "Cache-Control": { "$ref": "#/components/headers/NoStore" } },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["schema_version", "request_id", "transcript", "acoustic", "model_revision"],
+                  "properties": {
+                    "schema_version": { "type": "string", "const": "walksafe.speech-stt-response.v1" },
+                    "request_id": { "type": "string", "format": "uuid" },
+                    "transcript": { "type": "string", "maxLength": 500 },
+                    "acoustic": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["confidence", "avg_logprob", "no_speech_probability", "execution_allowed"],
+                      "properties": {
+                        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                        "avg_logprob": { "type": ["number", "null"] },
+                        "no_speech_probability": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+                        "execution_allowed": { "type": "boolean" }
+                      }
+                    },
+                    "model_revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/GatewayError" },
+          "401": { "$ref": "#/components/responses/GatewayError" },
+          "413": { "$ref": "#/components/responses/GatewayError" },
+          "415": { "$ref": "#/components/responses/GatewayError" },
+          "422": { "$ref": "#/components/responses/GatewayError" },
+          "429": { "$ref": "#/components/responses/GatewayError" },
+          "499": { "$ref": "#/components/responses/GatewayError" },
+          "502": { "$ref": "#/components/responses/GatewayError" },
+          "503": { "$ref": "#/components/responses/GatewayError" },
+          "504": { "$ref": "#/components/responses/GatewayError" }
+        }
+      }
+    },
+    "/api/speech/tts": {
+      "post": {
+        "operationId": "synthesizeSpeech",
+        "description": "General field session required. Exact JSON is translated to a non-caching, no-server-fallback Qwen3-TTS request. Only a bounded, duration-checked WAV is returned.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "x-max-body-bytes": 2048,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["schema_version", "text", "request_id"],
+                "properties": {
+                  "schema_version": { "type": "string", "const": "walksafe.speech-tts-request.v1" },
+                  "text": { "type": "string", "minLength": 1, "maxLength": 180 },
+                  "request_id": { "type": "string", "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validated Qwen3-TTS WAV; safety-critical Android guidance still requires the on-device TTS/vibration fallback",
+            "headers": { "Cache-Control": { "$ref": "#/components/headers/NoStore" } },
+            "content": { "audio/wav": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "400": { "$ref": "#/components/responses/GatewayError" },
+          "401": { "$ref": "#/components/responses/GatewayError" },
+          "408": { "$ref": "#/components/responses/GatewayError" },
+          "413": { "$ref": "#/components/responses/GatewayError" },
+          "415": { "$ref": "#/components/responses/GatewayError" },
+          "422": { "$ref": "#/components/responses/GatewayError" },
+          "429": { "$ref": "#/components/responses/GatewayError" },
+          "499": { "$ref": "#/components/responses/GatewayError" },
+          "502": { "$ref": "#/components/responses/GatewayError" },
+          "503": { "$ref": "#/components/responses/GatewayError" },
+          "504": { "$ref": "#/components/responses/GatewayError" }
+        }
+      }
+    },
     "/api/navigation/walking": {
       "post": {
         "operationId": "createWalkingRoute",
@@ -431,7 +663,8 @@
     "/api/reports/v2": {
       "post": {
         "operationId": "createReportV2",
-        "description": "Field session required. Total multipart limit 9437184 bytes; body and upstream timeouts are each 15 seconds; one upload may be in flight.\n\nThe header purpose must match multipart metadata.auto_reported before any backend fetch.\n\nx-walksafe-report-purpose is an authenticated first-party Android declaration inside the gateway trust boundary, not cryptographic client attestation. The gateway fail-closes when it disagrees with multipart metadata.auto_reported. A tampered but otherwise authenticated client is NOT_COVERED.",
+        "description": "Field session required. Total multipart limit 9437184 bytes; body and upstream timeouts are each 15 seconds; one upload may be in flight.\n\nThe three optional report transport headers are all-or-none. When present, the gateway validates their canonical form and forwards only their exact parsed values with the server-derived FIELD actor binding. Their absence preserves the legacy request contract.\n\nThe header purpose must match multipart metadata.auto_reported before any backend fetch.\n\nx-walksafe-report-purpose is an authenticated first-party Android declaration inside the gateway trust boundary, not cryptographic client attestation. The gateway fail-closes when it disagrees with multipart metadata.auto_reported. A tampered but otherwise authenticated client is NOT_COVERED.",
+        "x-walksafe-report-transport-headers": "all-or-none",
         "security": [
           {
             "fieldSession": []
@@ -600,19 +833,528 @@
                 "automatic"
               ]
             }
+          },
+          {
+            "name": "x-walksafe-report-id",
+            "in": "header",
+            "required": false,
+            "description": "Canonical lowercase client report UUID. Must occur with both payload headers.",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "x-walksafe-report-payload-sha256",
+            "in": "header",
+            "required": false,
+            "description": "Lowercase full transport payload SHA-256. Must occur with report id and payload bytes.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "x-walksafe-report-payload-bytes",
+            "in": "header",
+            "required": false,
+            "description": "Positive metadata-plus-image byte count. Must occur with report id and payload SHA-256.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
           }
         ]
       }
     },
-    "/privacy/rights": {
+    "/api/reports/v2/{report_id}/status": {
       "get": {
-        "operationId": "getIntegratedConsent",
-        "description": "Returns the current server-confirmed integrated-consent record. This control form requires exactly control, installation_id, and policy_version query parameters plus the installation control secret. A GET without control parameters serves the separate public privacy-rights HTML page.",
+        "operationId": "getReportTransportStatus",
+        "description": "Returns only the authenticated FIELD actor's persisted transport receipt and coarse user status. Missing and different actors receive the same 404. Backend response bodies are limited to 4096 bytes and projected through a strict allowlist.",
         "security": [
           {
-            "consentControlSecret": []
+            "fieldSession": []
           }
         ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReportTransportStatus"
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      }
+    },
+    "/api/reports/mine": {
+      "get": {
+        "operationId": "listMyReports",
+        "description": "Lists only the current v7 Backend-account device session's actor and account generation reports. Query and Backend JSON are strictly allowlisted; Backend response bodies are limited to 131072 bytes. Missing, tombstoned, fenced, and different subjects are concealed. Optional integrated consent is not required for this user right.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9_-]{1,1024}$"
+            }
+          },
+          {
+            "name": "user_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/UserReportStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/UserReportList"
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      }
+    },
+    "/api/reports/mine/deletions/{request_id}": {
+      "get": {
+        "operationId": "getMyReportDeletionStatus",
+        "description": "Returns the exact physical-deletion status for a canonical request UUID previously issued to the current v7 Backend-account device actor and account generation. Backend response bodies are limited to 131072 bytes. The request remains queryable after the report itself becomes 404. Missing and different-subject requests receive the same concealed 404. Optional integrated consent is not required.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CanonicalReportRequestId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReportDeletionStatus"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      }
+    },
+    "/api/reports/mine/{report_id}": {
+      "get": {
+        "operationId": "getMyReport",
+        "description": "Returns the strict minimum lifecycle projection for one report owned by the current v7 Backend-account device actor and account generation. Missing, tombstoned, fenced, and different subjects receive the same 404. Optional integrated consent is not required.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CanonicalReportId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/UserReportDetail"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      }
+    },
+    "/api/reports/mine/{report_id}/content": {
+      "get": {
+        "operationId": "getMyReportContent",
+        "description": "Returns the exact current append-only content revision for a report owned by the current v7 Backend-account device actor and account generation. Backend response bodies are limited to 131072 bytes. Revision zero has null user description, category, and correction time. Missing and different-subject reports receive the same concealed 404. Optional integrated consent is not required.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CanonicalReportId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReportContentCurrent"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      }
+    },
+    "/api/reports/mine/{report_id}/corrections": {
+      "post": {
+        "operationId": "correctMyReportContent",
+        "description": "Appends or exactly replays one structured report-content revision for the current v7 Backend-account device actor and account generation. Request bodies are limited to 4096 bytes and Backend response bodies to 131072 bytes. expected_revision is compare-and-swap and idempotency_key is a canonical UUID. At least one patch field is required: omission preserves its current value and explicit null clears it. Optional integrated consent is not required.",
+        "x-max-body-bytes": 4096,
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CanonicalReportId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportContentCorrectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReportContentRevision"
+          },
+          "201": {
+            "$ref": "#/components/responses/ReportContentRevision"
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      }
+    },
+    "/api/reports/mine/{report_id}/requests": {
+      "post": {
+        "operationId": "createMyReportRequest",
+        "description": "Legacy compatibility path that creates or exactly replays one free-text CORRECTION or DELETE intent without modifying the report. It requires the current v7 Backend-account device actor and account generation. JSON bodies are limited to 4096 bytes and contain exactly the three documented fields. Optional integrated consent is not required.",
+        "x-max-body-bytes": 4096,
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CanonicalReportId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportUserRequestCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReportUserRequest"
+          },
+          "201": {
+            "$ref": "#/components/responses/ReportUserRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      }
+    },
+    "/api/raw-collections/{collection_id}/manifest": {
+      "put": {
+        "operationId": "putRawCollectionManifest",
+        "description": "Accepts one canonical raw manifest only from a current v7 Backend-account device session bound to the same active field walk and account generation. The Gateway performs a same-path HEAD admission check before reading the body and revalidates the session, walk, privacy generation, and authoritative Backend consent receipt after each I/O boundary.",
+        "x-max-body-bytes": 524288,
+        "security": [{ "fieldSession": [], "consentControlSecret": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/RawCollectionId" },
+          { "$ref": "#/components/parameters/RawPurpose" },
+          { "$ref": "#/components/parameters/RawWalkId" },
+          { "$ref": "#/components/parameters/RawManifestSha256" },
+          { "$ref": "#/components/parameters/RawConsentReceiptSha256" },
+          { "$ref": "#/components/parameters/ConsentInstallationId" },
+          { "$ref": "#/components/parameters/ConsentPolicyVersion" },
+          { "$ref": "#/components/parameters/ConsentRevision" },
+          { "$ref": "#/components/parameters/ConsentControlSecretHeader" },
+          { "$ref": "#/components/parameters/RawNetworkTransport" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RawCollectionManifestV1" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/RawCollectionStatus" },
+          "201": { "$ref": "#/components/responses/RawCollectionStatus" },
+          "400": { "$ref": "#/components/responses/GatewayError" },
+          "401": { "$ref": "#/components/responses/GatewayError" },
+          "409": { "$ref": "#/components/responses/GatewayError" },
+          "413": { "$ref": "#/components/responses/GatewayError" },
+          "415": { "$ref": "#/components/responses/GatewayError" },
+          "422": { "$ref": "#/components/responses/GatewayError" },
+          "428": { "$ref": "#/components/responses/GatewayError" },
+          "429": { "$ref": "#/components/responses/GatewayError" },
+          "502": { "$ref": "#/components/responses/GatewayError" },
+          "503": { "$ref": "#/components/responses/GatewayUnavailable" }
+        }
+      }
+    },
+    "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}": {
+      "put": {
+        "operationId": "putRawCollectionChunk",
+        "description": "Streams exactly one digest-bound chunk through the bounded Gateway relay. Content-Length is mandatory and the Gateway holds at most one 8 MiB chunk while hashing it.",
+        "x-max-body-bytes": 8388608,
+        "security": [{ "fieldSession": [], "consentControlSecret": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/RawCollectionId" },
+          { "$ref": "#/components/parameters/RawObjectId" },
+          { "$ref": "#/components/parameters/RawChunkIndex" },
+          { "$ref": "#/components/parameters/RawPurpose" },
+          { "$ref": "#/components/parameters/RawWalkId" },
+          { "$ref": "#/components/parameters/RawManifestSha256" },
+          { "$ref": "#/components/parameters/RawChunkSha256" },
+          { "$ref": "#/components/parameters/RawConsentReceiptSha256" },
+          { "$ref": "#/components/parameters/ConsentInstallationId" },
+          { "$ref": "#/components/parameters/ConsentPolicyVersion" },
+          { "$ref": "#/components/parameters/ConsentRevision" },
+          { "$ref": "#/components/parameters/ConsentControlSecretHeader" },
+          { "$ref": "#/components/parameters/RawNetworkTransport" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": { "type": "string", "format": "binary", "minLength": 1, "maxLength": 8388608 }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/RawCollectionChunkAck" },
+          "201": { "$ref": "#/components/responses/RawCollectionChunkAck" },
+          "400": { "$ref": "#/components/responses/GatewayError" },
+          "401": { "$ref": "#/components/responses/GatewayError" },
+          "409": { "$ref": "#/components/responses/GatewayError" },
+          "413": { "$ref": "#/components/responses/GatewayError" },
+          "415": { "$ref": "#/components/responses/GatewayError" },
+          "422": { "$ref": "#/components/responses/GatewayError" },
+          "428": { "$ref": "#/components/responses/GatewayError" },
+          "429": { "$ref": "#/components/responses/GatewayError" },
+          "502": { "$ref": "#/components/responses/GatewayError" },
+          "503": { "$ref": "#/components/responses/GatewayUnavailable" }
+        }
+      }
+    },
+    "/api/raw-collections/{collection_id}": {
+      "get": {
+        "operationId": "getRawCollectionStatus",
+        "description": "Recovers a collection status with the same current v7 Backend-account session, account generation, and privacy generation. An active walk and current consent are intentionally not required for recovery.",
+        "security": [{ "fieldSession": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/RawCollectionId" },
+          { "$ref": "#/components/parameters/RawPurpose" },
+          { "$ref": "#/components/parameters/RawWalkId" },
+          { "$ref": "#/components/parameters/RawManifestSha256" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/RawCollectionStatus" },
+          "400": { "$ref": "#/components/responses/GatewayError" },
+          "401": { "$ref": "#/components/responses/GatewayError" },
+          "404": { "$ref": "#/components/responses/GatewayError" },
+          "409": { "$ref": "#/components/responses/GatewayError" },
+          "429": { "$ref": "#/components/responses/GatewayError" },
+          "502": { "$ref": "#/components/responses/GatewayError" },
+          "503": { "$ref": "#/components/responses/GatewayUnavailable" }
+        }
+      }
+    },
+    "/api/raw-collections/{collection_id}/commit": {
+      "post": {
+        "operationId": "commitRawCollection",
+        "description": "Commits one complete collection into the 14-day quarantine lifecycle and returns a strict receipt v2. Legacy receipt v1 remains readable only from status recovery for collections committed before the v2 rollout.",
+        "x-max-body-bytes": 16384,
+        "security": [{ "fieldSession": [], "consentControlSecret": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/RawCollectionId" },
+          { "$ref": "#/components/parameters/RawPurpose" },
+          { "$ref": "#/components/parameters/RawWalkId" },
+          { "$ref": "#/components/parameters/RawManifestSha256" },
+          { "$ref": "#/components/parameters/RawCommitSha256" },
+          { "$ref": "#/components/parameters/RawConsentReceiptSha256" },
+          { "$ref": "#/components/parameters/ConsentInstallationId" },
+          { "$ref": "#/components/parameters/ConsentPolicyVersion" },
+          { "$ref": "#/components/parameters/ConsentRevision" },
+          { "$ref": "#/components/parameters/ConsentControlSecretHeader" },
+          { "$ref": "#/components/parameters/RawNetworkTransport" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RawCollectionCommitV1" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/RawCollectionReceipt" },
+          "400": { "$ref": "#/components/responses/GatewayError" },
+          "401": { "$ref": "#/components/responses/GatewayError" },
+          "409": { "$ref": "#/components/responses/GatewayError" },
+          "413": { "$ref": "#/components/responses/GatewayError" },
+          "415": { "$ref": "#/components/responses/GatewayError" },
+          "422": { "$ref": "#/components/responses/GatewayError" },
+          "428": { "$ref": "#/components/responses/GatewayError" },
+          "429": { "$ref": "#/components/responses/GatewayError" },
+          "502": { "$ref": "#/components/responses/GatewayError" },
+          "503": { "$ref": "#/components/responses/GatewayUnavailable" }
+        }
+      }
+    },
+    "/privacy/rights": {
+      "get": {
+        "operationId": "getIntegratedConsentControl",
+        "description": "Returns either the authenticated actor/generation- and installation-secret-bound current consent record for control=integrated-consent or the authenticated actor/generation-bound Backend bootstrap projection for control=integrated-consent-bootstrap. Both forms require exactly control, installation_id, and policy_version. An actor-binding mismatch returns integrated_consent_actor_reconsent_required without exposing another actor's selections. A GET without control parameters serves the separate public privacy-rights HTML page.",
+        "security": [
+          {
+            "fieldSession": [],
+            "consentControlSecret": []
+          },
+          {
+            "fieldSession": []
+          }
+        ],
+        "x-walksafe-conditional-security": {
+          "integrated-consent": ["fieldSession", "consentControlSecret"],
+          "integrated-consent-bootstrap": ["fieldSession"]
+        },
         "parameters": [
           {
             "name": "control",
@@ -620,7 +1362,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "const": "integrated-consent"
+              "enum": [
+                "integrated-consent",
+                "integrated-consent-bootstrap"
+              ]
             }
           },
           {
@@ -640,13 +1385,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "const": "FP-013-1.0.0"
+              "const": "FP-013-1.1.0"
             }
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/IntegratedConsentConfirmation"
+            "$ref": "#/components/responses/IntegratedConsentRead"
           },
           "400": {
             "$ref": "#/components/responses/GatewayError"
@@ -661,6 +1406,9 @@
             "$ref": "#/components/responses/GatewayError"
           },
           "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
             "$ref": "#/components/responses/GatewayError"
           },
           "503": {
@@ -886,6 +1634,26 @@
       }
     },
     "parameters": {
+      "CanonicalReportId": {
+        "name": "report_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "CanonicalReportRequestId": {
+        "name": "request_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
       "AccountDeletionRequestId": {
         "name": "request_id",
         "in": "path",
@@ -896,6 +1664,99 @@
           "maxLength": 128,
           "pattern": "^[A-Za-z0-9_-]{16,128}$"
         }
+      },
+      "RawCollectionId": {
+        "name": "collection_id",
+        "in": "path",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/RawCanonicalUuid" }
+      },
+      "RawObjectId": {
+        "name": "object_id",
+        "in": "path",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/RawCanonicalUuid" }
+      },
+      "RawChunkIndex": {
+        "name": "index",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "integer", "minimum": 0, "maximum": 2047 }
+      },
+      "RawPurpose": {
+        "name": "x-walksafe-raw-purpose",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "enum": ["GENERAL_RAW", "AUTO_REPORT"] }
+      },
+      "RawWalkId": {
+        "name": "x-walksafe-raw-walk-id",
+        "in": "header",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/RawCanonicalUuid" }
+      },
+      "RawManifestSha256": {
+        "name": "x-walksafe-raw-manifest-sha256",
+        "in": "header",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/RawSha256" }
+      },
+      "RawChunkSha256": {
+        "name": "x-walksafe-chunk-sha256",
+        "in": "header",
+        "required": true,
+        "description": "SHA-256 of the raw chunk bytes, not a JSON contract digest.",
+        "schema": { "$ref": "#/components/schemas/RawSha256" }
+      },
+      "RawCommitSha256": {
+        "name": "x-walksafe-raw-commit-sha256",
+        "in": "header",
+        "required": true,
+        "description": "Domain-separated canonical digest of the commit body.",
+        "schema": { "$ref": "#/components/schemas/RawSha256" }
+      },
+      "RawConsentReceiptSha256": {
+        "name": "x-walksafe-consent-receipt-sha256",
+        "in": "header",
+        "required": true,
+        "description": "Authoritative Backend consent receipt. A Gateway audit-record hash is never accepted here.",
+        "schema": { "$ref": "#/components/schemas/RawSha256" }
+      },
+      "ConsentInstallationId": {
+        "name": "x-walksafe-consent-installation-id",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+        }
+      },
+      "ConsentPolicyVersion": {
+        "name": "x-walksafe-consent-policy-version",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "const": "FP-013-1.1.0" }
+      },
+      "ConsentRevision": {
+        "name": "x-walksafe-consent-revision",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "ConsentControlSecretHeader": {
+        "name": "x-walksafe-consent-control-secret",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" }
+      },
+      "RawNetworkTransport": {
+        "name": "x-walksafe-network-transport",
+        "in": "header",
+        "required": true,
+        "description": "GENERAL_RAW accepts wifi only. AUTO_REPORT on cellular additionally requires mobile-network consent.",
+        "schema": { "type": "string", "enum": ["wifi", "cellular"] }
       }
     },
     "headers": {
@@ -908,6 +1769,225 @@
       }
     },
     "schemas": {
+      "AccountEnrollmentEmailOtpRequest": {
+        "type": "object",
+        "required": ["schema_version", "email", "date_of_birth", "request_id"],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.account-enrollment-email-otp.v1"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 3,
+            "maxLength": 254
+          },
+          "date_of_birth": {
+            "type": "string",
+            "format": "date"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_-]{16,128}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountEnrollmentEmailOtpResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "enrollment_handle",
+          "expires_at",
+          "resend_available_at"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.account-enrollment-email-otp-response.v1"
+          },
+          "enrollment_handle": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resend_available_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SignupConsentDocumentVersions": {
+        "type": "object",
+        "required": [
+          "terms_of_service",
+          "privacy_notice",
+          "location_terms",
+          "raw_original",
+          "automatic_reporting",
+          "training_reuse"
+        ],
+        "properties": {
+          "terms_of_service": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$" },
+          "privacy_notice": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$" },
+          "location_terms": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$" },
+          "raw_original": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$" },
+          "automatic_reporting": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$" },
+          "training_reuse": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$" }
+        },
+        "additionalProperties": false
+      },
+      "SignupConsentSelections": {
+        "type": "object",
+        "required": [
+          "terms_of_service",
+          "privacy_notice",
+          "location_terms",
+          "raw_original",
+          "automatic_reporting",
+          "training_reuse"
+        ],
+        "properties": {
+          "terms_of_service": { "type": "boolean", "const": true },
+          "privacy_notice": { "type": "boolean", "const": true },
+          "location_terms": { "type": "boolean", "const": true },
+          "raw_original": { "type": "boolean" },
+          "automatic_reporting": { "type": "boolean" },
+          "training_reuse": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "SignupConsent": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "document_versions",
+          "selections"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.signup-consent.v1"
+          },
+          "document_versions": {
+            "$ref": "#/components/schemas/SignupConsentDocumentVersions"
+          },
+          "selections": {
+            "$ref": "#/components/schemas/SignupConsentSelections"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountCreateRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "enrollment_handle",
+          "otp_code",
+          "password",
+          "consent"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.account-create.v1"
+          },
+          "enrollment_handle": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "otp_code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 128,
+            "format": "password"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/SignupConsent"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Account": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "actor_id",
+          "account_generation",
+          "signup_receipt_sha256"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.account.v1"
+          },
+          "actor_id": {
+            "type": "string",
+            "minLength": 36,
+            "maxLength": 36,
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "account_generation": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "signup_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountPasswordSessionLogin": {
+        "type": "object",
+        "required": ["grant_type", "email", "password", "remember_me"],
+        "properties": {
+          "grant_type": {
+            "type": "string",
+            "const": "password"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 3,
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 10,
+            "maxLength": 128
+          },
+          "remember_me": {
+            "type": "boolean",
+            "description": "When false, the bounded 12-hour cookie omits Max-Age and is browser-session scoped."
+          },
+          "device_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "description": "Optional canonical device binding. When present, the fixed 12-hour Backend account session is issued as device-bound v7 and may authorize field-walk; it is not a refresh-token session."
+          }
+        },
+        "additionalProperties": false
+      },
       "FieldSessionLogin": {
         "type": "object",
         "required": [
@@ -1295,6 +2375,759 @@
         "type": "integer",
         "format": "int64",
         "minimum": 1
+      },
+      "ReportTransportReceipt": {
+        "type": "object",
+        "required": [
+          "marker",
+          "report_id",
+          "persistence_marker",
+          "payload_sha256",
+          "payload_bytes"
+        ],
+        "properties": {
+          "marker": {
+            "type": "string",
+            "const": "DATABASE_AND_ENCRYPTED_IMAGE_STORE"
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "persistence_marker": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "payload_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "payload_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportTransportStatus": {
+        "type": "object",
+        "required": [
+          "persistence_state",
+          "user_status",
+          "transport_receipt"
+        ],
+        "properties": {
+          "persistence_state": {
+            "type": "string",
+            "const": "PERSISTED"
+          },
+          "user_status": {
+            "type": "string",
+            "enum": [
+              "RECEIVED",
+              "IN_REVIEW",
+              "COMPLETED"
+            ]
+          },
+          "transport_receipt": {
+            "$ref": "#/components/schemas/ReportTransportReceipt"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserReportStatus": {
+        "type": "string",
+        "enum": [
+          "RECEIVED",
+          "INSTITUTION_SUBMITTED",
+          "REJECTED",
+          "RESOLVED"
+        ]
+      },
+      "ReportUserRequestStatus": {
+        "type": "string",
+        "enum": [
+          "RECEIVED",
+          "ACKNOWLEDGED",
+          "RESOLVED",
+          "REJECTED"
+        ]
+      },
+      "ReportUserRequest": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "request_type",
+          "status",
+          "status_version",
+          "public_response",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "request_type": {
+            "type": "string",
+            "enum": ["CORRECTION", "DELETE"]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReportUserRequestStatus"
+          },
+          "status_version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "public_response": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "minLength": 20,
+            "maxLength": 40
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "minLength": 20,
+            "maxLength": 40
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserReport": {
+        "type": "object",
+        "required": [
+          "report_id",
+          "created_at",
+          "user_status",
+          "public_rejection_reason",
+          "latest_request"
+        ],
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "minLength": 20,
+            "maxLength": 40
+          },
+          "user_status": {
+            "$ref": "#/components/schemas/UserReportStatus"
+          },
+          "public_rejection_reason": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "latest_request": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReportUserRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserReportList": {
+        "type": "object",
+        "required": ["schema_version", "items", "next_cursor"],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.user-report-list.v1"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/UserReport"
+            }
+          },
+          "next_cursor": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "^[A-Za-z0-9_-]{1,1024}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserReportDetail": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "report_id",
+          "created_at",
+          "user_status",
+          "public_rejection_reason",
+          "latest_request"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.user-report-detail.v1"
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "minLength": 20,
+            "maxLength": 40
+          },
+          "user_status": {
+            "$ref": "#/components/schemas/UserReportStatus"
+          },
+          "public_rejection_reason": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "latest_request": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReportUserRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportUserRequestCreate": {
+        "type": "object",
+        "required": ["client_request_id", "request_type", "request_text"],
+        "properties": {
+          "client_request_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "request_type": {
+            "type": "string",
+            "enum": ["CORRECTION", "DELETE"]
+          },
+          "request_text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportContentCategory": {
+        "type": "string",
+        "enum": [
+          "SIDEWALK_OBSTRUCTION",
+          "ROAD_DAMAGE",
+          "ACCESSIBILITY_BARRIER",
+          "OTHER"
+        ]
+      },
+      "ReportContentCurrent": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "report_id",
+          "revision",
+          "content_sha256",
+          "user_description",
+          "category_hint",
+          "corrected_at"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.report-content-current.v1"
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "content_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "user_description": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "category_hint": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReportContentCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "corrected_at": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "minLength": 20,
+            "maxLength": 40
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "revision": {
+                  "const": 0
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "user_description": {
+                  "type": "null"
+                },
+                "category_hint": {
+                  "type": "null"
+                },
+                "corrected_at": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "revision": {
+                  "minimum": 1
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "corrected_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "minLength": 20,
+                  "maxLength": 40
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
+      },
+      "ReportContentCorrectionRequest": {
+        "type": "object",
+        "required": ["expected_revision", "idempotency_key"],
+        "properties": {
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Compare-and-swap revision observed from the current content resource."
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "user_description": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Omission preserves the current description; explicit null clears it. Non-null input is NFC-normalized, whitespace-collapsed, and rejects Unicode control categories."
+          },
+          "category_hint": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReportContentCategory"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omission preserves the current category; explicit null clears it."
+          }
+        },
+        "anyOf": [
+          {
+            "required": ["user_description"]
+          },
+          {
+            "required": ["category_hint"]
+          }
+        ],
+        "additionalProperties": false
+      },
+      "ReportContentRevision": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "report_id",
+          "revision",
+          "expected_revision",
+          "idempotency_key",
+          "content_sha256",
+          "user_description",
+          "category_hint",
+          "corrected_at"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.report-content-revision.v1"
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "content_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "user_description": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "category_hint": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReportContentCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "corrected_at": {
+            "type": "string",
+            "format": "date-time",
+            "minLength": 20,
+            "maxLength": 40
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportDeletionState": {
+        "type": "string",
+        "enum": ["PENDING", "LEGAL_HOLD", "REJECTED", "DELETED"]
+      },
+      "ReportDeletionStatus": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "report_id",
+          "state",
+          "request_status_version",
+          "external_copy_count",
+          "updated_at"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.report-deletion-status.v1"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReportDeletionState"
+          },
+          "request_status_version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "external_copy_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "minLength": 20,
+            "maxLength": 40
+          }
+        },
+        "additionalProperties": false
+      },
+      "RawCanonicalUuid": {
+        "type": "string",
+        "format": "uuid",
+        "minLength": 36,
+        "maxLength": 36,
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "RawSha256": {
+        "type": "string",
+        "minLength": 64,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "RawCollectionManifestChunkV1": {
+        "type": "object",
+        "required": ["index", "size_bytes", "sha256"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 0, "maximum": 2047 },
+          "size_bytes": { "type": "integer", "minimum": 1, "maximum": 8388608 },
+          "sha256": { "$ref": "#/components/schemas/RawSha256" }
+        },
+        "additionalProperties": false
+      },
+      "RawCollectionManifestObjectV1": {
+        "type": "object",
+        "required": ["object_id", "kind", "content_type", "size_bytes", "sha256", "chunks"],
+        "properties": {
+          "object_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "kind": { "type": "string", "enum": ["VIDEO", "AUDIO", "EXACT_LOCATION", "SENSOR", "ROUTE", "DETECTION", "REPORT", "PERFORMANCE"] },
+          "content_type": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 128,
+            "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]{0,63}/[a-z0-9][a-z0-9!#$&^_.+-]{0,63}$"
+          },
+          "size_bytes": { "type": "integer", "minimum": 1, "maximum": 17179869184 },
+          "sha256": { "$ref": "#/components/schemas/RawSha256" },
+          "chunks": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2048,
+            "items": { "$ref": "#/components/schemas/RawCollectionManifestChunkV1" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RawCollectionManifestV1": {
+        "type": "object",
+        "description": "Canonical UTF-8 JSON with lexically sorted unique object IDs, contiguous chunk indexes, exact aggregate counters, and manifest_sha256=SHA256('walksafe/raw-collection-manifest/v1\\0' || canonical JSON without manifest_sha256).",
+        "required": ["schema_version", "collection_id", "walk_id", "segment_id", "purpose", "captured_started_at", "captured_ended_at", "consent_receipt_sha256", "object_count", "chunk_count", "total_bytes", "objects", "manifest_sha256"],
+        "properties": {
+          "schema_version": { "type": "string", "const": "walksafe.raw-collection-manifest.v1" },
+          "collection_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "walk_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "segment_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "purpose": { "type": "string", "enum": ["GENERAL_RAW", "AUTO_REPORT"] },
+          "captured_started_at": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+          "captured_ended_at": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+          "consent_receipt_sha256": { "$ref": "#/components/schemas/RawSha256" },
+          "object_count": { "type": "integer", "minimum": 1, "maximum": 64 },
+          "chunk_count": { "type": "integer", "minimum": 1, "maximum": 2048 },
+          "total_bytes": { "type": "integer", "minimum": 1, "maximum": 17179869184 },
+          "objects": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": { "$ref": "#/components/schemas/RawCollectionManifestObjectV1" }
+          },
+          "manifest_sha256": { "$ref": "#/components/schemas/RawSha256" }
+        },
+        "additionalProperties": false
+      },
+      "RawCollectionCommitV1": {
+        "type": "object",
+        "description": "commit_sha256 is carried only in the header and equals SHA256('walksafe/raw-collection-commit/v1\\0' || canonical body).",
+        "required": ["schema_version", "collection_id", "manifest_sha256", "object_count", "chunk_count", "total_bytes"],
+        "properties": {
+          "schema_version": { "type": "string", "const": "walksafe.raw-collection-commit.v1" },
+          "collection_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "manifest_sha256": { "$ref": "#/components/schemas/RawSha256" },
+          "object_count": { "type": "integer", "minimum": 1, "maximum": 64 },
+          "chunk_count": { "type": "integer", "minimum": 1, "maximum": 2048 },
+          "total_bytes": { "type": "integer", "minimum": 1, "maximum": 17179869184 }
+        },
+        "additionalProperties": false
+      },
+      "RawCollectionMissingRangeV1": {
+        "type": "object",
+        "required": ["start", "end"],
+        "properties": {
+          "start": { "type": "integer", "minimum": 0, "maximum": 2047 },
+          "end": { "type": "integer", "minimum": 0, "maximum": 2047 }
+        },
+        "additionalProperties": false
+      },
+      "RawCollectionStatusObjectV1": {
+        "type": "object",
+        "required": ["object_id", "kind", "sha256", "chunk_count", "received_chunk_count", "size_bytes", "received_bytes", "missing_ranges"],
+        "properties": {
+          "object_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "kind": { "type": "string", "enum": ["VIDEO", "AUDIO", "EXACT_LOCATION", "SENSOR", "ROUTE", "DETECTION", "REPORT", "PERFORMANCE"] },
+          "sha256": { "$ref": "#/components/schemas/RawSha256" },
+          "chunk_count": { "type": "integer", "minimum": 1, "maximum": 2048 },
+          "received_chunk_count": { "type": "integer", "minimum": 0, "maximum": 2048 },
+          "size_bytes": { "type": "integer", "minimum": 1, "maximum": 17179869184 },
+          "received_bytes": { "type": "integer", "minimum": 0, "maximum": 17179869184 },
+          "missing_ranges": {
+            "type": "array",
+            "maxItems": 2048,
+            "items": { "$ref": "#/components/schemas/RawCollectionMissingRangeV1" }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RawCollectionReceiptObjectV1": {
+        "type": "object",
+        "required": ["object_id", "kind", "size_bytes", "sha256", "chunk_count"],
+        "properties": {
+          "object_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "kind": { "type": "string", "enum": ["VIDEO", "AUDIO", "EXACT_LOCATION", "SENSOR", "ROUTE", "DETECTION", "REPORT", "PERFORMANCE"] },
+          "size_bytes": { "type": "integer", "minimum": 1, "maximum": 17179869184 },
+          "sha256": { "$ref": "#/components/schemas/RawSha256" },
+          "chunk_count": { "type": "integer", "minimum": 1, "maximum": 2048 }
+        },
+        "additionalProperties": false
+      },
+      "RawCollectionReceiptV1": {
+        "type": "object",
+        "description": "Legacy read-only receipt with exact RAW_ORIGINAL_180D retention. receipt_sha256 is domain-separated over the canonical receipt without receipt_sha256.",
+        "required": ["schema_version", "collection_id", "manifest_sha256", "purpose", "persistence_marker", "object_count", "chunk_count", "total_bytes", "objects", "retention_class", "committed_at", "retention_expires_at", "receipt_sha256"],
+        "properties": {
+          "schema_version": { "type": "string", "const": "walksafe.raw-collection-receipt.v1" },
+          "collection_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "manifest_sha256": { "$ref": "#/components/schemas/RawSha256" },
+          "purpose": { "type": "string", "enum": ["GENERAL_RAW", "AUTO_REPORT"] },
+          "persistence_marker": { "type": "string", "const": "DATABASE_AND_ENCRYPTED_CHUNK_STORE" },
+          "object_count": { "type": "integer", "minimum": 1, "maximum": 64 },
+          "chunk_count": { "type": "integer", "minimum": 1, "maximum": 2048 },
+          "total_bytes": { "type": "integer", "minimum": 1, "maximum": 17179869184 },
+          "objects": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": { "$ref": "#/components/schemas/RawCollectionReceiptObjectV1" }
+          },
+          "retention_class": { "type": "string", "const": "RAW_ORIGINAL_180D" },
+          "committed_at": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+          "retention_expires_at": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+          "receipt_sha256": { "$ref": "#/components/schemas/RawSha256" }
+        },
+        "additionalProperties": false
+      },
+      "RawCollectionReceiptV2": {
+        "type": "object",
+        "description": "Current commit receipt with exact RAW_QUARANTINE_14D retention. receipt_sha256 uses the v2 domain over the canonical receipt without receipt_sha256.",
+        "required": ["schema_version", "collection_id", "manifest_sha256", "purpose", "persistence_marker", "object_count", "chunk_count", "total_bytes", "objects", "retention_class", "committed_at", "quarantine_expires_at", "receipt_sha256"],
+        "properties": {
+          "schema_version": { "type": "string", "const": "walksafe.raw-collection-receipt.v2" },
+          "collection_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "manifest_sha256": { "$ref": "#/components/schemas/RawSha256" },
+          "purpose": { "type": "string", "enum": ["GENERAL_RAW", "AUTO_REPORT"] },
+          "persistence_marker": { "type": "string", "const": "DATABASE_AND_ENCRYPTED_CHUNK_STORE" },
+          "object_count": { "type": "integer", "minimum": 1, "maximum": 64 },
+          "chunk_count": { "type": "integer", "minimum": 1, "maximum": 2048 },
+          "total_bytes": { "type": "integer", "minimum": 1, "maximum": 17179869184 },
+          "objects": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": { "$ref": "#/components/schemas/RawCollectionReceiptObjectV1" }
+          },
+          "retention_class": { "type": "string", "const": "RAW_QUARANTINE_14D" },
+          "committed_at": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+          "quarantine_expires_at": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+          "receipt_sha256": { "$ref": "#/components/schemas/RawSha256" }
+        },
+        "additionalProperties": false
+      },
+      "RawCollectionStatusV1": {
+        "type": "object",
+        "required": ["schema_version", "collection_id", "manifest_sha256", "purpose", "state", "object_count", "chunk_count", "total_bytes", "received_chunk_count", "received_bytes", "objects", "receipt"],
+        "properties": {
+          "schema_version": { "type": "string", "const": "walksafe.raw-collection-status.v1" },
+          "collection_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "manifest_sha256": { "$ref": "#/components/schemas/RawSha256" },
+          "purpose": { "type": "string", "enum": ["GENERAL_RAW", "AUTO_REPORT"] },
+          "state": { "type": "string", "enum": ["MANIFEST_ACCEPTED", "RECEIVING", "READY_TO_COMMIT", "COMMITTED", "QUARANTINED"] },
+          "object_count": { "type": "integer", "minimum": 1, "maximum": 64 },
+          "chunk_count": { "type": "integer", "minimum": 1, "maximum": 2048 },
+          "total_bytes": { "type": "integer", "minimum": 1, "maximum": 17179869184 },
+          "received_chunk_count": { "type": "integer", "minimum": 0, "maximum": 2048 },
+          "received_bytes": { "type": "integer", "minimum": 0, "maximum": 17179869184 },
+          "objects": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": { "$ref": "#/components/schemas/RawCollectionStatusObjectV1" }
+          },
+          "receipt": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/RawCollectionReceiptV1" },
+              { "$ref": "#/components/schemas/RawCollectionReceiptV2" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "RawCollectionChunkAckV1": {
+        "type": "object",
+        "required": ["schema_version", "collection_id", "object_id", "index", "size_bytes", "sha256", "state", "stored_at"],
+        "properties": {
+          "schema_version": { "type": "string", "const": "walksafe.raw-collection-chunk-ack.v1" },
+          "collection_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "object_id": { "$ref": "#/components/schemas/RawCanonicalUuid" },
+          "index": { "type": "integer", "minimum": 0, "maximum": 2047 },
+          "size_bytes": { "type": "integer", "minimum": 1, "maximum": 8388608 },
+          "sha256": { "$ref": "#/components/schemas/RawSha256" },
+          "state": { "type": "string", "enum": ["MANIFEST_ACCEPTED", "RECEIVING", "READY_TO_COMMIT", "COMMITTED", "QUARANTINED"] },
+          "stored_at": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" }
+        },
+        "additionalProperties": false
       },
       "GatewayError": {
         "type": "object",
@@ -1732,11 +3565,11 @@
         "properties": {
           "raw_source_collection": {
             "type": "string",
-            "const": "FP-013-RAW-1.0.0"
+            "const": "FP-013-RAW-1.1.0"
           },
           "automatic_reporting": {
             "type": "string",
-            "const": "FP-013-AUTO-1.0.0"
+            "const": "FP-013-AUTO-1.1.0"
           },
           "mobile_network_transfer": {
             "type": "string",
@@ -1744,7 +3577,7 @@
           },
           "training_reuse": {
             "type": "string",
-            "const": "FP-013-TRAINING-1.0.0"
+            "const": "FP-013-TRAINING-1.1.0"
           }
         },
         "additionalProperties": false
@@ -1782,6 +3615,7 @@
           "policy_version",
           "item_versions",
           "client_revision",
+          "expected_previous_backend_receipt_sha256",
           "selections"
         ],
         "properties": {
@@ -1803,7 +3637,7 @@
           },
           "policy_version": {
             "type": "string",
-            "const": "FP-013-1.0.0"
+            "const": "FP-013-1.1.0"
           },
           "item_versions": {
             "$ref": "#/components/schemas/IntegratedConsentItemVersions"
@@ -1813,8 +3647,75 @@
             "minimum": 1,
             "maximum": 9007199254740991
           },
+          "expected_previous_backend_receipt_sha256": {
+            "type": ["string", "null"],
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Backend CAS predecessor from the authenticated bootstrap response. Null is valid only when the Backend revision floor is zero."
+          },
           "selections": {
             "$ref": "#/components/schemas/IntegratedConsentSelections"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IntegratedConsentBootstrap": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "status",
+          "source",
+          "installation_id",
+          "policy_version",
+          "item_versions",
+          "client_revision_floor",
+          "selections",
+          "source_receipt_sha256",
+          "expected_previous_backend_receipt_sha256"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.integrated-consent-bootstrap.v1"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["READY", "RECONSENT_REQUIRED"]
+          },
+          "source": {
+            "type": "string",
+            "enum": ["CURRENT_CONSENT", "SIGNUP_CONSENT", "NONE"]
+          },
+          "installation_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "policy_version": {
+            "type": "string",
+            "const": "FP-013-1.1.0"
+          },
+          "item_versions": {
+            "$ref": "#/components/schemas/IntegratedConsentItemVersions"
+          },
+          "client_revision_floor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "selections": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/IntegratedConsentSelections" },
+              { "type": "null" }
+            ]
+          },
+          "source_receipt_sha256": {
+            "type": ["string", "null"],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "expected_previous_backend_receipt_sha256": {
+            "type": ["string", "null"],
+            "pattern": "^[0-9a-f]{64}$"
           }
         },
         "additionalProperties": false
@@ -1832,12 +3733,13 @@
           "revision",
           "selections",
           "confirmed_at",
-          "receipt_sha256"
+          "gateway_audit_record_sha256",
+          "backend_consent_receipt_sha256"
         ],
         "properties": {
           "schema_version": {
             "type": "string",
-            "const": "walksafe.integrated-consent-confirmation.v1"
+            "const": "walksafe.integrated-consent-confirmation.v2"
           },
           "current": {
             "type": "boolean",
@@ -1857,7 +3759,7 @@
           },
           "policy_version": {
             "type": "string",
-            "const": "FP-013-1.0.0"
+            "const": "FP-013-1.1.0"
           },
           "item_versions": {
             "$ref": "#/components/schemas/IntegratedConsentItemVersions"
@@ -1879,9 +3781,15 @@
             "type": "string",
             "format": "date-time"
           },
-          "receipt_sha256": {
+          "gateway_audit_record_sha256": {
             "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Gateway-local immutable audit-chain record hash. It is never an authorization receipt."
+          },
+          "backend_consent_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Authoritative Backend consent receipt used for authorization."
           }
         },
         "additionalProperties": false
@@ -2151,6 +4059,174 @@
       }
     },
     "responses": {
+      "AccountEnrollmentEmailOtp": {
+        "description": "Opaque email OTP enrollment handle metadata",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AccountEnrollmentEmailOtpResponse"
+            }
+          }
+        }
+      },
+      "AccountCreated": {
+        "description": "Backend-created account identity and signup receipt",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Account"
+            }
+          }
+        }
+      },
+      "UserReportList": {
+        "description": "Strict actor-bound report list",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/UserReportList"
+            }
+          }
+        }
+      },
+      "UserReportDetail": {
+        "description": "Strict actor-bound report detail",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/UserReportDetail"
+            }
+          }
+        }
+      },
+      "ReportUserRequest": {
+        "description": "Created or exactly replayed report-scoped user request",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ReportUserRequest"
+            }
+          }
+        }
+      },
+      "ReportContentCurrent": {
+        "description": "Strict actor/generation-bound current report content revision",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ReportContentCurrent"
+            }
+          }
+        }
+      },
+      "ReportContentRevision": {
+        "description": "Created or exactly replayed structured report content revision",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ReportContentRevision"
+            }
+          }
+        }
+      },
+      "ReportDeletionStatus": {
+        "description": "Strict actor/generation-bound physical report deletion status",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ReportDeletionStatus"
+            }
+          }
+        }
+      },
+      "ReportTransportStatus": {
+        "description": "Strict actor-bound report transport status",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ReportTransportStatus"
+            }
+          }
+        }
+      },
+      "RawCollectionStatus": {
+        "description": "Strict current-generation raw collection status projection",
+        "headers": {
+          "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/RawCollectionStatusV1" }
+          }
+        }
+      },
+      "RawCollectionChunkAck": {
+        "description": "Strict digest-bound chunk acknowledgement projection",
+        "headers": {
+          "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/RawCollectionChunkAckV1" }
+          }
+        }
+      },
+      "RawCollectionReceipt": {
+        "description": "Strict domain-digest-validated 14-day quarantine receipt v2 projection",
+        "headers": {
+          "Cache-Control": { "$ref": "#/components/headers/NoStore" }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/RawCollectionReceiptV2" }
+          }
+        }
+      },
       "GatewayError": {
         "description": "Bounded gateway error",
         "headers": {
@@ -2193,6 +4269,24 @@
             "schema": {
               "type": "object",
               "additionalProperties": true
+            }
+          }
+        }
+      },
+      "IntegratedConsentRead": {
+        "description": "Strict current-consent or authenticated bootstrap projection selected by the control query",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                { "$ref": "#/components/schemas/IntegratedConsentConfirmation" },
+                { "$ref": "#/components/schemas/IntegratedConsentBootstrap" }
+              ]
             }
           }
         }

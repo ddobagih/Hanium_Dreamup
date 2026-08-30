@@ -342,43 +342,31 @@ class MainActivityPhoneMountingStaticTest {
         )
 
         val report = functionBlock("private fun processReportCandidate(")
+        assertInOrder(
+            report,
+            "walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch)",
+            "!officialEnvironmentOutputsAllowed || !phoneMountingOutputsAllowed",
+            "integratedConsentSession.currentConfirmationOrNull()",
+            "reportQueueStore.enqueue(",
+        )
+        assertFalse(report.contains("uploadCall("))
         assertTrue(
-            "report callbacks must re-check the combined gate before asynchronous output",
-            report.countOccurrences("runIfReportUploadTerminalCurrent(") >= 8,
-        )
-        assertUsesCombinedSafetyGate(
-            report.substringBefore("reportUploaderExecutor.execute"),
-            "report pre-dispatch",
-        )
-        assertUsesCombinedSafetyGate(
-            report.substringAfter("reportUploaderExecutor.execute")
-                .substringBefore("val response = uploadCall.execute()"),
-            "report executor preflight",
-        )
-        assertTrue(
-            "report response and callback handling must use the guarded terminal callback",
-            report.substringAfter("val response = uploadCall.execute()")
-                .contains("runIfReportUploadTerminalCurrent("),
-        )
-
-        val reportTerminalGate =
-            declarationRegion("private fun isReportUploadTerminalCurrent(")
-        assertTrue(reportTerminalGate.contains("reportUploadSafetyGeneration"))
-        assertTrue(reportTerminalGate.contains("automaticReportUploadSafetyGeneration"))
-        assertTrue(reportTerminalGate.contains("!uploadCall.isCancelled()"))
-        assertTrue(
-            reportTerminalGate.contains(
-                "walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch)",
+            report.contains(
+                "!explicitRequest && !consentConfirmation.selections.automaticReporting",
             ),
         )
-        assertTrue(reportTerminalGate.contains("isCurrentGatewaySession(gatewaySession)"))
-        assertTrue(reportTerminalGate.contains("reportPrivacyConsentSession.isGranted()"))
-        assertTrue(reportTerminalGate.contains("isWalkSessionRuntimeActive()"))
-        assertTrue(reportTerminalGate.contains("walkSafetyOutputsAllowed()"))
-        val terminalMutation = functionBlock("private fun runIfReportUploadTerminalCurrent(")
-        assertTrue(terminalMutation.contains("synchronized(phoneMountingObservationLock)"))
-        assertTrue(terminalMutation.contains("synchronized(reportUploadSafetyLock)"))
-        assertTrue(report.contains("automaticReportConsentGranted"))
+        val drain = functionBlock("private fun drainInitialExactReportQueue(")
+        assertInOrder(
+            drain,
+            "val context = reportQueueDrainContext(trigger)",
+            "if (!context.allRequiredBaseGatesAllowed()) break",
+            "reportQueueDrainCoordinator.startNext(",
+            "call.execute()",
+        )
+        val drainContext = functionBlock("private fun reportQueueDrainContext(")
+        assertTrue(drainContext.contains("runtime.triggerCurrent && isActivityForeground"))
+        assertTrue(drainContext.contains("currentConfirmation == trigger.consentConfirmation"))
+        assertTrue(drainContext.contains("currentGateway.session === trigger.gatewaySession"))
         val automaticConsent =
             functionBlock("private fun updateIntegratedConsentDraft(")
         assertTrue(
@@ -389,6 +377,12 @@ class MainActivityPhoneMountingStaticTest {
         assertTrue(
             immediateConsentWithdrawals.contains(
                 "automaticReportUploadSafetyGeneration += 1L",
+            ),
+        )
+        assertTrue(immediateConsentWithdrawals.contains("cancelReportQueueDrain()"))
+        assertTrue(
+            immediateConsentWithdrawals.contains(
+                "reportQueueDrainCoordinator.onConsentRevoked(previousReceipt)",
             ),
         )
         assertFalse(automaticConsent.contains("\n                reportUploadSafetyGeneration += 1L"))

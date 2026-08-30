@@ -1271,6 +1271,14 @@ def test_admin_operation_classifier_is_exact_and_unknown_writes_fail_closed() ->
         "PATCH",
         "/reports/11111111-1111-4111-8111-111111111111/status",
     )
+    admin_status_patch = classify_admin_operation(
+        "PATCH",
+        "/admin/reports/11111111-1111-4111-8111-111111111111/status",
+    )
+    delivery_package = classify_admin_operation(
+        "POST",
+        "/admin/reports/11111111-1111-4111-8111-111111111111/delivery-packages",
+    )
     original_grant = classify_admin_operation(
         "POST",
         "/reports/11111111-1111-4111-8111-111111111111/original-access-grants",
@@ -1294,6 +1302,16 @@ def test_admin_operation_classifier_is_exact_and_unknown_writes_fail_closed() ->
     assert (status_patch.action, status_patch.method) == (
         "report.status.patch",
         "PATCH",
+    )
+    assert admin_status_patch is not None
+    assert (admin_status_patch.action, admin_status_patch.risk) == (
+        "admin.report.status.update",
+        "HIGH",
+    )
+    assert delivery_package is not None
+    assert (delivery_package.action, delivery_package.risk) == (
+        "admin.report.delivery_package.create",
+        "HIGH",
     )
     assert original_grant is not None
     assert (original_grant.action, original_grant.method) == (
@@ -1321,6 +1339,12 @@ def test_admin_operation_classifier_is_exact_and_unknown_writes_fail_closed() ->
     assert classify_admin_operation("POST", "/reports/export") is None
     assert classify_admin_operation("GET", "/reports/export/near") is None
     assert classify_admin_operation("PATCH", "/reports/not-a-uuid/status") is None
+    assert classify_admin_operation(
+        "PATCH", "/admin/reports/not-a-uuid/status"
+    ) is None
+    assert classify_admin_operation(
+        "POST", "/admin/reports/not-a-uuid/delivery-packages"
+    ) is None
     assert classify_admin_operation("POST", "/reports/not-a-uuid/original-access-grants") is None
     assert classify_admin_operation(
         "POST", "/admin/security/devices/short/report-lost"
@@ -2041,7 +2065,7 @@ def test_postgres_recovery_custody_migration_preflights_control_count(
             assert revision == prior_revision
             assert custody_column_count == 0
         else:
-            assert revision == "202608250002"
+            assert revision == "202608290011"
             assert custody_column_count == 1
     finally:
         engine.dispose()

@@ -473,7 +473,45 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(visibility.contains("accountDeletionRecoveryLoginRequired()"))
         assertTrue(visibility.contains("BuildConfig.DEBUG"))
         assertTrue(visibility.contains("View.GONE"))
-        assertFalse(visibility.contains("privacyControls.visibility =\n                if"))
+        assertTrue(visibility.contains("privacySectionExpanded"))
+        assertTrue(visibility.contains("deletionRecoverySurface"))
+        assertTrue(visibility.contains("gatewaySessionControlsExpanded"))
+        assertTrue(source.contains("label = \"설정과 개인정보 펼치기\""))
+        assertTrue(source.contains("label = \"개발자용 Gateway 설정 펼치기\""))
+    }
+
+    @Test
+    fun secondaryAndGatewayControlsUseExplicitCollapsedDisclosure() {
+        val privacy = functionBlock("private fun updatePrivacySectionVisibility()")
+        assertTrue(privacy.contains("privacyControls.visibility"))
+        assertTrue(privacy.contains("privacySectionExpanded"))
+        assertTrue(privacy.contains("gatewaySessionControls.visibility"))
+        assertTrue(privacy.contains("gatewaySessionControlsExpanded"))
+        assertTrue(privacy.contains("accountDeletionRecoveryLoginRequired()"))
+        assertTrue(privacy.contains("contentDescription"))
+
+        val overlay = sourceBlock(
+            "val overlay = LinearLayout(this).apply",
+            "walkSafetyOverlay = LinearLayout(this).apply",
+        )
+        val disclosure = overlay.indexOf("addView(privacySectionToggleButton)")
+        val controls = overlay.indexOf("addView(privacyControls)")
+        assertTrue(disclosure >= 0)
+        assertTrue(controls >= 0)
+        assertTrue(disclosure < controls)
+    }
+
+    @Test
+    fun allInteractiveControlsReceiveReadableTextAndFortyEightDpTargets() {
+        val defaults = functionBlock("private fun applyAccessibleControlDefaults(")
+        assertTrue(defaults.contains("accessibilityTargetSizePx()"))
+        assertTrue(defaults.contains("minimumHeight = maxOf"))
+        assertTrue(defaults.contains("minimumWidth = maxOf"))
+        assertTrue(source.contains("const val MIN_INTERACTIVE_TEXT_SP = 16f"))
+        assertTrue(defaults.contains("TypedValue.applyDimension("))
+        assertTrue(defaults.contains("if (root.textSize < minimumTextSizePx)"))
+        assertTrue(defaults.contains("root is ViewGroup"))
+        assertTrue(source.contains("applyAccessibleControlDefaults(overlay)"))
     }
     @Test
     fun controlsCarryTheMeasuredDesignTokensInsteadOfPlatformDefaults() {
@@ -502,28 +540,44 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(source.contains("firstRunProgressBar"))
         assertTrue(source.contains("firstRunProgressSegments"))
 
-        val bar = source.substringAfter("firstRunProgressBar = LinearLayout(this)")
-            .substringBefore("firstRunOnboardingStatusText = TextView(this)")
+        val bar = sourceBlock(
+            "firstRunProgressBar = LinearLayout(this)",
+            "firstRunOnboardingStatusText = TextView(this)",
+        )
         assertTrue(bar.contains("View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
 
-        // 단계 문장은 본문 크기가 아니라 제목으로 보인다.
-        val title = source.substringAfter("firstRunOnboardingStatusText = TextView(this).apply")
-            .substringBefore("ViewCompat.setAccessibilityHeading(firstRunOnboardingStatusText")
+        // 큰 글꼴에서도 현재 행동이 첫 화면에 남는 제목 크기를 쓴다.
+        val title = sourceBlock(
+            "firstRunOnboardingStatusText = TextView(this).apply",
+            "ViewCompat.setAccessibilityHeading(firstRunOnboardingStatusText",
+        )
         assertTrue(title.contains("Typeface.NORMAL"))
-        assertTrue(title.contains("textSize = 22f"))
+        assertTrue(title.contains("textSize = 20f"))
     }
     @Test
-    fun standingSafetyNoticeReadsAsAContainedBlockNotTheWholeScreen() {
-        // 고지는 순서를 유지한 채(FirstOnTheStartupSurface 계약) 카드로 감싸 시각적으로
-        // 뒤로 물린다. 본문색 #c9c6c0 은 카드 위에서 10.81:1 로 AAA 를 유지한다.
+    fun acknowledgedSafetyNoticeCollapsesToACompactDisclosure() {
+        // 최초 안전 확인 뒤에는 카드 전문을 숨기고 한 개의 명시적인
+        // 펼침 동작만 남겨 1.5배 글꼴에서도 현재 단계와 로그인을 먼저 볼 수 있게 한다.
         assertTrue(source.contains("WS_COLOR_NOTICE_TEXT"))
         assertTrue(source.contains("WS_COLOR_NOTICE_FILL"))
 
-        val notice = source.substringAfter("productPurposeText = TextView(this).apply")
-            .substringBefore("firstRunProgressSegments.clear()")
+        val notice = sourceBlock(
+            "productPurposeText = TextView(this).apply",
+            "firstRunProgressSegments.clear()",
+        )
         assertTrue(notice.contains("GradientDrawable()"))
         assertTrue(notice.contains("WS_COLOR_NOTICE_TEXT"))
         assertFalse(notice.contains("setTextColor(0xffffffff.toInt())"))
+
+        val update = functionBlock("private fun refreshFirstRunNoticeUi")
+        assertTrue(update.contains("productPurposeText.visibility"))
+        assertTrue(update.contains("if (expanded) View.VISIBLE else View.GONE"))
+        assertTrue(
+            update.contains(
+                "안전 보장·보조수단 대체 아님 · 자세히 보기",
+            ),
+        )
+        assertFalse(update.contains("신고는 자동 아님"))
     }
     @Test
     fun safetyNoticeCollapsesOnlyAfterTheUserAcknowledgesIt() {
@@ -541,10 +595,21 @@ class MainActivityAccessibilityStaticTest {
         assertFalse(update.contains("canScrollVertically"))
     }
 
+    @Test
+    fun dynamicDestinationResultsKeepReadableTextAndTouchTargets() {
+        val update = functionBlock("private fun updateDestinationSearchUi")
+        assertTrue(update.contains("textSize = MIN_INTERACTIVE_TEXT_SP"))
+        assertTrue(update.contains("minimumHeight = accessibilityTargetSizePx()"))
+        assertTrue(update.contains("minimumWidth = accessibilityTargetSizePx()"))
+        assertFalse(update.contains("textSize = 12f"))
+        assertFalse(update.contains("textSize = 11f"))
+    }
+
     private fun functionBlock(marker: String): String {
         val start = source.indexOf(marker)
         require(start >= 0) { "missing: $marker" }
         val open = source.indexOf('{', start)
+        require(open >= 0) { "missing function body: $marker" }
         var depth = 0
         for (index in open until source.length) {
             when (source[index]) {
@@ -556,6 +621,14 @@ class MainActivityAccessibilityStaticTest {
             }
         }
         error("unterminated: $marker")
+    }
+
+    private fun sourceBlock(startMarker: String, endMarker: String): String {
+        val start = source.indexOf(startMarker)
+        require(start >= 0) { "missing start marker: $startMarker" }
+        val end = source.indexOf(endMarker, start + startMarker.length)
+        require(end >= 0) { "missing end marker after $startMarker: $endMarker" }
+        return source.substring(start, end)
     }
     @Test
     fun stageHeadingRendersEyebrowAndTitleWithoutSplittingTheAnnouncement() {
@@ -572,6 +645,33 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(caller.contains("firstRunOnboardingStatusText.text = message"))
         assertTrue(caller.contains("firstRunOnboardingStatusText.contentDescription = message"))
         assertTrue(caller.contains("applyStageHeadingStyle("))
+    }
+
+    @Test
+    fun stageHeadingsUseShortActionLanguageForLargeFonts() {
+        val update = functionBlock("private fun updateFirstRunOnboardingUi")
+        assertTrue(update.contains("로그인하거나 새 계정을 만드세요."))
+        assertTrue(update.contains("인증번호를 입력해 계정을 만드세요."))
+        assertTrue(update.contains("기기 기능을 점검하세요."))
+        assertFalse(
+            update.contains("이메일과 생년월일로 가입하거나 기존 계정으로 로그인하세요."),
+        )
+    }
+
+    @Test
+    fun completeHeadingKeepsFeaturesLockedUntilRuntimeSafetyGatesPass() {
+        val update = functionBlock("private fun updateFirstRunOnboardingUi")
+        val complete = update.substring(
+            update.indexOf("FirstRunOnboardingStage.COMPLETE ->").also {
+                require(it >= 0) { "missing COMPLETE heading branch" }
+            },
+            update.indexOf("FirstRunOnboardingStage.BLOCKED_UNDER_14 ->").also {
+                require(it >= 0) { "missing heading branch after COMPLETE" }
+            },
+        )
+        assertTrue(complete.contains("firstRunOnboardingComplete()"))
+        assertTrue(complete.contains("기능은 잠겨 있습니다"))
+        assertTrue(complete.contains("권한·안전 상태"))
     }
     @Test
     fun primaryActionIsVisuallySeparatedFromSecondaryChoices() {

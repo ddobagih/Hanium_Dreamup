@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.admin.security;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -30,7 +31,7 @@ final class AdminStrictJson {
             if (!(item instanceof Map<?, ?> object)) throw new IOException("JSON array item must be an object");
             result.add(castObject(object));
         }
-        return List.copyOf(result);
+        return AdminJava8Collections.copyList(result);
     }
 
     static String decodeUtf8(byte[] value) throws IOException {
@@ -82,7 +83,7 @@ final class AdminStrictJson {
                 case 't' -> parseLiteral("true", Boolean.TRUE);
                 case 'f' -> parseLiteral("false", Boolean.FALSE);
                 case 'n' -> parseLiteral("null", null);
-                default -> parseInteger();
+                default -> parseNumber();
             };
         }
 
@@ -170,7 +171,7 @@ final class AdminStrictJson {
             return value;
         }
 
-        private Long parseInteger() throws IOException {
+        private Number parseNumber() throws IOException {
             int start = offset;
             if (consume('-') && offset >= input.length()) throw error("JSON number is incomplete");
             if (consume('0')) {
@@ -183,16 +184,22 @@ final class AdminStrictJson {
                 }
                 while (offset < input.length() && isAsciiDigit(input.charAt(offset))) offset += 1;
             }
-            if (offset < input.length()) {
-                char next = input.charAt(offset);
-                if (next == '.' || next == 'e' || next == 'E') {
-                    throw error("contract integer must not use a fraction or exponent");
+            boolean decimal = false;
+            if (consume('.')) {
+                decimal = true;
+                if (offset >= input.length() || !isAsciiDigit(input.charAt(offset))) {
+                    throw error("JSON fraction is incomplete");
                 }
+                while (offset < input.length() && isAsciiDigit(input.charAt(offset))) offset += 1;
+            }
+            if (offset < input.length() && (input.charAt(offset) == 'e' || input.charAt(offset) == 'E')) {
+                throw error("administrator contract numbers must not use an exponent");
             }
             try {
-                return Long.parseLong(input.substring(start, offset));
+                String encoded = input.substring(start, offset);
+                return decimal ? new BigDecimal(encoded) : Long.parseLong(encoded);
             } catch (NumberFormatException error) {
-                throw error("JSON integer is outside signed 64-bit range");
+                throw error("JSON number is invalid");
             }
         }
 

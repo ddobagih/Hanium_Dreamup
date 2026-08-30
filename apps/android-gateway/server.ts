@@ -4,7 +4,8 @@ import {
   assertGatewayStateStorageConfiguration,
   resolveBindAddress,
   resolveGatewayServiceRuntimeLockPath,
-  resolvePrivacyRightsRequestUrl
+  resolvePrivacyRightsRequestUrl,
+  resolveVoiceServiceConfig
 } from "./src/config.js";
 import { initializeGatewayStateEncryption } from "./src/encrypted-json-store.js";
 import { acquireSharedFileLock } from "./src/exclusive-file-lock.js";
@@ -19,6 +20,7 @@ if (!cluster.isPrimary) {
 assertGatewayStateStorageConfiguration();
 const bind = resolveBindAddress();
 resolvePrivacyRightsRequestUrl();
+resolveVoiceServiceConfig();
 const runtimeLock = acquireSharedFileLock(resolveGatewayServiceRuntimeLockPath());
 let server: ReturnType<typeof createGatewayServer>;
 try {

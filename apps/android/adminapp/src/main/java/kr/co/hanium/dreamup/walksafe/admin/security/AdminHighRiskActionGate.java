@@ -6,7 +6,13 @@ import java.util.Map;
 public final class AdminHighRiskActionGate {
     public static final String RECONFIRMATION_NONCE_HEADER = "X-WalkSafe-Reconfirm-Nonce";
 
-    public enum Action {
+    public interface Operation {
+        String reauthenticationAction();
+        String method();
+        String path();
+    }
+
+    public enum Action implements Operation {
         RELEASE_APPROVAL(
             "release.approval",
             "POST",
@@ -82,11 +88,11 @@ public final class AdminHighRiskActionGate {
     }
 
     public static final class Binding {
-        private final Action action;
+        private final Operation action;
         private final String nonce;
         private final long expiresAtEpochMs;
 
-        public Binding(Action action, String nonce, long expiresAtEpochMs) {
+        public Binding(Operation action, String nonce, long expiresAtEpochMs) {
             if (action == null || !isCanonicalNonce(nonce)) {
                 throw new IllegalArgumentException("invalid reauthentication binding");
             }
@@ -102,6 +108,50 @@ public final class AdminHighRiskActionGate {
 
     private AdminHighRiskActionGate() {}
 
+    public static Operation reportStatus(String reportId) {
+        String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
+        return operation(
+            "admin.report.status.update",
+            "PATCH",
+            "/admin/reports/" + safeId + "/status"
+        );
+    }
+
+    public static Operation deliveryPackage(String reportId) {
+        String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
+        return operation(
+            "admin.report.delivery_package.create",
+            "POST",
+            "/admin/reports/" + safeId + "/delivery-packages"
+        );
+    }
+
+    public static Operation reportRequestStatus(String requestId) {
+        String safeId = AdminReportRequestModels.canonicalUuid(requestId, "request_id");
+        return operation(
+            "admin.report_request.status.update",
+            "PATCH",
+            "/admin/report-requests/" + safeId + "/status"
+        );
+    }
+
+    public static Operation incidentStatus(String incidentId) {
+        String safeId = AdminIncidentModels.canonicalUuid(incidentId, "incident_id");
+        return operation(
+            "admin.incident.status.update",
+            "PATCH",
+            "/admin/incidents/" + safeId + "/status"
+        );
+    }
+
+    private static Operation operation(String action, String method, String path) {
+        return new Operation() {
+            @Override public String reauthenticationAction() { return action; }
+            @Override public String method() { return method; }
+            @Override public String path() { return path; }
+        };
+    }
+
     static boolean isCanonicalNonce(String nonce) {
         if (nonce == null || !nonce.matches("[A-Za-z0-9_-]{22}")) return false;
         try {
@@ -114,7 +164,7 @@ public final class AdminHighRiskActionGate {
     }
 
     public static Decision evaluate(
-        Action action,
+        Operation action,
         AdminSecurityState securityState,
         AdminRecoveryCustodyState recoveryCustodyState,
         long reauthenticatedUntilEpochMs,
@@ -132,7 +182,7 @@ public final class AdminHighRiskActionGate {
     }
 
     public static Decision evaluate(
-        Action action,
+        Operation action,
         AdminSecurityState securityState,
         AdminRecoveryCustodyState recoveryCustodyState,
         Binding binding,
@@ -149,17 +199,19 @@ public final class AdminHighRiskActionGate {
         if (!operationalWorkflowsEnabled) return denied("operational_workflows_locked");
         if (binding == null) return denied("reconfirmation_binding_required");
         if (binding.expiresAtEpochMs <= nowEpochMs) return denied("recent_reauthentication_required");
-        if (binding.action != action) {
+        if (!binding.action.reauthenticationAction().equals(action.reauthenticationAction())
+            || !binding.action.method().equals(action.method())
+            || !binding.action.path().equals(action.path())) {
             return denied("reconfirmation_binding_mismatch");
         }
         return new Decision(
             true,
             "allowed",
-            Map.of(RECONFIRMATION_NONCE_HEADER, binding.nonce)
+            AdminJava8Collections.map(RECONFIRMATION_NONCE_HEADER, binding.nonce)
         );
     }
 
     private static Decision denied(String reason) {
-        return new Decision(false, reason, Map.of());
+        return new Decision(false, reason, AdminJava8Collections.map());
     }
 }

@@ -191,7 +191,7 @@ def test_normal_key_retirement_and_destruction_are_blocked_without_backup_proof(
         _validate_rotation(retired.public_states(), compromised_instead)
 
 
-def test_normal_terminal_key_requires_zero_report_image_object_use() -> None:
+def test_normal_terminal_key_requires_zero_report_and_raw_object_use() -> None:
     terminal = parse_report_image_keyring(
         _raw_keyring(
             [
@@ -215,11 +215,16 @@ def test_normal_terminal_key_requires_zero_report_image_object_use() -> None:
     class FakeSession:
         def __init__(self, values: list[str]) -> None:
             self._values = values
+            self.statements: list[str] = []
 
-        def scalars(self, _statement) -> ScalarResult:
+        def scalars(self, statement) -> ScalarResult:
+            self.statements.append(str(statement))
             return ScalarResult(self._values)
 
-    _assert_normal_terminal_keys_unused(FakeSession([]), terminal)  # type: ignore[arg-type]
+    unused = FakeSession([])
+    _assert_normal_terminal_keys_unused(unused, terminal)  # type: ignore[arg-type]
+    assert "report_image_objects" in unused.statements[0]
+    assert "raw_collection_chunks" in unused.statements[0]
     with pytest.raises(ReportImageKeyringInvalid, match="objects still use"):
         _assert_normal_terminal_keys_unused(  # type: ignore[arg-type]
             FakeSession(["key-v1"]),

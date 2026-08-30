@@ -152,6 +152,7 @@ UNIT_PYTHON_TESTS=(
   tests/test_walksafe_fp048_r002_goal_start_gate_20260825.py
   tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py
   tests/test_account_deletion_worker_operations.py
+  tests/test_raw_collection_retention_operations.py
   tests/test_apply_walksafe_fp048_r002_goal_start_control_reanchor_seq90_20260826.py
   tests/test_apply_walksafe_fp048_r002_goal_start_control_correction_seq91_20260826.py
   tests/test_apply_walksafe_fp048_r002_goal_started_seq91_20260826.py
@@ -197,6 +198,7 @@ UNIT_PYTHON_TESTS=(
   model/test_two_model_runtime.py
   backend/tests/test_admin_credential_issuer_binding.py
   backend/tests/test_admin_credential_issuer_key.py
+  backend/tests/test_accounts.py
   backend/tests/test_account_deletion_worker.py
   backend/tests/test_capacity_state.py
   backend/tests/test_field_test_security.py
@@ -206,12 +208,22 @@ UNIT_PYTHON_TESTS=(
   backend/tests/test_report_image_crypto.py
   backend/tests/test_report_image_keyring.py
   backend/tests/test_report_storage_reconciliation.py
+  backend/tests/test_raw_collection_contract.py
+  backend/tests/test_raw_collection_crypto.py
+  backend/tests/test_raw_collection_storage.py
+  backend/tests/test_raw_collection_storage_reconciliation.py
+  backend/tests/test_raw_collection_retention.py
+  backend/tests/test_report_transport_contract.py
+  backend/tests/test_report_user_requests.py
   backend/tests/test_report_retention.py
   backend/tests/test_inference_process.py
 )
 
 FUNCTIONAL_PYTHON_TESTS=(
   backend/tests/test_admin_device_proof.py
+  backend/tests/test_admin_report_detail.py
+  backend/tests/test_admin_report_wave5.py
+  backend/tests/test_admin_reports.py
   backend/tests/test_admin_report_workflow.py
   backend/tests/test_admin_security.py
   backend/tests/test_admin_runtime_acl_hardening.py
@@ -227,8 +239,12 @@ FUNCTIONAL_PYTHON_TESTS=(
   backend/tests/test_test_storage_isolation.py
   backend/tests/test_uploads.py
   backend/tests/test_yolo_inference_adapter.py
+  backend/tests/test_accounts_postgres_integration.py
   backend/tests/test_fp008_postgres_integration.py
   backend/tests/test_fp046_postgres_integration.py
+  backend/tests/test_raw_collection_postgres_integration.py
+  backend/tests/test_raw_collection_retention_postgres_integration.py
+  backend/tests/test_report_user_requests_postgres_integration.py
   tests/test_agency_submission_receipt.py
   tests/test_android_field_session_summary.py
   tests/test_cloudflare_field_runner.py
