@@ -521,6 +521,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var voiceDataInstallButton: Button
     private lateinit var accountConsentStepControls: LinearLayout
     private lateinit var accountDetailsStepControls: LinearLayout
+    /** 가입 화면 안에서 로그인으로 돌아가는 길. 공용 토글과 같은 동작이고 자리만 끝으로 뺐다. */
+    private lateinit var accountSignupBackButton: Button
     private var accountConsentDisclosureExpanded = false
     private lateinit var firstRunPurposeButton: Button
     private val firstRunAgeButtons = mutableMapOf<FirstRunAgeBand, Button>()
@@ -11741,6 +11743,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(accountDateOfBirthInput)
             addView(accountRequestOtpButton)
         }
+        // 공용 토글은 로그인 화면에서 「새 계정 만들기」로 쓰이느라 입력칸 사이에 놓인다. 가입에
+        // 들어오면 그 자리가 이메일·비밀번호와 비밀번호 확인·인증번호 사이를 가르게 되어 입력
+        // 흐름이 끊긴다. 가입 안에서는 이 버튼을 맨 끝에서 보인다.
+        accountSignupBackButton = accessiblePriorityUserButton(
+            label = "로그인 화면으로 돌아가기",
+            spokenLabel = "로그인 화면으로 돌아가기. 두 번 탭하여 가입 입력 접기",
+            onClick = { accountSignupToggleButton.performClick() },
+        )
         accountSignupControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -11750,6 +11760,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(accountPasswordConfirmationInput)
             addView(accountOtpInput)
             addView(accountCreateButton)
+            addView(accountSignupBackButton)
         }
         accountAccessControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -12714,6 +12725,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             walkReadinessToggleButton,
             runtimeDebugControlsToggleButton,
             accountSignupToggleButton,
+            accountSignupBackButton,
             accountConsentDisclosureToggleButton,
             firstRunDisclosureToggleButton,
         ).forEach(::applyWsSecondaryButtonStyle)
@@ -13053,6 +13065,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     /** 실제 → 1단계 → … → 12단계 → 실제 순으로 미리볼 화면만 바꾼다. DEBUG 빌드에만 존재한다. */
+    /**
+     * 앞 낱말의 받침에 따라 「으로」와 「로」를 고른다. 「보행 화면 로 바꿨습니다」처럼 읽히면
+     * 화면에서도 어색하고 음성으로는 더 어색하다. 받침 ㄹ 은 「로」를 쓴다.
+     */
+    private fun String.koreanToParticle(): String {
+        val last = trimEnd().lastOrNull() ?: return "로"
+        if (last !in '가'..'힣') return "로"
+        val finalConsonant = (last.code - 0xAC00) % 28
+        return if (finalConsonant == 0 || finalConsonant == 8) "로" else "으로"
+    }
+
     private fun cycleFirstRunPreviewStage() {
         if (!BuildConfig.DEBUG) return
         val order = FIRST_RUN_PREVIEW_STAGES
@@ -13078,7 +13101,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "${FIRST_RUN_PREVIEW_STAGES.indexOf(firstRunPreviewStage) + 1}번째 화면"
             else -> "실제 단계"
         }
-        speakInteraction("미리보기를 $label 로 바꿨습니다. 화면만 바뀌고 진행 상태는 그대로입니다.")
+        speakInteraction(
+            "미리보기를 $label${label.koreanToParticle()} 바꿨습니다. " +
+                "화면만 바뀌고 진행 상태는 그대로입니다.",
+        )
     }
 
     private fun updateFirstRunPreviewStageButton(renderStage: FirstRunOnboardingStage) {
@@ -14244,8 +14270,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (credentialFieldsVisible) View.VISIBLE else View.GONE
         accountRememberMeCheck.visibility = if (signupOpen) View.GONE else View.VISIBLE
         accountLoginButton.visibility = if (signupOpen) View.GONE else View.VISIBLE
-        accountSignupToggleButton.visibility =
-            if (verifiedLogin) View.GONE else View.VISIBLE
+        accountSignupToggleButton.visibility = when {
+            verifiedLogin -> View.GONE
+            // 가입에 들어오면 같은 동작을 맨 끝 버튼이 맡는다. 둘 다 보이면 같은 말을 두 번 읽는다.
+            signupOpen -> View.GONE
+            else -> View.VISIBLE
+        }
+        accountSignupBackButton.visibility = if (signupOpen) View.VISIBLE else View.GONE
         accountSignupToggleButton.text =
             when {
                 signupOpen -> "로그인 화면으로 돌아가기"
