@@ -114,4 +114,26 @@ class MainActivityFirstRunPreviewStaticTest {
         assertTrue(order.contains("EMAIL_OTP_ENROLLMENT"))
         assertTrue(order.contains("ACCOUNT_CREATED"))
     }
+
+    @Test
+    fun theCompletedScreenAndTheWalkScreenAreSeparatePreviewSlots() {
+        val cycle = source.substringAfter("private fun cycleFirstRunPreviewStage()")
+            .substringBefore("\n    private fun ")
+
+        // 완료 다음 한 자리가 보행 화면이고, 그 다음에 실제 단계로 돌아간다.
+        assertTrue(cycle.contains("current == order.last() ->"))
+        assertTrue(cycle.contains("firstRunPreviewWalkScreenOnly = true"))
+        assertTrue(cycle.contains("firstRunPreviewWalkScreenOnly -> {"))
+
+        val render = source.substringAfter("private fun updateFirstRunOnboardingUi()")
+            .substringBefore("private fun linkPriorityUserAccessibilityTraversal")
+
+        // 그 자리에서는 온보딩이 남긴 표면을 내린다. 완료 화면과 겹치면 둘 다 못 본다.
+        assertTrue(render.contains("if (previewWalkOnly) {"))
+        assertTrue(render.contains("firstRunOnboardingStatusText.visibility = View.GONE"))
+        assertTrue(
+            render.contains("if (firstRunOnboardingComplete() || previewWalkOnly) View.GONE"),
+        )
+        assertTrue(render.contains("previewWalkOnly ||"))
+    }
 }

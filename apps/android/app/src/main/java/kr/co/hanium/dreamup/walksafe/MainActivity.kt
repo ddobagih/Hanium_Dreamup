@@ -513,6 +513,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
      */
     private enum class AccountSignupStep { CONSENT, DETAILS }
     private var accountSignupStep = AccountSignupStep.CONSENT
+    /** DEBUG 미리보기에서 온보딩 표면을 모두 내리고 보행 화면만 그리는 자리. */
+    private var firstRunPreviewWalkScreenOnly = false
     private lateinit var accountConsentContinueButton: Button
     private lateinit var accountConsentStepControls: LinearLayout
     private lateinit var accountDetailsStepControls: LinearLayout
@@ -12949,14 +12951,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!BuildConfig.DEBUG) return
         val order = FIRST_RUN_PREVIEW_STAGES
         val current = firstRunPreviewStage
-        firstRunPreviewStage = when {
-            current == null -> order.first()
-            else -> order.getOrNull(order.indexOf(current) + 1)
+        // 완료 다음 한 자리는 보행 화면이다. 완료 화면은 「첫 실행이 끝났다」를 알리는 화면이고
+        // 보행 화면은 그 뒤로 앱이 머무는 화면이라, 한 자리에 겹쳐 두면 둘을 볼 수 없다.
+        when {
+            firstRunPreviewWalkScreenOnly -> {
+                firstRunPreviewWalkScreenOnly = false
+                firstRunPreviewStage = null
+            }
+            current == null -> firstRunPreviewStage = order.first()
+            current == order.last() -> {
+                firstRunPreviewStage = current
+                firstRunPreviewWalkScreenOnly = true
+            }
+            else -> firstRunPreviewStage = order.getOrNull(order.indexOf(current) + 1)
         }
         updateFirstRunOnboardingUi()
-        val label = firstRunPreviewStage
-            ?.let { "${FIRST_RUN_PREVIEW_STAGES.indexOf(it) + 1}번째 화면" }
-            ?: "실제 단계"
+        val label = when {
+            firstRunPreviewWalkScreenOnly -> "보행 화면"
+            firstRunPreviewStage != null ->
+                "${FIRST_RUN_PREVIEW_STAGES.indexOf(firstRunPreviewStage) + 1}번째 화면"
+            else -> "실제 단계"
+        }
         speakInteraction("미리보기를 $label 로 바꿨습니다. 화면만 바뀌고 진행 상태는 그대로입니다.")
     }
 
@@ -12966,7 +12981,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         button.text = if (preview == null) {
             "미리보기 단계: 실제"
         } else {
-            "미리보기 ${FIRST_RUN_PREVIEW_STAGES.indexOf(renderStage) + 1}/${FIRST_RUN_PREVIEW_STAGES.size}"
+            if (firstRunPreviewWalkScreenOnly) {
+                "미리보기 보행 화면"
+            } else {
+                "미리보기 ${FIRST_RUN_PREVIEW_STAGES.indexOf(renderStage) + 1}/${FIRST_RUN_PREVIEW_STAGES.size}"
+            }
         }
         button.contentDescription =
             "${button.text}. 누르면 다음 단계 화면을 미리봅니다. 진행 상태는 바뀌지 않습니다."
@@ -14225,6 +14244,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         // snapshot.stage / firstRunOnboardingComplete() 즉 실제 단계를 쓰므로, 미리보기로는 어떤
         // 조작도 활성화되지 않고 증거·신원도 생기지 않는다.
         val renderStage = firstRunPreviewStage ?: snapshot.stage
+        val previewWalkOnly = firstRunPreviewWalkScreenOnly
         // 번호와 개수는 미리보기와 무관하게 언제나 실제 단계를 말한다. 미리보기는 그릴 화면만 바꾸고
         // 진행 상태는 바꾸지 않는다는 원칙 그대로이며, 미리보고 있는 단계 번호는 미리보기 버튼이 따로 읽는다.
         val stageNumber = firstRunStageNumber(snapshot)
@@ -14409,19 +14429,28 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (::walkReadinessControls.isInitialized) {
             // 준비 표면 중 하나라도 나올 상황이면 덩어리를 띄우고, 접을지는 아래에서 정한다.
             walkReadinessControls.visibility =
-                if (mayTrain || mayCheckDevice || showVerifiedSurfaces) {
+                if ((mayTrain || mayCheckDevice || showVerifiedSurfaces) && !previewWalkOnly) {
                     View.VISIBLE
                 } else {
                     View.GONE
                 }
             updateWalkReadinessSection()
         }
+        // 보행 화면 자리에서는 온보딩이 남긴 것을 전부 내린다. 완료 화면과 보행 화면이 한 스크롤에
+        // 겹쳐 있으면 둘 중 어느 것도 제대로 볼 수 없다.
+        if (previewWalkOnly) {
+            firstRunOnboardingStatusText.visibility = View.GONE
+            if (::privacySectionToggleButton.isInitialized) {
+                privacySectionToggleButton.visibility = View.GONE
+            }
+        }
         if (::runtimeControls.isInitialized) {
             // 완료 단계를 미리보면 보행 화면 자체도 그린다. 표시 전용이다. 실제 안내는
             // walkSafetyOutputsAllowed() 가 첫 실행 완료를 먼저 요구하므로 나가지 않고, 각 조작도
             // currentReporterUserId() 로 따로 막혀 있다.
             val previewingWalkScreen =
-                !mayUseWalk && renderStage == FirstRunOnboardingStage.COMPLETE
+                previewWalkOnly ||
+                    (!mayUseWalk && renderStage == FirstRunOnboardingStage.COMPLETE)
             if (previewingWalkScreen) {
                 runtimeControls.visibility = View.VISIBLE
             } else if (!showVerifiedSurfaces) {
@@ -14436,7 +14465,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 )
             }
             firstRunProgressBar.visibility =
-                if (firstRunOnboardingComplete()) View.GONE else View.VISIBLE
+                if (firstRunOnboardingComplete() || previewWalkOnly) View.GONE else View.VISIBLE
         }
         updatePrivacySectionVisibility()
     }
