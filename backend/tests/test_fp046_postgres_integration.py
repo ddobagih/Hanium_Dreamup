@@ -22,6 +22,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from asgi_client import ASGITestClient
+from migration_head import current_migration_head
 from backend.app.account_schemas import (
     AccountAuthenticateRequestV1,
     AccountCreateRequestV1,
@@ -329,7 +330,7 @@ def test_fp046_schema_migration_constraints_and_append_only_evidence() -> None:
         return table is not None and table.name in privacy_tables
 
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "202608290011"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == current_migration_head()
         assert compare_metadata(
             MigrationContext.configure(
                 connection,

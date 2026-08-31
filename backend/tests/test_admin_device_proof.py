@@ -58,6 +58,7 @@ from backend.app.services.admin_security import (
 )
 from scripts import provision_walksafe_admin_device_key as provision_cli
 from asgi_client import ASGITestClient
+from migration_head import current_migration_head
 
 
 ADMIN_ID = "walksafe.admin"
@@ -1088,7 +1089,7 @@ def test_postgres_expired_recovery_proof_reaches_real_cleanup_route(
             assert "test" in database_name.lower()
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == current_migration_head()
 
         with owner_sessions() as db:
             provision_admin_security(

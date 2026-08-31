@@ -88,6 +88,7 @@ from backend.app.models import (
     Base,
 )
 from asgi_client import ASGITestClient
+from migration_head import current_migration_head
 
 
 DEVICE_ID = "android-device-0001"
@@ -2065,7 +2066,7 @@ def test_postgres_recovery_custody_migration_preflights_control_count(
             assert revision == prior_revision
             assert custody_column_count == 0
         else:
-            assert revision == "202608290011"
+            assert revision == current_migration_head()
             assert custody_column_count == 1
     finally:
         engine.dispose()

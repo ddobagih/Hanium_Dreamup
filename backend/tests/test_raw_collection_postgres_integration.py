@@ -26,6 +26,7 @@ from sqlalchemy import create_engine, func, inspect, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
+from migration_head import current_migration_head
 
 import backend.app.main as main_app
 import backend.app.services.raw_collection_storage as raw_storage
@@ -503,7 +504,7 @@ def test_raw_b1b_one_step_downgrade_drops_ephemeral_rate_rows(
         with restored_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == current_migration_head()
     finally:
         restored_engine.dispose()
 
@@ -558,7 +559,7 @@ def test_raw_b1e_upgrade_backfills_retention_and_refuses_data_loss(
         with engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == current_migration_head()
             assert connection.execute(
                 text(
                     "SELECT retention_class FROM raw_collections "
@@ -573,7 +574,7 @@ def test_raw_b1e_upgrade_backfills_retention_and_refuses_data_loss(
         with engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == current_migration_head()
     finally:
         command.upgrade(config, "head")
         with engine.begin() as connection:
@@ -614,7 +615,7 @@ def test_raw_b1b_schema_acl_rate_group_and_state_guards(tmp_path: Path) -> None:
         with engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == current_migration_head()
             assert compare_metadata(
                 MigrationContext.configure(
                     connection,

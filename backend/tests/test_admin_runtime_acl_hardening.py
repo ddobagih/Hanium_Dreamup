@@ -17,6 +17,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
+from migration_head import current_migration_head
 
 from backend.app.services.admin_security import (
     AdminSecurityService,
@@ -716,7 +717,7 @@ def test_postgres_startup_totp_candidate_exact_binding_and_normal_ops_blocked() 
         with engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == current_migration_head()
 
         with engine.connect() as connection:
             transaction = connection.begin()
@@ -1026,7 +1027,7 @@ def test_postgres_runtime_acl_migration_downgrade_and_reupgrade_on_fresh_databas
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == current_migration_head()
             assert connection.execute(
                 text(
                     "SELECT EXISTS (SELECT 1 FROM pg_extension "
@@ -1080,7 +1081,7 @@ def test_postgres_runtime_acl_migration_downgrade_and_reupgrade_on_fresh_databas
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == current_migration_head()
             assert connection.execute(
                 text(
                     "SELECT count(*) FROM pg_trigger "
