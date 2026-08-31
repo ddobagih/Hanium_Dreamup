@@ -108,6 +108,12 @@ def _validated_test_database_url(raw_url: str | None) -> str | None:
 
 _TEST_DATABASE_URL = _validated_test_database_url(os.environ.get("WALKSAFE_TEST_DATABASE_URL"))
 os.environ["DATABASE_URL"] = _TEST_DATABASE_URL or _UNCONFIGURED_TEST_DATABASE_URL
+# Alembic resolves WALKSAFE_MIGRATION_DATABASE_URL ahead of DATABASE_URL, so an
+# operator's migration URL would otherwise decide which database the test run
+# migrates.  Pin it to the same validated test database.
+os.environ["WALKSAFE_MIGRATION_DATABASE_URL"] = (
+    _TEST_DATABASE_URL or _UNCONFIGURED_TEST_DATABASE_URL
+)
 
 _UPLOAD_TMP = tempfile.TemporaryDirectory(prefix="walksafe-pytest-uploads-")
 os.environ["UPLOAD_DIR"] = str(Path(_UPLOAD_TMP.name).resolve())
@@ -196,6 +202,23 @@ def clean_test_storage() -> Iterator[Callable[[], None] | None]:
             "WALKSAFE_TEST_DATABASE_URL is already in use by another test process",
             pytrace=False,
         )
+
+    def upgrade_test_database_to_head() -> None:
+        """Create the schema before any test needs it.
+
+        Nothing else does.  Individual modules used to migrate the database as
+        a side effect of their own setup, so every test that sorted before
+        them ran against an empty database and failed on a missing relation.
+        That made a module's result depend on which other modules ran first,
+        and the suite total move between runs.
+        """
+        from alembic import command
+        from alembic.config import Config
+
+        backend_root = Path(__file__).resolve().parents[1]
+        config = Config(str(backend_root / "alembic.ini"))
+        config.set_main_option("script_location", str(backend_root / "alembic"))
+        command.upgrade(config, "head")
 
     def truncate_reports_if_present() -> None:
         with engine.begin() as connection:
@@ -294,6 +317,7 @@ def clean_test_storage() -> Iterator[Callable[[], None] | None]:
                 connection.execute(text(f"ALTER TABLE {table_name} ENABLE TRIGGER USER"))
 
     try:
+        upgrade_test_database_to_head()
         truncate_reports_if_present()
         yield truncate_reports_if_present
     finally:
