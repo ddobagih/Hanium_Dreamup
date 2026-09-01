@@ -207,6 +207,8 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(update.contains("로그인 화면으로 돌아가기"))
         assertTrue(update.contains("FirstRunOnboardingStage.ACCOUNT_CREATED"))
         assertTrue(update.contains("FirstRunOnboardingStage.VERIFIED_LOGIN"))
+        assertTrue(update.contains("if (snapshot.isComplete)"))
+        assertTrue(update.contains("로그인과 첫 실행 등록을 완료했습니다"))
         assertFalse(update.contains("accountEmailInput.text?.clear()"))
         assertFalse(update.contains("accountPasswordInput.text?.clear()"))
     }

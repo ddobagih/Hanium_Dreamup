@@ -135,7 +135,7 @@ class MainActivityAccessibilityStaticTest {
             "ObservedPermission.MICROPHONE -> \"마이크\"" to
                 "ObservedPermission.MICROPHONE -> \"음성 명령과 음성 재개 확인을 사용할 수 없습니다.\"",
             "ObservedPermission.ACTIVITY_RECOGNITION -> \"보행 센서\"" to
-                "ObservedPermission.ACTIVITY_RECOGNITION -> \"걸음 수 추적을 사용할 수 없습니다.\"",
+                "걸음 수 추적과 정지 확인 후 대기 신고 자동 전송을 사용할 수 없습니다.",
         ).forEach { (label, reasonText) ->
             assertTrue(labels.contains(label))
             assertTrue(reasons.contains(reasonText))

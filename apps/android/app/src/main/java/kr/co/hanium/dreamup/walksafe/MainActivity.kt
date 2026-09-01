@@ -15175,7 +15175,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             postLoginDeviceCheckSnapshot.passesFeatureGate &&
             !hasActivityRecognitionPermission()
         ) {
-            add("걸음 수 추적")
+            add("걸음 수 추적·정지 확인 후 대기 신고 자동 전송")
         }
     }.joinToString(", ")
 
@@ -16089,7 +16089,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 add("마이크: 호출어와 음성 명령")
             }
             if (Manifest.permission.ACTIVITY_RECOGNITION in missing) {
-                add("신체 활동: 걸음 수 추적")
+                add("신체 활동: 걸음 수 추적·정지 확인 후 대기 신고 자동 전송")
             }
             if (Manifest.permission.POST_NOTIFICATIONS in missing) {
                 add("알림: 백그라운드 호출어 알림")
@@ -16764,8 +16764,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             accountLoginButton.visibility = View.GONE
             accountSignupToggleButton.visibility = View.GONE
             accountSignupControls.visibility = View.GONE
-            val authenticatedStatus =
+            val authenticatedStatus = if (snapshot.isComplete) {
+                "로그인과 첫 실행 등록을 완료했습니다. 보행 전 실제 상태를 확인하세요."
+            } else {
                 "로그인했습니다. 다음 단계가 끝날 때까지 보행 기능은 잠깁니다."
+            }
             accountAccessStatusText.text = authenticatedStatus
             accountAccessStatusText.contentDescription = authenticatedStatus
             return
@@ -22291,13 +22294,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             walkSessionPermissionRequestInFlight ||
             walkSessionPermissionRequestAttempted
         ) return
-        val missing = missingWalkSessionPermissions(decision)
-        if (missing.isEmpty()) return
+        val requestable = missingWalkSessionPermissions(decision).filterNot { permission ->
+            permission == Manifest.permission.RECORD_AUDIO ||
+                permission == Manifest.permission.ACTIVITY_RECOGNITION
+        }
+        if (requestable.isEmpty()) return
         walkSessionPermissionRequestAttempted = true
         walkSessionPermissionRequestInFlight = true
         walkSessionPermissionRequestCode = try {
             requestPermissionsWithLease(
-                missing.toTypedArray(),
+                requestable.toTypedArray(),
                 PermissionRequestPurpose.WALK_SESSION,
             )
         } catch (error: RuntimeException) {
@@ -23799,8 +23805,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             missing += Manifest.permission.ACCESS_FINE_LOCATION
             missing += Manifest.permission.ACCESS_COARSE_LOCATION
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && requireActivityRecognition && !hasActivityRecognitionPermission()) {
-            missing += Manifest.permission.ACTIVITY_RECOGNITION
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            requireActivityRecognition &&
+            !hasActivityRecognitionPermission()
+        ) {
+            updateNavigationStatus(
+                "navigation=activity_recognition_permission_missing step_tracking_limited",
+            )
         }
         if (missing.isEmpty()) return
         requestPermissionsWithLease(
@@ -23909,7 +23921,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ObservedPermission.CAMERA -> "장애물 인식과 신고 전송을 사용할 수 없습니다."
         ObservedPermission.PRECISE_LOCATION -> "거리 측정, 길안내와 신고 전송을 사용할 수 없습니다."
         ObservedPermission.MICROPHONE -> "음성 명령과 음성 재개 확인을 사용할 수 없습니다."
-        ObservedPermission.ACTIVITY_RECOGNITION -> "걸음 수 추적을 사용할 수 없습니다."
+        ObservedPermission.ACTIVITY_RECOGNITION ->
+            "걸음 수 추적과 정지 확인 후 대기 신고 자동 전송을 사용할 수 없습니다."
     }
 
     private fun persistPermissionRecoveryGate() {
@@ -24151,7 +24164,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             stopStepTracking()
         }
         if (
-            sessionSnapshot.state == WalkSessionState.ACTIVE &&
+            sessionSnapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
             hasCurrentPostLoginDeviceRestrictions()
         ) {
             val stoppedOnly = setOfNotNull(
@@ -24168,6 +24181,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "제한 기능: ${postLoginDeviceCheckDisabledFeatureText()}. " +
                     "해당 기능만 중지하고 나머지 기능은 계속 사용합니다.",
             )
+        } else if (
+            sessionSnapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
+            !hasCurrentPostLoginDeviceRestrictions() &&
+            !permissionRecoveryGate.blocksAutomaticResourceStart &&
+            ::permissionDenialPanel.isInitialized
+        ) {
+            permissionDenialPanel.visibility = View.GONE
         }
         if (::startupCapabilityProbe.isInitialized) {
             refreshStartupCapabilityUi()
@@ -25966,11 +25986,13 @@ generation != cameraFallbackGeneration
         val missing = requiredStartWalkObservedPermissions()
             .filterNot(currentObservedPermissionSnapshot()::isGranted)
             .toSet()
-        if (!permissionRecoveryGate.blocksAutomaticResourceStart) {
-            enterPermissionRecoveryBarrier(missing, "settings_requested")
+        if (missing.isNotEmpty() || permissionRecoveryGate.blocksAutomaticResourceStart) {
+            if (!permissionRecoveryGate.blocksAutomaticResourceStart) {
+                enterPermissionRecoveryBarrier(missing, "settings_requested")
+            }
+            permissionRecoveryGate = permissionRecoveryGate.settingsPending()
+            persistPermissionRecoveryGate()
         }
-        permissionRecoveryGate = permissionRecoveryGate.settingsPending()
-        persistPermissionRecoveryGate()
         startActivity(
             Intent(
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
@@ -27882,10 +27904,12 @@ generation != cameraFallbackGeneration
             return
         }
         if (!hasRecordAudioPermission()) {
-            requestPermissionsWithLease(
-                arrayOf(Manifest.permission.RECORD_AUDIO),
-                PermissionRequestPurpose.VOICE_COMMAND,
+            updateNavigationStatus("voice_command=microphone_permission_missing feature_limited")
+            showPermissionDenialPanel(
+                missingPermissions = setOf(ObservedPermission.MICROPHONE),
+                reason = "voice_command_microphone_missing",
             )
+            updateVoiceCommandButton(active = false)
             return
         }
         startVoiceCommandRecognition()
@@ -29021,11 +29045,12 @@ generation != cameraFallbackGeneration
         val snapshot = walkSessionLifecycle.snapshot()
         val gatewayRecording = gatewayVoiceRecorder?.isRecording == true
         val gatewayProcessing = activeGatewaySpeechInteraction != null && !gatewayRecording
-        val voiceCommandAvailable = when (snapshot.state) {
-            WalkSessionState.ACTIVE -> !oneShotSpeechRecognitionLimited
-            WalkSessionState.PAUSED -> voiceResumeConfirmationAvailable()
-            else -> false
-        }
+        val voiceCommandAvailable = hasRecordAudioPermission() &&
+            when (snapshot.state) {
+                WalkSessionState.ACTIVE -> !oneShotSpeechRecognitionLimited
+                WalkSessionState.PAUSED -> voiceResumeConfirmationAvailable()
+                else -> false
+            }
         val enabled = if (gatewayRecording) {
             snapshot.isForeground && isActivityForeground
         } else {
