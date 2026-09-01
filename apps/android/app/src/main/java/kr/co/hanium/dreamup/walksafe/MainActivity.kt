@@ -15195,6 +15195,33 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE,
             )
 
+    private fun terminalCameraDetectorStatusText(): String? {
+        if (!postLoginDeviceCheckSnapshot.passesFeatureGate) return null
+        return when {
+            postLoginCameraDependentChecksDeferred ->
+                if (hasCameraPermission()) "재점검 필요" else "권한 허용 후 재점검 필요"
+            !postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.OBSTACLE_DETECTION) ->
+                "제한"
+            !detectorLoadAttempted -> "통과 · 보행 시작 시 모델 재확인"
+            detectorAvailable -> "통과"
+            else -> "제한"
+        }
+    }
+
+    private fun terminalMetricDistanceStatusText(): String? {
+        if (!postLoginDeviceCheckSnapshot.passesFeatureGate) return null
+        return when {
+            postLoginCameraDependentChecksDeferred ->
+                if (hasCameraPermission()) "재점검 필요" else "권한 허용 후 재점검 필요"
+            !postLoginDeviceFeatureEnabled(
+                PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE,
+            ) -> "통과(거리 제한 모드)"
+            postLoginMetricDepthState == PostLoginMetricDepthState.PENDING ->
+                "통과 · 보행 시작 시 재확인"
+            else -> null
+        }
+    }
+
     private fun postLoginDeviceCheckItemsMessage(): String {
         val state = postLoginDeviceCheckSnapshot.state
         if (state == PostLoginDeviceCheckState.NOT_RUN) {
@@ -15241,7 +15268,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         } else {
             "검사 대기"
         }
-        val cameraText = if (postLoginCameraDependentChecksDeferred) {
+        val cameraText = terminalCameraDetectorStatusText() ?: if (
+            postLoginCameraDependentChecksDeferred
+        ) {
             if (hasCameraPermission()) "재점검 필요" else "권한 허용 후 재점검 필요"
         } else {
             label(
@@ -15253,7 +15282,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 cameraPending,
             )
         }
-        val distanceText = if (postLoginCameraDependentChecksDeferred) {
+        val distanceText = terminalMetricDistanceStatusText() ?: if (
+            postLoginCameraDependentChecksDeferred
+        ) {
             if (hasCameraPermission()) "재점검 필요" else "권한 허용 후 재점검 필요"
         } else when (observation.metricDepth) {
             PostLoginMetricDepthState.PENDING -> "검사 대기"
@@ -21873,19 +21904,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         action: WalkSessionAction,
     ): WalkSessionReadinessSnapshot {
         val epoch = walkSessionLifecycle.snapshot().epoch
-        val plan = WalkSessionReadinessPlan(
-            action = action,
-            mode = decision.effectiveWalkSessionMode(),
-        )
+        var effectiveDecision = decision
         if (
             firstRunOnboardingComplete() &&
-            plan.requires(WalkSessionReadinessRequirement.MODEL) &&
+            action in setOf(WalkSessionAction.START_WALK, WalkSessionAction.RESUME_WALK) &&
+            cameraAnalysisFeaturesEnabled() &&
             hasCameraPermission() &&
             WalkSafeStartupRequirement.CAMERA !in decision.pendingRequirements &&
             WalkSafeStartupRequirement.CAMERA !in decision.unavailableRequirements
         ) {
+            val restrictionsBeforeDetectorLoad = currentPostLoginDisabledFeatures()
             loadDetectorAfterCameraGate()
+            if (currentPostLoginDisabledFeatures() != restrictionsBeforeDetectorLoad) {
+                effectiveDecision = applyPostLoginDeviceFeatureRestrictions(decision)
+            }
         }
+        val plan = WalkSessionReadinessPlan(
+            action = action,
+            mode = effectiveDecision.effectiveWalkSessionMode(),
+        )
         val deviceResources = walkSessionResourceProbe.snapshot()
         val collector = WalkSessionReadinessCollector(epoch = epoch, plan = plan)
         plan.requiredRequirements.forEach { requirement ->
@@ -21901,7 +21938,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
                 WalkSessionReadinessRequirement.PRIORITY_USER_ONBOARDING -> {
                     val onboarding = priorityUserOnboardingPolicy.evaluate(
-                        environment = currentPriorityUserSupportEnvironment(decision),
+                        environment = currentPriorityUserSupportEnvironment(effectiveDecision),
                         walkIsActive = isWalkSessionRuntimeActive(),
                     )
                     if (
@@ -21931,7 +21968,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     } else {
                         combineReadinessChecks(
                             startupRequirementCheck(
-                                decision,
+                                effectiveDecision,
                                 setOf(WalkSafeStartupRequirement.CAMERA),
                             ),
                             if (hasCameraPermission()) {
@@ -21952,7 +21989,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     } else {
                         combineReadinessChecks(
                             startupRequirementCheck(
-                                decision,
+                                effectiveDecision,
                                 setOf(WalkSafeStartupRequirement.GPS),
                             ),
                             if (hasLocationPermission()) {
@@ -21965,7 +22002,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     }
                 WalkSessionReadinessRequirement.METRIC_DISTANCE ->
                     startupRequirementCheck(
-                        decision,
+                        effectiveDecision,
                         setOf(
                             WalkSafeStartupRequirement.METRIC_DISTANCE,
                             WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE,
@@ -21979,8 +22016,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             "model_unavailable:${detectorLoadReason ?: "not_loaded"}"
                     }
                 WalkSessionReadinessRequirement.VOICE_INPUT -> if (
-                    !decision.allowsRequirement(WalkSafeStartupRequirement.MICROPHONE) ||
-                    !decision.allowsRequirement(WalkSafeStartupRequirement.ON_DEVICE_STT)
+                    !effectiveDecision.allowsRequirement(WalkSafeStartupRequirement.MICROPHONE) ||
+                    !effectiveDecision.allowsRequirement(WalkSafeStartupRequirement.ON_DEVICE_STT)
                 ) {
                     WalkSessionReadinessStatus.READY to ""
                 } else {
@@ -21991,12 +22028,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     }
                 }
                 WalkSessionReadinessRequirement.VOICE_OUTPUT -> if (
-                    !decision.allowsRequirement(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS)
+                    !effectiveDecision.allowsRequirement(
+                        WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS,
+                    )
                 ) {
                     WalkSessionReadinessStatus.READY to ""
                 } else {
                     startupRequirementCheck(
-                        decision,
+                        effectiveDecision,
                         setOf(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS),
                     )
                 }
@@ -22026,7 +22065,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
                 WalkSessionReadinessRequirement.DEVICE_RESOURCES -> combineReadinessChecks(
                     startupRequirementCheck(
-                        decision,
+                        effectiveDecision,
                         setOf(
                             WalkSafeStartupRequirement.ANDROID_VERSION,
                         ),
@@ -25854,6 +25893,9 @@ generation != cameraFallbackGeneration
 
     private fun loadDetectorForCurrentProcess() {
         if (detectorLoadAttempted) return
+        val metricDistanceWasEnabled = postLoginDeviceFeatureEnabled(
+            PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE,
+        )
         detectorLoadAttempted = true
         val runtimeConfig = reportRuntimeConfig ?: loadReportRuntimeConfig().also { reportRuntimeConfig = it }
         val detectorLoad = runtimeConfig
@@ -25867,6 +25909,15 @@ generation != cameraFallbackGeneration
         detectorModelKeyForReports = detectorLoad.modelKey?.toReportModelKey()
         detectorStatusText = "detector=${detectorLoad.reason} model=${detectorLoad.modelKey ?: "-"} fallback=${detectorLoad.fallbackUsed}"
         detectorLoad.detector?.let { detector -> frameDetector = detector }
+        if (
+            postLoginDeviceCheckSnapshot.passesFeatureGate &&
+            !detectorAvailable
+        ) {
+            runtimeObstacleDetectionCapabilityOverride = false
+            if (metricDistanceWasEnabled) {
+                metricDistanceCapabilityOverride = false
+            }
+        }
     }
 
     private fun handleDetectorRuntimeFailure(

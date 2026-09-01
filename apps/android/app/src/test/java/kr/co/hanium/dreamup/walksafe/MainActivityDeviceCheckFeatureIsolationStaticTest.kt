@@ -169,6 +169,63 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
     }
 
     @Test
+    fun restoredTerminalCameraStatusMatchesTheEffectiveObstacleFeature() {
+        val terminalStatus = functionBlock(
+            "private fun terminalCameraDetectorStatusText(): String?",
+        )
+        val terminalDistanceStatus = functionBlock(
+            "private fun terminalMetricDistanceStatusText(): String?",
+        )
+        val items = functionBlock("private fun postLoginDeviceCheckItemsMessage()")
+
+        assertTrue(terminalStatus.contains("postLoginDeviceCheckSnapshot.passesFeatureGate"))
+        assertTrue(terminalStatus.contains("postLoginCameraDependentChecksDeferred"))
+        assertTrue(terminalStatus.contains("재점검 필요"))
+        assertTrue(terminalStatus.contains("PostLoginDeviceCheckFeature.OBSTACLE_DETECTION"))
+        assertTrue(terminalStatus.contains("-> \"제한\""))
+        assertTrue(terminalStatus.contains("!detectorLoadAttempted"))
+        assertTrue(terminalStatus.contains("통과 · 보행 시작 시 모델 재확인"))
+        assertTrue(terminalStatus.contains("detectorAvailable -> \"통과\""))
+        assertFalse(terminalStatus.contains("검사 대기"))
+        assertTrue(items.contains("terminalCameraDetectorStatusText()"))
+        assertTrue(terminalDistanceStatus.contains("postLoginDeviceCheckSnapshot.passesFeatureGate"))
+        assertTrue(terminalDistanceStatus.contains("postLoginCameraDependentChecksDeferred"))
+        assertTrue(
+            terminalDistanceStatus.contains(
+                "PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE",
+            ),
+        )
+        assertTrue(terminalDistanceStatus.contains("통과(거리 제한 모드)"))
+        assertTrue(terminalDistanceStatus.contains("통과 · 보행 시작 시 재확인"))
+        assertFalse(terminalDistanceStatus.contains("검사 대기"))
+        assertTrue(items.contains("terminalMetricDistanceStatusText()"))
+    }
+
+    @Test
+    fun restoredLazyDetectorFailureImmediatelyDowngradesOnlyCameraFeatures() {
+        val loader = functionBlock("private fun loadDetectorForCurrentProcess()")
+        val readiness = functionBlock("private fun captureWalkSessionReadiness(")
+
+        assertTrue(loader.contains("postLoginDeviceCheckSnapshot.passesFeatureGate"))
+        assertTrue(loader.contains("!detectorAvailable"))
+        assertTrue(loader.contains("metricDistanceWasEnabled"))
+        assertTrue(loader.contains("runtimeObstacleDetectionCapabilityOverride = false"))
+        assertTrue(loader.contains("metricDistanceCapabilityOverride = false"))
+        assertTrue(readiness.contains("var effectiveDecision = decision"))
+        assertTrue(
+            readiness.indexOf("loadDetectorAfterCameraGate()") <
+                readiness.indexOf("val plan = WalkSessionReadinessPlan("),
+        )
+        assertTrue(
+            readiness.contains(
+                "effectiveDecision = applyPostLoginDeviceFeatureRestrictions(decision)",
+            ),
+        )
+        assertTrue(readiness.contains("mode = effectiveDecision.effectiveWalkSessionMode()"))
+        assertTrue(readiness.contains("!cameraAnalysisFeaturesEnabled() || detectorAvailable"))
+    }
+
+    @Test
     fun runtimeMetricLossLimitsOnlyDistanceAndKeepsTheActiveSession() {
         val metricLoss = functionBlock("private fun handleRuntimeMetricLoss(")
         val fallback = functionBlock("private fun requestCameraFallbackStart(")
