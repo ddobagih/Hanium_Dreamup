@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.session
 
 import kr.co.hanium.dreamup.walksafe.network.MobileNetworkPreference
+import kr.co.hanium.dreamup.walksafe.network.ActiveNetworkTransport
+import kr.co.hanium.dreamup.walksafe.network.AndroidNetworkTransferPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -67,12 +69,12 @@ class PermissionSessionPolicyTest {
     }
 
     @Test
-    fun rawAndAutomaticReportConsentRemainSeparateDecisions() {
+    fun automaticReportConsentDoesNotDependOnRawDiagnosticConsent() {
         val policy = PermissionSessionPolicy()
 
         policy.setAutomaticReportConsent(true)
         assertTrue(policy.snapshot().automaticReportConsentGranted)
-        assertFalse(policy.snapshot().mayCreateAutomaticReport)
+        assertTrue(policy.snapshot().mayCreateAutomaticReport)
 
         policy.setRawCollectionConsent(true)
         assertTrue(policy.snapshot().mayCreateAutomaticReport)
@@ -80,7 +82,33 @@ class PermissionSessionPolicyTest {
         policy.setRawCollectionConsent(false)
         assertFalse(policy.snapshot().rawCollectionConsentGranted)
         assertTrue(policy.snapshot().automaticReportConsentGranted)
-        assertFalse(policy.snapshot().mayCreateAutomaticReport)
+        assertTrue(policy.snapshot().mayCreateAutomaticReport)
+    }
+
+    @Test
+    fun immediateLocalMobileWithdrawalBlocksCellularEvenBeforeServerReceiptRefresh() {
+        val policy = PermissionSessionPolicy(
+            PermissionSessionSnapshot(
+                actorId = "walker-1",
+                authentication = AuthenticationState.ACTIVE,
+                mobileNetworkPreference = MobileNetworkPreference.ALLOW_CELLULAR,
+            ),
+        )
+        policy.setMobileNetworkPreference(MobileNetworkPreference.WIFI_ONLY)
+        val localPreference = policy.snapshot().mobileNetworkPreference
+
+        assertFalse(
+            AndroidNetworkTransferPolicy.isAllowed(
+                localPreference,
+                ActiveNetworkTransport.CELLULAR,
+            ),
+        )
+        assertTrue(
+            AndroidNetworkTransferPolicy.isAllowed(
+                localPreference,
+                ActiveNetworkTransport.WIFI,
+            ),
+        )
     }
 
     @Test
@@ -174,7 +202,7 @@ class PermissionSessionPolicyTest {
                 microphoneGranted = true,
                 activityRecognitionGranted = true,
             ),
-            activityRecognitionRequired = true,
+            requiredPermissions = required,
             allPrerequisitesReady = true,
         )
 

@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.report
 
+import kr.co.hanium.dreamup.walksafe.network.GatewayCredentialPolicy
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionState
 
 internal data class ReportQueueDrainContext(
@@ -10,6 +11,7 @@ internal data class ReportQueueDrainContext(
     val consentAllowed: Boolean,
     val automaticReportingAllowed: Boolean,
     val authorityAllowed: Boolean,
+    val reporterActorId: String,
     val walkSessionId: String,
     val consentReceiptSha256: String,
     val movementGeneration: Long,
@@ -19,7 +21,9 @@ internal data class ReportQueueDrainLease(
     val leaseId: Long,
     val reportId: String,
     val priority: ReportQueuePriority,
-    val walkSessionId: String,
+    val reporterActorId: String,
+    val sourceWalkSessionId: String,
+    val runtimeWalkSessionId: String,
     val consentReceiptSha256: String,
     val movementGeneration: Long,
 )
@@ -50,8 +54,10 @@ internal class ReportQueueDrainPolicy {
             leaseId = nextLeaseId++,
             reportId = report.payload.reportId,
             priority = report.priority,
-            walkSessionId = report.walkSessionId,
-            consentReceiptSha256 = report.consentReceiptSha256,
+            reporterActorId = report.reporterActorId,
+            sourceWalkSessionId = report.walkSessionId,
+            runtimeWalkSessionId = context.walkSessionId,
+            consentReceiptSha256 = context.consentReceiptSha256,
             movementGeneration = context.movementGeneration,
         )
         currentLease = lease
@@ -79,7 +85,8 @@ internal class ReportQueueDrainPolicy {
                     context.automaticReportingAllowed
             ) &&
             context.authorityAllowed &&
-            context.walkSessionId == lease.walkSessionId &&
+            context.reporterActorId == lease.reporterActorId &&
+            context.walkSessionId == lease.runtimeWalkSessionId &&
             context.consentReceiptSha256 == lease.consentReceiptSha256 &&
             context.movementGeneration == lease.movementGeneration
         if (!valid && current == lease) currentLease = null
@@ -105,8 +112,10 @@ internal class ReportQueueDrainPolicy {
                     context.automaticReportingAllowed
             ) &&
             context.authorityAllowed &&
-            context.walkSessionId == report.walkSessionId &&
-            context.consentReceiptSha256 == report.consentReceiptSha256
+            report.reporterActorId == context.reporterActorId &&
+            GatewayCredentialPolicy.normalizedActorIdOrNull(context.reporterActorId) ==
+            context.reporterActorId &&
+            REPORT_SHA256_HEX.matches(context.consentReceiptSha256)
 
     private companion object {
         val BLOCKED = ReportQueueDrainDecision(

@@ -30,21 +30,47 @@ class MainActivityOfficialEnvironmentStaticTest {
     }
 
     @Test
-    fun gpsPreflightIsCancellationGenerationAndEpochBound() {
+    fun gpsPreflightContinuouslyRefreshesAndIsGenerationEpochBound() {
         val request = functionBlock("private fun requestOfficialEnvironmentGpsPreflight(")
         val lease = functionBlock("private fun isOfficialEnvironmentGpsPreflightCurrent(")
+        val observe = functionBlock("private fun observeOfficialEnvironmentGpsLocation(")
+        val stop = functionBlock("private fun stopOfficialEnvironmentGpsPreflight(")
         val invalidate = functionBlock("private fun invalidateOfficialEnvironmentEvidence(")
+        val cameraStop = functionBlock("private fun stopOfficialEnvironmentCameraPreflight(")
 
-        assertTrue(request.contains("CancellationTokenSource()"))
-        assertTrue(request.contains("getCurrentLocation("))
+        assertTrue(request.contains("object : LocationCallback()"))
+        assertTrue(request.contains("fusedLocationClient.requestLocationUpdates("))
+        assertTrue(request.contains("callback,"))
+        assertTrue(request.contains("Looper.getMainLooper()"))
         assertTrue(request.contains("Priority.PRIORITY_HIGH_ACCURACY"))
+        assertTrue(request.contains("LocationRequest.Builder("))
+        assertTrue(request.contains("setMaxUpdateAgeMillis(0L)"))
+        assertTrue(request.contains("setWaitForAccurateLocation(true)"))
+        assertTrue(
+            request.contains(
+                "setDurationMillis(OFFICIAL_ENVIRONMENT_GPS_REQUEST_MAX_DURATION_MS)",
+            ),
+        )
+        assertFalse(request.contains("getCurrentLocation("))
+        val mockCompatibility = functionBlock("private fun isMockLocationCompat(")
+        assertTrue(mockCompatibility.contains("Build.VERSION.SDK_INT >= Build.VERSION_CODES.S"))
+        assertTrue(mockCompatibility.contains("location.isMock"))
+        assertTrue(mockCompatibility.contains("location.isFromMockProvider"))
         assertTrue(request.contains("isOfficialEnvironmentGpsPreflightCurrent("))
-        assertTrue(lease.contains("officialEnvironmentGpsCancellation === cancellation"))
+        assertTrue(lease.contains("officialEnvironmentGpsCallback === callback"))
         assertTrue(lease.contains("generation == officialEnvironmentPreflightGeneration"))
+        assertTrue(lease.contains("officialEnvironmentCameraPreflightActive"))
         assertTrue(lease.contains("snapshot.epoch == epoch"))
+        assertTrue(observe.contains("OfficialEnvironmentGpsPreflightPolicy.assess("))
+        assertTrue(observe.contains("OfficialEnvironmentGpsPreflightPolicy.selectEvidence("))
+        assertTrue(observe.contains("maximumGpsHorizontalAccuracyMeters"))
+        assertTrue(observe.contains("GPS_PREFLIGHT_LOG_TAG"))
+        assertFalse(observe.contains("\"latitude="))
+        assertFalse(observe.contains("\"longitude="))
+        assertTrue(stop.contains("removeLocationUpdates"))
         assertTrue(invalidate.contains("officialEnvironmentPreflightGeneration += 1L"))
-        assertTrue(invalidate.contains("officialEnvironmentGpsCancellation?.cancel()"))
-        assertTrue(invalidate.contains("officialEnvironmentGpsCancellation = null"))
+        assertTrue(invalidate.contains("stopOfficialEnvironmentCameraPreflight()"))
+        assertTrue(cameraStop.contains("stopOfficialEnvironmentGpsPreflight()"))
         assertFalse(request.contains("activateWalkSessionRuntime()"))
         assertFalse(request.contains("confirmedStartupCapabilityDecision ="))
     }
@@ -166,12 +192,8 @@ class MainActivityOfficialEnvironmentStaticTest {
                     "if (!officialEnvironmentOutputsAllowed || !phoneMountingOutputsAllowed)",
                 ),
         )
-        val preflightFrame =
-            functionBlock("private fun handleRuntimeMetricPreflightFrame(")
-        assertTrue(
-            preflightFrame.indexOf("walkSessionLifecycle.snapshot().epoch != expectedWalkEpoch") <
-                preflightFrame.indexOf("observeOfficialEnvironmentCameraFrame("),
-        )
+        val preflightFrame = functionBlock("private fun handleRuntimeMetricPreflightFrame(")
+        assertFalse(preflightFrame.contains("observeOfficialEnvironmentCameraFrame("))
         val frameFailure = functionBlock("private fun handleRuntimeMetricFrameFailure(")
         assertTrue(frameFailure.contains("arSessionGeneration != expectedArSessionGeneration"))
         assertTrue(frameFailure.contains("walkSessionLifecycle.snapshot().epoch != expectedWalkEpoch"))
@@ -207,36 +229,164 @@ class MainActivityOfficialEnvironmentStaticTest {
         ).substringBefore("startupCapabilityText = TextView(this).apply")
         val overlay = source.substringAfter("val overlay = LinearLayout(this).apply")
             .substringBefore("val controlsScroll = ScrollView(this).apply")
+        val readiness = source
+            .substringAfter("walkReadinessControls = LinearLayout(this).apply")
+            .substringBefore("walkLastResultText = TextView(this).apply")
         val update = functionBlock("private fun updateOfficialEnvironmentUi()")
         val message = functionBlock("private fun officialEnvironmentStatusMessage(")
+        val detail = functionBlock("private fun officialEnvironmentMeasurementDetail(")
+        val guidance = functionBlock("private fun updatePrewalkGuidance(")
 
-        assertTrue(statusView.contains("View.ACCESSIBILITY_LIVE_REGION_POLITE"))
+        assertTrue(statusView.contains("View.ACCESSIBILITY_LIVE_REGION_NONE"))
         assertTrue(update.contains("officialEnvironmentStatusText.contentDescription = message"))
-        assertTrue(update.contains("OfficialEnvironmentPolicy.productionProfile != null"))
+        assertTrue(update.contains("officialEnvironmentStatusText.text.toString() != message"))
+        assertTrue(update.contains("!officialEnvironmentCameraPreflightActive"))
+        assertTrue(update.contains("위치·카메라 자동 점검 중"))
+        assertTrue(update.contains("activeOfficialEnvironmentProfile != null"))
         assertTrue(update.contains("승인된 환경 프로필 없음"))
         assertTrue(message.contains("원인:"))
         assertTrue(message.contains("다음 행동:"))
+        assertTrue(detail.contains("GPS_ACCURACY_OUTSIDE_APPROVED_RANGE"))
+        assertTrue(detail.contains("현재 정확도"))
+        assertTrue(detail.contains("CAMERA_STABILIZING"))
+        assertTrue(guidance.contains("ACTION_ACCESSIBILITY_FOCUS"))
+        assertFalse(guidance.contains("requestFocus()"))
+        assertFalse(guidance.contains("announceForAccessibility("))
+        assertTrue(guidance.contains("환경과 장착 점검 통과. 보행 시작 확인"))
         assertInOrder(
-            overlay,
+            readiness,
             "addView(priorityUserOnboardingControls)",
             "addView(officialEnvironmentStatusText)",
             "addView(officialEnvironmentConfirmButton)",
             "addView(startupCapabilityText)",
         )
+        assertTrue(overlay.contains("addView(walkReadinessControls)"))
     }
 
     @Test
-    fun activeLocationPermissionRevocationEntersSafetyStop() {
+    fun prewalkCameraAndMountingSensorsProduceAllRequiredMeasurements() {
+        val confirmation = functionBlock("private fun confirmOfficialEnvironmentConditions()")
+        val start = functionBlock("private fun startOfficialEnvironmentCameraPreflight(")
+        val current = functionBlock("private fun isOfficialEnvironmentCameraPreflightCurrent(")
+        val measurement = functionBlock("private fun cameraFrameQualityObservation(")
+        val invalidate = functionBlock("private fun invalidateOfficialEnvironmentEvidence(")
+        val activation = functionBlock("private fun activateWalkSessionRuntime()")
+        val startAfterRelease =
+            functionBlock("private fun startWalkSessionRuntimeAfterCameraRelease(")
+
+        assertTrue(confirmation.contains("startOfficialEnvironmentCameraPreflight(snapshot.epoch)"))
+        assertTrue(start.contains("phoneMountingSensorProbe.start()"))
+        assertTrue(start.contains("ProcessCameraProvider.getInstance(this)"))
+        assertTrue(start.contains("ImageAnalysis.Builder()"))
+        assertTrue(
+            start.indexOf("cameraFallbackAnalysis = analysis") <
+                start.indexOf("provider.bindToLifecycle("),
+        )
+        assertTrue(start.contains("imageProxy.planes.firstOrNull()"))
+        assertTrue(start.contains("cameraFrameQualityObservation("))
+        assertTrue(start.contains("expectedCameraPreflightGeneration = generation"))
+        assertTrue(start.contains("observedAtElapsedRealtimeMs = nowMs"))
+        assertFalse(start.contains("imageProxy.imageInfo.timestamp / NANOS_PER_MILLISECOND"))
+        assertTrue(current.contains("generation == officialEnvironmentCameraPreflightGeneration"))
+        assertTrue(current.contains("walkSessionLifecycle.snapshot().epoch == epoch"))
+        assertTrue(measurement.contains("CameraLumaMeasurementPolicy.measure("))
+        assertTrue(
+            measurement.contains(
+                "phoneMountingSensorProbe.latestNow()",
+            ),
+        )
+        assertTrue(measurement.contains("normalizedBrightness = luma?.normalizedBrightness"))
+        assertTrue(measurement.contains("occludedFraction = luma?.darkOrOccludedFraction"))
+        assertTrue(
+            measurement.contains(
+                "angularShakeDegreesPerSecond = mounting?.angularShakeDegreesPerSecond",
+            ),
+        )
+        assertTrue(
+            measurement.contains(
+                "mountPitchDegrees = mounting?.cameraPitchFromHorizontalDegrees",
+            ),
+        )
+        assertTrue(invalidate.contains("stopOfficialEnvironmentCameraPreflight()"))
+        assertTrue(invalidate.contains("phoneMountingSensorProbe.stop()"))
+        assertTrue(
+            activation.indexOf(
+                "stopOfficialEnvironmentCameraPreflight(",
+            ) <
+                activation.indexOf("startWalkSessionRuntimeAfterCameraRelease(runtimeEpoch)"),
+        )
+        assertTrue(startAfterRelease.contains("ensurePermissionsThenStart()"))
+    }
+
+    @Test
+    fun debugPrewalkCameraLogContainsRawMeasurementsThresholdsAndDecision() {
+        val observation = functionBlock("private fun observeOfficialEnvironmentCameraFrame(")
+
+        assertTrue(
+            observation.contains("BuildConfig.DEBUG && expectedCameraPreflightGeneration != null"),
+        )
+        assertTrue(observation.contains("CAMERA_PREFLIGHT_LOG_TAG"))
+        assertTrue(observation.contains("brightness=${'$'}{observation.normalizedBrightness}"))
+        assertTrue(observation.contains("occludedFraction=${'$'}{observation.occludedFraction}"))
+        assertTrue(
+            observation.contains(
+                "shakeDegreesPerSecond=${'$'}{observation.angularShakeDegreesPerSecond}",
+            ),
+        )
+        assertTrue(observation.contains("mountPitchDegrees=${'$'}{observation.mountPitchDegrees}"))
+        assertTrue(observation.contains("status=${'$'}{cameraAssessment.status}"))
+        assertTrue(observation.contains("reason=${'$'}{cameraAssessment.reason}"))
+    }
+
+    @Test
+    fun prewalkRetryFencesOldFramesAndReleasesOnlyOwnedCameraResources() {
+        val confirmation = functionBlock("private fun confirmOfficialEnvironmentConditions()")
+        val mounting = functionBlock("private fun confirmPhoneMounting(")
+        val observer = functionBlock("private fun observeOfficialEnvironmentCameraFrame(")
+        val stop = functionBlock("private fun stopOfficialEnvironmentCameraPreflight(")
+
+        assertTrue(confirmation.contains("officialEnvironmentCameraCleanupPending"))
+        assertTrue(confirmation.contains("onReleased = ::confirmOfficialEnvironmentConditions"))
+        assertTrue(observer.contains("expectedCameraPreflightGeneration"))
+        assertTrue(observer.contains("isOfficialEnvironmentCameraPreflightCurrent("))
+        assertTrue(observer.contains("previousObservedAtMs"))
+        assertTrue(observer.contains("val commit = synchronized(phoneMountingObservationLock)"))
+        assertTrue(observer.contains("candidateObservedAtMs < previousObservedAtMs"))
+        assertTrue(observer.contains("officialEnvironmentCameraStabilityGate.observe("))
+        assertTrue(observer.contains("CameraPreflightStabilityDecision.RETAIN_PREVIOUS_PASS"))
+        assertTrue(observer.contains("CAMERA_STABILIZING"))
+        assertTrue(observer.contains("officialEnvironmentCameraEvidence = evidence"))
+        assertTrue(
+            observer.indexOf("val commit = synchronized(phoneMountingObservationLock)") <
+                observer.indexOf("officialEnvironmentCameraEvidence = evidence"),
+        )
+        assertTrue(stop.contains("synchronized(phoneMountingObservationLock)"))
+        assertTrue(stop.contains("officialEnvironmentCameraPreflightActive = false"))
+        assertTrue(stop.contains("officialEnvironmentCameraPreflightGeneration += 1L"))
+        assertTrue(stop.contains("unbind(ownedAnalysis)"))
+        assertTrue(stop.contains("detectorExecutor.execute"))
+        assertTrue(stop.contains("officialEnvironmentAfterCameraRelease"))
+        assertFalse(stop.contains("unbindAll()"))
+        assertTrue(stop.contains("phoneMountingSensorProbe.stop()"))
+        assertTrue(mounting.contains("onReleased = { confirmPhoneMounting(method) }"))
+        assertInOrder(
+            mounting.substringAfter("onReleased = { confirmPhoneMounting(method) }"),
+            "return",
+            "resetPrewalkCameraEvidenceForNewAttempt()",
+            "val confirmedAtMs",
+        )
+    }
+
+    @Test
+    fun activeLocationPermissionRevocationStopsOnlyLocationFeatures() {
         val permissionChange =
             functionBlock("private fun applyObservedPermissionStateChange(")
 
-        assertTrue(permissionChange.contains("else -> \"location_permission_revoked\""))
-        assertTrue(
-            permissionChange.contains(
-                "enterWalkSessionSafetyStopAndCancelOutputs(safetyStopReason)",
-            ),
-        )
-        assertTrue(permissionChange.contains("공식 사용환경의 위치 품질"))
+        assertTrue(permissionChange.contains("stopLocationUpdates()"))
+        assertTrue(permissionChange.contains("navigationRequests.cancelRoute()"))
+        assertTrue(permissionChange.contains("resetRouteState()"))
+        assertTrue(permissionChange.contains("해당 기능만 중지하고 나머지 기능은 계속 사용합니다."))
+        assertFalse(permissionChange.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertFalse(permissionChange.contains("WalkSessionEvent.Resume"))
     }
 

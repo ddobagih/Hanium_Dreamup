@@ -172,6 +172,62 @@ class AndroidFeedbackActuatorStaticTest {
     }
 
     @Test
+    fun featureRestrictionsSuppressOnlyTheirOwnOutputChannel() {
+        val constructor = source.substringAfter("class AndroidFeedbackActuator(")
+            .substringBefore(") : TextToSpeech.OnInitListener")
+        val dispatch = source.substringAfter("fun emit(\n")
+            .substringBefore("fun vibrateRiskOnly(action: FeedbackAction)")
+        val speech = source.substringAfter("private fun speak(\n")
+            .substringBefore("private fun flushPendingSpeech()")
+        val queuedSpeech = source.substringAfter("private fun flushPendingSpeech()")
+            .substringBefore("private fun vibrate(")
+        val vibration = source.substringAfter("private fun vibrate(\n")
+            .substringBefore("private fun cancelPriorityUserTrainingVibration(")
+
+        assertTrue(constructor.contains("speechAllowed: () -> Boolean = { true }"))
+        assertTrue(constructor.contains("hapticAllowed: () -> Boolean = { true }"))
+        assertTrue(
+            speech.contains(
+                "if (!speechAllowed()) return NavigationSpeechDispatchResult.UNAVAILABLE",
+            ),
+        )
+        assertFalse(speech.contains("hapticAllowed"))
+        assertTrue(queuedSpeech.contains("speechAllowed()"))
+        assertTrue(vibration.contains("if (!hapticAllowed()) return false"))
+        assertFalse(vibration.contains("speechAllowed"))
+        assertTrue(
+            vibration.indexOf("if (!hapticAllowed()) return false") <
+                vibration.indexOf("cancelPriorityUserTrainingVibration(notifyFailure = true)"),
+        )
+        assertTrue(
+            dispatch.indexOf("val speech = speak(") <
+                dispatch.indexOf("val vibrationAccepted = vibrate("),
+        )
+        assertFalse(
+            dispatch.substringBefore("val vibrationAccepted = vibrate(")
+                .contains("return RiskFeedbackDispatchResult"),
+        )
+    }
+
+    @Test
+    fun voiceListeningSignalsUseDistinctShortHapticsThroughTheSharedGate() {
+        val start = source.substringAfter("fun playVoiceListeningStartVibration()")
+            .substringBefore("fun playVoiceListeningEndVibration()")
+        val end = source.substringAfter("fun playVoiceListeningEndVibration()")
+            .substringBefore("fun playRouteGuidancePausedVibration()")
+        val sharedVibration = source.substringAfter("private fun vibrate(")
+            .substringBefore("private fun cancelPriorityUserTrainingVibration(")
+
+        assertTrue(start.contains("vibrate(longArrayOf(0L, 35L))"))
+        assertTrue(end.contains("vibrate(longArrayOf(0L, 35L, 45L, 35L))"))
+        assertFalse(start.contains("longArrayOf(0L, 120L)"))
+        assertFalse(start.contains("longArrayOf(0L, 220L)"))
+        assertFalse(start.contains("currentVibrator.vibrate"))
+        assertFalse(end.contains("currentVibrator.vibrate"))
+        assertTrue(sharedVibration.contains("if (!hapticAllowed()) return false"))
+    }
+
+    @Test
     fun phoneMountingCorrectionUsesAShortNonRepeatingCueThroughTheSharedVibrationGate() {
         val correction = source.substringAfter("fun playPhoneMountingCorrectionVibration()")
             .substringBefore("fun playPhoneMountingSafetyStopVibration()")

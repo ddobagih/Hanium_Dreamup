@@ -10,6 +10,7 @@ WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프
 | 팀 기능 분담 | [기능 구현 카탈로그](docs/planning/walksafe_feature_implementation_catalog.html) |
 | 산출물 정본 | [산출물 대장 current notice](docs/deliverables/00-control/artifact-register-current-notice-20260728-r001.md) |
 | 자동 테스트와 정식 시험 | [테스트 가이드](docs/guides/testing-guide.md) |
+| 2026-08-30 로컬·실기기 실행 결과 | [실환경 실행 보고서](docs/testing/walksafe-real-environment-execution-report-20260830.md) |
 | 현재 상태와 다음 작업 | [continuation checkpoint](docs/control/walksafe-project-continuation-checkpoint.json) |
 | 레거시 사용 금지 경계 | [저장소 가이드 — 레거시 경계](docs/guides/repository-guide.md#레거시-경계) |
 | 기여·보안 | [CONTRIBUTING](CONTRIBUTING.md) · [SECURITY](SECURITY.md) |
@@ -25,7 +26,8 @@ WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프
 - 다음 통제 작업: `EPIC-03` workstream 완료 조건 평가; 다음 구현 후보는 `FP-022 / GAP-031`
 - 정식 시험: 279/279 `NOT_RUN`
 - 출시 gate: 5/5 `NOT_RUN`, 면제 없음
-- 실제 기기·현장·운영 배포·외부 수락: `NOT_RUN`
+- 로컬 debug 실기기 설치·cold start·계측시험: `LIMITED` ([실행 보고서](docs/testing/walksafe-real-environment-execution-report-20260830.md))
+- 정식 실기기 시험·현장·운영 배포·외부 수락: `NOT_RUN`
 - 출시 상태: `NOT_ELIGIBLE`
 
 자동 테스트나 debug build가 통과해도 위 정식 시험·배포·출시 완료를 뜻하지 않습니다.
@@ -42,7 +44,7 @@ WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프
 | [`backend`](backend) | 계정·신고·관리자·데이터·외부 API 서버 | `SUPPORT`, 운영 배포 `NOT_RUN` |
 | [`model`](model) · [`data_sources`](data_sources) | 모델 runtime·학습 후보·provenance | `SUPPORT`, 정식 모델 승인 전 |
 | [`apps/web`](apps/web) | 과거 Web/PWA 코드와 410 경계 회귀 | `LEGACY_REFERENCE_ONLY`, 구현·출시 근거 사용 금지 |
-| [`voice`](voice) | 별도 로컬 음성 prototype | `LEGACY_REFERENCE`, Android 제품 경로 아님 |
+| [`voice`](voice) | Gateway 뒤에서 선택적으로 쓰는 STT·TTS 지원 서비스 | `SUPPORT`, 기본 OFF·직접 추론 확인·통합 E2E 대기 |
 
 관리자 앱은 외부 기관에 자동 전송하지 않습니다. 앱 밖에서 실제 수행한 수동 전달 사실과 상태를 기록할 뿐입니다.
 

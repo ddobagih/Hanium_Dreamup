@@ -12,18 +12,28 @@ class FirstRunOnboardingPolicyTest {
     private val acceptingVerifier = FirstRunOnboardingEvidenceVerifier { _, _ -> true }
 
     @Test
-    fun emailJitAndDeviceCheckAdvanceLocallyWithoutNewReceiptEntries() {
+    fun verifiedEmailLoginRequiresPurposeAndSafetyBeforeLocalPostLoginChecks() {
         val loggedIn = FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
             FirstRunOnboardingPolicy.initialEmailAccount(2L),
             actorBinding(),
             receipt(40),
         ).current
-        val receiptKeys = loggedIn.completedReceiptHashes.keys
-
-        val jit = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+        val skippedSafety = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
             loggedIn,
             loggedIn.epoch,
             loggedIn.revision,
+        )
+        val safety = FirstRunOnboardingPolicy.acknowledgePurposeAndSafety(
+            loggedIn,
+            request(loggedIn),
+            receipt(42),
+        )
+        val receiptKeys = safety.current.completedReceiptHashes.keys
+
+        val jit = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            safety.current,
+            safety.current.epoch,
+            safety.current.revision,
         )
         val device = FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(
             jit.current,
@@ -31,12 +41,134 @@ class FirstRunOnboardingPolicyTest {
             jit.current.revision,
         )
 
+        assertEquals(FirstRunOnboardingStage.PURPOSE_AND_SAFETY, loggedIn.stage)
+        assertFalse(skippedSafety.accepted)
+        assertSame(loggedIn, skippedSafety.current)
+        assertTrue(safety.accepted)
+        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, safety.current.stage)
+        assertTrue(
+            FirstRunOnboardingStage.PURPOSE_AND_SAFETY in
+                safety.current.completedReceiptHashes,
+        )
         assertTrue(jit.accepted)
         assertEquals(FirstRunOnboardingStage.DEVICE_CHECK, jit.current.stage)
         assertEquals(receiptKeys, jit.current.completedReceiptHashes.keys)
         assertTrue(device.accepted)
         assertEquals(FirstRunOnboardingStage.FP004_TRAINING, device.current.stage)
         assertEquals(receiptKeys, device.current.completedReceiptHashes.keys)
+    }
+
+    @Test
+    fun advancedEmailProgressCanOnlyBeReauthenticatedByItsBoundActor() {
+        val awaitingSafety = FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
+            FirstRunOnboardingPolicy.initialEmailAccount(3L),
+            actorBinding(),
+            receipt(41),
+        ).current
+        val loggedIn = FirstRunOnboardingPolicy.acknowledgePurposeAndSafety(
+            awaitingSafety,
+            request(awaitingSafety),
+            receipt(42),
+        ).current
+        val deviceCheck = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            loggedIn,
+            loggedIn.epoch,
+            loggedIn.revision,
+        ).current
+        val otherActor = FirstRunOpaqueActorBinding.fromProvider(
+            "actor_0123456789abcdef0123456789abcdef",
+        )
+
+        assertTrue(
+            FirstRunOnboardingPolicy.mayReauthenticateVerifiedEmailActor(
+                awaitingSafety,
+                actorBinding(),
+            ),
+        )
+        assertTrue(
+            FirstRunOnboardingPolicy.mayReauthenticateVerifiedEmailActor(
+                deviceCheck,
+                actorBinding(),
+            ),
+        )
+        assertFalse(
+            FirstRunOnboardingPolicy.mayReauthenticateVerifiedEmailActor(
+                deviceCheck,
+                otherActor,
+            ),
+        )
+        assertFalse(
+            FirstRunOnboardingPolicy.mayReauthenticateVerifiedEmailActor(
+                FirstRunOnboardingPolicy.initialEmailAccount(4L),
+                actorBinding(),
+            ),
+        )
+    }
+
+    @Test
+    fun newlyCreatedEmailAccountUsesTheSamePurposeAndSafetyGate() {
+        val enrolled = FirstRunOnboardingPolicy.recordEmailOtpEnrollment(
+            FirstRunOnboardingPolicy.initialEmailAccount(4L),
+            receipt(43),
+        ).current
+        val created = FirstRunOnboardingPolicy.recordEmailAccountCreated(
+            enrolled,
+            receipt(44),
+        ).current
+        val loggedIn = FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
+            created,
+            actorBinding(),
+            receipt(45),
+        ).current
+        val safety = FirstRunOnboardingPolicy.acknowledgePurposeAndSafety(
+            loggedIn,
+            request(loggedIn),
+            receipt(46),
+        )
+
+        assertEquals(FirstRunOnboardingStage.PURPOSE_AND_SAFETY, loggedIn.stage)
+        assertTrue(safety.accepted)
+        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, safety.current.stage)
+        assertEquals(
+            setOf(
+                FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT,
+                FirstRunOnboardingStage.ACCOUNT_CREATED,
+                FirstRunOnboardingStage.VERIFIED_LOGIN,
+                FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
+            ),
+            safety.current.completedReceiptHashes.keys,
+        )
+    }
+
+    @Test
+    fun emailReceiptRestorationCannotSynthesizeMissingSafetyAcknowledgement() {
+        val missingSafety = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+            epoch = 5L,
+            orderedEvidence = listOf(
+                FirstRunOnboardingEvidence.VerifiedLogin(actorBinding(), receipt(47)),
+                FirstRunOnboardingEvidence.Fp004Training(receipt(48)),
+            ),
+            verifier = acceptingVerifier,
+        )
+        val restored = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+            epoch = 5L,
+            orderedEvidence = listOf(
+                FirstRunOnboardingEvidence.VerifiedLogin(actorBinding(), receipt(47)),
+                FirstRunOnboardingEvidence.PurposeAndSafety(receipt(49)),
+                FirstRunOnboardingEvidence.Fp004Training(receipt(48)),
+            ),
+            verifier = acceptingVerifier,
+        )
+
+        assertEquals(1, missingSafety.restoredEvidenceCount)
+        assertEquals(FirstRunOnboardingStage.PURPOSE_AND_SAFETY, missingSafety.snapshot.stage)
+        assertEquals(FirstRunOnboardingRejection.STAGE_MISMATCH, missingSafety.rejection)
+        assertTrue(restored.fullyRestored)
+        assertTrue(restored.snapshot.isComplete)
+        assertTrue(
+            FirstRunOnboardingStage.PURPOSE_AND_SAFETY in
+                restored.snapshot.completedReceiptHashes,
+        )
     }
 
     @Test

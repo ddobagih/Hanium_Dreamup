@@ -14,6 +14,12 @@ object GatewayEndpointPolicy {
         return normalizeOrNull(raw, allowDebugLoopbackHttp = true)
     }
 
+    fun approvedDebugOriginOrNull(raw: String?, approvedOrigin: String): String? {
+        val approved = normalizeOrNull(approvedOrigin, allowDebugLoopbackHttp = true) ?: return null
+        val requested = normalizeOrNull(raw, allowDebugLoopbackHttp = true) ?: return null
+        return requested.takeIf { it == approved }
+    }
+
     private fun normalizeOrNull(raw: String?, allowDebugLoopbackHttp: Boolean): String? {
         val value = raw?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() } ?: return null
         val uri = runCatching { URI(value) }.getOrNull() ?: return null

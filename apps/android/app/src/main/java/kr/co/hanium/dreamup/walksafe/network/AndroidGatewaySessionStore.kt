@@ -328,6 +328,11 @@ internal class AndroidGatewaySessionStore(
                         ),
                     )
                     add(
+                        FirstRunOnboardingEvidence.PurposeAndSafety(
+                            receipt(FirstRunOnboardingStage.PURPOSE_AND_SAFETY),
+                        ),
+                    )
+                    add(
                         FirstRunOnboardingEvidence.Fp004Training(
                             receipt(FirstRunOnboardingStage.FP004_TRAINING),
                         ),

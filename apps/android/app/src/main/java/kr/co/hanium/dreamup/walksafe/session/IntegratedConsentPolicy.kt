@@ -13,10 +13,10 @@ const val INTEGRATED_CONSENT_TRAINING_ITEM_VERSION = "FP-013-TRAINING-1.1.0"
 
 const val INTEGRATED_CONSENT_DISCLOSURE_KO =
     "통합 동의 문서 $INTEGRATED_CONSENT_POLICY_VERSION. 네 항목을 각각 허용하거나 거부할 수 있습니다. " +
-        "1. 신고·진단용 raw v2: 탐지·성능 메타데이터와 chunk 시각·크기·hash만 수집하며, 영상·음성·이미지·" +
+        "1. 원본·진단수집 raw v2: 탐지·성능 메타데이터와 chunk 시각·크기·hash만 수집하며, 영상·음성·이미지·" +
         "정확한 위치·이동경로·개별 frame·bbox는 제외합니다. 기기에 최대 30일 암호화 저장하고 사용자가 " +
         "재확인한 PAUSED 상태에서만 전송하며, 서버 검역은 receipt commit부터 최대 14일입니다. END에서는 " +
-        "전송하지 않습니다. " +
+        "전송하지 않습니다. 거부해도 신고 사진과 정확한 위치를 건별 확인하는 직접 신고에는 영향이 없습니다. " +
         "2. 자동신고: JPEG 신고 사진과 정확한 위치·방향·탐지 metadata를 기기에 암호화해 대기하고, 사용자가 " +
         "재확인한 PAUSED 상태에서만 동의와 네트워크 조건을 다시 확인해 전송합니다. END는 자동 전송 시점이 아닙니다. " +
         "3. 이동통신 전송: Wi-Fi가 아닐 때 같은 서버 자료를 이동통신망으로 전송합니다. 거부하면 Wi-Fi만 사용합니다. " +

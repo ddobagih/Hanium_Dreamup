@@ -46,6 +46,23 @@ class LocationPolicyTest {
     }
 
     @Test
+    fun rejectsMockFixWithoutReplacingPreviousTrustedFix() {
+        val previous = LocationTrustPolicy.trustedOrNull(37.0, 127.0, 5f, 1_000L)
+
+        assertNull(
+            LocationTrustPolicy.trustedOrNull(
+                latitude = 37.00001,
+                longitude = 127.00001,
+                accuracyM = 5f,
+                elapsedRealtimeMs = 2_000L,
+                previous = previous,
+                mock = true,
+            ),
+        )
+        assertNotNull(previous)
+    }
+
+    @Test
     fun clearsFixesThatAreOldOrFromTheFuture() {
         val trusted = TrustedLocation(37.0, 127.0, 5f, 1_000L)
 

@@ -1173,7 +1173,9 @@ internal class PersistentFieldSessionLog(
         val SAFE_FIELD_VALUE = Regex("[A-Za-z0-9_.:=+\\-]{0,160}")
         val RECORD_FILE_REGEX = Regex("records-(\\d{4})\\.jsonl")
         val ALLOWED_EVENT_FIELDS = setOf(
+            "accuracy_bucket",
             "activity_permission",
+            "age_bucket",
             "audio_permission",
             "camera_fallback_running",
             "camera_permission",
@@ -1194,6 +1196,7 @@ internal class PersistentFieldSessionLog(
             "model_fallback_used",
             "reason",
             "reports_allowed",
+            "result",
             "state",
             "tmap_authoritative",
             "tmap_route_active",

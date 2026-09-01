@@ -37,6 +37,28 @@ fun configuredReportQueueValue(name: String): String? = providers.gradleProperty
     ?.trim()
     ?.takeIf { it.isNotEmpty() }
 
+fun normalizedDebugOriginOrNull(raw: String?): String? {
+    normalizedHttpsOriginOrNull(raw)?.let { return it }
+    val value = raw?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() } ?: return null
+    val uri = runCatching { URI(value) }.getOrNull() ?: return null
+    if (!uri.scheme.equals("http", ignoreCase = true)) return null
+    if (uri.host.isNullOrBlank() || uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null) {
+        return null
+    }
+    if (uri.rawPath?.takeIf { it.isNotEmpty() } !in setOf(null, "/")) return null
+    if (!uri.host.equals("127.0.0.1") && !uri.host.equals("localhost", ignoreCase = true)) {
+        return null
+    }
+    val port = if (uri.port == -1) "" else ":${uri.port}"
+    return "http://${uri.host.lowercase()}$port"
+}
+
+val configuredReportQueueTestOrigin =
+    configuredReportQueueValue("WALKSAFE_REPORT_QUEUE_TEST_ORIGIN")
+        ?: "http://127.0.0.1:8081"
+val verifiedReportQueueTestOrigin =
+    normalizedDebugOriginOrNull(configuredReportQueueTestOrigin)
+
 val reportQueueEnabled = when (
     val configured = configuredReportQueueValue("WALKSAFE_REPORT_QUEUE_ENABLED")?.lowercase()
 ) {
@@ -64,6 +86,9 @@ val reportQueueAutomaticMaxTotalBytes =
     configuredPositiveLong("WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES")
 
 if (reportQueueEnabled) {
+    check(verifiedReportQueueTestOrigin != null) {
+        "Enabled report queue requires WALKSAFE_REPORT_QUEUE_TEST_ORIGIN as HTTPS or loopback HTTP"
+    }
     check(reportQueueMaxEntries != null && reportQueueMaxEntries >= 2) {
         "Enabled report queue requires WALKSAFE_REPORT_QUEUE_MAX_ENTRIES >= 2"
     }
@@ -108,6 +133,8 @@ val reportQueueBuildAutomaticMaxEntries =
     if (reportQueueEnabled) reportQueueAutomaticMaxEntries!! else 0
 val reportQueueBuildAutomaticMaxTotalBytes =
     if (reportQueueEnabled) reportQueueAutomaticMaxTotalBytes!! else 0L
+val reportQueueBuildTestOrigin =
+    if (reportQueueEnabled) verifiedReportQueueTestOrigin!! else "disabled"
 val debugLongLivedLoginEnabled =
     providers.gradleProperty("walksafe.longLivedLoginEnabled").orNull == "true"
 val validateWalkSafeSourceCommit by tasks.registering {
@@ -121,8 +148,44 @@ val validateWalkSafeSourceCommit by tasks.registering {
     }
 }
 
+val bundledVoskModelAssetDirectory =
+    file("src/main/assets/voice-models/vosk-model-small-ko-0.22")
+val verifyBundledVoskModelAssets by tasks.registering {
+    doLast {
+        val manifest = bundledVoskModelAssetDirectory.resolve("MODEL_FILES.sha256")
+        check(manifest.isFile) {
+            "Bundled Korean Vosk model is missing. Run " +
+                "python3 scripts/prepare_vosk_ko_small_model.py from the repository root."
+        }
+        val missing = manifest.readLines()
+            .filter(String::isNotBlank)
+            .map { line ->
+                val separator = line.indexOf("  ")
+                check(
+                    separator == 64 &&
+                        line.take(64).matches(Regex("[0-9a-f]{64}")),
+                ) { "Bundled Korean Vosk manifest is malformed." }
+                line.substring(separator + 2).also { relative ->
+                    check(
+                        relative.isNotBlank() &&
+                            !relative.startsWith('/') &&
+                            '\\' !in relative &&
+                            relative.split('/').none { it.isBlank() || it == "." || it == ".." },
+                    ) { "Bundled Korean Vosk manifest contains an unsafe path." }
+                }
+            }
+            .filterNot { relative -> bundledVoskModelAssetDirectory.resolve(relative).isFile }
+        check(missing.isEmpty()) {
+            "Bundled Korean Vosk model is incomplete. Re-run the model preparation script."
+        }
+    }
+}
+
 tasks.configureEach {
     if (name == "preReleaseBuild") dependsOn(validateWalkSafeSourceCommit)
+    if (name == "mergeDebugAssets" || name == "mergeReleaseAssets") {
+        dependsOn(verifyBundledVoskModelAssets)
+    }
 }
 
 android {
@@ -139,6 +202,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WALKSAFE_PRODUCT_ROLE", "\"USER\"")
         buildConfigField("boolean", "WALKSAFE_REPORT_QUEUE_ENABLED", "$reportQueueEnabled")
+        buildConfigField(
+            "String",
+            "WALKSAFE_REPORT_QUEUE_TEST_ORIGIN",
+            "\"$reportQueueBuildTestOrigin\"",
+        )
         buildConfigField("int", "WALKSAFE_REPORT_QUEUE_MAX_ENTRIES", "$reportQueueBuildMaxEntries")
         buildConfigField(
             "int",
@@ -215,6 +283,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.ai.edge.litert:litert:1.4.0")
+    implementation("com.alphacephei:vosk-android:0.3.75")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

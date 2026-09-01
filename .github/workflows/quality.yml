@@ -226,6 +226,9 @@ jobs:
       - name: Run model and data audit tests
         run: |
           PYTHON_BIN="${WALKSAFE_GENERAL_PYTHON_BIN:?}" scripts/run_walksafe_test_layers_current.sh model-audit
+      - name: Prepare pinned Korean voice model
+        run: |
+          "${WALKSAFE_GENERAL_PYTHON_BIN:?}" -I -S -B scripts/prepare_vosk_ko_small_model.py
       - name: Run commit-stable test layers
         env:
           WALKSAFE_RUN_ANDROID_DEVICE_TESTS: "false"

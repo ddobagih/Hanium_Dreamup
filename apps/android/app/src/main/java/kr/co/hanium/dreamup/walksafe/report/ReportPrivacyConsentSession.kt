@@ -7,12 +7,22 @@ import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
 
 const val REPORT_PRIVACY_DISCLOSURE_KO =
     "$WALKSAFE_PRODUCT_PURPOSE_STATEMENT_KO $WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO " +
-        "손상 점자블록 신고 데이터 전송·보관(기본 꺼짐): 자동 또는 직접 손상 점자블록 신고 시 " +
-        "긴 변 최대 960px 이내(현재 Android 앱은 320px) JPEG를 메타데이터 제거를 위해 " +
-        "재인코딩하며 모자이크하지 않습니다. 정확한 GPS 좌표와 GPS가 제공한 이동 heading을 함께 " +
-        "WalkSafe 서버에 전송해 180일간 보관합니다. 카메라 권한 및 기기 내 위험 탐지·안내와 " +
-        "별도이며, 철회해도 기기 내 탐지·안내는 계속됩니다. 동의는 사용자가 철회할 때까지 " +
-        "이 기기에 유지되며, 자동신고 사용 여부는 별도 설정으로 관리합니다."
+        "직접 손상 점자블록 신고는 신고할 때마다 전송 내용을 확인해야 합니다. 신고 사진은 긴 변 " +
+        "최대 960px 이내(현재 Android 앱은 320px) JPEG로 재인코딩해 메타데이터를 제거하지만 " +
+        "모자이크하지 않습니다. 정확한 GPS 좌표, GPS가 제공한 이동 heading, 탐지·시각·모델 " +
+        "정보를 신고 처리와 중복 확인을 위해 사용합니다. 운영 수신자와 보유기간 문안이 승인되기 " +
+        "전에는 release 빌드의 신고 대기열을 열지 않습니다. 대기열을 명시적으로 켠 개발 빌드는 " +
+        "구성된 WalkSafe 테스트 서버에만 전송하며 기관으로 자동 전송하지 않습니다. " +
+        "선택 원본·진단수집 raw v2는 영상·이미지·정확한 위치를 수집하지 않는 별도 경로이며, " +
+        "거부하거나 철회해도 건별 확인을 거친 직접 신고는 사용할 수 있습니다. 자동신고는 별도 " +
+        "선택 동의가 있어야 합니다. 카메라 권한과 기기 내 위험 탐지·안내도 각각 별도입니다."
+
+const val REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO =
+    "이번 손상 점자블록 직접 신고를 위해 방금 고정한 장면의 JPEG 사진을 메타데이터 제거 목적으로 " +
+        "재인코딩하며 모자이크하지 않습니다. 정확한 GPS 좌표, GPS 이동 방향, 탐지·시각·모델 " +
+        "정보와 함께 기기에 암호화해 대기한 뒤, 보행을 멈추고 재확인한 상태에서 WalkSafe " +
+        "테스트 서버로 전송합니다. 운영 문안 승인 전의 개발 시험용이며 기관으로 자동 전송하지 " +
+        "않습니다. 선택 원본·진단수집 raw v2나 학습 재사용에는 이 확인을 사용하지 않습니다."
 
 enum class ReportTransferPurpose(val wireValue: String) {
     EXPLICIT("explicit"),
@@ -34,7 +44,10 @@ private class CanonicalReportUploadPermit private constructor(
     }
 }
 
-/** Consent and per-purpose cancellation boundary for privacy-sensitive report uploads. */
+/**
+ * Current-confirmation authorization and per-purpose cancellation boundary for report uploads.
+ * This process-local state is not the optional raw/diagnostic collection consent.
+ */
 internal object ReportPrivacyConsentSession {
     private val lock = Any()
     private val explicitCalls = ActiveNetworkCalls()

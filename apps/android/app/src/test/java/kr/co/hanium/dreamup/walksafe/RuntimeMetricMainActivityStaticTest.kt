@@ -11,25 +11,28 @@ class RuntimeMetricMainActivityStaticTest {
     ).readText()
 
     @Test
-    fun preflightActionAppearsBeforeCapabilityConfirmationOnTheStartupSurface() {
+    fun oneTapDeviceCheckStartsPreflightWithoutAnIntermediateDialog() {
         assertTrue(
             "startup must expose a dedicated runtime metric preflight button",
             source.contains("startupMetricPreflightButton"),
         )
         assertTrue(
-            "the post-login check must show its JIT explanation before starting",
-            source.contains("setOnClickListener { showPostLoginDeviceCheckExplanation() }"),
+            "the post-login check must start from its single primary action",
+            source.contains("setOnClickListener { handlePostLoginDeviceCheckPrimaryAction() }"),
         )
-        val explanation = functionBlock("private fun showPostLoginDeviceCheckExplanation()")
-        assertTrue(explanation.contains(".setPositiveButton("))
-        assertTrue(explanation.contains("beginPostLoginDeviceCheckFromUserAction(sessionBinding)"))
+        val primaryAction = functionBlock("private fun handlePostLoginDeviceCheckPrimaryAction()")
+        assertTrue(primaryAction.contains("startPostLoginDeviceCheckFromPrimaryAction()"))
+        assertFalse(primaryAction.contains("showPostLoginDeviceCheckExplanation()"))
+        val start = functionBlock("private fun startPostLoginDeviceCheckFromPrimaryAction()")
+        assertTrue(start.contains("beginPostLoginDeviceCheckFromUserAction(sessionBinding)"))
+        assertFalse(start.contains("AlertDialog"))
 
-        val overlay = sourceSection(
-            "val overlay = LinearLayout(this).apply",
-            "controlsScroll = ScrollView(this).apply",
+        val readiness = sourceSection(
+            "walkReadinessControls = LinearLayout(this).apply",
+            "walkLastResultText = TextView(this).apply",
         )
-        val preflight = overlay.indexOf("addView(startupMetricPreflightButton)")
-        val confirmation = overlay.indexOf("addView(startupCapabilityConfirmButton)")
+        val preflight = readiness.indexOf("addView(startupMetricPreflightButton)")
+        val confirmation = readiness.indexOf("addView(startupCapabilityConfirmButton)")
         assertTrue("preflight button is missing from the startup overlay", preflight >= 0)
         assertTrue("confirmation button is missing from the startup overlay", confirmation >= 0)
         assertTrue(
@@ -111,7 +114,7 @@ class RuntimeMetricMainActivityStaticTest {
     }
 
     @Test
-    fun terminalPreflightClosesItsSessionThenUpdatesEvidenceWithoutAutoConfirmation() {
+    fun terminalPreflightClosesItsSessionThenUpdatesEvidenceWithoutStartingWalk() {
         val finish = functionBlock("private fun finishRuntimeMetricPreflight(")
         val close = firstIndexOf(
             finish,
@@ -129,11 +132,30 @@ class RuntimeMetricMainActivityStaticTest {
         assertTrue("profile evidence must be applied only after session closure", close < profile)
         assertTrue(finish.contains("refreshStartupCapabilityUi()"))
         assertFalse(
-            "preflight completion must not bypass the user's spoken/TalkBack confirmation",
+            "device-check measurement must not confirm walk startup",
             finish.contains("confirmedStartupCapabilityDecision ="),
         )
         assertFalse(finish.contains("completeStartupCapabilityConfirmation("))
         assertFalse(finish.contains("confirmStartupCapabilityDecision()"))
+    }
+
+    @Test
+    fun missingOrOutdatedArCoreLimitsMetricDistanceWithoutAnInstallPrompt() {
+        val continuation = functionBlock("private fun continueRuntimeMetricPreflightStart(")
+        val unsupportedBranch = continuation.substringAfter(
+            "availability == ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED",
+        ).substringBefore("var candidateSession")
+
+        assertTrue(
+            unsupportedBranch.contains(
+                "availability == ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD",
+            ),
+        )
+        assertTrue(unsupportedBranch.contains("finishRuntimeMetricPreflightWithoutSession("))
+        assertTrue(unsupportedBranch.contains("RuntimeMetricDepthSupport.UNSUPPORTED"))
+        assertTrue(unsupportedBranch.contains("return"))
+        assertFalse(unsupportedBranch.contains("requestInstall("))
+        assertFalse(unsupportedBranch.contains("updateStatus("))
     }
 
     @Test
@@ -168,12 +190,24 @@ class RuntimeMetricMainActivityStaticTest {
         assertTrue(detector >= 0)
         assertTrue(report >= 0)
         assertTrue(feedback >= 0)
-        assertTrue(failClosedGate < detector)
+        assertTrue(
+            "camera quality observation must remain reachable while outputs are suppressed",
+            detector < failClosedGate,
+        )
         assertTrue(failClosedGate < report)
         assertTrue(failClosedGate < feedback)
         assertTrue(
             "the runtime metric gate must return before any output workload",
-            draw.substring(failClosedGate, detector).contains("return"),
+            draw.substring(failClosedGate, report).contains("return"),
+        )
+        val scheduled = functionBlock("private fun scheduleDetectionIfDue(")
+        assertTrue(
+            scheduled.indexOf("observeOfficialEnvironmentCameraFrame(qualityObservation)") <
+                scheduled.indexOf("if (!currentRuntimeMetricOutputAllowsWork("),
+        )
+        assertTrue(
+            scheduled.indexOf("if (!currentRuntimeMetricOutputAllowsWork(") <
+                scheduled.indexOf("frameDetector.detect("),
         )
 
         val queuedFeedbackGate = functionBlock("private fun currentFeedbackDeviceGateAllowsAlerts()")
@@ -227,11 +261,12 @@ class RuntimeMetricMainActivityStaticTest {
             "feedbackActuator?.close()",
         ).forEach { call -> assertTrue("missing invalidation call: $call", invalidation.contains(call)) }
 
-        val explicitReport = functionBlock("private fun requestExplicitReport()")
+        val explicitReport = functionBlock("private fun ensureExplicitReportCapturePreconditions()")
         val metricGate = explicitReport.indexOf("currentRuntimeMetricOutputAllowsWork()")
-        val candidate = explicitReport.indexOf("prepareExplicitReportCandidateIfCurrent(")
         assertTrue(metricGate >= 0)
-        assertTrue(candidate > metricGate)
+        val submit = functionBlock("private fun submitFrozenExplicitReportAfterConfirmation(")
+        assertTrue(submit.contains("confirmed.useExactBytes"))
+        assertFalse(submit.contains("prepareExplicitReportCandidateIfCurrent("))
     }
 
     @Test
@@ -328,23 +363,31 @@ class RuntimeMetricMainActivityStaticTest {
         assertTrue(explicit.contains("synchronized(frameStateLock)"))
         assertTrue(explicit.contains("synchronized(runtimeMetricStateLock)"))
         assertTrue(explicit.contains("currentRuntimeMetricOutputAllowsWork()"))
-        val request = functionBlock("private fun requestExplicitReport()")
-        assertTrue(request.contains("prepareExplicitReportCandidateIfCurrent("))
+        val request = functionBlock("private fun requestExplicitReport(")
+        assertTrue(request.contains("explicitReportConfirmationPolicy.consumeIfConfirmed("))
+        assertTrue(request.contains("submitFrozenExplicitReportAfterConfirmation(confirmed)"))
+        assertTrue(
+            request
+                .contains("prepareExplicitReportCandidateIfCurrent("),
+        )
     }
 
     @Test
-    fun startupCanRecoverAnActiveFieldLogAndPermissionCallbacksCannotBypassMetricGate() {
+    fun startupCanRecoverAnActiveFieldLogAndCollectionUsesFeatureSpecificGates() {
         val runtimeControls = sourceSection(
             "runtimeControls = LinearLayout(this).apply",
             "val overlay = LinearLayout(this).apply",
         )
-        val overlay = sourceSection(
-            "val overlay = LinearLayout(this).apply",
-            "controlsScroll = ScrollView(this).apply",
+        val readiness = sourceSection(
+            "walkReadinessControls = LinearLayout(this).apply",
+            "walkLastResultText = TextView(this).apply",
         )
         assertFalse(runtimeControls.contains("addView(fieldSessionLogButton)"))
-        assertTrue(overlay.contains("addView(fieldSessionLogButton)"))
+        assertTrue(readiness.contains("if (BuildConfig.DEBUG)"))
+        assertTrue(readiness.contains("addView(fieldSessionLogButton)"))
         val fieldButton = functionBlock("private fun updateFieldSessionLogButton()")
+        assertTrue(fieldButton.contains("if (!BuildConfig.DEBUG)"))
+        assertTrue(fieldButton.contains("fieldSessionLogButton.visibility = View.GONE"))
         assertTrue(fieldButton.contains("fieldSessionLog.isActive() || isStartupCapabilityConfirmed()"))
         assertTrue(
             functionBlock("private fun toggleFieldSessionLog()")
@@ -352,8 +395,13 @@ class RuntimeMetricMainActivityStaticTest {
         )
 
         val collectionGate = functionBlock("private fun currentNavigationCollectionAllowsWork()")
-        assertTrue(collectionGate.contains("WalkSafeStartupCapabilityTier.FULL"))
-        assertTrue(collectionGate.contains("currentRuntimeMetricOutputAllowsWork()"))
+        assertTrue(
+            collectionGate.contains(
+                "postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)",
+            ),
+        )
+        assertFalse(collectionGate.contains("WalkSafeStartupCapabilityTier.FULL"))
+        assertFalse(collectionGate.contains("currentRuntimeMetricOutputAllowsWork()"))
         assertTrue(
             functionBlock("private fun startLocationUpdatesIfAllowed(")
                 .contains("currentLocationCollectionAllowsWork()"),
@@ -366,7 +414,7 @@ class RuntimeMetricMainActivityStaticTest {
         val confirmation = functionBlock("private fun completeStartupCapabilityConfirmation(")
         assertFalse(confirmation.contains("earthOrientationTracker.start()"))
         assertTrue(
-            functionBlock("private fun activateWalkSessionRuntime()")
+            functionBlock("private fun startWalkSessionRuntimeAfterCameraRelease(")
                 .contains("earthOrientationTracker.start()"),
         )
     }

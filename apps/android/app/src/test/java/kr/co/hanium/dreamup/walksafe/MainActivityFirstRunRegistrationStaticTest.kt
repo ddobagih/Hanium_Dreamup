@@ -13,7 +13,7 @@ class MainActivityFirstRunRegistrationStaticTest {
     @Test
     fun progressReflectsTheActiveFlowWhileLegacyMappingKeepsTwelveStages() {
         assertTrue(source.contains("const val FIRST_RUN_STAGE_COUNT = 12"))
-        assertTrue(source.contains("const val EMAIL_FIRST_RUN_STAGE_COUNT = 6"))
+        assertTrue(source.contains("const val EMAIL_FIRST_RUN_STAGE_COUNT = 7"))
         val progress = sourceSection(
             "firstRunProgressBar = LinearLayout(this).apply",
             "firstRunOnboardingStatusText = TextView(this).apply",
@@ -75,16 +75,27 @@ class MainActivityFirstRunRegistrationStaticTest {
         assertInOrder(
             processSession,
             "val firstRun = snapshot.restoredFirstRunSnapshot",
-            "val reporterActorId = firstRun?.reporterActorBinding?.value",
-            "val verifiedEmailActorId = firstRun?.takeIf",
+            "val firstRunIsStale =",
+            "val effectiveFirstRun = if (firstRunIsStale)",
+            "val reporterActorId = effectiveFirstRun?.reporterActorBinding?.value",
+            "val verifiedEmailActorId = effectiveFirstRun?.takeIf",
             "val actorId = reporterActorId ?: verifiedEmailActorId",
-            "session != null",
-            "firstRun != null",
+            "val verifiedActorSession = session?.takeIf",
+            "actorId == current.actorId",
+            "current.verificationState == GatewaySessionVerificationState.VERIFIED",
+            "current.isUsableFor(current.actorId)",
+            "if (verifiedActorSession == null)",
+            "cancelPendingPriorityUserTrainingFeedback()",
+            "reporterUserId = null",
+            "if (\n            verifiedActorSession != null",
+            "effectiveFirstRun != null",
             "actorId != null",
-            "actorId == session.actorId",
+            "actorId == verifiedActorSession.actorId",
+            "if (firstRun != null && !firstRunIsStale)",
             "firstRunOnboardingSnapshot = firstRun",
+            "val appliedFirstRun = firstRunOnboardingSnapshot",
             "reporterUserId = actorId",
-            "firstRun.isComplete",
+            "appliedFirstRun.isComplete",
             "} else {\n            permissionSessionPolicy.authenticationExpired()",
         )
         assertTrue(
@@ -168,7 +179,10 @@ class MainActivityFirstRunRegistrationStaticTest {
         val clear = functionBlock("private fun clearGatewaySession(")
         assertInOrder(
             clear,
-            "val operation = GatewaySessionProcessCoordinator.beginOperation() ?: return null",
+            "val operation = if (expectedProcessGeneration != null && expectedSession != null)",
+            "GatewaySessionProcessCoordinator.beginGeneralSessionOperationIfCurrent(",
+            "GatewaySessionProcessCoordinator.beginOperation()",
+            "} ?: return null",
             "gatewaySessionStore.moveActiveToPendingRevocation(",
             "GatewaySessionProcessCoordinator.publishPendingRevocation(operation)",
             "permissionSessionPolicy.authenticationExpired()",
@@ -234,6 +248,8 @@ class MainActivityFirstRunRegistrationStaticTest {
         assertInOrder(
             request,
             "if (!firstRunPermissionRequestAllowed(purpose)) return null",
+            "val postLoginBinding =",
+            "isPostLoginDeviceCheckSnapshotBindingLive(it)",
             "firstRunLease = currentFirstRunAsyncLease()",
             "requestPermissions(permissions, requestCode)",
         )
@@ -243,6 +259,7 @@ class MainActivityFirstRunRegistrationStaticTest {
             current,
             "if (!isFirstRunAsyncLeaseCurrent(lease.firstRunLease)) return false",
             "if (!firstRunPermissionRequestAllowed(lease.purpose)) return false",
+            "lease.postLoginBinding?.let(::isPostLoginDeviceCheckSnapshotBindingLive)",
             "val snapshot = walkSessionLifecycle.snapshot()",
         )
 
@@ -251,6 +268,7 @@ class MainActivityFirstRunRegistrationStaticTest {
             "private data class FirstRunAsyncLease(",
         )
         assertTrue(lease.contains("val firstRunLease: FirstRunAsyncLease"))
+        assertTrue(lease.contains("val postLoginBinding: PostLoginDeviceCheckBinding?"))
     }
 
     @Test
@@ -308,12 +326,8 @@ class MainActivityFirstRunRegistrationStaticTest {
         }
 
         val frame = functionBlock("private fun handleRuntimeMetricPreflightFrame(")
-        assertInOrder(
-            frame,
-            "if (firstRunOnboardingComplete())",
-            "observeOfficialEnvironmentCameraFrame(",
-            "val validSamples = snapshot.runtimeMetricValidSampleCount()",
-        )
+        assertTrue(frame.contains("val validSamples = snapshot.runtimeMetricValidSampleCount()"))
+        assertFalse(frame.contains("observeOfficialEnvironmentCameraFrame("))
 
         val failure = functionBlock("private fun handleRuntimeMetricFrameFailure(")
         assertInOrder(
@@ -326,14 +340,54 @@ class MainActivityFirstRunRegistrationStaticTest {
     }
 
     @Test
+    fun deviceCheckAndTrainingCompletionMoveFocusToTheNewVisibleStage() {
+        val changed = functionBlock("private fun onFirstRunOnboardingStateChanged(")
+        val focus = functionBlock("private fun focusCurrentFirstRunStage(")
+        val update = functionBlock("private fun updateFirstRunOnboardingUi()")
+
+        assertInOrder(
+            changed,
+            "updateFirstRunOnboardingUi()",
+            "focusCurrentFirstRunStage(firstRunOnboardingSnapshot.stage)",
+        )
+        assertTrue(
+            focus.contains(
+                "FirstRunOnboardingStage.FP004_TRAINING -> priorityUserOnboardingStatusText",
+            ),
+        )
+        assertTrue(
+            focus.contains(
+                "FirstRunOnboardingStage.COMPLETE -> officialEnvironmentStatusText",
+            ),
+        )
+        assertTrue(focus.contains("target.post"))
+        assertTrue(focus.contains("firstRunOnboardingSnapshot.stage != stage"))
+        assertTrue(focus.contains("!target.isShown"))
+        assertTrue(focus.contains("target.requestRectangleOnScreen("))
+        assertTrue(focus.contains("ACTION_ACCESSIBILITY_FOCUS"))
+        assertTrue(update.contains("val mayTrain = snapshot.stage == FirstRunOnboardingStage.FP004_TRAINING"))
+        assertTrue(update.contains("val showWalkPreparation = snapshot.isComplete"))
+    }
+
+    @Test
     fun completionGateCoversWalkSensorsCameraLocationRouteFeedbackAndReports() {
         assertTrue(
             functionBlock("private fun isWalkSessionRuntimeActive()")
                 .contains("return firstRunOnboardingComplete() &&"),
         )
+        val activation = functionBlock("private fun activateWalkSessionRuntime()")
+        val startAfterCameraRelease =
+            functionBlock("private fun startWalkSessionRuntimeAfterCameraRelease(")
         assertInOrder(
-            functionBlock("private fun activateWalkSessionRuntime()"),
+            activation,
             "if (!isWalkSessionRuntimeActive()) return",
+            "beginRuntimeCameraHandoff(runtimeEpoch)",
+            "stopOfficialEnvironmentCameraPreflight(",
+            "startWalkSessionRuntimeAfterCameraRelease(runtimeEpoch)",
+        )
+        assertInOrder(
+            startAfterCameraRelease,
+            "!walkSessionLifecycle.isRuntimeEpochCurrent(expectedEpoch)",
             "earthOrientationTracker.start()",
             "startNavigationServicesIfNeeded()",
         )
@@ -373,7 +427,7 @@ class MainActivityFirstRunRegistrationStaticTest {
                 .contains("if (!currentNavigationCollectionAllowsWork()) return"),
         )
         assertTrue(
-            functionBlock("private fun requestExplicitReport()")
+            functionBlock("private fun ensureExplicitReportCapturePreconditions()")
                 .contains("if (!currentRuntimeMetricOutputAllowsWork())"),
         )
         assertInOrder(
@@ -420,13 +474,23 @@ class MainActivityFirstRunRegistrationStaticTest {
             "val overlay = LinearLayout(this).apply",
             "controlsScroll = ScrollView(this).apply",
         )
+        val readiness = sourceSection(
+            "walkReadinessControls = LinearLayout(this).apply",
+            "walkLastResultText = TextView(this).apply",
+        )
         assertInOrder(
             overlay,
             "addView(productPurposeText)",
             "addView(firstRunOnboardingControls)",
+            "addView(walkReadinessControls)",
+            "addView(runtimeControls)",
+        )
+        assertInOrder(
+            readiness,
             "addView(priorityUserOnboardingControls)",
             "addView(startupCapabilityText)",
-            "addView(runtimeControls)",
+            "addView(startupMetricPreflightButton)",
+            "addView(startupCapabilityConfirmButton)",
         )
 
         val traversal = functionBlock("private fun linkFirstRunAccessibilityTraversal()")

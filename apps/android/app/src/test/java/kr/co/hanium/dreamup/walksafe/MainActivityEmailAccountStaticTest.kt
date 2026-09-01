@@ -39,22 +39,63 @@ class MainActivityEmailAccountStaticTest {
         assertFalse(request.contains("putString(dateOfBirth"))
 
         val create = functionBlock("private fun createEmailAccount()")
+        assertTrue(create.contains("if (!selections.requiredGranted)"))
         assertTrue(create.contains("password != confirmation"))
         assertTrue(create.contains("Regex(\"^[0-9]{6}$\")"))
         assertTrue(create.contains("emailEnrollmentStore.clear()"))
     }
 
     @Test
-    fun loginPublishesVerifiedSessionThenMovesExactlyToJit() {
+    fun loginPublishesBeforeLocalCommitAndCanResumeBoundAdvancedProgress() {
         val login = functionBlock("private fun loginEmailAccount(")
         assertTrue(login.contains("gatewaySessionClient.loginWithPassword("))
         assertTrue(login.contains("gatewaySessionStore.getOrCreateInstallDeviceId()"))
         assertTrue(login.contains("deviceId = installationDeviceId"))
         assertTrue(login.contains("FirstRunOnboardingPolicy.recordVerifiedEmailLogin("))
+        assertTrue(login.contains("FirstRunOnboardingPolicy.mayReauthenticateVerifiedEmailActor("))
+        assertTrue(login.contains("val nextFirstRunSnapshot = if (reauthenticatesExistingProgress)"))
+        assertTrue(login.contains("ageBand = PriorityUserAgeBand.VERIFIED_14_PLUS"))
         assertTrue(login.contains("GatewaySessionProcessCoordinator.publishVerified("))
-        assertTrue(login.contains("next=jit_permission_observation"))
+        assertTrue(login.contains("로그인했습니다. 먼저 서비스 목적과 안전 한계를 확인하세요."))
+        assertTrue(login.contains("account=authenticated next=purpose_and_safety"))
+        assertTrue(login.contains("account=reauthenticated next=onboarding_resume"))
+        assertTrue(login.contains("restorePriorityUserOnboardingFromPrefs()"))
+        assertInOrder(
+            login,
+            "GatewaySessionProcessCoordinator.publishVerified(",
+            "firstRunOnboardingSnapshot = nextFirstRunSnapshot",
+        )
+        assertFalse(login.contains("PriorityUserAgeBand.AGE_14_TO_17"))
         assertFalse(login.contains("VERIFIED_SMS"))
         assertFalse(login.contains("LOCAL_CREDENTIAL_PHONE_SUBMISSION"))
+    }
+
+    @Test
+    fun purposeAndSafetyAcknowledgementAlsoPersistsVoiceProcessingDisclosure() {
+        val acknowledgement =
+            functionBlock("private fun acknowledgeFirstRunPurposeAndSafety()")
+        assertInOrder(
+            acknowledgement,
+            "FirstRunOnboardingStage.PURPOSE_AND_SAFETY",
+            "if (!acknowledgeHandsFreeVoiceDisclosure())",
+            "FirstRunOnboardingPolicy.acknowledgePurposeAndSafety(",
+            "firstRunOnboardingSnapshot = transition.current",
+        )
+        val disclosureFailureGate = sourceBlock(
+            "if (!acknowledgeHandsFreeVoiceDisclosure()) {",
+            "val transition = FirstRunOnboardingPolicy.acknowledgePurposeAndSafety(",
+        )
+        assertTrue(disclosureFailureGate.contains("return"))
+
+        val voiceDisclosure =
+            functionBlock("private fun acknowledgeHandsFreeVoiceDisclosure()")
+        assertInOrder(
+            voiceDisclosure,
+            ".putInt(",
+            "PREF_HANDS_FREE_VOICE_DISCLOSURE_VERSION",
+            "HANDS_FREE_VOICE_DISCLOSURE_VERSION",
+            ".commit()",
+        )
     }
 
     @Test
@@ -80,14 +121,15 @@ class MainActivityEmailAccountStaticTest {
         val changed = functionBlock("private fun onGatewayProcessSessionChanged(")
         assertTrue(changed.contains("verifiedEmailActorId"))
         assertTrue(changed.contains("firstRunOnboardingSnapshot = firstRun"))
-        assertTrue(changed.contains("firstRun.isComplete &&"))
+        assertTrue(changed.contains("appliedFirstRun.isComplete &&"))
+        assertTrue(changed.contains("if (firstRunIsStale)"))
         assertTrue(changed.contains("permissionSessionPolicy.authenticationExpired()"))
         assertTrue(changed.contains("updateFirstRunOnboardingUi()"))
     }
 
     @Test
-    fun emailAccountProgressUsesTheActualSixStageFlow() {
-        assertTrue(source.contains("const val EMAIL_FIRST_RUN_STAGE_COUNT = 6"))
+    fun emailAccountProgressUsesTheActualSevenStageFlow() {
+        assertTrue(source.contains("const val EMAIL_FIRST_RUN_STAGE_COUNT = 7"))
 
         val numbering = functionBlock("private fun firstRunStageNumber(")
         assertInOrder(
@@ -95,10 +137,11 @@ class MainActivityEmailAccountStaticTest {
             "FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT -> 1",
             "FirstRunOnboardingStage.ACCOUNT_CREATED -> 2",
             "FirstRunOnboardingStage.VERIFIED_LOGIN -> 3",
-            "FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION -> 4",
-            "FirstRunOnboardingStage.DEVICE_CHECK -> 5",
-            "FirstRunOnboardingStage.FP004_TRAINING -> 6",
-            "FirstRunOnboardingStage.COMPLETE -> 6",
+            "FirstRunOnboardingStage.PURPOSE_AND_SAFETY -> 4",
+            "FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION -> 5",
+            "FirstRunOnboardingStage.DEVICE_CHECK -> 6",
+            "FirstRunOnboardingStage.FP004_TRAINING -> 7",
+            "FirstRunOnboardingStage.COMPLETE -> 7",
         )
 
         val count = functionBlock("private fun firstRunStageCount(")
@@ -119,6 +162,7 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(update.contains("val stageCount = firstRunStageCount(snapshot)"))
         assertTrue(update.contains("\$stageNumber/\${stageCount}단계"))
         assertFalse(update.contains("\$stageNumber/6"))
+        assertFalse(update.contains("\$stageNumber/7"))
     }
 
     @Test
@@ -143,8 +187,10 @@ class MainActivityEmailAccountStaticTest {
         )
 
         val update = functionBlock("private fun updateEmailAccountAccessUi(")
-        assertTrue(update.contains("if (verifiedLogin) accountSignupExpanded = false"))
-        assertTrue(update.contains("val signupVisible = accountSignupExpanded && !verifiedLogin"))
+        assertTrue(update.contains("if (verifiedLogin || reauthenticationRequired)"))
+        assertTrue(update.contains("val reauthenticationRequired ="))
+        assertTrue(update.contains("liveBinding?.actorId == expectedActorId"))
+        assertTrue(update.contains("!reauthenticationRequired"))
         assertTrue(update.contains("accountSignupControls.visibility ="))
         assertTrue(update.contains("accountConsentDisclosureExpanded"))
         assertTrue(update.contains("accountConsentDisclosureText.visibility ="))
@@ -173,6 +219,75 @@ class MainActivityEmailAccountStaticTest {
         val create = functionBlock("private fun createEmailAccount()")
         assertTrue(create.contains("val rememberMe = false"))
         assertFalse(create.contains("val rememberMe = accountRememberMeCheck.isChecked"))
+    }
+
+    @Test
+    fun lostSessionShowsReauthenticationWithoutDiscardingAdvancedProgress() {
+        val sessionChange = functionBlock("private fun onGatewayProcessSessionChanged(")
+        val update = functionBlock("private fun updateEmailAccountAccessUi(")
+        val login = functionBlock("private fun loginEmailAccount(")
+        val sessionAction = functionBlock("private fun onAccountSessionButtonClicked()")
+
+        assertTrue(sessionChange.contains("if (verifiedActorSession == null)"))
+        assertTrue(sessionChange.contains("reporterUserId = null"))
+        assertFalse(sessionChange.contains("firstRunOnboardingSnapshot = FirstRunOnboardingPolicy.initialEmailAccount("))
+        assertTrue(update.contains("currentPostLoginDeviceCheckSessionBinding()"))
+        assertTrue(update.contains("로그인 세션이 만료되었습니다"))
+        assertTrue(update.contains("val credentialFieldsVisible = !onConsentStep"))
+        assertTrue(update.contains("if (credentialFieldsVisible) View.VISIBLE else View.GONE"))
+        assertTrue(update.contains("accountLoginButton.visibility"))
+        assertTrue(update.contains("이전 로그인 상태 정리"))
+        assertTrue(login.contains("mayReauthenticateVerifiedEmailActor"))
+        assertTrue(login.contains("firstRunSnapshot = nextFirstRunSnapshot"))
+        assertTrue(source.contains("onClick = ::onAccountSessionButtonClicked"))
+        assertTrue(sessionAction.contains("preservesAdvancedProgress"))
+        assertTrue(sessionAction.contains("clearGatewaySession("))
+        assertTrue(sessionAction.contains("온보딩 진도는 유지했습니다"))
+        assertFalse(
+            sessionAction.contains(
+                "firstRunOnboardingSnapshot = FirstRunOnboardingPolicy.initialEmailAccount(",
+            ),
+        )
+    }
+
+    @Test
+    fun staleSessionCleanupCannotDiscardDeletionRecoveryOrMaskStorageFailure() {
+        val update = functionBlock("private fun updateEmailAccountAccessUi(")
+        val sessionAction = functionBlock("private fun onAccountSessionButtonClicked()")
+
+        assertTrue(sessionAction.contains("process.deletionRecoveryOnly"))
+        assertTrue(
+            sessionAction.contains(
+                "process.session?.sessionScope == GatewaySessionScope.ACCOUNT_DELETION_RECOVERY",
+            ),
+        )
+        assertTrue(sessionAction.contains("if (process.storageBlocked)"))
+        assertInOrder(
+            sessionAction,
+            "process.deletionRecoveryOnly",
+            "if (process.storageBlocked)",
+            "val preservesAdvancedProgress",
+            "val staleSession = process.session",
+            "clearGatewaySession(",
+        )
+        assertTrue(sessionAction.contains("if (staleSession == null)"))
+        assertTrue(sessionAction.contains("expectedSession = staleSession"))
+        assertTrue(sessionAction.contains("expectedProcessGeneration = process.generation"))
+
+        val clear = functionBlock("private fun clearGatewaySession(")
+        assertTrue(clear.contains("expectedProcessGeneration: Long? = null"))
+        assertTrue(clear.contains("beginGeneralSessionOperationIfCurrent("))
+
+        assertTrue(update.contains("val deletionRecoveryBlocksReauthentication ="))
+        assertTrue(update.contains("val storageBlocksReauthentication ="))
+        assertTrue(update.contains("val staleGeneralSession ="))
+        assertTrue(
+            update.contains(
+                "if (authenticated || staleGeneralSession) View.VISIBLE else View.GONE",
+            ),
+        )
+        assertTrue(update.contains("계정 삭제 복구 전용 로그인이 진행 중입니다"))
+        assertTrue(update.contains("로그인 저장소가 안전 차단 상태입니다"))
     }
 
     private fun assertInOrder(source: String, vararg markers: String) {

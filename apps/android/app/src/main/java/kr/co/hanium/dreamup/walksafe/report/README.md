@@ -15,10 +15,18 @@
 
 `reporter_user_id` metadata는 인증 credential 자체가 아니다. Android가 검증된 actor와 일치하는 Gateway session으로 요청하고 Gateway가 Backend report API로 중계하며, 이 흐름은 공공기관 자동 제출 기능이 아니다.
 
+실패한 전송은 생성 보행 ID나 선택 동의 receipt가 바뀌어도 생성 당시 reporter actor와 현재
+로그인 actor가 정확히 같은 경우에만 현재 서버 확인 receipt로 다시 승인한 다음 정지·일시정지·종료
+전송 기회에 복구한다. actor binding이 없는 v1 queue envelope는 v2에서 전송하지 않는
+fail-closed 자료다. queue에 저장된 생성 시 receipt는 감사 provenance로 유지한다. 자동 신고는 현재
+자동신고 선택을 추가로 확인하고, 정확한
+성공 receipt 후 cooldown을 내구 저장한 뒤에만 queue 원본을 삭제한다.
+
 ## 영속 대기열 활성화 경계
 
-신고 대기열은 승인된 capacity profile이 없는 기본 build에서 비활성이다. 활성 build는 아래
-7개 값을 Gradle property 또는 같은 이름의 environment variable로 모두 전달해야 한다.
+신고 대기열은 승인된 capacity profile이 없는 기본 build에서 비활성이고 release build에서는
+설정값과 무관하게 열리지 않는다. debug 활성 build는 아래 7개 용량 값을 Gradle property 또는 같은
+이름의 environment variable로 모두 전달해야 한다.
 
 - `WALKSAFE_REPORT_QUEUE_ENABLED=true`
 - `WALKSAFE_REPORT_QUEUE_MAX_ENTRIES`
@@ -28,16 +36,28 @@
 - `WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_ENTRIES`
 - `WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES`
 
+queue 전송 origin은 일반 debug 로그인 URL과 별도로
+`WALKSAFE_REPORT_QUEUE_TEST_ORIGIN`에 빌드 시 고정하며, 로그인 session origin이 이 값과 정확히
+일치할 때만 status/POST를 만든다. 지정하지 않으면 `adb reverse tcp:8081 tcp:8081` 시험용
+`http://127.0.0.1:8081`만 승인한다. 다른 HTTPS origin을 시험하려면 빌드 전에 이 값을 명시해야
+하며, 실행 중 URL 입력만으로 queue 전송 대상을 바꿀 수 없다.
+
 자동신고 한도 뒤에는 최대 저장 entry 한 건 이상을 명시 신고용 reserve로 남겨야 한다. total byte는
 평문 image 합이 아니라 queue 내부 암호화 envelope·손상 파일·crash 잔여 regular file의 실제
 content byte를 센다. 안전하게 셀 수 없는 symlink·특수 파일·예상 밖 디렉터리가 있으면 신규
 신고 저장을 거부하고 임의 삭제하지 않는다. 암호화 envelope 생성부터 최종 용량·차단 표식·중복
-ID 확인과 파일 게시까지 같은 storage lock 안에서 수행한다. 동의 철회의 표식·전체 파일 삭제·키
-폐기/재생성도 같은 lock을 사용한다. purge 시작 전에 미완료 consent/account 의도 목록을 담은
+ID 확인과 파일 게시까지 같은 storage lock 안에서 수행한다. account/전체 신고 권한 철회의
+표식·전체 파일 삭제·키 폐기/재생성도 같은 lock을 사용한다. purge 시작 전에 미완료
+consent/account 의도 목록을 담은
 `lifecycle-pending`을 내구화하고, 다음 privacy hook은 기존 의도까지 fence로 복구한다. 조회·복호화,
 receipt/만료 삭제도 같은 OS file lock 안에서 account/consent/pending 표식을 확인한다. 파일 삭제나
 키 lifecycle이 실패하면 pending을 남겨 모든 consent의 신규 저장·조회가 재시도 완료 전까지
 fail-closed된다. account 삭제는 terminal 우선순위라 이후 consent 변경이 새 키를 만들지 않는다.
+
+자동신고 선택 철회는 같은 lock에서 automatic 전용 pending fence를 먼저 내구화하고, queue에 남은
+모든 자동 후보의 생성 receipt를 각각 fence한 뒤 자동 후보만 삭제한다. 중간 실패 시 automatic만
+계속 닫히고 명시 신고와 공유 암호화 키는 보존된다. raw 진단수집·학습·통신 선택 변경은 진행 중
+전송을 재검증하도록 취소하지만 명시 신고 queue를 삭제하지 않는다.
 
 capacity profile이 없는 build도 이전 활성 build의 잔존 자료를 없애기 위한 consent/account privacy
 purge는 실행한다. 비활성 build에서는 신규 저장·조회·만료정리는 storage를 열지 않는다. consent

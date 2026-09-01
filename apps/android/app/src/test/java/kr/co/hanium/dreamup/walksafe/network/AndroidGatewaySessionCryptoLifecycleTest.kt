@@ -5,10 +5,19 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
 import kr.co.hanium.dreamup.walksafe.security.AeadLimits
+import kr.co.hanium.dreamup.walksafe.security.AeadOpenResult
 import kr.co.hanium.dreamup.walksafe.security.AeadSealResult
 import kr.co.hanium.dreamup.walksafe.security.LocalAeadKeyProvider
 import kr.co.hanium.dreamup.walksafe.security.VersionedLocalAead
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingAttemptRequest
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingEvidence
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingEvidenceVerifier
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingFlow
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingPolicy
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingSnapshot
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingStage
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOpaqueActorBinding
+import kr.co.hanium.dreamup.walksafe.session.FirstRunReceiptHash
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -152,6 +161,55 @@ class AndroidGatewaySessionCryptoLifecycleTest {
     }
 
     @Test
+    fun emailPurposeAndSafetyReceiptIsSerializedAndRestoredAroundLocalChecks() {
+        val fixture = Fixture("email-purpose-safety")
+        val store = fixture.store()
+        val deviceId = requireNotNull(store.getOrCreateInstallDeviceId())
+        val completedFirstRun = completedReturningEmailFirstRun()
+        val session = GatewayFieldSession.longLivedSession(
+            gatewayBaseUrl = GATEWAY_ORIGIN,
+            actorId = ACTOR_ID,
+            deviceId = deviceId,
+            familyId = "f".repeat(32),
+            rotation = 0L,
+            cookiePair = "${GatewayFieldSession.COOKIE_NAME}=access-token-00000001",
+            refreshToken = "r".repeat(64),
+            accessExpiresAtEpochMs = NOW_EPOCH_MS + 60_000L,
+            idleExpiresAtEpochMs = NOW_EPOCH_MS + 120_000L,
+            absoluteExpiresAtEpochMs = NOW_EPOCH_MS + 180_000L,
+        )
+
+        assertEquals(
+            GatewaySessionStoreResult.COMMITTED,
+            store.saveInitialIfAbsent(session, completedFirstRun, GATEWAY_ORIGIN),
+        )
+        assertEquals(
+            listOf("VERIFIED_LOGIN", "PURPOSE_AND_SAFETY", "FP004_TRAINING"),
+            fixture.persistedEvidenceStages(),
+        )
+
+        val restored = requireNotNull(
+            fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS),
+        )
+        assertEquals(FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4, restored.firstRunSnapshot.flow)
+        assertTrue(restored.firstRunSnapshot.isComplete)
+        assertEquals(
+            setOf(
+                FirstRunOnboardingStage.VERIFIED_LOGIN,
+                FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
+                FirstRunOnboardingStage.FP004_TRAINING,
+            ),
+            restored.firstRunSnapshot.completedReceiptHashes.keys,
+        )
+        assertEquals(
+            receipt(2),
+            restored.firstRunSnapshot.completedReceiptHashes[
+                FirstRunOnboardingStage.PURPOSE_AND_SAFETY
+            ],
+        )
+    }
+
+    @Test
     fun incompleteV3StateFailsClosedInsteadOfBecomingEmailV4() {
         val fixture = Fixture("v3-incomplete")
         val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
@@ -185,6 +243,23 @@ class AndroidGatewaySessionCryptoLifecycleTest {
             v3SessionAead = v3SessionAead,
             legacySessionAead = legacyAead,
         )
+
+        fun persistedEvidenceStages(): List<String> {
+            val envelope = requireNotNull(preferences.getString(V4_STATE_PREF_KEY, null))
+            val plaintext =
+                (sessionAead.open(envelope, STATE_AAD, STATE_LIMITS) as AeadOpenResult.Opened)
+                    .plaintext
+            return try {
+                val evidence = JSONObject(String(plaintext, Charsets.UTF_8))
+                    .getJSONObject("first_run")
+                    .getJSONArray("ordered_evidence")
+                List(evidence.length()) { index ->
+                    evidence.getJSONObject(index).getString("stage")
+                }
+            } finally {
+                plaintext.fill(0)
+            }
+        }
 
         fun storeV3Active(deviceId: String, evidenceCount: Int) {
             val evidence = legacyEvidence().take(evidenceCount)
@@ -297,6 +372,51 @@ class AndroidGatewaySessionCryptoLifecycleTest {
             KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
     }
 
+    private fun completedReturningEmailFirstRun(): FirstRunOnboardingSnapshot {
+        val loggedIn = FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
+            snapshot = FirstRunOnboardingPolicy.initialEmailAccount(10L),
+            actorBinding = FirstRunOpaqueActorBinding.fromProvider(ACTOR_ID),
+            receiptHash = receipt(1),
+        ).current
+        val safety = FirstRunOnboardingPolicy.acknowledgePurposeAndSafety(
+            snapshot = loggedIn,
+            request = request(loggedIn),
+            receiptHash = receipt(2),
+        ).current
+        val jit = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            snapshot = safety,
+            expectedEpoch = safety.epoch,
+            expectedRevision = safety.revision,
+        ).current
+        val device = FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(
+            snapshot = jit,
+            expectedEpoch = jit.epoch,
+            expectedRevision = jit.revision,
+        ).current
+        val started = FirstRunOnboardingPolicy.beginAttempt(device, request(device)).current
+        return FirstRunOnboardingPolicy.completeAttempt(
+            snapshot = started,
+            token = requireNotNull(started.pendingAttempt),
+            evidence = FirstRunOnboardingEvidence.Fp004Training(receipt(3)),
+            verifier = FirstRunOnboardingEvidenceVerifier { _, _ -> true },
+        ).current
+    }
+
+    private fun request(snapshot: FirstRunOnboardingSnapshot): FirstRunOnboardingAttemptRequest {
+        val suffix =
+            "${snapshot.epoch.toString(16)}" +
+                "${snapshot.revision.toString(16)}" +
+                snapshot.stage.ordinal.toString(16)
+        return FirstRunOnboardingAttemptRequest.forSnapshot(
+            snapshot = snapshot,
+            requestId = "req_${suffix.padStart(64, 'a')}",
+            attemptId = "att_${suffix.padStart(64, 'b')}",
+        )
+    }
+
+    private fun receipt(number: Int): FirstRunReceiptHash =
+        FirstRunReceiptHash.fromSha256Hex(number.toString(16).padStart(64, '0'))
+
     private class FakeSharedPreferences : SharedPreferences {
         private val values = linkedMapOf<String, Any?>()
 
@@ -359,6 +479,9 @@ class AndroidGatewaySessionCryptoLifecycleTest {
         const val NOW_EPOCH_MS = 1_000_000L
         val V3_STATE_AAD =
             "kr.co.hanium.dreamup.walksafe|USER|gateway-session|payload=3"
+                .toByteArray(Charsets.UTF_8)
+        val STATE_AAD =
+            "kr.co.hanium.dreamup.walksafe|USER|gateway-session|payload=4"
                 .toByteArray(Charsets.UTF_8)
         val STATE_LIMITS = AeadLimits(
             maxPlaintextBytes = 20_480,

@@ -28,6 +28,24 @@ class MainActivityIntegratedConsentStaticTest {
 
         assertTrue(refresh.contains("bootstrapOnMissing = true"))
         assertTrue(refresh.contains("session = gatewaySession"))
+        assertTrue(refresh.contains("integratedConsentRefreshSessionOrNull()"))
+        assertFalse(refresh.contains("gatewaySessionOrNull("))
+        val refreshSession = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun integratedConsentRefreshSessionOrNull",
+        )
+        assertTrue(refreshSession.contains("isGatewaySessionReadyForCurrentActor(session)"))
+        assertTrue(refreshSession.contains("FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4"))
+        assertTrue(refreshSession.contains("!it.isComplete"))
+        assertTrue(refreshSession.contains("verifiedActorBinding?.value"))
+        assertTrue(refreshSession.contains("processSnapshot.session === session"))
+        assertTrue(refreshSession.contains("!processSnapshot.storageBlocked"))
+        assertTrue(refreshSession.contains("!processSnapshot.deletionRecoveryOnly"))
+        assertTrue(refreshSession.contains("GatewaySessionScope.GENERAL"))
+        assertTrue(refreshSession.contains("GatewaySessionVerificationState.VERIFIED"))
+        assertTrue(refreshSession.contains("session.isUsableFor(onboardingActorId)"))
+        assertTrue(refreshSession.contains("session.gatewayBaseUrl == configuredGatewayOriginOrNull()"))
+        assertTrue(refreshSession.contains("clearGatewaySession("))
         assertTrue(bootstrap.contains("isCurrentGatewaySession(gatewaySession)"))
         assertTrue(bootstrap.contains("bootstrap.clientRevisionFloor"))
         assertTrue(bootstrap.contains("bootstrap.expectedPreviousBackendReceiptSha256"))
@@ -77,13 +95,14 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(controls.contains("PAUSED"))
         assertTrue(controls.contains("END는 자동 전송"))
         assertTrue(controls.contains("영상·음성·이미지·정확한 위치"))
-        assertTrue(controls.contains("본인인증이나 공적 연령 인증이 아닙니다"))
+        assertTrue(controls.contains("본인인증이나 공적 연령 인증이 아니"))
         assertTrue(controls.contains("거부하면"))
-        assertTrue(controls.contains("출시 전 처리방침/약관 URL 확정 필요"))
+        assertFalse(controls.contains("출시 전 처리방침/약관 URL 확정 필요"))
         assertTrue(controls.contains("contentDescription = accountConsentDisclosure"))
         assertTrue(controls.contains("textSize = 18f"))
         assertTrue(controls.contains("View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
-        assertTrue(source.contains("[선택] 신고·진단용 raw v2 자료 처리 동의"))
+        assertTrue(source.contains("[선택] 원본·진단수집 raw v2 자료 처리 동의"))
+        assertTrue(controls.contains("직접 신고에는 영향이 없습니다"))
     }
 
     @Test
@@ -96,18 +115,19 @@ class MainActivityIntegratedConsentStaticTest {
             ReportStaticSourceInspector.appearsInOrder(
                 process,
                 "integratedConsentSession.currentConfirmationOrNull()",
-                "!consentConfirmation.selections.rawSourceCollection",
                 "!explicitRequest && !consentConfirmation.selections.automaticReporting",
                 "reportQueueStore.enqueue(",
             ),
         )
+        assertFalse(process.contains("rawSourceCollection"))
 
         val capture = ReportStaticSourceInspector.functionBlock(
             source,
-            "private fun captureReportQueueDrainTriggerBeforeTransition",
+            "private fun buildReportQueueDrainTrigger",
         )
         assertTrue(capture.contains("reportPrivacyConsentSession.isGranted()"))
         assertTrue(capture.contains("integratedConsentSession.currentConfirmationOrNull("))
+        assertFalse(capture.contains("IntegratedConsentItem.RAW_SOURCE_COLLECTION"))
         assertTrue(capture.contains("AndroidNetworkTransferPolicy.isAllowed("))
         assertTrue(capture.contains("currentIntegratedConsentBinding() ?: return null"))
 
@@ -118,6 +138,7 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(context.contains("currentConfirmation == trigger.consentConfirmation"))
         assertTrue(context.contains("trigger.networkBinding.isSameNetworkBinding(currentBinding)"))
         assertTrue(context.contains("AndroidNetworkTransferPolicy.isAllowed("))
+        assertFalse(context.contains("IntegratedConsentItem.RAW_SOURCE_COLLECTION"))
 
         val coordinator = File(
             "src/main/java/kr/co/hanium/dreamup/walksafe/report/" +

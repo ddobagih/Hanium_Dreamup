@@ -342,12 +342,16 @@ data class FirstRunOnboardingSnapshot internal constructor(
                 return signupPrefix.take(2).toSet()
             }
             val completedPostLogin = when (stage) {
+                FirstRunOnboardingStage.PURPOSE_AND_SAFETY -> emptySet()
                 FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
                 FirstRunOnboardingStage.DEVICE_CHECK,
                 FirstRunOnboardingStage.FP004_TRAINING,
-                -> emptySet()
+                -> setOf(FirstRunOnboardingStage.PURPOSE_AND_SAFETY)
                 FirstRunOnboardingStage.COMPLETE ->
-                    setOf(FirstRunOnboardingStage.FP004_TRAINING)
+                    setOf(
+                        FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
+                        FirstRunOnboardingStage.FP004_TRAINING,
+                    )
                 else -> return null
             }
             val signupCompleted = signupPrefix.toSet() + completedPostLogin
@@ -528,7 +532,8 @@ object FirstRunOnboardingPolicy {
     /**
      * A verified password session is valid either after account creation or as returning-user
      * login. The returning-user path intentionally records no synthetic email-OTP/account-create
-     * evidence and proceeds directly to JIT permission observation.
+     * evidence. Both paths require an explicit purpose-and-safety acknowledgement before JIT
+     * permission observation.
      */
     fun recordVerifiedEmailLogin(
         snapshot: FirstRunOnboardingSnapshot,
@@ -554,7 +559,7 @@ object FirstRunOnboardingPolicy {
             snapshot,
             snapshot.copy(
                 revision = snapshot.revision + 1L,
-                stage = FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+                stage = FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
                 ageBand = FirstRunAgeBand.VERIFIED_14_PLUS,
                 completedReceiptHashes = receipts,
                 verifiedActorBinding = actorBinding,
@@ -562,6 +567,21 @@ object FirstRunOnboardingPolicy {
             ),
         )
     }
+
+    fun mayReauthenticateVerifiedEmailActor(
+        snapshot: FirstRunOnboardingSnapshot,
+        actorBinding: FirstRunOpaqueActorBinding,
+    ): Boolean =
+        snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 &&
+            snapshot.stage in setOf(
+                FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
+                FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+                FirstRunOnboardingStage.DEVICE_CHECK,
+                FirstRunOnboardingStage.FP004_TRAINING,
+                FirstRunOnboardingStage.COMPLETE,
+            ) &&
+            snapshot.pendingAttempt == null &&
+            snapshot.verifiedActorBinding == actorBinding
 
     fun recordEmailJitPermissionObservation(
         snapshot: FirstRunOnboardingSnapshot,
@@ -945,7 +965,11 @@ object FirstRunOnboardingPolicy {
             FirstRunOnboardingStage.ACCOUNT_CREATED ->
                 FirstRunOnboardingStage.VERIFIED_LOGIN
             FirstRunOnboardingStage.PURPOSE_AND_SAFETY ->
-                FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED
+                if (snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4) {
+                    FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION
+                } else {
+                    FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED
+                }
             FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED ->
                 if (ageBand == FirstRunAgeBand.UNDER_14) {
                     FirstRunOnboardingStage.BLOCKED_UNDER_14

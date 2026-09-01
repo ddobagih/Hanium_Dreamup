@@ -86,11 +86,39 @@ internal object GatewaySessionProcessCoordinator {
         snapshotLocked()
     }
 
-    fun beginOperation(): GatewaySessionOperation? {
+    fun beginOperation(): GatewaySessionOperation? =
+        beginOperationMatching(
+            expectedGeneration = null,
+            expectedGeneralSession = null,
+        )
+
+    fun beginGeneralSessionOperationIfCurrent(
+        expectedGeneration: Long,
+        expectedSession: GatewayFieldSession,
+    ): GatewaySessionOperation? =
+        beginOperationMatching(
+            expectedGeneration = expectedGeneration,
+            expectedGeneralSession = expectedSession,
+        )
+
+    private fun beginOperationMatching(
+        expectedGeneration: Long?,
+        expectedGeneralSession: GatewayFieldSession?,
+    ): GatewaySessionOperation? {
         val operation: GatewaySessionOperation
         val notification: Notification
         synchronized(lock) {
             if (inFlightOperation != null) return null
+            if (
+                expectedGeneration != null &&
+                (
+                    generation != expectedGeneration ||
+                        currentSession !== expectedGeneralSession ||
+                        expectedGeneralSession?.sessionScope != GatewaySessionScope.GENERAL ||
+                        storageBlocked ||
+                        deletionRecoveryOnly
+                    )
+            ) return null
             operation = GatewaySessionOperation(
                 generation = advanceGenerationLocked(),
                 operationId = UUID.randomUUID().toString(),
@@ -159,6 +187,46 @@ internal object GatewaySessionProcessCoordinator {
             notification = notificationLocked()
         }
         notification.deliver()
+        return true
+    }
+
+    /**
+     * Publishes newer first-run progress without changing the authenticated session generation.
+     *
+     * Device-check evidence is bound to the session generation, so a local onboarding transition
+     * must not look like a credential replacement. Older or actor-mismatched progress is rejected.
+     */
+    fun updateFirstRunSnapshot(
+        expectedGeneration: Long,
+        expectedActorId: String,
+        firstRunSnapshot: FirstRunOnboardingSnapshot,
+    ): Boolean {
+        if (
+            expectedActorId.isBlank() ||
+            firstRunSnapshot.verifiedActorBinding?.value != expectedActorId
+        ) return false
+        val notification: Notification?
+        synchronized(lock) {
+            val session = currentSession ?: return false
+            if (
+                generation != expectedGeneration ||
+                inFlightOperation != null ||
+                storageBlocked ||
+                deletionRecoveryOnly ||
+                session.verificationState != GatewaySessionVerificationState.VERIFIED ||
+                session.sessionScope != GatewaySessionScope.GENERAL ||
+                session.actorId != expectedActorId ||
+                !session.isUsableFor(expectedActorId)
+            ) return false
+            val current = restoredFirstRunSnapshot
+            if (current == firstRunSnapshot) return true
+            if (!mayReplaceFirstRunSnapshot(current, firstRunSnapshot, expectedActorId)) {
+                return false
+            }
+            restoredFirstRunSnapshot = firstRunSnapshot
+            notification = notificationLocked()
+        }
+        notification?.deliver()
         return true
     }
 
@@ -291,6 +359,19 @@ internal object GatewaySessionProcessCoordinator {
         return generation
     }
 
+    private fun mayReplaceFirstRunSnapshot(
+        current: FirstRunOnboardingSnapshot?,
+        candidate: FirstRunOnboardingSnapshot,
+        expectedActorId: String,
+    ): Boolean {
+        if (current == null) return true
+        val currentActorId = current.verifiedActorBinding?.value
+        if (currentActorId != null && currentActorId != expectedActorId) return false
+        if (currentActorId == expectedActorId && current.flow != candidate.flow) return false
+        return candidate.epoch > current.epoch ||
+            (candidate.epoch == current.epoch && candidate.revision > current.revision)
+    }
+
     private fun snapshotLocked(): GatewaySessionProcessSnapshot =
         GatewaySessionProcessSnapshot(
             session = currentSession,
@@ -323,11 +404,17 @@ internal object GatewaySessionProcessCoordinator {
         private val deliveryLock = Any()
         private var active = true
         private var lastDeliveredGeneration = -1L
+        private var lastDeliveredFirstRunSnapshot: FirstRunOnboardingSnapshot? = null
 
         fun deliver(snapshot: GatewaySessionProcessSnapshot) {
             synchronized(deliveryLock) {
-                if (!active || snapshot.generation <= lastDeliveredGeneration) return
+                if (!active || snapshot.generation < lastDeliveredGeneration) return
+                if (
+                    snapshot.generation == lastDeliveredGeneration &&
+                    snapshot.restoredFirstRunSnapshot == lastDeliveredFirstRunSnapshot
+                ) return
                 lastDeliveredGeneration = snapshot.generation
+                lastDeliveredFirstRunSnapshot = snapshot.restoredFirstRunSnapshot
                 runCatching { subscriber(snapshot) }
             }
         }

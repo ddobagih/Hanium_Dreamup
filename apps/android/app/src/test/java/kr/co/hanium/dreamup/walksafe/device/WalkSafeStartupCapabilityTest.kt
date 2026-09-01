@@ -26,6 +26,7 @@ class WalkSafeStartupCapabilityTest {
         assertEquals(WalkSafeStartupCapabilityTier.LIMITED, decision.tier)
         assertTrue(decision.mayConfirmAndStart)
         assertEquals(WALKSAFE_LIMITED_DISTANCE_NOTICE_KO, decision.noticeKo)
+        assertTrue(decision.noticeKo.contains(WalkSafeStartupRequirement.METRIC_DISTANCE.labelKo))
         assertEquals(
             listOf(WalkSafeStartupRequirement.METRIC_DISTANCE),
             decision.unavailableRequirements,
@@ -49,7 +50,16 @@ class WalkSafeStartupCapabilityTest {
             listOf(WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE),
             unapproved.unavailableRequirements,
         )
+        assertTrue(
+            unapproved.noticeKo.contains(
+                WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE.labelKo,
+            ),
+        )
         assertEquals(WalkSafeStartupCapabilityTier.LIMITED, unversioned.tier)
+        assertEquals(
+            listOf(WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE),
+            unversioned.unavailableRequirements,
+        )
     }
 
     @Test
@@ -72,32 +82,69 @@ class WalkSafeStartupCapabilityTest {
     }
 
     @Test
-    fun everyUnavailableCoreCapabilityBlocksStart() {
-        val unavailableInputs = listOf(
-            availableInput().copy(androidVersionSupported = false),
-            availableInput().copy(cameraAvailable = false),
-            availableInput().copy(microphoneAvailable = false),
-            availableInput().copy(vibrationAvailable = false),
-            availableInput().copy(onDeviceSpeechRecognitionAvailable = false),
-            availableInput().copy(offlineKoreanTextToSpeechAvailable = false),
-        )
-
-        unavailableInputs.forEach { input ->
-            val decision = WalkSafeStartupCapabilityResolver.resolve(input)
-            assertEquals(WalkSafeStartupCapabilityTier.BLOCKED, decision.tier)
-            assertFalse(decision.mayConfirmAndStart)
-            assertTrue(decision.unavailableRequirements.isNotEmpty())
-        }
-    }
-
-    @Test
-    fun unavailableGpsFallsBackToCameraOnlyLimitedModeIsRejected() {
+    fun unsupportedAndroidVersionBlocksStartAndPreservesEveryKnownFailure() {
         val decision = WalkSafeStartupCapabilityResolver.resolve(
-            availableInput().copy(gpsAvailable = false),
+            availableInput().copy(
+                androidVersionSupported = false,
+                cameraAvailable = false,
+                gpsAvailable = false,
+            ),
         )
 
         assertEquals(WalkSafeStartupCapabilityTier.BLOCKED, decision.tier)
         assertFalse(decision.mayConfirmAndStart)
+        assertEquals(
+            listOf(
+                WalkSafeStartupRequirement.ANDROID_VERSION,
+                WalkSafeStartupRequirement.CAMERA,
+                WalkSafeStartupRequirement.GPS,
+            ),
+            decision.unavailableRequirements,
+        )
+        decision.unavailableRequirements.forEach { requirement ->
+            assertTrue(decision.noticeKo.contains(requirement.labelKo))
+        }
+    }
+
+    @Test
+    fun everyUnavailableFeatureYieldsLimitedTierAndNamesTheRestriction() {
+        val unavailableInputs = listOf(
+            WalkSafeStartupRequirement.CAMERA to availableInput().copy(cameraAvailable = false),
+            WalkSafeStartupRequirement.GPS to availableInput().copy(gpsAvailable = false),
+            WalkSafeStartupRequirement.MICROPHONE to
+                availableInput().copy(microphoneAvailable = false),
+            WalkSafeStartupRequirement.VIBRATION to
+                availableInput().copy(vibrationAvailable = false),
+            WalkSafeStartupRequirement.ON_DEVICE_STT to
+                availableInput().copy(onDeviceSpeechRecognitionAvailable = false),
+            WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS to
+                availableInput().copy(offlineKoreanTextToSpeechAvailable = false),
+            WalkSafeStartupRequirement.METRIC_DISTANCE to
+                availableInput().copy(metricDistanceAvailable = false),
+            WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE to availableInput().copy(
+                approvedDesignatedDeviceProfile = false,
+                designatedDeviceProfileVersion = null,
+            ),
+        )
+
+        unavailableInputs.forEach { (requirement, input) ->
+            val decision = WalkSafeStartupCapabilityResolver.resolve(input)
+            assertEquals(WalkSafeStartupCapabilityTier.LIMITED, decision.tier)
+            assertTrue(decision.mayConfirmAndStart)
+            assertEquals(listOf(requirement), decision.unavailableRequirements)
+            assertTrue(decision.pendingRequirements.isEmpty())
+            assertTrue(decision.noticeKo.contains(requirement.labelKo))
+        }
+    }
+
+    @Test
+    fun unavailableGpsYieldsLimitedTier() {
+        val decision = WalkSafeStartupCapabilityResolver.resolve(
+            availableInput().copy(gpsAvailable = false),
+        )
+
+        assertEquals(WalkSafeStartupCapabilityTier.LIMITED, decision.tier)
+        assertTrue(decision.mayConfirmAndStart)
         assertEquals(
             listOf(WalkSafeStartupRequirement.GPS),
             decision.unavailableRequirements,
@@ -128,7 +175,7 @@ class WalkSafeStartupCapabilityTest {
     }
 
     @Test
-    fun knownCoreFailureIsExplainedWithoutWaitingForOtherProbes() {
+    fun knownFeatureFailureRemainsVisibleWhileOtherProbesArePending() {
         val decision = WalkSafeStartupCapabilityResolver.resolve(
             availableInput().copy(
                 cameraAvailable = false,
@@ -140,7 +187,42 @@ class WalkSafeStartupCapabilityTest {
         assertEquals(WalkSafeStartupCapabilityTier.BLOCKED, decision.tier)
         assertFalse(decision.mayConfirmAndStart)
         assertTrue(decision.noticeKo.contains("카메라"))
-        assertTrue(decision.pendingRequirements.isNotEmpty())
+        assertEquals(
+            listOf(WalkSafeStartupRequirement.CAMERA),
+            decision.unavailableRequirements,
+        )
+        assertEquals(
+            listOf(
+                WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS,
+                WalkSafeStartupRequirement.METRIC_DISTANCE,
+            ),
+            decision.pendingRequirements,
+        )
+    }
+
+    @Test
+    fun multipleUnavailableFeaturesAreAllPreservedAndNamed() {
+        val decision = WalkSafeStartupCapabilityResolver.resolve(
+            availableInput().copy(
+                cameraAvailable = false,
+                microphoneAvailable = false,
+                vibrationAvailable = false,
+                metricDistanceAvailable = false,
+            ),
+        )
+        val expectedUnavailable = listOf(
+            WalkSafeStartupRequirement.CAMERA,
+            WalkSafeStartupRequirement.MICROPHONE,
+            WalkSafeStartupRequirement.VIBRATION,
+            WalkSafeStartupRequirement.METRIC_DISTANCE,
+        )
+
+        assertEquals(WalkSafeStartupCapabilityTier.LIMITED, decision.tier)
+        assertTrue(decision.mayConfirmAndStart)
+        assertEquals(expectedUnavailable, decision.unavailableRequirements)
+        expectedUnavailable.forEach { requirement ->
+            assertTrue(decision.noticeKo.contains(requirement.labelKo))
+        }
     }
 
     @Test

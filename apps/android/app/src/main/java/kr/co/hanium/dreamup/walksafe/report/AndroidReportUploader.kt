@@ -131,11 +131,16 @@ internal class AndroidReportUploader internal constructor() {
         consentConfirmation: IntegratedConsentConfirmation,
         networkBinding: IntegratedConsentNetworkBinding,
         report: QueuedReport,
+        approvedGatewayOrigin: String,
     ): CancellableNetworkCall<ReportQueueReceipt> {
+        require(report.reporterActorId == session.actorId) {
+            "queued report actor id does not match verified session"
+        }
         require(
-            consentConfirmation.backendConsentReceiptSha256 ==
-                report.consentReceiptSha256,
-        )
+            approvedReportQueueGatewayOriginOrNull(session.gatewayBaseUrl) ==
+                approvedGatewayOrigin &&
+                approvedGatewayOrigin == session.gatewayBaseUrl,
+        ) { "queued report gateway origin is not build-approved" }
         val purpose = report.priority.toTransferPurpose()
         return reportTransportCall(
             permit = permit,
@@ -145,7 +150,7 @@ internal class AndroidReportUploader internal constructor() {
             purpose = purpose,
             report = report,
             requestMethod = "POST",
-            endpoint = session.gatewayBaseUrl.trimEnd('/') + "/api/reports/v2",
+            endpoint = approvedGatewayOrigin + "/api/reports/v2",
         ) { connection, cancellation ->
             val boundary = "----walksafe-${System.currentTimeMillis()}"
             connection.doOutput = true
@@ -178,11 +183,16 @@ internal class AndroidReportUploader internal constructor() {
         consentConfirmation: IntegratedConsentConfirmation,
         networkBinding: IntegratedConsentNetworkBinding,
         report: QueuedReport,
+        approvedGatewayOrigin: String,
     ): CancellableNetworkCall<ReportQueueReceipt?> {
+        require(report.reporterActorId == session.actorId) {
+            "queued report actor id does not match verified session"
+        }
         require(
-            consentConfirmation.backendConsentReceiptSha256 ==
-                report.consentReceiptSha256,
-        )
+            approvedReportQueueGatewayOriginOrNull(session.gatewayBaseUrl) ==
+                approvedGatewayOrigin &&
+                approvedGatewayOrigin == session.gatewayBaseUrl,
+        ) { "queued report gateway origin is not build-approved" }
         val purpose = report.priority.toTransferPurpose()
         return reportTransportCall(
             permit = permit,
@@ -192,7 +202,7 @@ internal class AndroidReportUploader internal constructor() {
             purpose = purpose,
             report = report,
             requestMethod = "GET",
-            endpoint = session.gatewayBaseUrl.trimEnd('/') +
+            endpoint = approvedGatewayOrigin +
                 "/api/reports/v2/${report.payload.reportId}/status",
         ) { connection, cancellation ->
             val response = connection.readBoundedResponse(REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation)

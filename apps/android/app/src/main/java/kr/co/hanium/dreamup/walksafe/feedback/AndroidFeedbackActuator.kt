@@ -41,6 +41,8 @@ data class RiskFeedbackDispatchResult(
 class AndroidFeedbackActuator(
     context: Context,
     private val onOfflineKoreanSpeechUnavailable: () -> Unit = {},
+    private val speechAllowed: () -> Boolean = { true },
+    private val hapticAllowed: () -> Boolean = { true },
 ) : TextToSpeech.OnInitListener, Closeable {
     private val appContext = context.applicationContext
     private val audioManager = appContext.getSystemService(AudioManager::class.java)
@@ -210,6 +212,11 @@ class AndroidFeedbackActuator(
 
     fun vibrateRiskOnly(action: FeedbackAction): Boolean = vibrate(action.vibrationPatternMs)
 
+    /** Short, distinct haptics announce when voice recognition starts and stops listening. */
+    fun playVoiceListeningStartVibration(): Boolean = vibrate(longArrayOf(0L, 35L))
+
+    fun playVoiceListeningEndVibration(): Boolean = vibrate(longArrayOf(0L, 35L, 45L, 35L))
+
     fun playRouteGuidancePausedVibration(): Boolean = vibrate(longArrayOf(0L, 120L))
 
     fun playRouteDeviationConfirmedVibration(): Boolean =
@@ -346,6 +353,18 @@ class AndroidFeedbackActuator(
         onFailed = onFailed,
     )
 
+    fun speakExplicitConfirmation(
+        message: String,
+        onCompleted: () -> Unit,
+        onFailed: () -> Unit,
+    ): NavigationSpeechDispatchResult = speak(
+        message = message,
+        priority = SpeechPriority.INTERACTION,
+        onCompleted = onCompleted,
+        onFailed = onFailed,
+        requiresExplicitTerminalCallback = true,
+    )
+
     fun speakPriorityUserTraining(
         message: String,
         onCompleted: () -> Unit,
@@ -376,6 +395,10 @@ class AndroidFeedbackActuator(
 
     fun isAppSpeechIdleForExternalAdvisory(): Boolean =
         synchronized(pendingUtterances) { pendingUtterances.isEmpty() }
+
+    /** Includes queued and currently playing app-owned TTS so microphone decoders can pause. */
+    fun isAppSpeechActive(): Boolean =
+        synchronized(pendingUtterances) { pendingUtterances.isNotEmpty() }
 
     /** Stops ordinary queued speech before STT, but never lets STT interrupt an active risk alert. */
     fun prepareForSpeechRecognition(): Boolean {
@@ -469,6 +492,7 @@ class AndroidFeedbackActuator(
         requiresExplicitTerminalCallback: Boolean = false,
     ): NavigationSpeechDispatchResult {
         if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
+        if (!speechAllowed()) return NavigationSpeechDispatchResult.UNAVAILABLE
         when (ttsState) {
             TtsState.INITIALIZING -> {
                 // Navigation owns an explicit speech-ack state machine and must be retried there
@@ -505,7 +529,9 @@ class AndroidFeedbackActuator(
 
     private fun flushPendingSpeech() {
         pendingSpeechQueue.drainPriorityOrder().forEach { pending ->
-            speakReady(pending.message, pending.priority, riskRank = pending.riskRank)
+            if (speechAllowed()) {
+                speakReady(pending.message, pending.priority, riskRank = pending.riskRank)
+            }
         }
     }
 
@@ -631,6 +657,7 @@ class AndroidFeedbackActuator(
         patternMs: LongArray?,
         cancelPriorityUserTraining: Boolean = true,
     ): Boolean {
+        if (!hapticAllowed()) return false
         if (cancelPriorityUserTraining) {
             cancelPriorityUserTrainingVibration(notifyFailure = true)
         }

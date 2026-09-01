@@ -6,7 +6,7 @@ WalkSafe의 일반 사용자용 정식 제품 후보입니다. 카메라로 가�
 
 EPIC-01 1차 시작 gate는 Android 12+, 카메라, GPS, 마이크, 진동, 온디바이스 STT와 오프라인 한국어 TTS를 확인한다. `FULL`은 안정적인 live ARCore 미터 거리와 승인된 지정 기기 프로필·비어 있지 않은 프로필 버전이 모두 있어야 하며 현재는 허용하지 않는다. 시작 제한 고지는 TTS 완료 또는 TalkBack 전달 뒤에만 확인되고, STT/TTS의 구조적 실행 실패는 확인·경로를 무효화해 카메라·위치·걸음·방향 출력을 안전중지한다. 앱 재개와 권한 callback도 확인 없이는 센서를 다시 시작하지 않는다.
 
-FP-004 최초 사용 경계는 전맹·저시력 사용자를 같은 우선순위로 두고 화면읽기·큰 글자·고대비 상태를 표시한다. 먼저 교육 대상 로그인 ID를 선택하며 교육 상태는 정규화 ID의 SHA-256으로 분리한 계정별 앱 전용 프로필에 저장한다. 프로필을 바꾸기 전에는 계정별 무효화 표식을 동기식으로 저장하고, 새 스냅샷과 표식 해제를 한 커밋으로 확정한다. 두 번째 커밋이 실패하면 무효화 표식이 남아 다음 실행에서도 과거 완료 상태를 복원하지 않으며, 첫 표식 저장 자체가 실패하면 변경을 수락하지 않고 현재 실행을 차단한다. 소유자를 증명할 수 없는 이전 전역 교육 상태는 어떤 계정에도 이관하지 않는다. 만 14세 미만과 보호자 확인이 없는 만 18세 미만 계정은 활성화하지 않는다. 성인 사용자는 안전 제한을 들은 뒤 실제 도로가 아닌 장소를 확인하고 위험 안내·일시정지·재개·안전정지 네 동작을 순서대로 직접 연습해야 첫 보행을 시작할 수 있다. 위험 안내 확인은 연습 상태를 다음 단계로 전이하되 실제 보행 상태는 `ACTIVE`로 유지하고, 일시정지·재개·안전정지는 센서 없는 연습 상태에서 제품 보행 생명주기 전이를 실행한다. 안내 또는 연습 음성은 TTS 재생 종료가 확인돼야 하며, 연습은 진동 요청이 수락되고 비반복 패턴 시간이 지난 뒤에만 완료로 기록한다. 이는 실제 기기의 물리 진동 전달을 입증하는 정식 시험이 아니다. 교육 완료 기록은 해당 계정에서 앱 재시작 뒤 보존하지만 이전 보행·경로는 복원하지 않으며, 계정 전환·로그아웃·필수 채널 상실 시 진행 중 연습을 폐기하고 필요한 경우 활성 보행을 안전정지한다. 보호자 본인확인 공급자와 실제 전맹·저시력·초보 사용자 시험은 아직 연결하지 않았으므로 내부 구현 근거가 정식 접근성 PASS를 뜻하지 않는다.
+FP-004 최초 사용 경계는 전맹·저시력 사용자를 같은 우선순위로 두고 화면읽기·큰 글자·고대비 상태를 표시한다. 교육 상태는 검증된 로그인 계정 ID의 SHA-256으로 분리한 계정별 앱 전용 프로필에 저장한다. 프로필을 바꾸기 전에는 계정별 무효화 표식을 동기식으로 저장하고, 새 스냅샷과 표식 해제를 한 커밋으로 확정한다. 두 번째 커밋이 실패하면 무효화 표식이 남아 다음 실행에서도 과거 완료 상태를 복원하지 않으며, 첫 표식 저장 자체가 실패하면 변경을 수락하지 않고 현재 실행을 차단한다. 소유자를 증명할 수 없는 이전 전역 교육 상태는 어떤 계정에도 이관하지 않는다. 현재 `EMAIL_ACCOUNT_V4` 가입은 사용자가 입력한 생년월일을 서울 날짜 기준으로 계산해 만 14세 미만이면 서버가 이메일 OTP 발급 전에 차단한다. 만 14세 이상은 보호자 확인 없이 이메일 OTP로 가입하고 로그인하며, 이 자기입력 방식은 본인·명의·공적 연령 인증이 아니다. 과거 `LEGACY_PHONE_V3`의 14~17세 보호자 게이트는 현행 가입 경로에서 사용하지 않는다. 만 14세 이상 사용자는 안전 제한을 들은 뒤 실제 도로가 아닌 장소를 확인하고 위험 안내·일시정지·재개·안전정지 네 동작을 순서대로 직접 연습해야 첫 보행을 시작할 수 있다. 위험 안내 확인은 연습 상태를 다음 단계로 전이하되 실제 보행 상태는 `ACTIVE`로 유지하고, 일시정지·재개·안전정지는 센서 없는 연습 상태에서 제품 보행 생명주기 전이를 실행한다. 안내 또는 연습 음성은 TTS 재생 종료가 확인돼야 하며, 연습은 진동 요청이 수락되고 비반복 패턴 시간이 지난 뒤에만 완료로 기록한다. 이는 실제 기기의 물리 진동 전달을 입증하는 정식 시험이 아니다. 교육 완료 기록은 해당 계정에서 앱 재시작 뒤 보존하지만 이전 보행·경로는 복원하지 않으며, 계정 전환·로그아웃·필수 채널 상실 시 진행 중 연습을 폐기하고 필요한 경우 활성 보행을 안전정지한다. 실제 전맹·저시력·초보 사용자 시험은 아직 끝나지 않았으므로 내부 구현 근거가 정식 접근성 PASS를 뜻하지 않는다.
 
 ## 사용자 문서 후보
 
@@ -116,6 +116,10 @@ axis-aligned bbox만으로 점자블록의 지리 좌표나 실제 연결망을 
 
 ## Android native 음성 길안내
 
+- 전경 `ACTIVE` 보행에서는 Vosk Android `0.3.75`와 hash-pinned `vosk-model-small-ko-0.22` 하나가 16kHz mono PCM16 스트림에서 `길라잡이` 호출어와 이어지는 명령을 모두 처리합니다. `길라잡이, 서울역으로 안내해줘` 한 문장과 호출어 뒤 6초 command window를 지원합니다.
+- final word confidence가 없거나 비유한 값·0.60 미만이면 호출어와 명령을 모두 실행하지 않습니다. PCM은 메모리에서만 처리하고 pre-roll·음성 파일·서버 전송·원문 상태 로그를 만들지 않습니다.
+- microphone foreground service는 로그인·기기점검·안전교육, 버전된 호출어 고지 확인, 마이크와 Android 13 이상 알림 권한을 통과한 전경 ACTIVE 보행에서만 시작하며, ACTIVE 이탈·background·권한 철회에서 중지합니다. 화면 꺼짐/background 상시 청취는 현재 지원하지 않습니다.
+- Vosk 명령은 아래 기존 parser와 action을 그대로 사용합니다. 기존 Android `SpeechRecognizer` 확인 흐름 및 선택적 Gateway 녹음과 호출어 마이크는 직렬 전환하고, 앱 TTS·TalkBack 발화 중 decoder를 억제해 자기 음성 재인식을 막습니다.
 - 플랫폼 `SpeechRecognizer` 결과는 `AndroidVoiceCommand`의 순수 parser를 거쳐 실행하며 지원 명령의 부정문은 action 없이 fail-closed 처리합니다.
 - recognizer의 최상위 가설 하나만 실행 후보로 사용한다. confidence가 제공되면 0.55 미만·비유한 값은 실행하지 않으며, 낮은 순위의 positive 가설로 대체하지 않는다.
 - 명시적 신고, 목적지 설정·변경, 목적지 후보 번호 선택, 목적지 취소, “다음 경로 뭐야?”, 길안내 중지를 실제 Activity action에 연결했습니다.
@@ -240,11 +244,11 @@ cd apps/android && ./gradlew assembleDebugAndroidTest connectedDebugAndroidTest 
 
 - Android TFLite contract check: PASS, backend threshold 차이는 warning
 - Android depth scaffold check: PASS
-- Android unit tests: JVM 480/480 PASS, 0 failures/errors/skips
+- Android unit tests: JVM 1,313 PASS, 0 failures/errors/skips
 - Android debug APK/lint/AndroidTest APK assemble: 현재 변경본 BUILD SUCCESSFUL·SHA 확인
 - `SM-G981N` Android 13 연결 실기기 instrumentation: unified 768 TFLite와 legacy asset hash·load/invoke 2/2 PASS. 현재 primary 실행은 `fallback_used=false`다. 대화형 앱 launch·camera pipeline·FPS·실외 동작은 별도 검증 필요
 - MetadataCaptureLog unit test: Gradle test에 포함
-- Stationary device smoke on `SM-G981N` / Android 13 / `R3CN50F4APH`: 변경 전 기록에서 install Success, `am start -W` Status ok/COLD/TotalTime 480ms, process PID 16571, `MainActivity` RESUMED/visible/reportedDrawn, AndroidRuntime:E empty. 현재 변경본은 instrumentation 설치·invoke만 확인했으며 대화형 launch 기록은 다시 필요
+- Stationary device smoke on `SM-G981N` / Android 13: 사용자·관리자 debug APK 설치와 cold start, 사용자 앱 가입·권한·기기점검 진입을 확인했다. 오프라인 한국어 TTS가 없어 기기점검이 안전하게 실패했으며 TalkBack·실외 보행·카메라 지속 frame은 별도 검증이 필요하다.
 
 ## 남은 gate
 

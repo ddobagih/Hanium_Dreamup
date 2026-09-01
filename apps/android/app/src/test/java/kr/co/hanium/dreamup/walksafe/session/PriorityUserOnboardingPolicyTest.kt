@@ -222,7 +222,7 @@ class PriorityUserOnboardingPolicyTest {
     }
 
     @Test
-    fun losingVoiceOrVibrationBlocksStartAndStopsAnActiveWalk() {
+    fun missingVoiceOrVibrationDoesNotBlockCompletedTrainingOrStopAnActiveWalk() {
         val policy = completedPolicy()
         val voiceMissing = supportedEnvironment.copy(
             offlineKoreanVoiceAvailable = false,
@@ -230,14 +230,22 @@ class PriorityUserOnboardingPolicyTest {
         val vibrationMissing = supportedEnvironment.copy(
             vibrationAvailable = false,
         )
+        val bothMissing = supportedEnvironment.copy(
+            offlineKoreanVoiceAvailable = false,
+            vibrationAvailable = false,
+        )
 
-        assertFalse(policy.evaluate(voiceMissing).mayStartWalk)
-        assertFalse(policy.evaluate(vibrationMissing).mayStartWalk)
-        assertTrue(
+        assertTrue(policy.evaluate(voiceMissing).mayStartWalk)
+        assertTrue(policy.evaluate(vibrationMissing).mayStartWalk)
+        assertTrue(policy.evaluate(bothMissing).mayStartWalk)
+        assertFalse(
             policy.evaluate(voiceMissing, walkIsActive = true).requiresSafetyStop,
         )
-        assertTrue(
+        assertFalse(
             policy.evaluate(vibrationMissing, walkIsActive = true).requiresSafetyStop,
+        )
+        assertFalse(
+            policy.evaluate(bothMissing, walkIsActive = true).requiresSafetyStop,
         )
     }
 

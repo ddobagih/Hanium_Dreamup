@@ -58,6 +58,17 @@ class ProductPurposeSurfacesStaticTest {
     }
 
     @Test
+    fun userGuideUsesTheUnder14EmailEnrollmentBoundary() {
+        assertTrue(userGuide.contains("만 14세 미만은 계정과 보행을 시작할 수 없습니다"))
+        assertTrue(
+            userGuide.contains(
+                "만 14세 이상은 보호자 확인 없이 이메일 OTP 인증으로 가입할 수 있습니다",
+            ),
+        )
+        assertFalse(userGuide.contains("만 14세 이상 18세 미만은 보호자 확인이 끝나야"))
+    }
+
+    @Test
     fun reportSurfacesNameOnlyDamagedTactileBlockReporting() {
         assertFalse(activity.contains("위험 신고"))
         assertFalse(activity.contains("\"신고 요청\""))
@@ -66,8 +77,13 @@ class ProductPurposeSurfacesStaticTest {
         assertFalse(activity.contains("보호자 추적"))
         assertFalse(activity.contains("넘어짐 탐지"))
 
-        assertTrue(activity.contains("\"손상 점자블록 신고 요청\""))
-        assertTrue(activity.contains("\"손상 점자블록 신고 데이터 전송과 180일 보관 동의가 필요합니다.\""))
-        assertTrue(disclosure.contains("손상 점자블록 신고 데이터 전송·보관"))
+        assertTrue(activity.contains("\"손상 점자블록 직접 신고\""))
+        assertTrue(activity.contains("REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO"))
+        assertTrue(activity.contains("방금 고정한 신고 보내기"))
+        assertTrue(disclosure.contains("이번 손상 점자블록 직접 신고"))
+        assertTrue(disclosure.contains("WalkSafe 테스트 서버"))
+        assertTrue(disclosure.contains("기관으로 자동 전송하지 않습니다"))
+        assertFalse(activity.contains("180일"))
+        assertFalse(disclosure.contains("180일"))
     }
 }

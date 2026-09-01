@@ -11,6 +11,7 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.util.Base64
 import java.util.Comparator
 import java.util.UUID
+import kr.co.hanium.dreamup.walksafe.network.GatewayCredentialPolicy
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
 import kr.co.hanium.dreamup.walksafe.security.AeadLimits
 import kr.co.hanium.dreamup.walksafe.security.AeadOpenResult
@@ -54,6 +55,7 @@ internal class AndroidReportQueueStore private constructor(
 
     @Synchronized
     fun enqueue(
+        expectedReporterActorId: String,
         metadataUtf8: ByteArray,
         imageJpeg: ByteArray,
         priority: ReportQueuePriority,
@@ -62,6 +64,12 @@ internal class AndroidReportQueueStore private constructor(
     ): QueuedReport? {
         val profile = capacityProfile ?: return null
         val now = nowMillis()
+        val reporterActorId = reportActorIdFromMetadataOrNull(metadataUtf8) ?: return null
+        if (
+            GatewayCredentialPolicy.normalizedActorIdOrNull(expectedReporterActorId) !=
+            expectedReporterActorId ||
+            reporterActorId != expectedReporterActorId
+        ) return null
         val incomingPayloadBytes = metadataUtf8.size.toLong() + imageJpeg.size.toLong()
         if (
             now < 0L ||
@@ -75,7 +83,16 @@ internal class AndroidReportQueueStore private constructor(
         if (
             storage.hasFence(ACCOUNT_DELETE_FENCE) ||
             storage.hasFence(LIFECYCLE_PENDING_FENCE) ||
-            storage.hasFence(consentRevokeFence(consentReceiptSha256))
+            storage.hasFence(consentRevokeFence(consentReceiptSha256)) ||
+            (
+                priority == ReportQueuePriority.AUTOMATIC &&
+                    (
+                        storage.hasFence(AUTOMATIC_REVOCATION_PENDING_FENCE) ||
+                            storage.hasFence(
+                                automaticConsentRevokeFence(consentReceiptSha256),
+                            )
+                    )
+            )
         ) return null
         pruneExpiredLocked(now)
         val usage = storage.measureUsage() ?: return null
@@ -102,6 +119,7 @@ internal class AndroidReportQueueStore private constructor(
         val report = QueuedReport(
             payload = payload,
             priority = priority,
+            reporterActorId = reporterActorId,
             walkSessionId = walkSessionId,
             consentReceiptSha256 = consentReceiptSha256,
             createdAtEpochMs = now,
@@ -117,7 +135,14 @@ internal class AndroidReportQueueStore private constructor(
                     ACCOUNT_DELETE_FENCE,
                     LIFECYCLE_PENDING_FENCE,
                     consentRevokeFence(consentReceiptSha256),
-                ),
+                ) + if (priority == ReportQueuePriority.AUTOMATIC) {
+                    setOf(
+                        AUTOMATIC_REVOCATION_PENDING_FENCE,
+                        automaticConsentRevokeFence(consentReceiptSha256),
+                    )
+                } else {
+                    emptySet()
+                },
                 envelopeFactory = { sealReport(report) },
             )
         }
@@ -149,13 +174,30 @@ internal class AndroidReportQueueStore private constructor(
         consentReceiptSha256: String,
     ): Int = reportsForDrain(walkSessionId, consentReceiptSha256).size
 
+    /**
+     * A failed upload may outlive both the walk and the optional-consent receipt that existed when
+     * it was created. The stored receipt remains creation-time audit provenance; drain admission
+     * is re-authorized with the current server-confirmed receipt.
+     */
+    @Synchronized
+    fun nextForRecoveryDrain(reporterActorId: String): QueuedReport? =
+        reportsForRecoveryDrain(reporterActorId).firstOrNull()
+
+    @Synchronized
+    fun countForRecoveryDrain(reporterActorId: String): Int =
+        reportsForRecoveryDrain(reporterActorId).size
+
     @Synchronized
     fun pruneExpired(): Int = if (capacityProfile == null) 0 else pruneExpiredLocked(nowMillis())
 
     @Synchronized
-    fun deleteAfterReceipt(receipt: ReportQueueReceipt): Boolean {
+    fun deleteAfterReceipt(
+        reporterActorId: String,
+        receipt: ReportQueueReceipt,
+    ): Boolean {
         if (capacityProfile == null) return false
         if (
+            GatewayCredentialPolicy.normalizedActorIdOrNull(reporterActorId) != reporterActorId ||
             !isCanonicalReportUuid(receipt.reportId) ||
             !REPORT_SHA256_HEX.matches(receipt.payloadSha256) ||
             receipt.payloadBytes <= 0L ||
@@ -170,6 +212,7 @@ internal class AndroidReportQueueStore private constructor(
             }
             val report = readAllowedReport(access, receipt.reportId) ?: return@withLockedAccess false
             if (
+                report.reporterActorId != reporterActorId ||
                 report.payload.reportId != receipt.reportId ||
                 report.payload.payloadSha256 != receipt.payloadSha256 ||
                 report.payload.payloadBytes != receipt.payloadBytes
@@ -191,6 +234,27 @@ internal class AndroidReportQueueStore private constructor(
                     aead.createFreshAfterVerifiedPurge()
                 )
         }
+    }
+
+    /**
+     * Persists a temporary automatic-only barrier, then fences every creation receipt found on an
+     * automatic entry before deletion. Explicit reports share the queue key and remain readable.
+     */
+    @Synchronized
+    fun onAutomaticReportingRevoked(consentReceiptSha256: String): Boolean {
+        if (!REPORT_SHA256_HEX.matches(consentReceiptSha256)) return false
+        return runCatching {
+            storage.deleteMatchingWithFences(
+                pendingFence = AUTOMATIC_REVOCATION_PENDING_FENCE,
+                initialPermanentFences = setOf(
+                    automaticConsentRevokeFence(consentReceiptSha256),
+                ),
+            ) { reportId, envelope ->
+                val report = checkNotNull(openReport(envelope, reportId))
+                automaticConsentRevokeFence(report.consentReceiptSha256)
+                    .takeIf { report.priority == ReportQueuePriority.AUTOMATIC }
+            }
+        }.getOrDefault(false)
     }
 
     @Synchronized
@@ -238,19 +302,43 @@ internal class AndroidReportQueueStore private constructor(
         }
     }
 
+    private fun reportsForRecoveryDrain(reporterActorId: String): List<QueuedReport> {
+        if (GatewayCredentialPolicy.normalizedActorIdOrNull(reporterActorId) != reporterActorId) {
+            return emptyList()
+        }
+        return queuedReports().filter { it.reporterActorId == reporterActorId }
+    }
+
     private fun readAllowedReport(
         access: LockedReportQueueStorage,
         reportId: String,
     ): QueuedReport? {
         val envelope = access.read(reportId) ?: return null
+        val report = openReport(envelope, reportId) ?: return null
+        return report.takeIf {
+            !access.hasFence(consentRevokeFence(it.consentReceiptSha256)) &&
+                (
+                    it.priority != ReportQueuePriority.AUTOMATIC ||
+                        (
+                            !access.hasFence(AUTOMATIC_REVOCATION_PENDING_FENCE) &&
+                                !access.hasFence(
+                                    automaticConsentRevokeFence(it.consentReceiptSha256),
+                                )
+                        )
+                )
+        }
+    }
+
+    private fun openReport(envelope: String, reportId: String): QueuedReport? {
         val opened = aead.open(envelope, reportAad(reportId), REPORT_LIMITS)
             as? AeadOpenResult.Opened
             ?: return null
-        val report = decodeReport(opened.plaintext)
-        opened.plaintext.fill(0)
-        return report?.takeIf {
-            it.payload.reportId == reportId &&
-                !access.hasFence(consentRevokeFence(it.consentReceiptSha256))
+        return try {
+            decodeReport(opened.plaintext)?.takeIf {
+                it.payload.reportId == reportId
+            }
+        } finally {
+            opened.plaintext.fill(0)
         }
     }
 
@@ -266,7 +354,7 @@ internal class AndroidReportQueueStore private constructor(
 
     private companion object {
         fun reportAad(reportId: String): ByteArray =
-            "kr.co.hanium.dreamup.walksafe|USER|report-queue|schema=1|report=$reportId"
+            "kr.co.hanium.dreamup.walksafe|USER|report-queue|schema=2|report=$reportId"
                 .toByteArray(Charsets.UTF_8)
 
         val REPORT_ORDER = compareBy<QueuedReport>(
@@ -276,8 +364,12 @@ internal class AndroidReportQueueStore private constructor(
         )
         const val ACCOUNT_DELETE_FENCE = "account-deleted"
         const val LIFECYCLE_PENDING_FENCE = "lifecycle-pending"
+        const val AUTOMATIC_REVOCATION_PENDING_FENCE =
+            "automatic-revocation-pending"
         fun consentRevokeFence(receiptSha256: String): String =
             "consent-revoked-$receiptSha256"
+        fun automaticConsentRevokeFence(receiptSha256: String): String =
+            "automatic-consent-revoked-$receiptSha256"
         val REPORT_LIMITS = AeadLimits(
             maxPlaintextBytes = 32 * 1_024 * 1_024,
             maxCiphertextBytes = 32 * 1_024 * 1_024 + 16,
@@ -290,6 +382,7 @@ private fun encodeReport(report: QueuedReport): ByteArray = JSONObject()
     .put("schema_version", REPORT_QUEUE_SCHEMA)
     .put("report_id", report.payload.reportId)
     .put("priority", report.priority.name)
+    .put("reporter_actor_id", report.reporterActorId)
     .put("walk_session_id", report.walkSessionId)
     .put("consent_receipt_sha256", report.consentReceiptSha256)
     .put("created_at_epoch_ms", report.createdAtEpochMs)
@@ -306,6 +399,7 @@ private fun decodeReport(bytes: ByteArray): QueuedReport? = runCatching {
     require(root.keysAsSet() == REPORT_QUEUE_FIELDS)
     require(root.getString("schema_version") == REPORT_QUEUE_SCHEMA)
     val reportId = root.getString("report_id")
+    val reporterActorId = root.getString("reporter_actor_id")
     val walkSessionId = root.getString("walk_session_id")
     val consentReceipt = root.getString("consent_receipt_sha256")
     val createdAt = root.strictLong("created_at_epoch_ms")
@@ -313,20 +407,26 @@ private fun decodeReport(bytes: ByteArray): QueuedReport? = runCatching {
     val declaredSha = root.getString("payload_sha256")
     val declaredBytes = root.strictLong("payload_bytes")
     require(isCanonicalReportUuid(reportId))
+    require(GatewayCredentialPolicy.normalizedActorIdOrNull(reporterActorId) == reporterActorId)
     require(isCanonicalReportUuid(walkSessionId))
     require(REPORT_SHA256_HEX.matches(consentReceipt))
     require(createdAt >= 0L && expiresAt - createdAt == REPORT_QUEUE_TTL_MS)
     val metadata = Base64.getDecoder().decode(root.getString("metadata_base64"))
     val image = Base64.getDecoder().decode(root.getString("image_jpeg_base64"))
-    val payload = FrozenReportPayload.freeze(reportId, metadata, image)
-    metadata.fill(0)
-    image.fill(0)
+    val payload = try {
+        require(reportActorIdFromMetadataOrNull(metadata) == reporterActorId)
+        FrozenReportPayload.freeze(reportId, metadata, image)
+    } finally {
+        metadata.fill(0)
+        image.fill(0)
+    }
     requireNotNull(payload)
     require(payload.payloadSha256 == declaredSha)
     require(payload.payloadBytes == declaredBytes)
     QueuedReport(
         payload = payload,
         priority = ReportQueuePriority.valueOf(root.getString("priority")),
+        reporterActorId = reporterActorId,
         walkSessionId = walkSessionId,
         consentReceiptSha256 = consentReceipt,
         createdAtEpochMs = createdAt,
@@ -359,6 +459,11 @@ internal interface ReportQueueStorage {
     fun purgeAllWithFence(
         name: String,
         keyLifecycle: (ReportQueuePurgeContext) -> Boolean,
+    ): Boolean
+    fun deleteMatchingWithFences(
+        pendingFence: String,
+        initialPermanentFences: Set<String>,
+        permanentFenceForMatch: (reportId: String, envelope: String) -> String?,
     ): Boolean
     fun measureUsage(): ReportQueueStorageUsage?
 }
@@ -507,7 +612,10 @@ internal class FileReportQueueStorage(rootDirectory: File) : ReportQueueStorage 
         keyLifecycle: (ReportQueuePurgeContext) -> Boolean,
     ): Boolean {
         if (fenceFile(name) == null) return false
-        if (name == LIFECYCLE_PENDING_FENCE) return false
+        if (
+            name == LIFECYCLE_PENDING_FENCE ||
+            name == AUTOMATIC_REVOCATION_PENDING_FENCE
+        ) return false
         val pending = fenceFile(LIFECYCLE_PENDING_FENCE) ?: return false
         var keyLifecycleAttempted = false
         val result = withStorageLock {
@@ -575,6 +683,51 @@ internal class FileReportQueueStorage(rootDirectory: File) : ReportQueueStorage 
         return result == true
     }
 
+    override fun deleteMatchingWithFences(
+        pendingFence: String,
+        initialPermanentFences: Set<String>,
+        permanentFenceForMatch: (reportId: String, envelope: String) -> String?,
+    ): Boolean {
+        if (
+            pendingFence != AUTOMATIC_REVOCATION_PENDING_FENCE ||
+            initialPermanentFences.any { !AUTOMATIC_CONSENT_FENCE.matches(it) }
+        ) return false
+        val pending = fenceFile(pendingFence) ?: return false
+        return withStorageLock {
+            if (
+                !ensureQueueDirectory(reports) ||
+                !ensureQueueDirectory(fences) ||
+                measureUsage() == null ||
+                !atomicWrite(pending, "$pendingFence\n", replaceExisting = true)
+            ) return@withStorageLock false
+            val reportIds = listReportIds()
+            val matches = mutableListOf<String>()
+            val permanentFences = initialPermanentFences.toMutableSet()
+            reportIds.forEach { reportId ->
+                val envelope = read(reportId)
+                    ?: return@withStorageLock false
+                val permanentFence = permanentFenceForMatch(reportId, envelope)
+                if (permanentFence != null) {
+                    if (!AUTOMATIC_CONSENT_FENCE.matches(permanentFence)) {
+                        return@withStorageLock false
+                    }
+                    permanentFences += permanentFence
+                    matches += reportId
+                }
+            }
+            if (
+                !permanentFences.all { name ->
+                    val target = fenceFile(name) ?: return@all false
+                    atomicWrite(target, "$name\n", replaceExisting = true)
+                }
+            ) return@withStorageLock false
+            if (!matches.map(::deleteUnlocked).all { it }) {
+                return@withStorageLock false
+            }
+            deleteAndSync(pending) && !hasFence(AUTOMATIC_REVOCATION_PENDING_FENCE)
+        } == true
+    }
+
     @Synchronized
     override fun measureUsage(): ReportQueueStorageUsage? {
         return try {
@@ -615,7 +768,9 @@ internal class FileReportQueueStorage(rootDirectory: File) : ReportQueueStorage 
         name.takeIf {
             it == ACCOUNT_DELETE_FENCE ||
                 it == LIFECYCLE_PENDING_FENCE ||
-                CONSENT_FENCE.matches(it)
+                it == AUTOMATIC_REVOCATION_PENDING_FENCE ||
+                CONSENT_FENCE.matches(it) ||
+                AUTOMATIC_CONSENT_FENCE.matches(it)
         }
             ?.let { File(fences, "$it.fence") }
 
@@ -821,11 +976,15 @@ internal class FileReportQueueStorage(rootDirectory: File) : ReportQueueStorage 
         val PROCESS_STORAGE_LOCK = Any()
         const val ACCOUNT_DELETE_FENCE = "account-deleted"
         const val LIFECYCLE_PENDING_FENCE = "lifecycle-pending"
+        const val AUTOMATIC_REVOCATION_PENDING_FENCE =
+            "automatic-revocation-pending"
         const val MAX_PENDING_FENCE_BYTES = 64L * 1_024L
         const val LOCK_FILE = ".queue.lock"
         const val REPORT_SUFFIX = ".aead"
         const val MAX_ENVELOPE_BYTES = 44L * 1_024L * 1_024L
         val CONSENT_FENCE = Regex("consent-revoked-[0-9a-f]{64}")
+        val AUTOMATIC_CONSENT_FENCE =
+            Regex("automatic-consent-revoked-[0-9a-f]{64}")
     }
 }
 
@@ -835,11 +994,12 @@ internal val REPORT_QUEUE_KEY_POLICY = AeadKeyPolicy(
     readableVersions = setOf(1),
 )
 
-private const val REPORT_QUEUE_SCHEMA = "walksafe.android.report-queue-entry.v1"
+private const val REPORT_QUEUE_SCHEMA = "walksafe.android.report-queue-entry.v2"
 private val REPORT_QUEUE_FIELDS = setOf(
     "schema_version",
     "report_id",
     "priority",
+    "reporter_actor_id",
     "walk_session_id",
     "consent_receipt_sha256",
     "created_at_epoch_ms",

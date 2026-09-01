@@ -26,7 +26,7 @@ data class PermissionSessionSnapshot(
         get() = authentication == AuthenticationState.ACTIVE
 
     val mayCreateAutomaticReport: Boolean
-        get() = rawCollectionConsentGranted && automaticReportConsentGranted
+        get() = automaticReportConsentGranted
 
     val mayReuseForTraining: Boolean
         get() = rawCollectionConsentGranted && trainingReuseConsentGranted
@@ -191,13 +191,10 @@ data class PermissionRecoveryGate(
 
     fun completeFullRecheck(
         observed: ObservedPermissionSnapshot,
-        activityRecognitionRequired: Boolean,
+        requiredPermissions: Set<ObservedPermission>,
         allPrerequisitesReady: Boolean,
     ): PermissionRecoveryGate {
-        val missing = WalkStartPermissionPolicy.missing(
-            observed = observed,
-            activityRecognitionRequired = activityRecognitionRequired,
-        )
+        val missing = PermissionDependencyPolicy.missing(requiredPermissions, observed)
         return when {
             missing.isNotEmpty() -> blocked(missing)
             allPrerequisitesReady -> PermissionRecoveryGate(

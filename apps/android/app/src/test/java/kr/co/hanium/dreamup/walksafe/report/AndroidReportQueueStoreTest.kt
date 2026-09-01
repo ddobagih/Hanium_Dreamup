@@ -15,6 +15,7 @@ import kr.co.hanium.dreamup.walksafe.security.AeadLimits
 import kr.co.hanium.dreamup.walksafe.security.AeadOpenResult
 import kr.co.hanium.dreamup.walksafe.security.AeadSealResult
 import kr.co.hanium.dreamup.walksafe.security.LocalAead
+import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -48,13 +49,15 @@ class AndroidReportQueueStoreTest {
             testOnly = Unit,
         )
 
-        assertNull(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
+        assertNull(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
         assertTrue(store.queuedReports().isEmpty())
         assertNull(store.nextForDrain())
         assertNull(store.nextForDrain(WALK_ID, CONSENT))
         assertEquals(0, store.countForDrain(WALK_ID, CONSENT))
+        assertNull(store.nextForRecoveryDrain(ACTOR_ID))
+        assertEquals(0, store.countForRecoveryDrain(ACTOR_ID))
         assertEquals(0, store.pruneExpired())
-        assertFalse(store.deleteAfterReceipt(receipt(REPORT_1, "a".repeat(64), 1L)))
+        assertFalse(store.deleteAfterReceipt(ACTOR_ID, receipt(REPORT_1, "a".repeat(64), 1L)))
         assertEquals(0, storageCalls)
         assertEquals(0, idCalls)
         assertEquals(0, aead.sealCalls + aead.openCalls)
@@ -107,6 +110,7 @@ class AndroidReportQueueStoreTest {
 
         assertNull(
             store.enqueue(
+                ACTOR_ID,
                 metadata(),
                 jpeg(),
                 ReportQueuePriority.EXPLICIT,
@@ -140,16 +144,16 @@ class AndroidReportQueueStoreTest {
         )
 
         assertTrue(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
         )
         assertNull(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT),
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT),
         )
         assertTrue(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null,
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null,
         )
         assertNull(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT),
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT),
         )
         assertEquals(2, storage.values.size)
     }
@@ -178,13 +182,13 @@ class AndroidReportQueueStoreTest {
         )
 
         assertTrue(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
         )
         assertNull(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT),
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT),
         )
         assertTrue(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null,
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null,
         )
         assertEquals(64L, requireNotNull(storage.measureUsage()).totalBytes)
     }
@@ -232,11 +236,11 @@ class AndroidReportQueueStoreTest {
         val store = store(storage, aead, { now }) { ids.removeFirst() }
 
         assertTrue(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
         )
         now += 1L
         assertTrue(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null,
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null,
         )
         assertEquals(REPORT_2, store.nextForDrain()?.payload?.reportId)
 
@@ -258,10 +262,10 @@ class AndroidReportQueueStoreTest {
         )
         val store = store(storage, aead, { now++ }) { ids.removeFirst() }
 
-        store.enqueue(metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT)
-        store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, OTHER_WALK_ID, CONSENT)
-        store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT)
-        store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT)
+        store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT)
+        store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, OTHER_WALK_ID, CONSENT)
+        store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT)
+        store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT)
 
         assertEquals(2, store.countForDrain(WALK_ID, CONSENT))
         assertEquals(REPORT_4, store.nextForDrain(WALK_ID, CONSENT)?.payload?.reportId)
@@ -272,31 +276,192 @@ class AndroidReportQueueStoreTest {
     }
 
     @Test
+    fun recoveryDrainSelectorAllowsPreviousWalkAndReceiptButPreservesPriority() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        var now = 5_000L
+        val ids = ArrayDeque(
+            listOf(REPORT_1, REPORT_2, REPORT_3).map(UUID::fromString),
+        )
+        val store = store(storage, aead, { now++ }) { ids.removeFirst() }
+
+        store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT)
+        store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, OTHER_WALK_ID, CONSENT)
+        store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT)
+        val restored = store(storage, aead, { now }) {
+            error("recovery drain must not create report IDs")
+        }
+
+        assertEquals(3, restored.countForRecoveryDrain(ACTOR_ID))
+        assertEquals(REPORT_2, restored.nextForRecoveryDrain(ACTOR_ID)?.payload?.reportId)
+    }
+
+    @Test
+    fun recoveryAndReceiptDeletionAreBoundToTheExactReporterActor() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2).map(UUID::fromString))
+        val store = store(storage, aead, { 5_000L }) { ids.removeFirst() }
+        val actorA = requireNotNull(
+            store.enqueue(
+                expectedReporterActorId = ACTOR_ID,
+                metadataUtf8 = metadata(ACTOR_ID),
+                imageJpeg = jpeg(),
+                priority = ReportQueuePriority.EXPLICIT,
+                walkSessionId = WALK_ID,
+                consentReceiptSha256 = CONSENT,
+            ),
+        )
+        requireNotNull(
+            store.enqueue(
+                expectedReporterActorId = OTHER_ACTOR_ID,
+                metadataUtf8 = metadata(OTHER_ACTOR_ID),
+                imageJpeg = jpeg(),
+                priority = ReportQueuePriority.EXPLICIT,
+                walkSessionId = WALK_ID,
+                consentReceiptSha256 = CONSENT,
+            ),
+        )
+
+        assertEquals(REPORT_1, store.nextForRecoveryDrain(ACTOR_ID)?.payload?.reportId)
+        assertEquals(REPORT_2, store.nextForRecoveryDrain(OTHER_ACTOR_ID)?.payload?.reportId)
+        val actorAReceipt = receipt(
+            actorA.payload.reportId,
+            actorA.payload.payloadSha256,
+            actorA.payload.payloadBytes,
+        )
+        assertFalse(store.deleteAfterReceipt(OTHER_ACTOR_ID, actorAReceipt))
+        assertEquals(REPORT_1, store.nextForRecoveryDrain(ACTOR_ID)?.payload?.reportId)
+        assertTrue(store.deleteAfterReceipt(ACTOR_ID, actorAReceipt))
+        assertNull(store.nextForRecoveryDrain(ACTOR_ID))
+        assertEquals(REPORT_2, store.nextForRecoveryDrain(OTHER_ACTOR_ID)?.payload?.reportId)
+    }
+
+    @Test
+    fun enqueueRejectsMetadataActorThatDoesNotMatchTrustedActor() {
+        val store = store(FakeReportQueueStorage(), FakeQueueAead(), { 1_000L }) {
+            UUID.fromString(REPORT_1)
+        }
+
+        assertNull(
+            store.enqueue(
+                expectedReporterActorId = ACTOR_ID,
+                metadataUtf8 = metadata(OTHER_ACTOR_ID),
+                imageJpeg = jpeg(),
+                priority = ReportQueuePriority.EXPLICIT,
+                walkSessionId = WALK_ID,
+                consentReceiptSha256 = CONSENT,
+            ),
+        )
+    }
+
+    @Test
+    fun missingActorRejectsBeforeIdSealOrStorageWrite() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        var idCalls = 0
+        val store = store(storage, aead, { 1_000L }) {
+            idCalls += 1
+            UUID.fromString(REPORT_1)
+        }
+
+        assertNull(
+            store.enqueue(
+                expectedReporterActorId = ACTOR_ID,
+                metadataUtf8 = "{}".toByteArray(),
+                imageJpeg = jpeg(),
+                priority = ReportQueuePriority.EXPLICIT,
+                walkSessionId = WALK_ID,
+                consentReceiptSha256 = CONSENT,
+            ),
+        )
+        assertEquals(0, idCalls)
+        assertEquals(0, aead.sealCalls)
+        assertTrue(storage.values.isEmpty())
+    }
+
+    @Test
+    fun envelopeActorThatDoesNotMatchFrozenMetadataFailsClosed() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        val store = store(storage, aead, { 1_000L }) { UUID.fromString(REPORT_1) }
+        requireNotNull(
+            store.enqueue(
+                expectedReporterActorId = ACTOR_ID,
+                metadataUtf8 = metadata(ACTOR_ID),
+                imageJpeg = jpeg(),
+                priority = ReportQueuePriority.EXPLICIT,
+                walkSessionId = WALK_ID,
+                consentReceiptSha256 = CONSENT,
+            ),
+        )
+        val envelope = requireNotNull(storage.values[REPORT_1])
+        aead.replacePlaintext(envelope) { plaintext ->
+            JSONObject(String(plaintext, Charsets.UTF_8))
+                .put("reporter_actor_id", OTHER_ACTOR_ID)
+                .toString()
+                .toByteArray()
+        }
+
+        assertNull(store.nextForRecoveryDrain(ACTOR_ID))
+        assertNull(store.nextForRecoveryDrain(OTHER_ACTOR_ID))
+    }
+
+    @Test
+    fun v1AadEnvelopeCannotEnterTheV2RecoverySelector() {
+        val storage = FakeReportQueueStorage()
+        val aead = AadBoundQueueAead()
+        val oldAad =
+            "kr.co.hanium.dreamup.walksafe|USER|report-queue|schema=1|report=$REPORT_1"
+                .toByteArray()
+        val envelope = requireNotNull(
+            aead.seal("legacy-v1".toByteArray(), oldAad, TEST_AEAD_LIMITS)
+                as? AeadSealResult.Sealed,
+        ).envelope
+        storage.values[REPORT_1] = envelope
+        val store = AndroidReportQueueStore(
+            capacityProfile = PROFILE,
+            storageFactory = { storage },
+            aead = aead,
+            idFactory = { error("legacy recovery must not create IDs") },
+            nowMillis = { 1_000L },
+            testOnly = Unit,
+        )
+
+        assertNull(store.nextForRecoveryDrain(ACTOR_ID))
+        assertTrue(aead.aadMismatchCount > 0)
+    }
+
+    @Test
     fun receiptMustMatchIdHashBytesAndPersistenceMarkerExactly() {
         val storage = FakeReportQueueStorage()
         val aead = FakeQueueAead()
         val store = store(storage, aead, { 1_000L }) { UUID.fromString(REPORT_1) }
         val report = requireNotNull(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT),
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT),
         )
 
         assertFalse(
             store.deleteAfterReceipt(
+                ACTOR_ID,
                 receipt(REPORT_2, report.payload.payloadSha256, report.payload.payloadBytes),
             ),
         )
         assertFalse(
             store.deleteAfterReceipt(
+                ACTOR_ID,
                 receipt(REPORT_1, "f".repeat(64), report.payload.payloadBytes),
             ),
         )
         assertFalse(
             store.deleteAfterReceipt(
+                ACTOR_ID,
                 receipt(REPORT_1, report.payload.payloadSha256, report.payload.payloadBytes + 1L),
             ),
         )
         assertFalse(
             store.deleteAfterReceipt(
+                ACTOR_ID,
                 receipt(
                     REPORT_1,
                     report.payload.payloadSha256,
@@ -307,6 +472,7 @@ class AndroidReportQueueStoreTest {
         )
         assertFalse(
             store.deleteAfterReceipt(
+                ACTOR_ID,
                 receipt(
                     REPORT_1,
                     report.payload.payloadSha256,
@@ -317,6 +483,7 @@ class AndroidReportQueueStoreTest {
         )
         assertTrue(
             store.deleteAfterReceipt(
+                ACTOR_ID,
                 receipt(REPORT_1, report.payload.payloadSha256, report.payload.payloadBytes),
             ),
         )
@@ -328,14 +495,15 @@ class AndroidReportQueueStoreTest {
         val storage = FakeReportQueueStorage()
         val aead = FakeQueueAead()
         val store = store(storage, aead, { 1_000L }) { UUID.fromString(REPORT_1) }
-        assertTrue(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
+        assertTrue(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
 
         assertTrue(store.onConsentRevoked(CONSENT))
         assertTrue(storage.values.isEmpty())
         assertTrue(aead.destroyed)
-        assertNull(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
+        assertNull(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
         assertTrue(
             store.enqueue(
+                ACTOR_ID,
                 metadata(),
                 jpeg(),
                 ReportQueuePriority.EXPLICIT,
@@ -346,18 +514,236 @@ class AndroidReportQueueStoreTest {
     }
 
     @Test
+    fun automaticWithdrawalDeletesOnlyAutomaticEntriesAcrossCreationReceipts() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        val ids = ArrayDeque(
+            listOf(REPORT_1, REPORT_2, REPORT_3, REPORT_4, REPORT_5).map(UUID::fromString),
+        )
+        val store = store(storage, aead, { 1_000L }) { ids.removeFirst() }
+        assertTrue(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.AUTOMATIC,
+                WALK_ID,
+                CONSENT,
+            ) != null,
+        )
+        assertTrue(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.AUTOMATIC,
+                WALK_ID,
+                NEW_CONSENT,
+            ) != null,
+        )
+        assertTrue(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.EXPLICIT,
+                WALK_ID,
+                CONSENT,
+            ) != null,
+        )
+
+        assertTrue(store.onAutomaticReportingRevoked(CONSENT))
+        assertEquals(
+            listOf(ReportQueuePriority.EXPLICIT),
+            store.queuedReports().map(QueuedReport::priority),
+        )
+        assertNull(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.AUTOMATIC,
+                WALK_ID,
+                CONSENT,
+            ),
+        )
+        assertNull(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.AUTOMATIC,
+                WALK_ID,
+                NEW_CONSENT,
+            ),
+        )
+        assertTrue(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.EXPLICIT,
+                WALK_ID,
+                CONSENT,
+            ) != null,
+        )
+        assertTrue(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.AUTOMATIC,
+                WALK_ID,
+                LATEST_CONSENT,
+            ) != null,
+        )
+        assertEquals(0, aead.destroyCalls)
+    }
+
+    @Test
+    fun automaticWithdrawalFenceHidesSurvivorWhenSelectiveDeleteFails() {
+        val storage = FakeReportQueueStorage(
+            deleteMatchingEntries = false,
+            deleteMatchingResult = false,
+        )
+        val aead = FakeQueueAead()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2).map(UUID::fromString))
+        val store = store(storage, aead, { 1_000L }) { ids.removeFirst() }
+        requireNotNull(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.AUTOMATIC,
+                WALK_ID,
+                CONSENT,
+            ),
+        )
+        requireNotNull(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.EXPLICIT,
+                WALK_ID,
+                CONSENT,
+            ),
+        )
+
+        assertFalse(store.onAutomaticReportingRevoked(CONSENT))
+        assertEquals(2, storage.values.size)
+        assertEquals(
+            listOf(ReportQueuePriority.EXPLICIT),
+            store.queuedReports().map(QueuedReport::priority),
+        )
+        assertEquals(0, aead.destroyCalls)
+    }
+
+    @Test
+    fun unreadableEntryLeavesAutomaticPendingFenceWithoutHidingExplicitAfterRecovery() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2).map(UUID::fromString))
+        val store = store(storage, aead, { 1_000L }) { ids.removeFirst() }
+        requireNotNull(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.AUTOMATIC,
+                WALK_ID,
+                CONSENT,
+            ),
+        )
+        requireNotNull(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.EXPLICIT,
+                WALK_ID,
+                CONSENT,
+            ),
+        )
+
+        aead.openSucceeds = false
+        assertFalse(store.onAutomaticReportingRevoked(CONSENT))
+        aead.openSucceeds = true
+        assertEquals(
+            listOf(ReportQueuePriority.EXPLICIT),
+            store.queuedReports().map(QueuedReport::priority),
+        )
+        assertTrue("automatic-revocation-pending" in storage.fences)
+    }
+
+    @Test
+    fun fileStoragePersistsEveryAutomaticReceiptFenceAndClearsPendingAfterDelete() {
+        val root = temporaryFolder.newFolder("automatic-selective-revocation")
+        val aead = FakeQueueAead()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2, REPORT_3).map(UUID::fromString))
+        val store = AndroidReportQueueStore(
+            rootDirectory = root,
+            capacityProfile = PROFILE,
+            aead = aead,
+            idFactory = { ids.removeFirst() },
+            nowMillis = { 1_000L },
+        )
+        requireNotNull(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.AUTOMATIC,
+                WALK_ID,
+                CONSENT,
+            ),
+        )
+        requireNotNull(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.AUTOMATIC,
+                WALK_ID,
+                NEW_CONSENT,
+            ),
+        )
+        requireNotNull(
+            store.enqueue(
+                ACTOR_ID,
+                metadata(),
+                jpeg(),
+                ReportQueuePriority.EXPLICIT,
+                WALK_ID,
+                CONSENT,
+            ),
+        )
+
+        assertTrue(store.onAutomaticReportingRevoked(CONSENT))
+        assertEquals(
+            listOf(ReportQueuePriority.EXPLICIT),
+            store.queuedReports().map(QueuedReport::priority),
+        )
+        val fences = root.resolve("report_queue_v1/fences")
+        assertTrue(fences.resolve("automatic-consent-revoked-$CONSENT.fence").isFile)
+        assertTrue(fences.resolve("automatic-consent-revoked-$NEW_CONSENT.fence").isFile)
+        assertFalse(fences.resolve("automatic-revocation-pending.fence").exists())
+        assertEquals(0, aead.destroyCalls)
+    }
+
+    @Test
     fun accountDeletionFenceCannotBeClearedByAConsentChange() {
         val storage = FakeReportQueueStorage()
         val aead = FakeQueueAead()
         val store = store(storage, aead, { 1_000L }) { UUID.fromString(REPORT_1) }
-        assertTrue(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
+        assertTrue(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
 
         assertTrue(store.onAccountDeleted())
         assertTrue(storage.values.isEmpty())
-        assertNull(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT))
+        assertNull(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT))
         assertTrue(store.onConsentRevoked(CONSENT))
         assertEquals(0, aead.freshCalls)
-        assertNull(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT))
+        assertNull(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT))
     }
 
     @Test
@@ -365,7 +751,7 @@ class AndroidReportQueueStoreTest {
         val storage = FakeReportQueueStorage()
         val aead = FakeQueueAead()
         val store = store(storage, aead, { 1_000L }) { UUID.fromString(REPORT_1) }
-        assertTrue(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
+        assertTrue(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
 
         storage.fences += "lifecycle-pending"
         assertTrue(store.queuedReports().isEmpty())
@@ -382,18 +768,18 @@ class AndroidReportQueueStoreTest {
         val storage = FakeReportQueueStorage()
         val aead = FakeQueueAead(destroySucceeds = false)
         val store = store(storage, aead, { 1_000L }) { UUID.fromString(REPORT_1) }
-        assertTrue(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
+        assertTrue(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
 
         assertFalse(store.onConsentRevoked(CONSENT))
         assertTrue("lifecycle-pending" in storage.fences)
         assertTrue(store.queuedReports().isEmpty())
-        assertNull(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT))
+        assertNull(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT))
 
         aead.destroySucceeds = true
         assertTrue(store.onConsentRevoked(CONSENT))
         assertFalse("lifecycle-pending" in storage.fences)
         assertTrue(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT) != null,
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT) != null,
         )
     }
 
@@ -405,7 +791,7 @@ class AndroidReportQueueStoreTest {
 
         assertFalse(store.onConsentRevoked(CONSENT))
         assertTrue("lifecycle-pending" in storage.fences)
-        assertNull(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT))
+        assertNull(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT))
 
         aead.freshSucceeds = true
         assertTrue(store.onConsentRevoked(CONSENT))
@@ -728,7 +1114,7 @@ class AndroidReportQueueStoreTest {
             idFactory = { UUID.fromString(REPORT_1) },
             nowMillis = { 1_000L },
         )
-        assertTrue(store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
+        assertTrue(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
         val executor = Executors.newSingleThreadExecutor()
         try {
             val read = executor.submit<List<QueuedReport>> { store.queuedReports() }
@@ -888,7 +1274,7 @@ class AndroidReportQueueStoreTest {
         )
 
         assertNull(
-            store.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT),
+            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT),
         )
         assertEquals(ReportQueueStorageUsage(1, 90L), FileReportQueueStorage(root).measureUsage())
 
@@ -910,6 +1296,21 @@ class AndroidReportQueueStoreTest {
         testOnly = Unit,
     )
 
+    private fun AndroidReportQueueStore.enqueue(
+        metadataUtf8: ByteArray,
+        imageJpeg: ByteArray,
+        priority: ReportQueuePriority,
+        walkSessionId: String,
+        consentReceiptSha256: String,
+    ): QueuedReport? = enqueue(
+        expectedReporterActorId = ACTOR_ID,
+        metadataUtf8 = metadataUtf8,
+        imageJpeg = imageJpeg,
+        priority = priority,
+        walkSessionId = walkSessionId,
+        consentReceiptSha256 = consentReceiptSha256,
+    )
+
     private fun receipt(
         id: String,
         hash: String,
@@ -918,7 +1319,8 @@ class AndroidReportQueueStoreTest {
         persistenceMarker: String = PERSISTENCE_MARKER,
     ) = ReportQueueReceipt(id, hash, bytes, marker, persistenceMarker)
 
-    private fun metadata() = "{\"kind\":\"hazard\"}".toByteArray()
+    private fun metadata(actorId: String = ACTOR_ID) =
+        "{\"reporter_user_id\":\"$actorId\"}".toByteArray()
 
     private fun jpeg() =
         byteArrayOf(0xff.toByte(), 0xd8.toByte(), 1, 2, 0xff.toByte(), 0xd9.toByte())
@@ -952,15 +1354,23 @@ class AndroidReportQueueStoreTest {
         const val REPORT_2 = "123e4567-e89b-42d3-a456-426614174001"
         const val REPORT_3 = "123e4567-e89b-42d3-a456-426614174004"
         const val REPORT_4 = "123e4567-e89b-42d3-a456-426614174005"
+        const val REPORT_5 = "123e4567-e89b-42d3-a456-426614174007"
         const val WALK_ID = "123e4567-e89b-42d3-a456-426614174002"
+        const val ACTOR_ID = "a"
+        const val OTHER_ACTOR_ID = "b"
         const val OTHER_WALK_ID = "123e4567-e89b-42d3-a456-426614174006"
         const val PERSISTENCE_MARKER = "123e4567-e89b-42d3-a456-426614174003"
         val CONSENT = "c".repeat(64)
         val NEW_CONSENT = "d".repeat(64)
+        val LATEST_CONSENT = "e".repeat(64)
+        val TEST_AEAD_LIMITS = AeadLimits(1_024, 1_040, 2_048)
     }
 }
 
-private class FakeReportQueueStorage : ReportQueueStorage {
+private class FakeReportQueueStorage(
+    private val deleteMatchingEntries: Boolean = true,
+    private val deleteMatchingResult: Boolean = true,
+) : ReportQueueStorage {
     val values = mutableMapOf<String, String>()
     val fences = mutableSetOf<String>()
     private val pendingIntents = mutableSetOf<String>()
@@ -1034,6 +1444,25 @@ private class FakeReportQueueStorage : ReportQueueStorage {
         }
         return completed
     }
+    @Synchronized
+    override fun deleteMatchingWithFences(
+        pendingFence: String,
+        initialPermanentFences: Set<String>,
+        permanentFenceForMatch: (reportId: String, envelope: String) -> String?,
+    ): Boolean {
+        fences += pendingFence
+        fences += initialPermanentFences
+        if (deleteMatchingEntries) {
+            values.entries
+                .filter { (reportId, envelope) ->
+                    permanentFenceForMatch(reportId, envelope)?.also(fences::add) != null
+                }
+                .map { it.key }
+                .forEach(values::remove)
+        }
+        if (deleteMatchingResult) fences -= pendingFence
+        return deleteMatchingResult
+    }
     override fun measureUsage(): ReportQueueStorageUsage = ReportQueueStorageUsage(
         reportFileCount = values.size,
         totalBytes = values.values.sumOf { it.toByteArray(Charsets.UTF_8).size.toLong() },
@@ -1053,6 +1482,12 @@ private class FakeQueueAead(
     var destroyCalls = 0
     var freshCalls = 0
     var destroyed = false
+    var openSucceeds = true
+
+    fun replacePlaintext(envelope: String, transform: (ByteArray) -> ByteArray) {
+        val existing = requireNotNull(values[envelope])
+        values[envelope] = transform(existing.copyOf())
+    }
 
     override fun seal(
         plaintext: ByteArray,
@@ -1076,6 +1511,9 @@ private class FakeQueueAead(
     ): AeadOpenResult {
         openCalls += 1
         openHook?.invoke()
+        if (!openSucceeds) {
+            return AeadOpenResult.Blocked(AeadBlockReason.KEY_ACCESS_FAILED)
+        }
         val plaintext = values[envelope]?.copyOf()
             ?: return AeadOpenResult.Blocked(AeadBlockReason.MALFORMED_ENVELOPE)
         return AeadOpenResult.Opened(plaintext, 1, false)
@@ -1093,4 +1531,38 @@ private class FakeQueueAead(
         freshCalls += 1
         return freshSucceeds
     }
+}
+
+private class AadBoundQueueAead : LocalAead {
+    private data class BoundValue(val plaintext: ByteArray, val aad: ByteArray)
+
+    private val values = mutableMapOf<String, BoundValue>()
+    var aadMismatchCount = 0
+
+    override fun seal(
+        plaintext: ByteArray,
+        domainAad: ByteArray,
+        limits: AeadLimits,
+    ): AeadSealResult {
+        values["aad-bound"] = BoundValue(plaintext.copyOf(), domainAad.copyOf())
+        return AeadSealResult.Sealed("aad-bound")
+    }
+
+    override fun open(
+        envelope: String,
+        domainAad: ByteArray,
+        limits: AeadLimits,
+    ): AeadOpenResult {
+        val value = values[envelope]
+            ?: return AeadOpenResult.Blocked(AeadBlockReason.MALFORMED_ENVELOPE)
+        if (!value.aad.contentEquals(domainAad)) {
+            aadMismatchCount += 1
+            return AeadOpenResult.Blocked(AeadBlockReason.MALFORMED_ENVELOPE)
+        }
+        return AeadOpenResult.Opened(value.plaintext.copyOf(), 1, false)
+    }
+
+    override fun destroyVersion(version: Int): Boolean = true
+    override fun destroyKnownVersions(): Boolean = values.clear().let { true }
+    override fun createFreshAfterVerifiedPurge(): Boolean = true
 }

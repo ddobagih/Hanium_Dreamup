@@ -746,8 +746,8 @@ class MainActivityAccountDeletionStaticTest {
         assertTrue(
             appearsInOrder(
                 source,
-                "addView(privacyControls)",
                 "addView(runtimeControls)",
+                "addView(privacyControls)",
             ),
         )
 

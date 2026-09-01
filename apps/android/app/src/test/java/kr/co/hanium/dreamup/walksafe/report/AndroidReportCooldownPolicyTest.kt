@@ -3,8 +3,10 @@ package kr.co.hanium.dreamup.walksafe.report
 import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONObject
 
 class AndroidReportCooldownPolicyTest {
     @Test
@@ -151,6 +153,38 @@ class AndroidReportCooldownPolicyTest {
         assertEquals(AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS - 1L, futureRecord.remainingMs)
     }
 
+    @Test
+    fun queuedAutomaticMetadataRestoresExactCooldownScope() {
+        val metadata = automaticMetadata()
+        val payload = requireNotNull(
+            FrozenReportPayload.freeze(
+                "123e4567-e89b-42d3-a456-426614174000",
+                metadata.toString().toByteArray(),
+                byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xd9.toByte()),
+            ),
+        )
+        val report = QueuedReport(
+            payload = payload,
+            priority = ReportQueuePriority.AUTOMATIC,
+            reporterActorId = "field-user-1",
+            walkSessionId = "123e4567-e89b-42d3-a456-426614174001",
+            consentReceiptSha256 = "c".repeat(64),
+            createdAtEpochMs = 1_000L,
+            expiresAtEpochMs = 1_000L + REPORT_QUEUE_TTL_MS,
+        )
+
+        assertEquals(scope(), report.automaticCooldownScopeOrNull())
+        assertNull(
+            report.copy(priority = ReportQueuePriority.EXPLICIT)
+                .automaticCooldownScopeOrNull(),
+        )
+        assertNull(
+            automaticReportCooldownScopeOrNull(
+                automaticMetadata().put("trigger", AndroidReportCandidatePolicy.TRIGGER_VOICE),
+            ),
+        )
+    }
+
     private fun scope(
         actorId: String = "field-user-1",
         latitude: Double = 37.0,
@@ -162,4 +196,17 @@ class AndroidReportCooldownPolicyTest {
             location = TrustedLocation(latitude, longitude, 5f, 1_000L),
         )!!
     }
+
+    private fun automaticMetadata(): JSONObject = JSONObject()
+        .put("schema_version", "detect.v2")
+        .put("trigger", AndroidReportCandidatePolicy.TRIGGER_AUTO)
+        .put("auto_reported", true)
+        .put("reporter_user_id", "field-user-1")
+        .put("class_name", AndroidReportCandidatePolicy.DAMAGED_TACTILE_BLOCK)
+        .put(
+            "gps",
+            JSONObject()
+                .put("latitude", 37.0)
+                .put("longitude", 127.0),
+        )
 }

@@ -398,10 +398,6 @@ class PriorityUserOnboardingPolicy(
             current.completedPractices::contains,
         )
         val walkBlock = accountBlock ?: when {
-            !environment.offlineKoreanVoiceAvailable ->
-                PriorityUserBlockReason.OFFLINE_KOREAN_VOICE_UNAVAILABLE
-            !environment.vibrationAvailable ->
-                PriorityUserBlockReason.VIBRATION_UNAVAILABLE
             !current.educationReviewed ->
                 PriorityUserBlockReason.SAFETY_EDUCATION_NOT_REVIEWED
             !current.safePracticePlaceConfirmed ->

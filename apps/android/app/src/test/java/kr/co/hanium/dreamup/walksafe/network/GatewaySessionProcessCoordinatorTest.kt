@@ -2,7 +2,10 @@ package kr.co.hanium.dreamup.walksafe.network
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingAttemptRequest
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingPolicy
+import kr.co.hanium.dreamup.walksafe.session.FirstRunOpaqueActorBinding
+import kr.co.hanium.dreamup.walksafe.session.FirstRunReceiptHash
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -155,6 +158,99 @@ class GatewaySessionProcessCoordinatorTest {
     }
 
     @Test
+    fun newerFirstRunProgressUpdatesWithoutReplacingTheSessionGeneration() {
+        val actorId = BACKEND_ACTOR_ID
+        val session = verifiedSession(
+            rotation = 20L,
+            actorId = actorId,
+            nowEpochMs = System.currentTimeMillis(),
+        )
+        val firstRun = verifiedEmailFirstRun(epoch = 20L, actorId = actorId)
+        val operation = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        assertTrue(
+            GatewaySessionProcessCoordinator.publishVerified(
+                operation = operation,
+                session = session,
+                firstRunSnapshot = firstRun,
+            ),
+        )
+        val observed = mutableListOf<GatewaySessionProcessSnapshot>()
+        val published = GatewaySessionProcessCoordinator.attach(firstOwner, observed::add)
+        val advanced = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            snapshot = firstRun,
+            expectedEpoch = firstRun.epoch,
+            expectedRevision = firstRun.revision,
+        ).current
+
+        assertTrue(
+            GatewaySessionProcessCoordinator.updateFirstRunSnapshot(
+                expectedGeneration = published.generation,
+                expectedActorId = actorId,
+                firstRunSnapshot = advanced,
+            ),
+        )
+
+        val latest = GatewaySessionProcessCoordinator.snapshot()
+        assertEquals(published.generation, latest.generation)
+        assertSame(session, latest.session)
+        assertSame(advanced, latest.restoredFirstRunSnapshot)
+        assertEquals(2, observed.size)
+        assertEquals(observed.first().generation, observed.last().generation)
+        assertSame(advanced, observed.last().restoredFirstRunSnapshot)
+    }
+
+    @Test
+    fun staleOrActorMismatchedFirstRunProgressCannotReplaceCurrentProgress() {
+        val actorId = BACKEND_ACTOR_ID
+        val session = verifiedSession(
+            rotation = 21L,
+            actorId = actorId,
+            nowEpochMs = System.currentTimeMillis(),
+        )
+        val firstRun = verifiedEmailFirstRun(epoch = 21L, actorId = actorId)
+        val operation = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        assertTrue(
+            GatewaySessionProcessCoordinator.publishVerified(
+                operation = operation,
+                session = session,
+                firstRunSnapshot = firstRun,
+            ),
+        )
+        val generation = GatewaySessionProcessCoordinator.snapshot().generation
+        val advanced = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            snapshot = firstRun,
+            expectedEpoch = firstRun.epoch,
+            expectedRevision = firstRun.revision,
+        ).current
+        assertTrue(
+            GatewaySessionProcessCoordinator.updateFirstRunSnapshot(
+                generation,
+                actorId,
+                advanced,
+            ),
+        )
+
+        assertFalse(
+            GatewaySessionProcessCoordinator.updateFirstRunSnapshot(
+                generation,
+                actorId,
+                firstRun,
+            ),
+        )
+        assertFalse(
+            GatewaySessionProcessCoordinator.updateFirstRunSnapshot(
+                generation,
+                "00000000-0000-4000-8000-000000000099",
+                advanced,
+            ),
+        )
+        assertSame(
+            advanced,
+            GatewaySessionProcessCoordinator.snapshot().restoredFirstRunSnapshot,
+        )
+    }
+
+    @Test
     fun pendingRevocationClearsTheCredentialButRetainsTheExactOperation() {
         val session = verifiedSession(rotation = 8L)
         val loginOperation =
@@ -205,6 +301,66 @@ class GatewaySessionProcessCoordinatorTest {
         assertNull(blocked.session)
         assertNull(blocked.restoredFirstRunSnapshot)
         assertNull(blocked.inFlightOperationId)
+    }
+
+    @Test
+    fun guardedGeneralOperationRejectsNewDeletionRecoveryOrStorageBlock() {
+        val generalSession = verifiedSession(rotation = 30L)
+        val generalLogin = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        assertTrue(
+            GatewaySessionProcessCoordinator.publishVerified(
+                operation = generalLogin,
+                session = generalSession,
+                firstRunSnapshot = FirstRunOnboardingPolicy.initial(epoch = 30L),
+            ),
+        )
+        val beforeRecovery = GatewaySessionProcessCoordinator.snapshot()
+        val recoveryOperation =
+            requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        val recoverySession = deletionRecoveryVerifiedSession(rotation = 30L)
+        assertTrue(
+            GatewaySessionProcessCoordinator.publishDeletionRecoveryVerified(
+                operation = recoveryOperation,
+                session = recoverySession,
+                expectedActorId = ACTOR_ID,
+                expectedGatewayBaseUrl = GATEWAY_ORIGIN,
+            ),
+        )
+
+        assertNull(
+            GatewaySessionProcessCoordinator.beginGeneralSessionOperationIfCurrent(
+                expectedGeneration = beforeRecovery.generation,
+                expectedSession = generalSession,
+            ),
+        )
+        val afterRecovery = GatewaySessionProcessCoordinator.snapshot()
+        assertSame(recoverySession, afterRecovery.session)
+        assertTrue(afterRecovery.deletionRecoveryOnly)
+
+        assertNotNull(GatewaySessionProcessCoordinator.clear(afterRecovery.generation))
+        val secondGeneralSession = verifiedSession(rotation = 31L)
+        val secondLogin = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        assertTrue(
+            GatewaySessionProcessCoordinator.publishVerified(
+                operation = secondLogin,
+                session = secondGeneralSession,
+                firstRunSnapshot = FirstRunOnboardingPolicy.initial(epoch = 31L),
+            ),
+        )
+        val beforeStorageBlock = GatewaySessionProcessCoordinator.snapshot()
+        val storageOperation =
+            requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        assertTrue(GatewaySessionProcessCoordinator.markStorageBlocked(storageOperation))
+
+        assertNull(
+            GatewaySessionProcessCoordinator.beginGeneralSessionOperationIfCurrent(
+                expectedGeneration = beforeStorageBlock.generation,
+                expectedSession = secondGeneralSession,
+            ),
+        )
+        val afterStorageBlock = GatewaySessionProcessCoordinator.snapshot()
+        assertTrue(afterStorageBlock.storageBlocked)
+        assertNull(afterStorageBlock.session)
     }
 
     @Test
@@ -345,19 +501,42 @@ class GatewaySessionProcessCoordinatorTest {
         )
     }
 
-    private fun verifiedSession(rotation: Long): GatewayFieldSession =
+    private fun verifiedSession(
+        rotation: Long,
+        actorId: String = ACTOR_ID,
+        nowEpochMs: Long = NOW_EPOCH_MS,
+    ): GatewayFieldSession =
         GatewayFieldSession.longLivedSession(
             gatewayBaseUrl = GATEWAY_ORIGIN,
-            actorId = ACTOR_ID,
+            actorId = actorId,
             deviceId = DEVICE_ID,
             familyId = FAMILY_ID,
             rotation = rotation,
             cookiePair = "${GatewayFieldSession.COOKIE_NAME}=$ACCESS_SECRET",
             refreshToken = REFRESH_SECRET,
-            accessExpiresAtEpochMs = NOW_EPOCH_MS + 60_000L,
-            idleExpiresAtEpochMs = NOW_EPOCH_MS + 120_000L,
-            absoluteExpiresAtEpochMs = NOW_EPOCH_MS + 180_000L,
+            accessExpiresAtEpochMs = nowEpochMs + 60_000L,
+            idleExpiresAtEpochMs = nowEpochMs + 120_000L,
+            absoluteExpiresAtEpochMs = nowEpochMs + 180_000L,
         )
+
+    private fun verifiedEmailFirstRun(
+        epoch: Long,
+        actorId: String,
+    ) = FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
+        snapshot = FirstRunOnboardingPolicy.initialEmailAccount(epoch),
+        actorBinding = FirstRunOpaqueActorBinding.fromProvider(actorId),
+        receiptHash = FirstRunReceiptHash.fromSha256Hex("1".repeat(64)),
+    ).current.let { awaitingSafety ->
+        FirstRunOnboardingPolicy.acknowledgePurposeAndSafety(
+            snapshot = awaitingSafety,
+            request = FirstRunOnboardingAttemptRequest.forSnapshot(
+                snapshot = awaitingSafety,
+                requestId = "req_${"2".repeat(64)}",
+                attemptId = "att_${"3".repeat(64)}",
+            ),
+            receiptHash = FirstRunReceiptHash.fromSha256Hex("4".repeat(64)),
+        ).current
+    }
 
     private fun deletionRecoveryVerifiedSession(rotation: Long): GatewayFieldSession {
         val nowEpochMs = System.currentTimeMillis()
@@ -374,6 +553,7 @@ class GatewaySessionProcessCoordinatorTest {
     private companion object {
         const val GATEWAY_ORIGIN = "https://gateway.example.test"
         const val ACTOR_ID = "actor-test"
+        const val BACKEND_ACTOR_ID = "00000000-0000-4000-8000-000000000001"
         const val DEVICE_ID = "device-installation-00000001"
         const val NOW_EPOCH_MS = 1_000_000L
         const val ACCESS_SECRET = "access-token-value-0000000000000001"

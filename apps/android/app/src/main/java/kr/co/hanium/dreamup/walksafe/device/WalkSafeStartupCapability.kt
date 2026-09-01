@@ -9,7 +9,8 @@ const val WALKSAFE_PRODUCT_PURPOSE_STATEMENT_KO =
 const val WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO =
     "워크세이프는 보행 안전을 보장하지 않으며 흰지팡이·안내견·보호자를 대신하지 않습니다."
 const val WALKSAFE_LIMITED_DISTANCE_NOTICE_KO =
-    "이 휴대폰은 거리를 잴 수 없어 물체 종류만 알려드립니다. 거리와 안전 여부는 판단하지 않습니다"
+    "사용할 수 없는 기능: 미터 단위 거리 측정. " +
+        "이 휴대폰은 거리를 잴 수 없어 물체 종류만 알려드립니다. 거리와 안전 여부는 판단하지 않습니다"
 
 val WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO = """
     $WALKSAFE_PRODUCT_PURPOSE_STATEMENT_KO
@@ -17,6 +18,8 @@ val WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO = """
     1. 카메라로 가까운 위험을 안내합니다.
     2. TMAP으로 큰 이동 방향을 안내합니다.
     3. 손상된 점자블록 신고를 돕습니다.
+    기기점검은 카메라·위치·마이크·음성·진동 지원 여부를 확인하며 실제 보행이나 신고를 시작하지 않습니다.
+    호출어 음성은 휴대폰 안에서 처리하고 원본을 저장하거나 서버로 보내지 않습니다.
     안전 제한: $WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO
     고지 기준: $WALKSAFE_PRODUCT_NOTICE_BASELINE
 """.trimIndent()
@@ -38,6 +41,10 @@ enum class WalkSafeStartupRequirement(val labelKo: String) {
     METRIC_DISTANCE("미터 단위 거리 측정"),
     APPROVED_DEVICE_PROFILE("승인된 지정 기기 프로필"),
 }
+
+val USER_INSTALLABLE_REQUIREMENTS: Set<WalkSafeStartupRequirement> = setOf(
+    WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS,
+)
 
 data class WalkSafeStartupCapabilityInput(
     val androidVersionSupported: Boolean?,
@@ -90,46 +97,45 @@ object WalkSafeStartupCapabilityResolver {
         }
         val pending = statuses.filterValues { it == null }.keys.toList()
         val unavailable = statuses.filterValues { it == false }.keys.toList()
-        val fullOnlyRequirements = setOf(
-            WalkSafeStartupRequirement.METRIC_DISTANCE,
-            WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE,
-        )
-        val unavailableCore = unavailable.filterNot { it in fullOnlyRequirements }
-        val pendingCore = pending.filterNot { it in fullOnlyRequirements }
 
-        if (unavailableCore.isNotEmpty()) {
+        if (WalkSafeStartupRequirement.ANDROID_VERSION in unavailable) {
             return WalkSafeStartupCapabilityDecision(
                 tier = WalkSafeStartupCapabilityTier.BLOCKED,
                 unavailableRequirements = unavailable,
                 pendingRequirements = pending,
-                noticeKo = "이 휴대폰에서는 WalkSafe를 시작할 수 없습니다. " +
-                    "사용할 수 없는 기능: ${unavailableCore.labelsKo()}",
+                noticeKo = "지원 Android 버전이 아니어서 WalkSafe를 시작할 수 없습니다. " +
+                    "사용할 수 없는 기능: ${unavailable.labelsKo()}",
             )
         }
-        if (pendingCore.isNotEmpty()) {
+        if (pending.isNotEmpty()) {
+            val unavailableNotice = if (unavailable.isEmpty()) {
+                ""
+            } else {
+                " 확인된 미지원 기능: ${unavailable.labelsKo()}"
+            }
             return WalkSafeStartupCapabilityDecision(
                 tier = WalkSafeStartupCapabilityTier.BLOCKED,
                 unavailableRequirements = unavailable,
                 pendingRequirements = pending,
-                noticeKo = "기기 기능을 확인하는 중입니다: ${pendingCore.labelsKo()}",
+                noticeKo = "기기 기능을 확인하는 중입니다: ${pending.labelsKo()}." +
+                    unavailableNotice,
             )
         }
-        val unavailableFullOnly = unavailable.filter { it in fullOnlyRequirements }
-        if (unavailableFullOnly.isNotEmpty()) {
+        if (unavailable.isNotEmpty()) {
+            val noticeKo = if (
+                unavailable == listOf(WalkSafeStartupRequirement.METRIC_DISTANCE)
+            ) {
+                WALKSAFE_LIMITED_DISTANCE_NOTICE_KO
+            } else {
+                "일부 기기 기능을 사용할 수 없습니다. " +
+                    "사용할 수 없는 기능: ${unavailable.labelsKo()}. " +
+                    "해당 기능과 관련된 기능만 제한됩니다."
+            }
             return WalkSafeStartupCapabilityDecision(
                 tier = WalkSafeStartupCapabilityTier.LIMITED,
-                unavailableRequirements = unavailableFullOnly,
-                pendingRequirements = emptyList(),
-                noticeKo = WALKSAFE_LIMITED_DISTANCE_NOTICE_KO,
-            )
-        }
-        val pendingFullOnly = pending.filter { it in fullOnlyRequirements }
-        if (pendingFullOnly.isNotEmpty()) {
-            return WalkSafeStartupCapabilityDecision(
-                tier = WalkSafeStartupCapabilityTier.BLOCKED,
                 unavailableRequirements = unavailable,
-                pendingRequirements = pending,
-                noticeKo = "기기 기능을 확인하는 중입니다: ${pendingFullOnly.labelsKo()}",
+                pendingRequirements = emptyList(),
+                noticeKo = noticeKo,
             )
         }
         return WalkSafeStartupCapabilityDecision(

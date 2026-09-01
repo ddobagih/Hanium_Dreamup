@@ -100,7 +100,8 @@ class CameraXFallbackCompositionStaticTest {
         assertTrue(finalGuard.contains("lifecycleGeneration == feedbackLifecycleGeneration"))
         assertTrue(finalGuard.contains("AndroidLocalTactileTier.CAMERA_IMU_NON_METRIC"))
         assertTrue(source.contains("latestReportCandidateStatus = \"reportCandidate=blocked:camera_non_metric_tier\""))
-        assertTrue(source.contains("카메라 보조 경고 · 목적지 없이 사용 가능"))
+        assertTrue(source.contains("카메라 보조 경고 · 거리 제한 모드"))
+        assertTrue(source.contains("현재 사용 가능한 위치·경로·걸음 수·음성·진동 기능은 계속"))
         assertFalse(source.contains("카메라 보조 경고 · TMAP 경로 유지"))
     }
 
@@ -226,7 +227,20 @@ class CameraXFallbackCompositionStaticTest {
         assertTrue(arCoreStart.indexOf("stopCameraFallbackSession(updateUi = false)") < arCoreStart.indexOf("requestInstall"))
         assertTrue(arCoreStart.indexOf("stopCameraFallbackSession(updateUi = false)") < arCoreStart.indexOf("Session(this)"))
         assertTrue(fallbackStop.indexOf("cameraFallbackGeneration += 1") < fallbackStop.indexOf("clearAnalyzer()"))
-        assertTrue(fallbackStop.indexOf("clearAnalyzer()") < fallbackStop.indexOf("unbindAll()"))
+        assertTrue(fallbackStop.indexOf("clearAnalyzer()") < fallbackStop.indexOf("unbind(ownedAnalysis)"))
+        assertTrue(fallbackStop.contains("detectorExecutor.execute"))
+        assertTrue(fallbackStop.contains("CAMERA_ANALYZER_RELEASE_BARRIER_TIMEOUT_MS"))
+        assertTrue(fallbackStop.contains("awaitCameraXClosed(ownedCamera)"))
+        assertTrue(fallbackStop.contains("closed && !analyzerBarrierTimedOut.get()"))
+        assertTrue(fallbackStop.contains("cameraFallbackAfterRelease = onReleased"))
+        assertTrue(fallbackStop.contains("unbind(ownedPreview)"))
+        assertFalse(fallbackStop.contains("unbindAll()"))
+
+        val continuation = source.substringAfter("private fun continueDepthSessionStart(")
+            .substringBefore("private fun stopDepthSession(")
+        assertTrue(continuation.contains("expectedLifecycleGeneration"))
+        assertTrue(continuation.contains("walkSessionLifecycle.isRuntimeEpochCurrent(expectedEpoch)"))
+        assertTrue(continuation.contains("isWalkSessionRuntimeActive()"))
     }
 
     @Test
@@ -251,7 +265,7 @@ class CameraXFallbackCompositionStaticTest {
     }
 
     @Test
-    fun unavailableDetectorStopsCameraHazardWithoutClaimingAnActiveRoute() {
+    fun unavailableDetectorLimitsCameraHazardWithoutStoppingOtherFeatures() {
         val fallbackStart = source.substringAfter("private fun startCameraFallbackSession(")
             .substringBefore("private fun bindCameraFallbackSession()")
         val detectorFailure = source.substringAfter("private fun disableDetectorAfterRuntimeFailure(")
@@ -259,7 +273,9 @@ class CameraXFallbackCompositionStaticTest {
 
         assertTrue(fallbackStart.contains("if (!detectorAvailable)"))
         assertTrue(fallbackStart.contains("cameraFallbackRequested = false"))
-        assertTrue(fallbackStart.contains("카메라 보조 경고 사용 불가"))
+        assertTrue(fallbackStart.contains("continueAfterCameraFallbackFailure("))
+        assertTrue(fallbackStart.contains("대체 장애물 탐지기를 사용할 수 없습니다."))
+        assertFalse(fallbackStart.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertFalse(fallbackStart.contains("TMAP 전용"))
         assertTrue(fallbackStart.indexOf("if (!detectorAvailable)") < fallbackStart.indexOf("cameraFallbackRequested = true"))
         assertTrue(detectorFailure.contains("stopCameraFallbackSession(updateUi = false)"))

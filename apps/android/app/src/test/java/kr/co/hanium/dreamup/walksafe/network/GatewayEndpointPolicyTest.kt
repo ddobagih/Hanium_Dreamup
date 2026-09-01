@@ -33,4 +33,34 @@ class GatewayEndpointPolicyTest {
         )
         assertNull(GatewayEndpointPolicy.debugOriginOrNull("http://192.168.0.10:8081"))
     }
+
+    @Test
+    fun queueStyleDebugTrafficAcceptsOnlyTheExactBuildApprovedTestOrigin() {
+        assertEquals(
+            "http://127.0.0.1:8081",
+            GatewayEndpointPolicy.approvedDebugOriginOrNull(
+                raw = "http://127.0.0.1:8081/",
+                approvedOrigin = "http://127.0.0.1:8081",
+            ),
+        )
+        assertNull(
+            GatewayEndpointPolicy.approvedDebugOriginOrNull(
+                raw = "https://arbitrary.example",
+                approvedOrigin = "http://127.0.0.1:8081",
+            ),
+        )
+        assertNull(
+            GatewayEndpointPolicy.approvedDebugOriginOrNull(
+                raw = "http://localhost:8081",
+                approvedOrigin = "http://127.0.0.1:8081",
+            ),
+        )
+        assertEquals(
+            "https://queue-test.example",
+            GatewayEndpointPolicy.approvedDebugOriginOrNull(
+                raw = "https://QUEUE-test.example/",
+                approvedOrigin = "https://queue-test.example",
+            ),
+        )
+    }
 }

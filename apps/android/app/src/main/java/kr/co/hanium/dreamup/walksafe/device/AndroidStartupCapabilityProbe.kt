@@ -7,11 +7,9 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
 import com.google.ar.core.ArCoreApk
 import java.io.Closeable
-import java.util.Locale
+import kr.co.hanium.dreamup.walksafe.voice.BundledVoskModelInstaller
 
 class AndroidStartupCapabilityProbe(
     context: Context,
@@ -32,17 +30,25 @@ class AndroidStartupCapabilityProbe(
     private var started = false
     private var closed = false
     private var generation = 0
-    private var textToSpeech: TextToSpeech? = null
-    private var offlineKoreanTextToSpeechAvailable: Boolean? = null
+    private val offlineKoreanTextToSpeechProbeState = OfflineKoreanTextToSpeechProbeState()
+    private var koreanTextToSpeechProbe: AndroidKoreanTextToSpeechSynthesisProbe? = null
     private var metricDistanceAvailable: Boolean? = null
 
     fun start() {
+        check(!closed) { "AndroidStartupCapabilityProbe is already closed" }
         check(!started) { "AndroidStartupCapabilityProbe may only be started once" }
         started = true
         val currentGeneration = ++generation
         probeDistance(currentGeneration)
         probeOfflineKoreanTextToSpeech(currentGeneration)
         notifyChanged(currentGeneration)
+    }
+
+    fun recheckOfflineKoreanTextToSpeech() {
+        check(!closed) { "AndroidStartupCapabilityProbe is already closed" }
+        check(started) { "AndroidStartupCapabilityProbe must be started before rechecking" }
+        val currentGeneration = generation
+        probeOfflineKoreanTextToSpeech(currentGeneration, notifyPending = true)
     }
 
     fun snapshot(): WalkSafeStartupCapabilityInput {
@@ -53,7 +59,7 @@ class AndroidStartupCapabilityProbe(
             microphoneAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_MICROPHONE),
             vibrationAvailable = vibrator()?.hasVibrator() == true,
             onDeviceSpeechRecognitionAvailable = onDeviceSpeechRecognitionAvailable(),
-            offlineKoreanTextToSpeechAvailable = offlineKoreanTextToSpeechAvailable,
+            offlineKoreanTextToSpeechAvailable = offlineKoreanTextToSpeechProbeState.available,
             metricDistanceAvailable = metricDistanceAvailable,
             approvedDesignatedDeviceProfile = approvedDeviceProfileMatch.approved,
             designatedDeviceProfileVersion = approvedDeviceProfileMatch.profileVersion,
@@ -83,10 +89,7 @@ class AndroidStartupCapabilityProbe(
     }
 
     private fun onDeviceSpeechRecognitionAvailable(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
-        return runCatching {
-            SpeechRecognizer.isOnDeviceRecognitionAvailable(appContext)
-        }.getOrDefault(false)
+        return BundledVoskModelInstaller.bundledModelAvailable(appContext)
     }
 
     private fun vibrator(): Vibrator? {
@@ -123,7 +126,7 @@ class AndroidStartupCapabilityProbe(
             ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED,
             -> if (packageManager.hasSystemFeature(ARCORE_DEPTH_FEATURE)) {
                 // A hardware declaration identifies only a candidate. FULL stays blocked until a
-                // live session proves stable metric frames on an approved device profile.
+                // live session proves stable metric frames on this device.
                 null
             } else {
                 false
@@ -138,36 +141,58 @@ class AndroidStartupCapabilityProbe(
         }
     }
 
-    private fun probeOfflineKoreanTextToSpeech(currentGeneration: Int) {
-        runCatching {
-            textToSpeech = TextToSpeech(appContext) { status ->
-                mainHandler.post {
-                    if (!isCurrent(currentGeneration)) return@post
-                    val engine = textToSpeech
-                    offlineKoreanTextToSpeechAvailable =
-                        status == TextToSpeech.SUCCESS && engine?.hasOfflineKoreanVoice() == true
-                    engine?.shutdown()
-                    textToSpeech = null
-                    onCapabilityChanged()
+    private fun probeOfflineKoreanTextToSpeech(
+        currentGeneration: Int,
+        notifyPending: Boolean = false,
+    ) {
+        val currentKoreanTextToSpeechGeneration = offlineKoreanTextToSpeechProbeState.begin()
+        val previousProbe = koreanTextToSpeechProbe
+        koreanTextToSpeechProbe = null
+        previousProbe?.close()
+        if (notifyPending) notifyChanged(currentGeneration)
+        val probe = runCatching {
+            AndroidKoreanTextToSpeechSynthesisProbe(appContext) { result ->
+                if (
+                    !isCurrent(currentGeneration) ||
+                    !offlineKoreanTextToSpeechProbeState.complete(
+                        currentKoreanTextToSpeechGeneration,
+                        result.available,
+                    )
+                ) {
+                    return@AndroidKoreanTextToSpeechSynthesisProbe
                 }
+                koreanTextToSpeechProbe = null
+                onCapabilityChanged()
             }
-        }.onFailure {
-            offlineKoreanTextToSpeechAvailable = false
+        }.getOrElse {
+            if (
+                isCurrent(currentGeneration) &&
+                offlineKoreanTextToSpeechProbeState.complete(
+                    currentKoreanTextToSpeechGeneration,
+                    available = false,
+                )
+            ) {
+                notifyChanged(currentGeneration)
+            }
+            return
+        }
+        koreanTextToSpeechProbe = probe
+        runCatching { probe.start() }.onFailure {
+            if (
+                !isCurrent(currentGeneration) ||
+                !offlineKoreanTextToSpeechProbeState.complete(
+                    currentKoreanTextToSpeechGeneration,
+                    available = false,
+                )
+            ) {
+                if (koreanTextToSpeechProbe === probe) koreanTextToSpeechProbe = null
+                probe.close()
+                return@onFailure
+            }
+            koreanTextToSpeechProbe = null
+            probe.close()
             notifyChanged(currentGeneration)
         }
-    }
-
-    private fun TextToSpeech.hasOfflineKoreanVoice(): Boolean {
-        val koreanSupported = runCatching {
-            isLanguageAvailable(Locale.KOREAN) >= TextToSpeech.LANG_AVAILABLE
-        }.getOrDefault(false)
-        if (!koreanSupported) return false
-        return runCatching {
-            voices.orEmpty().any { voice ->
-                voice.locale.language.equals(Locale.KOREAN.language, ignoreCase = true) &&
-                    !voice.isNetworkConnectionRequired
-            }
-        }.getOrDefault(false)
     }
 
     private fun notifyChanged(currentGeneration: Int) {
@@ -184,11 +209,44 @@ class AndroidStartupCapabilityProbe(
         closed = true
         generation += 1
         mainHandler.removeCallbacksAndMessages(null)
-        textToSpeech?.shutdown()
-        textToSpeech = null
+        offlineKoreanTextToSpeechProbeState.close()
+        val previousProbe = koreanTextToSpeechProbe
+        koreanTextToSpeechProbe = null
+        previousProbe?.close()
     }
 
     private companion object {
         const val ARCORE_DEPTH_FEATURE = "com.google.ar.core.depth"
+    }
+}
+
+internal class OfflineKoreanTextToSpeechProbeState {
+    var available: Boolean? = null
+        private set
+
+    private var generation = 0
+    private var closed = false
+
+    fun begin(): Int {
+        check(!closed) { "Offline Korean TTS probe state is already closed" }
+        available = null
+        generation += 1
+        return generation
+    }
+
+    fun complete(
+        currentGeneration: Int,
+        available: Boolean,
+    ): Boolean {
+        if (closed || currentGeneration != generation) return false
+        this.available = available
+        generation += 1
+        return true
+    }
+
+    fun close() {
+        if (closed) return
+        closed = true
+        generation += 1
     }
 }

@@ -93,7 +93,7 @@ class GatewayCapacityMainActivityStaticTest {
     fun capacityBlocksOnlyAutomaticCandidatesAndNeverExplicitSafetyReports() {
         val prepare = functionBlock("private fun prepareReportCandidate(")
         val process = functionBlock("private fun processReportCandidate(")
-        val explicit = functionBlock("private fun requestExplicitReport()")
+        val explicit = functionBlock("private fun requestExplicitReport(")
         val explicitPreparation = functionBlock(
             "private fun prepareExplicitReportCandidateIfCurrent(",
         )
@@ -109,7 +109,7 @@ class GatewayCapacityMainActivityStaticTest {
         assertTrue(process.contains("reportQueueStore.enqueue("))
         assertFalse(process.contains("uploadCall("))
         assertFalse(process.contains("gatewaySessionClient.revalidate("))
-        val capture = functionBlock("private fun captureReportQueueDrainTriggerBeforeTransition(")
+        val capture = functionBlock("private fun buildReportQueueDrainTrigger(")
         assertTrue(capture.contains("GatewaySessionProcessCoordinator.snapshot()"))
         assertTrue(capture.contains("gatewaySession.isUsableFor(reporter)"))
         assertTrue(capture.contains("gatewaySessionGeneration = gatewaySnapshot.generation"))

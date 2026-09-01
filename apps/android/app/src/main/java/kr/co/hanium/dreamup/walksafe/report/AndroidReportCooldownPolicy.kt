@@ -4,6 +4,7 @@ import java.util.Locale
 import kr.co.hanium.dreamup.walksafe.navigation.haversineMeters
 import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
 import kr.co.hanium.dreamup.walksafe.network.GatewayCredentialPolicy
+import org.json.JSONObject
 
 data class AndroidReportSpatialScope(
     val actorId: String,
@@ -17,6 +18,35 @@ data class AndroidReportSuccessfulCooldown(
     val scope: AndroidReportSpatialScope,
     val lastUploadedAtMs: Long,
 )
+
+internal fun automaticReportCooldownScopeOrNull(
+    metadata: JSONObject,
+): AndroidReportSpatialScope? = runCatching {
+    require(metadata.getString("schema_version") == "detect.v2")
+    require(metadata.getString("trigger") == AndroidReportCandidatePolicy.TRIGGER_AUTO)
+    require(metadata.getBoolean("auto_reported"))
+    val gps = metadata.getJSONObject("gps")
+    AndroidReportCooldownPolicy.spatialScopeOrNull(
+        actorId = metadata.getString("reporter_user_id"),
+        className = metadata.getString("class_name"),
+        location = TrustedLocation(
+            latitude = gps.getDouble("latitude"),
+            longitude = gps.getDouble("longitude"),
+            accuracyM = 0f,
+            elapsedRealtimeMs = 0L,
+        ),
+    )
+}.getOrNull()
+
+internal fun QueuedReport.automaticCooldownScopeOrNull(): AndroidReportSpatialScope? {
+    if (priority != ReportQueuePriority.AUTOMATIC) return null
+    val metadata = payload.metadataUtf8()
+    return try {
+        automaticReportCooldownScopeOrNull(JSONObject(String(metadata, Charsets.UTF_8)))
+    } finally {
+        metadata.fill(0)
+    }
+}
 
 /** Keeps automatic reports scoped to a named actor and a real-distance GPS neighborhood. */
 object AndroidReportCooldownPolicy {

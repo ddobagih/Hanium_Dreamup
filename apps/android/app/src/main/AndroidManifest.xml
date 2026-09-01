@@ -8,8 +8,11 @@
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
     <uses-feature android:name="com.google.ar.core.depth" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
@@ -24,6 +27,7 @@
     </queries>
 
     <application
+        android:name=".voice.WalkSafeApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
@@ -34,6 +38,11 @@
         <meta-data
             android:name="com.google.ar.core"
             android:value="optional" />
+
+        <service
+            android:name=".voice.WalkVoiceForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <activity
             android:name=".MainActivity"

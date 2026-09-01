@@ -231,6 +231,37 @@ class OfficialEnvironmentPolicyTest {
         assertFalse(assessment.canStartWalk)
     }
 
+    @Test
+    fun sensorsMustOverlapInFreshnessAndARefreshedGpsRestoresReadiness() {
+        val laterMs = NOW_MS + MAX_AGE_MS + 1L
+        val freshCamera = cameraEvidence().copy(observedAtElapsedRealtimeMs = laterMs)
+        val staleGpsAssessment = OfficialEnvironmentPolicy.assess(
+            currentEpoch = EPOCH,
+            nowElapsedRealtimeMs = laterMs,
+            gpsQuality = gpsEvidence(),
+            cameraQuality = freshCamera,
+            userConfirmation = confirmation(),
+            approvedProfile = PROFILE,
+        )
+        val refreshedGps = OfficialEnvironmentPolicy.assessGpsQuality(
+            currentEpoch = EPOCH,
+            nowElapsedRealtimeMs = laterMs,
+            observation = gpsObservation().copy(observedAtElapsedRealtimeMs = laterMs),
+            approvedProfile = PROFILE,
+        )
+        val refreshedAssessment = OfficialEnvironmentPolicy.assess(
+            currentEpoch = EPOCH,
+            nowElapsedRealtimeMs = laterMs,
+            gpsQuality = refreshedGps,
+            cameraQuality = freshCamera,
+            userConfirmation = confirmation(),
+            approvedProfile = PROFILE,
+        )
+
+        assertEquals(OfficialEnvironmentSupport.LIMITED, staleGpsAssessment.support)
+        assertEquals(OfficialEnvironmentSupport.SUPPORTED, refreshedAssessment.support)
+    }
+
     private fun supportedAssessment() = assess()
 
     private fun assess(

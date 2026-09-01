@@ -81,14 +81,14 @@ class ArCoreTactileProjectionContextFactoryTest {
         val snapshotStore = bytecodeInstructions(onDrawFrame.substringAfter(depthCall))
             .first { opcode(it) == "astore" }
             .let(::operation)
-        val scheduleCall = "scheduleDetectionIfDue:(Lkr/co/hanium/dreamup/walksafe/depth/ArCoreFrameProvider;Lcom/google/ar/core/Frame;JJJLkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;ILkr/co/hanium/dreamup/walksafe/session/WalkRuntimeEpoch;)V"
+        val scheduleCall = "scheduleDetectionIfDue:(Lkr/co/hanium/dreamup/walksafe/depth/ArCoreFrameProvider;Lcom/google/ar/core/Frame;JJJLkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;ILkr/co/hanium/dreamup/walksafe/session/WalkRuntimeEpoch;J)V"
         assertTrue(onDrawFrame.contains(scheduleCall))
         val timestampStoresBeforeSchedule = bytecodeInstructions(
             onDrawFrame.substringAfter(frameTimestampCall).substringBefore(scheduleCall),
         ).map(::operation).count { it == timestampStore }
         assertEquals(1, timestampStoresBeforeSchedule)
         val drawInstructionsBeforeSchedule = bytecodeInstructions(onDrawFrame.substringBefore(scheduleCall))
-        val scheduleArguments = drawInstructionsBeforeSchedule.takeLast(10)
+        val scheduleArguments = drawInstructionsBeforeSchedule.takeLast(12)
         assertEquals(
             listOf(
                 "aload_0",
@@ -100,6 +100,8 @@ class ArCoreTactileProjectionContextFactoryTest {
                 "aload",
                 "iload_2",
                 "aload",
+                "aload_3",
+                "invokevirtual",
                 "invokespecial",
             ),
             scheduleArguments.map(::opcode),
@@ -107,13 +109,14 @@ class ArCoreTactileProjectionContextFactoryTest {
         assertEquals(providerLoad, operation(scheduleArguments[1]))
         assertEquals(frameLoad, operation(scheduleArguments[2]))
         assertEquals(snapshotStore.replaceFirst("astore", "aload"), operation(scheduleArguments[6]))
+        assertTrue(scheduleArguments[10].contains("ArSessionLease.getGeneration:()J"))
         val afterSessionFrameAssignment = bytecodeInstructions(
             onDrawFrame.substringAfter(displayGeometryCall).substringBefore(scheduleCall),
         )
         val frameStore = frameLoad.replaceFirst("aload", "astore")
         assertFalse(afterSessionFrameAssignment.map(::operation).any { it == frameStore })
 
-        val scheduleSignature = "scheduleDetectionIfDue(kr.co.hanium.dreamup.walksafe.depth.ArCoreFrameProvider, com.google.ar.core.Frame, long, long, long, kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot, int, kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch);"
+        val scheduleSignature = "scheduleDetectionIfDue(kr.co.hanium.dreamup.walksafe.depth.ArCoreFrameProvider, com.google.ar.core.Frame, long, long, long, kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot, int, kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch, long);"
         assertTrue(disassembly.contains(scheduleSignature))
         val schedule = disassembly
             .substringAfter(scheduleSignature)

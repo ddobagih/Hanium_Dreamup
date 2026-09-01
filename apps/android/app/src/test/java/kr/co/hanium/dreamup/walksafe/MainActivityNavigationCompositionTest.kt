@@ -5,7 +5,6 @@ import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchResult
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigator
 import kr.co.hanium.dreamup.walksafe.navigation.RoutePoint
 import kr.co.hanium.dreamup.walksafe.navigation.WalkingRoute
@@ -100,6 +99,21 @@ class MainActivityNavigationCompositionTest {
         assertEquals(3, Regex("addView\\(routeDeviation").findAll(controls).count())
         assertTrue(controls.contains("contentDescription = text"))
         assertTrue(source.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
+    }
+
+    @Test
+    fun teammateTmapUiHandoffIsAdaptedToTheCurrentNavigationLayout() {
+        val destination = source.substringAfter("destinationQueryInput = EditText(this).apply")
+            .substringBefore("destinationSearchButton = Button(this).apply")
+        val controls = source.substringAfter("offRouteNoticeText = TextView(this).apply")
+            .substringBefore("destinationResetButton = Button(this).apply")
+        val update = functionBlock("private fun updateRouteDeviationActions(")
+
+        assertTrue(destination.contains("contentDescription = \"목적지 입력\""))
+        assertTrue(controls.contains("addView(offRouteNoticeText)"))
+        assertTrue(update.contains("confirmed -> \"경로를 벗어났습니다\""))
+        assertTrue(update.contains("suspected -> \"경로를 벗어난 것으로 보입니다\""))
+        assertTrue(update.contains("else -> \"\""))
     }
 
     @Test
@@ -208,10 +222,18 @@ class MainActivityNavigationCompositionTest {
     @Test
     fun distrustedGpsStopsDirectionGuidanceInsteadOfSubstitutingStepLength() {
         val handler = functionBlock("private fun handleLocationUpdate(")
-        val untrusted = handler.substringAfter("gps_untrusted")
+        val untrusted = handler.substringAfter("if (freshTrusted == null)")
             .substringBefore("latestTrustedLocation = freshTrusted")
 
-        assertTrue(handler.contains("reason = \"gps_untrusted\""))
+        assertTrue(handler.contains("val mock = isMockLocationCompat(location)"))
+        assertTrue(handler.contains("if (mock) latestTrustedLocation = null"))
+        assertTrue(handler.contains("mock = mock"))
+        assertTrue(handler.contains("val untrustedReason = if (mock) \"gps_mock_rejected\" else \"gps_untrusted\""))
+        assertTrue(handler.contains("reason = untrustedReason"))
+        assertTrue(
+            handler.indexOf("if (mock) latestTrustedLocation = null") <
+                handler.indexOf("LocationTrustPolicy.trustedOrNull("),
+        )
         assertTrue(handler.contains("pauseDirectionGuidance("))
         assertFalse(untrusted.contains("stepLengthEstimator"))
         assertFalse(untrusted.contains("latestStepCount"))
@@ -251,37 +273,26 @@ class MainActivityNavigationCompositionTest {
     }
 
     @Test
-    fun destinationSearchPreservesRequestsUntilActualCandidateSelectionCancelsBoth() {
+    fun destinationSelectionGuardsUnavailableNavigationBeforeJointCancellation() {
+        val selection = functionBlock("private fun onDestinationSelected(")
+        val availabilityGuard = selection.indexOf("!currentNavigationCollectionAllowsWork()")
+        val unavailableExplanation = selection.indexOf("explainNavigationFeatureUnavailable()")
+        val cancellation = selection.indexOf("cancelNavigationRequestsForDestinationSelection()")
+
+        assertTrue(availabilityGuard >= 0)
+        assertTrue(unavailableExplanation > availabilityGuard)
+        assertTrue(cancellation > unavailableExplanation)
+
         val activity = MainActivity()
         val routeCancels = AtomicInteger()
         val searchCancels = AtomicInteger()
         val route = activity.trackRouteRequest(recordingCall(routeCancels))
         val search = activity.trackDestinationSearchRequest(recordingCall(searchCancels))
 
-        assertFalse(route.isCancelled())
-        assertFalse(search.isCancelled())
+        activity.cancelNavigationRequestsForDestinationSelection()
 
-        setReporterUserId(activity)
-        val entryFailure = invokeEntry(
-            activity = activity,
-            methodName = "onDestinationSelected",
-            returnType = Boolean::class.javaPrimitiveType!!,
-            parameterTypes = arrayOf(DestinationSearchResult::class.java),
-            arguments = arrayOf(
-                DestinationSearchResult(
-                    id = "destination-1",
-                    name = "서울역",
-                    point = RoutePoint(37.5547, 126.9707, "서울역"),
-                    address = null,
-                    roadAddress = null,
-                    category = null,
-                    distanceM = null,
-                ),
-            ),
-        )
-
-        assertTrue("selection entry failed before cancellation: $entryFailure", route.isCancelled())
-        assertTrue("selection entry failed before cancellation: $entryFailure", search.isCancelled())
+        assertTrue(route.isCancelled())
+        assertTrue(search.isCancelled())
         assertEquals(1, routeCancels.get())
         assertEquals(1, searchCancels.get())
     }
@@ -369,13 +380,6 @@ class MainActivityNavigationCompositionTest {
             executeBlock = {},
             cancelBlock = { cancelCount.incrementAndGet() },
         )
-    }
-
-    private fun setReporterUserId(activity: MainActivity) {
-        MainActivity::class.java.getDeclaredField("reporterUserId").apply {
-            isAccessible = true
-            set(activity, "test-user")
-        }
     }
 
     private fun field(activity: MainActivity, name: String): Any? {

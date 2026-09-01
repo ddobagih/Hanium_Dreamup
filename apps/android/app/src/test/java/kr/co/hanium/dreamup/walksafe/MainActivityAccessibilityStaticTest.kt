@@ -155,7 +155,7 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(presentation.contains("ACTION_ACCESSIBILITY_FOCUS"))
         assertFalse(presentation.contains("announceForAccessibility("))
         assertFalse(presentation.contains("speakInteraction("))
-        assertTrue(observedState.contains("speakInteraction("))
+        assertFalse(observedState.contains("speakInteraction("))
 
         val exitLabel = "확인하고 앱 끝내기"
         assertTrue(
@@ -420,9 +420,10 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(cameraFallbackStart.contains("cameraFallbackRunning = false"))
         assertTrue(
             cameraFallbackStart.contains(
-                "enterWalkSessionSafetyStopAndCancelOutputs(\"camera_fallback_bind_failed\")",
+                "continueAfterCameraFallbackFailure(",
             ),
         )
+        assertFalse(cameraFallbackStart.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertTrue(cameraFallbackStop.contains("cameraFallbackRunning = false\n        syncActiveSessionScreenPolicy()"))
         assertTrue(source.contains("isActivityForeground = false\n        feedbackLifecycleGeneration += 1"))
         assertTrue(source.contains("feedbackPolicy.cancelPendingFeedbackDeliveries()\n        feedbackActuator?.close()"))

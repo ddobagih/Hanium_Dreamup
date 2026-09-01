@@ -32,6 +32,40 @@ class MainActivityFp012StaticTest {
     }
 
     @Test
+    fun startReadinessIsRecapturedBeforeTheRequestAndAfterTheLeaseResponse() {
+        val request = functionBlock("private fun requestGatewayWalkStart(")
+        val activation = functionBlock("private fun completeGatewayWalkActivation(")
+        val recapture = functionBlock("private fun currentGatewayWalkStartReadinessOrNull(")
+
+        assertTrue(
+            request.indexOf("currentGatewayWalkStartReadinessOrNull(token)") <
+                request.indexOf("gatewayWalkSessionClient.start("),
+        )
+        assertTrue(
+            activation.indexOf("currentGatewayWalkStartReadinessOrNull(token)") <
+                activation.indexOf("WalkSessionEvent.StartRequested(token)"),
+        )
+        assertTrue(activation.contains("gatewayWalkAuthorityController.beginEnd(token.epoch)"))
+        assertTrue(activation.contains("endGatewayWalkBestEffort("))
+        assertTrue(recapture.contains("captureWalkSessionReadiness("))
+        assertTrue(recapture.contains("it.isReady"))
+        assertTrue(recapture.contains("it.plan.mode == token.readiness.plan.mode"))
+    }
+
+    @Test
+    fun centralSafetyStopEndsTheServerLeaseBestEffort() {
+        val safetyStop =
+            functionBlock("private fun enterWalkSessionSafetyStopAndCancelOutputs(")
+
+        assertTrue(safetyStop.contains("gatewayWalkAuthorityController.beginEnd(it.epoch)"))
+        assertTrue(safetyStop.contains("endGatewayWalkBestEffort("))
+        assertTrue(
+            safetyStop.indexOf("gatewayWalkAuthorityController.beginEnd(it.epoch)") <
+                safetyStop.indexOf("WalkSessionEvent.SafetyStopRequested"),
+        )
+    }
+
+    @Test
     fun conflictRequiresASeparateExactVoiceConfirmation() {
         val prompt = functionBlock("private fun requestGatewayWalkTakeoverConfirmation(")
         val recognition = functionBlock("private fun handleGatewayWalkTakeoverRecognition(")
@@ -44,6 +78,29 @@ class MainActivityFp012StaticTest {
         assertTrue(takeover.contains("gatewayWalkSessionClient.takeover("))
         assertTrue(gatewayWalkSource.contains(".put(\"confirmation\", \"voice_confirmed\")"))
         assertFalse(prompt.contains("postDelayed("))
+    }
+
+    @Test
+    fun failedStartOrTakeoverRestoresAnExplicitRetryButton() {
+        val request = functionBlock("private fun requestGatewayWalkStart(")
+        val result = functionBlock("private fun handleGatewayWalkStartResult(")
+        val takeover = functionBlock("private fun executeGatewayWalkTakeover(")
+        val cancelled = functionBlock("private fun cancelGatewayWalkTakeoverConfirmation(")
+        val retry = functionBlock("private fun makeGatewayWalkStartRetryAvailable(")
+        val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
+
+        assertTrue(request.contains("makeGatewayWalkStartRetryAvailable("))
+        assertTrue(result.contains("makeGatewayWalkStartRetryAvailable("))
+        assertTrue(takeover.contains("makeGatewayWalkStartRetryAvailable("))
+        assertTrue(cancelled.contains("makeGatewayWalkStartRetryAvailable("))
+        assertTrue(retry.contains("confirmedStartupCapabilityDecision = null"))
+        assertTrue(retry.contains("startupCapabilityRetryRequiresUserAction = true"))
+        assertTrue(retry.contains("refreshStartupCapabilityUi()"))
+        assertTrue(
+            refresh.contains(
+                "startupCapabilityRetryRequiresUserAction -> \"보행 시작 다시 시도\"",
+            ),
+        )
     }
 
     @Test

@@ -57,7 +57,7 @@ class PermissionSessionLifecycleStaticTest {
         val process = functionBlock("private fun processReportCandidate(")
         assertTrue(process.contains("reportQueueStore.enqueue("))
         assertFalse(process.contains("uploadCall("))
-        val capture = functionBlock("private fun captureReportQueueDrainTriggerBeforeTransition(")
+        val capture = functionBlock("private fun buildReportQueueDrainTrigger(")
         assertTrue(capture.contains("AndroidNetworkTransferPolicy.isAllowed("))
         assertTrue(capture.contains("currentIntegratedConsentBinding() ?: return null"))
         assertTrue(capture.contains("networkBinding.matches(networkTransport)"))
@@ -72,24 +72,28 @@ class PermissionSessionLifecycleStaticTest {
         val application = functionBlock("private fun applyObservedPermissionStateChange(")
 
         assertTrue(source.contains("applyObservedPermissionStateChange(\"app_resumed\")"))
-        assertTrue(application.contains("PermissionDependencyPolicy.evaluate("))
-        assertTrue(application.contains("camera_permission_revoked"))
+        assertTrue(application.contains("stopDepthSession(closeSession = true)"))
+        assertTrue(application.contains("stopCameraFallbackSession(updateUi = false)"))
         assertTrue(application.contains("stopLocationUpdates()"))
         assertTrue(application.contains("cancelVoiceCommandRecognition()"))
         assertTrue(application.contains("stopStepTracking()"))
+        assertTrue(application.contains("해당 기능만 중지하고 나머지 기능은 계속 사용합니다."))
+        assertFalse(application.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertFalse(application.contains("permissionSessionPolicy"))
         assertFalse(application.contains("withdrawReportPrivacyConsent"))
     }
 
     @Test
-    fun startWalkPermissionBundleIsAllOrNothing() {
+    fun startWalkRequiresOnlyActiveCoreFeaturesAndKeepsOptionalFeaturesSeparate() {
         val required = functionBlock("private fun missingRequiredWalkSessionPermissions(")
+        val optional = functionBlock("private fun missingWalkSessionPermissions(")
 
         assertTrue(required.contains("Manifest.permission.CAMERA"))
         assertTrue(required.contains("Manifest.permission.ACCESS_FINE_LOCATION"))
-        assertTrue(required.contains("Manifest.permission.RECORD_AUDIO"))
-        assertTrue(required.contains("Manifest.permission.ACTIVITY_RECOGNITION"))
-        assertTrue(required.contains("Build.VERSION_CODES.Q"))
+        assertFalse(required.contains("Manifest.permission.RECORD_AUDIO"))
+        assertFalse(required.contains("Manifest.permission.ACTIVITY_RECOGNITION"))
+        assertTrue(optional.contains("Manifest.permission.RECORD_AUDIO"))
+        assertTrue(optional.contains("Manifest.permission.ACTIVITY_RECOGNITION"))
     }
 
     @Test
@@ -257,14 +261,15 @@ class PermissionSessionLifecycleStaticTest {
         val externalButton = source
             .substringAfter(externalButtonMarker)
             .substringBefore(externalButtonEnd)
-        val explicitClick = externalButton
-            .substringAfter(clickMarker)
-            .substringBefore(normalClickMarker)
+        val explicitClick =
+            functionBlock("private fun handleStartupCapabilityConfirmAction()")
         val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
         val refreshButton = refresh
             .substringAfter(refreshButtonMarker)
             .substringBefore(refreshButtonEnd)
-        val runtimeVisibility = refresh.substringAfter(runtimeVisibilityMarker)
+        val runtimeVisibility =
+            functionBlock("private fun updateFirstRunOnboardingUi()")
+                .substringAfter(runtimeVisibilityMarker)
         val automaticRecheck =
             functionBlock("private fun completePermissionRecoveryRecheckIfPossible()")
         val automaticAdvance =
@@ -275,7 +280,19 @@ class PermissionSessionLifecycleStaticTest {
             functionBlock("private fun renderAwaitingExplicitResumeControl()")
 
         assertTrue(explicitClick.contains("resumePermissionRecoveryFromExplicitUserAction()"))
-        assertTrue(explicitClick.contains("return@setOnClickListener"))
+        assertTrue(
+            explicitClick.contains(
+                "if (resumePermissionRecoveryFromExplicitUserAction()) return",
+            ),
+        )
+        assertTrue(
+            explicitClick.indexOf("startupCapabilityRetryRequiresUserAction = false") <
+                explicitClick.indexOf("resumePermissionRecoveryFromExplicitUserAction()"),
+        )
+        assertTrue(
+            explicitClick.indexOf("walkSessionResumeRetryRequiresUserAction = false") <
+                explicitClick.indexOf("resumePermissionRecoveryFromExplicitUserAction()"),
+        )
         assertTrue(refreshButton.contains("PermissionRecoveryGateState.AWAITING_EXPLICIT_RESUME"))
         assertTrue(refreshButton.contains("renderAwaitingExplicitResumeControl()"))
         assertTrue(pureRender.contains("startupCapabilityConfirmButton.visibility = View.VISIBLE"))
@@ -301,7 +318,8 @@ class PermissionSessionLifecycleStaticTest {
             assertFalse(pureRender.contains(forbiddenCall))
         }
         assertFalse(refresh.contains("completePermissionRecoveryRecheckIfPossible()"))
-        assertFalse(automaticAdvance.contains("refreshStartupCapabilityUi()"))
+        assertTrue(automaticAdvance.contains("if (createdConfirmationToken)"))
+        assertTrue(automaticAdvance.contains("refreshStartupCapabilityUi()"))
         assertTrue(automaticAdvance.contains("completePermissionRecoveryRecheckIfPossible()"))
         assertFalse(automaticRecheck.contains("refreshStartupCapabilityUi()"))
         assertFalse(automaticRecheck.contains("maybeAdvanceWalkSessionAfterCapabilityCheck()"))
@@ -350,9 +368,9 @@ class PermissionSessionLifecycleStaticTest {
         val advance = functionBlock(advanceSignature)
         val activation =
             functionBlock("private fun completeGatewayWalkActivation(")
+        val permissionResult = functionBlock(permissionResultSignature)
         val automaticSlices = listOf(
             functionBlock(resumeSignature),
-            functionBlock(permissionResultSignature),
             functionBlock(cameraResultSignature),
             functionBlock(navigationResultSignature),
             functionBlock(voiceResultSignature),
@@ -371,6 +389,8 @@ class PermissionSessionLifecycleStaticTest {
                 assertFalse(automatic.contains(forbidden))
             }
         }
+        assertTrue(permissionResult.contains("permissionRecoveryGate = PermissionRecoveryGate()"))
+        assertFalse(permissionResult.contains("ensurePermissionsThenStart()"))
         assertTrue(nonClearRestore.contains("PermissionRecoveryGate.restoredBlocked(affected)"))
 
         val guardMarker =

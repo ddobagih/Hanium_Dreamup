@@ -9,43 +9,31 @@ class MainActivityFp016StaticTest {
     private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
 
     @Test
-    fun releaseActiveScreenHidesControlsAndShowsReadOnlySafetyOverlay() {
+    fun activeAndPausedScreensUseTheSingleScrollableProductSurfaceInEveryBuild() {
         assertTrue(source.contains("private lateinit var controlsScroll: ScrollView"))
         assertTrue(source.contains("private lateinit var walkSafetyOverlay: LinearLayout"))
 
-        val predicate = Regex(
-            """val\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*!BuildConfig\.DEBUG\s*&&\s*isWalkSessionRuntimeActive\(\)""",
-        ).find(source)
-        assertTrue("release ACTIVE screen predicate is missing", predicate != null)
-        val releaseActive = requireNotNull(predicate).groupValues[1]
-        val policy = compact(enclosingFunction(predicate.range.first))
+        val policy = compact(blockAt("private fun syncActiveSessionScreenPolicy()"))
+
+        assertTrue(policy.contains("val walkSessionScreenVisible ="))
+        assertTrue(policy.contains("WalkSessionState.ACTIVE"))
+        assertTrue(policy.contains("WalkSessionState.PAUSED"))
 
         assertTrue(
             policy.contains(
-                "controlsScroll.visibility = if ($releaseActive) View.GONE else View.VISIBLE",
+                "controlsScroll.visibility = View.VISIBLE",
             ),
         )
         assertTrue(
             policy.contains(
-                "walkSafetyOverlay.visibility = if ($releaseActive) View.VISIBLE else View.GONE",
+                "walkSafetyOverlay.visibility = View.GONE",
             ),
         )
-        assertTrue(
-            policy.contains(
-                "val releasePaused = !BuildConfig.DEBUG && " +
-                    "walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED",
-            ),
-        )
-        assertTrue(
-            policy.contains(
-                "if (releasePaused) { controlsScroll.visibility = View.GONE " +
-                    "walkSafetyOverlay.visibility = View.VISIBLE",
-            ),
-        )
+        assertFalse(policy.contains("!BuildConfig.DEBUG"))
 
         val overlay = blockAt("walkSafetyOverlay = LinearLayout(this).apply {")
-        assertTrue(overlay.contains("addView(safetySummaryText)"))
-        assertFalse(overlay.contains("addView(statusText)"))
+        assertFalse(overlay.contains("addView(safetySummaryText)"))
+        assertFalse(overlay.contains("addView(runtimeControls)"))
         assertFalse(overlay.contains("Button("))
         assertFalse(overlay.contains("EditText("))
         assertFalse(overlay.contains("setOnClickListener"))

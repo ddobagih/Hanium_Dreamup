@@ -33,12 +33,12 @@ class AndroidReportSuccessorStaticTest {
         val capture =
             ReportStaticSourceInspector.functionBlock(
                 main,
-                "private fun captureReportQueueDrainTriggerBeforeTransition",
+                "private fun buildReportQueueDrainTrigger",
             )
         assertTrue(
             appearsInOrder(
                 capture,
-                "val reporter = reporterUserId ?: return null",
+                "val reporter = currentReporterUserId() ?: return null",
                 "val gatewaySnapshot = GatewaySessionProcessCoordinator.snapshot()",
                 "gatewaySession.isUsableFor(reporter)",
                 "gatewaySessionGeneration = gatewaySnapshot.generation",
@@ -47,7 +47,12 @@ class AndroidReportSuccessorStaticTest {
 
         val queuedUpload =
             ReportStaticSourceInspector.functionBlock(uploader, "internal fun queuedUploadCall")
-        assertTrue(queuedUpload.contains("consentConfirmation.backendConsentReceiptSha256 =="))
+        assertFalse(queuedUpload.contains("consentConfirmation.backendConsentReceiptSha256 =="))
+        assertTrue(
+            uploader.contains(
+                "setRequestProperty(\n                    CONSENT_RECEIPT_HEADER,\n                    consentConfirmation.backendConsentReceiptSha256",
+            ),
+        )
         assertTrue(queuedUpload.contains("parseQueuedUploadReceiptOrNull(response.body, report)"))
 
         val transport =
@@ -77,6 +82,7 @@ class AndroidReportSuccessorStaticTest {
             ),
         )
         val deletion = ReportStaticSourceInspector.functionBlock(store, "fun deleteAfterReceipt")
+        assertTrue(deletion.contains("report.reporterActorId != reporterActorId"))
         assertTrue(deletion.contains("report.payload.reportId != receipt.reportId"))
         assertTrue(deletion.contains("report.payload.payloadSha256 != receipt.payloadSha256"))
         assertTrue(deletion.contains("report.payload.payloadBytes != receipt.payloadBytes"))
@@ -93,7 +99,7 @@ class AndroidReportSuccessorStaticTest {
         assertTrue(
             appearsInOrder(
                 statusReceipt,
-                "store.deleteAfterReceipt(statusReceipt)",
+                "store.deleteAfterReceipt(lease.reporterActorId, statusReceipt)",
                 "ReportQueueDrainOutcome.DELETED_AFTER_STATUS",
                 "ReportQueueDrainOutcome.RECEIPT_REJECTED",
             ),
@@ -103,7 +109,7 @@ class AndroidReportSuccessorStaticTest {
             appearsInOrder(
                 uploadReceipt,
                 "policy.isCurrent(lease, contextProvider())",
-                "store.deleteAfterReceipt(uploadReceipt)",
+                "store.deleteAfterReceipt(lease.reporterActorId, uploadReceipt)",
                 "ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD",
                 "ReportQueueDrainOutcome.RECEIPT_REJECTED",
             ),
@@ -120,6 +126,39 @@ class AndroidReportSuccessorStaticTest {
                 "ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD",
                 "break",
                 "remaining -= 1",
+            ),
+        )
+        assertTrue(
+            drain.contains(
+                "beforeDeleteAfterReceipt =\n" +
+                    "                        ::persistAutomaticReportCooldownBeforeQueueDelete",
+            ),
+        )
+        val commit = ReportStaticSourceInspector.functionBlock(
+            main,
+            "private fun persistAutomaticReportCooldownBeforeQueueDelete",
+        )
+        assertTrue(
+            appearsInOrder(
+                commit,
+                "report.automaticCooldownScopeOrNull()",
+                "persistReportCooldownForSuccess(",
+                "reportAttemptStore.markSucceeded(",
+                "reportAttemptStore.release(",
+            ),
+        )
+
+        val process = ReportStaticSourceInspector.functionBlock(
+            main,
+            "private fun processReportCandidate",
+        )
+        assertTrue(
+            appearsInOrder(
+                process,
+                "automaticReportCooldownScopeOrNull(candidate.metadata)",
+                "reportAttemptStore.acquire(",
+                "reportQueueStore.enqueue(",
+                "reportAttemptStore::release",
             ),
         )
     }

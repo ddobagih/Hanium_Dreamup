@@ -151,7 +151,33 @@ class ReportQueueDrainCoordinatorTest {
     }
 
     @Test
-    fun exactSelectorSkipsHigherPriorityReportFromAnotherWalk() {
+    fun requiredPreDeleteCommitFailureKeepsExactReceiptQueueEntry() {
+        val fixture = fixture(ReportQueuePriority.AUTOMATIC)
+        var commitCalls = 0
+        val outcome = requireNotNull(
+            fixture.coordinator.startNext(
+                contextProvider = { context() },
+                transport = object : ReportQueueTransport {
+                    override fun statusCall(report: QueuedReport) =
+                        CancellableNetworkCall.blocking<ReportQueueReceipt?> { receipt(report) }
+
+                    override fun uploadCall(report: QueuedReport) =
+                        error("status receipt must avoid upload")
+                },
+                beforeDeleteAfterReceipt = {
+                    commitCalls += 1
+                    false
+                },
+            ),
+        ).execute()
+
+        assertEquals(ReportQueueDrainOutcome.RECEIPT_REJECTED, outcome)
+        assertEquals(1, commitCalls)
+        assertEquals(1, fixture.store.queuedReports().size)
+    }
+
+    @Test
+    fun recoverySelectorDrainsPreviousWalkUsingCurrentConsentReceipt() {
         val storage = CoordinatorStorage()
         val aead = CoordinatorAead()
         val ids = ArrayDeque(listOf(UUID.fromString(OTHER_REPORT_ID), UUID.fromString(REPORT_ID)))
@@ -172,16 +198,18 @@ class ReportQueueDrainCoordinatorTest {
         )
         requireNotNull(
             store.enqueue(
-                "{}".toByteArray(),
+                ACTOR_ID,
+                metadata(),
                 jpeg(),
                 ReportQueuePriority.EXPLICIT,
                 OTHER_WALK_ID,
-                CONSENT,
+                OLD_CONSENT,
             ),
         )
-        val expected = requireNotNull(
+        requireNotNull(
             store.enqueue(
-                "{}".toByteArray(),
+                ACTOR_ID,
+                metadata(),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -207,8 +235,72 @@ class ReportQueueDrainCoordinatorTest {
         ).execute()
 
         assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_STATUS, outcome)
-        assertEquals(expected.payload.reportId, selectedReportId)
-        assertEquals(OTHER_REPORT_ID, store.nextForDrain()?.payload?.reportId)
+        assertEquals(OTHER_REPORT_ID, selectedReportId)
+        assertEquals(REPORT_ID, store.nextForDrain()?.payload?.reportId)
+    }
+
+    @Test
+    fun loginAsAnotherActorCannotUploadOrDeleteThePreviousActorsReport() {
+        val storage = CoordinatorStorage()
+        val aead = CoordinatorAead()
+        val ids = ArrayDeque(listOf(UUID.fromString(OTHER_REPORT_ID), UUID.fromString(REPORT_ID)))
+        val store = AndroidReportQueueStore(
+            capacityProfile = ApprovedReportQueueCapacityProfile(
+                maxEntries = 3,
+                maxPayloadBytes = 1_024,
+                maxStoredEntryBytes = 1_024L,
+                maxTotalBytes = 3_072L,
+                automaticMaxEntries = 2,
+                automaticMaxTotalBytes = 2_048L,
+            ),
+            storageFactory = { storage },
+            aead = aead,
+            idFactory = { ids.removeFirst() },
+            nowMillis = { 1_000L },
+            testOnly = Unit,
+        )
+        requireNotNull(
+            store.enqueue(
+                expectedReporterActorId = ACTOR_ID,
+                metadataUtf8 = metadata(ACTOR_ID),
+                imageJpeg = jpeg(),
+                priority = ReportQueuePriority.EXPLICIT,
+                walkSessionId = OTHER_WALK_ID,
+                consentReceiptSha256 = OLD_CONSENT,
+            ),
+        )
+        requireNotNull(
+            store.enqueue(
+                expectedReporterActorId = OTHER_ACTOR_ID,
+                metadataUtf8 = metadata(OTHER_ACTOR_ID),
+                imageJpeg = jpeg(),
+                priority = ReportQueuePriority.EXPLICIT,
+                walkSessionId = WALK_ID,
+                consentReceiptSha256 = CONSENT,
+            ),
+        )
+        var selectedActor: String? = null
+
+        val outcome = requireNotNull(
+            ReportQueueDrainCoordinator(store).startNext(
+                { context(reporterActorId = OTHER_ACTOR_ID) },
+                object : ReportQueueTransport {
+                    override fun statusCall(report: QueuedReport) =
+                        CancellableNetworkCall.blocking<ReportQueueReceipt?> {
+                            selectedActor = report.reporterActorId
+                            receipt(report)
+                        }
+
+                    override fun uploadCall(report: QueuedReport) =
+                        error("status receipt must avoid upload")
+                },
+            ),
+        ).execute()
+
+        assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_STATUS, outcome)
+        assertEquals(OTHER_ACTOR_ID, selectedActor)
+        assertEquals(OTHER_REPORT_ID, store.nextForRecoveryDrain(ACTOR_ID)?.payload?.reportId)
+        assertNull(store.nextForRecoveryDrain(OTHER_ACTOR_ID))
     }
 
     @Test
@@ -340,7 +432,8 @@ class ReportQueueDrainCoordinatorTest {
         )
         val report = requireNotNull(
             store.enqueue(
-                "{}".toByteArray(),
+                ACTOR_ID,
+                metadata(),
                 jpeg(),
                 priority,
                 WALK_ID,
@@ -367,6 +460,21 @@ class ReportQueueDrainCoordinatorTest {
         }
     }
 
+    private fun AndroidReportQueueStore.enqueue(
+        metadataUtf8: ByteArray,
+        imageJpeg: ByteArray,
+        priority: ReportQueuePriority,
+        walkSessionId: String,
+        consentReceiptSha256: String,
+    ): QueuedReport? = enqueue(
+        expectedReporterActorId = ACTOR_ID,
+        metadataUtf8 = metadataUtf8,
+        imageJpeg = imageJpeg,
+        priority = priority,
+        walkSessionId = walkSessionId,
+        consentReceiptSha256 = consentReceiptSha256,
+    )
+
     private fun context(
         state: WalkSessionState = WalkSessionState.PAUSED,
         appForeground: Boolean = true,
@@ -375,6 +483,7 @@ class ReportQueueDrainCoordinatorTest {
         consentAllowed: Boolean = true,
         automaticReportingAllowed: Boolean = true,
         authorityAllowed: Boolean = true,
+        reporterActorId: String = ACTOR_ID,
         movementGeneration: Long = 1L,
     ) = ReportQueueDrainContext(
         walkState = state,
@@ -384,6 +493,7 @@ class ReportQueueDrainCoordinatorTest {
         consentAllowed = consentAllowed,
         automaticReportingAllowed = automaticReportingAllowed,
         authorityAllowed = authorityAllowed,
+        reporterActorId = reporterActorId,
         walkSessionId = WALK_ID,
         consentReceiptSha256 = CONSENT,
         movementGeneration = movementGeneration,
@@ -400,6 +510,9 @@ class ReportQueueDrainCoordinatorTest {
     private fun jpeg() =
         byteArrayOf(0xff.toByte(), 0xd8.toByte(), 1, 0xff.toByte(), 0xd9.toByte())
 
+    private fun metadata(actorId: String = ACTOR_ID) =
+        "{\"reporter_user_id\":\"$actorId\"}".toByteArray()
+
     private data class Fixture(
         val store: AndroidReportQueueStore,
         val coordinator: ReportQueueDrainCoordinator,
@@ -412,7 +525,10 @@ class ReportQueueDrainCoordinatorTest {
         const val WALK_ID = "123e4567-e89b-42d3-a456-426614174001"
         const val OTHER_WALK_ID = "123e4567-e89b-42d3-a456-426614174004"
         const val PERSISTENCE_MARKER = "123e4567-e89b-42d3-a456-426614174002"
+        const val ACTOR_ID = "walker-1"
+        const val OTHER_ACTOR_ID = "walker-2"
         val CONSENT = "c".repeat(64)
+        val OLD_CONSENT = "d".repeat(64)
     }
 }
 
@@ -482,6 +598,23 @@ private class CoordinatorStorage : ReportQueueStorage {
             fences -= "lifecycle-pending"
         }
         return completed
+    }
+    @Synchronized
+    override fun deleteMatchingWithFences(
+        pendingFence: String,
+        initialPermanentFences: Set<String>,
+        permanentFenceForMatch: (reportId: String, envelope: String) -> String?,
+    ): Boolean {
+        fences += pendingFence
+        fences += initialPermanentFences
+        values.entries
+            .filter { (reportId, envelope) ->
+                permanentFenceForMatch(reportId, envelope)?.also(fences::add) != null
+            }
+            .map { it.key }
+            .forEach(values::remove)
+        fences -= pendingFence
+        return true
     }
     override fun measureUsage(): ReportQueueStorageUsage = ReportQueueStorageUsage(
         reportFileCount = values.size,

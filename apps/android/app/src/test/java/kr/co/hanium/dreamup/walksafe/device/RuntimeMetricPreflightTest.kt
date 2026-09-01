@@ -37,6 +37,55 @@ class RuntimeMetricPreflightTest {
     }
 
     @Test
+    fun allTerminalResultsIgnoreLateCallbacks() {
+        val availableSession = supportedSession()
+        repeat(10) { index ->
+            availableSession.observe(frame(index = index, passing = true))
+        }
+        val unsupportedSession = RuntimeMetricPreflightSession(
+            generation = 2L,
+            startedAtElapsedRealtimeMs = START_MS,
+            depthSupport = RuntimeMetricDepthSupport.UNSUPPORTED,
+        )
+        val unknownSession = supportedSession(generation = 3L)
+        unknownSession.failTransiently(START_MS + 500L)
+
+        listOf(availableSession, unsupportedSession, unknownSession).forEach { session ->
+            val terminalResult = session.result()
+
+            assertLateCallbacksAreNoOps(session, terminalResult)
+        }
+    }
+
+    @Test
+    fun exactDeadlineOutcomeDoesNotDependOnObserveOrExpireCallOrder() {
+        val observeThenExpire = supportedSession().also { session ->
+            repeat(9) { index -> session.observe(frame(index = index, passing = true)) }
+        }
+        val expireThenObserve = supportedSession().also { session ->
+            repeat(9) { index -> session.observe(frame(index = index, passing = true)) }
+        }
+        val deadlineFrame = frame(index = 9, passing = true).copy(
+            observedAtElapsedRealtimeMs = START_MS + RuntimeMetricPreflightPolicy.MAX_DURATION_MS,
+        )
+
+        val observeFirst = observeThenExpire.observe(deadlineFrame)
+        val observeFirstAfterExpire = observeThenExpire.expire(
+            START_MS + RuntimeMetricPreflightPolicy.MAX_DURATION_MS,
+        )
+        val expireFirst = expireThenObserve.expire(
+            START_MS + RuntimeMetricPreflightPolicy.MAX_DURATION_MS,
+        )
+        val expireFirstAfterObserve = expireThenObserve.observe(deadlineFrame)
+
+        assertEquals(RuntimeMetricPreflightStatus.UNKNOWN, observeFirst.status)
+        assertEquals(RuntimeMetricPreflightReason.TIMEOUT, observeFirst.reason)
+        assertEquals(observeFirst, observeFirstAfterExpire)
+        assertEquals(observeFirst, expireFirst)
+        assertEquals(expireFirst, expireFirstAfterObserve)
+    }
+
+    @Test
     fun fewerThanEightyPercentPassingNeverBecomesAvailableAndTimesOutBlocked() {
         val session = supportedSession()
 
@@ -215,6 +264,34 @@ class RuntimeMetricPreflightTest {
             }
             assertTrue("$name must be synchronized", Modifier.isSynchronized(method.modifiers))
         }
+    }
+
+    private fun assertLateCallbacksAreNoOps(
+        session: RuntimeMetricPreflightSession,
+        terminalResult: RuntimeMetricPreflightResult,
+    ) {
+        val lateResults = listOf(
+            session.observe(
+                frame(
+                    index = 10,
+                    passing = true,
+                    generation = session.generation + 1L,
+                ),
+            ),
+            session.observe(
+                frame(
+                    index = 10,
+                    passing = true,
+                    generation = session.generation,
+                ),
+            ),
+            session.failTransiently(START_MS + 8_000L),
+            session.cancelForLifecycle(START_MS + 9_000L),
+            session.expire(START_MS + RuntimeMetricPreflightPolicy.MAX_DURATION_MS),
+        )
+
+        lateResults.forEach { result -> assertEquals(terminalResult, result) }
+        assertEquals(terminalResult, session.result())
     }
 
     private fun supportedSession(generation: Long = 1L) = RuntimeMetricPreflightSession(

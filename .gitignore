@@ -136,6 +136,9 @@ samples/voice/stt/*
 *.ogg
 *.webm
 
+# Generated, hash-pinned Android Vosk assets (see scripts/prepare_vosk_ko_small_model.py).
+/apps/android/app/src/main/assets/voice-models/vosk-model-small-ko-0.22/
+
 # Local voice virtualenv
 .venv-voice/
 

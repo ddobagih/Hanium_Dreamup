@@ -69,9 +69,13 @@ class PhoneMountingPolicyTest {
     fun preflightFailureBlocksStartWithoutEnteringRuntimeCorrectionOrSafetyStop() {
         val oneRetryProfile = PROFILE.copy(maximumRuntimeRetryAttempts = 1)
         val assessment = assess(
+            nowMs = NOW_MS + 1L,
             phase = PhoneMountingAssessmentPhase.PREFLIGHT,
             confirmation = confirmation(),
-            camera = camera(status = EnvironmentEvidenceStatus.FAIL),
+            camera = camera(
+                observedAtMs = NOW_MS + 1L,
+                status = EnvironmentEvidenceStatus.FAIL,
+            ),
             previousState = PhoneMountingPolicy.initialState(EPOCH, oneRetryProfile),
         )
 
@@ -141,6 +145,32 @@ class PhoneMountingPolicyTest {
             assertEquals(PhoneMountingStatus.CORRECTION_REQUIRED, assessment.status)
             assertEquals(reason, assessment.reason)
         }
+    }
+
+    @Test
+    fun preflightRequiresACameraFrameStrictlyAfterMountingConfirmation() {
+        listOf(NOW_MS - 1L, NOW_MS).forEach { cameraObservedAtMs ->
+            val blocked = assess(
+                nowMs = NOW_MS + 1L,
+                phase = PhoneMountingAssessmentPhase.PREFLIGHT,
+                confirmation = confirmation(confirmedAtMs = NOW_MS),
+                camera = camera(observedAtMs = cameraObservedAtMs),
+            )
+
+            assertEquals(PhoneMountingStatus.CORRECTION_REQUIRED, blocked.status)
+            assertEquals(
+                PhoneMountingReason.POST_CONFIRMATION_CAMERA_EVIDENCE_REQUIRED,
+                blocked.reason,
+            )
+        }
+        val ready = assess(
+            nowMs = NOW_MS + 1L,
+            phase = PhoneMountingAssessmentPhase.PREFLIGHT,
+            confirmation = confirmation(confirmedAtMs = NOW_MS),
+            camera = camera(observedAtMs = NOW_MS + 1L),
+        )
+
+        assertEquals(PhoneMountingStatus.SUITABLE, ready.status)
     }
 
     @Test

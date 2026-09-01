@@ -13,7 +13,7 @@ class ReportQueueContractTest {
     @Test
     fun productionProfileMatchesTheValidatedBuildConfigExactly() {
         val profile = PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE
-        if (!BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED) {
+        if (!BuildConfig.DEBUG || !BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED) {
             assertNull(profile)
             return
         }

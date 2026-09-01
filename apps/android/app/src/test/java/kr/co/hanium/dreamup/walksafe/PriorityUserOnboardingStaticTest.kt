@@ -129,6 +129,130 @@ class PriorityUserOnboardingStaticTest {
     }
 
     @Test
+    fun fp004TrainingCannotStartOrRemainInFlightBehindAClosedDeviceGate() {
+        val update = functionBlock("private fun updatePriorityUserOnboardingUi(")
+        val education = functionBlock("private fun reviewPriorityUserSafetyEducation()")
+        val safePlace = functionBlock("private fun confirmPriorityUserSafePracticePlace()")
+        val practice = functionBlock("private fun performPriorityUserPractice(")
+        val delivery = functionBlock("private fun recordPriorityUserPracticeDelivery(")
+        val failure = functionBlock("private fun failPriorityUserTrainingDelivery(")
+        val cleanup = functionBlock("private fun clearPriorityUserTrainingDeliveryIfOwned(")
+        val current = functionBlock("private fun isPriorityUserTrainingDeliveryCurrent(")
+
+        assertTrue(update.contains("val deviceGateOpen = postLoginDeviceCheckPassesFeatureGate()"))
+        assertTrue(update.contains("accountBound && deviceGateOpen && decision.mayActivateAccount"))
+        assertTrue(education.contains("if (!requireDeviceCheckForPriorityUserTraining()) return"))
+        assertTrue(safePlace.contains("if (!requireDeviceCheckForPriorityUserTraining()) return"))
+        assertTrue(practice.contains("if (!requireDeviceCheckForPriorityUserTraining()) return"))
+        assertTrue(delivery.contains("clearPriorityUserTrainingDeliveryIfOwned("))
+        assertTrue(failure.contains("clearPriorityUserTrainingDeliveryIfOwned("))
+        assertTrue(cleanup.contains("priorityUserEducationInFlight = false"))
+        assertTrue(cleanup.contains("priorityUserPracticeInFlight = null"))
+        assertTrue(cleanup.contains("policy.cancelPractice(token)"))
+        assertTrue(cleanup.contains("cancelPriorityUserTrainingFeedback()"))
+        assertTrue(current.contains("postLoginDeviceCheckPassesFeatureGate()"))
+    }
+
+    @Test
+    fun limitedVoiceOrHapticUsesTheAvailableTrainingChannelsAndScreenConfirmation() {
+        val update = functionBlock("private fun updatePriorityUserOnboardingUi(")
+        val practiceButtons = update.substringAfter(
+            "priorityUserPracticeButtons.forEach",
+        ).substringBefore("priorityUserResetButton")
+        val education = functionBlock("private fun reviewPriorityUserSafetyEducation()")
+        val practice = functionBlock("private fun performPriorityUserPractice(")
+        val hapticDelivery = practice.substringAfter("if (hapticFeedbackEnabled) {")
+            .substringBefore("if (voiceGuidanceEnabled) {")
+        val hapticFallback = hapticDelivery.substringAfter("} else {")
+        val speechDelivery = practice.substringAfter("if (voiceGuidanceEnabled) {")
+        val speechFallback = speechDelivery.substringAfter("} else {")
+
+        assertFalse(practiceButtons.contains("environment.offlineKoreanVoiceAvailable"))
+        assertFalse(practiceButtons.contains("environment.vibrationAvailable"))
+        assertTrue(
+            education.contains(
+                "postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)",
+            ),
+        )
+        assertTrue(education.contains("if (!voiceGuidanceEnabled)"))
+        assertTrue(education.contains("화면의 안전 안내 확인으로 교육을 진행합니다."))
+        assertTrue(
+            education.substringAfter("if (!voiceGuidanceEnabled) {")
+                .substringBefore("val dispatch")
+                .contains("completed()"),
+        )
+        assertTrue(
+            practice.contains(
+                "postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)",
+            ),
+        )
+        assertTrue(
+            practice.contains(
+                "postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.HAPTIC_FEEDBACK)",
+            ),
+        )
+        assertTrue(hapticDelivery.contains("playPriorityUserTrainingVibration("))
+        assertTrue(
+            hapticFallback.contains(
+                "PriorityUserPracticeDeliverySignal.VIBRATION_REQUEST_WINDOW_ELAPSED",
+            ),
+        )
+        assertFalse(hapticFallback.contains("return"))
+        assertTrue(speechDelivery.contains("speakPriorityUserTraining("))
+        assertTrue(
+            speechFallback.contains(
+                "PriorityUserPracticeDeliverySignal.SPEECH_PLAYBACK_COMPLETED",
+            ),
+        )
+    }
+
+    @Test
+    fun centralActuatorMapsFeatureRestrictionsToOnlyTheirOwnOutputChannels() {
+        val restrictions = functionBlock("private fun applyPostLoginDeviceFeatureRestrictions(")
+        val resolver = functionBlock("private fun resolveCurrentStartupCapabilityDecision(")
+        val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
+        val actuator = functionBlock("private fun ensureFeedbackActuator()")
+        val speechAllowed = actuator.substringAfter("speechAllowed = {")
+            .substringBefore("hapticAllowed = {")
+        val hapticAllowed = actuator.substringAfter("hapticAllowed = {")
+        val unavailableSpeech = actuator.substringAfter(
+            "onOfflineKoreanSpeechUnavailable = {",
+        ).substringBefore("speechAllowed = {")
+
+        assertTrue(
+            restrictions.contains(
+                "PostLoginDeviceCheckFeature.VOICE_GUIDANCE ->\n" +
+                    "                        add(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS)",
+            ),
+        )
+        assertTrue(
+            restrictions.contains(
+                "PostLoginDeviceCheckFeature.HAPTIC_FEEDBACK ->\n" +
+                    "                        add(WalkSafeStartupRequirement.VIBRATION)",
+            ),
+        )
+        assertInOrder(
+            resolver,
+            "applyPostLoginDeviceFeatureRestrictions(",
+            "startupCapabilityProbe.decision(",
+        )
+        assertInOrder(
+            refresh,
+            "resolveCurrentStartupCapabilityDecision()",
+            "startupCapabilityDecision = decision",
+        )
+        assertTrue(speechAllowed.contains("WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS"))
+        assertFalse(speechAllowed.contains("WalkSafeStartupRequirement.VIBRATION"))
+        assertTrue(hapticAllowed.contains("WalkSafeStartupRequirement.VIBRATION"))
+        assertFalse(hapticAllowed.contains("WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS"))
+        assertTrue(unavailableSpeech.contains("PostLoginDeviceCheckFeature.VOICE_GUIDANCE"))
+        assertTrue(
+            unavailableSpeech.indexOf("PostLoginDeviceCheckFeature.VOICE_GUIDANCE") <
+                unavailableSpeech.indexOf("handleRuntimeSpeechCapabilityFailure("),
+        )
+    }
+
+    @Test
     fun switchingActorLoadsItsProfileBeforeCheckingActivationRules() {
         val bindActor = functionBlock("private fun bindFirstRunVerifiedActorForTraining()")
         val reporter = functionBlock("private fun currentReporterUserId()")
@@ -286,8 +410,12 @@ class PriorityUserOnboardingStaticTest {
         assertTrue(traversal.contains("nextFocusForwardId = current.id"))
         assertTrue(traversal.contains("nextFocusDownId = current.id"))
         assertTrue(traversal.contains("nextFocusUpId = previous.id"))
-        assertTrue(update.contains("if (environment.highContrastEnabled)"))
-        assertTrue(update.contains("0xff000000.toInt()"))
+        assertTrue(update.contains("if (environment.highContrastEnabled) 2f else 1f"))
+        assertTrue(
+            update.contains(
+                "if (environment.highContrastEnabled) WS_COLOR_BUTTON_BORDER else WS_COLOR_LINE",
+            ),
+        )
         assertTrue(update.contains("priorityUserOnboardingStatusText.contentDescription = message"))
         assertTrue(update.contains("button.contentDescription = button.text"))
         assertFalse(content.contains("setOnTouchListener"))

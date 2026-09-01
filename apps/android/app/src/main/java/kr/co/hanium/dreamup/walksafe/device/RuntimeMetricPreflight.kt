@@ -1,5 +1,39 @@
 package kr.co.hanium.dreamup.walksafe.device
 
+data class RuntimeMetricPreflightProfile(
+    val profileId: String,
+    val maximumDurationMs: Long,
+    val minimumDistinctFrames: Int,
+    val minimumObservationSpanMs: Long,
+    val minimumValidSamplesPerPassingFrame: Int,
+    val minimumPassingPercent: Int,
+    val minimumValidDistanceMeters: Double,
+    val maximumValidDistanceMeters: Double,
+) {
+    init {
+        require(profileId.isNotBlank()) { "profileId must not be blank" }
+        require(maximumDurationMs > 0L) { "maximumDurationMs must be positive" }
+        require(minimumDistinctFrames > 0) { "minimumDistinctFrames must be positive" }
+        require(minimumObservationSpanMs in 1L..maximumDurationMs) {
+            "minimumObservationSpanMs must be positive and within maximumDurationMs"
+        }
+        require(minimumValidSamplesPerPassingFrame > 0) {
+            "minimumValidSamplesPerPassingFrame must be positive"
+        }
+        require(minimumPassingPercent in 1..100) {
+            "minimumPassingPercent must be between 1 and 100"
+        }
+        require(
+            minimumValidDistanceMeters.isFinite() &&
+                maximumValidDistanceMeters.isFinite() &&
+                minimumValidDistanceMeters > 0.0 &&
+                maximumValidDistanceMeters >= minimumValidDistanceMeters,
+        ) {
+            "metric distance range must be finite, positive, and ordered"
+        }
+    }
+}
+
 object RuntimeMetricPreflightPolicy {
     const val MAX_DURATION_MS = 10_000L
     const val MIN_DISTINCT_FRAMES = 10
@@ -9,9 +43,27 @@ object RuntimeMetricPreflightPolicy {
     const val MIN_VALID_DISTANCE_METERS = 0.2
     const val MAX_VALID_DISTANCE_METERS = 8.0
 
+    val testCandidateProfile = RuntimeMetricPreflightProfile(
+        profileId = "runtime-metric-test-candidate-r001",
+        maximumDurationMs = MAX_DURATION_MS,
+        minimumDistinctFrames = MIN_DISTINCT_FRAMES,
+        minimumObservationSpanMs = MIN_OBSERVATION_SPAN_MS,
+        minimumValidSamplesPerPassingFrame = MIN_VALID_SAMPLES_PER_PASSING_FRAME,
+        minimumPassingPercent = MIN_PASSING_PERCENT,
+        minimumValidDistanceMeters = MIN_VALID_DISTANCE_METERS,
+        maximumValidDistanceMeters = MAX_VALID_DISTANCE_METERS,
+    )
+
     fun isValidMetricDistanceMeters(distanceMeters: Double): Boolean =
+        isValidMetricDistanceMeters(distanceMeters, testCandidateProfile)
+
+    fun isValidMetricDistanceMeters(
+        distanceMeters: Double,
+        profile: RuntimeMetricPreflightProfile,
+    ): Boolean =
         distanceMeters.isFinite() &&
-            distanceMeters in MIN_VALID_DISTANCE_METERS..MAX_VALID_DISTANCE_METERS
+            distanceMeters in
+            profile.minimumValidDistanceMeters..profile.maximumValidDistanceMeters
 }
 
 enum class RuntimeMetricDepthSupport {
@@ -86,7 +138,19 @@ class RuntimeMetricPreflightSession(
     val generation: Long,
     val startedAtElapsedRealtimeMs: Long,
     private val depthSupport: RuntimeMetricDepthSupport,
+    private val profile: RuntimeMetricPreflightProfile,
 ) {
+    constructor(
+        generation: Long,
+        startedAtElapsedRealtimeMs: Long,
+        depthSupport: RuntimeMetricDepthSupport,
+    ) : this(
+        generation = generation,
+        startedAtElapsedRealtimeMs = startedAtElapsedRealtimeMs,
+        depthSupport = depthSupport,
+        profile = RuntimeMetricPreflightPolicy.testCandidateProfile,
+    )
+
     private var status = if (depthSupport == RuntimeMetricDepthSupport.UNSUPPORTED) {
         RuntimeMetricPreflightStatus.UNSUPPORTED
     } else {
@@ -126,19 +190,14 @@ class RuntimeMetricPreflightSession(
 
     @Synchronized
     fun observe(frame: RuntimeMetricFrameEvidence): RuntimeMetricPreflightResult {
-        if (status == RuntimeMetricPreflightStatus.UNSUPPORTED || status == RuntimeMetricPreflightStatus.UNKNOWN) {
-            return result()
+        if (status != RuntimeMetricPreflightStatus.IN_PROGRESS) return result()
+        if (frame.observedAtElapsedRealtimeMs - startedAtElapsedRealtimeMs >=
+            profile.maximumDurationMs
+        ) {
+            return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, frame.observedAtElapsedRealtimeMs)
         }
         if (frame.generation != generation) {
             return finishUnknown(RuntimeMetricPreflightReason.GENERATION_MISMATCH, frame.observedAtElapsedRealtimeMs)
-        }
-        if (status == RuntimeMetricPreflightStatus.AVAILABLE) {
-            return result()
-        }
-        if (frame.observedAtElapsedRealtimeMs - startedAtElapsedRealtimeMs >
-            RuntimeMetricPreflightPolicy.MAX_DURATION_MS
-        ) {
-            return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, frame.observedAtElapsedRealtimeMs)
         }
         if (!frame.isWellFormed()) {
             return finishUnknown(RuntimeMetricPreflightReason.INVALID_FRAME_EVIDENCE, frame.observedAtElapsedRealtimeMs)
@@ -158,11 +217,6 @@ class RuntimeMetricPreflightSession(
             status = RuntimeMetricPreflightStatus.AVAILABLE
             reason = RuntimeMetricPreflightReason.STABLE_METRIC_DEPTH
             completedAtElapsedRealtimeMs = frame.observedAtElapsedRealtimeMs
-        } else if (
-            frame.observedAtElapsedRealtimeMs - startedAtElapsedRealtimeMs >=
-            RuntimeMetricPreflightPolicy.MAX_DURATION_MS
-        ) {
-            return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, frame.observedAtElapsedRealtimeMs)
         }
         return result()
     }
@@ -173,7 +227,7 @@ class RuntimeMetricPreflightSession(
         if (!isValidClock(nowElapsedRealtimeMs)) {
             return finishUnknown(RuntimeMetricPreflightReason.INVALID_FRAME_EVIDENCE, nowElapsedRealtimeMs)
         }
-        if (nowElapsedRealtimeMs - startedAtElapsedRealtimeMs >= RuntimeMetricPreflightPolicy.MAX_DURATION_MS) {
+        if (nowElapsedRealtimeMs - startedAtElapsedRealtimeMs >= profile.maximumDurationMs) {
             return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, nowElapsedRealtimeMs)
         }
         return result()
@@ -198,13 +252,13 @@ class RuntimeMetricPreflightSession(
     private fun RuntimeMetricFrameEvidence.isPassing(): Boolean =
         tracking &&
             metricDepthAvailable &&
-            validMetricSamplesInRange >= RuntimeMetricPreflightPolicy.MIN_VALID_SAMPLES_PER_PASSING_FRAME
+            validMetricSamplesInRange >= profile.minimumValidSamplesPerPassingFrame
 
     private fun hasStableEvidence(): Boolean =
-        distinctFrameCount >= RuntimeMetricPreflightPolicy.MIN_DISTINCT_FRAMES &&
-            observationSpanMs() >= RuntimeMetricPreflightPolicy.MIN_OBSERVATION_SPAN_MS &&
+        distinctFrameCount >= profile.minimumDistinctFrames &&
+            observationSpanMs() >= profile.minimumObservationSpanMs &&
             passingFrameCount.toLong() * 100L >=
-            distinctFrameCount.toLong() * RuntimeMetricPreflightPolicy.MIN_PASSING_PERCENT
+            distinctFrameCount.toLong() * profile.minimumPassingPercent
 
     private fun observationSpanMs(): Long {
         val first = firstFrameTimestampNanos ?: return 0L
@@ -221,7 +275,7 @@ class RuntimeMetricPreflightSession(
         terminalReason: RuntimeMetricPreflightReason,
         nowElapsedRealtimeMs: Long,
     ): RuntimeMetricPreflightResult {
-        if (status == RuntimeMetricPreflightStatus.UNSUPPORTED) return result()
+        if (status != RuntimeMetricPreflightStatus.IN_PROGRESS) return result()
         status = RuntimeMetricPreflightStatus.UNKNOWN
         reason = terminalReason
         completedAtElapsedRealtimeMs = nowElapsedRealtimeMs.takeIf { it >= startedAtElapsedRealtimeMs }

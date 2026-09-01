@@ -1,10 +1,14 @@
 package kr.co.hanium.dreamup.walksafe.account
 
+import kr.co.hanium.dreamup.walksafe.session.FirstRunAgeBand
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingFlow
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingPolicy
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingStage
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOpaqueActorBinding
 import kr.co.hanium.dreamup.walksafe.session.FirstRunReceiptHash
+import kr.co.hanium.dreamup.walksafe.session.PriorityUserAgeBand
+import kr.co.hanium.dreamup.walksafe.session.PriorityUserOnboardingPolicy
+import kr.co.hanium.dreamup.walksafe.session.PriorityUserOnboardingSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -40,6 +44,19 @@ class EmailAccountEnrollmentTest {
         assertFalse(requiredOnly.rawOriginal)
         assertFalse(requiredOnly.automaticReporting)
         assertFalse(requiredOnly.trainingReuse)
+    }
+
+    @Test
+    fun everyRequiredSignupSelectionMustRemainGranted() {
+        val allRequired = requiredSelections()
+
+        listOf(
+            allRequired.copy(termsOfService = false),
+            allRequired.copy(privacyNotice = false),
+            allRequired.copy(locationTerms = false),
+        ).forEach { selections ->
+            assertFalse(selections.requiredGranted)
+        }
     }
 
     @Test
@@ -87,7 +104,7 @@ class EmailAccountEnrollmentTest {
     }
 
     @Test
-    fun signupAndReturningLoginBothProceedToJitWithoutLegacyPhoneStages() {
+    fun signupAndReturningLoginBothProceedToPurposeAndSafetyWithoutLegacyPhoneStages() {
         val initial = FirstRunOnboardingPolicy.initialEmailAccount(10L)
         assertEquals(FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4, initial.flow)
         assertEquals(FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT, initial.stage)
@@ -104,7 +121,7 @@ class EmailAccountEnrollmentTest {
             receipt('c'),
         )
         assertTrue(loggedIn.accepted)
-        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, loggedIn.current.stage)
+        assertEquals(FirstRunOnboardingStage.PURPOSE_AND_SAFETY, loggedIn.current.stage)
         assertFalse(loggedIn.current.mayEnterWalk)
         assertFalse(
             loggedIn.current.completedReceiptHashes.containsKey(
@@ -118,7 +135,7 @@ class EmailAccountEnrollmentTest {
             receipt('d'),
         )
         assertTrue(returning.accepted)
-        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, returning.current.stage)
+        assertEquals(FirstRunOnboardingStage.PURPOSE_AND_SAFETY, returning.current.stage)
         assertEquals(
             setOf(FirstRunOnboardingStage.VERIFIED_LOGIN),
             returning.current.completedReceiptHashes.keys,
@@ -133,6 +150,24 @@ class EmailAccountEnrollmentTest {
         assertEquals(FirstRunOnboardingStage.PURPOSE_AND_SAFETY, legacy.stage)
         assertFalse(
             FirstRunOnboardingPolicy.recordEmailOtpEnrollment(legacy, receipt('e')).accepted,
+        )
+    }
+
+    @Test
+    fun emailV4EligibilityNeverEntersTheLegacyGuardianGate() {
+        val enrolled = FirstRunOnboardingPolicy.recordEmailOtpEnrollment(
+            FirstRunOnboardingPolicy.initialEmailAccount(40L),
+            receipt('f'),
+        ).current
+
+        assertEquals(FirstRunAgeBand.VERIFIED_14_PLUS, enrolled.ageBand)
+        assertFalse(enrolled.guardianApprovalRequired)
+        assertNull(
+            PriorityUserOnboardingPolicy(
+                PriorityUserOnboardingSnapshot(
+                    ageBand = PriorityUserAgeBand.VERIFIED_14_PLUS,
+                ),
+            ).accountBlockReason(),
         )
     }
 

@@ -29,7 +29,9 @@ object LocationTrustPolicy {
         elapsedRealtimeMs: Long,
         previous: TrustedLocation? = null,
         config: LocationTrustConfig = LocationTrustConfig(),
+        mock: Boolean = false,
     ): TrustedLocation? {
+        if (mock) return null
         if (!latitude.isFinite() || latitude !in -90.0..90.0) return null
         if (!longitude.isFinite() || longitude !in -180.0..180.0) return null
         if (elapsedRealtimeMs < 0L) return null

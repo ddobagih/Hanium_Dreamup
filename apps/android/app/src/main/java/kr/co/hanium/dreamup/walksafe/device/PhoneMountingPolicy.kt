@@ -21,9 +21,25 @@ data class PhoneMountingUserConfirmation(
 data class ApprovedPhoneMountingProfile(
     val profileId: String,
     val cameraFrameQualityProfileId: String,
+    /** Maximum age for camera-derived mounting evidence. */
     val maximumEvidenceAgeMs: Long,
     val maximumRuntimeRetryAttempts: Int,
+    /** A user confirmation is session-bound and may remain valid longer than a camera frame. */
+    val maximumUserConfirmationAgeMs: Long,
 ) {
+    constructor(
+        profileId: String,
+        cameraFrameQualityProfileId: String,
+        maximumEvidenceAgeMs: Long,
+        maximumRuntimeRetryAttempts: Int,
+    ) : this(
+        profileId = profileId,
+        cameraFrameQualityProfileId = cameraFrameQualityProfileId,
+        maximumEvidenceAgeMs = maximumEvidenceAgeMs,
+        maximumRuntimeRetryAttempts = maximumRuntimeRetryAttempts,
+        maximumUserConfirmationAgeMs = maximumEvidenceAgeMs,
+    )
+
     init {
         require(profileId.isNotBlank()) { "profileId must not be blank" }
         require(cameraFrameQualityProfileId.isNotBlank()) {
@@ -34,6 +50,9 @@ data class ApprovedPhoneMountingProfile(
         }
         require(maximumRuntimeRetryAttempts > 0) {
             "maximumRuntimeRetryAttempts must be positive"
+        }
+        require(maximumUserConfirmationAgeMs >= 0L) {
+            "maximumUserConfirmationAgeMs must not be negative"
         }
     }
 }
@@ -110,6 +129,10 @@ enum class PhoneMountingReason(
     CAMERA_EVIDENCE_STALE(
         "카메라 장착 검사가 오래되었거나 측정 시간이 올바르지 않습니다.",
         "현재 장착 상태에서 카메라 검사를 다시 실행하세요.",
+    ),
+    POST_CONFIRMATION_CAMERA_EVIDENCE_REQUIRED(
+        "현재 장착을 확인하기 전에 측정한 카메라 결과는 사용할 수 없습니다.",
+        "장착 확인 뒤 새 카메라 검사가 끝날 때까지 기다리세요.",
     ),
     CAMERA_QUALITY_UNKNOWN(
         "카메라 장착 품질을 신뢰할 수 있는 근거가 부족합니다.",
@@ -216,6 +239,7 @@ object PhoneMountingPolicy {
         )
 
         val failureReason = validateCurrentEvidence(
+            phase = phase,
             currentEpoch = currentEpoch,
             nowElapsedRealtimeMs = nowElapsedRealtimeMs,
             userConfirmation = userConfirmation,
@@ -303,6 +327,7 @@ object PhoneMountingPolicy {
     )
 
     private fun validateCurrentEvidence(
+        phase: PhoneMountingAssessmentPhase,
         currentEpoch: WalkRuntimeEpoch,
         nowElapsedRealtimeMs: Long,
         userConfirmation: PhoneMountingUserConfirmation?,
@@ -317,7 +342,7 @@ object PhoneMountingPolicy {
         if (!isFresh(
                 observedAtElapsedRealtimeMs = confirmation.confirmedAtElapsedRealtimeMs,
                 nowElapsedRealtimeMs = nowElapsedRealtimeMs,
-                maximumAgeMs = profile.maximumEvidenceAgeMs,
+                maximumAgeMs = profile.maximumUserConfirmationAgeMs,
             )
         ) {
             return PhoneMountingReason.USER_CONFIRMATION_STALE
@@ -344,6 +369,12 @@ object PhoneMountingPolicy {
             )
         ) {
             return PhoneMountingReason.CAMERA_EVIDENCE_STALE
+        }
+        if (
+            phase == PhoneMountingAssessmentPhase.PREFLIGHT &&
+            cameraObservedAt <= confirmation.confirmedAtElapsedRealtimeMs
+        ) {
+            return PhoneMountingReason.POST_CONFIRMATION_CAMERA_EVIDENCE_REQUIRED
         }
         if (
             camera.status == EnvironmentEvidenceStatus.PASS &&

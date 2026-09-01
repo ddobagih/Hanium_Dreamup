@@ -15,6 +15,15 @@ enum class PostLoginDeviceCheckSignal {
     UNAVAILABLE,
 }
 
+enum class PostLoginDeviceCheckFeature {
+    OBSTACLE_DETECTION,
+    METRIC_DISTANCE_GUIDANCE,
+    LOCATION_GUIDANCE,
+    HANDS_FREE_VOICE,
+    VOICE_GUIDANCE,
+    HAPTIC_FEEDBACK,
+}
+
 enum class PostLoginMetricDepthState {
     PENDING,
     AVAILABLE,
@@ -27,13 +36,20 @@ enum class PostLoginDeviceCheckFailure {
     BACKGROUNDED,
     MINIMUM_ANDROID_VERSION,
     REQUIRED_PERMISSION,
+    VOICE_DISCLOSURE_NOT_PERSISTED,
     CORE_HARDWARE_OR_SERVICE,
     LOCATION_SERVICE_DISABLED,
+    LOCATION_FIX_UNAVAILABLE,
     DEVICE_RESOURCE,
     DETECTOR_UNAVAILABLE,
-    CAMERA_FALLBACK_UNAVAILABLE,
+    CAMERA_PIPELINE_UNAVAILABLE,
+    KOREAN_TTS_UNAVAILABLE,
+    WAKE_PHRASE_UNAVAILABLE,
+    HAPTIC_UNAVAILABLE,
     DEPTH_UNKNOWN,
     DEPTH_TIMEOUT,
+    CHECK_TIMEOUT,
+    RESULT_SAVE_FAILED,
     SESSION_CHANGED,
 }
 
@@ -46,12 +62,21 @@ data class PostLoginDeviceCheckBinding(
 data class PostLoginDeviceCheckObservation(
     val minimumAndroidVersion: PostLoginDeviceCheckSignal,
     val requiredPermissions: PostLoginDeviceCheckSignal,
+    val voiceDisclosure: PostLoginDeviceCheckSignal,
     val coreHardwareAndServices: PostLoginDeviceCheckSignal,
     val locationService: PostLoginDeviceCheckSignal,
+    val locationFix: PostLoginDeviceCheckSignal,
     val deviceResources: PostLoginDeviceCheckSignal,
     val detector: PostLoginDeviceCheckSignal,
+    val cameraPipeline: PostLoginDeviceCheckSignal,
+    val koreanTextToSpeech: PostLoginDeviceCheckSignal,
+    val wakePhraseRecognition: PostLoginDeviceCheckSignal,
+    val hapticFeedback: PostLoginDeviceCheckSignal,
     val metricDepth: PostLoginMetricDepthState,
-    val cameraFallback: PostLoginDeviceCheckSignal,
+    // The runtime adapter classifies raw signals before evaluation. Raw UNAVAILABLE values are
+    // progress details and must not silently become a whole-app failure.
+    val unsupportedFeatures: Set<PostLoginDeviceCheckFeature> = emptySet(),
+    val blockingFailure: PostLoginDeviceCheckFailure? = null,
 )
 
 data class PostLoginDeviceCheckSnapshot(
@@ -60,6 +85,7 @@ data class PostLoginDeviceCheckSnapshot(
     val sessionGeneration: Long?,
     val attemptGeneration: Long,
     val failure: PostLoginDeviceCheckFailure? = null,
+    val disabledFeatures: Set<PostLoginDeviceCheckFeature> = emptySet(),
 ) {
     val passesFeatureGate: Boolean
         get() = state == PostLoginDeviceCheckState.FULL ||
@@ -110,6 +136,12 @@ object PostLoginDeviceCheckPolicy {
         sessionGeneration: Long,
         foreground: Boolean,
     ): PostLoginDeviceCheckSnapshot {
+        if (
+            snapshot.state == PostLoginDeviceCheckState.REQUESTING_PERMISSIONS ||
+            snapshot.state == PostLoginDeviceCheckState.RUNNING ||
+            snapshot.state == PostLoginDeviceCheckState.FULL ||
+            snapshot.state == PostLoginDeviceCheckState.LIMITED
+        ) return snapshot
         if (!foreground) {
             return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
         }
@@ -119,15 +151,13 @@ object PostLoginDeviceCheckPolicy {
             snapshot.sessionGeneration != sessionGeneration ||
             snapshot.attemptGeneration == Long.MAX_VALUE
         ) {
-            return snapshot.copy(
-                state = PostLoginDeviceCheckState.FAIL,
-                failure = PostLoginDeviceCheckFailure.SESSION_CHANGED,
-            )
+            return fail(snapshot, PostLoginDeviceCheckFailure.SESSION_CHANGED)
         }
         return snapshot.copy(
             state = PostLoginDeviceCheckState.REQUESTING_PERMISSIONS,
             attemptGeneration = snapshot.attemptGeneration + 1L,
             failure = null,
+            disabledFeatures = emptySet(),
         )
     }
 
@@ -137,9 +167,13 @@ object PostLoginDeviceCheckPolicy {
         foreground: Boolean,
     ): PostLoginDeviceCheckSnapshot {
         if (!isCurrent(snapshot, binding)) return snapshot
-        if (!foreground) return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
         if (snapshot.state != PostLoginDeviceCheckState.REQUESTING_PERMISSIONS) return snapshot
-        return snapshot.copy(state = PostLoginDeviceCheckState.RUNNING, failure = null)
+        if (!foreground) return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
+        return snapshot.copy(
+            state = PostLoginDeviceCheckState.RUNNING,
+            failure = null,
+            disabledFeatures = emptySet(),
+        )
     }
 
     fun evaluate(
@@ -149,34 +183,39 @@ object PostLoginDeviceCheckPolicy {
         observation: PostLoginDeviceCheckObservation,
     ): PostLoginDeviceCheckSnapshot {
         if (!isCurrent(snapshot, binding)) return snapshot
+        if (snapshot.isTerminal()) return snapshot
         if (!foreground) return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
         if (snapshot.state != PostLoginDeviceCheckState.RUNNING) return snapshot
 
-        firstUnavailable(observation)?.let { return fail(snapshot, it) }
-        when (observation.metricDepth) {
-            PostLoginMetricDepthState.UNKNOWN ->
-                return fail(snapshot, PostLoginDeviceCheckFailure.DEPTH_UNKNOWN)
-            PostLoginMetricDepthState.TIMED_OUT ->
-                return fail(snapshot, PostLoginDeviceCheckFailure.DEPTH_TIMEOUT)
-            else -> Unit
-        }
-        if (hasPendingCoreSignal(observation)) return snapshot
+        observation.blockingFailure?.let { return fail(snapshot, it) }
+        if (hasPendingAutomaticProbe(observation)) return snapshot
 
-        return when (observation.metricDepth) {
-            PostLoginMetricDepthState.PENDING -> snapshot
-            PostLoginMetricDepthState.AVAILABLE ->
-                snapshot.copy(state = PostLoginDeviceCheckState.FULL, failure = null)
-            PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED -> when (observation.cameraFallback) {
-                PostLoginDeviceCheckSignal.PENDING -> snapshot
-                PostLoginDeviceCheckSignal.READY ->
-                    snapshot.copy(state = PostLoginDeviceCheckState.LIMITED, failure = null)
-                PostLoginDeviceCheckSignal.UNAVAILABLE ->
-                    fail(snapshot, PostLoginDeviceCheckFailure.CAMERA_FALLBACK_UNAVAILABLE)
-            }
-            PostLoginMetricDepthState.UNKNOWN,
-            PostLoginMetricDepthState.TIMED_OUT,
-            -> error("Terminal depth states were handled before pending core signals")
+        val disabledFeatures = observation.unsupportedFeatures.toSet()
+        return if (disabledFeatures.isEmpty()) {
+            snapshot.copy(
+                state = PostLoginDeviceCheckState.FULL,
+                failure = null,
+                disabledFeatures = emptySet(),
+            )
+        } else {
+            snapshot.copy(
+                state = PostLoginDeviceCheckState.LIMITED,
+                failure = null,
+                disabledFeatures = disabledFeatures,
+            )
         }
+    }
+
+    fun timeout(
+        snapshot: PostLoginDeviceCheckSnapshot,
+        binding: PostLoginDeviceCheckBinding,
+        foreground: Boolean,
+    ): PostLoginDeviceCheckSnapshot {
+        if (!isCurrent(snapshot, binding)) return snapshot
+        if (snapshot.isTerminal()) return snapshot
+        if (!foreground) return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
+        if (snapshot.state != PostLoginDeviceCheckState.RUNNING) return snapshot
+        return fail(snapshot, PostLoginDeviceCheckFailure.CHECK_TIMEOUT)
     }
 
     fun onBackground(
@@ -193,10 +232,22 @@ object PostLoginDeviceCheckPolicy {
         }
         if (
             snapshot.state == PostLoginDeviceCheckState.NOT_RUN ||
-            snapshot.state == PostLoginDeviceCheckState.FAIL
+            snapshot.state == PostLoginDeviceCheckState.FAIL ||
+            snapshot.state == PostLoginDeviceCheckState.FULL ||
+            snapshot.state == PostLoginDeviceCheckState.LIMITED
         ) return snapshot
         return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
     }
+
+    fun invalidatePassedGate(
+        snapshot: PostLoginDeviceCheckSnapshot,
+        failure: PostLoginDeviceCheckFailure,
+    ): PostLoginDeviceCheckSnapshot =
+        if (snapshot.passesFeatureGate) {
+            fail(snapshot, failure)
+        } else {
+            snapshot
+        }
 
     fun isCurrent(
         snapshot: PostLoginDeviceCheckSnapshot,
@@ -206,34 +257,27 @@ object PostLoginDeviceCheckPolicy {
             snapshot.sessionGeneration == binding.sessionGeneration &&
             snapshot.attemptGeneration == binding.attemptGeneration
 
-    private fun firstUnavailable(
-        observation: PostLoginDeviceCheckObservation,
-    ): PostLoginDeviceCheckFailure? = when {
-        observation.minimumAndroidVersion == PostLoginDeviceCheckSignal.UNAVAILABLE ->
-            PostLoginDeviceCheckFailure.MINIMUM_ANDROID_VERSION
-        observation.requiredPermissions == PostLoginDeviceCheckSignal.UNAVAILABLE ->
-            PostLoginDeviceCheckFailure.REQUIRED_PERMISSION
-        observation.coreHardwareAndServices == PostLoginDeviceCheckSignal.UNAVAILABLE ->
-            PostLoginDeviceCheckFailure.CORE_HARDWARE_OR_SERVICE
-        observation.locationService == PostLoginDeviceCheckSignal.UNAVAILABLE ->
-            PostLoginDeviceCheckFailure.LOCATION_SERVICE_DISABLED
-        observation.deviceResources == PostLoginDeviceCheckSignal.UNAVAILABLE ->
-            PostLoginDeviceCheckFailure.DEVICE_RESOURCE
-        observation.detector == PostLoginDeviceCheckSignal.UNAVAILABLE ->
-            PostLoginDeviceCheckFailure.DETECTOR_UNAVAILABLE
-        else -> null
-    }
-
-    private fun hasPendingCoreSignal(
+    // Location-fix quality, spoken wake-phrase confirmation, and felt-vibration confirmation are
+    // not gates. Their related feature support must be classified from passive capability probes.
+    private fun hasPendingAutomaticProbe(
         observation: PostLoginDeviceCheckObservation,
     ): Boolean = listOf(
         observation.minimumAndroidVersion,
         observation.requiredPermissions,
+        observation.voiceDisclosure,
         observation.coreHardwareAndServices,
         observation.locationService,
         observation.deviceResources,
         observation.detector,
-    ).any { it == PostLoginDeviceCheckSignal.PENDING }
+        observation.cameraPipeline,
+        observation.koreanTextToSpeech,
+    ).any { it == PostLoginDeviceCheckSignal.PENDING } ||
+        observation.metricDepth == PostLoginMetricDepthState.PENDING
+
+    private fun PostLoginDeviceCheckSnapshot.isTerminal(): Boolean =
+        state == PostLoginDeviceCheckState.FULL ||
+            state == PostLoginDeviceCheckState.LIMITED ||
+            state == PostLoginDeviceCheckState.FAIL
 
     private fun fail(
         snapshot: PostLoginDeviceCheckSnapshot,
@@ -241,5 +285,6 @@ object PostLoginDeviceCheckPolicy {
     ): PostLoginDeviceCheckSnapshot = snapshot.copy(
         state = PostLoginDeviceCheckState.FAIL,
         failure = failure,
+        disabledFeatures = emptySet(),
     )
 }

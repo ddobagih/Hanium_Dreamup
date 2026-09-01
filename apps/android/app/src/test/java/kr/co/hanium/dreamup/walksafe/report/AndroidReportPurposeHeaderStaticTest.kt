@@ -35,6 +35,11 @@ class AndroidReportPurposeHeaderStaticTest {
         )
         assertTrue(uploadCall.contains("val purpose = report.priority.toTransferPurpose()"))
         assertTrue(
+            !uploadCall.contains(
+                "consentConfirmation.backendConsentReceiptSha256 ==\n                report.consentReceiptSha256",
+            ),
+        )
+        assertTrue(
             source.contains(
                 "setRequestProperty(\n                    CONSENT_RECEIPT_HEADER,\n                    consentConfirmation.backendConsentReceiptSha256",
             ),
@@ -55,5 +60,7 @@ class AndroidReportPurposeHeaderStaticTest {
                 "ReportQueuePriority.AUTOMATIC",
             ),
         )
+        assertTrue(process.contains("if (!explicitRequest &&"))
+        assertTrue(!process.contains("rawSourceCollection"))
     }
 }

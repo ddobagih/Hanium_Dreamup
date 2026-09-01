@@ -147,6 +147,29 @@ class AndroidReportUploaderTest {
     }
 
     @Test
+    fun queuedReportActorMismatchFailsBeforeNetworkOpener() {
+        var openerCalls = 0
+        val binding = IntegratedConsentNetworkBinding.forTest(
+            IntegratedConsentNetworkTransport.WIFI,
+        ) { url ->
+            openerCalls += 1
+            url.openConnection()
+        }
+
+        assertThrows(IllegalArgumentException::class.java) {
+            AndroidReportUploader().queuedStatusCall(
+                permit = uploadPermit(),
+                session = session("http://127.0.0.1:8081"),
+                consentConfirmation = consentConfirmation(),
+                networkBinding = binding,
+                report = queuedReport().copy(reporterActorId = "another-actor"),
+                approvedGatewayOrigin = "http://127.0.0.1:8081",
+            )
+        }
+        assertEquals(0, openerCalls)
+    }
+
+    @Test
     fun missingAndJsonNullReceiptFieldsAreAmbiguousOnlyForAutomaticReports() {
         val absentBodies =
             listOf(
@@ -512,6 +535,7 @@ class AndroidReportUploaderTest {
         return QueuedReport(
             payload = payload,
             priority = ReportQueuePriority.EXPLICIT,
+            reporterActorId = TEST_ACTOR_ID,
             walkSessionId = "123e4567-e89b-42d3-a456-426614174011",
             consentReceiptSha256 = "c".repeat(64),
             createdAtEpochMs = 1_000L,
@@ -534,7 +558,7 @@ class AndroidReportUploaderTest {
         itemVersions = IntegratedConsentItemVersions(),
         clientRevision = 1L,
         revision = 1L,
-        selections = IntegratedConsentSelections(rawSourceCollection = true),
+        selections = IntegratedConsentSelections(),
         confirmedAt = "2026-07-25T12:00:00.000Z",
         gatewayAuditRecordSha256 = "9".repeat(64),
         backendConsentReceiptSha256 = "a".repeat(64),

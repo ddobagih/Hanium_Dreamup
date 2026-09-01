@@ -83,7 +83,7 @@ class MainActivityWalkSessionLifecycleStaticTest {
         )
         assertTrue(
             functionBlock("private fun currentNavigationCollectionAllowsWork()")
-                .contains("tier == WalkSafeStartupCapabilityTier.FULL"),
+                .contains("postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)"),
         )
     }
 
@@ -111,14 +111,24 @@ class MainActivityWalkSessionLifecycleStaticTest {
     fun failedAutomaticNoticeAndResumeResponseRequireAnExplicitRetryAction() {
         val failure = functionBlock("private fun failStartupCapabilityConfirmation(")
         val advance = functionBlock("private fun maybeAdvanceWalkSessionAfterCapabilityCheck()")
-        val button = source.substringAfter("startupCapabilityConfirmButton = Button(this).apply")
-            .substringBefore("statusText = TextView(this).apply")
+        val buttonAction =
+            functionBlock("private fun handleStartupCapabilityConfirmAction()")
 
         assertTrue(failure.contains("startupCapabilityRetryRequiresUserAction = true"))
         assertTrue(advance.contains("startupCapabilityRetryRequiresUserAction"))
         assertTrue(advance.contains("walkSessionResumeRetryRequiresUserAction"))
-        assertTrue(button.contains("startupCapabilityRetryRequiresUserAction = false"))
-        assertTrue(button.contains("walkSessionResumeRetryRequiresUserAction = false"))
+        assertTrue(buttonAction.contains("startupCapabilityRetryRequiresUserAction = false"))
+        assertTrue(buttonAction.contains("walkSessionResumeRetryRequiresUserAction = false"))
+        assertTrue(
+            buttonAction.indexOf("walkSessionResumeRetryRequiresUserAction = false") <
+                buttonAction.indexOf("resumePermissionRecoveryFromExplicitUserAction()"),
+        )
+        assertTrue(
+            buttonAction.contains(
+                "session.recoveryStage == WalkSessionRecoveryStage.RECHECK_REQUIRED",
+            ),
+        )
+        assertTrue(buttonAction.contains("refreshStartupCapabilityUi()"))
         assertTrue(
             Regex(
                 """!startupCapabilityConfirmationPending\s*&&\s*!walkSessionResumePromptPending""",
@@ -165,7 +175,9 @@ class MainActivityWalkSessionLifecycleStaticTest {
 
         assertTrue(metricInvalidation.contains("WalkSessionEvent.SafetyStopRequested"))
         assertTrue(metricInvalidation.contains("runtimeFailureRequiresSafetyStop"))
-        assertTrue(speechFailure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertTrue(speechFailure.contains("기능 제한"))
+        assertTrue(speechFailure.contains("다른 기능은 계속 사용할 수 있습니다."))
+        assertFalse(speechFailure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertTrue(safetyStop.contains("cancelWalkSessionOutputs(reason)"))
         assertTrue(foregroundRecheck.contains("WalkSessionEvent.RecheckRequested"))
         assertTrue(foregroundRecheck.contains("cancelWalkSessionOutputs(reason)"))
@@ -179,10 +191,10 @@ class MainActivityWalkSessionLifecycleStaticTest {
         assertTrue(preflight.contains("WalkSessionState.READY"))
         assertTrue(preflight.contains("WalkSessionState.PAUSED"))
         assertFalse(preflight.contains("WalkSessionState.SAFE_STOP"))
-        assertTrue(
-            functionBlock("private fun requestCameraFallbackStart(")
-                .contains("enterWalkSessionForegroundRecheckAndCancelOutputs("),
-        )
+        val fallbackRequest = functionBlock("private fun requestCameraFallbackStart(")
+        assertTrue(fallbackRequest.contains("automaticallyContinueMetricOnlyDowngrade"))
+        assertTrue(fallbackRequest.contains("CameraFallbackStartReason.RUNTIME_METRIC_LOST"))
+        assertTrue(fallbackRequest.contains("enterWalkSessionForegroundRecheckAndCancelOutputs("))
     }
 
     @Test
@@ -215,7 +227,7 @@ class MainActivityWalkSessionLifecycleStaticTest {
     }
 
     @Test
-    fun everyStartWalkModeRequiresTheAllOrNothingPermissionBundle() {
+    fun startWalkRequestsOptionalPermissionsButRequiresOnlyActiveCoreFeatures() {
         val permissions = functionBlock("private fun missingWalkSessionPermissions(")
         val requiredPermissions =
             functionBlock("private fun missingRequiredWalkSessionPermissions(")
@@ -233,9 +245,8 @@ class MainActivityWalkSessionLifecycleStaticTest {
         assertTrue(permissions.contains("Manifest.permission.ACTIVITY_RECOGNITION"))
         assertTrue(requiredPermissions.contains("Manifest.permission.CAMERA"))
         assertTrue(requiredPermissions.contains("Manifest.permission.ACCESS_FINE_LOCATION"))
-        assertTrue(requiredPermissions.contains("Manifest.permission.RECORD_AUDIO"))
-        assertTrue(requiredPermissions.contains("Manifest.permission.ACTIVITY_RECOGNITION"))
-        assertTrue(requiredPermissions.contains("Build.VERSION_CODES.Q"))
+        assertFalse(requiredPermissions.contains("Manifest.permission.RECORD_AUDIO"))
+        assertFalse(requiredPermissions.contains("Manifest.permission.ACTIVITY_RECOGNITION"))
         assertTrue(effectiveMode.contains("toWalkSessionMode()"))
         assertFalse(effectiveMode.contains("!hasLocationPermission()"))
     }
@@ -313,7 +324,7 @@ class MainActivityWalkSessionLifecycleStaticTest {
         val route = functionBlock("private fun requestRoute(")
         val prepare = functionBlock("private fun prepareReportCandidate(")
         val report = functionBlock("private fun processReportCandidate(")
-        val capture = functionBlock("private fun captureReportQueueDrainTriggerBeforeTransition(")
+        val capture = functionBlock("private fun buildReportQueueDrainTrigger(")
         val drainContext = functionBlock("private fun reportQueueDrainContext(")
 
         assertTrue(destination.contains("isDestinationSearchLeaseCurrent(expectedWalkEpoch, requestId)"))

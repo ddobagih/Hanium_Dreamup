@@ -19,6 +19,10 @@ internal class AndroidReportQueueTransport(
     private val networkBinding: IntegratedConsentNetworkBinding,
     private val permitProvider: (ReportTransferPurpose) -> ReportUploadPermit?,
 ) : ReportQueueTransport {
+    private val approvedGatewayOrigin = requireNotNull(
+        approvedReportQueueGatewayOriginOrNull(session.gatewayBaseUrl),
+    )
+
     override fun statusCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt?> =
         uploader.queuedStatusCall(
             permit = requireNotNull(permitProvider(report.purpose())),
@@ -26,6 +30,7 @@ internal class AndroidReportQueueTransport(
             consentConfirmation = consentConfirmation,
             networkBinding = networkBinding,
             report = report,
+            approvedGatewayOrigin = approvedGatewayOrigin,
         )
 
     override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> =
@@ -35,6 +40,7 @@ internal class AndroidReportQueueTransport(
             consentConfirmation = consentConfirmation,
             networkBinding = networkBinding,
             report = report,
+            approvedGatewayOrigin = approvedGatewayOrigin,
         )
 
     private fun QueuedReport.purpose(): ReportTransferPurpose =
@@ -43,6 +49,8 @@ internal class AndroidReportQueueTransport(
         } else {
             ReportTransferPurpose.AUTOMATIC
         }
+
+    init { require(session.actorId.isNotBlank()) }
 }
 
 internal enum class ReportQueueDrainOutcome {
@@ -68,13 +76,11 @@ internal class ReportQueueDrainCoordinator(
     fun startNext(
         contextProvider: () -> ReportQueueDrainContext,
         transport: ReportQueueTransport,
+        beforeDeleteAfterReceipt: (QueuedReport) -> Boolean = { true },
     ): CancellableNetworkCall<ReportQueueDrainOutcome>? {
         if (activeDrain != null) return null
         val initialContext = contextProvider()
-        val report = store.nextForDrain(
-            initialContext.walkSessionId,
-            initialContext.consentReceiptSha256,
-        ) ?: return null
+        val report = store.nextForRecoveryDrain(initialContext.reporterActorId) ?: return null
         val lease = policy.acquire(report, initialContext).lease ?: return null
         val nested = AtomicReference<CancellableNetworkCall<*>?>()
         lateinit var outer: CancellableNetworkCall<ReportQueueDrainOutcome>
@@ -100,7 +106,10 @@ internal class ReportQueueDrainCoordinator(
                         return@execute ReportQueueDrainOutcome.CANCELLED
                     }
                     if (statusReceipt != null) {
-                        return@execute if (store.deleteAfterReceipt(statusReceipt)) {
+                        return@execute if (
+                            beforeDeleteAfterReceipt(report) &&
+                            store.deleteAfterReceipt(lease.reporterActorId, statusReceipt)
+                        ) {
                             ReportQueueDrainOutcome.DELETED_AFTER_STATUS
                         } else {
                             ReportQueueDrainOutcome.RECEIPT_REJECTED
@@ -121,7 +130,10 @@ internal class ReportQueueDrainCoordinator(
                     if (!policy.isCurrent(lease, contextProvider())) {
                         return@execute ReportQueueDrainOutcome.CANCELLED
                     }
-                    if (store.deleteAfterReceipt(uploadReceipt)) {
+                    if (
+                        beforeDeleteAfterReceipt(report) &&
+                        store.deleteAfterReceipt(lease.reporterActorId, uploadReceipt)
+                    ) {
                         ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD
                     } else {
                         ReportQueueDrainOutcome.RECEIPT_REJECTED
@@ -157,6 +169,12 @@ internal class ReportQueueDrainCoordinator(
     fun onConsentRevoked(consentReceiptSha256: String): Boolean {
         cancelActiveLocked()
         return store.onConsentRevoked(consentReceiptSha256)
+    }
+
+    @Synchronized
+    fun onAutomaticReportingRevoked(consentReceiptSha256: String): Boolean {
+        cancelActiveLocked()
+        return store.onAutomaticReportingRevoked(consentReceiptSha256)
     }
 
     @Synchronized

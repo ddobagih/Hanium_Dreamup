@@ -18,14 +18,14 @@ class MainActivityCameraAdmissionStaticTest {
         assertTrue(source.contains("if (!admission.detectorInvocationAllowed) return"))
         assertTrue(source.contains("if (!admission.detectorInvocationAllowed) {"))
         val preflight = source.substringAfter(
-            "private fun startPostLoginCameraFallbackPreflight(",
-        ).substringBefore("private fun isPostLoginCameraFallbackPreflightCurrent(")
+            "private fun startPostLoginCameraPipelinePreflight(",
+        ).substringBefore("private fun isPostLoginCameraPipelinePreflightCurrent(")
         assertTrue(
             preflight.contains(
-                "if (!isPostLoginCameraFallbackPreflightCurrent(binding, generation)) {",
+                "if (!isPostLoginCameraPipelinePreflightCurrent(binding, generation)) {",
             ),
         )
-        assertTrue(preflight.indexOf("isPostLoginCameraFallbackPreflightCurrent") <
+        assertTrue(preflight.indexOf("isPostLoginCameraPipelinePreflightCurrent") <
             preflight.indexOf("frameDetector.detect"))
     }
 
@@ -33,5 +33,26 @@ class MainActivityCameraAdmissionStaticTest {
     fun arAdmissionUsesCaptureTimeAndCurrentElapsedTimeSeparately() {
         assertTrue(source.contains("nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),"))
         assertTrue(source.contains("observedAtElapsedRealtimeMs = elapsedRealtimeMs,"))
+    }
+
+    @Test
+    fun walkingAdmissionsUseMeasuredLumaAndMountingSensorsWithTheActiveProfile() {
+        val measurement = source.substringAfter(
+            "private fun cameraFrameQualityObservation(",
+        ).substringBefore("private fun observeOfficialEnvironmentCameraFrame(")
+        val fallback = source.substringAfter(
+            "private fun analyzeCameraFallbackFrame(",
+        ).substringBefore("private fun isFeedbackLifecycleCurrent(")
+        val ar = source.substringAfter(
+            "val yPlane = cameraImage.planes.firstOrNull()",
+        ).substringBefore("val rawCollectionAllowed")
+
+        assertTrue(measurement.contains("CameraLumaMeasurementPolicy.measure("))
+        assertTrue(measurement.contains("phoneMountingSensorProbe.latestNow()"))
+        assertTrue(fallback.contains("val yPlane = imageProxy.planes.firstOrNull()"))
+        assertTrue(fallback.contains("approvedProfile = activeCameraFrameQualityProfile"))
+        assertTrue(ar.contains("cameraFrameQualityObservation("))
+        assertTrue(source.contains("approvedProfile = activeCameraFrameQualityProfile"))
+        assertTrue(source.contains("WalkSafeEnvironmentProfiles.active(allowTestCandidate = BuildConfig.DEBUG)"))
     }
 }

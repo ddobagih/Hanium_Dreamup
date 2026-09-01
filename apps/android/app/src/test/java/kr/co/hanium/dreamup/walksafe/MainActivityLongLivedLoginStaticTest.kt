@@ -200,9 +200,12 @@ class MainActivityLongLivedLoginStaticTest {
         )
         assertInOrder(
             applySnapshot,
+            "val verifiedActorSession = session?.takeIf",
             "!snapshot.storageBlocked",
-            "session.verificationState == GatewaySessionVerificationState.VERIFIED",
-            "session.isUsableFor(actorId)",
+            "current.verificationState == GatewaySessionVerificationState.VERIFIED",
+            "current.isUsableFor(current.actorId)",
+            "if (\n            verifiedActorSession != null",
+            "verifiedActorSession.isUsableFor(actorId)",
             "priorityUserOnboardingActorId == actorId",
             "permissionSessionPolicy.authenticated(actorId)",
         )
@@ -213,7 +216,10 @@ class MainActivityLongLivedLoginStaticTest {
         val clear = functionBlock("private fun clearGatewaySession(")
         assertInOrder(
             clear,
-            "val operation = GatewaySessionProcessCoordinator.beginOperation() ?: return null",
+            "val operation = if (expectedProcessGeneration != null && expectedSession != null)",
+            "GatewaySessionProcessCoordinator.beginGeneralSessionOperationIfCurrent(",
+            "GatewaySessionProcessCoordinator.beginOperation()",
+            "} ?: return null",
             "gatewaySessionStore.moveActiveToPendingRevocation(",
             "GatewaySessionProcessCoordinator.publishPendingRevocation(operation)",
             "permissionSessionPolicy.authenticationExpired()",

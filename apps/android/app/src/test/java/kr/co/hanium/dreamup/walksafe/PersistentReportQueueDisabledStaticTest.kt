@@ -78,6 +78,21 @@ class PersistentReportQueueDisabledStaticTest {
         assertTrue(
             buildScript.contains("automatic capacity plus one max stored explicit entry reserve"),
         )
+
+        val explicitButton = source.substringAfter("explicitReportButton = Button(this).apply")
+            .substringBefore("voiceReportButton = Button(this).apply")
+        assertTrue(explicitButton.contains("PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE != null"))
+        assertTrue(explicitButton.contains("isEnabled = queueAvailable"))
+        assertTrue(explicitButton.contains("신고 저장 기능 준비 중"))
+        assertTrue(explicitButton.contains("contentDescription = if (queueAvailable)"))
+
+        val explicitRequest = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun ensureExplicitReportAuthorityPreconditions",
+        )
+        assertTrue(explicitRequest.contains("PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE == null"))
+        assertTrue(explicitRequest.contains("reportCandidate=blocked:queue_disabled"))
+        assertTrue(explicitRequest.contains("speakInteraction(message)"))
     }
 
     @Test
@@ -174,17 +189,13 @@ class PersistentReportQueueDisabledStaticTest {
                 source,
                 "private fun applyImmediateConsentWithdrawals",
             )
-        val rawWithdrawal =
-            ReportStaticSourceInspector.blockAfter(
-                consentWithdrawals,
-                "IntegratedConsentItem.RAW_SOURCE_COLLECTION ->",
-            )
-        val automaticWithdrawal =
-            ReportStaticSourceInspector.blockAfter(
-                consentWithdrawals,
-                "IntegratedConsentItem.AUTOMATIC_REPORTING",
-            )
-        assertTrue(rawWithdrawal.contains("scheduleLegacyPendingReportQueuePurge()"))
+        val rawWithdrawal = consentWithdrawals
+            .substringAfter("IntegratedConsentItem.RAW_SOURCE_COLLECTION ->")
+            .substringBefore("IntegratedConsentItem.AUTOMATIC_REPORTING ->")
+        val automaticWithdrawal = consentWithdrawals
+            .substringAfter("IntegratedConsentItem.AUTOMATIC_REPORTING ->")
+            .substringBefore("IntegratedConsentItem.MOBILE_NETWORK_TRANSFER ->")
+        assertFalse(rawWithdrawal.contains("scheduleLegacyPendingReportQueuePurge()"))
         assertTrue(automaticWithdrawal.contains("scheduleLegacyPendingReportQueuePurge()"))
 
         val accountDeletion =

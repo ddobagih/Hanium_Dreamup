@@ -16,11 +16,14 @@ class MainActivityPhoneMountingStaticTest {
             content,
             "phoneMountingStatusText = TextView(this).apply",
         )
-        val overlay = blockStartingAt(content, "val overlay = LinearLayout(this).apply")
+        val overlay = blockStartingAt(
+            content,
+            "walkReadinessControls = LinearLayout(this).apply",
+        )
 
         assertTrue(statusView.contains("contentDescription = text"))
         assertTrue(statusView.contains("View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
-        assertTrue(statusView.contains("View.ACCESSIBILITY_LIVE_REGION_POLITE"))
+        assertTrue(statusView.contains("View.ACCESSIBILITY_LIVE_REGION_NONE"))
         assertTrue(content.contains("ViewCompat.setAccessibilityHeading(phoneMountingStatusText"))
         assertTrue(content.contains("phoneMountingChestConfirmButton ="))
         assertTrue(content.contains("confirmPhoneMounting(PhoneMountingMethod.CHEST_FORWARD)"))
@@ -74,8 +77,10 @@ class MainActivityPhoneMountingStaticTest {
         val blockReason = functionBlock("private fun walkSessionReadinessBlockReason(")
         val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
         val activation = functionBlock("private fun activateWalkSessionRuntime()")
+        val startAfterRelease =
+            functionBlock("private fun startWalkSessionRuntimeAfterCameraRelease(")
 
-        assertTrue(readiness.contains("PhoneMountingPolicy.productionProfile"))
+        assertTrue(readiness.contains("activePhoneMountingProfile"))
         assertTrue(readiness.contains("WalkSessionReadinessStatus.UNAVAILABLE"))
         assertTrue(readiness.contains("PhoneMountingStatus.SUITABLE"))
         assertTrue(readiness.contains("WalkSessionReadinessStatus.READY"))
@@ -103,8 +108,9 @@ class MainActivityPhoneMountingStaticTest {
         assertTrue(activation.contains("activatePhoneMountingRuntime()"))
         assertTrue(
             activation.indexOf("activatePhoneMountingRuntime()") <
-                activation.indexOf("startNavigationServicesIfNeeded()"),
+                activation.indexOf("startWalkSessionRuntimeAfterCameraRelease(runtimeEpoch)"),
         )
+        assertTrue(startAfterRelease.contains("startNavigationServicesIfNeeded()"))
     }
 
     @Test
@@ -130,6 +136,20 @@ class MainActivityPhoneMountingStaticTest {
             ),
         )
         assertTrue(runtimeActivation.contains("phase = PhoneMountingAssessmentPhase.ACTIVE"))
+        assertTrue(runtimeActivation.contains("phoneMountingSensorProbe.start()"))
+        assertTrue(runtimeActivation.contains("phone_mounting_sensor_start_failed"))
+        assertTrue(
+            runtimeActivation.indexOf("phoneMountingSensorProbe.start()") <
+                runtimeActivation.indexOf("phone_mounting_sensor_start_failed"),
+        )
+        assertTrue(
+            runtimeActivation.indexOf("phone_mounting_sensor_start_failed") <
+                runtimeActivation.indexOf(
+                    "return false",
+                    runtimeActivation.indexOf("phone_mounting_sensor_start_failed"),
+                ),
+        )
+        assertTrue(runtimeActivation.contains("if (!usable) phoneMountingSensorProbe.stop()"))
         assertTrue(runtimeReassessment.contains("phase = PhoneMountingAssessmentPhase.ACTIVE"))
         assertTrue(
             currentAssessment.contains(
@@ -137,7 +157,7 @@ class MainActivityPhoneMountingStaticTest {
             ),
         )
         assertTrue(currentAssessment.contains("cameraFrameQuality = cameraFrameQuality"))
-        assertTrue(currentAssessment.contains("PhoneMountingPolicy.productionProfile"))
+        assertTrue(currentAssessment.contains("activePhoneMountingProfile"))
 
         val mountingIntegration = listOf(
             functionBlock("private fun confirmPhoneMounting("),
@@ -382,7 +402,7 @@ class MainActivityPhoneMountingStaticTest {
         assertTrue(immediateConsentWithdrawals.contains("cancelReportQueueDrain()"))
         assertTrue(
             immediateConsentWithdrawals.contains(
-                "reportQueueDrainCoordinator.onConsentRevoked(previousReceipt)",
+                "reportQueueDrainCoordinator.onAutomaticReportingRevoked(previousReceipt)",
             ),
         )
         assertFalse(automaticConsent.contains("\n                reportUploadSafetyGeneration += 1L"))

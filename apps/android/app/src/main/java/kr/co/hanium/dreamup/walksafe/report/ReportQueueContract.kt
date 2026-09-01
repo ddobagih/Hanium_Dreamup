@@ -9,6 +9,9 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
 import kr.co.hanium.dreamup.walksafe.BuildConfig
+import kr.co.hanium.dreamup.walksafe.network.GatewayCredentialPolicy
+import kr.co.hanium.dreamup.walksafe.network.GatewayEndpointPolicy
+import org.json.JSONObject
 
 internal enum class ReportQueuePriority {
     EXPLICIT,
@@ -101,11 +104,19 @@ internal class FrozenReportPayload private constructor(
 internal data class QueuedReport(
     val payload: FrozenReportPayload,
     val priority: ReportQueuePriority,
+    val reporterActorId: String,
     val walkSessionId: String,
     val consentReceiptSha256: String,
     val createdAtEpochMs: Long,
     val expiresAtEpochMs: Long,
 )
+
+internal fun reportActorIdFromMetadataOrNull(metadataUtf8: ByteArray): String? = runCatching {
+    val root = JSONObject(String(metadataUtf8, Charsets.UTF_8))
+    val actorId = root.get("reporter_user_id") as? String ?: return@runCatching null
+    GatewayCredentialPolicy.normalizedActorIdOrNull(actorId)
+        ?.takeIf { it == actorId }
+}.getOrNull()
 
 internal data class ReportQueueReceipt(
     val reportId: String,
@@ -173,7 +184,7 @@ internal const val REPORT_QUEUE_MAX_STORED_ENTRY_BYTES = 44L * 1_024L * 1_024L
 internal val REPORT_SHA256_HEX = Regex("[0-9a-f]{64}")
 internal val PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE: ApprovedReportQueueCapacityProfile? =
     approvedReportQueueCapacityProfile(
-        enabled = BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED,
+        enabled = BuildConfig.DEBUG && BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED,
         maxEntries = BuildConfig.WALKSAFE_REPORT_QUEUE_MAX_ENTRIES,
         maxPayloadBytes = BuildConfig.WALKSAFE_REPORT_QUEUE_MAX_PAYLOAD_BYTES,
         maxStoredEntryBytes = BuildConfig.WALKSAFE_REPORT_QUEUE_MAX_STORED_ENTRY_BYTES,
@@ -181,4 +192,14 @@ internal val PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE: ApprovedReportQueueCapaci
         automaticMaxEntries = BuildConfig.WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_ENTRIES,
         automaticMaxTotalBytes = BuildConfig.WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES,
     )
+
+internal fun approvedReportQueueGatewayOriginOrNull(raw: String?): String? =
+    if (!BuildConfig.DEBUG || !BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED) {
+        null
+    } else {
+        GatewayEndpointPolicy.approvedDebugOriginOrNull(
+            raw = raw,
+            approvedOrigin = BuildConfig.WALKSAFE_REPORT_QUEUE_TEST_ORIGIN,
+        )
+    }
 private val REPORT_PAYLOAD_DOMAIN = "walksafe-report-payload-v1\u0000".toByteArray(Charsets.US_ASCII)

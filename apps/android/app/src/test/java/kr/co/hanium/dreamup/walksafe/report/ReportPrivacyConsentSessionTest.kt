@@ -310,9 +310,7 @@ class ReportPrivacyConsentSessionTest {
                         itemVersions = IntegratedConsentItemVersions(),
                         clientRevision = 1L,
                         revision = 1L,
-                        selections = IntegratedConsentSelections(
-                            rawSourceCollection = true,
-                        ),
+                        selections = IntegratedConsentSelections(),
                         confirmedAt = "2026-07-25T12:00:00.000Z",
                         gatewayAuditRecordSha256 = "9".repeat(64),
                         backendConsentReceiptSha256 = "a".repeat(64),
@@ -352,17 +350,24 @@ class ReportPrivacyConsentSessionTest {
     fun disclosureStatesTheActualTransferAndRetentionBoundary() {
         assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains(WALKSAFE_PRODUCT_PURPOSE_STATEMENT_KO))
         assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains(WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO))
-        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("손상 점자블록 신고 데이터"))
+        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("직접 손상 점자블록 신고"))
         assertFalse(REPORT_PRIVACY_DISCLOSURE_KO.contains("위험 신고"))
         assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("최대 960px"))
         assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("현재 Android 앱은 320px"))
         assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("JPEG"))
-        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("메타데이터 제거"))
+        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("메타데이터를 제거"))
         assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("모자이크하지 않습니다"))
         assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("정확한 GPS 좌표"))
         assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("GPS가 제공한 이동 heading"))
-        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("180일"))
-        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("기기 내 위험 탐지·안내와 별도"))
+        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("release 빌드의 신고 대기열을 열지 않습니다"))
+        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("WalkSafe 테스트 서버에만 전송"))
+        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("기관으로 자동 전송하지 않습니다"))
+        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("영상·이미지·정확한 위치를 수집하지 않는 별도 경로"))
+        assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("직접 신고는 사용할 수 있습니다"))
+        assertTrue(REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO.contains("이번 손상 점자블록 직접 신고"))
+        assertTrue(REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO.contains("선택 원본·진단수집 raw v2나 학습 재사용에는"))
+        assertFalse(REPORT_PRIVACY_DISCLOSURE_KO.contains("180일"))
+        assertFalse(REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO.contains("180일"))
     }
 
     @Test

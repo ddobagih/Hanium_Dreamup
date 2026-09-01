@@ -31,6 +31,7 @@
 | `check_detect_*`, `evaluate_predictions_*`, `evaluate_yolo_*` | backend detection/report 계약과 저장 예측 평가 |
 | `check_navigation_*`, `check_tmap_*` | 길안내·reroute·TTS 타이밍 검사 |
 | `check_voice_*`, `test_stt.py`, `test_tts.py` | 음성 계약과 로컬 STT/TTS smoke |
+| `prepare_vosk_ko_small_model.py` | 공식 `vosk-model-small-ko-0.22` archive·Apache-2.0 원문을 고정 URL/크기/SHA-256으로 검증하고 Android asset을 원자적으로 준비한다. 기본 실행은 다운로드 또는 기존 설치 검증, `--verify-only`는 18개 현재 산출물과 `MODEL_FILES.sha256`만 읽기 검증한다. 생성 asset은 Git에서 제외되며 Android APK asset 병합 전 반드시 준비돼야 한다. |
 | `check_android_*`, `export_android_tflite_models_20260531.py` | Android model asset 정적 계약과 legacy export. cleartext debug를 요구하던 `check_android_depth_scaffold_20260531.py`는 대체된 역사 snapshot |
 | `check_android_apk_model_asset_20260713.py` | 빌드 APK의 runtime config가 source와 byte-identical인지, 설정된 3개 model asset만 있고 hash가 맞는지, env/log/test/fixture payload가 없는지 검사 |
 | `prepare_android_field_device_20260710.sh`, `pull_android_field_sessions_20260710.py`, `summarize_android_field_sessions_20260710.py` | `--apk`로 고정한 same-commit Android debug field APK의 로컬/기기 SHA를 대조해 설치하고, 앱 전용 현장 로그를 회수해 개인정보 제한 요약·strict 출발 gate를 수행. CameraX mode는 실제 analyzed frame을 요구하고 `--require-arcore-unsupported`로 debug 강제/Depth 제한 기능 증거와 실제 ARCore 미지원 증거를 분리한다. field APK와 서명 release APK는 별도 SHA이며 field 결과는 release binary 실행 근거가 아니다 |
@@ -52,7 +53,7 @@
 | `check_report_retention_dry_run.py` | 기본은 report 보존 후보만 계산. 명시적 `--apply`·확인 문구·actor·DB/upload·manifest와 최근 관리자 재확인이 모두 있을 때만 image 격리→DB transaction→정리를 수행하고 실패 전 rollback |
 | `manage_field_telemetry_retention_20260711.py` | 서버 수신일 기준 7일 field telemetry/test-capture 보존을 scope별로 기본 preview하고, apply 시 정상 DB 연결 범위에서 관리자 control 잠금을 유지하며 관리자·세션 ID가 결속된 결과 생성 |
 | `record_walksafe_agency_submission_20260711.py` | agency export·manifest hash, 기관·채널·외부 접수번호·actor를 실제 제출 후 receipt로 기록. 외부 제출 자체는 수행하지 않음 |
-| `backup_walksafe_data_20260711.sh`, `restore_walksafe_backup_drill_20260711.sh` | 명시적 단일 PostgreSQL URL(원격은 `sslmode=verify-full&gssencmode=disable`)의 PostGIS dump·upload을 OpenPGP로 암호화하고 hash manifest를 남기며, 명시 대상에 복구 drill receipt 생성. 두 스크립트는 직접 실행해야 하며(`bash script` 금지), upload/output/lock parent는 미리 만든 현재 사용자 소유 0700 canonical directory여야 한다. 복원 전용 사용자·호스트에는 암호문과 평문의 합계만큼 sealed memfd/tmpfs 여유를 확보해야 함 |
+| `backup_walksafe_data_20260711.sh`, `restore_walksafe_backup_drill_20260711.sh` | 명시적 단일 PostgreSQL URL(원격은 `sslmode=verify-full&gssencmode=disable`)의 PostGIS dump·upload을 OpenPGP로 암호화하고 hash manifest를 남기며, 명시 대상에 복구 drill receipt 생성. source URL은 `DATABASE_URL`, 복원 target URL은 `TARGET_DATABASE_URL` 환경변수로만 전달하며 CLI 인자에 넣지 않는다. 두 스크립트는 직접 실행해야 하며(`bash script` 금지), upload/output/lock parent는 미리 만든 현재 사용자 소유 0700 canonical directory여야 한다. 복원 전용 사용자·호스트에는 암호문과 평문의 합계만큼 sealed memfd/tmpfs 여유를 확보해야 함 |
 | `prune_walksafe_backups_20260711.py` | 기본은 서명된 백업의 보존 후보만 계산. 명시적 apply·확인 문구에 더해 DB 관리자 상태, 기기 결속 세션, 최근 TOTP 재확인이 모두 유효해야 하며, 정상 DB 연결 범위에서 해당 잠금을 유지하고 관리자·세션 ID를 결과에 결속 |
 | `check_walksafe_backup_source_20260713.py`, `walksafe_backup_integrity.py`, `walksafe_environment_identity.py` | 고정된 upload directory FD의 실제 파일 SHA-256과 report `metadata.image_sha256`를 대조하고, flat snapshot 정합, backup artifact/manifest hash, secret을 제외한 DB·경로 환경 identity를 검사 |
 | `check_frontend_motion_projection_policy_20260711.sh` | Web GPS/step/route bearing의 3~5초 미래 ROI와 점자블록 보조 안내 계약 검사 |

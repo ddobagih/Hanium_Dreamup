@@ -25,14 +25,19 @@ class MainActivityStartupCapabilityStaticTest {
 
         val overlay = activity.substringAfter("val overlay = LinearLayout(this).apply")
             .substringBefore("val controlsScroll = ScrollView(this).apply")
+        val readiness = activity
+            .substringAfter("walkReadinessControls = LinearLayout(this).apply")
+            .substringBefore("walkLastResultText = TextView(this).apply")
         val purpose = overlay.indexOf("addView(productPurposeText)")
-        val capability = overlay.indexOf("addView(startupCapabilityText)")
-        val confirmation = overlay.indexOf("addView(startupCapabilityConfirmButton)")
+        val readinessGroup = overlay.indexOf("addView(walkReadinessControls)")
         val runtime = overlay.indexOf("addView(runtimeControls)")
+        val capability = readiness.indexOf("addView(startupCapabilityText)")
+        val confirmation = readiness.indexOf("addView(startupCapabilityConfirmButton)")
         assertTrue(purpose >= 0)
-        assertTrue(purpose < capability)
+        assertTrue(purpose < readinessGroup)
+        assertTrue(readinessGroup < runtime)
+        assertTrue(capability >= 0)
         assertTrue(capability < confirmation)
-        assertTrue(confirmation < runtime)
     }
 
     @Test
@@ -42,14 +47,17 @@ class MainActivityStartupCapabilityStaticTest {
         assertTrue(probe.contains("PackageManager.FEATURE_LOCATION_GPS"))
         assertTrue(probe.contains("PackageManager.FEATURE_MICROPHONE"))
         assertTrue(probe.contains("hasVibrator() == true"))
-        assertTrue(probe.contains("SpeechRecognizer.isOnDeviceRecognitionAvailable"))
-        assertTrue(probe.contains("!voice.isNetworkConnectionRequired"))
+        assertTrue(probe.contains("BundledVoskModelInstaller.bundledModelAvailable"))
+        assertTrue(probe.contains("AndroidKoreanTextToSpeechSynthesisProbe"))
+        assertFalse(probe.contains("SpeechRecognizer.isOnDeviceRecognitionAvailable"))
+        assertFalse(probe.contains("voice.isNetworkConnectionRequired"))
         assertTrue(probe.contains("ARCORE_DEPTH_FEATURE"))
         assertFalse(probe.contains("-> packageManager.hasSystemFeature(ARCORE_DEPTH_FEATURE)"))
-        assertTrue(probe.contains("live session proves stable metric frames"))
+        assertTrue(probe.contains("live session proves stable metric frames on this device"))
         assertTrue(probe.contains("ApprovedDeviceProfileMatcher.match"))
         assertTrue(probe.contains("approvedDesignatedDeviceProfile = approvedDeviceProfileMatch.approved"))
         assertTrue(probe.contains("designatedDeviceProfileVersion = approvedDeviceProfileMatch.profileVersion"))
+        assertTrue(activity.contains("approvedDeviceProfileRequired = false"))
         assertTrue(capability.contains("APPROVED_DEVICE_PROFILE"))
         assertTrue(capability.contains("designatedDeviceProfileVersion"))
     }
@@ -62,17 +70,14 @@ class MainActivityStartupCapabilityStaticTest {
             .substringBefore("private fun requestArCoreAvailabilityRecheck(")
         val actionGate = activity.substringAfter("private fun applyActionButtonState()")
             .substringBefore("private fun openAppSettings()")
+        val automaticStart =
+            activity.substringAfter("private fun maybeAdvanceWalkSessionAfterCapabilityCheck()")
+                .substringBefore("private fun requestGatewayWalkStart(")
 
         assertTrue(permissionStart.contains("if (!requireStartupCapabilityConfirmation()) return"))
         assertTrue(depthStart.contains("if (!requireStartupCapabilityConfirmation()) return"))
         assertTrue(actionGate.contains("isStartupCapabilityConfirmed()"))
-        assertTrue(
-            activity.contains(
-                "firstRunOnboardingComplete() &&\n" +
-                    "                confirmed &&\n" +
-                    "                isWalkSessionRuntimeActive()",
-            ),
-        )
+        assertTrue(automaticStart.contains("if (!isStartupCapabilityConfirmed())"))
         assertFalse(activity.contains("confirmedStartupCapabilityDecision = decision\n        startDepthSession()"))
     }
 
@@ -85,7 +90,11 @@ class MainActivityStartupCapabilityStaticTest {
 
         assertTrue(fallbackRequest.contains("metricDistanceCapabilityOverride = false"))
         assertTrue(fallbackRequest.contains("refreshStartupCapabilityUi()"))
-        assertTrue(fallbackRequest.contains("if (isStartupCapabilityConfirmed())"))
+        assertTrue(
+            fallbackRequest.contains(
+                "if (automaticTransitionReady || isStartupCapabilityConfirmed())",
+            ),
+        )
         assertTrue(fallbackRequest.contains("WALKSAFE_LIMITED_DISTANCE_NOTICE_KO"))
         assertTrue(arCoreStart.contains("requestCameraFallbackStart("))
         assertFalse(arCoreStart.contains("startCameraFallbackSession("))
@@ -128,20 +137,18 @@ class MainActivityStartupCapabilityStaticTest {
     }
 
     @Test
-    fun runtimeSpeechFailureInvalidatesConfirmationAndStopsWalkingOutputs() {
+    fun runtimeSpeechFailureRestrictsOnlyTheRelatedVoiceFeature() {
         val failure = activity.substringAfter("private fun handleRuntimeSpeechCapabilityFailure(")
             .substringBefore("private fun feedbackActuatorStatusText()")
-        val safetyStop = activity.substringAfter("private fun enterWalkSessionSafetyStopAndCancelOutputs(")
-            .substringBefore("private fun handleRuntimeSpeechCapabilityFailure(")
 
-        assertTrue(failure.contains("confirmedStartupCapabilityDecision = null"))
-        assertTrue(failure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
-        assertTrue(failure.contains("stopCameraFallbackSession(updateUi = false)"))
-        assertTrue(failure.contains("stopDepthSession(closeSession = true)"))
-        assertTrue(safetyStop.contains("resetRouteState()"))
-        assertTrue(safetyStop.contains("stopLocationUpdates()"))
-        assertTrue(safetyStop.contains("stopStepTracking()"))
-        assertTrue(safetyStop.contains("earthOrientationTracker.stop()"))
+        assertTrue(failure.contains("onDeviceSpeechRecognitionCapabilityOverride = false"))
+        assertTrue(failure.contains("offlineKoreanTextToSpeechCapabilityOverride = false"))
+        assertTrue(failure.contains("stopHandsFreeVoiceService()"))
+        assertTrue(failure.contains("cancelVoiceCommandRecognition()"))
+        assertTrue(failure.contains("화면과 사용 가능한 다른 기능은 계속 사용할 수 있습니다."))
+        assertFalse(failure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertFalse(failure.contains("stopDepthSession("))
+        assertFalse(failure.contains("stopLocationUpdates()"))
         assertTrue(failure.contains("refreshStartupCapabilityUi()"))
 
         val navigationStart = activity.substringAfter("private fun startNavigationServicesIfNeeded()")
@@ -152,7 +159,12 @@ class MainActivityStartupCapabilityStaticTest {
             .substringBefore("private fun updateHeadingFromLocation(")
         assertTrue(navigationStart.contains("if (!currentNavigationCollectionAllowsWork())"))
         assertTrue(navigationGate.contains("if (!isStartupCapabilityConfirmed()) return false"))
-        assertTrue(navigationGate.contains("currentRuntimeMetricOutputAllowsWork()"))
+        assertTrue(
+            navigationGate.contains(
+                "postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)",
+            ),
+        )
+        assertFalse(navigationGate.contains("currentRuntimeMetricOutputAllowsWork()"))
         assertTrue(locationUpdate.contains("!currentNavigationCollectionAllowsWork()"))
     }
 

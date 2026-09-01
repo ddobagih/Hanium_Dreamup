@@ -20,15 +20,13 @@ class ReportQueueDrainPolicyTest {
     }
 
     @Test
-    fun onlyStationaryAllowedNetworkAndCurrentConsentSessionAcquireNextItem() {
+    fun onlyStationaryAllowedNetworkAndCurrentConsentAcquireNextItem() {
         listOf(
             context(appForeground = false),
             context(stationary = false),
             context(networkAllowed = false),
             context(consentAllowed = false),
             context(authorityAllowed = false),
-            context(walkSessionId = OTHER_WALK),
-            context(consent = "d".repeat(64)),
         ).forEach { blocked ->
             val decision = ReportQueueDrainPolicy().acquire(report(), blocked)
             assertEquals(0, decision.allowedStatusRequests)
@@ -39,6 +37,41 @@ class ReportQueueDrainPolicyTest {
         assertTrue(allowed.allowed)
         assertEquals(1, allowed.allowedStatusRequests)
         assertEquals(1, allowed.allowedPostRequests)
+
+        val recovery = ReportQueueDrainPolicy().acquire(
+            report(),
+            context(walkSessionId = OTHER_WALK),
+        )
+        assertTrue(recovery.allowed)
+        assertEquals(WALK_ID, recovery.lease?.sourceWalkSessionId)
+        assertEquals(OTHER_WALK, recovery.lease?.runtimeWalkSessionId)
+    }
+
+    @Test
+    fun currentReceiptReauthorizesReportCreatedUnderAnOlderOptionalSelectionReceipt() {
+        val currentReceipt = "d".repeat(64)
+        val decision = ReportQueueDrainPolicy().acquire(
+            report(),
+            context(consent = currentReceipt),
+        )
+
+        assertTrue(decision.allowed)
+        assertEquals(CONSENT, report().consentReceiptSha256)
+        assertEquals(currentReceipt, decision.lease?.consentReceiptSha256)
+    }
+
+    @Test
+    fun reportFromAnotherActorCannotAcquireOrRemainCurrent() {
+        assertFalse(
+            ReportQueueDrainPolicy().acquire(
+                report(),
+                context(reporterActorId = "walker-2"),
+            ).allowed,
+        )
+        val policy = ReportQueueDrainPolicy()
+        val lease = requireNotNull(policy.acquire(report(), context()).lease)
+
+        assertFalse(policy.isCurrent(lease, context(reporterActorId = "walker-2")))
     }
 
     @Test
@@ -82,7 +115,7 @@ class ReportQueueDrainPolicyTest {
     }
 
     @Test
-    fun currentLeaseRevalidatesExactWalkReceiptForegroundConsentAndAuthority() {
+    fun currentLeaseRevalidatesRuntimeWalkReceiptForegroundConsentAndAuthority() {
         listOf(
             context(walkSessionId = OTHER_WALK),
             context(consent = "d".repeat(64)),
@@ -112,6 +145,7 @@ class ReportQueueDrainPolicyTest {
         return QueuedReport(
             payload = payload,
             priority = priority,
+            reporterActorId = ACTOR_ID,
             walkSessionId = WALK_ID,
             consentReceiptSha256 = CONSENT,
             createdAtEpochMs = 1_000L,
@@ -127,6 +161,7 @@ class ReportQueueDrainPolicyTest {
         consentAllowed: Boolean = true,
         automaticReportingAllowed: Boolean = true,
         authorityAllowed: Boolean = true,
+        reporterActorId: String = ACTOR_ID,
         walkSessionId: String = WALK_ID,
         consent: String = CONSENT,
         movementGeneration: Long = 7L,
@@ -138,6 +173,7 @@ class ReportQueueDrainPolicyTest {
         consentAllowed = consentAllowed,
         automaticReportingAllowed = automaticReportingAllowed,
         authorityAllowed = authorityAllowed,
+        reporterActorId = reporterActorId,
         walkSessionId = walkSessionId,
         consentReceiptSha256 = consent,
         movementGeneration = movementGeneration,
@@ -151,6 +187,7 @@ class ReportQueueDrainPolicyTest {
         const val REPORT_2 = "123e4567-e89b-42d3-a456-426614174001"
         const val WALK_ID = "123e4567-e89b-42d3-a456-426614174002"
         const val OTHER_WALK = "123e4567-e89b-42d3-a456-426614174003"
+        const val ACTOR_ID = "walker-1"
         val CONSENT = "c".repeat(64)
     }
 }
