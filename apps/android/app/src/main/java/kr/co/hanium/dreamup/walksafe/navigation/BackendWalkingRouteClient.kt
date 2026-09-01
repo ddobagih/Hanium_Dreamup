@@ -60,6 +60,7 @@ class BackendWalkingRouteClient(
                 DestinationSearchResponse(provider = "tmap_poi", query = "", results = emptyList())
             }
         }
+        require(validDestinationSearchQuery(safeQuery)) { "destination_query_invalid" }
         val safeLimit = limit.coerceIn(1, MAX_DESTINATION_RESULT_LIMIT)
         val endpoint = buildString {
             append(session.gatewayBaseUrl.trimEnd('/'))
@@ -499,6 +500,12 @@ private fun RoutePoint.isValidCoordinate(): Boolean =
 
 private fun normalizeDestinationQuery(query: String): String = query.trim().replace(Regex("\\s+"), " ")
 
+internal fun canonicalDestinationSearchQueryOrNull(query: String): String? =
+    normalizeDestinationQuery(query).takeIf(::validDestinationSearchQuery)
+
+private fun validDestinationSearchQuery(query: String): Boolean =
+    query.codePointCount(0, query.length) in 1..MAX_DESTINATION_QUERY_CODE_POINTS
+
 private fun requireProtocolValue(json: JSONObject, name: String, expected: String) {
     if (json.optString(name) != expected) {
         throw GatewayResponseProtocolException("${name}_invalid")
@@ -640,6 +647,7 @@ private const val TMAP_SUCCESS_RESULT_CODE = 0
 private const val STAIR_AVOID_PRIORITY = "STAIR_AVOID"
 private const val MAX_PROVIDER_ROUTE_ID_LENGTH = 256
 private const val MAX_DESTINATION_RESULT_LIMIT = 10
+private const val MAX_DESTINATION_QUERY_CODE_POINTS = 80
 internal const val WALKING_ROUTE_MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 private const val ROUTE_ENDPOINT_MAX_DISTANCE_M = 100.0
 private const val ROUTE_SUMMARY_GEOMETRY_MIN_RATIO = 0.5

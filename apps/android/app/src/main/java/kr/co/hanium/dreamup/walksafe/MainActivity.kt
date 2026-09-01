@@ -260,6 +260,7 @@ import kr.co.hanium.dreamup.walksafe.navigation.WalkSessionVoiceControlPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.formatDestinationDistance
 import kr.co.hanium.dreamup.walksafe.navigation.reliableMovementHeadingDegrees
 import kr.co.hanium.dreamup.walksafe.navigation.classifyNavigationBackendFailure
+import kr.co.hanium.dreamup.walksafe.navigation.canonicalDestinationSearchQueryOrNull
 import kr.co.hanium.dreamup.walksafe.navigation.selectAndroidVoiceAction
 import kr.co.hanium.dreamup.walksafe.navigation.createProductionAndroidTactileFrameCoordinator
 import kr.co.hanium.dreamup.walksafe.network.AndroidNavigationCancellation
@@ -387,6 +388,7 @@ import kr.co.hanium.dreamup.walksafe.report.automaticCooldownScopeOrNull
 import kr.co.hanium.dreamup.walksafe.report.automaticReportCooldownScopeOrNull
 import kr.co.hanium.dreamup.walksafe.report.canonicalUserReportCorrectionDescriptionOrNull
 import kr.co.hanium.dreamup.walksafe.report.reportRetryDelayMs
+import kr.co.hanium.dreamup.walksafe.report.validUserReportRequestText
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionRuntimeContext
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionRuntimeCoordinator
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionUploadOutcome
@@ -9446,7 +9448,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             return
         }
         val requestText = userReportRequestTextInput.text?.toString()?.trim().orEmpty()
-        if (requestText.isEmpty() || requestText.length > 500) {
+        if (!validUserReportRequestText(requestText)) {
             setUserReportStatusMessage(
                 "내 신고 상태: 요청 사유를 1자 이상 500자 이하로 입력하세요.",
             )
@@ -29802,6 +29804,16 @@ generation != cameraFallbackGeneration
             return false
         }
         if (blockRouteMutationWhileDeviationChoicePending()) return false
+        val rawQuery = destinationQueryInput.text?.toString().orEmpty()
+        if (rawQuery.isBlank()) {
+            updateNavigationStatus("navigation=destination_query_missing")
+            return false
+        }
+        val query = canonicalDestinationSearchQueryOrNull(rawQuery) ?: run {
+            updateNavigationStatus("navigation=destination_query_invalid max_code_points=80")
+            speakInteraction("목적지는 80자 이하로 입력해 주세요.")
+            return false
+        }
         val expectedWalkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return false
         if (!requireReporterUserId("login_required_destination_search")) return false
         if (!isGatewayNetworkAllowed(reason = "destination_search")) return false
@@ -29818,11 +29830,6 @@ generation != cameraFallbackGeneration
         )
         if (destinationSearchInFlight || navigationRequests.hasActiveDestinationSearch()) return false
         if (!isRouteLocationPermissionReady() && !ensureNavigationPermissionForRouteOrStep()) {
-            return false
-        }
-        val query = destinationQueryInput.text?.toString()?.trim().orEmpty()
-        if (query.isBlank()) {
-            updateNavigationStatus("navigation=destination_query_missing")
             return false
         }
         val requestId = destinationSearchGeneration + 1

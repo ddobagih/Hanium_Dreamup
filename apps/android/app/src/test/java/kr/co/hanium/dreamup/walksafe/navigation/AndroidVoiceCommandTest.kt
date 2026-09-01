@@ -46,6 +46,18 @@ class AndroidVoiceCommandTest {
     }
 
     @Test
+    fun destinationVoiceCommandUsesUnicodeCodePointsForTheEightyCharacterLimit() {
+        val accepted = "😀".repeat(80)
+        val rejected = "😀".repeat(81)
+
+        assertEquals(
+            AndroidVoiceCommand.SetDestination(accepted),
+            parseAndroidVoiceCommand("목적지 $accepted 설정해"),
+        )
+        assertNull(parseAndroidVoiceCommand("목적지 $rejected 설정해"))
+    }
+
+    @Test
     fun parsesDestinationCancellationNextRouteAndNavigationStop() {
         assertEquals(AndroidVoiceCommand.CancelDestination, parseAndroidVoiceCommand("목적지 취소"))
         assertEquals(AndroidVoiceCommand.CancelDestination, parseAndroidVoiceCommand("목적지를 취소해"))

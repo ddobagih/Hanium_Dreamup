@@ -102,6 +102,22 @@ class MainActivityNavigationCompositionTest {
     }
 
     @Test
+    fun destinationSearchRejectsOverlongQueriesBeforeCreatingANetworkCall() {
+        val search = functionBlock("private fun performDestinationSearch(")
+
+        assertTrue(search.contains("canonicalDestinationSearchQueryOrNull(rawQuery)"))
+        assertTrue(search.contains("navigation=destination_query_invalid max_code_points=80"))
+        assertTrue(
+            search.indexOf("canonicalDestinationSearchQueryOrNull(rawQuery)") <
+                search.indexOf("gatewaySessionOrNull(\"destination_search\")"),
+        )
+        assertTrue(
+            search.indexOf("canonicalDestinationSearchQueryOrNull(rawQuery)") <
+                search.indexOf("walkingRouteClient.searchDestinationsCall("),
+        )
+    }
+
+    @Test
     fun voiceDecisionCommandsAreBoundToTheRouteRevisionAtRecognitionStart() {
         val recognitionStart = functionBlock("private fun startVoiceCommandRecognition(")
         val commandHandler = functionBlock("private fun handleVoiceCommandPhrases(")

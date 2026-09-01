@@ -1367,7 +1367,8 @@ function validAwareDateTime(value: unknown): value is string {
 
 function optionalBoundedText(value: unknown): value is string | null {
   return value === null || (
-    typeof value === "string" && value.length >= 1 && value.length <= 500
+    typeof value === "string" &&
+    Array.from(value).length >= 1 && Array.from(value).length <= 500
   );
 }
 
@@ -1851,7 +1852,8 @@ function validUserRequestBody(value: unknown): Record<string, unknown> | null {
     (payload.request_type !== "CORRECTION" && payload.request_type !== "DELETE") ||
     typeof payload.request_text !== "string" ||
     payload.request_text !== payload.request_text.trim() ||
-    payload.request_text.length < 1 || payload.request_text.length > 500
+    Array.from(payload.request_text).length < 1 ||
+    Array.from(payload.request_text).length > 500
   ) return null;
   return payload;
 }

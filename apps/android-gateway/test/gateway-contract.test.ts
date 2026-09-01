@@ -1893,6 +1893,7 @@ test("user report routes bind actor generation and expose only strict minimum JS
   const cookie = backendAccountSessionCookie("android-report-rights-device");
   const reportId = "44444444-4444-4444-8444-444444444444";
   const requestId = "55555555-5555-4555-8555-555555555555";
+  const unicodeRequestId = "56555555-5555-4555-8555-555555555555";
   const correctionId = "66666666-6666-4666-8666-666666666666";
   const clearCorrectionId = "77777777-7777-4777-8777-777777777777";
   const deletionRequestId = "88888888-8888-4888-8888-888888888888";
@@ -2146,6 +2147,41 @@ test("user report routes bind actor generation and expose only strict minimum JS
   assert.equal(created.status, 201);
   assert.equal((await created.json() as { request_id: string }).request_id, requestId);
 
+  const unicodeRequestText = "😀".repeat(500);
+  const unicodeCreated = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/requests`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        client_request_id: unicodeRequestId,
+        request_type: "DELETE",
+        request_text: unicodeRequestText
+      })
+    }),
+    {
+      fetchImpl: async (_input, init) => {
+        assert.equal(
+          (JSON.parse(String(init?.body)) as { request_text: string }).request_text,
+          unicodeRequestText
+        );
+        return Response.json({
+          request_id: unicodeRequestId,
+          request_type: "DELETE",
+          status: "RECEIVED",
+          status_version: 1,
+          public_response: unicodeRequestText,
+          created_at: createdAt,
+          updated_at: createdAt
+        }, { status: 201 });
+      }
+    }
+  );
+  assert.equal(unicodeCreated.status, 201);
+  assert.equal(
+    (await unicodeCreated.json() as { public_response: string }).public_response,
+    unicodeRequestText
+  );
+
   const retrievedRequest = await handleGatewayRequest(
     new Request(
       `http://127.0.0.1:8081/api/reports/mine/${reportId}/requests/${requestId}`,
@@ -2156,6 +2192,20 @@ test("user report routes bind actor generation and expose only strict minimum JS
   assert.equal(retrievedRequest.status, 200);
   assert.equal(retrievedRequest.headers.get("cache-control"), "no-store");
   assert.deepEqual(await retrievedRequest.json(), requestStatus);
+
+  const overlongUnicodeResponse = await handleGatewayRequest(
+    new Request(
+      `http://127.0.0.1:8081/api/reports/mine/${reportId}/requests/${requestId}`,
+      { headers: { cookie } }
+    ),
+    {
+      fetchImpl: async () => Response.json({
+        ...requestStatus,
+        public_response: "😀".repeat(501)
+      })
+    }
+  );
+  assert.equal(overlongUnicodeResponse.status, 502);
 
   for (const { request: limitedRequest, retryAfter, expectedRetryAfter } of [
     {
@@ -2260,6 +2310,20 @@ test("user report routes bind actor generation and expose only strict minimum JS
     { fetchImpl: async () => assert.fail("invalid request must not reach backend") }
   );
   assert.equal(invalidBody.status, 422);
+
+  const overlongUnicodeBody = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/requests`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        client_request_id: requestId,
+        request_type: "DELETE",
+        request_text: "😀".repeat(501)
+      })
+    }),
+    { fetchImpl: async () => assert.fail("overlong request must not reach backend") }
+  );
+  assert.equal(overlongUnicodeBody.status, 422);
 
   for (const body of [
     {

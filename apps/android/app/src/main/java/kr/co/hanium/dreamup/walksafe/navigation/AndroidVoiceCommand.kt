@@ -204,7 +204,7 @@ private fun normalizeDestination(value: String, removeFinalParticle: Boolean = f
         removeFinalParticle && destination.endsWith("로") -> destination.dropLast(1).trim()
         else -> destination
     }
-    return destination.takeIf { it.isNotBlank() && it.length <= MAX_DESTINATION_LENGTH }
+    return canonicalDestinationSearchQueryOrNull(destination)
 }
 
 private fun isReportCommand(compact: String): Boolean {
@@ -322,6 +322,5 @@ private val STOP_NAVIGATION_COMMANDS = setOf(
     "내비중지",
     "네비중지",
 )
-private const val MAX_DESTINATION_LENGTH = 80
 private const val MAX_DESTINATION_CANDIDATES = 20
 private const val MIN_VOICE_CONFIDENCE = 0.55f

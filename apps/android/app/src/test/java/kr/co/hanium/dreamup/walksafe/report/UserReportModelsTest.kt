@@ -148,8 +148,10 @@ class UserReportModelsTest {
         assertTrue(validUserReportCursor("A_b-9"))
         assertFalse(validUserReportCursor("a".repeat(1_025)))
         assertTrue(validUserReportRequestText("표면 손상을 정정해 주세요."))
+        assertTrue(validUserReportRequestText("😀".repeat(500)))
         assertFalse(validUserReportRequestText(" 앞뒤 공백 금지"))
         assertFalse(validUserReportRequestText("가".repeat(501)))
+        assertFalse(validUserReportRequestText("😀".repeat(501)))
     }
 
     @Test
