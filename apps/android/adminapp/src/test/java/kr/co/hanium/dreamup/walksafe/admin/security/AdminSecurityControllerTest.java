@@ -460,6 +460,91 @@ public final class AdminSecurityControllerTest {
         assertAllCleared(failedTotp);
     }
 
+    @Test
+    public void rawReviewRequiresOperationalSessionAndConsumesExactStepUpWithWiping()
+        throws Exception {
+        FakeApi api = new FakeApi();
+        FakeRawCollections raw = new FakeRawCollections();
+        AdminSecurityController controller = new AdminSecurityController(
+            api, null, null, null, raw
+        );
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        char[] lockedPassword = PASSWORD.toCharArray();
+        char[] lockedTotp = "123456".toCharArray();
+        assertThrows(IllegalStateException.class, () -> controller.listAdminRawQuarantine(
+            lockedPassword, lockedTotp, 10_000L, false
+        ));
+        assertAllCleared(lockedPassword);
+        assertAllCleared(lockedTotp);
+        assertEquals(0, raw.listCalls);
+        char[] listPassword = PASSWORD.toCharArray();
+        char[] listTotp = "123456".toCharArray();
+        assertEquals(1, controller.listAdminRawQuarantine(
+            listPassword, listTotp, 10_000L, true
+        ).items().size());
+        assertEquals("admin.raw_collection.list", api.reconfirmationAction);
+        assertEquals("GET", api.reconfirmationMethod);
+        assertEquals("/admin/raw-collections/quarantine", api.reconfirmationPath);
+        assertAllCleared(listPassword);
+        assertAllCleared(listTotp);
+        assertEquals(CURRENT_SESSION_ID, raw.session.sessionId());
+
+        char[] decisionPassword = PASSWORD.toCharArray();
+        char[] decisionTotp = "123456".toCharArray();
+        controller.decideAdminRawCollectionPurpose(
+            AdminRawCollectionModelsTest.summary(),
+            AdminRawCollectionModelsTest.reportDecision(),
+            decisionPassword,
+            decisionTotp,
+            10_000L,
+            true
+        );
+        assertEquals("admin.raw_collection.purpose_decide", api.reconfirmationAction);
+        assertEquals(
+            "/admin/raw-collections/" + AdminRawCollectionModelsTest.COLLECTION + "/decisions",
+            api.reconfirmationPath
+        );
+        assertEquals(1, raw.decisionCalls);
+        assertEquals(1, raw.reconfirmationHeaders.size());
+        assertEquals(
+            api.reconfirmationNonce,
+            raw.reconfirmationHeaders.get(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER)
+        );
+        assertAllCleared(decisionPassword);
+        assertAllCleared(decisionTotp);
+
+        char[] invalidPassword = PASSWORD.toCharArray();
+        char[] invalidTotp = "123456".toCharArray();
+        assertThrows(IllegalArgumentException.class, () ->
+            controller.decideAdminRawCollectionPurpose(
+                null,
+                AdminRawCollectionModelsTest.reportDecision(),
+                invalidPassword,
+                invalidTotp,
+                10_000L,
+                true
+            )
+        );
+        assertAllCleared(invalidPassword);
+        assertAllCleared(invalidTotp);
+
+        char[] holdPassword = PASSWORD.toCharArray();
+        char[] holdTotp = "123456".toCharArray();
+        controller.recordAdminRawCollectionLegalHold(
+            AdminRawCollectionModelsTest.COLLECTION,
+            AdminRawCollectionModelsTest.legalHold(),
+            holdPassword,
+            holdTotp,
+            10_000L,
+            true
+        );
+        assertEquals("admin.raw_collection.legal_hold", api.reconfirmationAction);
+        assertEquals(1, raw.holdCalls);
+        assertAllCleared(holdPassword);
+        assertAllCleared(holdTotp);
+    }
+
     private static void assertAllCleared(char[] value) {
         for (char item : value) assertEquals('\0', item);
     }
@@ -808,6 +893,67 @@ public final class AdminSecurityControllerTest {
                 image.length,
                 image,
                 10_000L
+            );
+        }
+    }
+
+    private static final class FakeRawCollections implements AdminRawCollectionRepository {
+        int listCalls;
+        int decisionCalls;
+        int holdCalls;
+        Map<String, String> reconfirmationHeaders;
+        AdminOperationsApi.SessionContext session;
+
+        @Override
+        public AdminRawCollectionModels.Page listQuarantine(
+            AdminOperationsApi.SessionContext session,
+            Map<String, String> reconfirmationHeaders
+        ) throws IOException {
+            listCalls += 1;
+            this.session = session;
+            this.reconfirmationHeaders = reconfirmationHeaders;
+            return AdminRawCollectionModels.parsePage(AdminRawCollectionModelsTest.listJson());
+        }
+
+        @Override
+        public AdminRawCollectionModels.PurposeDecisionReceipt decidePurpose(
+            AdminOperationsApi.SessionContext session,
+            AdminRawCollectionModels.Summary source,
+            AdminRawCollectionModels.PurposeDecisionRequest request,
+            Map<String, String> reconfirmationHeaders
+        ) throws IOException {
+            decisionCalls += 1;
+            this.session = session;
+            this.reconfirmationHeaders = reconfirmationHeaders;
+            return AdminRawCollectionModels.parsePurposeDecisionReceipt(
+                AdminRawCollectionModelsTest.decisionReceiptJson().replace(
+                    "\"admin_id\":\"admin-001\"",
+                    "\"admin_id\":\"admin-01\""
+                ),
+                source,
+                request,
+                session.adminId()
+            );
+        }
+
+        @Override
+        public AdminRawCollectionModels.LegalHoldReceipt recordLegalHold(
+            AdminOperationsApi.SessionContext session,
+            String collectionId,
+            AdminRawCollectionModels.LegalHoldRequest request,
+            Map<String, String> reconfirmationHeaders
+        ) throws IOException {
+            holdCalls += 1;
+            this.session = session;
+            this.reconfirmationHeaders = reconfirmationHeaders;
+            return AdminRawCollectionModels.parseLegalHoldReceipt(
+                AdminRawCollectionModelsTest.legalHoldReceiptJson().replace(
+                    "\"admin_id\":\"admin-001\"",
+                    "\"admin_id\":\"admin-01\""
+                ),
+                collectionId,
+                request,
+                session.adminId()
             );
         }
     }

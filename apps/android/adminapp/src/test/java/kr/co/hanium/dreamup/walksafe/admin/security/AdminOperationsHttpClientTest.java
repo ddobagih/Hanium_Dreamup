@@ -97,6 +97,103 @@ public final class AdminOperationsHttpClientTest {
     }
 
     @Test
+    public void workflowPostTextCanBeParsedBackFromHistory() throws Exception {
+        FakeTransport reviewTransport = new FakeTransport();
+        AdminOperationsHttpClient reviewClient = client(reviewTransport, new CapturingSigner());
+        AdminReportDecision review = new AdminReportDecision(
+            AdminReportDecision.Decision.REJECTED,
+            "  내부\t검토\n사유\r확인  ",
+            "  공개\t처리\n결과\r안내  ",
+            null,
+            true,
+            true,
+            true,
+            0,
+            null
+        );
+        reviewClient.recordReviewDecision(SESSION, REPORT_ID, review);
+        JSONObject reviewPost = new JSONObject(reviewTransport.requests.get(1).bodyText());
+        JSONObject reviewPage = new JSONObject(FakeTransport.reviewHistoryJson());
+        JSONObject reviewItem = reviewPage.getJSONArray("items").getJSONObject(0);
+        reviewItem.put("decision", reviewPost.getString("decision"));
+        reviewItem.put("reason", reviewPost.getString("reason"));
+        reviewItem.put("user_visible_reason", reviewPost.getString("user_visible_reason"));
+        reviewTransport.reviewHistoryOverride = reviewPage.toString();
+
+        AdminOperationsApi.Result reviewHistory = reviewClient.readReviewDecisions(
+            SESSION, REPORT_ID
+        );
+        assertEquals(reviewPost.getString("reason"), reviewHistory.reviewHistory().get(0).reason());
+        assertEquals(
+            reviewPost.getString("user_visible_reason"),
+            reviewHistory.reviewHistory().get(0).userVisibleReason()
+        );
+
+        FakeTransport deliveryTransport = new FakeTransport();
+        AdminOperationsHttpClient deliveryClient = client(deliveryTransport, new CapturingSigner());
+        AdminInstitutionDelivery delivery = new AdminInstitutionDelivery(
+            "  서울시\t도로\n관리과\r담당  ",
+            "  전화\t포털\n기록\r완료  ",
+            "  당직\t담당자\n인계\r완료  ",
+            AdminInstitutionDelivery.Status.SUBMITTED,
+            "  접수\t번호\n확인\r완료  ",
+            "  기관\t전달\n사유\r기록  ",
+            null,
+            "2026-08-09T01:02:03Z",
+            1L,
+            0L,
+            "55555555-5555-4555-8555-555555555555"
+        );
+        deliveryClient.recordDelivery(SESSION, REPORT_ID, delivery);
+        JSONObject deliveryPost = new JSONObject(deliveryTransport.requests.get(1).bodyText());
+        JSONObject deliveryPage = new JSONObject(FakeTransport.deliveryHistoryJson());
+        JSONObject deliveryItem = deliveryPage.getJSONArray("items").getJSONObject(0);
+        deliveryItem.put("institution", deliveryPost.getString("institution"));
+        deliveryItem.put("channel", deliveryPost.getString("channel"));
+        deliveryItem.put("recipient", deliveryPost.getString("recipient"));
+        deliveryItem.put("status", deliveryPost.getString("status"));
+        deliveryItem.put("external_receipt_id", deliveryPost.getString("external_receipt_id"));
+        deliveryItem.put("reason", deliveryPost.getString("reason"));
+        deliveryTransport.deliveryHistoryOverride = deliveryPage.toString();
+
+        AdminOperationsApi.Result deliveryHistory = deliveryClient.readDeliveries(
+            SESSION, REPORT_ID
+        );
+        assertEquals(
+            deliveryPost.getString("institution"),
+            deliveryHistory.deliveryHistory().get(0).institution()
+        );
+        assertEquals(
+            deliveryPost.getString("external_receipt_id"),
+            deliveryHistory.deliveryHistory().get(0).externalReceiptId()
+        );
+    }
+
+    @Test
+    public void historyRejectsOtherC0AndDelControls() throws Exception {
+        for (int code = 0; code <= 0x7f; code++) {
+            if ((code >= 0x20 && code != 0x7f) || code == '\t' || code == '\n' || code == '\r') {
+                continue;
+            }
+            String invalid = String.valueOf((char) code) + "safe text";
+
+            FakeTransport reviewTransport = new FakeTransport();
+            JSONObject reviewPage = new JSONObject(FakeTransport.reviewHistoryJson());
+            reviewPage.getJSONArray("items").getJSONObject(0).put("reason", invalid);
+            reviewTransport.reviewHistoryOverride = reviewPage.toString();
+            assertThrows(IOException.class, () -> client(reviewTransport, new CapturingSigner())
+                .readReviewDecisions(SESSION, REPORT_ID));
+
+            FakeTransport deliveryTransport = new FakeTransport();
+            JSONObject deliveryPage = new JSONObject(FakeTransport.deliveryHistoryJson());
+            deliveryPage.getJSONArray("items").getJSONObject(0).put("external_receipt_id", invalid);
+            deliveryTransport.deliveryHistoryOverride = deliveryPage.toString();
+            assertThrows(IOException.class, () -> client(deliveryTransport, new CapturingSigner())
+                .readDeliveries(SESSION, REPORT_ID));
+        }
+    }
+
+    @Test
     public void malformedChallengeAndBusinessFailuresStopBeforeAnyFurtherEffect() throws Exception {
         FakeTransport malformed = new FakeTransport();
         malformed.addUnexpectedChallengeField = true;

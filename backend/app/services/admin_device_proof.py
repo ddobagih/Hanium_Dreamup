@@ -124,6 +124,12 @@ _ADMIN_INCIDENT_STATUS_PATH_PATTERN = re.compile(
     r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
     r"[0-9a-fA-F]{12}/status$"
 )
+_ADMIN_RAW_COLLECTION_LIST_PATH = "/admin/raw-collections/quarantine"
+_ADMIN_RAW_COLLECTION_ACTION_PATH_PATTERN = re.compile(
+    r"^/admin/raw-collections/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
+    r"[0-9a-fA-F]{12}/(?:decisions|legal-holds)$"
+)
 _REPORT_WORKFLOW_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/"
@@ -382,6 +388,10 @@ def is_admin_device_proof_workflow_request(method: str, path: str) -> bool:
         return normalized_method == "GET"
     if _ADMIN_INCIDENT_STATUS_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method == "PATCH"
+    if path == _ADMIN_RAW_COLLECTION_LIST_PATH:
+        return normalized_method == "GET"
+    if _ADMIN_RAW_COLLECTION_ACTION_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "POST"
     if _REPORT_WORKFLOW_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method in {"GET", "POST"}
     if _REPORT_WORKFLOW_HISTORY_PATH_PATTERN.fullmatch(path) is not None:

@@ -56,6 +56,9 @@ DECISION_ID = uuid.UUID("44444444-4444-4444-8444-444444444444")
 EVIDENCE_GRANT_ID = uuid.UUID("55555555-5555-4555-8555-555555555555")
 PACKAGE_ID = uuid.UUID("99999999-9999-4999-8999-999999999999")
 PREVIOUS_PACKAGE_ID = uuid.UUID("77777777-7777-4777-8777-777777777777")
+DISALLOWED_ADMIN_TEXT_CONTROLS = tuple(
+    chr(code) for code in range(0x20) if code not in {0x09, 0x0A, 0x0D}
+) + ("\x7f",)
 
 
 def _approved_request(**overrides: object) -> dict[str, object]:
@@ -392,6 +395,72 @@ def test_workflow_request_contracts_have_exact_fields_and_normalize_bounded_text
     assert delivery.reason == "관리자가 공식 창구에 수동 제출함"
     assert delivery.observed_at.tzinfo is UTC
     assert delivery.idempotency_key == IDEMPOTENCY_KEY
+
+
+def test_workflow_request_text_preserves_allowed_internal_whitespace() -> None:
+    review = ReportReviewDecisionRequest.model_validate(
+        _approved_request(
+            decision="REJECTED",
+            reason="  내부\t검토\n사유\r확인  ",
+            user_visible_reason="  공개\t처리\n결과\r안내  ",
+        )
+    )
+    delivery = ReportInstitutionDeliveryRequest.model_validate(
+        _delivery_request(
+            institution="  서울시\t도로\n관리과\r담당  ",
+            channel="  전화\t포털\n기록\r완료  ",
+            recipient="  당직\t담당자\n인계\r완료  ",
+            status="ACKNOWLEDGED",
+            external_receipt_id="  접수\t번호\n확인\r완료  ",
+            reason="  기관\t전달\n사유\r기록  ",
+        )
+    )
+
+    assert review.reason == "내부\t검토\n사유\r확인"
+    assert review.user_visible_reason == "공개\t처리\n결과\r안내"
+    assert delivery.institution == "서울시\t도로\n관리과\r담당"
+    assert delivery.channel == "전화\t포털\n기록\r완료"
+    assert delivery.recipient == "당직\t담당자\n인계\r완료"
+    assert delivery.external_receipt_id == "접수\t번호\n확인\r완료"
+    assert delivery.reason == "기관\t전달\n사유\r기록"
+
+
+@pytest.mark.parametrize(
+    "control",
+    DISALLOWED_ADMIN_TEXT_CONTROLS,
+    ids=lambda control: f"U+{ord(control):04X}",
+)
+@pytest.mark.parametrize("field_name", ["reason", "user_visible_reason"])
+def test_review_request_rejects_disallowed_text_controls_before_trimming(
+    field_name: str,
+    control: str,
+) -> None:
+    with pytest.raises(ValidationError, match="disallowed control"):
+        ReportReviewDecisionRequest.model_validate(
+            _approved_request(
+                decision="REJECTED",
+                **{field_name: control + "safe text"},
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "control",
+    DISALLOWED_ADMIN_TEXT_CONTROLS,
+    ids=lambda control: f"U+{ord(control):04X}",
+)
+@pytest.mark.parametrize(
+    "field_name",
+    ["institution", "channel", "recipient", "external_receipt_id", "reason"],
+)
+def test_delivery_request_rejects_disallowed_text_controls_before_trimming(
+    field_name: str,
+    control: str,
+) -> None:
+    with pytest.raises(ValidationError, match="disallowed control"):
+        ReportInstitutionDeliveryRequest.model_validate(
+            _delivery_request(**{field_name: control + "safe text"})
+        )
 
 
 @pytest.mark.parametrize(

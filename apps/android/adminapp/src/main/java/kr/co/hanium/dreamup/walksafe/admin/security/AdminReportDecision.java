@@ -117,10 +117,20 @@ public final class AdminReportDecision {
 
     static String requiredText(String value, String label, int maxLength) {
         if (value == null) throw new IllegalArgumentException(label + " is required");
+        if (hasDisallowedTextControl(value)) {
+            throw new IllegalArgumentException(label + " is invalid");
+        }
         String normalized = value.trim();
         if (normalized.isEmpty() || normalized.length() > maxLength) {
             throw new IllegalArgumentException(label + " is invalid");
         }
         return normalized;
+    }
+
+    static boolean hasDisallowedTextControl(String value) {
+        return value.chars().anyMatch(character ->
+            (character < 0x20 && character != '\t' && character != '\n' && character != '\r')
+                || character == 0x7f
+        );
     }
 }

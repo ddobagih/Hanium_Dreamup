@@ -145,6 +145,7 @@ public final class AdminDeviceProof {
                     || "admin.incident.list".equals(readPurpose)
                     || "admin.incident.detail".equals(readPurpose)
                     || "admin.incident.history".equals(readPurpose)
+                    || "admin.raw_collection.list".equals(readPurpose)
                     || "admin.audit.list".equals(readPurpose))) {
                     throw new IllegalArgumentException("protected read proof fields do not match the contract");
                 }
@@ -160,6 +161,8 @@ public final class AdminDeviceProof {
                     || "report.original.grant".equals(action)
                     || "admin.report.delivery_package.create".equals(action)
                     || "report.external_copy_deletion.record".equals(action)
+                    || "admin.raw_collection.purpose_decide".equals(action)
+                    || "admin.raw_collection.legal_hold".equals(action)
                     || "recovery.custody.attest".equals(action)
                     || "device.report_lost".equals(action));
             if (readPurpose != null || !(statusUpdate || postAction)) {

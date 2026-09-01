@@ -2033,6 +2033,55 @@ def test_history_challenge_accepts_canonical_uuid_path(
 
 
 @pytest.mark.parametrize(
+    ("method", "path", "action", "read_purpose"),
+    [
+        (
+            "GET",
+            "/admin/raw-collections/quarantine",
+            None,
+            "admin.raw_collection.list",
+        ),
+        (
+            "POST",
+            f"/admin/raw-collections/{REPORT_ID}/decisions",
+            "admin.raw_collection.purpose_decide",
+            None,
+        ),
+        (
+            "POST",
+            f"/admin/raw-collections/{REPORT_ID}/legal-holds",
+            "admin.raw_collection.legal_hold",
+            None,
+        ),
+    ],
+)
+def test_raw_collection_challenge_accepts_registered_admin_workflow(
+    method: str,
+    path: str,
+    action: str | None,
+    read_purpose: str | None,
+) -> None:
+    assert is_admin_device_proof_workflow_request(method, path) is True
+    assert validate_device_proof_challenge_binding(
+        purpose="ACTION",
+        action=action,
+        admin_id=ADMIN_ID,
+        device_id=DEVICE_ID,
+        session_id=str(SESSION_ID),
+        method=method,
+        path=path,
+        read_purpose=read_purpose,
+        identity=_identity(),
+    ) == SESSION_ID
+
+
+def test_raw_collection_challenge_rejects_unregistered_method() -> None:
+    assert is_admin_device_proof_workflow_request(
+        "DELETE", f"/admin/raw-collections/{REPORT_ID}/decisions"
+    ) is False
+
+
+@pytest.mark.parametrize(
     ("path", "read_purpose"),
     [
         (

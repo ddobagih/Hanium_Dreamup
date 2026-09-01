@@ -153,6 +153,36 @@ public final class AdminHighRiskActionGate {
         );
     }
 
+    public static Operation rawCollectionPurposeDecision(String collectionId) {
+        String safeId = AdminRawCollectionModels.canonicalUuid(
+            collectionId, "collection_id"
+        );
+        return operation(
+            "admin.raw_collection.purpose_decide",
+            "POST",
+            "/admin/raw-collections/" + safeId + "/decisions"
+        );
+    }
+
+    public static Operation rawCollectionList() {
+        return operation(
+            "admin.raw_collection.list",
+            "GET",
+            "/admin/raw-collections/quarantine"
+        );
+    }
+
+    public static Operation rawCollectionLegalHold(String collectionId) {
+        String safeId = AdminRawCollectionModels.canonicalUuid(
+            collectionId, "collection_id"
+        );
+        return operation(
+            "admin.raw_collection.legal_hold",
+            "POST",
+            "/admin/raw-collections/" + safeId + "/legal-holds"
+        );
+    }
+
     private static Operation operation(String action, String method, String path) {
         return new Operation() {
             @Override public String reauthenticationAction() { return action; }

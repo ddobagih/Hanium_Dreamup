@@ -74,6 +74,7 @@ public final class AdminSecurityController implements AutoCloseable {
     private final AdminOperationsApi operationsApi;
     private final AdminReportRepository reportRepository;
     private final AdminIncidentRepository incidentRepository;
+    private final AdminRawCollectionRepository rawCollectionRepository;
     private final AdminSecurityTelemetry.Recorder telemetry;
     private AdminSecurityState securityState = AdminSecurityState.SIGNED_OUT;
     private String accessToken;
@@ -138,6 +139,23 @@ public final class AdminSecurityController implements AutoCloseable {
     public AdminSecurityController(
         AdminSecurityApi api,
         AdminOperationsApi operationsApi,
+        AdminReportRepository reportRepository,
+        AdminIncidentRepository incidentRepository,
+        AdminRawCollectionRepository rawCollectionRepository
+    ) {
+        this(
+            api,
+            operationsApi,
+            reportRepository,
+            incidentRepository,
+            rawCollectionRepository,
+            AdminSecurityTelemetry.androidLogRecorder()
+        );
+    }
+
+    public AdminSecurityController(
+        AdminSecurityApi api,
+        AdminOperationsApi operationsApi,
         AdminSecurityTelemetry.Recorder telemetry
     ) {
         this(api, operationsApi, null, null, telemetry);
@@ -159,12 +177,24 @@ public final class AdminSecurityController implements AutoCloseable {
         AdminIncidentRepository incidentRepository,
         AdminSecurityTelemetry.Recorder telemetry
     ) {
+        this(api, operationsApi, reportRepository, incidentRepository, null, telemetry);
+    }
+
+    public AdminSecurityController(
+        AdminSecurityApi api,
+        AdminOperationsApi operationsApi,
+        AdminReportRepository reportRepository,
+        AdminIncidentRepository incidentRepository,
+        AdminRawCollectionRepository rawCollectionRepository,
+        AdminSecurityTelemetry.Recorder telemetry
+    ) {
         if (api == null) throw new IllegalArgumentException("api is required");
         if (telemetry == null) throw new IllegalArgumentException("telemetry is required");
         this.api = api;
         this.operationsApi = operationsApi;
         this.reportRepository = reportRepository;
         this.incidentRepository = incidentRepository;
+        this.rawCollectionRepository = rawCollectionRepository;
         this.telemetry = telemetry;
     }
 
@@ -845,6 +875,94 @@ public final class AdminSecurityController implements AutoCloseable {
         }
     }
 
+    public synchronized AdminRawCollectionModels.Page listAdminRawQuarantine(
+        char[] password,
+        char[] totpCode,
+        long nowEpochMs,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        AdminHighRiskActionGate.Operation operation = AdminHighRiskActionGate.rawCollectionList();
+        try {
+            reauthenticate(password, totpCode, operation, nowEpochMs);
+            AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
+                operation,
+                nowEpochMs,
+                operationalWorkflowsEnabled
+            );
+            if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
+            return requireRawCollectionRepository().listQuarantine(
+                requireOperationalSession(operationalWorkflowsEnabled),
+                decision.requestHeaders()
+            );
+        } finally {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totpCode != null) Arrays.fill(totpCode, '\0');
+        }
+    }
+
+    public synchronized AdminRawCollectionModels.PurposeDecisionReceipt
+        decideAdminRawCollectionPurpose(
+            AdminRawCollectionModels.Summary source,
+            AdminRawCollectionModels.PurposeDecisionRequest request,
+            char[] password,
+            char[] totpCode,
+            long nowEpochMs,
+            boolean operationalWorkflowsEnabled
+        ) throws IOException, GeneralSecurityException {
+        try {
+            if (source == null) throw new IllegalArgumentException("decision source is required");
+            AdminHighRiskActionGate.Operation operation =
+                AdminHighRiskActionGate.rawCollectionPurposeDecision(source.collectionId());
+            reauthenticate(password, totpCode, operation, nowEpochMs);
+            AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
+                operation,
+                nowEpochMs,
+                operationalWorkflowsEnabled
+            );
+            if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
+            return requireRawCollectionRepository().decidePurpose(
+                requireOperationalSession(operationalWorkflowsEnabled),
+                source,
+                request,
+                decision.requestHeaders()
+            );
+        } finally {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totpCode != null) Arrays.fill(totpCode, '\0');
+        }
+    }
+
+    public synchronized AdminRawCollectionModels.LegalHoldReceipt
+        recordAdminRawCollectionLegalHold(
+            String collectionId,
+            AdminRawCollectionModels.LegalHoldRequest request,
+            char[] password,
+            char[] totpCode,
+            long nowEpochMs,
+            boolean operationalWorkflowsEnabled
+        ) throws IOException, GeneralSecurityException {
+        try {
+            AdminHighRiskActionGate.Operation operation =
+                AdminHighRiskActionGate.rawCollectionLegalHold(collectionId);
+            reauthenticate(password, totpCode, operation, nowEpochMs);
+            AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
+                operation,
+                nowEpochMs,
+                operationalWorkflowsEnabled
+            );
+            if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
+            return requireRawCollectionRepository().recordLegalHold(
+                requireOperationalSession(operationalWorkflowsEnabled),
+                collectionId,
+                request,
+                decision.requestHeaders()
+            );
+        } finally {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totpCode != null) Arrays.fill(totpCode, '\0');
+        }
+    }
+
     public synchronized AdminReportRequestModels.Page listAdminReportRequests(
         AdminReportRequestModels.Filters filters,
         String cursor,
@@ -975,6 +1093,13 @@ public final class AdminSecurityController implements AutoCloseable {
             throw new IllegalStateException("administrator incident operations are unavailable");
         }
         return incidentRepository;
+    }
+
+    private AdminRawCollectionRepository requireRawCollectionRepository() {
+        if (rawCollectionRepository == null) {
+            throw new IllegalStateException("administrator raw collection review is unavailable");
+        }
+        return rawCollectionRepository;
     }
 
     private AdminOperationsApi.SessionContext requireOperationalSession(boolean operationalWorkflowsEnabled) {

@@ -68,6 +68,10 @@ import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportWorkflowControlle
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryMessagePolicy;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryCustodyState;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportDecision;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminRawCollectionController;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminRawCollectionHttpClient;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminRawCollectionModels;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminRawCollectionRepository;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityApi;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityHttpClient;
@@ -94,6 +98,8 @@ public final class AdminBoundaryActivity extends Activity {
     private static final String AUDIT_ACTOR_STATE = "admin_audit_actor";
     private static final String INCIDENT_FILTER_STATUS_STATE = "admin_incident_filter_status";
     private static final String INCIDENT_SELECTED_ID_STATE = "admin_incident_selected_id";
+    private static final String RAW_COLLECTION_SELECTED_ID_STATE =
+        "admin_raw_collection_selected_id";
     private static final int OPEN_DELIVERY_PACKAGE_DOCUMENT = 7_300;
     private static final int CREATE_DELIVERY_PACKAGE_DOCUMENT = 7_301;
     private static final int LAST_DELIVERY_PACKAGE_DOCUMENT_REQUEST = 65_534;
@@ -126,6 +132,7 @@ public final class AdminBoundaryActivity extends Activity {
     private AdminReportWorkflowController reportWorkflowController;
     private AdminAuditController auditController;
     private AdminIncidentController incidentController;
+    private AdminRawCollectionController rawCollectionController;
     private String deviceId;
     private AdminDeviceKeyStore.Descriptor deviceKeyDescriptor;
     private String deviceKeyFailure;
@@ -161,6 +168,7 @@ public final class AdminBoundaryActivity extends Activity {
     private AdminExternalCopyDeletionPanel externalCopyDeletionPanel;
     private AdminAuditPanel auditPanel;
     private AdminIncidentPanel incidentPanel;
+    private AdminRawCollectionPanel rawCollectionPanel;
     private EditText reportIdInput;
     private Spinner reviewDecisionInput;
     private EditText reviewReasonInput;
@@ -285,6 +293,7 @@ public final class AdminBoundaryActivity extends Activity {
                 AdminOperationsApi operationsApi = null;
                 AdminReportRepository reportRepository = null;
                 AdminIncidentRepository incidentRepository = null;
+                AdminRawCollectionRepository rawCollectionRepository = null;
                 if (BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED) {
                     operationsApi = new AdminOperationsHttpClient(
                         BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
@@ -304,13 +313,20 @@ public final class AdminBoundaryActivity extends Activity {
                         deviceKeyDescriptor,
                         keyStore
                     );
+                    rawCollectionRepository = new AdminRawCollectionHttpClient(
+                        BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
+                        BuildConfig.DEBUG,
+                        deviceKeyDescriptor,
+                        keyStore
+                    );
                     operationsClientConfigured = true;
                 }
                 controller = new AdminSecurityController(
                     securityClient,
                     operationsApi,
                     reportRepository,
-                    incidentRepository
+                    incidentRepository,
+                    rawCollectionRepository
                 );
                 reportController = new AdminReportController(new AdminReportController.Loader() {
                     @Override
@@ -486,6 +502,14 @@ public final class AdminBoundaryActivity extends Activity {
                         }
                     }
                 );
+                rawCollectionController = new AdminRawCollectionController((password, totp) ->
+                    controller.listAdminRawQuarantine(
+                        password,
+                        totp,
+                        System.currentTimeMillis(),
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    )
+                );
             } catch (Exception error) {
                 deviceKeyFailure = "키 사용 불가";
                 operationsClientConfigured = false;
@@ -532,6 +556,12 @@ public final class AdminBoundaryActivity extends Activity {
             outState.putString(INCIDENT_FILTER_STATUS_STATE, incidentPanel.filterStatus());
             outState.putString(INCIDENT_SELECTED_ID_STATE, incidentPanel.selectedIncidentId());
         }
+        if (rawCollectionPanel != null) {
+            outState.putString(
+                RAW_COLLECTION_SELECTED_ID_STATE,
+                rawCollectionPanel.selectedCollectionId()
+            );
+        }
         super.onSaveInstanceState(outState);
     }
 
@@ -546,6 +576,7 @@ public final class AdminBoundaryActivity extends Activity {
         if (externalCopyDeletionController != null) externalCopyDeletionController.invalidate();
         if (auditController != null) auditController.invalidate();
         if (incidentController != null) incidentController.invalidate();
+        if (rawCollectionController != null) rawCollectionController.invalidate();
         if (!awaitingSafResult && reportWorkflowController != null) {
             reportWorkflowController.invalidate();
         }
@@ -553,6 +584,7 @@ public final class AdminBoundaryActivity extends Activity {
         if (reportRequestPanel != null) reportRequestPanel.clearSensitiveInputs();
         if (externalCopyDeletionPanel != null) externalCopyDeletionPanel.clearTransientInputs();
         if (incidentPanel != null) incidentPanel.clearSensitiveInputs();
+        if (rawCollectionPanel != null) rawCollectionPanel.clearSensitiveInputs();
         clearSensitiveInputs();
         super.onStop();
     }
@@ -563,6 +595,7 @@ public final class AdminBoundaryActivity extends Activity {
         if (reportRequestController != null) reportRequestController.invalidate();
         if (externalCopyDeletionController != null) externalCopyDeletionController.invalidate();
         if (incidentController != null) incidentController.invalidate();
+        if (rawCollectionController != null) rawCollectionController.invalidate();
         if (pendingDeliveryPackage != null) pendingDeliveryPackage.destroy();
         pendingDeliveryPackage = null;
         verifiedDeliveryPackage = null;
@@ -1057,6 +1090,47 @@ public final class AdminBoundaryActivity extends Activity {
             }
         });
         requiredParallelOperationsGroup.addView(incidentPanel, matchWrap());
+
+        rawCollectionPanel = new AdminRawCollectionPanel(
+            this,
+            new AdminRawCollectionPanel.Listener() {
+                @Override
+                public void onLoad(char[] password, char[] totp) {
+                    loadRawQuarantine(password, totp);
+                }
+
+                @Override
+                public void onRetry(char[] password, char[] totp) {
+                    retryRawQuarantine(password, totp);
+                }
+
+                @Override
+                public void onSelect(String collectionId) {
+                    selectRawCollection(collectionId);
+                }
+
+                @Override
+                public void onDecide(
+                    AdminRawCollectionModels.Summary item,
+                    AdminRawCollectionModels.PurposeDecisionRequest request,
+                    char[] password,
+                    char[] totp
+                ) {
+                    runRawPurposeDecision(item, request, password, totp);
+                }
+
+                @Override
+                public void onLegalHold(
+                    AdminRawCollectionModels.Summary item,
+                    AdminRawCollectionModels.LegalHoldRequest request,
+                    char[] password,
+                    char[] totp
+                ) {
+                    runRawLegalHold(item, request, password, totp);
+                }
+            }
+        );
+        requiredParallelOperationsGroup.addView(rawCollectionPanel, matchWrap());
 
         LinearLayout auditSupplementGroup = group();
         auditPanel = new AdminAuditPanel(this, new AdminAuditPanel.Listener() {
@@ -2237,6 +2311,9 @@ public final class AdminBoundaryActivity extends Activity {
         if (incidentPanel != null && incidentController != null) {
             incidentPanel.render(incidentController.snapshot());
         }
+        if (rawCollectionPanel != null && rawCollectionController != null) {
+            rawCollectionPanel.render(rawCollectionController.snapshot());
+        }
         if (!BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED) {
             operationalLockText.setText(R.string.admin_operations_default_locked);
         } else if (!operationsClientConfigured) {
@@ -2591,6 +2668,7 @@ public final class AdminBoundaryActivity extends Activity {
             incidentPanel.clearSensitiveInputs();
             incidentPanel.clearSubmittedEvidence();
         }
+        if (rawCollectionPanel != null) rawCollectionPanel.clearSessionBoundDrafts();
         if (reportController != null) reportController.clearSessionState();
         if (reportRequestController != null) reportRequestController.clearSessionState();
         if (externalCopyDeletionController != null) {
@@ -2599,6 +2677,7 @@ public final class AdminBoundaryActivity extends Activity {
         if (reportWorkflowController != null) reportWorkflowController.clearSessionState();
         if (auditController != null) auditController.clearSessionState();
         if (incidentController != null) incidentController.clearSessionState();
+        if (rawCollectionController != null) rawCollectionController.clearSessionState();
     }
 
     private void resetReportHistoryState() {
@@ -2822,6 +2901,17 @@ public final class AdminBoundaryActivity extends Activity {
                 savedInstanceState.getString(INCIDENT_FILTER_STATUS_STATE, ""),
                 savedInstanceState.getString(INCIDENT_SELECTED_ID_STATE)
             );
+        }
+        if (rawCollectionPanel != null && rawCollectionController != null) {
+            String selectedId = savedInstanceState.getString(RAW_COLLECTION_SELECTED_ID_STATE);
+            rawCollectionPanel.restore(selectedId);
+            if (selectedId != null) {
+                try {
+                    rawCollectionController.restoreSelection(selectedId);
+                } catch (IllegalArgumentException ignored) {
+                    // Invalid saved identifiers never cross the administrator boundary.
+                }
+            }
         }
     }
 
@@ -3287,6 +3377,172 @@ public final class AdminBoundaryActivity extends Activity {
             Arrays.fill(password, '\0');
             Arrays.fill(totp, '\0');
             resultText.setText("허용된 다음 상태, 사유, 관찰, SHA-256과 재인증 정보를 확인해 주세요.");
+        }
+    }
+
+    private void loadRawQuarantine(char[] password, char[] totp) {
+        if (rawCollectionController == null || rawCollectionPanel == null) {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totp != null) Arrays.fill(totp, '\0');
+            return;
+        }
+        executeRawCollectionRequest(rawCollectionController.beginLoad(password, totp));
+    }
+
+    private void retryRawQuarantine(char[] password, char[] totp) {
+        if (rawCollectionController == null || rawCollectionPanel == null) {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totp != null) Arrays.fill(totp, '\0');
+            return;
+        }
+        try {
+            executeRawCollectionRequest(rawCollectionController.beginRetry(password, totp));
+        } catch (IllegalStateException error) {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totp != null) Arrays.fill(totp, '\0');
+            resultText.setText("다시 시도할 원시자료 검역 조회가 없습니다.");
+        }
+    }
+
+    private void selectRawCollection(String collectionId) {
+        if (rawCollectionController == null || rawCollectionPanel == null) return;
+        try {
+            rawCollectionController.select(collectionId);
+            rawCollectionPanel.render(rawCollectionController.snapshot());
+        } catch (IllegalArgumentException error) {
+            resultText.setText("현재 검역 목록에서 선택할 항목을 다시 확인해 주세요.");
+        }
+    }
+
+    private void executeRawCollectionRequest(AdminRawCollectionController.Request request) {
+        rawCollectionPanel.render(rawCollectionController.snapshot());
+        networkExecutor.execute(() -> {
+            boolean applied = rawCollectionController.execute(request);
+            runOnUiThread(() -> {
+                if (isDestroyed() || !applied) return;
+                rawCollectionPanel.render(rawCollectionController.snapshot());
+            });
+        });
+    }
+
+    private void runRawPurposeDecision(
+        AdminRawCollectionModels.Summary item,
+        AdminRawCollectionModels.PurposeDecisionRequest request,
+        char[] password,
+        char[] totp
+    ) {
+        char[] ownedPassword = password == null ? null : password.clone();
+        char[] ownedTotp = totp == null ? null : totp.clone();
+        if (password != null) Arrays.fill(password, '\0');
+        if (totp != null) Arrays.fill(totp, '\0');
+        try {
+            if (item == null || request == null
+                || request.expectedRevision() != item.decisionRevision(request.scope())) {
+                throw new IllegalArgumentException("raw decision CAS binding is invalid");
+            }
+            if (operationInFlight) throw new IllegalStateException("operation is already running");
+            operationInFlight = true;
+            setInteractiveEnabled(contentRoot, false);
+            resultText.setText(
+                "원시자료 " + request.scope() + " 결정을 기록하고 있습니다. 자동 재제출하지 않습니다."
+            );
+            networkExecutor.execute(() -> {
+                try {
+                    controller.decideAdminRawCollectionPurpose(
+                        item,
+                        request,
+                        ownedPassword,
+                        ownedTotp,
+                        System.currentTimeMillis(),
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    );
+                    runOnUiThread(() -> completeRawMutation(
+                        "원시자료 목적별 결정을 기록했습니다. 새 재인증으로 최신 revision을 조회해 주세요."
+                    ));
+                } catch (AdminRawCollectionRepository.ConflictException conflict) {
+                    runOnUiThread(() -> completeRawMutation(
+                        "다른 변경으로 결정 revision 또는 멱등 결속이 충돌했습니다. 재제출하지 말고 새 재인증으로 최신 목록을 조회해 주세요."
+                    ));
+                } catch (Exception error) {
+                    runOnUiThread(() -> completeRawMutation(
+                        "결정 결과를 확정할 수 없습니다. 재제출하지 말고 새 재인증으로 최신 목록에서 확인해 주세요."
+                    ));
+                } finally {
+                    if (ownedPassword != null) Arrays.fill(ownedPassword, '\0');
+                    if (ownedTotp != null) Arrays.fill(ownedTotp, '\0');
+                }
+            });
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            if (ownedPassword != null) Arrays.fill(ownedPassword, '\0');
+            if (ownedTotp != null) Arrays.fill(ownedTotp, '\0');
+            resultText.setText("최신 항목, 결정 증거와 재인증 정보를 확인해 주세요.");
+        }
+    }
+
+    private void runRawLegalHold(
+        AdminRawCollectionModels.Summary item,
+        AdminRawCollectionModels.LegalHoldRequest request,
+        char[] password,
+        char[] totp
+    ) {
+        char[] ownedPassword = password == null ? null : password.clone();
+        char[] ownedTotp = totp == null ? null : totp.clone();
+        if (password != null) Arrays.fill(password, '\0');
+        if (totp != null) Arrays.fill(totp, '\0');
+        try {
+            if (item == null || request == null
+                || request.expectedRevision() != item.legalHoldRevision()) {
+                throw new IllegalArgumentException("raw legal hold CAS binding is invalid");
+            }
+            if (operationInFlight) throw new IllegalStateException("operation is already running");
+            operationInFlight = true;
+            setInteractiveEnabled(contentRoot, false);
+            resultText.setText(
+                "원시자료 법적 보존 기록을 저장하고 있습니다. 자동 재제출하지 않습니다."
+            );
+            networkExecutor.execute(() -> {
+                try {
+                    controller.recordAdminRawCollectionLegalHold(
+                        item.collectionId(),
+                        request,
+                        ownedPassword,
+                        ownedTotp,
+                        System.currentTimeMillis(),
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    );
+                    runOnUiThread(() -> completeRawMutation(
+                        "원시자료 법적 보존 기록을 저장했습니다. 새 재인증으로 최신 revision을 조회해 주세요."
+                    ));
+                } catch (AdminRawCollectionRepository.ConflictException conflict) {
+                    runOnUiThread(() -> completeRawMutation(
+                        "다른 변경으로 법적 보존 revision 또는 멱등 결속이 충돌했습니다. 재제출하지 말고 새 재인증으로 최신 목록을 조회해 주세요."
+                    ));
+                } catch (Exception error) {
+                    runOnUiThread(() -> completeRawMutation(
+                        "법적 보존 결과를 확정할 수 없습니다. 재제출하지 말고 새 재인증으로 최신 목록에서 확인해 주세요."
+                    ));
+                } finally {
+                    if (ownedPassword != null) Arrays.fill(ownedPassword, '\0');
+                    if (ownedTotp != null) Arrays.fill(ownedTotp, '\0');
+                }
+            });
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            if (ownedPassword != null) Arrays.fill(ownedPassword, '\0');
+            if (ownedTotp != null) Arrays.fill(ownedTotp, '\0');
+            resultText.setText("최신 항목, 법적 보존 근거와 재인증 정보를 확인해 주세요.");
+        }
+    }
+
+    private void completeRawMutation(String message) {
+        if (isDestroyed()) return;
+        operationInFlight = false;
+        setInteractiveEnabled(contentRoot, true);
+        resultText.setText(message);
+        if (rawCollectionController != null && rawCollectionPanel != null) {
+            rawCollectionController.requireRefresh(
+                "변경 결과 확인을 위해 새 비밀번호·추가 인증으로 최신 검역 목록을 조회해 주세요. 자동 재제출하지 않습니다."
+            );
+            rawCollectionPanel.render(rawCollectionController.snapshot());
         }
     }
 

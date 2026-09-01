@@ -1327,6 +1327,11 @@
             "title": "Legal Hold Active",
             "type": "boolean"
           },
+          "legal_hold_revision": {
+            "minimum": 0.0,
+            "title": "Legal Hold Revision",
+            "type": "integer"
+          },
           "manifest_sha256": {
             "pattern": "^[0-9a-f]{64}$",
             "title": "Manifest Sha256",
@@ -1383,6 +1388,11 @@
             ],
             "title": "Report Decision"
           },
+          "report_decision_revision": {
+            "minimum": 0.0,
+            "title": "Report Decision Revision",
+            "type": "integer"
+          },
           "state": {
             "enum": [
               "MANIFEST_ACCEPTED",
@@ -1412,6 +1422,11 @@
               }
             ],
             "title": "Training Decision"
+          },
+          "training_decision_revision": {
+            "minimum": 0.0,
+            "title": "Training Decision Revision",
+            "type": "integer"
           }
         },
         "required": [
@@ -1425,8 +1440,11 @@
           "committed_at",
           "quarantine_expires_at",
           "report_decision",
+          "report_decision_revision",
           "training_decision",
-          "legal_hold_active"
+          "training_decision_revision",
+          "legal_hold_active",
+          "legal_hold_revision"
         ],
         "title": "AdminRawCollectionSummaryV1",
         "type": "object"

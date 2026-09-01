@@ -123,6 +123,19 @@ public final class AdminDeviceProofTest {
             AdminDeviceProof.Purpose.ACTION, EMPTY_SHA, "admin.incident.history", SESSION_ID
         );
         assertEquals("admin.incident.history", incidentHistory.readPurpose());
+        AdminDeviceProof.Intent rawList = new AdminDeviceProof.Intent(
+            null, "admin-001", EMPTY_SHA, CORRELATION_ID, DEVICE_ID, MARKER, 1,
+            "GET", "/admin/raw-collections/quarantine",
+            AdminDeviceProof.Purpose.ACTION, EMPTY_SHA, "admin.raw_collection.list", SESSION_ID
+        );
+        assertEquals("admin.raw_collection.list", rawList.readPurpose());
+        AdminDeviceProof.Intent rawDecision = new AdminDeviceProof.Intent(
+            "admin.raw_collection.purpose_decide", "admin-001", EMPTY_SHA,
+            CORRELATION_ID, DEVICE_ID, MARKER, 1, "POST",
+            "/admin/raw-collections/" + REPORT_ID + "/decisions",
+            AdminDeviceProof.Purpose.ACTION, EMPTY_SHA, null, SESSION_ID
+        );
+        assertEquals("admin.raw_collection.purpose_decide", rawDecision.action());
     }
 
     private static AdminDeviceProof.SignedChallenge parse(

@@ -756,8 +756,8 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(occurrences(clear, "setInteractiveEnabled(contentRoot, true)") == 1);
         assertTrue(occurrences(operational, "setInteractiveEnabled(contentRoot, true)") == 2);
         assertTrue(occurrences(security, "setInteractiveEnabled(contentRoot, true)") == 2);
-        assertTrue(occurrences(incident, "setInteractiveEnabled(contentRoot, true)") == 3);
-        assertTrue(occurrences(activity, "setInteractiveEnabled(contentRoot, true)") == 15);
+        assertTrue(occurrences(incident, "setInteractiveEnabled(contentRoot, true)") == 4);
+        assertTrue(occurrences(activity, "setInteractiveEnabled(contentRoot, true)") == 16);
 
         assertFalse(activity.contains("private static void setInteractiveEnabled("));
         assertTrue(interactive.contains("if (view == originalEvidenceConfirmedInput)"));

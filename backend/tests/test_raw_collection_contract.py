@@ -1676,6 +1676,23 @@ def test_raw_validation_oversize_and_unhandled_errors_are_no_store() -> None:
     assert unavailable.headers["cache-control"] == "no-store"
 
 
+def test_admin_raw_collection_responses_are_also_no_store() -> None:
+    app = FastAPI()
+
+    @app.get("/admin/raw-collections/quarantine")
+    def unavailable_admin_raw_collection() -> None:
+        raise RuntimeError("synthetic administrator raw store failure")
+
+    app.add_middleware(RawCollectionExceptionMiddleware)
+    app.add_middleware(RawCollectionNoStoreMiddleware)
+    response = ASGITestClient(app).get("/admin/raw-collections/quarantine")
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "raw_collection_service_unavailable"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+
+
 def _consent_event(
     revision: int,
     *,

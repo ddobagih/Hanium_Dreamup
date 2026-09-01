@@ -127,6 +127,82 @@ public final class AdminOperationModelsTest {
     }
 
     @Test
+    public void workflowTextAllowsInternalTabNewlineAndCarriageReturn() throws Exception {
+        AdminReportDecision review = new AdminReportDecision(
+            AdminReportDecision.Decision.REJECTED,
+            "  내부\t검토\n사유\r확인  ",
+            "  공개\t처리\n결과\r안내  ",
+            null,
+            true,
+            true,
+            true,
+            0,
+            null
+        );
+        JSONObject reviewBody = new JSONObject(new String(
+            review.requestBody(REPORT_ID), StandardCharsets.UTF_8
+        ));
+        assertEquals("내부\t검토\n사유\r확인", reviewBody.getString("reason"));
+        assertEquals("공개\t처리\n결과\r안내", reviewBody.getString("user_visible_reason"));
+
+        AdminInstitutionDelivery delivery = new AdminInstitutionDelivery(
+            "  서울시\t도로\n관리과\r담당  ",
+            "  전화\t포털\n기록\r완료  ",
+            "  당직\t담당자\n인계\r완료  ",
+            AdminInstitutionDelivery.Status.ACKNOWLEDGED,
+            "  접수\t번호\n확인\r완료  ",
+            "  기관\t전달\n사유\r기록  ",
+            null,
+            "2026-08-09T01:02:03Z",
+            1L,
+            0L,
+            IDEMPOTENCY_KEY
+        );
+        JSONObject deliveryBody = new JSONObject(new String(
+            delivery.requestBody(), StandardCharsets.UTF_8
+        ));
+        assertEquals("서울시\t도로\n관리과\r담당", deliveryBody.getString("institution"));
+        assertEquals("전화\t포털\n기록\r완료", deliveryBody.getString("channel"));
+        assertEquals("당직\t담당자\n인계\r완료", deliveryBody.getString("recipient"));
+        assertEquals("접수\t번호\n확인\r완료", deliveryBody.getString("external_receipt_id"));
+        assertEquals("기관\t전달\n사유\r기록", deliveryBody.getString("reason"));
+    }
+
+    @Test
+    public void workflowTextRejectsOtherC0AndDelControlsBeforeTrimming() {
+        for (int code = 0; code <= 0x7f; code++) {
+            if ((code >= 0x20 && code != 0x7f) || code == '\t' || code == '\n' || code == '\r') {
+                continue;
+            }
+            String invalid = String.valueOf((char) code) + "safe text";
+            assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
+                AdminReportDecision.Decision.REJECTED,
+                invalid,
+                "공개 사유",
+                null,
+                true,
+                true,
+                true,
+                0,
+                null
+            ));
+            assertThrows(IllegalArgumentException.class, () -> new AdminInstitutionDelivery(
+                "institution",
+                "phone",
+                "recipient",
+                AdminInstitutionDelivery.Status.ACKNOWLEDGED,
+                invalid,
+                "reason",
+                null,
+                "2026-08-09T01:02:03Z",
+                1L,
+                0L,
+                IDEMPOTENCY_KEY
+            ));
+        }
+    }
+
+    @Test
     public void manualDeliveryBodyIsExactTenAndNullableEvidenceRemainsPhysical() throws Exception {
         AdminInstitutionDelivery delivery = new AdminInstitutionDelivery(
             "서울시 도로관리과",

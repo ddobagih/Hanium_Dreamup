@@ -115,13 +115,18 @@ def create_router() -> APIRouter:
                     committed_at=row.committed_at,
                     quarantine_expires_at=row.quarantine_expires_at,
                     report_decision=None if report is None else report.decision,
+                    report_decision_revision=0 if report is None else report.revision,
                     training_decision=None if training is None else training.decision,
+                    training_decision_revision=(
+                        0 if training is None else training.revision
+                    ),
                     legal_hold_active=(
                         hold is not None
                         and hold.action == "APPLY"
                         and hold.expires_at is not None
                         and hold.expires_at > now
                     ),
+                    legal_hold_revision=0 if hold is None else hold.revision,
                 )
             )
         return AdminRawCollectionListV1(

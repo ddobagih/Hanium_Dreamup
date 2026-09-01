@@ -101,9 +101,11 @@ public final class AdminInstitutionDelivery {
 
     private static String optionalText(String value, String label, int maxLength) {
         if (value == null) return null;
+        if (AdminReportDecision.hasDisallowedTextControl(value)) {
+            throw new IllegalArgumentException(label + " must be null or non-blank text");
+        }
         String normalized = value.trim();
-        if (normalized.isEmpty() || normalized.length() > maxLength
-            || normalized.chars().anyMatch(character -> character < 0x20 || character == 0x7f)) {
+        if (normalized.isEmpty() || normalized.length() > maxLength) {
             throw new IllegalArgumentException(label + " must be null or non-blank text");
         }
         return normalized;

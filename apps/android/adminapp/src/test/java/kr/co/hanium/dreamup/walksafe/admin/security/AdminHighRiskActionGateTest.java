@@ -218,6 +218,54 @@ public final class AdminHighRiskActionGateTest {
     }
 
     @Test
+    public void rawReviewUsesResourceBoundDecisionAndLegalHoldTriples() {
+        String collectionId = "11111111-1111-4111-8111-111111111111";
+        AdminHighRiskActionGate.Operation decision =
+            AdminHighRiskActionGate.rawCollectionPurposeDecision(collectionId);
+        AdminHighRiskActionGate.Operation hold =
+            AdminHighRiskActionGate.rawCollectionLegalHold(collectionId);
+        AdminHighRiskActionGate.Operation list = AdminHighRiskActionGate.rawCollectionList();
+
+        assertEquals("admin.raw_collection.list", list.reauthenticationAction());
+        assertEquals("GET", list.method());
+        assertEquals("/admin/raw-collections/quarantine", list.path());
+        assertEquals("admin.raw_collection.purpose_decide", decision.reauthenticationAction());
+        assertEquals("POST", decision.method());
+        assertEquals(
+            "/admin/raw-collections/" + collectionId + "/decisions",
+            decision.path()
+        );
+        assertEquals("admin.raw_collection.legal_hold", hold.reauthenticationAction());
+        assertEquals(
+            "/admin/raw-collections/" + collectionId + "/legal-holds",
+            hold.path()
+        );
+        var binding = new AdminHighRiskActionGate.Binding(
+            decision, "AAECAwQFBgcICQoLDA0ODw", 20_000L
+        );
+        assertTrue(AdminHighRiskActionGate.evaluate(
+            decision,
+            AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED,
+            binding,
+            10_000L,
+            true
+        ).isAllowed());
+        assertFalse(AdminHighRiskActionGate.evaluate(
+            hold,
+            AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED,
+            binding,
+            10_000L,
+            true
+        ).isAllowed());
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> AdminHighRiskActionGate.rawCollectionLegalHold("not-a-canonical-uuid")
+        );
+    }
+
+    @Test
     public void originalEvidenceUsesOnlyTheCanonicalReportBoundGrantTriple() {
         String reportId = "11111111-1111-4111-8111-111111111111";
         AdminHighRiskActionGate.Operation operation =

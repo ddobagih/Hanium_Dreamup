@@ -36,6 +36,12 @@ _ACCOUNT_PATHS = frozenset(
 logger = logging.getLogger(__name__)
 
 
+def _is_raw_collection_path(path: str) -> bool:
+    return path.startswith("/raw-collections/") or path.startswith(
+        "/admin/raw-collections/"
+    )
+
+
 class RequestBodyTooLarge(Exception):
     pass
 
@@ -120,8 +126,8 @@ class RawCollectionNoStoreMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not scope.get("path", "").startswith(
-            "/raw-collections/"
+        if scope["type"] != "http" or not _is_raw_collection_path(
+            scope.get("path", "")
         ):
             await self.app(scope, receive, send)
             return
@@ -152,8 +158,8 @@ class RawCollectionExceptionMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not scope.get("path", "").startswith(
-            "/raw-collections/"
+        if scope["type"] != "http" or not _is_raw_collection_path(
+            scope.get("path", "")
         ):
             await self.app(scope, receive, send)
             return

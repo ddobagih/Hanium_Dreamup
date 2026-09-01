@@ -5,10 +5,13 @@ import hashlib
 import hmac
 import json
 from pathlib import Path
+from types import SimpleNamespace
 import uuid
 
 import pytest
+from starlette.requests import Request
 
+import backend.app.api.admin_raw_collections as admin_raw_collections_api
 from backend.app.schemas import (
     RawCollectionReceiptV2,
     RawCollectionStatusV1,
@@ -166,3 +169,68 @@ def test_admin_raw_review_operations_are_high_risk_and_exactly_classified() -> N
     assert decision is not None and decision.action == "admin.raw_collection.purpose_decide" and decision.risk == "HIGH"
     assert hold is not None and hold.action == "admin.raw_collection.legal_hold" and hold.risk == "HIGH"
     assert listing is not None and listing.action == "admin.raw_collection.list"
+
+
+def test_admin_quarantine_list_projects_latest_cas_revisions(monkeypatch) -> None:
+    now = datetime.now(UTC)
+    row = SimpleNamespace(
+        collection_id=uuid.UUID(COLLECTION_ID),
+        purpose="GENERAL_RAW",
+        state="QUARANTINED",
+        manifest_sha256="a" * 64,
+        receipt_sha256="b" * 64,
+        object_count=1,
+        total_bytes=4,
+        committed_at=now,
+        quarantine_expires_at=now + timedelta(days=14),
+    )
+    report = SimpleNamespace(decision="APPROVED", revision=2)
+    hold = SimpleNamespace(
+        action="APPLY", revision=4, expires_at=now + timedelta(days=7)
+    )
+
+    class Rows:
+        def all(self):
+            return [row]
+
+    class FakeDb:
+        def __init__(self) -> None:
+            self.latest = iter((report, None, hold))
+
+        def scalars(self, _statement):
+            return Rows()
+
+        def scalar(self, _statement):
+            return next(self.latest)
+
+    monkeypatch.setattr(
+        admin_raw_collections_api,
+        "_identity",
+        lambda _request, *, action: None,
+    )
+    endpoint = next(
+        route.endpoint
+        for route in admin_raw_collections_api.create_router().routes
+        if route.path == "/admin/raw-collections/quarantine"
+    )
+    request = Request({
+        "type": "http",
+        "method": "GET",
+        "path": "/admin/raw-collections/quarantine",
+        "headers": [],
+        "query_string": b"",
+        "scheme": "https",
+        "server": ("example.invalid", 443),
+        "client": ("127.0.0.1", 1),
+        "root_path": "",
+    })
+
+    result = endpoint(request=request, state="QUARANTINED", limit=100, db=FakeDb())
+    summary = result.items[0]
+
+    assert summary.report_decision == "APPROVED"
+    assert summary.report_decision_revision == 2
+    assert summary.training_decision is None
+    assert summary.training_decision_revision == 0
+    assert summary.legal_hold_active is True
+    assert summary.legal_hold_revision == 4

@@ -97,6 +97,18 @@ ReportInstitution = Annotated[str, StringConstraints(strip_whitespace=True, min_
 ReportDeliveryChannel = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
 ReportDeliveryRecipient = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
 ReportExternalReceiptId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
+
+
+def _reject_disallowed_admin_text_controls(value: object) -> object:
+    if isinstance(value, str) and any(
+        (ord(character) < 0x20 and character not in "\t\n\r")
+        or ord(character) == 0x7F
+        for character in value
+    ):
+        raise ValueError("administrator workflow text contains a disallowed control character")
+    return value
+
+
 ReportInstitutionReference = Annotated[
     str,
     StringConstraints(
@@ -1166,6 +1178,11 @@ class ReportReviewDecisionRequest(BaseModel):
     content_revision: int = Field(default=0, ge=0, strict=True)
     evidence_grant_id: uuid.UUID | None = None
 
+    @field_validator("reason", "user_visible_reason", mode="before")
+    @classmethod
+    def reject_disallowed_text_controls(cls, value: object) -> object:
+        return _reject_disallowed_admin_text_controls(value)
+
     @field_validator(
         "duplicate_of_report_id", "evidence_grant_id", mode="before"
     )
@@ -1272,6 +1289,13 @@ class ReportInstitutionDeliveryRequest(BaseModel):
     package_revision: int = Field(ge=1, strict=True)
     expected_revision: int = Field(ge=0, strict=True)
     idempotency_key: uuid.UUID
+
+    @field_validator(
+        "institution", "channel", "recipient", "external_receipt_id", "reason", mode="before"
+    )
+    @classmethod
+    def reject_disallowed_text_controls(cls, value: object) -> object:
+        return _reject_disallowed_admin_text_controls(value)
 
     @field_validator("observed_at", mode="before")
     @classmethod
@@ -2356,8 +2380,11 @@ class AdminRawCollectionSummaryV1(BaseModel):
     committed_at: Optional[AwareDatetime]
     quarantine_expires_at: Optional[AwareDatetime]
     report_decision: Optional[Literal["APPROVED", "REJECTED"]]
+    report_decision_revision: int = Field(ge=0)
     training_decision: Optional[Literal["APPROVED", "REJECTED"]]
+    training_decision_revision: int = Field(ge=0)
     legal_hold_active: bool
+    legal_hold_revision: int = Field(ge=0)
 
 
 class AdminRawCollectionListV1(BaseModel):

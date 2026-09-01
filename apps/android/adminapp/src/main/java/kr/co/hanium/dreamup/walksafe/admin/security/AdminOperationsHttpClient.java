@@ -962,7 +962,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     private static String requiredText(Map<String, Object> value, String key, int maxLength) throws IOException {
         Object raw = value.get(key);
         if (!(raw instanceof String text) || text.trim().isEmpty() || text.length() > maxLength
-            || text.chars().anyMatch(character -> character < 0x20 || character == 0x7f)) {
+            || AdminReportDecision.hasDisallowedTextControl(text)) {
             throw new IOException("administrator history text is invalid: " + key);
         }
         return text;
@@ -972,7 +972,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         Object raw = value.get(key);
         if (raw == null) return null;
         if (!(raw instanceof String text) || text.trim().isEmpty() || text.length() > maxLength
-            || text.chars().anyMatch(character -> character < 0x20 || character == 0x7f)) {
+            || AdminReportDecision.hasDisallowedTextControl(text)) {
             throw new IOException("administrator history nullable text is invalid: " + key);
         }
         return text;
