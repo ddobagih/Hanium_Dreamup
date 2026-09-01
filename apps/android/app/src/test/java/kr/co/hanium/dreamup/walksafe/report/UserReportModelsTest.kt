@@ -298,6 +298,166 @@ class UserReportModelsTest {
         ).forEach { assertNull(validatedUserReportDeletionStatusOrNull(it)) }
     }
 
+    @Test
+    fun requestHistoryParserAcceptsActiveRequestsAndDeletionTombstonesNewestFirst() {
+        val activeCorrection = historyItem(
+            revision = 3,
+            requestId = requestId(3),
+            request = requestSummary(requestId = requestId(3)),
+        )
+        val activeDeletion = historyItem(
+            revision = 2,
+            requestId = requestId(2),
+            request = requestSummary(
+                requestId = requestId(2),
+                requestType = "DELETE",
+                statusVersion = 2,
+            ),
+            deletionStatus = deletionBody(
+                state = "PENDING",
+                requestId = requestId(2),
+                requestStatusVersion = 2,
+            ),
+        )
+        val tombstone = historyItem(
+            revision = 1,
+            source = "DELETION_TOMBSTONE",
+            requestId = requestId(1),
+            request = "null",
+            deletionStatus = deletionBody(
+                state = "DELETED",
+                requestId = requestId(1),
+            ),
+        )
+
+        val parsed = validatedUserReportRequestHistoryOrNull(
+            historyPage(
+                items = listOf(activeCorrection, activeDeletion, tombstone),
+                snapshotRevision = 3,
+                totalCount = 3,
+            ),
+        )
+
+        assertNotNull(parsed)
+        assertNull(parsed?.reportId)
+        assertEquals(listOf(3L, 2L, 1L), parsed?.items?.map { it.revision })
+        assertEquals(
+            listOf(
+                UserReportRequestHistorySource.ACTIVE_REQUEST,
+                UserReportRequestHistorySource.ACTIVE_REQUEST,
+                UserReportRequestHistorySource.DELETION_TOMBSTONE,
+            ),
+            parsed?.items?.map { it.source },
+        )
+        assertEquals(UserReportRequestType.DELETE, parsed?.items?.get(1)?.request?.requestType)
+        assertEquals(UserReportDeletionState.DELETED, parsed?.items?.last()?.deletionStatus?.state)
+        assertNull(parsed?.items?.last()?.request)
+    }
+
+    @Test
+    fun requestHistoryParserRejectsNonV1OrInconsistentSourceProjections() {
+        val correction = historyItem(
+            revision = 2,
+            requestId = requestId(2),
+            request = requestSummary(requestId = requestId(2)),
+        )
+        val tombstone = historyItem(
+            revision = 1,
+            source = "DELETION_TOMBSTONE",
+            requestId = requestId(1),
+            request = "null",
+            deletionStatus = deletionBody("DELETED", requestId = requestId(1)),
+        )
+        val valid = historyPage(
+            items = listOf(correction, tombstone),
+            snapshotRevision = 2,
+            totalCount = 2,
+            nextCursor = "cursor_1",
+        )
+        val activeDeletion = historyPage(
+            items = listOf(
+                historyItem(
+                    revision = 1,
+                    requestId = requestId(1),
+                    request = requestSummary(
+                        requestId = requestId(1),
+                        requestType = "DELETE",
+                        statusVersion = 2,
+                    ),
+                    deletionStatus = deletionBody(
+                        state = "PENDING",
+                        requestId = requestId(1),
+                        requestStatusVersion = 2,
+                    ),
+                ),
+            ),
+            snapshotRevision = 1,
+            totalCount = 1,
+        )
+        val invalidBodies = listOf(
+            valid.dropLast(1) + ",\"internal\":true}",
+            valid.replace("history-page.v1", "history-page.v2"),
+            valid.replace("\"snapshot_revision\":2", "\"snapshot_revision\":2.0"),
+            valid.replace("\"total_count\":2", "\"total_count\":1"),
+            valid.replace("\"next_cursor\":\"cursor_1\"", "\"next_cursor\":\"bad cursor\""),
+            valid.replace("\"revision\":2", "\"revision\":1"),
+            valid.replace("\"request\":${requestSummary(requestId = requestId(2))}", "\"request\":null"),
+            valid.replace("\"deletion_status\":null", "\"deletion_status\":${deletionBody("PENDING", requestId = requestId(2))}"),
+            valid.replaceFirst("\"request\":null", "\"request\":${requestSummary(requestId = requestId(1))}"),
+            valid.replaceFirst("\"state\":\"DELETED\"", "\"state\":\"PENDING\""),
+            valid.replaceFirst(requestId(1), requestId(3)),
+            valid.replace("\"deletion_status\":", "\"unknown\":true,\"deletion_status\":"),
+            historyPage(
+                items = listOf(
+                    historyItem(
+                        revision = 2,
+                        requestId = requestId(2),
+                        request = requestSummary(requestId = requestId(2)),
+                    ),
+                    historyItem(
+                        revision = 1,
+                        requestId = requestId(2),
+                        request = requestSummary(requestId = requestId(2)),
+                    ),
+                ),
+                snapshotRevision = 2,
+                totalCount = 2,
+            ),
+            activeDeletion.replace(
+                "\"deletion_status\":${deletionBody("PENDING", requestId = requestId(1), requestStatusVersion = 2)}",
+                "\"deletion_status\":null",
+            ),
+            activeDeletion.replace("\"request_status_version\":2", "\"request_status_version\":3"),
+            activeDeletion.replace("\"state\":\"PENDING\"", "\"state\":\"DELETED\""),
+            valid + "{}",
+            valid.replaceFirst(
+                "\"schema_version\":",
+                "\"schema_version\":\"walksafe.user-report-request-history-page.v1\"," +
+                    "\"schema_version\":",
+            ),
+            valid.replaceFirst(
+                "\"schema_version\":",
+                "\"\\u0073chema_version\":" +
+                    "\"walksafe.user-report-request-history-page.v1\"," +
+                    "\"schema_version\":",
+            ),
+            valid.replaceFirst("\"items\":", "/*comment*/\"items\":"),
+            valid.replaceFirst("\"schema_version\"", "'schema_version'"),
+            valid.replaceFirst(":", "="),
+            valid.replaceFirst(",", ";"),
+        )
+
+        invalidBodies.forEach { assertNull(validatedUserReportRequestHistoryOrNull(it)) }
+        assertNotNull(validatedUserReportRequestHistoryOrNull(valid))
+        assertNotNull(validatedUserReportRequestHistoryOrNull(" \n$valid\r\n\t"))
+        assertNotNull(validatedUserReportRequestHistoryOrNull(activeDeletion))
+        assertNull(
+            validatedUserReportRequestHistoryOrNull(
+                historyPage(emptyList(), snapshotRevision = 0, totalCount = 0, nextCursor = "cursor_1"),
+            ),
+        )
+    }
+
     private fun reportItem(
         reportId: String,
         userStatus: String = "RECEIVED",
@@ -309,8 +469,31 @@ class UserReportModelsTest {
     private fun listBody(item: String): String =
         """{"schema_version":"walksafe.user-report-list.v1","items":[$item],"next_cursor":null}"""
 
-    private fun requestSummary(requestStatus: String): String =
-        """{"request_id":"${requestId()}","request_type":"CORRECTION","status":"$requestStatus","status_version":1,"public_response":null,"created_at":"$TIMESTAMP","updated_at":"$TIMESTAMP"}"""
+    private fun requestSummary(
+        requestStatus: String = "RECEIVED",
+        requestId: String = requestId(),
+        requestType: String = "CORRECTION",
+        statusVersion: Int = 1,
+    ): String =
+        """{"request_id":"$requestId","request_type":"$requestType","status":"$requestStatus","status_version":$statusVersion,"public_response":null,"created_at":"$TIMESTAMP","updated_at":"$TIMESTAMP"}"""
+
+    private fun historyItem(
+        revision: Int,
+        requestId: String,
+        source: String = "ACTIVE_REQUEST",
+        request: String,
+        deletionStatus: String = "null",
+    ): String =
+        """{"revision":$revision,"source":"$source","report_id":"${reportId(1)}","request_id":"$requestId","request":$request,"deletion_status":$deletionStatus}"""
+
+    private fun historyPage(
+        items: List<String>,
+        snapshotRevision: Int,
+        totalCount: Int,
+        nextCursor: String? = null,
+        reportId: String? = null,
+    ): String =
+        """{"schema_version":"walksafe.user-report-request-history-page.v1","report_id":${reportId?.let { "\"$it\"" } ?: "null"},"snapshot_revision":$snapshotRevision,"total_count":$totalCount,"items":[${items.joinToString(",")}],"next_cursor":${nextCursor?.let { "\"$it\"" } ?: "null"}}"""
 
     private fun contentBody(
         revision: Int,
@@ -332,13 +515,18 @@ class UserReportModelsTest {
         state: String,
         externalCopyCount: Int = 0,
         externalCopies: String = "",
+        requestId: String = REQUEST_ID,
+        requestStatusVersion: Int = 1,
     ): String =
-        """{"schema_version":"walksafe.report-deletion-status.v2","request_id":"$REQUEST_ID","report_id":"${reportId(1)}","state":"$state","request_status_version":1,"external_copy_count":$externalCopyCount,"external_copies":[$externalCopies],"updated_at":"$TIMESTAMP"}"""
+        """{"schema_version":"walksafe.report-deletion-status.v2","request_id":"$requestId","report_id":"${reportId(1)}","state":"$state","request_status_version":$requestStatusVersion,"external_copy_count":$externalCopyCount,"external_copies":[$externalCopies],"updated_at":"$TIMESTAMP"}"""
 
     private fun reportId(index: Int): String =
         "aaaaaaaa-aaaa-4aaa-8aaa-${index.toString().padStart(12, '0')}"
 
     private fun requestId(): String = "11111111-1111-4111-8111-111111111111"
+
+    private fun requestId(index: Int): String =
+        "11111111-1111-4111-8111-${index.toString().padStart(12, '0')}"
 
     private companion object {
         const val TIMESTAMP = "2026-08-29T01:02:03.000000Z"

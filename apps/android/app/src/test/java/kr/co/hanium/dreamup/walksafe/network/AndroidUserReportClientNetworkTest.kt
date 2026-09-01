@@ -114,6 +114,78 @@ class AndroidUserReportClientNetworkTest {
     }
 
     @Test
+    fun requestHistoryUsesCanonicalGlobalAndReportScopedQueryNoStoreAndNoBody() {
+        CapturingServer(
+            responses = listOf(
+                HISTORY_GLOBAL_RESPONSE,
+                HISTORY_REPORT_RESPONSE,
+            ),
+        ).use { server ->
+            val client = AndroidUserReportClient()
+            val session = session(server.baseUrl)
+
+            val global = client.requestHistoryCall(
+                session = session,
+                limit = 25,
+                cursor = null,
+                reportId = null,
+            ).execute()
+            val filtered = client.requestHistoryCall(
+                session = session,
+                limit = 10,
+                cursor = "cursor_1",
+                reportId = REPORT_ID,
+            ).execute()
+            assertTrue(server.awaitRequests())
+
+            assertNull(global.reportId)
+            assertEquals(REPORT_ID, filtered.reportId)
+            assertEquals(UserReportRequestType.DELETE, filtered.items.single().request?.requestType)
+            assertEquals(
+                "GET /api/reports/mine/requests/history?limit=25 HTTP/1.1",
+                server.requests[0].startLine,
+            )
+            assertEquals(
+                "GET /api/reports/mine/requests/history?limit=10&cursor=cursor_1&report_id=$REPORT_ID HTTP/1.1",
+                server.requests[1].startLine,
+            )
+            server.requests.forEach { request ->
+                assertEquals(COOKIE, request.headers["cookie"])
+                assertEquals("no-store", request.headers["cache-control"])
+                assertEquals("", request.body)
+            }
+        }
+
+        val client = AndroidUserReportClient()
+        val stableSession = session("https://gateway.example.test")
+        assertThrows(IllegalArgumentException::class.java) {
+            client.requestHistoryCall(stableSession, 26, null, null)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            client.requestHistoryCall(stableSession, 25, "bad cursor", null)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            client.requestHistoryCall(
+                stableSession,
+                25,
+                null,
+                "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa".uppercase(),
+            )
+        }
+        CapturingServer(responses = listOf(HISTORY_TWO_ITEMS_RESPONSE)).use { server ->
+            assertThrows(UserReportProtocolException::class.java) {
+                client.requestHistoryCall(
+                    session(server.baseUrl),
+                    1,
+                    null,
+                    REPORT_ID,
+                ).execute()
+            }
+            assertTrue(server.awaitRequests())
+        }
+    }
+
+    @Test
     fun responseIsBoundedBeforeJsonParsing() {
         val releaseServer = CountDownLatch(1)
         LocalHttpTestServer { _, socket ->
@@ -129,6 +201,34 @@ class AndroidUserReportClientNetworkTest {
             try {
                 assertThrows(NetworkResponseTooLargeException::class.java) {
                     AndroidUserReportClient().listReportsCall(
+                        session(server.baseUrl),
+                        25,
+                        null,
+                        null,
+                    ).execute()
+                }
+            } finally {
+                releaseServer.countDown()
+            }
+        }
+    }
+
+    @Test
+    fun requestHistoryResponseUsesTheFortyEightKibibyteBound() {
+        val releaseServer = CountDownLatch(1)
+        LocalHttpTestServer { _, socket ->
+            socket.getOutputStream().apply {
+                write(
+                    "HTTP/1.1 200 Test\r\nContent-Type: application/json\r\nContent-Length: ${USER_REPORT_REQUEST_HISTORY_MAX_RESPONSE_BYTES + 1}\r\n\r\n"
+                        .toByteArray(Charsets.US_ASCII),
+                )
+                flush()
+            }
+            releaseServer.await(3, TimeUnit.SECONDS)
+        }.use { server ->
+            try {
+                assertThrows(NetworkResponseTooLargeException::class.java) {
+                    AndroidUserReportClient().requestHistoryCall(
                         session(server.baseUrl),
                         25,
                         null,
@@ -443,5 +543,11 @@ class AndroidUserReportClientNetworkTest {
             """{"schema_version":"walksafe.report-content-revision.v1","report_id":"$REPORT_ID","revision":3,"expected_revision":2,"idempotency_key":"$SECOND_CORRECTION_ID","content_sha256":"$SHA256","user_description":"café 파손","category_hint":null,"corrected_at":"$TIMESTAMP"}"""
         const val DELETION_RESPONSE =
             """{"schema_version":"walksafe.report-deletion-status.v2","request_id":"$REQUEST_ID","report_id":"$REPORT_ID","state":"DELETED","request_status_version":3,"external_copy_count":3,"external_copies":[{"institution":"서울시청","state":"REQUEST_SENT","status_recorded_at":"$TIMESTAMP"},{"institution":"보행지원기관","state":"REPLY_ACKNOWLEDGED","status_recorded_at":"$TIMESTAMP"},{"institution":"시설관리기관","state":"REPLY_DELETION_CONFIRMED","status_recorded_at":"$TIMESTAMP"}],"updated_at":"$TIMESTAMP"}"""
+        const val HISTORY_GLOBAL_RESPONSE =
+            """{"schema_version":"walksafe.user-report-request-history-page.v1","report_id":null,"snapshot_revision":0,"total_count":0,"items":[],"next_cursor":null}"""
+        const val HISTORY_REPORT_RESPONSE =
+            """{"schema_version":"walksafe.user-report-request-history-page.v1","report_id":"$REPORT_ID","snapshot_revision":1,"total_count":1,"items":[{"revision":1,"source":"ACTIVE_REQUEST","report_id":"$REPORT_ID","request_id":"$REQUEST_ID","request":$REQUEST_RESPONSE,"deletion_status":{"schema_version":"walksafe.report-deletion-status.v2","request_id":"$REQUEST_ID","report_id":"$REPORT_ID","state":"PENDING","request_status_version":1,"external_copy_count":0,"external_copies":[],"updated_at":"$TIMESTAMP"}}],"next_cursor":null}"""
+        const val HISTORY_TWO_ITEMS_RESPONSE =
+            """{"schema_version":"walksafe.user-report-request-history-page.v1","report_id":"$REPORT_ID","snapshot_revision":2,"total_count":2,"items":[{"revision":2,"source":"ACTIVE_REQUEST","report_id":"$REPORT_ID","request_id":"$REQUEST_ID","request":{"request_id":"$REQUEST_ID","request_type":"CORRECTION","status":"RECEIVED","status_version":1,"public_response":null,"created_at":"$TIMESTAMP","updated_at":"$TIMESTAMP"},"deletion_status":null},{"revision":1,"source":"ACTIVE_REQUEST","report_id":"$REPORT_ID","request_id":"$OTHER_REQUEST_ID","request":{"request_id":"$OTHER_REQUEST_ID","request_type":"CORRECTION","status":"RECEIVED","status_version":1,"public_response":null,"created_at":"$TIMESTAMP","updated_at":"$TIMESTAMP"},"deletion_status":null}],"next_cursor":null}"""
     }
 }

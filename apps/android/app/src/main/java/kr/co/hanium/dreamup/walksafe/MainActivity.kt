@@ -55,6 +55,7 @@ import android.view.WindowManager
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
 import android.view.accessibility.AccessibilityManager
+import android.view.accessibility.AccessibilityNodeInfo
 import android.util.Size
 import android.util.TypedValue
 import android.widget.Button
@@ -372,6 +373,8 @@ import kr.co.hanium.dreamup.walksafe.report.UserReportDeletionStatus
 import kr.co.hanium.dreamup.walksafe.report.UserReportDetail
 import kr.co.hanium.dreamup.walksafe.report.UserReportFailure
 import kr.co.hanium.dreamup.walksafe.report.UserReportRequestSummary
+import kr.co.hanium.dreamup.walksafe.report.UserReportRequestHistoryItem
+import kr.co.hanium.dreamup.walksafe.report.UserReportRequestHistorySource
 import kr.co.hanium.dreamup.walksafe.report.UserReportRequestType
 import kr.co.hanium.dreamup.walksafe.report.UserReportStatus
 import kr.co.hanium.dreamup.walksafe.report.UserReportSummary
@@ -516,6 +519,20 @@ private fun CameraFrameQualityReason.isTransientPreflightQualityFailure(): Boole
     CameraFrameQualityReason.MOUNT_ANGLE_OUTSIDE_APPROVED_RANGE,
     -> true
     else -> false
+}
+
+internal fun userReportAuthorityExpiryDelayMs(
+    accessExpiresAtEpochMs: Long,
+    idleExpiresAtEpochMs: Long,
+    absoluteExpiresAtEpochMs: Long,
+    nowEpochMs: Long,
+): Long {
+    val expiresAtEpochMs = minOf(
+        accessExpiresAtEpochMs,
+        idleExpiresAtEpochMs,
+        absoluteExpiresAtEpochMs,
+    )
+    return if (nowEpochMs >= expiresAtEpochMs) 0L else expiresAtEpochMs - nowEpochMs
 }
 
 private enum class OfficialEnvironmentPreflightPhase {
@@ -698,6 +715,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var userReportRetryButton: Button
     private lateinit var userReportMoreButton: Button
     private lateinit var userReportListContainer: LinearLayout
+    private lateinit var userReportHistoryStatusText: TextView
+    private lateinit var userReportHistoryContainer: LinearLayout
+    private lateinit var userReportHistoryMoreButton: Button
     private lateinit var userReportDetailText: TextView
     private lateinit var userReportRequestTextInput: EditText
     private lateinit var userReportContentButton: Button
@@ -715,6 +735,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var renderedUserReportRequestId: String? = null
     private var renderedUserReportCorrectionId: String? = null
     private var renderedUserReports: List<UserReportSummary>? = null
+    private var renderedUserReportHistoryItems: List<UserReportRequestHistoryItem>? = null
+    private var renderedUserReportHistoryRefreshSequence = 0L
+    private var userReportAuthorityExpiryRunnable: Runnable? = null
     private var clearUserReportCorrectionDescription = false
     private var userReportCorrectionCategoryPatch:
         UserReportCorrectionPatch<UserReportContentCategory> =
@@ -6009,6 +6032,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun onGatewayProcessSessionChanged(
         snapshot: GatewaySessionProcessSnapshot,
     ) {
+        cancelUserReportAuthorityExpirySchedule()
         invalidatePendingExplicitReport()
         cancelIntegratedConsentControlCall()
         val confirmedActor = integratedConsentConfirmedActorSha256
@@ -6205,6 +6229,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 userReportController.loadReports()
             }
         }
+        scheduleUserReportAuthorityExpiryIfNeeded()
         val restoredDeviceCheckBinding = postLoginDeviceCheckSnapshot.bindingOrNull
         if (
             restoredDeviceCheckBinding != null &&
@@ -8645,6 +8670,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             snapshot.deletionRecoveryOnly ||
             !firstRun.isComplete ||
             session.sessionScope != GatewaySessionScope.GENERAL ||
+            !session.isBackendAccountDeviceBound ||
+            session.backendAccountGeneration == null ||
+            session.backendDevicePersistenceSnapshotOrNull() == null ||
             session.actorId != actorId ||
             session.verificationState != GatewaySessionVerificationState.VERIFIED ||
             !session.isUsableFor(actorId) ||
@@ -8655,6 +8683,90 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             sessionGeneration = snapshot.generation,
             localIdentityEpoch = firstRun.epoch,
         )
+    }
+
+    private fun cancelUserReportAuthorityExpirySchedule() {
+        val scheduled = userReportAuthorityExpiryRunnable ?: return
+        userReportAuthorityExpiryRunnable = null
+        reportCleanupCallbackHandler.removeCallbacks(scheduled)
+    }
+
+    private fun scheduleUserReportAuthorityExpiryIfNeeded(
+        authority: UserReportAuthority? = currentUserReportAuthorityOrNull(),
+    ) {
+        cancelUserReportAuthorityExpirySchedule()
+        if (
+            !isActivityForeground ||
+            privacyStartupInspectionDestroyed ||
+            authority == null
+        ) return
+        val process = GatewaySessionProcessCoordinator.snapshot()
+        if (!process.matchesUserReportAuthority(authority)) return
+        val session = authority.session
+        val expiresAtEpochMs = minOf(
+            session.accessExpiresAtEpochMs,
+            session.idleExpiresAtEpochMs,
+            session.absoluteExpiresAtEpochMs,
+        )
+        lateinit var expiry: Runnable
+        expiry = Runnable {
+            if (userReportAuthorityExpiryRunnable !== expiry) return@Runnable
+            userReportAuthorityExpiryRunnable = null
+            if (!isActivityForeground || privacyStartupInspectionDestroyed) return@Runnable
+            val current = GatewaySessionProcessCoordinator.snapshot()
+            if (!current.matchesUserReportAuthority(authority)) {
+                scheduleUserReportAuthorityExpiryIfNeeded()
+                return@Runnable
+            }
+            if (System.currentTimeMillis() < expiresAtEpochMs) {
+                scheduleUserReportAuthorityExpiryIfNeeded(authority)
+                return@Runnable
+            }
+            clearUserReportRequestUiForAuthorityFence()
+            if (::userReportController.isInitialized) {
+                userReportController.onAuthorityChanged()
+            }
+        }
+        userReportAuthorityExpiryRunnable = expiry
+        val posted = reportCleanupCallbackHandler.postDelayed(
+            expiry,
+            userReportAuthorityExpiryDelayMs(
+                accessExpiresAtEpochMs = session.accessExpiresAtEpochMs,
+                idleExpiresAtEpochMs = session.idleExpiresAtEpochMs,
+                absoluteExpiresAtEpochMs = session.absoluteExpiresAtEpochMs,
+                nowEpochMs = System.currentTimeMillis(),
+            ),
+        )
+        if (!posted && userReportAuthorityExpiryRunnable === expiry) {
+            userReportAuthorityExpiryRunnable = null
+        }
+    }
+
+    private fun GatewaySessionProcessSnapshot.matchesUserReportAuthority(
+        authority: UserReportAuthority,
+    ): Boolean =
+        session === authority.session &&
+            generation == authority.sessionGeneration &&
+            restoredFirstRunSnapshot?.epoch == authority.localIdentityEpoch
+
+    private fun revalidateUserReportAuthorityOnResume() {
+        val authority = currentUserReportAuthorityOrNull()
+        val rendered = renderedUserReportAuthority
+        val renderedAuthorityChanged =
+            authority != null &&
+                rendered != null &&
+                (
+                    rendered.session !== authority.session ||
+                        rendered.sessionGeneration != authority.sessionGeneration ||
+                        rendered.localIdentityEpoch != authority.localIdentityEpoch
+                    )
+        if (authority == null || renderedAuthorityChanged) {
+            clearUserReportRequestUiForAuthorityFence()
+        }
+        if (::userReportController.isInitialized) {
+            userReportController.onAuthorityChanged()
+        }
+        scheduleUserReportAuthorityExpiryIfNeeded(authority)
     }
 
     private fun nextUserReportStatusFilter(current: UserReportStatus?): UserReportStatus? =
@@ -8671,9 +8783,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             privacyStartupInspectionDestroyed ||
             !::userReportControls.isInitialized
         ) return
-        val busy = state.phase in setOf(
+        val authority = currentUserReportAuthorityOrNull()
+        val authorityReady = authority != null
+        reconcileUserReportRequestInput(state, authority)
+        val refreshRequestHistory =
+            authorityReady &&
+                state.requestHistoryRefreshSequence >
+                renderedUserReportHistoryRefreshSequence
+        if (refreshRequestHistory) {
+            renderedUserReportHistoryRefreshSequence = state.requestHistoryRefreshSequence
+        }
+        val busy = refreshRequestHistory || state.phase in setOf(
             UserReportUiPhase.LOADING_LIST,
             UserReportUiPhase.LOADING_MORE,
+            UserReportUiPhase.LOADING_REQUEST_HISTORY,
+            UserReportUiPhase.LOADING_MORE_REQUEST_HISTORY,
             UserReportUiPhase.LOADING_DETAIL,
             UserReportUiPhase.LOADING_CONTENT,
             UserReportUiPhase.LOADING_REQUEST_STATUS,
@@ -8681,11 +8805,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             UserReportUiPhase.SUBMITTING_REQUEST,
             UserReportUiPhase.SUBMITTING_CORRECTION,
         )
-        val statusMessage = when (state.phase) {
+        val statusMessage = if (refreshRequestHistory) {
+            "내 신고 상태: 정정·삭제 요청 이력을 불러오는 중입니다."
+        } else when (state.phase) {
             UserReportUiPhase.SIGNED_OUT -> "내 신고 상태: 로그인이 필요합니다."
             UserReportUiPhase.IDLE -> "내 신고 상태: 새로고침을 눌러 확인하세요."
             UserReportUiPhase.LOADING_LIST -> "내 신고 상태: 목록을 불러오는 중입니다."
             UserReportUiPhase.LOADING_MORE -> "내 신고 상태: 다음 목록을 불러오는 중입니다."
+            UserReportUiPhase.LOADING_REQUEST_HISTORY ->
+                "내 신고 상태: 정정·삭제 요청 이력을 불러오는 중입니다."
+            UserReportUiPhase.LOADING_MORE_REQUEST_HISTORY ->
+                "내 신고 상태: 다음 정정·삭제 요청 이력을 불러오는 중입니다."
             UserReportUiPhase.LOADING_DETAIL -> "내 신고 상태: 상세 상태를 불러오는 중입니다."
             UserReportUiPhase.LOADING_CONTENT -> "내 신고 상태: 현재 신고 내용을 불러오는 중입니다."
             UserReportUiPhase.LOADING_REQUEST_STATUS ->
@@ -8695,8 +8825,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             UserReportUiPhase.SUBMITTING_REQUEST -> "내 신고 상태: 요청을 접수하는 중입니다."
             UserReportUiPhase.SUBMITTING_CORRECTION ->
                 "내 신고 상태: 구조화된 내용 정정을 반영하는 중입니다."
-            UserReportUiPhase.READY -> "내 신고 상태: ${state.reports.size}건을 표시합니다."
-            UserReportUiPhase.EMPTY -> "내 신고 상태: 조건에 맞는 신고가 없습니다."
+            UserReportUiPhase.READY ->
+                "내 신고 상태: 신고 ${state.reports.size}건, 요청 이력 " +
+                    "${state.requestHistoryItems.size}건을 표시합니다."
+            UserReportUiPhase.EMPTY -> "내 신고 상태: 신고와 요청 이력이 없습니다."
             UserReportUiPhase.ERROR -> when (state.failure) {
                 UserReportFailure.NOT_FOUND_OR_SIGNED_OUT ->
                     "내 신고 상태 오류: 로그인 또는 신고 소유 상태를 확인할 수 없습니다."
@@ -8715,9 +8847,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val filterLabel = state.statusFilter?.labelKo ?: "전체"
         userReportFilterButton.text = "상태 필터: $filterLabel"
         userReportFilterButton.contentDescription = "내 신고 상태 필터: $filterLabel"
-        val authority = currentUserReportAuthorityOrNull()
-        val authorityReady = authority != null
-        reconcileUserReportRequestInput(state, authority)
         userReportFilterButton.isEnabled = authorityReady && !busy
         userReportRefreshButton.isEnabled = authorityReady && !busy
         userReportRetryButton.visibility =
@@ -8727,6 +8856,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (state.nextCursor != null) View.VISIBLE else View.GONE
         userReportMoreButton.isEnabled = state.nextCursor != null && authorityReady && !busy
         renderUserReportList(state.reports, busy)
+        val historyStatus = when {
+            !authorityReady -> "요청 이력: 로그인이 필요합니다."
+            refreshRequestHistory ||
+                (
+                    !state.requestHistoryLoaded &&
+                        state.phase == UserReportUiPhase.LOADING_REQUEST_HISTORY
+                    ) ->
+                "요청 이력: 첫 페이지를 불러오는 중입니다."
+            !state.requestHistoryLoaded -> "요청 이력: 신고 목록 확인 뒤 불러옵니다."
+            state.requestHistoryItems.isEmpty() -> "요청 이력: 표시할 이력이 없습니다."
+            else ->
+                "요청 이력: ${state.requestHistoryItems.size}건 / 전체 " +
+                    "${state.requestHistoryTotalCount}건"
+        }
+        userReportHistoryStatusText.text = historyStatus
+        userReportHistoryStatusText.contentDescription = historyStatus
+        renderUserReportRequestHistory(state.requestHistoryItems)
+        userReportHistoryMoreButton.visibility =
+            if (state.requestHistoryNextCursor != null) View.VISIBLE else View.GONE
+        userReportHistoryMoreButton.isEnabled =
+            state.requestHistoryNextCursor != null && authorityReady && !busy
         val detail = state.selectedDetail
         val detailMessage = detail?.let {
             userReportDetailText(
@@ -8788,6 +8938,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 updateUserReportCorrectionPatchButtons()
             }
         }
+        if (refreshRequestHistory) {
+            userReportController.loadRequestHistory()
+        }
     }
 
     private fun renderUserReportList(
@@ -8832,37 +8985,139 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         userReportDetailButtonsByReportId.values.forEach { it.isEnabled = !busy }
     }
 
+    private fun renderUserReportRequestHistory(
+        items: List<UserReportRequestHistoryItem>,
+    ) {
+        val previous = renderedUserReportHistoryItems
+        if (previous == items) return
+        val appendFrom = previous?.takeIf {
+            it.isNotEmpty() &&
+                items.size > it.size &&
+                items.subList(0, it.size) == it
+        }?.size
+        if (appendFrom == null) userReportHistoryContainer.removeAllViews()
+        var firstAppendedText: TextView? = null
+        items.drop(appendFrom ?: 0).forEach { item ->
+            val message = userReportRequestHistoryText(item)
+            val historyText = TextView(this).apply {
+                text = message
+                contentDescription = message
+                textSize = 16f
+                setTextColor(WS_COLOR_NOTICE_TEXT)
+                isFocusable = true
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            }
+            if (firstAppendedText == null) firstAppendedText = historyText
+            userReportHistoryContainer.addView(
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    val density = resources.displayMetrics.density
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = WS_CORNER_RADIUS_DP * density
+                        setColor(WS_COLOR_NOTICE_FILL)
+                        setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+                    }
+                    setPadding(
+                        (14f * density).roundToInt(),
+                        (12f * density).roundToInt(),
+                        (14f * density).roundToInt(),
+                        (12f * density).roundToInt(),
+                    )
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply {
+                        bottomMargin = (WS_GROUP_GAP_DP * density).roundToInt()
+                    }
+                    addView(historyText)
+                },
+            )
+        }
+        renderedUserReportHistoryItems = items.toList()
+        if (appendFrom != null) {
+            firstAppendedText?.let { target ->
+                target.post {
+                    if (
+                        target.isAttachedToWindow &&
+                        renderedUserReportHistoryItems == items
+                    ) {
+                        target.requestFocus()
+                        target.performAccessibilityAction(
+                            AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS,
+                            null,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun userReportRequestHistoryText(item: UserReportRequestHistoryItem): String =
+        when (item.source) {
+            UserReportRequestHistorySource.ACTIVE_REQUEST -> buildString {
+                val request = requireNotNull(item.request)
+                append("정정·삭제 요청 이력\n")
+                append("신고 번호: ")
+                append(item.reportId)
+                append("\n")
+                append(userReportExactRequestStatusText(request))
+                item.deletionStatus?.let { deletion ->
+                    append("\n")
+                    append(userReportDeletionStatusText(deletion))
+                }
+            }
+            UserReportRequestHistorySource.DELETION_TOMBSTONE -> buildString {
+                append("신고 삭제 완료 이력\n")
+                append(userReportDeletionStatusText(requireNotNull(item.deletionStatus)))
+            }
+        }
+
     private fun setUserReportStatusMessage(message: String) {
         userReportStatusText.text = message
         userReportStatusText.contentDescription = message
     }
 
     private fun clearUserReportRequestUiForAuthorityFence() {
-        if (!::userReportRequestTextInput.isInitialized) {
-            renderedUserReportAuthority = null
-            renderedUserReportInputReportId = null
-            renderedUserReportRequestId = null
-            renderedUserReportCorrectionId = null
-            clearUserReportCorrectionDescription = false
-            userReportCorrectionCategoryPatch = UserReportCorrectionPatch.Omitted
-            return
-        }
+        renderedUserReportAuthority = null
+        renderedUserReportInputReportId = null
+        renderedUserReportRequestId = null
+        renderedUserReportCorrectionId = null
+        renderedUserReportHistoryItems = null
+        renderedUserReportHistoryRefreshSequence = 0L
+        clearUserReportCorrectionDescription = false
+        userReportCorrectionCategoryPatch = UserReportCorrectionPatch.Omitted
+        if (
+            !::userReportRequestTextInput.isInitialized &&
+            !::userReportCorrectionDescriptionInput.isInitialized &&
+            !::userReportHistoryContainer.isInitialized &&
+            !::userReportHistoryStatusText.isInitialized &&
+            !::userReportHistoryMoreButton.isInitialized
+        ) return
         val clear = Runnable {
-            renderedUserReportAuthority = null
-            renderedUserReportInputReportId = null
-            renderedUserReportRequestId = null
-            renderedUserReportCorrectionId = null
-            userReportRequestTextInput.text?.clear()
+            if (::userReportRequestTextInput.isInitialized) {
+                userReportRequestTextInput.text?.clear()
+            }
             if (::userReportCorrectionDescriptionInput.isInitialized) {
                 userReportCorrectionDescriptionInput.text?.clear()
             }
-            clearUserReportCorrectionDescription = false
-            userReportCorrectionCategoryPatch = UserReportCorrectionPatch.Omitted
             if (
                 ::userReportCorrectionDescriptionClearButton.isInitialized &&
                 ::userReportCorrectionCategoryButton.isInitialized
             ) {
                 updateUserReportCorrectionPatchButtons()
+            }
+            if (::userReportHistoryContainer.isInitialized) {
+                userReportHistoryContainer.removeAllViews()
+            }
+            if (::userReportHistoryStatusText.isInitialized) {
+                val message = "요청 이력: 로그인이 필요합니다."
+                userReportHistoryStatusText.text = message
+                userReportHistoryStatusText.contentDescription = message
+            }
+            if (::userReportHistoryMoreButton.isInitialized) {
+                userReportHistoryMoreButton.visibility = View.GONE
+                userReportHistoryMoreButton.isEnabled = false
             }
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -8886,6 +9141,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     previousAuthority.localIdentityEpoch == authority.localIdentityEpoch
         }
         val selectedReportId = state.selectedDetail?.reportId
+        if (!sameAuthority) {
+            renderedUserReportHistoryItems = null
+            renderedUserReportHistoryRefreshSequence = 0L
+        }
         if (
             !sameAuthority ||
             state.phase == UserReportUiPhase.SIGNED_OUT ||
@@ -9970,6 +10229,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountRequestFence.enteredForeground()
         feedbackLifecycleGeneration += 1
         isActivityForeground = true
+        revalidateUserReportAuthorityOnResume()
         if (::firstRunWaitingCard.isInitialized) {
             updateFirstRunWaitingDots(firstRunWaitingCard.visibility == View.VISIBLE)
         }
@@ -10102,6 +10362,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     override fun onPause() {
+        cancelUserReportAuthorityExpirySchedule()
         if (::firstRunWaitingCard.isInitialized) updateFirstRunWaitingDots(active = false)
         stopHandsFreeVoiceService()
         cancelGatewaySpeechInteraction("app_paused")
@@ -10226,6 +10487,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     override fun onDestroy() {
+        cancelUserReportAuthorityExpirySchedule()
         invalidatePendingExplicitReport()
         closeHandsFreeVoice()
         cancelGatewaySpeechInteraction("app_destroyed")
@@ -12626,6 +12888,26 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
+        userReportHistoryStatusText = TextView(this).apply {
+            id = View.generateViewId()
+            text = "요청 이력: 로그인이 필요합니다."
+            contentDescription = text
+            textSize = 18f
+            setTextColor(WS_COLOR_BUTTON_TEXT)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        ViewCompat.setAccessibilityHeading(userReportHistoryStatusText, true)
+        userReportHistoryContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
+        userReportHistoryMoreButton = accessiblePriorityUserButton(
+            label = "다음 요청 이력",
+            onClick = { userReportController.loadNextRequestHistoryPage() },
+        ).apply {
+            visibility = View.GONE
+        }
         userReportDetailText = TextView(this).apply {
             id = View.generateViewId()
             text = "신고를 선택하면 상세 상태가 표시됩니다."
@@ -12714,6 +12996,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(userReportRetryButton)
             addView(userReportListContainer)
             addView(userReportMoreButton)
+            addView(userReportHistoryStatusText)
+            addView(userReportHistoryContainer)
+            addView(userReportHistoryMoreButton)
             addView(userReportDetailText)
             addView(userReportContentButton)
             addView(userReportCorrectionDescriptionInput)

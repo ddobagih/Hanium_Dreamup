@@ -14,6 +14,8 @@ internal const val USER_REPORT_CONTENT_REVISION_SCHEMA_VERSION =
     "walksafe.report-content-revision.v1"
 internal const val USER_REPORT_DELETION_STATUS_SCHEMA_VERSION =
     "walksafe.report-deletion-status.v2"
+internal const val USER_REPORT_REQUEST_HISTORY_SCHEMA_VERSION =
+    "walksafe.user-report-request-history-page.v1"
 
 internal enum class UserReportStatus(val wireValue: String, val labelKo: String) {
     RECEIVED("RECEIVED", "접수됨"),
@@ -238,6 +240,76 @@ internal data class UserReportDeletionStatus(
     }
 }
 
+internal enum class UserReportRequestHistorySource {
+    ACTIVE_REQUEST,
+    DELETION_TOMBSTONE,
+}
+
+internal data class UserReportRequestHistoryItem(
+    val revision: Long,
+    val source: UserReportRequestHistorySource,
+    val reportId: String,
+    val requestId: String,
+    val request: UserReportRequestSummary?,
+    val deletionStatus: UserReportDeletionStatus?,
+) {
+    init {
+        require(revision in 1L..MAX_SAFE_JSON_INTEGER)
+        require(validCanonicalUserReportUuid(reportId))
+        require(validCanonicalUserReportUuid(requestId))
+        when (source) {
+            UserReportRequestHistorySource.ACTIVE_REQUEST -> {
+                val activeRequest = requireNotNull(request)
+                require(activeRequest.requestId == requestId)
+                require(
+                    (activeRequest.requestType == UserReportRequestType.DELETE) ==
+                        (deletionStatus != null),
+                )
+                require(deletionStatus?.state != UserReportDeletionState.DELETED)
+                require(
+                    deletionStatus == null ||
+                        activeRequest.statusVersion == deletionStatus.requestStatusVersion,
+                )
+            }
+            UserReportRequestHistorySource.DELETION_TOMBSTONE -> {
+                require(request == null)
+                require(deletionStatus?.state == UserReportDeletionState.DELETED)
+            }
+        }
+        require(
+            deletionStatus == null ||
+                (
+                    deletionStatus.reportId == reportId &&
+                        deletionStatus.requestId == requestId
+                    ),
+        )
+    }
+}
+
+internal data class UserReportRequestHistoryPage(
+    val reportId: String?,
+    val snapshotRevision: Long,
+    val totalCount: Long,
+    val items: List<UserReportRequestHistoryItem>,
+    val nextCursor: String?,
+) {
+    init {
+        require(reportId == null || validCanonicalUserReportUuid(reportId))
+        require(snapshotRevision in 0L..MAX_SAFE_JSON_INTEGER)
+        require(totalCount in 0L..MAX_SAFE_JSON_INTEGER)
+        require(items.size <= USER_REPORT_REQUEST_HISTORY_MAX_ITEMS)
+        require(totalCount >= items.size.toLong())
+        require((totalCount == 0L) == (snapshotRevision == 0L))
+        val revisions = items.map(UserReportRequestHistoryItem::revision)
+        require(revisions == revisions.distinct().sortedDescending())
+        require(items.map(UserReportRequestHistoryItem::requestId).distinct().size == items.size)
+        require(revisions.all { it <= snapshotRevision })
+        require(reportId == null || items.all { it.reportId == reportId })
+        require(nextCursor == null || validUserReportCursor(nextCursor))
+        require(items.isNotEmpty() || nextCursor == null)
+    }
+}
+
 internal fun validatedUserReportListOrNull(body: String): UserReportListPage? =
     runCatching {
         val root = JSONObject(body)
@@ -279,6 +351,39 @@ internal fun validatedUserReportDetailOrNull(body: String): UserReportDetail? =
             latestRequest = summary.latestRequest,
         )
     }.getOrNull()
+
+internal fun validatedUserReportRequestHistoryOrNull(
+    body: String,
+): UserReportRequestHistoryPage? = runCatching {
+    require(strictJsonObjectDocument(body))
+    val root = JSONObject(body)
+    require(
+        root.exactKeys(
+            "schema_version",
+            "report_id",
+            "snapshot_revision",
+            "total_count",
+            "items",
+            "next_cursor",
+        ),
+    )
+    require(root.strictString("schema_version") == USER_REPORT_REQUEST_HISTORY_SCHEMA_VERSION)
+    val reportId = root.strictNullableString("report_id", 36, 36)
+    require(reportId == null || validCanonicalUserReportUuid(reportId))
+    val rawItems = root.get("items") as? JSONArray ?: error("items must be an array")
+    require(rawItems.length() <= USER_REPORT_REQUEST_HISTORY_MAX_ITEMS)
+    UserReportRequestHistoryPage(
+        reportId = reportId,
+        snapshotRevision = root.strictNonNegativeLong("snapshot_revision"),
+        totalCount = root.strictNonNegativeLong("total_count"),
+        items = buildList {
+            repeat(rawItems.length()) { index ->
+                add(parseUserReportRequestHistoryItem(rawItems.get(index)))
+            }
+        },
+        nextCursor = root.strictNullableString("next_cursor", 1, 1_024),
+    )
+}.getOrNull()
 
 internal fun validatedUserReportRequestOrNull(body: String): UserReportRequestSummary? =
     runCatching { parseUserReportRequest(JSONObject(body)) }.getOrNull()
@@ -375,67 +480,68 @@ internal fun validatedUserReportContentRevisionOrNull(
 }.getOrNull()
 
 internal fun validatedUserReportDeletionStatusOrNull(body: String): UserReportDeletionStatus? =
-    runCatching {
-        val root = JSONObject(body)
-        require(
-            root.exactKeys(
-                "schema_version",
-                "request_id",
-                "report_id",
-                "state",
-                "request_status_version",
-                "external_copy_count",
-                "external_copies",
-                "updated_at",
-            ),
-        )
-        require(root.strictString("schema_version") == USER_REPORT_DELETION_STATUS_SCHEMA_VERSION)
-        val requestId = root.strictString("request_id")
-        val reportId = root.strictString("report_id")
-        val updatedAt = root.strictString("updated_at")
-        require(validCanonicalUserReportUuid(requestId))
-        require(validCanonicalUserReportUuid(reportId))
-        require(validUserReportTimestamp(updatedAt))
-        val externalCopyCount = root.strictNonNegativeLong("external_copy_count")
-        val rawExternalCopies = root.get("external_copies") as? JSONArray
-            ?: error("external_copies must be an array")
-        require(externalCopyCount == rawExternalCopies.length().toLong())
-        val externalCopies = buildList {
-            repeat(rawExternalCopies.length()) { index ->
-                val item = rawExternalCopies.get(index) as? JSONObject
-                    ?: error("external copy must be an object")
-                require(item.exactKeys("institution", "state", "status_recorded_at"))
-                val institution = item.strictString("institution")
-                require(institution == institution.trim())
-                require(institution.codePointCount(0, institution.length) in 1..160)
-                val statusRecordedAt = item.strictNullableString(
-                    "status_recorded_at",
-                    20,
-                    40,
-                )
-                require(statusRecordedAt == null || validUserReportTimestamp(statusRecordedAt))
-                add(
-                    UserReportDeletionExternalCopyStatus(
-                        institution = institution,
-                        state = UserReportExternalCopyDeletionState.fromWireOrNull(
-                            item.strictString("state"),
-                        ) ?: error("unknown external copy deletion state"),
-                        statusRecordedAt = statusRecordedAt,
-                    ),
-                )
-            }
+    runCatching { parseUserReportDeletionStatus(JSONObject(body)) }.getOrNull()
+
+private fun parseUserReportDeletionStatus(root: JSONObject): UserReportDeletionStatus {
+    require(
+        root.exactKeys(
+            "schema_version",
+            "request_id",
+            "report_id",
+            "state",
+            "request_status_version",
+            "external_copy_count",
+            "external_copies",
+            "updated_at",
+        ),
+    )
+    require(root.strictString("schema_version") == USER_REPORT_DELETION_STATUS_SCHEMA_VERSION)
+    val requestId = root.strictString("request_id")
+    val reportId = root.strictString("report_id")
+    val updatedAt = root.strictString("updated_at")
+    require(validCanonicalUserReportUuid(requestId))
+    require(validCanonicalUserReportUuid(reportId))
+    require(validUserReportTimestamp(updatedAt))
+    val externalCopyCount = root.strictNonNegativeLong("external_copy_count")
+    val rawExternalCopies = root.get("external_copies") as? JSONArray
+        ?: error("external_copies must be an array")
+    require(externalCopyCount == rawExternalCopies.length().toLong())
+    val externalCopies = buildList {
+        repeat(rawExternalCopies.length()) { index ->
+            val item = rawExternalCopies.get(index) as? JSONObject
+                ?: error("external copy must be an object")
+            require(item.exactKeys("institution", "state", "status_recorded_at"))
+            val institution = item.strictString("institution")
+            require(institution == institution.trim())
+            require(institution.codePointCount(0, institution.length) in 1..160)
+            val statusRecordedAt = item.strictNullableString(
+                "status_recorded_at",
+                20,
+                40,
+            )
+            require(statusRecordedAt == null || validUserReportTimestamp(statusRecordedAt))
+            add(
+                UserReportDeletionExternalCopyStatus(
+                    institution = institution,
+                    state = UserReportExternalCopyDeletionState.fromWireOrNull(
+                        item.strictString("state"),
+                    ) ?: error("unknown external copy deletion state"),
+                    statusRecordedAt = statusRecordedAt,
+                ),
+            )
         }
-        UserReportDeletionStatus(
-            requestId = requestId,
-            reportId = reportId,
-            state = UserReportDeletionState.fromWireOrNull(root.strictString("state"))
-                ?: error("unknown deletion state"),
-            requestStatusVersion = root.strictPositiveLong("request_status_version"),
-            externalCopyCount = externalCopyCount,
-            externalCopies = externalCopies,
-            updatedAt = updatedAt,
-        )
-    }.getOrNull()
+    }
+    return UserReportDeletionStatus(
+        requestId = requestId,
+        reportId = reportId,
+        state = UserReportDeletionState.fromWireOrNull(root.strictString("state"))
+            ?: error("unknown deletion state"),
+        requestStatusVersion = root.strictPositiveLong("request_status_version"),
+        externalCopyCount = externalCopyCount,
+        externalCopies = externalCopies,
+        updatedAt = updatedAt,
+    )
+}
 
 internal fun validCanonicalUserReportUuid(value: String): Boolean {
     if (!CANONICAL_UUID.matches(value)) return false
@@ -535,6 +641,40 @@ private fun parseUserReportRequest(value: JSONObject): UserReportRequestSummary 
     )
 }
 
+private fun parseUserReportRequestHistoryItem(value: Any): UserReportRequestHistoryItem {
+    val item = value as? JSONObject ?: error("request history item must be an object")
+    require(
+        item.exactKeys(
+            "revision",
+            "source",
+            "report_id",
+            "request_id",
+            "request",
+            "deletion_status",
+        ),
+    )
+    val request = when (val raw = item.get("request")) {
+        JSONObject.NULL -> null
+        is JSONObject -> parseUserReportRequest(raw)
+        else -> error("request must be an object or null")
+    }
+    val deletionStatus = when (val raw = item.get("deletion_status")) {
+        JSONObject.NULL -> null
+        is JSONObject -> parseUserReportDeletionStatus(raw)
+        else -> error("deletion_status must be an object or null")
+    }
+    return UserReportRequestHistoryItem(
+        revision = item.strictPositiveLong("revision"),
+        source = runCatching {
+            UserReportRequestHistorySource.valueOf(item.strictString("source"))
+        }.getOrElse { error("unknown request history source") },
+        reportId = item.strictString("report_id"),
+        requestId = item.strictString("request_id"),
+        request = request,
+        deletionStatus = deletionStatus,
+    )
+}
+
 private fun JSONObject.exactKeys(vararg expected: String): Boolean {
     val actual = mutableSetOf<String>()
     val iterator = keys()
@@ -590,6 +730,155 @@ private fun JSONObject.strictNonNegativeLong(name: String): Long {
     return parsed
 }
 
+private fun strictJsonObjectDocument(value: String): Boolean =
+    runCatching { StrictJsonDocumentReader(value).readObjectDocument() }.isSuccess
+
+private class StrictJsonDocumentReader(
+    private val value: String,
+) {
+    private var index = 0
+
+    fun readObjectDocument() {
+        skipWhitespace()
+        require(peek() == '{')
+        readObject(depth = 1)
+        skipWhitespace()
+        require(index == value.length)
+    }
+
+    private fun readValue(depth: Int) {
+        require(depth <= STRICT_JSON_MAX_DEPTH)
+        skipWhitespace()
+        when (peek()) {
+            '{' -> readObject(depth)
+            '[' -> readArray(depth)
+            '"' -> readString()
+            't' -> readLiteral("true")
+            'f' -> readLiteral("false")
+            'n' -> readLiteral("null")
+            '-', in '0'..'9' -> readNumber()
+            else -> error("invalid JSON value")
+        }
+    }
+
+    private fun readObject(depth: Int) {
+        require(consume('{'))
+        skipWhitespace()
+        if (consume('}')) return
+        val keys = mutableSetOf<String>()
+        while (true) {
+            require(peek() == '"')
+            require(keys.add(readString()))
+            skipWhitespace()
+            require(consume(':'))
+            readValue(depth + 1)
+            skipWhitespace()
+            if (consume('}')) return
+            require(consume(','))
+            skipWhitespace()
+        }
+    }
+
+    private fun readArray(depth: Int) {
+        require(consume('['))
+        skipWhitespace()
+        if (consume(']')) return
+        while (true) {
+            readValue(depth + 1)
+            skipWhitespace()
+            if (consume(']')) return
+            require(consume(','))
+            skipWhitespace()
+        }
+    }
+
+    private fun readString(): String {
+        require(consume('"'))
+        val decoded = StringBuilder()
+        while (true) {
+            require(index < value.length)
+            when (val current = value[index++]) {
+                '"' -> return decoded.toString()
+                '\\' -> {
+                    require(index < value.length)
+                    when (val escaped = value[index++]) {
+                        '"', '\\', '/' -> decoded.append(escaped)
+                        'b' -> decoded.append('\b')
+                        'f' -> decoded.append('\u000c')
+                        'n' -> decoded.append('\n')
+                        'r' -> decoded.append('\r')
+                        't' -> decoded.append('\t')
+                        'u' -> decoded.append(readUnicodeEscape())
+                        else -> error("invalid JSON escape")
+                    }
+                }
+                else -> {
+                    require(current.code >= 0x20)
+                    decoded.append(current)
+                }
+            }
+        }
+    }
+
+    private fun readUnicodeEscape(): Char {
+        require(index + 4 <= value.length)
+        var decoded = 0
+        repeat(4) {
+            decoded = decoded * 16 + value[index++].digitToIntOrNull(16)
+                .let(::requireNotNull)
+        }
+        return decoded.toChar()
+    }
+
+    private fun readLiteral(expected: String) {
+        require(value.regionMatches(index, expected, 0, expected.length))
+        index += expected.length
+    }
+
+    private fun readNumber() {
+        consume('-')
+        when (peek()) {
+            '0' -> {
+                index += 1
+                require(!nextIsDigit())
+            }
+            in '1'..'9' -> readDigits()
+            else -> error("invalid JSON number")
+        }
+        if (consume('.')) readRequiredDigits()
+        if (peek() == 'e' || peek() == 'E') {
+            index += 1
+            if (peek() == '+' || peek() == '-') index += 1
+            readRequiredDigits()
+        }
+    }
+
+    private fun readRequiredDigits() {
+        require(nextIsDigit())
+        readDigits()
+    }
+
+    private fun readDigits() {
+        while (nextIsDigit()) index += 1
+    }
+
+    private fun skipWhitespace() {
+        while (peek() == ' ' || peek() == '\t' || peek() == '\n' || peek() == '\r') {
+            index += 1
+        }
+    }
+
+    private fun consume(expected: Char): Boolean {
+        if (peek() != expected) return false
+        index += 1
+        return true
+    }
+
+    private fun peek(): Char? = value.getOrNull(index)
+
+    private fun nextIsDigit(): Boolean = peek()?.let { it in '0'..'9' } == true
+}
+
 private val CANONICAL_UUID =
     Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 private val UTC_TIMESTAMP =
@@ -602,3 +891,5 @@ private val LOWER_SHA256 = Regex("^[0-9a-f]{64}$")
 private val CONTROL_CHARACTER = Regex("\\p{C}")
 private val WHITESPACE = Regex("(?U)\\s+")
 private const val MAX_SAFE_JSON_INTEGER = 9_007_199_254_740_991L
+private const val USER_REPORT_REQUEST_HISTORY_MAX_ITEMS = 25
+private const val STRICT_JSON_MAX_DEPTH = 16

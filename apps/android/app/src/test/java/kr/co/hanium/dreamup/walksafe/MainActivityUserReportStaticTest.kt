@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe
 
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,6 +18,44 @@ class MainActivityUserReportStaticTest {
     private val models =
         File("src/main/java/kr/co/hanium/dreamup/walksafe/report/UserReportModels.kt")
             .readText()
+
+    @Test
+    fun userReportAuthorityExpiryDelayUsesTheEarliestBoundaryAndNeverRunsLate() {
+        assertEquals(100L, userReportAuthorityExpiryDelayMs(1_100L, 1_200L, 1_300L, 1_000L))
+        assertEquals(50L, userReportAuthorityExpiryDelayMs(1_200L, 1_050L, 1_300L, 1_000L))
+        assertEquals(25L, userReportAuthorityExpiryDelayMs(1_200L, 1_300L, 1_025L, 1_000L))
+        assertEquals(0L, userReportAuthorityExpiryDelayMs(1_000L, 1_200L, 1_300L, 1_000L))
+        assertEquals(0L, userReportAuthorityExpiryDelayMs(900L, 1_200L, 1_300L, 1_000L))
+    }
+
+    @Test
+    fun reportHistoryIsScrubbedOnResumeAndAtNaturalSessionExpiry() {
+        val resume = main.substringAfter("override fun onResume()")
+            .substringBefore("override fun onWindowFocusChanged(")
+        val revalidate = main.substringAfter("private fun revalidateUserReportAuthorityOnResume()")
+            .substringBefore("private fun nextUserReportStatusFilter(")
+        val schedule = main.substringAfter("private fun scheduleUserReportAuthorityExpiryIfNeeded(")
+            .substringBefore("private fun GatewaySessionProcessSnapshot.matchesUserReportAuthority(")
+        val pause = main.substringAfter("override fun onPause()")
+            .substringBefore("internal fun pauseWalkSafeRuntime()")
+        val destroy = main.substringAfter("override fun onDestroy()")
+            .substringBefore("override fun onRequestPermissionsResult(")
+
+        assertTrue(resume.contains("revalidateUserReportAuthorityOnResume()"))
+        assertTrue(revalidate.contains("currentUserReportAuthorityOrNull()"))
+        assertTrue(revalidate.contains("clearUserReportRequestUiForAuthorityFence()"))
+        assertTrue(revalidate.contains("userReportController.onAuthorityChanged()"))
+        assertTrue(revalidate.contains("scheduleUserReportAuthorityExpiryIfNeeded(authority)"))
+        assertTrue(schedule.contains("session.accessExpiresAtEpochMs"))
+        assertTrue(schedule.contains("session.idleExpiresAtEpochMs"))
+        assertTrue(schedule.contains("session.absoluteExpiresAtEpochMs"))
+        assertTrue(schedule.contains("current.matchesUserReportAuthority(authority)"))
+        assertTrue(schedule.contains("System.currentTimeMillis() < expiresAtEpochMs"))
+        assertTrue(schedule.contains("clearUserReportRequestUiForAuthorityFence()"))
+        assertTrue(schedule.contains("userReportController.onAuthorityChanged()"))
+        assertTrue(pause.contains("cancelUserReportAuthorityExpirySchedule()"))
+        assertTrue(destroy.contains("cancelUserReportAuthorityExpirySchedule()"))
+    }
 
     @Test
     fun reportRightsSurfaceUsesTextStatusReflowLiveRegionAndStableFocus() {
@@ -126,6 +165,11 @@ class MainActivityUserReportStaticTest {
                 "authenticated Backend actor and account-generation binding",
             ),
         )
+        val authority = main.substringAfter("private fun currentUserReportAuthorityOrNull()")
+            .substringBefore("private fun nextUserReportStatusFilter(")
+        assertTrue(authority.contains("!session.isBackendAccountDeviceBound"))
+        assertTrue(authority.contains("session.backendAccountGeneration == null"))
+        assertTrue(authority.contains("session.backendDevicePersistenceSnapshotOrNull() == null"))
     }
 
     @Test
@@ -146,6 +190,10 @@ class MainActivityUserReportStaticTest {
         assertTrue(authorityFence.contains("renderedUserReportInputReportId = null"))
         assertTrue(authorityFence.contains("renderedUserReportRequestId = null"))
         assertTrue(authorityFence.contains("userReportRequestTextInput.text?.clear()"))
+        assertTrue(authorityFence.contains("userReportHistoryContainer.removeAllViews()"))
+        assertTrue(authorityFence.contains("요청 이력: 로그인이 필요합니다."))
+        assertTrue(authorityFence.contains("userReportHistoryMoreButton.visibility = View.GONE"))
+        assertTrue(authorityFence.contains("userReportHistoryMoreButton.isEnabled = false"))
         assertTrue(binding.contains("previousAuthority.session === authority.session"))
         assertTrue(binding.contains("previousAuthority.sessionGeneration == authority.sessionGeneration"))
         assertTrue(binding.contains("previousAuthority.localIdentityEpoch == authority.localIdentityEpoch"))
@@ -170,6 +218,51 @@ class MainActivityUserReportStaticTest {
         assertTrue(listRendering.contains("userReportDetailButtonsByReportId[reportId]"))
         assertTrue(listRendering.contains("renderedUserReports = reports.toList()"))
         assertFalse(listLoading.contains("reports = emptyList()"))
+    }
+
+    @Test
+    fun serverRequestHistoryIsPagedRefreshedAndTombstonesShowOnlyDeletionFacts() {
+        val rendering = main.substringAfter("private fun renderUserReportState(")
+            .substringBefore("private fun renderUserReportList(")
+        val tombstone = main.substringAfter(
+            "UserReportRequestHistorySource.DELETION_TOMBSTONE ->",
+        ).substringBefore("private fun setUserReportStatusMessage(")
+
+        assertTrue(client.contains("/requests/history"))
+        assertTrue(client.contains("USER_REPORT_REQUEST_HISTORY_MAX_RESPONSE_BYTES = 48 * 1024"))
+        assertTrue(client.contains("it.items.size <= limit"))
+        assertTrue(main.contains("label = \"다음 요청 이력\""))
+        assertTrue(main.contains("userReportController.loadNextRequestHistoryPage()"))
+        assertTrue(rendering.contains("state.requestHistoryRefreshSequence"))
+        assertTrue(rendering.contains("userReportController.loadRequestHistory()"))
+        assertTrue(main.contains("renderUserReportRequestHistory(state.requestHistoryItems)"))
+        assertTrue(tombstone.contains("userReportDeletionStatusText"))
+        assertFalse(tombstone.contains("userReportExactRequestStatusText"))
+        assertFalse(tombstone.contains("item.reportId"))
+        assertFalse(tombstone.contains("item.requestId"))
+        assertFalse(tombstone.contains("item.request"))
+        assertFalse(tombstone.contains("publicResponse"))
+        assertFalse(tombstone.contains("request.status"))
+        assertTrue(controller.contains("?.statusCode == 422"))
+        assertTrue(controller.contains("startRequestHistory(cursor = null"))
+        assertFalse(
+            controller.substringAfter("fun onAuthorityChanged()")
+                .substringBefore("fun loadReports(")
+                .contains("trackedRequestReferences("),
+        )
+    }
+
+    @Test
+    fun requestHistoryPaginationAppendsCardsAndMovesFocusToTheFirstNewItem() {
+        val history = main.substringAfter("private fun renderUserReportRequestHistory(")
+            .substringBefore("private fun userReportRequestHistoryText(")
+
+        assertTrue(history.contains("items.subList(0, it.size) == it"))
+        assertTrue(history.contains("items.drop(appendFrom ?: 0)"))
+        assertTrue(history.contains("if (appendFrom == null) userReportHistoryContainer.removeAllViews()"))
+        assertTrue(history.contains("target.requestFocus()"))
+        assertTrue(history.contains("AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS"))
+        assertTrue(history.contains("renderedUserReportHistoryItems == items"))
     }
 
     @Test

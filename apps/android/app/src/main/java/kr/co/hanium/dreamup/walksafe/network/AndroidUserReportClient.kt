@@ -10,6 +10,7 @@ import kr.co.hanium.dreamup.walksafe.report.UserReportCorrectionPatch
 import kr.co.hanium.dreamup.walksafe.report.UserReportDeletionStatus
 import kr.co.hanium.dreamup.walksafe.report.UserReportListPage
 import kr.co.hanium.dreamup.walksafe.report.UserReportRequestIntent
+import kr.co.hanium.dreamup.walksafe.report.UserReportRequestHistoryPage
 import kr.co.hanium.dreamup.walksafe.report.UserReportRequestSummary
 import kr.co.hanium.dreamup.walksafe.report.UserReportStatus
 import kr.co.hanium.dreamup.walksafe.report.validCanonicalUserReportUuid
@@ -21,6 +22,7 @@ import kr.co.hanium.dreamup.walksafe.report.validatedUserReportDeletionStatusOrN
 import kr.co.hanium.dreamup.walksafe.report.validatedUserReportDetailOrNull
 import kr.co.hanium.dreamup.walksafe.report.validatedUserReportListOrNull
 import kr.co.hanium.dreamup.walksafe.report.validatedUserReportRequestOrNull
+import kr.co.hanium.dreamup.walksafe.report.validatedUserReportRequestHistoryOrNull
 import org.json.JSONObject
 
 internal interface UserReportNetworkClient {
@@ -35,6 +37,13 @@ internal interface UserReportNetworkClient {
         session: GatewayFieldSession,
         reportId: String,
     ): CancellableNetworkCall<UserReportDetail>
+
+    fun requestHistoryCall(
+        session: GatewayFieldSession,
+        limit: Int,
+        cursor: String?,
+        reportId: String?,
+    ): CancellableNetworkCall<UserReportRequestHistoryPage>
 
     fun createRequestCall(
         session: GatewayFieldSession,
@@ -110,6 +119,43 @@ internal class AndroidUserReportClient : UserReportNetworkClient {
             acceptedStatusCodes = setOf(200),
         ) { body ->
             validatedUserReportDetailOrNull(body)?.takeIf { it.reportId == reportId }
+        }
+    }
+
+    override fun requestHistoryCall(
+        session: GatewayFieldSession,
+        limit: Int,
+        cursor: String?,
+        reportId: String?,
+    ): CancellableNetworkCall<UserReportRequestHistoryPage> {
+        require(limit in 1..USER_REPORT_REQUEST_HISTORY_MAX_ITEMS)
+        require(cursor == null || validUserReportCursor(cursor))
+        require(reportId == null || validCanonicalUserReportUuid(reportId))
+        val endpoint = buildString {
+            append(session.gatewayBaseUrl.trimEnd('/'))
+            append(USER_REPORT_REQUEST_HISTORY_PATH)
+            append("?limit=")
+            append(limit)
+            cursor?.let {
+                append("&cursor=")
+                append(it)
+            }
+            reportId?.let {
+                append("&report_id=")
+                append(it)
+            }
+        }
+        return requestCall(
+            session = session,
+            endpoint = endpoint,
+            method = "GET",
+            requestBody = null,
+            acceptedStatusCodes = setOf(200),
+            maxResponseBytes = USER_REPORT_REQUEST_HISTORY_MAX_RESPONSE_BYTES,
+        ) { body ->
+            validatedUserReportRequestHistoryOrNull(body)?.takeIf {
+                it.reportId == reportId && it.items.size <= limit
+            }
         }
     }
 
@@ -241,6 +287,7 @@ internal class AndroidUserReportClient : UserReportNetworkClient {
         method: String,
         requestBody: String?,
         acceptedStatusCodes: Set<Int>,
+        maxResponseBytes: Int = USER_REPORT_MAX_RESPONSE_BYTES,
         parse: (String) -> T?,
     ): CancellableNetworkCall<T> {
         require(session.sessionScope == GatewaySessionScope.GENERAL)
@@ -278,7 +325,7 @@ internal class AndroidUserReportClient : UserReportNetworkClient {
                     }
                 }
                 val response = connection.readBoundedResponse(
-                    USER_REPORT_MAX_RESPONSE_BYTES,
+                    maxResponseBytes,
                     cancellation,
                 )
                 if (response.statusCode !in acceptedStatusCodes) {
@@ -299,6 +346,8 @@ internal class AndroidUserReportClient : UserReportNetworkClient {
 
     private companion object {
         const val USER_REPORT_LIST_PATH = "/api/reports/mine"
+        const val USER_REPORT_REQUEST_HISTORY_PATH =
+            "$USER_REPORT_LIST_PATH/requests/history"
     }
 }
 
@@ -310,3 +359,5 @@ internal class UserReportProtocolException :
     IllegalStateException("user report response is malformed")
 
 internal const val USER_REPORT_MAX_RESPONSE_BYTES = 128 * 1024
+internal const val USER_REPORT_REQUEST_HISTORY_MAX_RESPONSE_BYTES = 48 * 1024
+private const val USER_REPORT_REQUEST_HISTORY_MAX_ITEMS = 25

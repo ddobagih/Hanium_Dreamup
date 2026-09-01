@@ -29,6 +29,8 @@ internal enum class UserReportUiPhase {
     IDLE,
     LOADING_LIST,
     LOADING_MORE,
+    LOADING_REQUEST_HISTORY,
+    LOADING_MORE_REQUEST_HISTORY,
     LOADING_DETAIL,
     LOADING_CONTENT,
     LOADING_REQUEST_STATUS,
@@ -53,6 +55,13 @@ internal data class UserReportUiState(
     val statusFilter: UserReportStatus? = null,
     val reports: List<UserReportSummary> = emptyList(),
     val nextCursor: String? = null,
+    val requestHistoryItems: List<UserReportRequestHistoryItem> = emptyList(),
+    val requestHistoryNextCursor: String? = null,
+    val requestHistoryReportId: String? = null,
+    val requestHistorySnapshotRevision: Long = 0L,
+    val requestHistoryTotalCount: Long = 0L,
+    val requestHistoryLoaded: Boolean = false,
+    val requestHistoryRefreshSequence: Long = 0L,
     val selectedDetail: UserReportDetail? = null,
     val selectedContent: UserReportContentCurrent? = null,
     val latestCorrection: UserReportContentRevision? = null,
@@ -95,18 +104,6 @@ internal class UserReportController(
             authorityChangeSequence
         }
         val next = authorityProvider()
-        val trackedRequests = next?.let { authority ->
-            runCatching {
-                TrackedRequests(
-                    references = deletionTracker
-                        ?.trackedRequestReferences(authority.session)
-                        .orEmpty(),
-                    deletionRequestIds = deletionTracker
-                        ?.trackedRequestIds(authority.session)
-                        .orEmpty(),
-                )
-            }.getOrNull()
-        } ?: TrackedRequests()
         val nextState: UserReportUiState?
         synchronized(lock) {
             if (
@@ -130,8 +127,6 @@ internal class UserReportController(
                     UserReportUiPhase.IDLE
                 },
                 statusFilter = state.statusFilter,
-                trackedRequestReferences = trackedRequests.references,
-                trackedDeletionRequestIds = trackedRequests.deletionRequestIds,
             )
             nextState = state
         }
@@ -145,6 +140,18 @@ internal class UserReportController(
         val snapshot = snapshot()
         val cursor = snapshot.nextCursor ?: return false
         return startList(cursor = cursor, statusFilter = snapshot.statusFilter)
+    }
+
+    fun loadRequestHistory(reportId: String? = null): Boolean =
+        startRequestHistory(cursor = null, reportId = reportId)
+
+    fun loadNextRequestHistoryPage(): Boolean {
+        val snapshot = snapshot()
+        val cursor = snapshot.requestHistoryNextCursor ?: return false
+        return startRequestHistory(
+            cursor = cursor,
+            reportId = snapshot.requestHistoryReportId,
+        )
     }
 
     fun openDetail(reportId: String): Boolean {
@@ -283,6 +290,13 @@ internal class UserReportController(
         ) return false
         val current = snapshot()
         if (current.selectedDetail?.reportId != reportId) return false
+        if (
+            current.requestHistoryItems.any { item ->
+                item.source == UserReportRequestHistorySource.DELETION_TOMBSTONE &&
+                    item.reportId == reportId &&
+                    item.requestId == requestId
+            }
+        ) return false
         val reference = current.trackedRequestReferences.singleOrNull {
             it.reportId == reportId && it.requestId == requestId
         } ?: current.selectedDetail.latestRequest
@@ -301,6 +315,11 @@ internal class UserReportController(
             precondition = { locked ->
                 val selected = locked.selectedDetail
                 selected?.reportId == reference.reportId &&
+                    locked.requestHistoryItems.none { item ->
+                        item.source == UserReportRequestHistorySource.DELETION_TOMBSTONE &&
+                            item.reportId == reference.reportId &&
+                            item.requestId == reference.requestId
+                    } &&
                     (
                         locked.trackedRequestReferences.any { it == reference } ||
                             selected.latestRequest?.let {
@@ -372,6 +391,7 @@ internal class UserReportController(
         retryAction
     }) {
         is Action.List -> startList(action.cursor, action.statusFilter)
+        is Action.RequestHistory -> startRequestHistory(action.cursor, action.reportId)
         is Action.Detail -> openDetail(action.reportId)
         is Action.Content -> loadContent(action.reportId)
         is Action.RequestStatus -> refreshRequestStatus(
@@ -450,14 +470,174 @@ internal class UserReportController(
             require(result.items.none { it.reportId in existingIds })
             val reports = existing + result.items
             before.copy(
-                phase = if (reports.isEmpty()) {
-                    UserReportUiPhase.EMPTY
-                } else {
-                    UserReportUiPhase.READY
-                },
+                phase = readyPhase(reports, before.requestHistoryItems),
                 statusFilter = statusFilter,
                 reports = reports,
                 nextCursor = result.nextCursor,
+                requestHistoryRefreshSequence = if (cursor == null) {
+                    before.requestHistoryRefreshSequence + 1L
+                } else {
+                    before.requestHistoryRefreshSequence
+                },
+                failure = null,
+                retryAvailable = false,
+            )
+        }
+    }
+
+    private fun startRequestHistory(
+        cursor: String?,
+        reportId: String?,
+    ): Boolean {
+        if (cursor != null && !validUserReportCursor(cursor)) return false
+        if (reportId != null && !validCanonicalUserReportUuid(reportId)) return false
+        val action = Action.RequestHistory(cursor = cursor, reportId = reportId)
+        return start(
+            action = action,
+            loadingPhase = if (cursor == null) {
+                UserReportUiPhase.LOADING_REQUEST_HISTORY
+            } else {
+                UserReportUiPhase.LOADING_MORE_REQUEST_HISTORY
+            },
+            precondition = { before ->
+                cursor == null ||
+                    (
+                        before.requestHistoryLoaded &&
+                            before.requestHistoryNextCursor == cursor &&
+                            before.requestHistoryReportId == reportId
+                        )
+            },
+            createCall = { authority ->
+                client.requestHistoryCall(
+                    session = authority.session,
+                    limit = PAGE_LIMIT,
+                    cursor = cursor,
+                    reportId = reportId,
+                )
+            },
+        ) { result, before, _ ->
+            require(result.reportId == reportId)
+            require(result.nextCursor == null || result.nextCursor != cursor)
+            val existing = if (cursor == null) emptyList() else before.requestHistoryItems
+            if (cursor == null) {
+                require(
+                    result.totalCount == 0L ||
+                        (
+                            result.items.isNotEmpty() &&
+                                result.items.first().revision == result.snapshotRevision
+                            ),
+                )
+            } else {
+                require(result.items.isNotEmpty())
+                require(result.snapshotRevision == before.requestHistorySnapshotRevision)
+                require(result.totalCount == before.requestHistoryTotalCount)
+                val previousRevision = existing.lastOrNull()?.revision
+                val nextRevision = result.items.firstOrNull()?.revision
+                require(
+                    previousRevision == null ||
+                        nextRevision == null ||
+                        previousRevision > nextRevision,
+                )
+            }
+            val existingRevisions = existing.mapTo(mutableSetOf()) { it.revision }
+            val existingRequestIds = existing.mapTo(mutableSetOf()) { it.requestId }
+            require(result.items.none { it.revision in existingRevisions })
+            require(result.items.none { it.requestId in existingRequestIds })
+            val items = existing + result.items
+            require(items.size.toLong() <= result.totalCount)
+            require(
+                (result.nextCursor == null) ==
+                    (items.size.toLong() == result.totalCount),
+            )
+            val tombstones = items.filter {
+                it.source == UserReportRequestHistorySource.DELETION_TOMBSTONE
+            }
+            val tombstonedReportIds = tombstones.mapTo(mutableSetOf()) { it.reportId }
+            val tombstonedRequestIds = tombstones.mapTo(mutableSetOf()) { it.requestId }
+            val tombstonedRequests = tombstones.mapTo(mutableSetOf()) {
+                it.reportId to it.requestId
+            }
+            val reports = before.reports.filterNot { report ->
+                report.reportId in tombstonedReportIds ||
+                    report.latestRequest?.let {
+                        report.reportId to it.requestId in tombstonedRequests
+                    } == true
+            }
+            val activeRequestReferences = items.asReversed().mapNotNull { item ->
+                item.request?.let { request ->
+                    UserReportRequestReference(
+                        reportId = item.reportId,
+                        requestId = item.requestId,
+                        requestType = request.requestType,
+                    )
+                }
+            }.filterNot { reference ->
+                reference.reportId in tombstonedReportIds ||
+                    reference.reportId to reference.requestId in tombstonedRequests
+            }
+            val selectedDetail = before.selectedDetail?.takeUnless { detail ->
+                detail.reportId in tombstonedReportIds ||
+                    detail.latestRequest?.let {
+                        detail.reportId to it.requestId in tombstonedRequests
+                    } == true
+            }
+            val selectedDetailRemoved = before.selectedDetail != null && selectedDetail == null
+            pendingRequestIntent = pendingRequestIntent?.takeUnless {
+                it.reportId in tombstonedReportIds
+            }
+            pendingCorrectionIntent = pendingCorrectionIntent?.takeUnless {
+                it.reportId in tombstonedReportIds
+            }
+            val selectedReportId = selectedDetail?.reportId
+            val requestSummaryWasTombstoned: (UserReportRequestSummary) -> Boolean = {
+                selectedDetailRemoved ||
+                    if (selectedReportId == null) {
+                        it.requestId in tombstonedRequestIds
+                    } else {
+                        selectedReportId to it.requestId in tombstonedRequests
+                    }
+            }
+            before.copy(
+                phase = readyPhase(reports, items),
+                reports = reports,
+                requestHistoryItems = items,
+                requestHistoryNextCursor = result.nextCursor,
+                requestHistoryReportId = result.reportId,
+                requestHistorySnapshotRevision = result.snapshotRevision,
+                requestHistoryTotalCount = result.totalCount,
+                requestHistoryLoaded = true,
+                trackedRequestReferences = activeRequestReferences,
+                trackedDeletionRequestIds = activeRequestReferences
+                    .filter { it.requestType == UserReportRequestType.DELETE }
+                    .map(UserReportRequestReference::requestId),
+                selectedDetail = selectedDetail,
+                selectedContent = if (selectedDetailRemoved) {
+                    null
+                } else {
+                    before.selectedContent?.takeUnless { it.reportId in tombstonedReportIds }
+                },
+                latestCorrection = if (selectedDetailRemoved) {
+                    null
+                } else {
+                    before.latestCorrection?.takeUnless { it.reportId in tombstonedReportIds }
+                },
+                latestCreatedRequest = if (selectedDetailRemoved) {
+                    null
+                } else {
+                    before.latestCreatedRequest?.takeUnless(requestSummaryWasTombstoned)
+                },
+                selectedRequestStatus = if (selectedDetailRemoved) {
+                    null
+                } else {
+                    before.selectedRequestStatus?.takeUnless(requestSummaryWasTombstoned)
+                },
+                selectedDeletionStatus = if (selectedDetailRemoved) {
+                    null
+                } else {
+                    before.selectedDeletionStatus?.takeUnless {
+                        it.reportId to it.requestId in tombstonedRequests
+                    }
+                },
                 failure = null,
                 retryAvailable = false,
             )
@@ -523,6 +703,7 @@ internal class UserReportController(
                 latestCreatedRequest = result,
                 trackedRequestReferences = trackedRequestReferences,
                 trackedDeletionRequestIds = trackedDeletionRequestIds,
+                requestHistoryRefreshSequence = before.requestHistoryRefreshSequence + 1L,
                 failure = if (trackingSucceeded) null else UserReportFailure.LOCAL_TRACKING,
                 retryAvailable = false,
             )
@@ -576,7 +757,7 @@ internal class UserReportController(
                 retryAction = null
                 pendingRequestIntent = null
                 pendingCorrectionIntent = null
-                boundAuthority = null
+                boundAuthority = authority
                 state = UserReportUiState(
                     phase = if (authority == null) {
                         UserReportUiPhase.SIGNED_OUT
@@ -647,17 +828,42 @@ internal class UserReportController(
         applyResult: (T, UserReportUiState, UserReportAuthority) -> UserReportUiState,
     ) {
         val nextState: UserReportUiState?
+        var cursorRecovery: Action.RequestHistory? = null
         synchronized(lock) {
             val currentAuthority = authorityProvider()
             if (
                 destroyed ||
                 active !== operation ||
                 operation.call !== call ||
-                operation.generation != generation ||
+                operation.generation != generation
+            ) {
+                return
+            }
+            if (
                 currentAuthority == null ||
                 !exactAuthority(operation.authority, currentAuthority)
             ) {
-                return
+                generation += 1L
+                active = null
+                retryAction = null
+                pendingRequestIntent = null
+                pendingCorrectionIntent = null
+                boundAuthority = currentAuthority
+                state = UserReportUiState(
+                    phase = if (currentAuthority == null) {
+                        UserReportUiPhase.SIGNED_OUT
+                    } else {
+                        UserReportUiPhase.IDLE
+                    },
+                    statusFilter = state.statusFilter,
+                    failure = if (currentAuthority == null) {
+                        UserReportFailure.NOT_FOUND_OR_SIGNED_OUT
+                    } else {
+                        null
+                    },
+                )
+                nextState = state
+                return@synchronized
             }
             active = null
             nextState = result.fold(
@@ -680,6 +886,44 @@ internal class UserReportController(
                     )
                 },
                 onFailure = { error ->
+                    val concealedCollectionFailure =
+                        (error as? UserReportHttpException)?.statusCode == 404 &&
+                            (
+                                operation.action is Action.List ||
+                                    (
+                                        operation.action is Action.RequestHistory &&
+                                            operation.action.reportId == null
+                                        )
+                                )
+                    if (concealedCollectionFailure) {
+                        retryAction = null
+                        pendingRequestIntent = null
+                        pendingCorrectionIntent = null
+                        state = UserReportUiState(
+                            phase = UserReportUiPhase.ERROR,
+                            statusFilter = state.statusFilter,
+                            requestHistoryRefreshSequence =
+                                state.requestHistoryRefreshSequence,
+                            failure = UserReportFailure.NOT_FOUND_OR_SIGNED_OUT,
+                            retryAvailable = false,
+                        )
+                        return@fold state
+                    }
+                    val historyCursorFailure = (operation.action as? Action.RequestHistory)
+                        ?.takeIf {
+                            it.cursor != null &&
+                                (error as? UserReportHttpException)?.statusCode == 422
+                        }
+                    if (historyCursorFailure != null) {
+                        retryAction = null
+                        cursorRecovery = historyCursorFailure.copy(cursor = null)
+                        state = state.copy(
+                            phase = readyPhase(state.reports, state.requestHistoryItems),
+                            failure = null,
+                            retryAvailable = false,
+                        )
+                        return@fold state
+                    }
                     val terminalRequestFailure =
                         operation.action is Action.Request ||
                             operation.action is Action.Correction
@@ -703,7 +947,9 @@ internal class UserReportController(
                 },
             )
         }
-        nextState?.let(::publish)
+        cursorRecovery?.let { recovery ->
+            startRequestHistory(cursor = null, reportId = recovery.reportId)
+        } ?: nextState?.let(::publish)
     }
 
     private fun failToSchedule(operation: ActiveOperation) {
@@ -724,7 +970,12 @@ internal class UserReportController(
     private fun publish(value: UserReportUiState) {
         try {
             callbackExecutor.execute {
-                if (synchronized(lock) { !destroyed && state === value }) observer(value)
+                val deliver = synchronized(lock) {
+                    !destroyed &&
+                        state === value &&
+                        exactNullableAuthority(boundAuthority, authorityProvider())
+                }
+                if (deliver) observer(value)
             }
         } catch (_: RejectedExecutionException) {
             Unit
@@ -742,6 +993,15 @@ internal class UserReportController(
 
     private fun Throwable.statusCodeOrNull(): Int? =
         (this as? UserReportHttpException)?.statusCode
+
+    private fun readyPhase(
+        reports: List<UserReportSummary>,
+        requestHistoryItems: List<UserReportRequestHistoryItem>,
+    ): UserReportUiPhase = if (reports.isEmpty() && requestHistoryItems.isEmpty()) {
+        UserReportUiPhase.EMPTY
+    } else {
+        UserReportUiPhase.READY
+    }
 
     private fun exactAuthority(
         expected: UserReportAuthority,
@@ -772,6 +1032,11 @@ internal class UserReportController(
             val statusFilter: UserReportStatus?,
         ) : Action
 
+        data class RequestHistory(
+            val cursor: String?,
+            val reportId: String?,
+        ) : Action
+
         data class Detail(val reportId: String) : Action
 
         data class Content(val reportId: String) : Action
@@ -784,11 +1049,6 @@ internal class UserReportController(
 
         data class DeletionStatus(val requestId: String) : Action
     }
-
-    private data class TrackedRequests(
-        val references: List<UserReportRequestReference> = emptyList(),
-        val deletionRequestIds: List<String> = emptyList(),
-    )
 
     private companion object {
         const val PAGE_LIMIT = 25
