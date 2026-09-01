@@ -26885,13 +26885,14 @@ generation != cameraFallbackGeneration
                         "화면 음성 명령과 보행의 다른 기능은 계속 사용할 수 있습니다.",
                 )
                 updateNavigationStatus(
-                    "voice_hands_free=transcriber_limited error=${failure.error.name.lowercase()}",
+                    "voice_hands_free=transcriber_limited_${failure.statusToken}",
                 )
             }
-            is HandsFreeVoiceTerminalFailure.Internal -> {
+            HandsFreeVoiceTerminalFailure.CommandDispatchFailed,
+            HandsFreeVoiceTerminalFailure.OutputTimeout,
+            -> {
                 updateNavigationStatus(
-                    "voice_hands_free=internal_restart " +
-                        "reason=${failure.reason.name.lowercase()}",
+                    "voice_hands_free=internal_restart_${failure.statusToken}",
                 )
                 scheduleHandsFreeVoiceRestart()
             }

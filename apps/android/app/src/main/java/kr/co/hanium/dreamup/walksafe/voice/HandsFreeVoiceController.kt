@@ -16,15 +16,44 @@ internal data class HandsFreeVoiceEligibility(
 )
 
 internal sealed interface HandsFreeVoiceTerminalFailure {
-    data class Transcriber(val error: VoskStreamingError) : HandsFreeVoiceTerminalFailure
-    data class Internal(
-        val reason: HandsFreeVoiceInternalFailure,
-    ) : HandsFreeVoiceTerminalFailure
+    val statusToken: String
+
+    data class Transcriber(val error: VoskStreamingError) : HandsFreeVoiceTerminalFailure {
+        override val statusToken: String = when (error) {
+            VoskStreamingError.MODEL_UNAVAILABLE -> "model_unavailable"
+            VoskStreamingError.MODEL_LOAD_FAILED -> "model_load_failed"
+            VoskStreamingError.AUDIO_START_FAILED -> "audio_start_failed"
+            VoskStreamingError.AUDIO_READ_FAILED -> "audio_read_failed"
+            VoskStreamingError.INFERENCE_FAILED -> "inference_failed"
+        }
+    }
+
+    data object CommandDispatchFailed : HandsFreeVoiceTerminalFailure {
+        override val statusToken: String = "command_dispatch_failed"
+    }
+
+    data object OutputTimeout : HandsFreeVoiceTerminalFailure {
+        override val statusToken: String = "output_timeout"
+    }
 }
 
-internal enum class HandsFreeVoiceInternalFailure {
-    COMMAND_DISPATCH_FAILED,
-    OUTPUT_TIMEOUT,
+internal object HandsFreeVoiceRunCallbackFence {
+    fun acceptsReady(closed: Boolean, startingRunId: Long?, callbackRunId: Long): Boolean =
+        !closed && startingRunId == callbackRunId
+
+    fun acceptsError(
+        closed: Boolean,
+        startingRunId: Long?,
+        activeRunId: Long?,
+        callbackRunId: Long,
+    ): Boolean = !closed && (activeRunId ?: startingRunId) == callbackRunId
+}
+
+internal fun notifyHandsFreeVoiceTerminalFailure(
+    failure: HandsFreeVoiceTerminalFailure,
+    callback: (HandsFreeVoiceTerminalFailure) -> Unit,
+) {
+    runCatching { callback(failure) }
 }
 
 /** Binds the pure wake/command lifecycle to one continuous on-device Vosk stream. */
@@ -42,8 +71,10 @@ internal class HandsFreeVoiceController(
 ) : WalkVoiceSessionController, Closeable {
     private val stateMachine = HandsFreeVoiceStateMachine()
     private var activeRunId: Long? = null
+    private var startingRunId: Long? = null
     private var starting = false
     private var closed = false
+    private var terminalFailureDelivered = false
     private var commandTimeout: Runnable? = null
     private var outputPoll: Runnable? = null
     private var outputObserved = false
@@ -81,17 +112,27 @@ internal class HandsFreeVoiceController(
             return false
         }
         activeRunId = null
+        startingRunId = null
         starting = true
+        terminalFailureDelivered = false
         onStatus("voice_hands_free=model_loading")
-        transcriber.start()
-        return true
+        val runReserved = transcriber.start { runId ->
+            startingRunId = runId
+        } != null
+        if (!runReserved) {
+            endSessionWithoutRestart("transcriber_start_rejected")
+            return false
+        }
+        return starting || activeRunId != null
     }
 
     override fun stop() {
         checkMainThread()
         if (closed) return
         activeRunId = null
+        startingRunId = null
         starting = false
+        terminalFailureDelivered = true
         cancelScheduledWork()
         stateMachine.stop()
         transcriber.stop()
@@ -103,14 +144,17 @@ internal class HandsFreeVoiceController(
         if (closed) return
         closed = true
         activeRunId = null
+        startingRunId = null
         starting = false
+        terminalFailureDelivered = true
         cancelScheduledWork()
         stateMachine.stop()
         transcriber.close()
     }
 
     private fun handleReady(runId: Long) {
-        if (closed || !starting) return
+        if (!HandsFreeVoiceRunCallbackFence.acceptsReady(closed, startingRunId, runId)) return
+        startingRunId = null
         starting = false
         val current = eligibility()
         if (!current.allowsListening()) {
@@ -199,7 +243,7 @@ internal class HandsFreeVoiceController(
         } catch (_: RuntimeException) {
             failClosed(
                 processing.generation,
-                HandsFreeVoiceInternalFailure.COMMAND_DISPATCH_FAILED,
+                HandsFreeVoiceTerminalFailure.CommandDispatchFailed,
             )
             return
         }
@@ -256,7 +300,7 @@ internal class HandsFreeVoiceController(
                 return@Runnable
             }
             if (nowMs - outputWaitStartedAtMs >= MAX_OUTPUT_WAIT_MS) {
-                failClosed(generation, HandsFreeVoiceInternalFailure.OUTPUT_TIMEOUT)
+                failClosed(generation, HandsFreeVoiceTerminalFailure.OutputTimeout)
                 return@Runnable
             }
             mainHandler.postDelayed(poll, OUTPUT_POLL_MS)
@@ -274,36 +318,40 @@ internal class HandsFreeVoiceController(
     }
 
     private fun handleError(runId: Long, error: VoskStreamingError) {
-        if (closed) return
-        if (activeRunId != null) {
-            if (activeRunId != runId) return
-        } else if (!starting) {
-            return
-        }
+        if (
+            !HandsFreeVoiceRunCallbackFence.acceptsError(
+                closed = closed,
+                startingRunId = startingRunId,
+                activeRunId = activeRunId,
+                callbackRunId = runId,
+            ) || terminalFailureDelivered
+        ) return
+        terminalFailureDelivered = true
         activeRunId = null
+        startingRunId = null
         starting = false
         cancelScheduledWork()
         val generation = stateMachine.snapshot().generation
         stateMachine.onError(generation)
         transcriber.stop()
         preserveStopStatus = true
-        onStatus("voice_hands_free=error ${error.name.lowercase()}")
-        runCatching {
-            onTerminalFailure(HandsFreeVoiceTerminalFailure.Transcriber(error))
-        }
+        val failure = HandsFreeVoiceTerminalFailure.Transcriber(error)
+        onStatus("voice_hands_free=error_${failure.statusToken}")
+        notifyHandsFreeVoiceTerminalFailure(failure, onTerminalFailure)
     }
 
-    private fun failClosed(generation: Long, reason: HandsFreeVoiceInternalFailure) {
+    private fun failClosed(generation: Long, failure: HandsFreeVoiceTerminalFailure) {
+        if (terminalFailureDelivered) return
+        terminalFailureDelivered = true
         cancelScheduledWork()
         stateMachine.onError(generation)
         activeRunId = null
+        startingRunId = null
         starting = false
         transcriber.stop()
         preserveStopStatus = true
-        onStatus("voice_hands_free=error ${reason.name.lowercase()}")
-        runCatching {
-            onTerminalFailure(HandsFreeVoiceTerminalFailure.Internal(reason))
-        }
+        onStatus("voice_hands_free=error_${failure.statusToken}")
+        notifyHandsFreeVoiceTerminalFailure(failure, onTerminalFailure)
     }
 
     private fun shouldSuppressInput(): Boolean {
@@ -325,7 +373,9 @@ internal class HandsFreeVoiceController(
 
     private fun endSessionWithoutRestart(reason: String) {
         activeRunId = null
+        startingRunId = null
         starting = false
+        terminalFailureDelivered = true
         cancelScheduledWork()
         stateMachine.stop()
         transcriber.stop()
