@@ -35,6 +35,27 @@ public final class AdminIncidentModelsTest {
     }
 
     @Test
+    public void parsesStrictBoundedHistoryPageAndRejectsSnapshotDrift() throws Exception {
+        AdminIncidentModels.HistoryPage page = AdminIncidentModels.parseHistoryPage(
+            historyJson(), INCIDENT
+        );
+
+        assertEquals(INCIDENT, page.incident().incidentId());
+        assertEquals(1, page.snapshotRevision());
+        assertEquals(1, page.totalCount());
+        assertEquals(1, page.items().size());
+        assertEquals("OPENED", page.items().get(0).eventType());
+
+        assertThrows(IOException.class, () -> AdminIncidentModels.parseHistoryPage(
+            historyJson().replace("\"total_count\":1", "\"total_count\":2"), INCIDENT
+        ));
+        assertThrows(IOException.class, () -> AdminIncidentModels.parseHistoryPage(
+            historyJson().replace("\"items\":[", "\"private_log\":\"secret\",\"items\":["),
+            INCIDENT
+        ));
+    }
+
+    @Test
     public void statusRequestRequiresExactTransitionEvidenceAndCanonicalIdempotency() {
         AdminIncidentModels.StatusRequest request = new AdminIncidentModels.StatusRequest(
             "ACKNOWLEDGED",
@@ -81,5 +102,25 @@ public final class AdminIncidentModelsTest {
             + "\"evidence_sha256\":\"" + SHA + "\","
             + "\"observed_at\":\"2026-08-29T00:01:00Z\","
             + "\"recorded_at\":\"2026-08-29T00:01:01Z\",\"actor_id\":null}]}";
+    }
+
+    static String historyJson() {
+        return "{\"schema_version\":\"walksafe.admin-incident-history-page.v1\","
+            + "\"incident\":{"
+            + "\"incident_id\":\"" + INCIDENT + "\",\"severity\":\"CRITICAL\","
+            + "\"status\":\"OPEN\",\"status_version\":1,"
+            + "\"reason_code\":\"USER_SAFETY_RISK\",\"summary\":\"안전 안내 기능 중단\","
+            + "\"started_at\":\"2026-08-29T00:00:00Z\","
+            + "\"detected_at\":\"2026-08-29T00:01:00Z\","
+            + "\"updated_at\":\"2026-08-29T00:01:00Z\"},"
+            + "\"allowed_next_states\":[\"ACKNOWLEDGED\"],"
+            + "\"snapshot_revision\":1,\"total_count\":1,\"items\":[{"
+            + "\"event_id\":\"" + EVENT + "\",\"revision\":1,\"event_type\":\"OPENED\","
+            + "\"previous_state\":null,\"next_state\":\"OPEN\","
+            + "\"reason\":\"USER_SAFETY_RISK\",\"observation\":\"안전 안내 기능 중단\","
+            + "\"evidence_sha256\":\"" + SHA + "\","
+            + "\"observed_at\":\"2026-08-29T00:01:00Z\","
+            + "\"recorded_at\":\"2026-08-29T00:01:01Z\",\"actor_id\":null}],"
+            + "\"next_cursor\":null}";
     }
 }

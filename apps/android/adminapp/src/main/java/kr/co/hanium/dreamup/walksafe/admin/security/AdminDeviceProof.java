@@ -144,6 +144,7 @@ public final class AdminDeviceProof {
                     || "admin.report_deletion.external_copy.list".equals(readPurpose)
                     || "admin.incident.list".equals(readPurpose)
                     || "admin.incident.detail".equals(readPurpose)
+                    || "admin.incident.history".equals(readPurpose)
                     || "admin.audit.list".equals(readPurpose))) {
                     throw new IllegalArgumentException("protected read proof fields do not match the contract");
                 }

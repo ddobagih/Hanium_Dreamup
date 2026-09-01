@@ -36,22 +36,22 @@ public final class AdminOperationsHttpClientTest {
         assertOperationPair(
             transport.requests.get(0), transport.requests.get(1),
             "POST", "/reports/" + REPORT_ID + "/review-decisions",
-            "report.review.decide", null
+            "report.review.decide", null, ""
         );
         assertOperationPair(
             transport.requests.get(2), transport.requests.get(3),
-            "GET", "/reports/" + REPORT_ID + "/review-decisions",
-            null, "report.review_decisions"
+            "GET", "/reports/" + REPORT_ID + "/review-decisions/history",
+            null, "report.review_decisions", "limit=25"
         );
         assertOperationPair(
             transport.requests.get(4), transport.requests.get(5),
             "POST", "/reports/" + REPORT_ID + "/deliveries",
-            "report.delivery.create", null
+            "report.delivery.create", null, ""
         );
         assertOperationPair(
             transport.requests.get(6), transport.requests.get(7),
-            "GET", "/reports/" + REPORT_ID + "/deliveries",
-            null, "report.delivery_events"
+            "GET", "/reports/" + REPORT_ID + "/deliveries/history",
+            null, "report.delivery_events", "limit=25"
         );
         assertEquals(4, signer.payloads.size());
         assertEquals(Integer.valueOf(1), reviewRead.returnedItemCount());
@@ -140,6 +140,116 @@ public final class AdminOperationsHttpClientTest {
     }
 
     @Test
+    public void historyCursorUsesCanonicalQueryHashAndNoStoreWithoutEnteringProofPath()
+        throws Exception {
+        FakeTransport transport = new FakeTransport();
+        client(transport, new CapturingSigner()).readReviewDecisions(
+            SESSION, REPORT_ID, "cursor_A"
+        );
+
+        Request challengeRequest = transport.requests.get(0);
+        Request historyRequest = transport.requests.get(1);
+        JSONObject challenge = new JSONObject(challengeRequest.bodyText());
+        String query = "cursor=cursor_A&limit=25";
+        assertEquals(
+            "/reports/" + REPORT_ID + "/review-decisions/history",
+            challenge.getString("path")
+        );
+        assertEquals(
+            AdminCanonicalEncoding.sha256Hex(query.getBytes(StandardCharsets.UTF_8)),
+            challenge.getString("query_sha256")
+        );
+        assertEquals(ORIGIN + challenge.getString("path") + "?" + query, historyRequest.url);
+        assertEquals("no-store", historyRequest.headers.get("Cache-Control"));
+        assertEquals("no-cache", historyRequest.headers.get("Pragma"));
+    }
+
+    @Test
+    public void historyStatusAndPageIntegrityFailuresAreTypedOrRejected() {
+        FakeTransport invalidCursor = new FakeTransport();
+        invalidCursor.readStatus = 422;
+        assertThrows(AdminOperationsApi.HistoryCursorException.class, () ->
+            client(invalidCursor, new CapturingSigner())
+                .readReviewDecisions(SESSION, REPORT_ID, "stale_cursor")
+        );
+
+        FakeTransport missing = new FakeTransport();
+        missing.readStatus = 404;
+        assertThrows(AdminOperationsApi.HistoryNotFoundException.class, () ->
+            client(missing, new CapturingSigner()).readDeliveries(SESSION, REPORT_ID)
+        );
+
+        FakeTransport inconsistent = new FakeTransport();
+        inconsistent.reviewHistoryOverride = FakeTransport.reviewHistoryJson().replace(
+            "\"total_count\":1", "\"total_count\":2"
+        );
+        assertThrows(IOException.class, () -> client(inconsistent, new CapturingSigner())
+            .readReviewDecisions(SESSION, REPORT_ID));
+    }
+
+    @Test
+    public void deliveryHistoryAcceptsNullableLegacyPackageAndLongRevisions() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        transport.deliveryHistoryOverride = FakeTransport.deliveryHistoryJson()
+            .replace("\"snapshot_revision\":1,\"total_count\":1", "\"snapshot_revision\":2147483648,\"total_count\":2147483648")
+            .replace("\"package_id\":\"cccccccc-cccc-4ccc-8ccc-cccccccccccc\"", "\"package_id\":null")
+            .replace("\"package_revision\":1", "\"package_revision\":null")
+            .replace("\"revision\":1", "\"revision\":2147483648")
+            .replace("\"expected_revision\":0", "\"expected_revision\":2147483647");
+
+        AdminOperationsApi.Result result = client(transport, new CapturingSigner())
+            .readDeliveries(SESSION, REPORT_ID, "cursor_A");
+
+        assertEquals(2_147_483_648L, result.snapshotRevision());
+        assertEquals(2_147_483_648L, result.deliveryHistory().get(0).revision());
+        assertNull(result.deliveryHistory().get(0).packageRevision());
+    }
+
+    @Test
+    public void deliveryHistoryAllowsInitialStatusWhenPackageChanges() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        JSONObject page = new JSONObject(FakeTransport.deliveryHistoryJson());
+        JSONObject second = new JSONObject(page.getJSONArray("items").getJSONObject(0).toString());
+        second.put("id", "dddddddd-dddd-4ddd-8ddd-dddddddddddd");
+        second.put("package_id", "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee");
+        second.put("package_revision", 2);
+        second.put("revision", 2);
+        second.put("expected_revision", 1);
+        second.put("idempotency_key", "88888888-8888-4888-8888-888888888888");
+        second.put("correlation_id", "99999999-9999-4999-8999-999999999999");
+        page.put("snapshot_revision", 2);
+        page.put("total_count", 2);
+        page.getJSONArray("items").put(second);
+        transport.deliveryHistoryOverride = page.toString();
+
+        AdminOperationsApi.Result result = client(transport, new CapturingSigner())
+            .readDeliveries(SESSION, REPORT_ID);
+
+        assertEquals(2, result.deliveryHistory().size());
+        assertEquals("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            result.deliveryHistory().get(1).packageId());
+    }
+
+    @Test
+    public void firstHistoryPageRejectsMissingRevisionPrefixAndAcceptsLongContentRevision()
+        throws Exception {
+        FakeTransport missingPrefix = new FakeTransport();
+        missingPrefix.reviewHistoryOverride = FakeTransport.reviewHistoryJson()
+            .replace("\"snapshot_revision\":1,\"total_count\":1",
+                "\"snapshot_revision\":2,\"total_count\":2")
+            .replace("\"revision\":1,", "\"revision\":2,");
+        assertThrows(IOException.class, () -> client(missingPrefix, new CapturingSigner())
+            .readReviewDecisions(SESSION, REPORT_ID));
+
+        FakeTransport longContentRevision = new FakeTransport();
+        longContentRevision.reviewHistoryOverride = FakeTransport.reviewHistoryJson().replace(
+            "\"content_revision\":0", "\"content_revision\":2147483648"
+        );
+        assertEquals(1, client(longContentRevision, new CapturingSigner())
+            .readReviewDecisions(SESSION, REPORT_ID).reviewHistory().size());
+    }
+
+    @Test
     public void historyRequiresStrictArrayExactFieldsAndAppendOnlyRevision() {
         FakeTransport duplicate = new FakeTransport();
         duplicate.reviewHistoryOverride = FakeTransport.reviewHistoryJson().replace(
@@ -205,7 +315,8 @@ public final class AdminOperationsHttpClientTest {
             "POST",
             "/reports/" + REPORT_ID + "/original-access-grants",
             AdminOperationsHttpClient.ORIGINAL_GRANT_ACTION,
-            null
+            null,
+            ""
         );
         Request grantRequest = transport.requests.get(1);
         JSONObject grantBody = new JSONObject(grantRequest.bodyText());
@@ -384,7 +495,8 @@ public final class AdminOperationsHttpClientTest {
         String method,
         String path,
         String action,
-        String readPurpose
+        String readPurpose,
+        String canonicalQuery
     ) throws Exception {
         assertEquals("POST", challengeRequest.method);
         assertEquals(ORIGIN + AdminOperationsHttpClient.CHALLENGE_PATH, challengeRequest.url);
@@ -397,9 +509,16 @@ public final class AdminOperationsHttpClientTest {
         else assertEquals(action, challenge.getString("action"));
         if (readPurpose == null) assertTrue(challenge.isNull("read_purpose"));
         else assertEquals(readPurpose, challenge.getString("read_purpose"));
+        assertEquals(
+            AdminCanonicalEncoding.sha256Hex(canonicalQuery.getBytes(StandardCharsets.UTF_8)),
+            challenge.getString("query_sha256")
+        );
 
         assertEquals(method, operationRequest.method);
-        assertEquals(ORIGIN + path, operationRequest.url);
+        assertEquals(
+            ORIGIN + path + (canonicalQuery.isEmpty() ? "" : "?" + canonicalQuery),
+            operationRequest.url
+        );
         assertEquals("Bearer " + ACCESS_TOKEN, operationRequest.headers.get("Authorization"));
         assertEquals("ADMIN_ANDROID", operationRequest.headers.get("X-WalkSafe-App-Kind"));
         assertEquals("ADMIN", operationRequest.headers.get("X-WalkSafe-Role"));
@@ -414,6 +533,10 @@ public final class AdminOperationsHttpClientTest {
         );
         assertFalse(operationRequest.headers.get(AdminDeviceProof.SIGNATURE_HEADER).contains("="));
         assertEquals(readPurpose, operationRequest.headers.get(AdminOperationsHttpClient.READ_PURPOSE_HEADER));
+        if (readPurpose != null) {
+            assertEquals("no-store", operationRequest.headers.get("Cache-Control"));
+            assertEquals("no-cache", operationRequest.headers.get("Pragma"));
+        }
     }
 
     private static AdminOperationsHttpClient client(FakeTransport transport, CapturingSigner signer) {
@@ -596,13 +719,13 @@ public final class AdminOperationsHttpClientTest {
                     grantOverride == null ? grantJson() : grantOverride
                 );
             }
-            if ("GET".equals(method) && url.endsWith("/review-decisions")) {
+            if ("GET".equals(method) && url.contains("/review-decisions/history?")) {
                 return new AdminOperationsHttpClient.Response(
                     readStatus,
                     reviewHistoryOverride == null ? reviewHistoryJson() : reviewHistoryOverride
                 );
             }
-            if ("GET".equals(method) && url.endsWith("/deliveries")) {
+            if ("GET".equals(method) && url.contains("/deliveries/history?")) {
                 return new AdminOperationsHttpClient.Response(
                     readStatus,
                     deliveryHistoryOverride == null ? deliveryHistoryJson() : deliveryHistoryOverride
@@ -650,7 +773,9 @@ public final class AdminOperationsHttpClientTest {
 
         private static String reviewHistoryJson() {
             return """
-                [{
+                {"schema_version":"walksafe.report-review-decision-page.v1",
+                "report_id":"44444444-4444-4444-8444-444444444444",
+                "snapshot_revision":1,"total_count":1,"items":[{
                   "id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                   "report_id":"44444444-4444-4444-8444-444444444444",
                   "revision":1,
@@ -668,13 +793,15 @@ public final class AdminOperationsHttpClientTest {
                   "correlation_id":"66666666-6666-4666-8666-666666666666",
                   "decided_at":"2026-08-09T01:00:00Z",
                   "created_at":"2026-08-09T01:00:00Z"
-                }]
+                }],"next_cursor":null}
                 """;
         }
 
         private static String deliveryHistoryJson() {
             return """
-                [{
+                {"schema_version":"walksafe.report-delivery-event-page.v1",
+                "report_id":"44444444-4444-4444-8444-444444444444",
+                "snapshot_revision":1,"total_count":1,"items":[{
                   "id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
                   "report_id":"44444444-4444-4444-8444-444444444444",
                   "review_decision_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -696,7 +823,7 @@ public final class AdminOperationsHttpClientTest {
                   "device_id":"admin-device-12345678-1234-1234-1234-123456789abc",
                   "correlation_id":"77777777-7777-4777-8777-777777777777",
                   "recorded_at":"2026-08-09T01:02:04Z"
-                }]
+                }],"next_cursor":null}
                 """;
         }
 

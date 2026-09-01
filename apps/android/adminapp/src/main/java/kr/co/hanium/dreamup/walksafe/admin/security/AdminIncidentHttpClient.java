@@ -20,10 +20,12 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
     static final String CHALLENGE_PATH = "/admin/security/device-proof/challenges";
     static final String LIST_PURPOSE = "admin.incident.list";
     static final String DETAIL_PURPOSE = "admin.incident.detail";
+    static final String HISTORY_PURPOSE = "admin.incident.history";
     static final String STATUS_ACTION = "admin.incident.status.update";
     private static final String CORRELATION_ID_HEADER = "X-WalkSafe-Correlation-Id";
     private static final String READ_PURPOSE_HEADER = "X-WalkSafe-Read-Purpose";
     private static final int MAX_RESPONSE_BYTES = 128 * 1024;
+    private static final int MAX_HISTORY_RESPONSE_BYTES = 96 * 1024;
     private static final byte[] EMPTY_BODY = new byte[0];
 
     interface Clock { long nowEpochMs(); }
@@ -140,6 +142,44 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
         if (response.statusCode == 404) throw new NotFoundException();
         requireStatus(response, 200);
         return AdminIncidentModels.parseDetail(jsonBody(response), safeId);
+    }
+
+    @Override
+    public AdminIncidentModels.HistoryPage history(
+        AdminOperationsApi.SessionContext session,
+        String incidentId,
+        String cursor
+    ) throws IOException, GeneralSecurityException {
+        String safeId = canonicalHistoryUuid(incidentId);
+        List<AdminCanonicalEncoding.QueryParameter> parameters = new ArrayList<>();
+        parameters.add(new AdminCanonicalEncoding.QueryParameter(
+            "limit", Integer.toString(AdminIncidentModels.PAGE_SIZE)
+        ));
+        if (cursor != null) {
+            if (!cursor.matches("[A-Za-z0-9_-]{1,1024}")) {
+                throw new IllegalArgumentException("incident history cursor is invalid");
+            }
+            parameters.add(new AdminCanonicalEncoding.QueryParameter("cursor", cursor));
+        }
+        String query = AdminCanonicalEncoding.canonicalQuery(parameters);
+        Response response = executeProtected(
+            requireSession(session), "GET", LIST_PATH + "/" + safeId + "/history",
+            query, null, HISTORY_PURPOSE, EMPTY_BODY,
+            AdminJava8Collections.map(
+                "Cache-Control", "no-store",
+                "Pragma", "no-cache"
+            )
+        );
+        if (response.statusCode == 404) throw new NotFoundException();
+        if (response.statusCode == 422) throw new HistoryCursorException();
+        requireStatus(response, 200);
+        AdminIncidentModels.HistoryPage page = AdminIncidentModels.parseHistoryPage(
+            jsonBody(response, MAX_HISTORY_RESPONSE_BYTES), safeId
+        );
+        if (cursor == null && page.items().get(0).revision() != 1) {
+            throw new IOException("incident history first page is not contiguous");
+        }
+        return page;
     }
 
     @Override
@@ -287,12 +327,25 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
     }
 
     private static String jsonBody(Response response) throws IOException {
+        return jsonBody(response, MAX_RESPONSE_BYTES);
+    }
+
+    private static String jsonBody(Response response, int maximumBytes) throws IOException {
         if (response.contentType == null
             || !response.contentType.toLowerCase(Locale.ROOT).startsWith("application/json")
-            || response.body.length > MAX_RESPONSE_BYTES) {
+            || response.body.length > maximumBytes) {
             throw new IOException("administrator incident JSON response is invalid");
         }
         return AdminStrictJson.decodeUtf8(response.body);
+    }
+
+    private static String canonicalHistoryUuid(String value) {
+        String canonical = AdminIncidentModels.canonicalUuid(value, "incident_id");
+        UUID parsed = UUID.fromString(canonical);
+        if (parsed.variant() != 2 || parsed.version() < 1 || parsed.version() > 5) {
+            throw new IllegalArgumentException("incident_id is not a supported canonical UUID");
+        }
+        return canonical;
     }
 
     private static final class UrlConnectionTransport implements Transport {

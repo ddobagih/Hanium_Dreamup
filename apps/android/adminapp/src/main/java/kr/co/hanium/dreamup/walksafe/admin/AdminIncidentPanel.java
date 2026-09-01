@@ -23,6 +23,7 @@ public final class AdminIncidentPanel extends LinearLayout {
     public interface Listener {
         void onApplyStatus(String status);
         void onLoadMore();
+        void onLoadMoreHistory();
         void onOpenDetail(String incidentId);
         void onRetry();
         void onUpdateStatus(
@@ -52,7 +53,9 @@ public final class AdminIncidentPanel extends LinearLayout {
     private final Button retryButton;
     private final LinearLayout detailGroup;
     private final TextView detailText;
+    private final TextView historyStateText;
     private final LinearLayout events;
+    private final Button historyMoreButton;
     private final EditText reasonInput;
     private final EditText observationInput;
     private final EditText evidenceInput;
@@ -115,8 +118,14 @@ public final class AdminIncidentPanel extends LinearLayout {
         detailGroup.addView(detailHeading, matchWrap());
         detailText = text("", 15);
         detailGroup.addView(detailText, matchWrap());
+        historyStateText = text("상태 이력: 조회 전", 15);
+        historyStateText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        detailGroup.addView(historyStateText, matchWrap());
         events = vertical();
         detailGroup.addView(events, matchWrap());
+        historyMoreButton = button("다음 이력 불러오기");
+        historyMoreButton.setOnClickListener(view -> listener.onLoadMoreHistory());
+        detailGroup.addView(historyMoreButton, matchWrap());
 
         detailGroup.addView(text(
             "상태 변경은 현재 허용된 다음 단계만 기록할 수 있습니다. 사유와 관찰에는 개인정보, 정확한 위치, 음성·영상 또는 원로그를 입력하지 마세요.",
@@ -163,7 +172,9 @@ public final class AdminIncidentPanel extends LinearLayout {
             case IDLE -> "조회 전입니다.";
             case LOADING_LIST -> "중대 사고 기록을 불러오는 중입니다…";
             case LOADING_MORE -> "다음 중대 사고 기록을 불러오는 중입니다…";
-            case LOADING_DETAIL -> "중대 사고 상세 이력을 불러오는 중입니다…";
+            case LOADING_DETAIL -> "중대 사고 상세와 첫 상태 이력을 불러오는 중입니다…";
+            case LOADING_HISTORY -> "중대 사고 상태 이력을 첫 페이지부터 다시 불러오는 중입니다…";
+            case LOADING_HISTORY_MORE -> "다음 중대 사고 상태 이력을 불러오는 중입니다…";
             case CONTENT -> "중대 사고 " + state.items().size() + "건을 표시합니다.";
             case EMPTY -> "조건에 맞는 실제 중대 사고 기록이 없습니다. '모든 상태'로 다시 조회해 보세요.";
             case ERROR -> "중대 사고 기록을 불러오지 못했습니다. '중대 사고 조회 다시 시도'를 누르세요. " + state.errorMessage();
@@ -172,11 +183,20 @@ public final class AdminIncidentPanel extends LinearLayout {
         moreButton.setVisibility(state.canLoadMore() ? VISIBLE : GONE);
         retryButton.setVisibility(state.phase() == AdminIncidentController.Phase.ERROR ? VISIBLE : GONE);
         renderItems(state.items());
+        selectedIncidentId = state.selectedIncidentId();
         AdminIncidentModels.Detail detail = state.detail();
         detailGroup.setVisibility(detail == null ? GONE : VISIBLE);
         if (detail != null) {
-            selectedIncidentId = detail.summary().incidentId();
-            renderDetail(detail);
+            renderDetail(detail, state.historyItems());
+            historyStateText.setText(
+                "상태 이력 " + state.historyItems().size() + "/"
+                    + state.historyTotalCount() + "건을 불러왔습니다."
+                    + (state.historyNextCursor() == null ? " 전체 이력 조회 완료." : "")
+            );
+            historyMoreButton.setVisibility(state.canLoadMoreHistory() ? VISIBLE : GONE);
+        }
+        if (state.errorMessage() != null && state.phase() != AdminIncidentController.Phase.ERROR) {
+            stateText.append(" " + state.errorMessage());
         }
     }
 
@@ -219,7 +239,10 @@ public final class AdminIncidentPanel extends LinearLayout {
         }
     }
 
-    private void renderDetail(AdminIncidentModels.Detail detail) {
+    private void renderDetail(
+        AdminIncidentModels.Detail detail,
+        List<AdminIncidentModels.Event> history
+    ) {
         AdminIncidentModels.Summary summary = detail.summary();
         detailText.setText(
             "CRITICAL · " + statusIcon(summary.status()) + " " + statusLabel(summary.status())
@@ -231,7 +254,7 @@ public final class AdminIncidentPanel extends LinearLayout {
                 + "\n사고 ID: " + summary.incidentId()
         );
         events.removeAllViews();
-        for (AdminIncidentModels.Event event : detail.events()) {
+        for (AdminIncidentModels.Event event : history) {
             TextView eventText = text(
                 "기록 " + event.revision() + " · " + statusIcon(event.nextState())
                     + " " + statusLabel(event.nextState())
@@ -372,7 +395,9 @@ public final class AdminIncidentPanel extends LinearLayout {
     private static boolean isLoading(AdminIncidentController.Phase phase) {
         return phase == AdminIncidentController.Phase.LOADING_LIST
             || phase == AdminIncidentController.Phase.LOADING_MORE
-            || phase == AdminIncidentController.Phase.LOADING_DETAIL;
+            || phase == AdminIncidentController.Phase.LOADING_DETAIL
+            || phase == AdminIncidentController.Phase.LOADING_HISTORY
+            || phase == AdminIncidentController.Phase.LOADING_HISTORY_MORE;
     }
 
     private LayoutParams wrapCentered() {

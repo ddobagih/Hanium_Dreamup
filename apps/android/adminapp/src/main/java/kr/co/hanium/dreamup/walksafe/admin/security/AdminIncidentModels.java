@@ -14,6 +14,7 @@ import java.util.UUID;
 public final class AdminIncidentModels {
     public static final String LIST_SCHEMA = "walksafe.admin-incident-list.v1";
     public static final String DETAIL_SCHEMA = "walksafe.admin-incident-detail.v1";
+    public static final String HISTORY_SCHEMA = "walksafe.admin-incident-history-page.v1";
     public static final String STATUS_SCHEMA = "walksafe.admin-incident-status.v1";
     public static final int PAGE_SIZE = 25;
 
@@ -170,6 +171,38 @@ public final class AdminIncidentModels {
         }
 
         public List<Summary> items() { return items; }
+        public String nextCursor() { return nextCursor; }
+    }
+
+    public static final class HistoryPage {
+        private final Summary incident;
+        private final List<String> allowedNextStates;
+        private final int snapshotRevision;
+        private final int totalCount;
+        private final List<Event> items;
+        private final String nextCursor;
+
+        private HistoryPage(
+            Summary incident,
+            List<String> allowedNextStates,
+            int snapshotRevision,
+            int totalCount,
+            List<Event> items,
+            String nextCursor
+        ) {
+            this.incident = incident;
+            this.allowedNextStates = AdminJava8Collections.copyList(allowedNextStates);
+            this.snapshotRevision = snapshotRevision;
+            this.totalCount = totalCount;
+            this.items = AdminJava8Collections.copyList(items);
+            this.nextCursor = nextCursor;
+        }
+
+        public Summary incident() { return incident; }
+        public List<String> allowedNextStates() { return allowedNextStates; }
+        public int snapshotRevision() { return snapshotRevision; }
+        public int totalCount() { return totalCount; }
+        public List<Event> items() { return items; }
         public String nextCursor() { return nextCursor; }
     }
 
@@ -335,6 +368,78 @@ public final class AdminIncidentModels {
             throw new IOException("incident current projection is not bound to its history");
         }
         return new Detail(summary, allowed, events);
+    }
+
+    public static HistoryPage parseHistoryPage(String body, String expectedIncidentId)
+        throws IOException {
+        String safeId = canonicalUuid(expectedIncidentId, "incident_id");
+        Map<String, Object> root = AdminStrictJson.parseObject(body);
+        exact(root, AdminJava8Collections.set(
+            "schema_version", "incident", "allowed_next_states", "snapshot_revision",
+            "total_count", "items", "next_cursor"
+        ));
+        if (!HISTORY_SCHEMA.equals(text(root, "schema_version", 64))) {
+            throw new IOException("unsupported incident history schema");
+        }
+        Summary incident = new Summary(object(root, "incident"));
+        if (!safeId.equals(incident.incidentId())) {
+            throw new IOException("incident history id is mismatched");
+        }
+        List<String> allowed = allowedStates(root, "allowed_next_states", incident.status());
+        int snapshot = integer(root, "snapshot_revision", 1, 256);
+        int total = integer(root, "total_count", 1, 256);
+        if (snapshot != total || incident.statusVersion() != snapshot) {
+            throw new IOException("incident history snapshot is inconsistent");
+        }
+        Object rawItems = root.get("items");
+        if (!(rawItems instanceof List<?> values) || values.isEmpty()
+            || values.size() > PAGE_SIZE) {
+            throw new IOException("incident history page items are invalid");
+        }
+        List<Event> items = new ArrayList<>(values.size());
+        Set<String> eventIds = new HashSet<>();
+        Event previous = null;
+        for (Object value : values) {
+            if (!(value instanceof Map<?, ?> eventValue)) {
+                throw new IOException("incident history event is invalid");
+            }
+            Event event = new Event(stringObject(eventValue));
+            if (!eventIds.add(event.eventId())
+                || (previous != null && (event.revision() != previous.revision() + 1
+                    || !previous.nextState().equals(event.previousState())))) {
+                throw new IOException("incident history page is not contiguous");
+            }
+            items.add(event);
+            previous = event;
+        }
+        String cursor = nullableText(root, "next_cursor", 1024);
+        if (cursor != null && !cursor.matches("[A-Za-z0-9_-]{1,1024}")) {
+            throw new IOException("incident history cursor is invalid");
+        }
+        Event last = items.get(items.size() - 1);
+        if (last.revision() > snapshot
+            || (cursor == null && (last.revision() != snapshot
+                || !incident.status().equals(last.nextState())))
+            || (cursor != null && last.revision() >= snapshot)) {
+            throw new IOException("incident history page boundary is inconsistent");
+        }
+        return new HistoryPage(incident, allowed, snapshot, total, items, cursor);
+    }
+
+    public static Detail bindDetailToHistory(Detail detail, HistoryPage history)
+        throws IOException {
+        if (detail == null || history == null
+            || !detail.summary().incidentId().equals(history.incident().incidentId())) {
+            throw new IOException("incident detail and history are mismatched");
+        }
+        return new Detail(history.incident(), history.allowedNextStates(), detail.events());
+    }
+
+    public static Detail detailFromHistory(HistoryPage history) {
+        if (history == null) throw new IllegalArgumentException("incident history is required");
+        return new Detail(
+            history.incident(), history.allowedNextStates(), AdminJava8Collections.list()
+        );
     }
 
     public static StatusSnapshot parseStatus(String body, String expectedIncidentId) throws IOException {

@@ -121,6 +121,65 @@ public final class AdminIncidentHttpClientTest {
         ));
     }
 
+    @Test
+    public void historyUsesCanonicalQueryProofNoStoreAndTypedFailures() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        AdminIncidentModels.HistoryPage page = client(transport).history(
+            SESSION, INCIDENT, "cursor_A"
+        );
+
+        assertEquals(2, transport.requests.size());
+        Map<String, Object> proof = AdminStrictJson.parseObject(
+            transport.requests.get(0).bodyText()
+        );
+        Request request = transport.requests.get(1);
+        String query = "cursor=cursor_A&limit=25";
+        assertEquals("admin.incident.history", proof.get("read_purpose"));
+        assertEquals("/admin/incidents/" + INCIDENT + "/history", proof.get("path"));
+        assertEquals(
+            AdminCanonicalEncoding.sha256Hex(query.getBytes(StandardCharsets.UTF_8)),
+            proof.get("query_sha256")
+        );
+        assertEquals(
+            "http://127.0.0.1:8000/admin/incidents/" + INCIDENT + "/history?" + query,
+            request.url
+        );
+        assertEquals("no-store", request.headers.get("Cache-Control"));
+        assertEquals("no-cache", request.headers.get("Pragma"));
+        assertEquals(1, page.totalCount());
+
+        FakeTransport stale = new FakeTransport();
+        stale.historyStatus = 422;
+        assertThrows(AdminIncidentRepository.HistoryCursorException.class, () ->
+            client(stale).history(SESSION, INCIDENT, "cursor_A")
+        );
+        FakeTransport missing = new FakeTransport();
+        missing.historyStatus = 404;
+        assertThrows(AdminIncidentRepository.NotFoundException.class, () ->
+            client(missing).history(SESSION, INCIDENT, null)
+        );
+    }
+
+    @Test
+    public void firstHistoryRequestRejectsAValidLookingPageWithoutOpeningRevision() {
+        FakeTransport transport = new FakeTransport();
+        transport.historyBody = AdminIncidentModelsTest.historyJson()
+            .replace("\"status\":\"OPEN\"", "\"status\":\"ACKNOWLEDGED\"")
+            .replace("\"status_version\":1", "\"status_version\":2")
+            .replace("[\"ACKNOWLEDGED\"]", "[\"RESOLVED\"]")
+            .replace("\"snapshot_revision\":1,\"total_count\":1",
+                "\"snapshot_revision\":2,\"total_count\":2")
+            .replace("\"revision\":1", "\"revision\":2")
+            .replace("\"event_type\":\"OPENED\"", "\"event_type\":\"ACKNOWLEDGED\"")
+            .replace("\"previous_state\":null", "\"previous_state\":\"OPEN\"")
+            .replace("\"next_state\":\"OPEN\"", "\"next_state\":\"ACKNOWLEDGED\"")
+            .replace("\"actor_id\":null", "\"actor_id\":\"admin-001\"");
+
+        assertThrows(IOException.class, () -> client(transport).history(
+            SESSION, INCIDENT, null
+        ));
+    }
+
     private static AdminIncidentHttpClient client(FakeTransport transport) {
         return new AdminIncidentHttpClient(
             "http://127.0.0.1:8000",
@@ -136,6 +195,8 @@ public final class AdminIncidentHttpClientTest {
     private static final class FakeTransport implements AdminIncidentHttpClient.Transport {
         final List<Request> requests = new ArrayList<>();
         String listBody = listJson();
+        String historyBody = AdminIncidentModelsTest.historyJson();
+        int historyStatus = 200;
         boolean conflict;
 
         @Override
@@ -175,6 +236,9 @@ public final class AdminIncidentHttpClientTest {
                 return conflict
                     ? new AdminIncidentHttpClient.Response(409, conflictJson())
                     : new AdminIncidentHttpClient.Response(200, statusJson());
+            }
+            if (url.contains("/history?")) {
+                return new AdminIncidentHttpClient.Response(historyStatus, historyBody);
             }
             if (url.contains("?")) return new AdminIncidentHttpClient.Response(200, listBody);
             return new AdminIncidentHttpClient.Response(200, AdminIncidentModelsTest.detailJson());

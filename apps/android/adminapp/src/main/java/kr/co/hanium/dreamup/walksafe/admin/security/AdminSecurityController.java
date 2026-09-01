@@ -629,12 +629,21 @@ public final class AdminSecurityController implements AutoCloseable {
 
     public synchronized AdminOperationsApi.Result readReviewDecisions(
         String reportId,
+        String cursor,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
         return requireOperationsApi().readReviewDecisions(
             requireOperationalSession(operationalWorkflowsEnabled),
-            reportId
+            reportId,
+            cursor
         );
+    }
+
+    public synchronized AdminOperationsApi.Result readReviewDecisions(
+        String reportId,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return readReviewDecisions(reportId, null, operationalWorkflowsEnabled);
     }
 
     public synchronized AdminOperationsApi.Result recordDelivery(
@@ -651,12 +660,21 @@ public final class AdminSecurityController implements AutoCloseable {
 
     public synchronized AdminOperationsApi.Result readDeliveries(
         String reportId,
+        String cursor,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
         return requireOperationsApi().readDeliveries(
             requireOperationalSession(operationalWorkflowsEnabled),
-            reportId
+            reportId,
+            cursor
         );
+    }
+
+    public synchronized AdminOperationsApi.Result readDeliveries(
+        String reportId,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return readDeliveries(reportId, null, operationalWorkflowsEnabled);
     }
 
     public synchronized AdminReportModels.Page listAdminReports(
@@ -782,6 +800,18 @@ public final class AdminSecurityController implements AutoCloseable {
         return requireIncidentRepository().detail(
             requireOperationalSession(operationalWorkflowsEnabled),
             incidentId
+        );
+    }
+
+    public synchronized AdminIncidentModels.HistoryPage getAdminIncidentHistory(
+        String incidentId,
+        String cursor,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireIncidentRepository().history(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            incidentId,
+            cursor
         );
     }
 

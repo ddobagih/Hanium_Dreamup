@@ -755,7 +755,7 @@ public final class AdminSecurityControllerTest {
         }
 
         @Override
-        public Result readReviewDecisions(SessionContext session, String reportId) {
+        public Result readReviewDecisions(SessionContext session, String reportId, String cursor) {
             throw new UnsupportedOperationException();
         }
 
@@ -765,7 +765,7 @@ public final class AdminSecurityControllerTest {
         }
 
         @Override
-        public Result readDeliveries(SessionContext session, String reportId) {
+        public Result readDeliveries(SessionContext session, String reportId, String cursor) {
             throw new UnsupportedOperationException();
         }
 

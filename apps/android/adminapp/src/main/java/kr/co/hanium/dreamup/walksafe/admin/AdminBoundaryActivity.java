@@ -32,8 +32,10 @@ import java.time.Instant;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -188,10 +190,26 @@ public final class AdminBoundaryActivity extends Activity {
     private EditText idempotencyKeyInput;
     private CheckBox manualDeliveryCompletedInput;
     private Button reconnectDeliveryPackageButton;
+    private TextView reviewHistoryStatusText;
+    private Button reviewHistoryNextButton;
+    private TextView deliveryHistoryStatusText;
+    private Button deliveryHistoryNextButton;
     private Button revokeCurrentButton;
     private LinearLayout contentRoot;
     private boolean operationInFlight;
     private boolean recordingDelivery;
+    private final List<AdminOperationsApi.ReviewHistoryItem> reviewHistoryItems =
+        new ArrayList<>();
+    private String reviewHistoryNextCursor;
+    private long reviewHistorySnapshotRevision = -1L;
+    private long reviewHistoryTotalCount;
+    private boolean reviewHistoryNeedsFirstPage;
+    private final List<AdminOperationsApi.DeliveryHistoryItem> deliveryHistoryItems =
+        new ArrayList<>();
+    private String deliveryHistoryNextCursor;
+    private long deliveryHistorySnapshotRevision = -1L;
+    private long deliveryHistoryTotalCount;
+    private boolean deliveryHistoryNeedsFirstPage;
     private AdminDeliveryPackage pendingDeliveryPackage;
     private AdminDeliveryPackageSaver.Saved verifiedDeliveryPackage;
     private AdminOriginalEvidence originalEvidence;
@@ -214,6 +232,7 @@ public final class AdminBoundaryActivity extends Activity {
     private boolean operationsAccessBindingInitialized;
     private volatile boolean boundOperationsAccessActive;
     private volatile long operationsSessionGeneration;
+    private long reportHistoryGeneration;
     private volatile long safSaveGeneration;
     private volatile long safReconnectGeneration;
     private long pendingSafSaveGeneration = -1L;
@@ -455,10 +474,13 @@ public final class AdminBoundaryActivity extends Activity {
                         }
 
                         @Override
-                        public AdminIncidentModels.Detail loadDetail(String incidentId)
-                            throws Exception {
-                            return controller.getAdminIncidentDetail(
+                        public AdminIncidentModels.HistoryPage loadHistory(
+                            String incidentId,
+                            String cursor
+                        ) throws Exception {
+                            return controller.getAdminIncidentHistory(
                                 incidentId,
+                                cursor,
                                 BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                             );
                         }
@@ -999,6 +1021,11 @@ public final class AdminBoundaryActivity extends Activity {
             }
 
             @Override
+            public void onLoadMoreHistory() {
+                loadNextIncidentHistoryPage();
+            }
+
+            @Override
             public void onOpenDetail(String incidentId) {
                 loadIncidentDetail(incidentId);
             }
@@ -1159,8 +1186,15 @@ public final class AdminBoundaryActivity extends Activity {
         reviewButton.setOnClickListener(view -> recordReviewDecision());
         reportOperationsFormGroup.addView(reviewButton, matchWrap());
         Button reviewHistoryButton = button("검토 결정 이력 확인");
-        reviewHistoryButton.setOnClickListener(view -> readReviewDecisions());
+        reviewHistoryButton.setOnClickListener(view -> readReviewDecisions(false));
         reportOperationsFormGroup.addView(reviewHistoryButton, matchWrap());
+        reviewHistoryStatusText = text("검토 결정 이력: 조회 전", 15);
+        reviewHistoryStatusText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        reportOperationsFormGroup.addView(reviewHistoryStatusText, matchWrap());
+        reviewHistoryNextButton = button("다음 이력 불러오기");
+        reviewHistoryNextButton.setOnClickListener(view -> readReviewDecisions(true));
+        reviewHistoryNextButton.setVisibility(View.GONE);
+        reportOperationsFormGroup.addView(reviewHistoryNextButton, matchWrap());
 
         TextView deliveryHeading = text("3. 기관 수동 제출·접수 기록", 20);
         deliveryHeading.setPadding(0, 28, 0, 4);
@@ -1226,8 +1260,15 @@ public final class AdminBoundaryActivity extends Activity {
         deliveryButton.setOnClickListener(view -> recordDelivery());
         reportOperationsFormGroup.addView(deliveryButton, matchWrap());
         Button deliveryHistoryButton = button("수동 전달 상태 이력 확인");
-        deliveryHistoryButton.setOnClickListener(view -> readDeliveries());
+        deliveryHistoryButton.setOnClickListener(view -> readDeliveries(false));
         reportOperationsFormGroup.addView(deliveryHistoryButton, matchWrap());
+        deliveryHistoryStatusText = text("수동 전달 상태 이력: 조회 전", 15);
+        deliveryHistoryStatusText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        reportOperationsFormGroup.addView(deliveryHistoryStatusText, matchWrap());
+        deliveryHistoryNextButton = button("다음 이력 불러오기");
+        deliveryHistoryNextButton.setOnClickListener(view -> readDeliveries(true));
+        deliveryHistoryNextButton.setVisibility(View.GONE);
+        reportOperationsFormGroup.addView(deliveryHistoryNextButton, matchWrap());
         group.addView(reportOperationsFormGroup, matchWrap());
 
         TextView requiredParallelHeading = text("필수 병행 업무", 22);
@@ -1576,11 +1617,18 @@ public final class AdminBoundaryActivity extends Activity {
         if (!bitmap.isRecycled()) bitmap.recycle();
     }
 
-    private void readReviewDecisions() {
+    private void readReviewDecisions(boolean nextPage) {
         try {
             String reportId = requireConnectedOperationsReportId();
-            runOperationalOperation("검토 결정 이력을 확인하고 있습니다.", () ->
-                controller.readReviewDecisions(reportId, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED)
+            boolean firstPage = !nextPage || reviewHistoryNeedsFirstPage;
+            if (!firstPage && reviewHistoryNextCursor == null) {
+                throw new IllegalStateException("불러올 다음 검토 결정 이력이 없습니다.");
+            }
+            runReportHistoryOperation(
+                true,
+                firstPage,
+                reportId,
+                firstPage ? null : reviewHistoryNextCursor
             );
         } catch (IllegalStateException error) {
             resultText.setText(error.getMessage());
@@ -1651,15 +1699,271 @@ public final class AdminBoundaryActivity extends Activity {
         }
     }
 
-    private void readDeliveries() {
+    private void readDeliveries(boolean nextPage) {
         try {
             String reportId = requireConnectedOperationsReportId();
-            runOperationalOperation("수동 전달 상태 이력을 확인하고 있습니다.", () ->
-                controller.readDeliveries(reportId, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED)
+            boolean firstPage = !nextPage || deliveryHistoryNeedsFirstPage;
+            if (!firstPage && deliveryHistoryNextCursor == null) {
+                throw new IllegalStateException("불러올 다음 수동 전달 상태 이력이 없습니다.");
+            }
+            runReportHistoryOperation(
+                false,
+                firstPage,
+                reportId,
+                firstPage ? null : deliveryHistoryNextCursor
             );
         } catch (IllegalStateException error) {
             resultText.setText(error.getMessage());
         }
+    }
+
+    private void runReportHistoryOperation(
+        boolean review,
+        boolean firstPage,
+        String reportId,
+        String cursor
+    ) {
+        if (controller == null || operationInFlight) return;
+        long generation = reportHistoryGeneration;
+        operationInFlight = true;
+        setInteractiveEnabled(contentRoot, false);
+        resultText.setText(review
+            ? "검토 결정 이력을 확인하고 있습니다."
+            : "수동 전달 상태 이력을 확인하고 있습니다.");
+        networkExecutor.execute(() -> {
+            try {
+                AdminOperationsApi.Result result = review
+                    ? controller.readReviewDecisions(
+                        reportId, cursor, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    )
+                    : controller.readDeliveries(
+                        reportId, cursor, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    );
+                runOnUiThread(() -> {
+                    if (isDestroyed() || generation != reportHistoryGeneration
+                        || !reportId.equals(connectedOperationsReportId)) return;
+                    operationInFlight = false;
+                    setInteractiveEnabled(contentRoot, true);
+                    try {
+                        applyReportHistoryPage(review, firstPage, cursor, result);
+                        resultText.setText(review
+                            ? "검토 결정 이력을 갱신했습니다."
+                            : "수동 전달 상태 이력을 갱신했습니다.");
+                    } catch (IOException error) {
+                        resultText.setText(
+                            "이력 페이지 무결성을 확인하지 못했습니다. 기존 이력은 유지했습니다."
+                        );
+                    }
+                    renderReportHistory();
+                });
+            } catch (AdminOperationsApi.HistoryCursorException error) {
+                runOnUiThread(() -> finishHistoryFailure(
+                    generation, reportId, review, true,
+                    "이력 페이지 기준이 만료되었습니다. 기존 이력은 유지했으며 첫 페이지부터 다시 조회해 주세요."
+                ));
+            } catch (AdminOperationsApi.HistoryNotFoundException error) {
+                runOnUiThread(() -> {
+                    if (isDestroyed() || generation != reportHistoryGeneration) return;
+                    operationInFlight = false;
+                    setInteractiveEnabled(contentRoot, true);
+                    clearConnectedOperationsSelection();
+                    resultText.setText(
+                        "선택한 신고가 더 이상 존재하지 않아 업무 연결을 해제했습니다."
+                    );
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> finishHistoryFailure(
+                    generation, reportId, review, false,
+                    "이력 페이지를 불러오지 못했습니다. 기존 이력과 다음 페이지 위치는 유지했습니다."
+                ));
+            }
+        });
+    }
+
+    private void applyReportHistoryPage(
+        boolean review,
+        boolean firstPage,
+        String requestedCursor,
+        AdminOperationsApi.Result result
+    ) throws IOException {
+        if (result == null || !java.util.Objects.equals(result.reportId(), connectedOperationsReportId)
+            || result.snapshotRevision() != result.totalCount()
+            || (requestedCursor != null && requestedCursor.equals(result.nextCursor()))) {
+            throw new IOException("report history page binding is invalid");
+        }
+        if (review) {
+            if (result.kind() != AdminOperationsApi.ResultKind.REVIEW_HISTORY
+                || (!firstPage && (result.snapshotRevision() != reviewHistorySnapshotRevision
+                    || result.totalCount() != reviewHistoryTotalCount))) {
+                throw new IOException("review history snapshot is invalid");
+            }
+            List<AdminOperationsApi.ReviewHistoryItem> combined = new ArrayList<>();
+            if (!firstPage) combined.addAll(reviewHistoryItems);
+            long expectedRevision = combined.isEmpty()
+                ? 1L : combined.get(combined.size() - 1).revision() + 1L;
+            for (AdminOperationsApi.ReviewHistoryItem item : result.reviewHistory()) {
+                if (item.revision() != expectedRevision++) {
+                    throw new IOException("review history pages are not contiguous");
+                }
+                combined.add(item);
+            }
+            requireLoadedCount(combined.size(), result.totalCount(), result.nextCursor());
+            reviewHistoryItems.clear();
+            reviewHistoryItems.addAll(combined);
+            reviewHistorySnapshotRevision = result.snapshotRevision();
+            reviewHistoryTotalCount = result.totalCount();
+            reviewHistoryNextCursor = result.nextCursor();
+            reviewHistoryNeedsFirstPage = false;
+            return;
+        }
+        if (result.kind() != AdminOperationsApi.ResultKind.DELIVERY_HISTORY
+            || (!firstPage && (result.snapshotRevision() != deliveryHistorySnapshotRevision
+                || result.totalCount() != deliveryHistoryTotalCount))) {
+            throw new IOException("delivery history snapshot is invalid");
+        }
+        List<AdminOperationsApi.DeliveryHistoryItem> combined = new ArrayList<>();
+        if (!firstPage) combined.addAll(deliveryHistoryItems);
+        long expectedRevision = combined.isEmpty()
+            ? 1L : combined.get(combined.size() - 1).revision() + 1L;
+        AdminOperationsApi.DeliveryHistoryItem previous = combined.isEmpty()
+            ? null : combined.get(combined.size() - 1);
+        for (AdminOperationsApi.DeliveryHistoryItem item : result.deliveryHistory()) {
+            if (item.revision() != expectedRevision++
+                || !validDeliveryHistoryTransition(previous, item)) {
+                throw new IOException("delivery history pages are not contiguous");
+            }
+            combined.add(item);
+            previous = item;
+        }
+        requireLoadedCount(combined.size(), result.totalCount(), result.nextCursor());
+        deliveryHistoryItems.clear();
+        deliveryHistoryItems.addAll(combined);
+        deliveryHistorySnapshotRevision = result.snapshotRevision();
+        deliveryHistoryTotalCount = result.totalCount();
+        deliveryHistoryNextCursor = result.nextCursor();
+        deliveryHistoryNeedsFirstPage = false;
+    }
+
+    private static void requireLoadedCount(int loaded, long total, String nextCursor)
+        throws IOException {
+        if (loaded > total || (nextCursor == null && loaded != total)
+            || (nextCursor != null && loaded >= total)) {
+            throw new IOException("report history loaded count is invalid");
+        }
+    }
+
+    private void finishHistoryFailure(
+        long generation,
+        String reportId,
+        boolean review,
+        boolean reloadFirstPage,
+        String message
+    ) {
+        if (isDestroyed() || generation != reportHistoryGeneration
+            || !reportId.equals(connectedOperationsReportId)) return;
+        operationInFlight = false;
+        setInteractiveEnabled(contentRoot, true);
+        if (reloadFirstPage) {
+            if (review) reviewHistoryNeedsFirstPage = true;
+            else deliveryHistoryNeedsFirstPage = true;
+        }
+        resultText.setText(message);
+        renderReportHistory();
+    }
+
+    private void renderReportHistory() {
+        if (reviewHistoryStatusText != null) {
+            reviewHistoryStatusText.setText(historyText(
+                "검토 결정 이력",
+                reviewHistoryItems,
+                reviewHistoryTotalCount,
+                reviewHistorySnapshotRevision >= 0L
+            ));
+        }
+        if (reviewHistoryNextButton != null) {
+            reviewHistoryNextButton.setText(
+                reviewHistoryNeedsFirstPage ? "첫 페이지 다시 불러오기" : "다음 이력 불러오기"
+            );
+            reviewHistoryNextButton.setVisibility(
+                reviewHistoryNeedsFirstPage || reviewHistoryNextCursor != null
+                    ? View.VISIBLE : View.GONE
+            );
+        }
+        if (deliveryHistoryStatusText != null) {
+            deliveryHistoryStatusText.setText(deliveryHistoryText());
+        }
+        if (deliveryHistoryNextButton != null) {
+            deliveryHistoryNextButton.setText(
+                deliveryHistoryNeedsFirstPage ? "첫 페이지 다시 불러오기" : "다음 이력 불러오기"
+            );
+            deliveryHistoryNextButton.setVisibility(
+                deliveryHistoryNeedsFirstPage || deliveryHistoryNextCursor != null
+                    ? View.VISIBLE : View.GONE
+            );
+        }
+    }
+
+    private static String historyText(
+        String title,
+        List<AdminOperationsApi.ReviewHistoryItem> items,
+        long total,
+        boolean loaded
+    ) {
+        if (!loaded) return title + ": 조회 전";
+        StringBuilder message = new StringBuilder(title)
+            .append(" ").append(items.size()).append("/").append(total).append("건");
+        for (AdminOperationsApi.ReviewHistoryItem item : items) {
+            message.append("\n\nrevision ").append(item.revision())
+                .append(" / ").append(item.decision())
+                .append("\n결정시각: ").append(item.decidedAt())
+                .append("\n내부 사유: ").append(item.reason())
+                .append("\n사용자 공개 사유: ")
+                .append(item.userVisibleReason() == null ? "없음" : item.userVisibleReason());
+            if (item.duplicateOfReportId() != null) {
+                message.append("\n중복 대상: ").append(item.duplicateOfReportId());
+            }
+        }
+        return message.toString();
+    }
+
+    private String deliveryHistoryText() {
+        if (deliveryHistorySnapshotRevision < 0L) return "수동 전달 상태 이력: 조회 전";
+        StringBuilder message = new StringBuilder("수동 전달 상태 이력 ")
+            .append(deliveryHistoryItems.size()).append("/")
+            .append(deliveryHistoryTotalCount).append("건");
+        for (AdminOperationsApi.DeliveryHistoryItem item : deliveryHistoryItems) {
+            message.append("\n\nrevision ").append(item.revision())
+                .append(" / status ").append(item.status())
+                .append(" / package revision ")
+                .append(item.packageRevision() == null ? "없음" : item.packageRevision())
+                .append("\n기관: ").append(item.institution())
+                .append("\n관찰시각: ").append(item.observedAt())
+                .append("\n서버 기록시각: ").append(item.recordedAt())
+                .append("\n외부 접수번호: ")
+                .append(item.externalReceiptId() == null ? "없음" : item.externalReceiptId());
+        }
+        return message.toString();
+    }
+
+    private static boolean validDeliveryHistoryTransition(
+        AdminOperationsApi.DeliveryHistoryItem previous,
+        AdminOperationsApi.DeliveryHistoryItem next
+    ) {
+        boolean samePackage = previous != null
+            && java.util.Objects.equals(previous.packageId(), next.packageId())
+            && java.util.Objects.equals(previous.packageRevision(), next.packageRevision());
+        if (!samePackage) {
+            return next.status() == AdminInstitutionDelivery.Status.SUBMITTED
+                || next.status() == AdminInstitutionDelivery.Status.FAILED;
+        }
+        return switch (previous.status()) {
+            case FAILED -> next.status() == AdminInstitutionDelivery.Status.FAILED
+                || next.status() == AdminInstitutionDelivery.Status.SUBMITTED;
+            case SUBMITTED -> next.status() == AdminInstitutionDelivery.Status.ACKNOWLEDGED
+                || next.status() == AdminInstitutionDelivery.Status.FAILED;
+            case ACKNOWLEDGED -> next.status() == AdminInstitutionDelivery.Status.RESOLVED;
+            case RESOLVED -> false;
+        };
     }
 
     private void runOperationalOperation(String pendingMessage, OperationalOperation operation) {
@@ -1720,7 +2024,8 @@ public final class AdminBoundaryActivity extends Activity {
             for (AdminOperationsApi.DeliveryHistoryItem item : result.deliveryHistory()) {
                 message.append("\n\nrevision ").append(item.revision())
                     .append(" / status ").append(item.status())
-                    .append(" / package revision ").append(item.packageRevision())
+                    .append(" / package revision ")
+                    .append(item.packageRevision() == null ? "없음" : item.packageRevision())
                     .append("\n기관: ").append(item.institution())
                     .append("\n관찰시각: ").append(item.observedAt())
                     .append("\n서버 기록시각: ").append(item.recordedAt())
@@ -2246,6 +2551,7 @@ public final class AdminBoundaryActivity extends Activity {
 
     private void resetSessionBoundReportState() {
         operationsSessionGeneration += 1L;
+        reportHistoryGeneration += 1L;
         safSaveGeneration += 1L;
         safReconnectGeneration += 1L;
         clearPendingSafBinding();
@@ -2259,6 +2565,7 @@ public final class AdminBoundaryActivity extends Activity {
         connectedOperationsDeliveryRevision = -1;
         connectedOperationsPackageRevision = null;
         connectedOperationsDeliveryStatus = null;
+        resetReportHistoryState();
         if (reportOperationsFormGroup != null) {
             reportOperationsFormGroup.setVisibility(View.GONE);
         }
@@ -2292,6 +2599,41 @@ public final class AdminBoundaryActivity extends Activity {
         if (reportWorkflowController != null) reportWorkflowController.clearSessionState();
         if (auditController != null) auditController.clearSessionState();
         if (incidentController != null) incidentController.clearSessionState();
+    }
+
+    private void resetReportHistoryState() {
+        reviewHistoryItems.clear();
+        reviewHistoryNextCursor = null;
+        reviewHistorySnapshotRevision = -1L;
+        reviewHistoryTotalCount = 0L;
+        reviewHistoryNeedsFirstPage = false;
+        deliveryHistoryItems.clear();
+        deliveryHistoryNextCursor = null;
+        deliveryHistorySnapshotRevision = -1L;
+        deliveryHistoryTotalCount = 0L;
+        deliveryHistoryNeedsFirstPage = false;
+        renderReportHistory();
+    }
+
+    private void clearConnectedOperationsSelection() {
+        reportHistoryGeneration += 1L;
+        invalidatePendingDeliveryPackageWork();
+        verifiedDeliveryPackage = null;
+        clearOriginalEvidence("선택한 신고가 없어 원본 증거를 지웠습니다.");
+        connectedOperationsReportId = null;
+        connectedOperationsContentRevision = -1;
+        connectedOperationsReviewRevision = -1;
+        connectedOperationsReviewDecision = null;
+        connectedOperationsLatestDeliveryRevision = -1;
+        connectedOperationsDeliveryRevision = -1;
+        connectedOperationsPackageRevision = null;
+        connectedOperationsDeliveryStatus = null;
+        clear(reportIdInput);
+        resetOperationsInputsForDifferentReport();
+        resetReportHistoryState();
+        if (reportOperationsFormGroup != null) {
+            reportOperationsFormGroup.setVisibility(View.GONE);
+        }
     }
 
     private String requireConnectedOperationsReportId() {
@@ -2329,6 +2671,8 @@ public final class AdminBoundaryActivity extends Activity {
                 || connectedOperationsLatestDeliveryRevision
                     != detail.latestDeliveryRevision());
         if (reportChanged || contentRevisionChanged || reviewChanged) {
+            reportHistoryGeneration += 1L;
+            resetReportHistoryState();
             invalidatePendingDeliveryPackageWork();
             verifiedDeliveryPackage = null;
             clearOriginalEvidence(
@@ -2340,6 +2684,8 @@ public final class AdminBoundaryActivity extends Activity {
             );
             resetOperationsInputsForDifferentReport();
         } else if (deliveryTupleChanged) {
+            reportHistoryGeneration += 1L;
+            resetReportHistoryState();
             invalidatePendingDeliveryPackageWork();
             resetPackageBoundDeliveryDraft();
         }
@@ -2837,6 +3183,15 @@ public final class AdminBoundaryActivity extends Activity {
             executeIncidentRequest(incidentController.beginDetail(incidentId));
         } catch (IllegalArgumentException error) {
             resultText.setText("상세를 확인할 중대 사고 UUID가 올바르지 않습니다.");
+        }
+    }
+
+    private void loadNextIncidentHistoryPage() {
+        if (incidentController == null) return;
+        try {
+            executeIncidentRequest(incidentController.beginNextHistoryPage());
+        } catch (IllegalStateException error) {
+            resultText.setText("불러올 다음 중대 사고 상태 이력이 없습니다.");
         }
     }
 

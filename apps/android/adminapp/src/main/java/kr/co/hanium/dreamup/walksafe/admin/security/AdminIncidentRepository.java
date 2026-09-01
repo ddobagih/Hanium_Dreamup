@@ -10,6 +10,10 @@ public interface AdminIncidentRepository {
         public NotFoundException() { super("administrator incident was not found"); }
     }
 
+    final class HistoryCursorException extends IOException {
+        public HistoryCursorException() { super("administrator incident history cursor is invalid"); }
+    }
+
     final class StatusConflictException extends IOException {
         private final AdminIncidentModels.StatusConflict latest;
 
@@ -31,6 +35,12 @@ public interface AdminIncidentRepository {
     AdminIncidentModels.Detail detail(
         AdminOperationsApi.SessionContext session,
         String incidentId
+    ) throws IOException, GeneralSecurityException;
+
+    AdminIncidentModels.HistoryPage history(
+        AdminOperationsApi.SessionContext session,
+        String incidentId,
+        String cursor
     ) throws IOException, GeneralSecurityException;
 
     AdminIncidentModels.StatusSnapshot updateStatus(

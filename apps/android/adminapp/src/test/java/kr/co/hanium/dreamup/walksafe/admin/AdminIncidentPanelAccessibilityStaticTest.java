@@ -23,6 +23,7 @@ public final class AdminIncidentPanelAccessibilityStaticTest {
         assertTrue(source.contains("ACCESSIBILITY_LIVE_REGION_POLITE"));
         assertTrue(source.contains("자동 복구나 자동 제어를 수행하지 않습니다"));
         assertTrue(source.contains("개인정보, 정확한 위치, 음성·영상 또는 원로그를 입력하지 마세요"));
+        assertTrue(source.contains("selectedIncidentId = state.selectedIncidentId()"));
         assertFalse(source.contains("자동 재제출"));
         assertFalse(source.contains("사고 생성"));
     }

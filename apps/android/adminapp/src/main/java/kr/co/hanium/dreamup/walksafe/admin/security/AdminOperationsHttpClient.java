@@ -28,7 +28,8 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     static final String ORIGINAL_ACCESS_GRANT_HEADER = "X-WalkSafe-Original-Access-Grant";
     static final String REVIEW_READ_PURPOSE = "report.review_decisions";
     static final String DELIVERY_READ_PURPOSE = "report.delivery_events";
-    private static final int MAX_HISTORY_ITEMS = 256;
+    private static final int HISTORY_PAGE_SIZE = 25;
+    private static final int MAX_HISTORY_RESPONSE_BYTES = 48 * 1024;
     private static final int MAX_CONSECUTIVE_ZERO_READS = 3;
 
     private enum HistoryType {
@@ -150,6 +151,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             requireSession(session),
             "POST",
             "/reports/" + safeReportId + "/review-decisions",
+            "",
             REVIEW_ACTION,
             null,
             decision.requestBody(safeReportId),
@@ -158,18 +160,22 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     }
 
     @Override
-    public Result readReviewDecisions(SessionContext session, String reportId)
+    public Result readReviewDecisions(SessionContext session, String reportId, String cursor)
         throws IOException, GeneralSecurityException {
-        String safeReportId = AdminReportDecision.canonicalUuid(reportId, "report_id");
-        return executeProtected(
+        String safeReportId = canonicalHistoryUuid(reportId);
+        String query = historyQuery(cursor);
+        Result result = executeProtected(
             requireSession(session),
             "GET",
-            "/reports/" + safeReportId + "/review-decisions",
+            "/reports/" + safeReportId + "/review-decisions/history",
+            query,
             null,
             REVIEW_READ_PURPOSE,
             null,
             HistoryType.REVIEW
         );
+        requireFirstHistoryRevision(result, cursor);
+        return result;
     }
 
     @Override
@@ -181,6 +187,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             requireSession(session),
             "POST",
             "/reports/" + safeReportId + "/deliveries",
+            "",
             DELIVERY_ACTION,
             null,
             delivery.requestBody(),
@@ -189,18 +196,22 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     }
 
     @Override
-    public Result readDeliveries(SessionContext session, String reportId)
+    public Result readDeliveries(SessionContext session, String reportId, String cursor)
         throws IOException, GeneralSecurityException {
-        String safeReportId = AdminReportDecision.canonicalUuid(reportId, "report_id");
-        return executeProtected(
+        String safeReportId = canonicalHistoryUuid(reportId);
+        String query = historyQuery(cursor);
+        Result result = executeProtected(
             requireSession(session),
             "GET",
-            "/reports/" + safeReportId + "/deliveries",
+            "/reports/" + safeReportId + "/deliveries/history",
+            query,
             null,
             DELIVERY_READ_PURPOSE,
             null,
             HistoryType.DELIVERY
         );
+        requireFirstHistoryRevision(result, cursor);
+        return result;
     }
 
     @Override
@@ -313,6 +324,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         SessionContext session,
         String method,
         String path,
+        String canonicalQuery,
         String action,
         String readPurpose,
         byte[] body,
@@ -320,7 +332,6 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     ) throws IOException, GeneralSecurityException {
         String correlationId = UUID.randomUUID().toString();
         byte[] transmittedBody = body == null ? new byte[0] : body;
-        String emptyQuery = AdminCanonicalEncoding.canonicalQuery(AdminJava8Collections.list());
         AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
             action,
             session.adminId(),
@@ -332,7 +343,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             method,
             path,
             AdminDeviceProof.Purpose.ACTION,
-            AdminCanonicalEncoding.sha256Hex(emptyQuery.getBytes(StandardCharsets.UTF_8)),
+            AdminCanonicalEncoding.sha256Hex(canonicalQuery.getBytes(StandardCharsets.UTF_8)),
             readPurpose,
             session.sessionId()
         );
@@ -356,15 +367,25 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             protectedHeaders(session, correlationId, readPurpose)
         );
         operationHeaders.putAll(proof.proofHeaders());
+        if (historyType != HistoryType.NONE) {
+            operationHeaders.put("Cache-Control", "no-store");
+            operationHeaders.put("Pragma", "no-cache");
+        }
         Map<String, String> finalHeaders = body == null
             ? acceptHeaders(operationHeaders)
             : jsonHeaders(operationHeaders);
         Response operationResponse = transport.execute(
             method,
-            origin + path,
+            origin + path + (canonicalQuery.isEmpty() ? "" : "?" + canonicalQuery),
             finalHeaders,
             body
         );
+        if (historyType != HistoryType.NONE && operationResponse.statusCode == 404) {
+            throw new HistoryNotFoundException();
+        }
+        if (historyType != HistoryType.NONE && operationResponse.statusCode == 422) {
+            throw new HistoryCursorException();
+        }
         requireExactStatus(
             operationResponse.statusCode,
             "POST".equals(method) ? 201 : 200,
@@ -372,17 +393,29 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         );
         return switch (historyType) {
             case NONE -> new Result(correlationId, operationResponse.statusCode);
-            case REVIEW -> Result.reviewHistory(
-                correlationId,
-                operationResponse.statusCode,
-                parseReviewHistory(operationResponse.body, reportIdFromPath(path))
+            case REVIEW -> parseReviewHistory(
+                operationResponse.body, reportIdFromPath(path),
+                correlationId, operationResponse.statusCode
             );
-            case DELIVERY -> Result.deliveryHistory(
-                correlationId,
-                operationResponse.statusCode,
-                parseDeliveryHistory(operationResponse.body, reportIdFromPath(path))
+            case DELIVERY -> parseDeliveryHistory(
+                operationResponse.body, reportIdFromPath(path),
+                correlationId, operationResponse.statusCode
             );
         };
+    }
+
+    private static String historyQuery(String cursor) {
+        List<AdminCanonicalEncoding.QueryParameter> parameters = new ArrayList<>();
+        parameters.add(new AdminCanonicalEncoding.QueryParameter(
+            "limit", Integer.toString(HISTORY_PAGE_SIZE)
+        ));
+        if (cursor != null) {
+            if (!cursor.matches("[A-Za-z0-9_-]{1,1024}")) {
+                throw new IllegalArgumentException("administrator history cursor is invalid");
+            }
+            parameters.add(new AdminCanonicalEncoding.QueryParameter("cursor", cursor));
+        }
+        return AdminCanonicalEncoding.canonicalQuery(parameters);
     }
 
     private static AdminOriginalEvidence.IssuedGrant parseOriginalGrant(
@@ -641,10 +674,18 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         if (actual != expected) throw new IOException(operation + " returned unexpected status=" + actual);
     }
 
-    private static List<ReviewHistoryItem> parseReviewHistory(String body, String expectedReportId)
-        throws IOException {
-        List<Map<String, Object>> array = historyArray(body);
+    private static Result parseReviewHistory(
+        String body,
+        String expectedReportId,
+        String correlationId,
+        int statusCode
+    ) throws IOException {
+        HistoryEnvelope envelope = historyEnvelope(
+            body, expectedReportId, "walksafe.report-review-decision-page.v1"
+        );
+        List<Map<String, Object>> array = envelope.items;
         List<ReviewHistoryItem> result = new ArrayList<>(array.size());
+        long previousRevision = 0L;
         for (int index = 0; index < array.size(); index++) {
             Map<String, Object> item = array.get(index);
             requireExactKeys(item, AdminJava8Collections.set(
@@ -656,9 +697,12 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             requiredUuid(item, "id");
             String reportId = requiredUuid(item, "report_id");
             if (!expectedReportId.equals(reportId)) throw new IOException("review history report binding is invalid");
-            int revision = requiredInt(item, "revision", 1);
-            if (revision != index + 1) throw new IOException("review history revisions are not append-only");
-            requiredInt(item, "content_revision", 0);
+            long revision = requiredLong(item, "revision", 1L);
+            if (index > 0 && revision != previousRevision + 1L) {
+                throw new IOException("review history revisions are not contiguous");
+            }
+            previousRevision = revision;
+            requiredLong(item, "content_revision", 0L);
             AdminReportDecision.Decision decision = reviewDecision(requiredText(item, "decision", 16));
             String reason = requiredText(item, "reason", 500);
             String userVisibleReason = nullableText(item, "user_visible_reason", 500);
@@ -695,14 +739,28 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 decidedAt
             ));
         }
-        return AdminJava8Collections.copyList(result);
+        validateHistoryTail(envelope, previousRevision);
+        return Result.reviewHistory(
+            correlationId, statusCode, envelope.reportId, envelope.snapshotRevision,
+            envelope.totalCount, envelope.nextCursor, result
+        );
     }
 
-    private static List<DeliveryHistoryItem> parseDeliveryHistory(String body, String expectedReportId)
-        throws IOException {
-        List<Map<String, Object>> array = historyArray(body);
+    private static Result parseDeliveryHistory(
+        String body,
+        String expectedReportId,
+        String correlationId,
+        int statusCode
+    ) throws IOException {
+        HistoryEnvelope envelope = historyEnvelope(
+            body, expectedReportId, "walksafe.report-delivery-event-page.v1"
+        );
+        List<Map<String, Object>> array = envelope.items;
         List<DeliveryHistoryItem> result = new ArrayList<>(array.size());
         AdminInstitutionDelivery.Status previousStatus = null;
+        String previousPackageId = null;
+        Long previousPackageRevision = null;
+        long previousRevision = 0L;
         for (int index = 0; index < array.size(); index++) {
             Map<String, Object> item = array.get(index);
             requireExactKeys(item, AdminJava8Collections.set(
@@ -716,18 +774,34 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             String reportId = requiredUuid(item, "report_id");
             if (!expectedReportId.equals(reportId)) throw new IOException("delivery history report binding is invalid");
             requiredUuid(item, "review_decision_id");
-            requiredUuid(item, "package_id");
-            int packageRevision = requiredInt(item, "package_revision", 1);
-            int revision = requiredInt(item, "revision", 1);
-            if (revision != index + 1) throw new IOException("delivery history revisions are not append-only");
+            String packageId = nullableUuid(item, "package_id");
+            Long packageRevision = nullableLong(item, "package_revision", 1L);
+            if ((packageId == null) != (packageRevision == null)) {
+                throw new IOException("delivery history package binding is invalid");
+            }
+            long revision = requiredLong(item, "revision", 1L);
+            if (index > 0 && revision != previousRevision + 1L) {
+                throw new IOException("delivery history revisions are not contiguous");
+            }
             String institution = requiredText(item, "institution", 160);
             requiredText(item, "channel", 32);
             requiredText(item, "recipient", 255);
             AdminInstitutionDelivery.Status status = deliveryStatus(requiredText(item, "status", 16));
-            if (!validDeliveryTransition(previousStatus, status)) {
-                throw new IOException("delivery history transition is invalid");
+            if (revision == 1L && !validDeliveryTransition(null, status)) {
+                throw new IOException("delivery history initial status is invalid");
+            }
+            if (index > 0) {
+                AdminInstitutionDelivery.Status transitionBase = sameDeliveryPackage(
+                    previousPackageId, previousPackageRevision, packageId, packageRevision
+                ) ? previousStatus : null;
+                if (!validDeliveryTransition(transitionBase, status)) {
+                    throw new IOException("delivery history transition is invalid");
+                }
             }
             previousStatus = status;
+            previousPackageId = packageId;
+            previousPackageRevision = packageRevision;
+            previousRevision = revision;
             String receipt = nullableText(item, "external_receipt_id", 160);
             if ((status == AdminInstitutionDelivery.Status.ACKNOWLEDGED
                 || status == AdminInstitutionDelivery.Status.RESOLVED) && receipt == null) {
@@ -739,8 +813,8 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 throw new IOException("delivery history evidence hash is invalid");
             }
             String observedAt = requiredInstant(item, "observed_at", true);
-            int expectedRevision = requiredInt(item, "expected_revision", 0);
-            if (expectedRevision != revision - 1) {
+            long expectedRevision = requiredLong(item, "expected_revision", 0L);
+            if (expectedRevision != revision - 1L) {
                 throw new IOException("delivery history expected revision is invalid");
             }
             requiredUuid(item, "idempotency_key");
@@ -751,6 +825,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             String recordedAt = requiredInstant(item, "recorded_at", false);
             result.add(new DeliveryHistoryItem(
                 revision,
+                packageId,
                 packageRevision,
                 status,
                 receipt,
@@ -759,13 +834,112 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 recordedAt
             ));
         }
-        return AdminJava8Collections.copyList(result);
+        validateHistoryTail(envelope, previousRevision);
+        return Result.deliveryHistory(
+            correlationId, statusCode, envelope.reportId, envelope.snapshotRevision,
+            envelope.totalCount, envelope.nextCursor, result
+        );
     }
 
-    private static List<Map<String, Object>> historyArray(String body) throws IOException {
-        List<Map<String, Object>> array = AdminStrictJson.parseObjectArray(body);
-        if (array.size() > MAX_HISTORY_ITEMS) throw new IOException("administrator history is too large");
-        return array;
+    private static HistoryEnvelope historyEnvelope(
+        String body,
+        String expectedReportId,
+        String expectedSchema
+    ) throws IOException {
+        if (body.getBytes(StandardCharsets.UTF_8).length > MAX_HISTORY_RESPONSE_BYTES) {
+            throw new IOException("administrator history response is too large");
+        }
+        Map<String, Object> root = AdminStrictJson.parseObject(body);
+        requireExactKeys(root, AdminJava8Collections.set(
+            "schema_version", "report_id", "snapshot_revision", "total_count",
+            "items", "next_cursor"
+        ));
+        if (!expectedSchema.equals(requiredText(root, "schema_version", 64))) {
+            throw new IOException("administrator history schema is unsupported");
+        }
+        String reportId = requiredUuid(root, "report_id");
+        if (!expectedReportId.equals(reportId)) {
+            throw new IOException("administrator history report binding is invalid");
+        }
+        long snapshotRevision = requiredLong(root, "snapshot_revision", 0L);
+        long totalCount = requiredLong(root, "total_count", 0L);
+        if (snapshotRevision != totalCount) {
+            throw new IOException("administrator history snapshot is inconsistent");
+        }
+        Object rawItems = root.get("items");
+        if (!(rawItems instanceof List<?> values) || values.size() > HISTORY_PAGE_SIZE) {
+            throw new IOException("administrator history page items are invalid");
+        }
+        List<Map<String, Object>> items = new ArrayList<>(values.size());
+        for (Object value : values) {
+            if (!(value instanceof Map<?, ?> object)) {
+                throw new IOException("administrator history item is invalid");
+            }
+            items.add(stringObject(object));
+        }
+        String nextCursor = nullableText(root, "next_cursor", 1024);
+        if (nextCursor != null && !nextCursor.matches("[A-Za-z0-9_-]{1,1024}")) {
+            throw new IOException("administrator history cursor is invalid");
+        }
+        if ((totalCount == 0L) != items.isEmpty() || (totalCount == 0L && nextCursor != null)) {
+            throw new IOException("administrator history empty page is inconsistent");
+        }
+        return new HistoryEnvelope(
+            reportId, snapshotRevision, totalCount, nextCursor,
+            AdminJava8Collections.copyList(items)
+        );
+    }
+
+    private static void validateHistoryTail(HistoryEnvelope envelope, long lastRevision)
+        throws IOException {
+        if (envelope.totalCount == 0L) return;
+        if (lastRevision > envelope.snapshotRevision
+            || (envelope.nextCursor == null && lastRevision != envelope.snapshotRevision)
+            || (envelope.nextCursor != null && lastRevision >= envelope.snapshotRevision)) {
+            throw new IOException("administrator history page boundary is inconsistent");
+        }
+    }
+
+    private static String canonicalHistoryUuid(String value) {
+        String canonical = AdminReportDecision.canonicalUuid(value, "report_id");
+        UUID parsed = UUID.fromString(canonical);
+        if (parsed.variant() != 2 || parsed.version() < 1 || parsed.version() > 5) {
+            throw new IllegalArgumentException("report_id is not a supported canonical UUID");
+        }
+        return canonical;
+    }
+
+    private static Map<String, Object> stringObject(Map<?, ?> value) throws IOException {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : value.entrySet()) {
+            if (!(entry.getKey() instanceof String key)) {
+                throw new IOException("administrator history item key is invalid");
+            }
+            result.put(key, entry.getValue());
+        }
+        return result;
+    }
+
+    private static final class HistoryEnvelope {
+        final String reportId;
+        final long snapshotRevision;
+        final long totalCount;
+        final String nextCursor;
+        final List<Map<String, Object>> items;
+
+        HistoryEnvelope(
+            String reportId,
+            long snapshotRevision,
+            long totalCount,
+            String nextCursor,
+            List<Map<String, Object>> items
+        ) {
+            this.reportId = reportId;
+            this.snapshotRevision = snapshotRevision;
+            this.totalCount = totalCount;
+            this.nextCursor = nextCursor;
+            this.items = items;
+        }
     }
 
     private static String reportIdFromPath(String path) throws IOException {
@@ -814,6 +988,24 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             throw new IOException("administrator history integer is invalid: " + key);
         }
         return (int) parsed;
+    }
+
+    private static long requiredLong(Map<String, Object> value, String key, long minimum)
+        throws IOException {
+        Object raw = value.get(key);
+        if (!(raw instanceof Integer || raw instanceof Long)) {
+            throw new IOException("administrator history integer is invalid: " + key);
+        }
+        long parsed = ((Number) raw).longValue();
+        if (parsed < minimum) {
+            throw new IOException("administrator history integer is invalid: " + key);
+        }
+        return parsed;
+    }
+
+    private static Long nullableLong(Map<String, Object> value, String key, long minimum)
+        throws IOException {
+        return value.get(key) == null ? null : requiredLong(value, key, minimum);
     }
 
     private static boolean requiredBoolean(Map<String, Object> value, String key) throws IOException {
@@ -902,6 +1094,27 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             case ACKNOWLEDGED -> next == AdminInstitutionDelivery.Status.RESOLVED;
             case RESOLVED -> false;
         };
+    }
+
+    private static boolean sameDeliveryPackage(
+        String leftId,
+        Long leftRevision,
+        String rightId,
+        Long rightRevision
+    ) {
+        return java.util.Objects.equals(leftId, rightId)
+            && java.util.Objects.equals(leftRevision, rightRevision);
+    }
+
+    private static void requireFirstHistoryRevision(Result result, String cursor)
+        throws IOException {
+        if (cursor != null || result.totalCount() == 0L) return;
+        long firstRevision = result.kind() == ResultKind.REVIEW_HISTORY
+            ? result.reviewHistory().get(0).revision()
+            : result.deliveryHistory().get(0).revision();
+        if (firstRevision != 1L) {
+            throw new IOException("administrator history first page is not contiguous");
+        }
     }
 
     private static final class UrlConnectionTransport implements Transport {

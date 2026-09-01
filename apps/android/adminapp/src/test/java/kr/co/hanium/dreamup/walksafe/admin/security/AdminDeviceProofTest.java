@@ -117,6 +117,12 @@ public final class AdminDeviceProofTest {
             "GET", "/reports/" + REPORT_ID + "/review-decisions", AdminDeviceProof.Purpose.ACTION,
             EMPTY_SHA, null, SESSION_ID
         ));
+        AdminDeviceProof.Intent incidentHistory = new AdminDeviceProof.Intent(
+            null, "admin-001", EMPTY_SHA, CORRELATION_ID, DEVICE_ID, MARKER, 1,
+            "GET", "/admin/incidents/" + REPORT_ID + "/history",
+            AdminDeviceProof.Purpose.ACTION, EMPTY_SHA, "admin.incident.history", SESSION_ID
+        );
+        assertEquals("admin.incident.history", incidentHistory.readPurpose());
     }
 
     private static AdminDeviceProof.SignedChallenge parse(

@@ -158,9 +158,9 @@ public final class AdminOperationsUxStaticTest {
         ));
         for (String method : new String[] {
             "private void recordReviewDecision()",
-            "private void readReviewDecisions()",
+            "private void readReviewDecisions(boolean nextPage)",
             "private void recordDelivery()",
-            "private void readDeliveries()"
+            "private void readDeliveries(boolean nextPage)"
         }) {
             String body = between(activity, method, "\n    }");
             assertTrue(method, body.contains("requireConnectedOperationsReportId()"));
@@ -177,7 +177,7 @@ public final class AdminOperationsUxStaticTest {
         String recordReview = between(
             activity,
             "private void recordReviewDecision()",
-            "private void readReviewDecisions()"
+            "private void readReviewDecisions(boolean nextPage)"
         );
         assertTrue(recordReview.contains("connectedOperationsContentRevision"));
         assertTrue(binding.contains("신고 상세에서 작업을 다시 연결해 주세요"));
@@ -461,7 +461,7 @@ public final class AdminOperationsUxStaticTest {
         String delivery = between(
             activity,
             "private void recordDelivery()",
-            "private void readDeliveries()"
+            "private void readDeliveries(boolean nextPage)"
         );
         assertTrue(connect.contains(
             "connectedOperationsLatestDeliveryRevision = detail.latestDeliveryRevision()"
@@ -587,7 +587,7 @@ public final class AdminOperationsUxStaticTest {
         String delivery = between(
             activity,
             "private void recordDelivery()",
-            "private void readDeliveries()"
+            "private void readDeliveries(boolean nextPage)"
         );
         assertTrue(delivery.contains("AdminInstitutionDelivery.Status deliveryStatus ="));
         assertTrue(delivery.contains(
@@ -757,7 +757,7 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(occurrences(operational, "setInteractiveEnabled(contentRoot, true)") == 2);
         assertTrue(occurrences(security, "setInteractiveEnabled(contentRoot, true)") == 2);
         assertTrue(occurrences(incident, "setInteractiveEnabled(contentRoot, true)") == 3);
-        assertTrue(occurrences(activity, "setInteractiveEnabled(contentRoot, true)") == 12);
+        assertTrue(occurrences(activity, "setInteractiveEnabled(contentRoot, true)") == 15);
 
         assertFalse(activity.contains("private static void setInteractiveEnabled("));
         assertTrue(interactive.contains("if (view == originalEvidenceConfirmedInput)"));
@@ -884,7 +884,7 @@ public final class AdminOperationsUxStaticTest {
         String delivery = between(
             activity,
             "private void recordDelivery()",
-            "private void readDeliveries()"
+            "private void readDeliveries(boolean nextPage)"
         );
         assertTrue(activity.contains("이 앱은 기관으로 자료를 전송하지 않습니다"));
         assertTrue(activity.contains("수동 전달 결과 기록"));
@@ -911,6 +911,22 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(activity.contains("서버·기기 보안 정보 펼치기"));
         assertTrue(activity.contains("securityDetailsGroup.setVisibility(View.GONE)"));
         assertTrue(activity.contains("securityDetailsGroup.setVisibility(opening ? View.VISIBLE : View.GONE)"));
+    }
+
+    @Test
+    public void reportHistoriesExposeMemoryOnlyPagingProgressAndExplicitRecovery() {
+        assertTrue(occurrences(activity, "다음 이력 불러오기") >= 2);
+        assertTrue(activity.contains("reviewHistoryNextCursor"));
+        assertTrue(activity.contains("deliveryHistoryNextCursor"));
+        assertTrue(activity.contains("reviewHistoryTotalCount"));
+        assertTrue(activity.contains(".append(items.size()).append(\"/\").append(total)"));
+        assertTrue(activity.contains("deliveryHistoryItems.size()"));
+        assertTrue(activity.contains("첫 페이지부터 다시 조회해 주세요"));
+        assertTrue(activity.contains("기존 이력과 다음 페이지 위치는 유지했습니다"));
+        assertTrue(activity.contains("clearConnectedOperationsSelection()"));
+        assertTrue(activity.contains("resetReportHistoryState()"));
+        assertFalse(activity.contains("putString(\"reviewHistoryNextCursor"));
+        assertFalse(activity.contains("putString(\"deliveryHistoryNextCursor"));
     }
 
     private static String read(String path) {
