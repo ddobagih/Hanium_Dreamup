@@ -483,10 +483,41 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     "ReportContentCurrent",
     "ReportContentCorrectionRequest",
     "ReportContentRevision",
+    "ReportDeletionExternalCopyStatus",
     "ReportDeletionStatus"
   ]) {
     assert.equal(detailed.components.schemas[schemaName]!.additionalProperties, false);
   }
+  const deletionStatusSchema = detailed.components.schemas.ReportDeletionStatus as unknown as {
+    description?: string;
+    required?: string[];
+    properties?: {
+      schema_version?: { const?: string };
+      external_copies?: { type?: string; items?: { $ref?: string } };
+    };
+  };
+  assert.match(deletionStatusSchema.description ?? "", /count exactly equals/i);
+  assert.equal(
+    deletionStatusSchema.properties?.schema_version?.const,
+    "walksafe.report-deletion-status.v2"
+  );
+  assert.ok(deletionStatusSchema.required?.includes("external_copies"));
+  assert.equal(deletionStatusSchema.properties?.external_copies?.type, "array");
+  assert.equal(
+    deletionStatusSchema.properties?.external_copies?.items?.$ref,
+    "#/components/schemas/ReportDeletionExternalCopyStatus"
+  );
+  const externalCopySchema = detailed.components.schemas
+    .ReportDeletionExternalCopyStatus as unknown as {
+      required?: string[];
+      properties?: Record<string, unknown>;
+    };
+  assert.deepEqual(externalCopySchema.required, [
+    "institution", "state", "status_recorded_at"
+  ]);
+  assert.deepEqual(Object.keys(externalCopySchema.properties ?? {}), [
+    "institution", "state", "status_recorded_at"
+  ]);
   const requestContract = contract.paths["/api/reports/mine/{report_id}/requests"]!
     .post as {
       "x-max-body-bytes"?: number;
@@ -1681,12 +1712,24 @@ test("user report routes bind actor generation and expose only strict minimum JS
     corrected_at: null
   };
   const deletionStatus = {
-    schema_version: "walksafe.report-deletion-status.v1",
+    schema_version: "walksafe.report-deletion-status.v2",
     request_id: deletionRequestId,
     report_id: reportId,
-    state: "PENDING",
-    request_status_version: 1,
-    external_copy_count: 0,
+    state: "DELETED",
+    request_status_version: 2,
+    external_copy_count: 2,
+    external_copies: [
+      {
+        institution: "서울시",
+        state: "NOT_REQUESTED",
+        status_recorded_at: null
+      },
+      {
+        institution: "서울교통공사",
+        state: "REQUEST_SENT",
+        status_recorded_at: createdAt
+      }
+    ],
     updated_at: createdAt
   };
   const requestStatus = {
@@ -2190,6 +2233,90 @@ test("user report routes bind actor generation and expose only strict minimum JS
   assert.deepEqual(await v6Rejected.json(), {
     detail: { code: "report_not_found" }
   });
+});
+
+test("report deletion status accepts only the exact v2 external-copy projection", async () => {
+  const cookie = backendAccountSessionCookie("android-report-deletion-device");
+  const reportId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const requestId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const recordedAt = "2026-08-30T12:34:56.123Z";
+  const url = `http://127.0.0.1:8081/api/reports/mine/deletions/${requestId}`;
+  const valid = {
+    schema_version: "walksafe.report-deletion-status.v2",
+    request_id: requestId,
+    report_id: reportId,
+    state: "DELETED",
+    request_status_version: 3,
+    external_copy_count: 1,
+    external_copies: [{
+      institution: "서울시",
+      state: "REPLY_ACKNOWLEDGED",
+      status_recorded_at: recordedAt
+    }],
+    updated_at: recordedAt
+  };
+
+  for (const payload of [
+    {
+      schema_version: "walksafe.report-deletion-status.v1",
+      request_id: requestId,
+      report_id: reportId,
+      state: "DELETED",
+      request_status_version: 3,
+      external_copy_count: 1,
+      updated_at: recordedAt
+    },
+    { ...valid, external_copy_count: 2 },
+    { ...valid, state: "PENDING" },
+    {
+      ...valid,
+      external_copies: [{ ...valid.external_copies[0], state: "UNKNOWN" }]
+    },
+    {
+      ...valid,
+      external_copies: [{ ...valid.external_copies[0], status_recorded_at: "2026-08-30" }]
+    },
+    {
+      ...valid,
+      external_copies: [{ ...valid.external_copies[0], institution: " 서울시" }]
+    },
+    {
+      ...valid,
+      external_copies: [{ ...valid.external_copies[0], private_actor: ACTOR_ID }]
+    },
+    { ...valid, updated_at: "2026-08-30T12:34:56" }
+  ]) {
+    const rejected = await handleGatewayRequest(
+      new Request(url, { headers: { cookie } }),
+      { fetchImpl: async () => Response.json(payload) }
+    );
+    assert.equal(rejected.status, 502);
+    assert.equal(rejected.headers.get("cache-control"), "no-store");
+    assert.doesNotMatch(await rejected.text(), /private_actor|field-operator/);
+  }
+
+  const oversized = await handleGatewayRequest(
+    new Request(url, { headers: { cookie } }),
+    {
+      fetchImpl: async () => Response.json(valid, {
+        headers: { "content-length": String(128 * 1024 + 1) }
+      })
+    }
+  );
+  assert.equal(oversized.status, 502);
+  assert.equal(oversized.headers.get("cache-control"), "no-store");
+
+  for (const [request, expectedStatus] of [
+    [new Request(`${url}?debug=1`, { headers: { cookie } }), 404],
+    [new Request(url, { method: "POST", headers: { cookie } }), 405],
+    [new Request(url), 404]
+  ] as const) {
+    const rejected = await handleGatewayRequest(request, {
+      fetchImpl: async () => assert.fail("invalid deletion lookup must not reach backend")
+    });
+    assert.equal(rejected.status, expectedStatus);
+    assert.equal(rejected.headers.get("cache-control"), "no-store");
+  }
 });
 
 test("report authentication and busy admission reject before opening the body", async () => {

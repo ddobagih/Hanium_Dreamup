@@ -975,7 +975,7 @@
     "/api/reports/mine/deletions/{request_id}": {
       "get": {
         "operationId": "getMyReportDeletionStatus",
-        "description": "Returns the exact physical-deletion status for a canonical request UUID previously issued to the current v7 Backend-account device actor and account generation. Backend response bodies are limited to 131072 bytes. The request remains queryable after the report itself becomes 404. Missing and different-subject requests receive the same concealed 404. Optional integrated consent is not required.",
+        "description": "Returns the exact v2 physical-deletion status and minimal institution-level external-copy deletion facts for a canonical request UUID previously issued to the current v7 Backend-account device actor and account generation. Backend response bodies are limited to 131072 bytes. The request remains queryable after the report itself becomes 404. Missing and different-subject requests receive the same concealed 404. Optional integrated consent is not required.",
         "security": [
           {
             "fieldSession": []
@@ -2906,8 +2906,47 @@
         "type": "string",
         "enum": ["PENDING", "LEGAL_HOLD", "REJECTED", "DELETED"]
       },
+      "ReportExternalCopyDeletionState": {
+        "type": "string",
+        "enum": [
+          "NOT_REQUESTED",
+          "REQUEST_SENT",
+          "REPLY_ACKNOWLEDGED",
+          "REPLY_DELETION_CONFIRMED",
+          "REPLY_DECLINED"
+        ]
+      },
+      "ReportDeletionExternalCopyStatus": {
+        "type": "object",
+        "required": ["institution", "state", "status_recorded_at"],
+        "properties": {
+          "institution": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReportExternalCopyDeletionState"
+          },
+          "status_recorded_at": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "minLength": 20,
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "ReportDeletionStatus": {
         "type": "object",
+        "description": "external_copy_count exactly equals external_copies length; external_copies is empty unless state is DELETED.",
         "required": [
           "schema_version",
           "request_id",
@@ -2915,12 +2954,13 @@
           "state",
           "request_status_version",
           "external_copy_count",
+          "external_copies",
           "updated_at"
         ],
         "properties": {
           "schema_version": {
             "type": "string",
-            "const": "walksafe.report-deletion-status.v1"
+            "const": "walksafe.report-deletion-status.v2"
           },
           "request_id": {
             "type": "string",
@@ -2944,6 +2984,12 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "external_copies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportDeletionExternalCopyStatus"
+            }
           },
           "updated_at": {
             "type": "string",
@@ -4234,7 +4280,7 @@
         }
       },
       "ReportDeletionStatus": {
-        "description": "Strict actor/generation-bound physical report deletion status",
+        "description": "Strict actor/generation-bound v2 physical and external-copy report deletion status",
         "headers": {
           "Cache-Control": {
             "$ref": "#/components/headers/NoStore"

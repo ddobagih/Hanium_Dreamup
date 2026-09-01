@@ -178,6 +178,13 @@ const USER_REPORT_CONTENT_CATEGORIES = new Set([
 const USER_REPORT_DELETION_STATES = new Set([
   "PENDING", "LEGAL_HOLD", "REJECTED", "DELETED"
 ]);
+const USER_REPORT_EXTERNAL_COPY_DELETION_STATES = new Set([
+  "NOT_REQUESTED",
+  "REQUEST_SENT",
+  "REPLY_ACKNOWLEDGED",
+  "REPLY_DELETION_CONFIRMED",
+  "REPLY_DECLINED"
+]);
 
 type ReportTransportHeaders = Readonly<{
   reportId: string;
@@ -1379,9 +1386,9 @@ function sanitizeReportDeletionStatus(
 ): Record<string, unknown> | null {
   if (!exactObjectKeys(value, [
     "schema_version", "request_id", "report_id", "state",
-    "request_status_version", "external_copy_count", "updated_at"
+    "request_status_version", "external_copy_count", "external_copies", "updated_at"
   ]) ||
-    value.schema_version !== "walksafe.report-deletion-status.v1" ||
+    value.schema_version !== "walksafe.report-deletion-status.v2" ||
     value.request_id !== requestId ||
     typeof value.report_id !== "string" || !CANONICAL_REPORT_UUID.test(value.report_id) ||
     typeof value.state !== "string" || !USER_REPORT_DELETION_STATES.has(value.state) ||
@@ -1390,8 +1397,30 @@ function sanitizeReportDeletionStatus(
     value.request_status_version < 1 ||
     typeof value.external_copy_count !== "number" ||
     !Number.isSafeInteger(value.external_copy_count) ||
-    value.external_copy_count < 0 || !validAwareDateTime(value.updated_at)
+    value.external_copy_count < 0 || !Array.isArray(value.external_copies) ||
+    value.external_copy_count !== value.external_copies.length ||
+    (value.state !== "DELETED" && value.external_copies.length > 0) ||
+    !validAwareDateTime(value.updated_at)
   ) return null;
+  const externalCopies: Record<string, unknown>[] = [];
+  for (const candidate of value.external_copies) {
+    const item = objectPayload(candidate);
+    if (!item || !exactObjectKeys(item, [
+      "institution", "state", "status_recorded_at"
+    ]) ||
+      typeof item.institution !== "string" ||
+      [...item.institution].length < 1 || [...item.institution].length > 160 ||
+      item.institution.trim() !== item.institution ||
+      typeof item.state !== "string" ||
+      !USER_REPORT_EXTERNAL_COPY_DELETION_STATES.has(item.state) ||
+      (item.status_recorded_at !== null && !validAwareDateTime(item.status_recorded_at))
+    ) return null;
+    externalCopies.push({
+      institution: item.institution,
+      state: item.state,
+      status_recorded_at: item.status_recorded_at
+    });
+  }
   return {
     schema_version: value.schema_version,
     request_id: value.request_id,
@@ -1399,6 +1428,7 @@ function sanitizeReportDeletionStatus(
     state: value.state,
     request_status_version: value.request_status_version,
     external_copy_count: value.external_copy_count,
+    external_copies: externalCopies,
     updated_at: value.updated_at
   };
 }
