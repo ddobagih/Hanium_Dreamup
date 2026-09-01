@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import Future
+from datetime import UTC, datetime
 import os
 from pathlib import Path
 import re
@@ -15,10 +16,13 @@ import uuid
 
 from fastapi import APIRouter, Response, status
 from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 from backend.app.config import DEPLOYMENT_ENVIRONMENTS, Settings
 from backend.app.database import SessionLocal
+from backend.app.models import CriticalIncident
+from backend.app.services.admin_incident_workflow import record_critical_incident
 from backend.app.services.admin_security import (
     AdminCredentialIssuerUnavailable,
     load_admin_credential_issuer_key_for_settings,
@@ -42,6 +46,7 @@ from backend.app.services.report_image_keys import (
     create_report_image_key_manager,
 )
 from backend.app.services.report_storage import (
+    ReportStorageInventorySetMismatch,
     validate_report_storage_database_inventory,
 )
 from backend.app.services.raw_collection_storage import (
@@ -58,6 +63,10 @@ from backend.app.services.tmap_pedestrian import (
 EXPECTED_ALEMBIC_HEAD = "202608300005"
 READINESS_LOCAL_CHECK_TIMEOUT_SECONDS = 5.0
 TMAP_READINESS_FAILURE_COOLDOWN_SECONDS = 5.0
+_REPORT_STORAGE_INCIDENT_NAMESPACE = uuid.uuid5(
+    uuid.NAMESPACE_URL,
+    "urn:walksafe:report-storage-inventory-set-mismatch:v1",
+)
 ACTOR_RATE_LIMIT_GROUP_CONSTRAINT = "ck_actor_rate_limit_events_group"
 EXPECTED_ACTOR_RATE_LIMIT_GROUPS = frozenset(
     {
@@ -463,20 +472,65 @@ def _report_storage_inventory_readiness(
 
     try:
         with SessionLocal.begin() as db:
-            validate_report_storage_database_inventory(
-                db,
-                settings.upload_dir,
-                known_key_states={
-                    slot.key_id: slot.state
-                    for slot in key_manager.keyring.slots
-                },
-            )
+            try:
+                validate_report_storage_database_inventory(
+                    db,
+                    settings.upload_dir,
+                    known_key_states={
+                        slot.key_id: slot.state
+                        for slot in key_manager.keyring.slots
+                    },
+                )
+            except ReportStorageInventorySetMismatch as mismatch:
+                try:
+                    _record_report_storage_inventory_incident(db, mismatch)
+                except Exception:
+                    return {
+                        "ready": False,
+                        "reason": "report_storage_inventory_incident_record_failed",
+                    }
+                return {
+                    "ready": False,
+                    "reason": "report_storage_inventory_invalid",
+                }
     except Exception:
         return {
             "ready": False,
             "reason": "report_storage_inventory_invalid",
         }
     return {"ready": True, "inventory": "database_and_encrypted_objects_matched"}
+
+
+def _report_storage_inventory_incident_id(evidence_sha256: str) -> uuid.UUID:
+    return uuid.uuid5(_REPORT_STORAGE_INCIDENT_NAMESPACE, evidence_sha256)
+
+
+def _record_report_storage_inventory_incident(
+    db: Session,
+    mismatch: ReportStorageInventorySetMismatch,
+) -> bool:
+    """Append one OPENED event while the inventory reconciliation lock is held."""
+
+    incident_id = _report_storage_inventory_incident_id(mismatch.evidence_sha256)
+    detected_now = datetime.now(UTC)
+    existing = db.get(CriticalIncident, incident_id)
+    started_at = existing.started_at if existing is not None else detected_now
+    detected_at = existing.detected_at if existing is not None else detected_now
+    _, created = record_critical_incident(
+        db,
+        incident_id=incident_id,
+        reason_code="USER_SAFETY_RISK",
+        summary="Report storage inventory mismatch detected",
+        started_at=started_at,
+        detected_at=detected_at,
+        reason="Database report image rows and encrypted object names differ.",
+        observation=(
+            "Readiness remained unavailable; no automated recovery or control was performed."
+        ),
+        evidence_sha256=mismatch.evidence_sha256,
+        now=max(detected_now, detected_at),
+    )
+    return created
 
 
 def _detector_readiness(settings: Any, warmup: Callable[[], None]) -> dict[str, object]:

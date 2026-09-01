@@ -18,17 +18,24 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import select, text
 
+from backend.app.api import health as health_api
 import backend.app.main as main_app
 import backend.app.services.report_storage as report_storage
 import backend.app.uploads as uploads
 from backend.app.database import SessionLocal
 from backend.app.api.reports import _commit_new_report_with_image
-from backend.app.models import Report, ReportImageObject
+from backend.app.models import (
+    CriticalIncident,
+    CriticalIncidentEvent,
+    Report,
+    ReportImageObject,
+)
 from backend.app.services.report_image_crypto import encrypt_report_image
 from backend.app.services.report_storage import (
     ReportImageCommitMetadata,
     ReportStorageCommitState,
     ReportStorageInventoryEntry,
+    ReportStorageInventorySetMismatch,
     pending_journal_directory,
     reconcile_pending_report_writes,
     stage_report_image,
@@ -362,7 +369,7 @@ def test_startup_inventory_accepts_only_exact_encrypted_database_mapping(
         known_key_states={"test-key-v1": "active"},
     )
 
-    with pytest.raises(RuntimeError, match="inventory differ"):
+    with pytest.raises(ReportStorageInventorySetMismatch, match="inventory differ"):
         validate_report_storage_inventory(
             tmp_path,
             [],
@@ -375,6 +382,31 @@ def test_startup_inventory_accepts_only_exact_encrypted_database_mapping(
                 [entry],
                 known_key_states={"test-key-v1": unavailable_state},
             )
+
+
+def test_inventory_set_mismatch_has_canonical_stable_evidence(tmp_path: Path) -> None:
+    storage_name = "11111111-1111-4111-8111-111111111111.wse"
+    unexpected = tmp_path / storage_name
+    unexpected.write_bytes(b"set-mismatch-is-detected-before-envelope-validation")
+    unexpected.chmod(0o600)
+
+    with pytest.raises(ReportStorageInventorySetMismatch) as captured:
+        validate_report_storage_inventory(tmp_path, [], known_key_states={})
+
+    assert captured.value.evidence_sha256 == (
+        "6b599c11ca244fd1ea29ed2931dad0513ec9d588b7e40ae0d5c0000676521da5"
+    )
+    same_difference = ReportStorageInventorySetMismatch(
+        expected_storage_names=("22222222-2222-4222-8222-222222222222.wse",),
+        actual_storage_names=(
+            storage_name,
+            "22222222-2222-4222-8222-222222222222.wse",
+        ),
+    )
+    assert same_difference.evidence_sha256 == captured.value.evidence_sha256
+    assert str(captured.value) == (
+        "report database and encrypted object inventory differ"
+    )
 
 
 def test_startup_inventory_accepts_backup_reader_group_files(
@@ -862,3 +894,60 @@ def test_postgres_multi_candidate_retention_delete_is_all_or_none(
                 select(Report).where(Report.id.in_(report_ids))
             ).all():
                 db.delete(report)
+
+
+@pytest.mark.skipif(
+    not TEST_DATABASE_CONFIGURED,
+    reason="WALKSAFE_TEST_DATABASE_URL is not configured",
+)
+def test_postgres_concurrent_inventory_detection_opens_one_incident(
+    tmp_path: Path,
+) -> None:
+    storage_name = "11111111-1111-4111-8111-111111111111.wse"
+    unexpected = tmp_path / storage_name
+    unexpected.write_bytes(b"concurrent-set-mismatch")
+    unexpected.chmod(0o600)
+
+    def detect_and_record() -> tuple[bool, str]:
+        with SessionLocal.begin() as db:
+            try:
+                report_storage.validate_report_storage_database_inventory(
+                    db,
+                    tmp_path,
+                    known_key_states={},
+                )
+            except ReportStorageInventorySetMismatch as mismatch:
+                return (
+                    health_api._record_report_storage_inventory_incident(
+                        db,
+                        mismatch,
+                    ),
+                    mismatch.evidence_sha256,
+                )
+        raise AssertionError("the orphan encrypted object was not detected")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _index: detect_and_record(), range(2)))
+
+    assert sorted(created for created, _evidence in results) == [False, True]
+    assert {evidence for _created, evidence in results} == {
+        "6b599c11ca244fd1ea29ed2931dad0513ec9d588b7e40ae0d5c0000676521da5"
+    }
+    incident_id = uuid.UUID("579bd7b6-2658-5d7c-9cc4-26f5778ce676")
+    with SessionLocal() as db:
+        incident = db.get(CriticalIncident, incident_id)
+        events = list(
+            db.scalars(
+                select(CriticalIncidentEvent).where(
+                    CriticalIncidentEvent.incident_id == incident_id
+                )
+            ).all()
+        )
+
+    assert incident is not None
+    assert incident.producer_source == "WALKSAFE_BACKEND"
+    assert incident.reason_code == "USER_SAFETY_RISK"
+    assert incident.status == "OPEN"
+    assert len(events) == 1
+    assert events[0].event_type == "OPENED"
+    assert events[0].evidence_sha256 == results[0][1]

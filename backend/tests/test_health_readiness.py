@@ -9,12 +9,14 @@ import sys
 import threading
 import time
 from types import SimpleNamespace
+import uuid
 
 import backend.app.api.health as health_api
 import httpx
 from fastapi import FastAPI
 import pytest
 from backend.app.main import app, settings as app_settings
+from backend.app.services.report_storage import ReportStorageInventorySetMismatch
 from asgi_client import ASGITestClient
 
 
@@ -965,6 +967,11 @@ def test_readiness_rejects_post_start_report_storage_drift(
     )
     monkeypatch.setattr(
         health_api,
+        "_record_report_storage_inventory_incident",
+        lambda _db, _mismatch: True,
+    )
+    monkeypatch.setattr(
+        health_api,
         "_database_and_admin_readiness",
         lambda _settings: {"ready": True},
     )
@@ -1004,6 +1011,123 @@ def test_readiness_rejects_post_start_report_storage_drift(
     assert len(lock_statements) == 1
     assert "pg_advisory_xact_lock(" in lock_statements[0]
     assert "pg_advisory_xact_lock_shared" not in lock_statements[0]
+
+
+def test_report_storage_set_mismatch_retries_append_then_reuses_one_incident(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mismatch = ReportStorageInventorySetMismatch(
+        expected_storage_names=(),
+        actual_storage_names=("11111111-1111-4111-8111-111111111111.wse",),
+    )
+    state: dict[str, object] = {"existing": None}
+    recorded: list[dict[str, object]] = []
+
+    class FakeDatabaseSession:
+        def get(self, _model, _incident_id):
+            return state["existing"]
+
+    class FakeTransaction:
+        def __enter__(self) -> FakeDatabaseSession:
+            return FakeDatabaseSession()
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+    def record(_db, **arguments):
+        recorded.append(arguments)
+        if len(recorded) == 1:
+            raise RuntimeError("incident store unavailable")
+        created = state["existing"] is None
+        if created:
+            state["existing"] = SimpleNamespace(
+                started_at=arguments["started_at"],
+                detected_at=arguments["detected_at"],
+            )
+        return state["existing"], created
+
+    def detect_mismatch(*_args, **_kwargs) -> None:
+        raise mismatch
+
+    monkeypatch.setattr(
+        health_api,
+        "SessionLocal",
+        SimpleNamespace(begin=lambda: FakeTransaction()),
+    )
+    monkeypatch.setattr(
+        health_api,
+        "validate_report_storage_database_inventory",
+        detect_mismatch,
+    )
+    monkeypatch.setattr(health_api, "record_critical_incident", record)
+    settings = SimpleNamespace(upload_dir=Path("/not-read"))
+    manager = SimpleNamespace(keyring=SimpleNamespace(slots=()))
+
+    failed = _REAL_REPORT_STORAGE_INVENTORY_READINESS(settings, manager)
+    created = _REAL_REPORT_STORAGE_INVENTORY_READINESS(settings, manager)
+    retried = _REAL_REPORT_STORAGE_INVENTORY_READINESS(settings, manager)
+
+    assert failed == {
+        "ready": False,
+        "reason": "report_storage_inventory_incident_record_failed",
+    }
+    assert created == retried == {
+        "ready": False,
+        "reason": "report_storage_inventory_invalid",
+    }
+    assert len(recorded) == 3
+    assert {call["incident_id"] for call in recorded} == {
+        uuid.UUID("579bd7b6-2658-5d7c-9cc4-26f5778ce676")
+    }
+    assert {call["reason_code"] for call in recorded} == {"USER_SAFETY_RISK"}
+    assert {call["evidence_sha256"] for call in recorded} == {
+        mismatch.evidence_sha256
+    }
+    assert recorded[1]["started_at"] == recorded[2]["started_at"]
+    assert recorded[1]["detected_at"] == recorded[2]["detected_at"]
+
+
+def test_report_storage_non_set_failure_is_not_recorded_as_incident(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded = False
+
+    class FakeTransaction:
+        def __enter__(self) -> object:
+            return object()
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+    def record(*_args, **_kwargs):
+        nonlocal recorded
+        recorded = True
+
+    def reject_inventory(*_args, **_kwargs) -> None:
+        raise RuntimeError("envelope metadata invalid")
+
+    monkeypatch.setattr(
+        health_api,
+        "SessionLocal",
+        SimpleNamespace(begin=lambda: FakeTransaction()),
+    )
+    monkeypatch.setattr(
+        health_api,
+        "validate_report_storage_database_inventory",
+        reject_inventory,
+    )
+    monkeypatch.setattr(health_api, "record_critical_incident", record)
+
+    result = _REAL_REPORT_STORAGE_INVENTORY_READINESS(
+        SimpleNamespace(upload_dir=Path("/not-read")),
+        SimpleNamespace(keyring=SimpleNamespace(slots=())),
+    )
+
+    assert result == {
+        "ready": False,
+        "reason": "report_storage_inventory_invalid",
+    }
+    assert recorded is False
 
 
 def test_real_detector_readiness_fails_closed_when_warmup_fails(monkeypatch) -> None:

@@ -60,6 +60,36 @@ _LOGICAL_IMAGE_PATH_PATTERN = re.compile(
 )
 RETENTION_QUARANTINE_DIRECTORY_NAME = ".retention-quarantine"
 REPORT_DELETION_QUARANTINE_DIRECTORY_NAME = ".report-deletion-quarantine"
+_INVENTORY_SET_MISMATCH_HASH_DOMAIN = (
+    b"walksafe/report-storage-inventory-set-mismatch/v1\0"
+)
+
+
+class ReportStorageInventorySetMismatch(RuntimeError):
+    """Exact database/object name-set mismatch with stable, non-secret evidence."""
+
+    def __init__(
+        self,
+        *,
+        expected_storage_names: Iterable[str],
+        actual_storage_names: Iterable[str],
+    ) -> None:
+        expected = set(expected_storage_names)
+        actual = set(actual_storage_names)
+        evidence = json.dumps(
+            {
+                "missing_storage_names": sorted(expected - actual),
+                "schema": "walksafe.report-storage-inventory-set-mismatch.v1",
+                "unexpected_storage_names": sorted(actual - expected),
+            },
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        self.evidence_sha256 = hashlib.sha256(
+            _INVENTORY_SET_MISMATCH_HASH_DOMAIN + evidence
+        ).hexdigest()
+        super().__init__("report database and encrypted object inventory differ")
 
 
 @dataclass(frozen=True)
@@ -638,7 +668,10 @@ def validate_report_storage_inventory(
             expected_objects[image_object.storage_name] = entry
 
         if set(actual_objects) != set(expected_objects):
-            raise RuntimeError("report database and encrypted object inventory differ")
+            raise ReportStorageInventorySetMismatch(
+                expected_storage_names=expected_objects,
+                actual_storage_names=actual_objects,
+            )
 
         for storage_name, entry in expected_objects.items():
             image_object = entry.image_object
