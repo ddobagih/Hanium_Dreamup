@@ -130,11 +130,13 @@ import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckFeature
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckFailure
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckObservation
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckPolicy
+import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckResultBinding
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckSignal
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckSnapshot
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckState
 import kr.co.hanium.dreamup.walksafe.device.PostLoginMetricDepthState
 import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceCheckResultStore
+import kr.co.hanium.dreamup.walksafe.device.POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION
 import kr.co.hanium.dreamup.walksafe.device.OfficialEnvironmentGpsPreflightPolicy
 import kr.co.hanium.dreamup.walksafe.device.OfficialEnvironmentGpsSample
 import kr.co.hanium.dreamup.walksafe.device.ApprovedDeviceProfileMatch
@@ -1265,6 +1267,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var actionRequestedEnabled = true
     private lateinit var startupCapabilityProbe: AndroidStartupCapabilityProbe
     private var startupCapabilityProbeStarted = false
+    private var storedDeviceCheckBindingValidationPending = false
     @Volatile
     private var startupCapabilityDecision: WalkSafeStartupCapabilityDecision? = null
     @Volatile
@@ -1707,6 +1710,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 )
                 earthOrientationTracker = AndroidEarthOrientationTracker(this)
                 setContentView(buildContentView())
+                surfaceView.onPause()
                 updatePermissionRecoveryUi()
                 if (accountDeletionStateMachine.processingBlocked()) {
                     resumePrivacyControlOperations()
@@ -1715,9 +1719,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
                 startupCapabilityProbe = AndroidStartupCapabilityProbe(this) {
                     completeVoiceDataInstallRecheckIfPossible()
+                    if (
+                        restoreBoundPostLoginDeviceCheckResultIfPossible() &&
+                        advanceEmailStagesWithRestoredDeviceCheck()
+                    ) {
+                        onFirstRunOnboardingStateChanged(
+                            announcement =
+                                "저장된 기기 점검 결과를 적용했습니다. 안전교육을 완료하세요.",
+                            preservePostLoginDeviceCheck = true,
+                        )
+                    }
                     refreshStartupCapabilityUi()
                 }
                 maybeStartFirstRunDeviceCheckProbes()
+                maybeStartStoredDeviceCheckBindingValidation()
                 refreshStartupCapabilityUi()
                 updateRouteButtonText()
                 updateStatus(
@@ -10412,7 +10427,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         invalidatePhoneMountingEvidence("app_paused")
         isActivityForeground = false
         feedbackLifecycleGeneration += 1
-        if (::surfaceView.isInitialized) surfaceView.onPause()
+        if (::surfaceView.isInitialized) {
+            syncGlSurfaceRenderMode(forceFrame = true)
+            surfaceView.onPause()
+        }
         invalidateRuntimeMetricEvidence("app_paused")
         confirmedStartupCapabilityDecision = null
         startupCapabilityConfirmationPending = false
@@ -10556,8 +10574,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         gatewayWalkTakeoverPromptOperationId = null
         gatewayWalkResumeRevalidationPending = false
         cancelNavigationRequestsForDestroy()
-        if (::surfaceView.isInitialized) surfaceView.onPause()
         isActivityForeground = false
+        if (::surfaceView.isInitialized) {
+            syncGlSurfaceRenderMode(forceFrame = true)
+            surfaceView.onPause()
+        }
         invalidateRuntimeMetricEvidence("app_destroyed")
         invalidateOfficialEnvironmentEvidence("app_destroyed")
         invalidatePhoneMountingEvidence("app_destroyed")
@@ -10617,17 +10638,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             .filterNot(observed::isGranted)
             .toSet()
         if (lease.purpose == PermissionRequestPurpose.WALK_SESSION) {
-            val missingRequired = missingRequested
-                .intersect(requiredStartWalkObservedPermissions())
-            if (missingRequired.isNotEmpty()) {
-                enterPermissionRecoveryBarrier(
-                    missingPermissions = missingRequired,
-                    reason = "permission_result_walk_session",
-                )
-            } else {
-                permissionRecoveryGate = PermissionRecoveryGate()
-                persistPermissionRecoveryGate()
-            }
+            permissionRecoveryGate = PermissionRecoveryGate()
+            persistPermissionRecoveryGate()
         }
         when (lease.purpose) {
             PermissionRequestPurpose.INITIAL_APP_ENTRY ->
@@ -10644,6 +10656,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         applyObservedPermissionStateChange(
             "permission_result_${lease.purpose.name.lowercase(Locale.US)}",
         )
+        if (
+            lease.purpose == PermissionRequestPurpose.WALK_SESSION &&
+            missingRequested.isNotEmpty()
+        ) {
+            showPermissionDenialPanel(
+                missingPermissions = missingRequested,
+                reason = "permission_result_walk_session",
+            )
+        }
     }
 
     private fun requestPermissionsWithLease(
@@ -11834,7 +11855,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         surfaceView = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
             setRenderer(this@MainActivity)
-            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
             preserveEGLContextOnPause = true
         }
         cameraFallbackPreviewView = PreviewView(this).apply {
@@ -13856,9 +13877,73 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun revalidateCompletedPostLoginDeviceCheckPrerequisites(): Boolean {
         if (!postLoginDeviceCheckSnapshot.passesFeatureGate) return false
-        return requiredPostLoginDeviceCheckPermissions().isNotEmpty() ||
-            !isLocationServiceEnabledForDeviceCheck() ||
-            !isHandsFreeVoiceDisclosureAccepted()
+        val actorId = postLoginDeviceCheckSnapshot.actorId
+        val binding = actorId?.let(::currentPostLoginDeviceCheckResultBinding)
+        val restored = binding?.let(postLoginDeviceCheckResultStore::restore)
+        if (
+            restored != null &&
+            restored.state == postLoginDeviceCheckSnapshot.state &&
+            restored.disabledFeatures == postLoginDeviceCheckSnapshot.disabledFeatures &&
+            restored.cameraDependentChecksDeferred ==
+            postLoginCameraDependentChecksDeferred
+        ) return false
+
+        cancelPostLoginDeviceCheckRuntime("saved_result_prerequisites_changed")
+        postLoginDeviceCheckSnapshot = postLoginDeviceCheckSnapshot.copy(
+            state = PostLoginDeviceCheckState.NOT_RUN,
+            failure = null,
+            disabledFeatures = emptySet(),
+        )
+        postLoginCameraDependentChecksDeferred = false
+        metricDistanceCapabilityOverride = null
+        runtimeObstacleDetectionCapabilityOverride = null
+        onDeviceSpeechRecognitionCapabilityOverride = null
+        offlineKoreanTextToSpeechCapabilityOverride = null
+        return true
+    }
+
+    private fun currentPostLoginDeviceCheckResultBinding(
+        actorId: String,
+    ): PostLoginDeviceCheckResultBinding? {
+        if (
+            !::startupCapabilityProbe.isInitialized ||
+            !::gatewaySessionStore.isInitialized
+        ) return null
+        val installationId = gatewaySessionStore.getOrCreateInstallDeviceId() ?: return null
+        val startup = startupCapabilityProbe.snapshot()
+        val offlineKoreanTextToSpeechAvailable =
+            startup.offlineKoreanTextToSpeechAvailable ?: return null
+        val onDeviceSpeechRecognitionAvailable =
+            startup.onDeviceSpeechRecognitionAvailable ?: return null
+        val environmentProfile = activeEnvironmentProfiles
+        val deviceProfile = startupCapabilityProbe.deviceProfileMatch()
+        return PostLoginDeviceCheckResultBinding(
+            actorId = actorId,
+            installationId = installationId,
+            deviceManufacturer = Build.MANUFACTURER,
+            deviceModel = Build.MODEL,
+            deviceName = Build.DEVICE,
+            osSdkInt = Build.VERSION.SDK_INT,
+            osBuildFingerprint = Build.FINGERPRINT,
+            appId = packageName,
+            appVersionCode = BuildConfig.VERSION_CODE.toLong(),
+            appVersionName = BuildConfig.VERSION_NAME,
+            appSourceRevision = BuildConfig.WALKSAFE_SOURCE_COMMIT,
+            probePolicyVersion = POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION,
+            environmentProfileId = environmentProfile?.bundleId,
+            environmentProfileRevision = environmentProfile?.revision,
+            approvedDeviceProfileRegistryRevision =
+                WalkSafeApprovedDeviceProfiles.REGISTRY_REVISION,
+            approvedDeviceProfileRegistrySha256 =
+                WalkSafeApprovedDeviceProfiles.registryContentSha256,
+            approvedDeviceProfileId = deviceProfile.profileId,
+            approvedDeviceProfileVersion = deviceProfile.profileVersion,
+            missingRequiredPermissions = requiredPostLoginDeviceCheckPermissions().toSet(),
+            locationServiceEnabled = isLocationServiceEnabledForDeviceCheck(),
+            voiceDisclosureAccepted = isHandsFreeVoiceDisclosureAccepted(),
+            offlineKoreanTextToSpeechAvailable = offlineKoreanTextToSpeechAvailable,
+            onDeviceSpeechRecognitionAvailable = onDeviceSpeechRecognitionAvailable,
+        )
     }
 
     private fun bindPostLoginDeviceCheckSession(
@@ -13877,7 +13962,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             next.state == PostLoginDeviceCheckState.NOT_RUN &&
             ::postLoginDeviceCheckResultStore.isInitialized
         ) {
-            postLoginDeviceCheckResultStore.restore()
+            currentPostLoginDeviceCheckResultBinding(actorId)
+                ?.let(postLoginDeviceCheckResultStore::restore)
         } else {
             null
         }
@@ -13915,8 +14001,64 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 PostLoginDeviceCheckFeature.VOICE_GUIDANCE !in restored.disabledFeatures
         } else if (sessionBindingChanged) {
             postLoginCameraDependentChecksDeferred = false
+            metricDistanceCapabilityOverride = null
+            runtimeObstacleDetectionCapabilityOverride = null
+            onDeviceSpeechRecognitionCapabilityOverride = null
+            offlineKoreanTextToSpeechCapabilityOverride = null
         }
+        maybeStartStoredDeviceCheckBindingValidation()
         if (::startupCapabilityText.isInitialized) refreshStartupCapabilityUi()
+    }
+
+    private fun restoreBoundPostLoginDeviceCheckResultIfPossible(): Boolean {
+        if (postLoginDeviceCheckSnapshot.state != PostLoginDeviceCheckState.NOT_RUN) return false
+        val sessionBinding = currentPostLoginDeviceCheckSessionBinding() ?: return false
+        if (currentPostLoginDeviceCheckResultBinding(sessionBinding.actorId) == null) return false
+        bindPostLoginDeviceCheckSession(
+            actorId = sessionBinding.actorId,
+            sessionGeneration = sessionBinding.sessionGeneration,
+        )
+        return postLoginDeviceCheckSnapshot.passesFeatureGate
+    }
+
+    private fun maybeStartStoredDeviceCheckBindingValidation() {
+        if (
+            !::startupCapabilityProbe.isInitialized ||
+            !::postLoginDeviceCheckResultStore.isInitialized ||
+            startupCapabilityProbeStarted ||
+            postLoginDeviceCheckSnapshot.state != PostLoginDeviceCheckState.NOT_RUN ||
+            currentPostLoginDeviceCheckSessionBinding() == null ||
+            !postLoginDeviceCheckResultStore.hasCurrentPolicyResultCandidate()
+        ) return
+
+        startupCapabilityProbe.close()
+        startupCapabilityProbe = AndroidStartupCapabilityProbe(this) {
+            completeVoiceDataInstallRecheckIfPossible()
+            val bindingReady = currentPostLoginDeviceCheckSessionBinding()?.actorId?.let {
+                currentPostLoginDeviceCheckResultBinding(it)
+            } != null
+            if (bindingReady) {
+                storedDeviceCheckBindingValidationPending = false
+                if (
+                    restoreBoundPostLoginDeviceCheckResultIfPossible() &&
+                    advanceEmailStagesWithRestoredDeviceCheck()
+                ) {
+                    onFirstRunOnboardingStateChanged(
+                        announcement =
+                            "저장된 기기 점검 결과를 적용했습니다. 안전교육을 완료하세요.",
+                        preservePostLoginDeviceCheck = true,
+                    )
+                }
+            }
+            refreshStartupCapabilityUi()
+        }
+        storedDeviceCheckBindingValidationPending = true
+        startupCapabilityProbeStarted = true
+        if (runCatching { startupCapabilityProbe.start() }.isFailure) {
+            startupCapabilityProbeStarted = false
+            storedDeviceCheckBindingValidationPending = false
+            startupCapabilityProbe.close()
+        }
     }
 
     private fun firstRunStageNumber(snapshot: FirstRunOnboardingSnapshot): Int =
@@ -14094,6 +14236,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         binding: PostLoginDeviceCheckBinding,
     ) {
         if (!isPostLoginDeviceCheckBindingCurrent(binding)) return
+        storedDeviceCheckBindingValidationPending = false
         if (::startupCapabilityProbe.isInitialized) startupCapabilityProbe.close()
         startupCapabilityProbe = AndroidStartupCapabilityProbe(this) {
             completeVoiceDataInstallRecheckIfPossible()
@@ -14322,10 +14465,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             postLoginCameraPipelineSignal != PostLoginDeviceCheckSignal.READY &&
                 PostLoginDeviceCheckFeature.OBSTACLE_DETECTION !in
                 postLoginDeviceCheckSnapshot.disabledFeatures
+        val resultBinding =
+            currentPostLoginDeviceCheckResultBinding(completedBinding.actorId)
         if (
+            resultBinding == null ||
             !postLoginDeviceCheckResultStore.save(
                 postLoginDeviceCheckSnapshot,
-                cameraDependentChecksDeferred,
+                resultBinding,
+                cameraDependentChecksDeferred = cameraDependentChecksDeferred,
             )
         ) {
             postLoginDeviceCheckSnapshot = postLoginDeviceCheckSnapshot.copy(
@@ -14465,6 +14612,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             startupCapabilityProbe.close()
             startupCapabilityProbeStarted = false
         }
+        storedDeviceCheckBindingValidationPending = false
         if (::walkSessionResourceProbe.isInitialized && walkSessionResourceProbeStarted) {
             walkSessionResourceProbe.close()
             walkSessionResourceProbeStarted = false
@@ -16051,10 +16199,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 disabledFeatures = remaining,
             )
             if (
-                !postLoginDeviceCheckResultStore.save(
-                    recovered,
-                    postLoginCameraDependentChecksDeferred,
-                )
+                current.actorId == null ||
+                currentPostLoginDeviceCheckResultBinding(current.actorId)?.let { binding ->
+                    postLoginDeviceCheckResultStore.save(
+                        recovered,
+                        binding,
+                        cameraDependentChecksDeferred =
+                            postLoginCameraDependentChecksDeferred,
+                    )
+                } != true
             ) {
                 updateStatus(
                     "음성 기능 복구 저장 실패",
@@ -19983,12 +20136,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     )
             visibility = if (showDeviceCheckAction) View.VISIBLE else View.GONE
             isEnabled = showDeviceCheckAction &&
+                !storedDeviceCheckBindingValidationPending &&
                 walkSessionLifecycle.snapshot().state != WalkSessionState.ACTIVE &&
                     postLoginDeviceCheckSnapshot.state !in setOf(
                         PostLoginDeviceCheckState.REQUESTING_PERMISSIONS,
                         PostLoginDeviceCheckState.RUNNING,
                     )
-            text = if (deferredCameraDependentChecksCanBeRetried()) {
+            text = if (storedDeviceCheckBindingValidationPending) {
+                "저장된 기기 점검 결과 확인 중"
+            } else if (deferredCameraDependentChecksCanBeRetried()) {
                 "카메라·거리 기능 다시 점검"
             } else when (postLoginDeviceCheckSnapshot.state) {
                 PostLoginDeviceCheckState.NOT_RUN -> "권한과 기기 기능 점검 시작"
@@ -22123,7 +22279,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (::cameraFallbackLifecycleOwner.isInitialized) {
             cameraFallbackLifecycleOwner.moveTo(Lifecycle.State.RESUMED)
         }
-        if (::surfaceView.isInitialized) surfaceView.onResume()
+        if (::surfaceView.isInitialized) {
+            val arSessionReady =
+                session != null && arSessionPurpose != ArSessionPurpose.NONE
+            if (arSessionReady) surfaceView.onResume()
+            syncGlSurfaceRenderMode(forceFrame = true)
+            if (!arSessionReady) surfaceView.onPause()
+        }
         if (::earthOrientationTracker.isInitialized) earthOrientationTracker.start()
         syncActiveSessionScreenPolicy()
         if (cameraFallbackRequested) {
@@ -22139,7 +22301,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun startWalkSessionRuntimeWithoutCamera() {
         cancelRuntimeCameraHandoff()
-        if (::surfaceView.isInitialized) surfaceView.onPause()
+        if (::surfaceView.isInitialized) {
+            syncGlSurfaceRenderMode(forceFrame = true)
+            surfaceView.onPause()
+        }
         if (::earthOrientationTracker.isInitialized) earthOrientationTracker.stop()
         startNavigationServicesIfNeeded()
         maybeStartHandsFreeVoiceService()
@@ -22748,7 +22913,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 if (::cameraFallbackLifecycleOwner.isInitialized) {
                     cameraFallbackLifecycleOwner.moveTo(Lifecycle.State.CREATED)
                 }
-                if (::surfaceView.isInitialized) surfaceView.onPause()
+                if (::surfaceView.isInitialized) {
+                    syncGlSurfaceRenderMode(forceFrame = true)
+                    surfaceView.onPause()
+                }
             }
             if (::fieldSessionLog.isInitialized && !invalidated.wasPreflight) {
                 fieldSessionLog.recordEvent("runtime_metric_evidence_invalidated", mapOf("reason" to reason))
@@ -22774,15 +22942,45 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun pauseRendererForSessionClose(): Boolean {
         val shouldResume = isActivityForeground && ::surfaceView.isInitialized
-        if (shouldResume) surfaceView.onPause()
+        if (shouldResume) {
+            syncGlSurfaceRenderMode(forceFrame = true)
+            surfaceView.onPause()
+        }
         return shouldResume
     }
 
     private fun resumeRendererAfterSessionClose(shouldResume: Boolean) {
         val rendererRequired =
-            isWalkSessionRuntimeActive() || arSessionPurpose == ArSessionPurpose.PREFLIGHT
+            isActivityForeground &&
+                session != null &&
+                arSessionPurpose != ArSessionPurpose.NONE
         if (shouldResume && rendererRequired && !isFinishing && !isDestroyed) {
             surfaceView.onResume()
+        }
+        syncGlSurfaceRenderMode(forceFrame = true)
+    }
+
+    private fun syncGlSurfaceRenderMode(
+        forceFrame: Boolean = false,
+        allowContinuousRendering: Boolean = true,
+    ) {
+        if (!::surfaceView.isInitialized) return
+        val continuousRenderingRequired =
+            allowContinuousRendering &&
+                isActivityForeground &&
+                session != null &&
+                arSessionPurpose != ArSessionPurpose.NONE
+        val targetRenderMode = if (continuousRenderingRequired) {
+            GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        } else {
+            GLSurfaceView.RENDERMODE_WHEN_DIRTY
+        }
+        val renderModeChanged = surfaceView.renderMode != targetRenderMode
+        if (renderModeChanged) {
+            surfaceView.renderMode = targetRenderMode
+        }
+        if (forceFrame || renderModeChanged) {
+            surfaceView.requestRender()
         }
     }
 
@@ -23696,10 +23894,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         permissionDenialPanel.visibility = View.VISIBLE
         permissionDenialSummaryText.text = message
         permissionDenialSummaryText.contentDescription = message
-        permissionDenialConfirmButton.text = when (permissionRecoveryGate.state) {
-            PermissionRecoveryGateState.BLOCKED -> "확인하고 앱 끝내기"
-            else -> "확인"
-        }
+        permissionDenialConfirmButton.text = "확인"
         permissionDenialConfirmButton.isEnabled = true
         permissionDenialSettingsButton.visibility = View.VISIBLE
         permissionDenialSummaryText.post {
@@ -23719,8 +23914,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 if (::fieldSessionLog.isInitialized) {
                     fieldSessionLog.blockActiveSessionRestore()
                 }
+                permissionRecoveryGate = PermissionRecoveryGate()
                 persistPermissionRecoveryGate()
-                finishAndRemoveTask()
+                permissionDenialPanel.visibility = View.GONE
+                refreshStartupCapabilityUi()
+                updateStatus(
+                    "일부 기능 제한",
+                    "권한이 필요한 기능만 제한하고 나머지 앱 기능을 계속 사용합니다.",
+                )
             }
             PermissionRecoveryGateState.AWAITING_EXPLICIT_RESUME -> {
                 permissionDenialPanel.visibility = View.GONE
@@ -26700,7 +26901,13 @@ generation != cameraFallbackGeneration
         if (::cameraFallbackLifecycleOwner.isInitialized) {
             cameraFallbackLifecycleOwner.moveTo(Lifecycle.State.CREATED)
         }
-        if (::surfaceView.isInitialized) surfaceView.onPause()
+        if (::surfaceView.isInitialized) {
+            syncGlSurfaceRenderMode(
+                forceFrame = true,
+                allowContinuousRendering = false,
+            )
+            surfaceView.onPause()
+        }
         syncActiveSessionScreenPolicy()
         if (::fieldSessionLog.isInitialized) {
             fieldSessionLog.recordEvent(

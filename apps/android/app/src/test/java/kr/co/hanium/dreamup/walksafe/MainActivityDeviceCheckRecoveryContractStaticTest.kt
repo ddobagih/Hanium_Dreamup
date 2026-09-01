@@ -134,7 +134,8 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         val sessionChange = functionBlock("private fun onGatewayProcessSessionChanged(")
         val postedRestore = sessionChange.substringAfterRequired("window.decorView.post {")
 
-        assertTrue(bind.contains("postLoginDeviceCheckResultStore.restore()"))
+        assertTrue(bind.contains("currentPostLoginDeviceCheckResultBinding(actorId)"))
+        assertTrue(bind.contains("postLoginDeviceCheckResultStore::restore"))
         assertTrue(bind.contains("state = result.state"))
         assertTrue(bind.contains("disabledFeatures = result.disabledFeatures"))
         assertTrue(bind.contains("metricDistanceCapabilityOverride ="))
@@ -145,6 +146,23 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         assertTrue(bind.contains("VOICE_GUIDANCE !in"))
         assertFalse(bind.contains("startPostLoginDeviceCheckRuntime("))
         assertFalse(bind.contains("beginPostLoginDeviceCheckFromUserAction("))
+        assertTrue(revalidate.contains("currentPostLoginDeviceCheckResultBinding"))
+        assertTrue(revalidate.contains("postLoginDeviceCheckResultStore::restore"))
+        assertTrue(revalidate.contains("state = PostLoginDeviceCheckState.NOT_RUN"))
+        val resultBinding = functionBlock(
+            "private fun currentPostLoginDeviceCheckResultBinding(",
+        )
+        assertTrue(resultBinding.contains("actorId = actorId"))
+        assertTrue(resultBinding.contains("getOrCreateInstallDeviceId()"))
+        assertTrue(resultBinding.contains("installationId = installationId"))
+        assertTrue(resultBinding.contains("osSdkInt = Build.VERSION.SDK_INT"))
+        assertTrue(resultBinding.contains("osBuildFingerprint = Build.FINGERPRINT"))
+        assertTrue(resultBinding.contains("appVersionCode = BuildConfig.VERSION_CODE.toLong()"))
+        assertTrue(resultBinding.contains("POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION"))
+        assertTrue(resultBinding.contains("environmentProfileRevision ="))
+        assertTrue(resultBinding.contains("missingRequiredPermissions ="))
+        assertTrue(resultBinding.contains("offlineKoreanTextToSpeechAvailable ="))
+        assertTrue(resultBinding.contains("onDeviceSpeechRecognitionAvailable ="))
         assertTrue(advance.contains("postLoginDeviceCheckSnapshot.passesFeatureGate"))
         assertTrue(advance.contains("recordEmailJitPermissionObservation("))
         assertTrue(advance.contains("recordEmailDeviceCheckPassed("))
@@ -172,6 +190,25 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
             "preservePostLoginDeviceCheck = true",
         )
         assertFalse(postedRestore.contains("startPostLoginDeviceCheckRuntime("))
+        val lateRestore = functionBlock(
+            "private fun restoreBoundPostLoginDeviceCheckResultIfPossible()",
+        )
+        assertTrue(lateRestore.contains("PostLoginDeviceCheckState.NOT_RUN"))
+        assertTrue(lateRestore.contains("currentPostLoginDeviceCheckResultBinding"))
+        assertTrue(lateRestore.contains("bindPostLoginDeviceCheckSession("))
+        assertFalse(lateRestore.contains("startPostLoginDeviceCheckRuntime("))
+        val storedValidation = functionBlock(
+            "private fun maybeStartStoredDeviceCheckBindingValidation()",
+        )
+        assertTrue(bind.contains("maybeStartStoredDeviceCheckBindingValidation()"))
+        assertTrue(storedValidation.contains("hasCurrentPolicyResultCandidate()"))
+        assertTrue(storedValidation.contains("PostLoginDeviceCheckState.NOT_RUN"))
+        assertTrue(storedValidation.contains("currentPostLoginDeviceCheckSessionBinding()"))
+        assertTrue(storedValidation.contains("startupCapabilityProbe.start()"))
+        assertTrue(storedValidation.contains("storedDeviceCheckBindingValidationPending = true"))
+        assertTrue(storedValidation.contains("restoreBoundPostLoginDeviceCheckResultIfPossible()"))
+        assertTrue(storedValidation.contains("storedDeviceCheckBindingValidationPending = false"))
+        assertFalse(storedValidation.contains("startPostLoginDeviceCheckRuntime("))
     }
 
     @Test
@@ -182,6 +219,8 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         assertTrue(capabilityUi.contains("FirstRunOnboardingStage.COMPLETE"))
         assertTrue(capabilityUi.contains("!postLoginDeviceCheckSnapshot.passesFeatureGate"))
         assertTrue(capabilityUi.contains("isEnabled = showDeviceCheckAction &&"))
+        assertTrue(capabilityUi.contains("!storedDeviceCheckBindingValidationPending"))
+        assertTrue(capabilityUi.contains("저장된 기기 점검 결과 확인 중"))
     }
 
     @Test

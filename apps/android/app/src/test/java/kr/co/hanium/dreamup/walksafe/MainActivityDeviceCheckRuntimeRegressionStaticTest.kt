@@ -30,9 +30,15 @@ class MainActivityDeviceCheckRuntimeRegressionStaticTest {
 
     @Test
     fun onboardingDepthPreflightResumesTheRendererThatConsumesFrames() {
+        val preflight = functionBlock("private fun startRuntimeMetricPreflightSession(")
         val resume = functionBlock("private fun resumeRendererAfterSessionClose(")
-        assertTrue(resume.contains("arSessionPurpose == ArSessionPurpose.PREFLIGHT"))
+
+        assertTrue(preflight.contains("arSessionPurpose = ArSessionPurpose.PREFLIGHT"))
+        assertTrue(preflight.contains("resumeRendererAfterSessionClose(resumeRenderer)"))
+        assertTrue(resume.contains("session != null"))
+        assertTrue(resume.contains("arSessionPurpose != ArSessionPurpose.NONE"))
         assertTrue(resume.contains("surfaceView.onResume()"))
+        assertTrue(resume.contains("syncGlSurfaceRenderMode(forceFrame = true)"))
     }
 
     private fun functionBlock(signature: String): String {

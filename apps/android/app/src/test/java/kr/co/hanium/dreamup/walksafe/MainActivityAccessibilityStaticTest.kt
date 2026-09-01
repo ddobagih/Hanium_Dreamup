@@ -157,18 +157,12 @@ class MainActivityAccessibilityStaticTest {
         assertFalse(presentation.contains("speakInteraction("))
         assertFalse(observedState.contains("speakInteraction("))
 
-        val exitLabel = "확인하고 앱 끝내기"
-        assertTrue(
-            presentation.contains(
-                "PermissionRecoveryGateState.BLOCKED -> \"$exitLabel\"",
-            ),
-        )
-        assertTrue(presentation.indexOf(exitLabel) == presentation.lastIndexOf(exitLabel))
-        assertTrue(blockedConfirmation.contains("finishAndRemoveTask()"))
-        assertTrue(
-            confirmation.indexOf("finishAndRemoveTask()") ==
-                confirmation.lastIndexOf("finishAndRemoveTask()"),
-        )
+        assertTrue(presentation.contains("permissionDenialConfirmButton.text = \"확인\""))
+        assertFalse(presentation.contains("확인하고 앱 끝내기"))
+        assertTrue(blockedConfirmation.contains("permissionRecoveryGate = PermissionRecoveryGate()"))
+        assertTrue(blockedConfirmation.contains("persistPermissionRecoveryGate()"))
+        assertTrue(blockedConfirmation.contains("permissionDenialPanel.visibility = View.GONE"))
+        assertFalse(confirmation.contains("finishAndRemoveTask()"))
         assertFalse(awaitingConfirmation.contains("finishAndRemoveTask()"))
         assertFalse(awaitingConfirmation.contains("maybeAdvance"))
         val hidePanel = awaitingConfirmation.indexOf(
@@ -225,7 +219,8 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(source.contains("override fun onPause()"))
         val pause = source.substringAfter("internal fun pauseWalkSafeRuntime()")
             .substringBefore("private fun invalidateFrameStateForPause()")
-        assertTrue(pause.contains("if (::surfaceView.isInitialized) surfaceView.onPause()"))
+        assertTrue(pause.contains("syncGlSurfaceRenderMode(forceFrame = true)"))
+        assertTrue(pause.contains("surfaceView.onPause()"))
         assertTrue(pause.contains("feedbackActuator?.close()"))
         assertTrue(pause.contains("feedbackActuator = null"))
         assertTrue(

@@ -140,11 +140,12 @@ class PermissionSessionLifecycleStaticTest {
     }
 
     @Test
-    fun dismissalExitAndProcessRestartRemainFailClosed() {
+    fun walkPermissionDenialLimitsFeaturesWithoutBlockingOrExitingTheApp() {
         val create = functionBlock("override fun onCreate(savedInstanceState: Bundle?)")
         val request = functionBlock("private fun requestPermissionsWithLease(")
         val callback = functionBlock("override fun onRequestPermissionsResult(")
         val barrier = functionBlock("private fun enterPermissionRecoveryBarrier(")
+        val confirmation = functionBlock("private fun onPermissionDenialConfirmed()")
         val fieldToggle = functionBlock("private fun toggleFieldSessionLog()")
 
         assertTrue(create.contains("restorePermissionRecoveryGateFromPrefs()"))
@@ -152,8 +153,13 @@ class PermissionSessionLifecycleStaticTest {
         assertTrue(request.indexOf("persistPermissionRecoveryGate()") < request.indexOf("requestPermissions("))
         assertTrue(callback.contains("lease.requestedPermissions"))
         assertTrue(callback.contains("filterNot(observed::isGranted)"))
+        assertFalse(callback.contains("enterPermissionRecoveryBarrier("))
+        assertTrue(callback.contains("showPermissionDenialPanel("))
+        assertTrue(callback.contains("permissionRecoveryGate = PermissionRecoveryGate()"))
         assertTrue(barrier.contains("fieldSessionLog.blockActiveSessionRestore()"))
-        assertTrue(source.contains("finishAndRemoveTask()"))
+        assertFalse(confirmation.contains("finishAndRemoveTask()"))
+        assertTrue(confirmation.contains("permissionRecoveryGate = PermissionRecoveryGate()"))
+        assertTrue(confirmation.contains("permissionDenialPanel.visibility = View.GONE"))
         assertTrue(fieldToggle.contains("permissionRecoveryGate.blocksAutomaticResourceStart"))
         assertTrue(fieldToggle.contains("startAfterUserConfirmation()"))
         assertFalse(fieldToggle.contains("fieldSessionLog.start()"))

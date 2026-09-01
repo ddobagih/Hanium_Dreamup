@@ -9,30 +9,65 @@ import org.junit.Test
 
 class AndroidDeviceCheckResultStoreTest {
     @Test
+    fun currentPolicyCandidateRequiresEveryStoredResultField() {
+        assertFalse(
+            AndroidDeviceCheckResultStore(FakeSharedPreferences())
+                .hasCurrentPolicyResultCandidate(),
+        )
+
+        val valid = validRecord()
+        assertTrue(
+            AndroidDeviceCheckResultStore(FakeSharedPreferences(valid))
+                .hasCurrentPolicyResultCandidate(),
+        )
+
+        val requiredKeys = listOf(
+            POLICY_VERSION_KEY,
+            BINDING_SHA256_KEY,
+            TIER_KEY,
+            DISABLED_FEATURES_KEY,
+            CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY,
+        )
+        requiredKeys.forEach { missingKey ->
+            assertFalse(
+                AndroidDeviceCheckResultStore(
+                    FakeSharedPreferences(valid - missingKey),
+                ).hasCurrentPolicyResultCandidate(),
+            )
+        }
+        assertFalse(
+            AndroidDeviceCheckResultStore(
+                FakeSharedPreferences(valid + (POLICY_VERSION_KEY to "2")),
+            ).hasCurrentPolicyResultCandidate(),
+        )
+    }
+
+    @Test
     fun fullRoundTripCommitsOnlyTheCanonicalResultValues() {
         val preferences = FakeSharedPreferences()
         val store = AndroidDeviceCheckResultStore(preferences)
 
-        assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL)))
+        assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
 
         assertEquals(1, preferences.commitCount)
         assertEquals(0, preferences.applyCount)
+        assertEquals(5, preferences.all.size)
         assertEquals(
-            mapOf(
-                POLICY_VERSION_KEY to POST_LOGIN_DEVICE_CHECK_RESULT_POLICY_VERSION,
-                TIER_KEY to "FULL",
-                DISABLED_FEATURES_KEY to "",
-                CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY to false,
-            ),
-            preferences.all,
+            POST_LOGIN_DEVICE_CHECK_RESULT_POLICY_VERSION,
+            preferences.getString(POLICY_VERSION_KEY, null),
         )
+        assertTrue(
+            preferences.getString(BINDING_SHA256_KEY, null)
+                ?.matches(Regex("^[0-9a-f]{64}$")) == true,
+        )
+        assertFalse(preferences.all.values.contains("actor-must-not-be-persisted"))
         assertEquals(
             PersistedPostLoginDeviceCheckResult(
                 state = PostLoginDeviceCheckState.FULL,
                 disabledFeatures = emptySet(),
                 cameraDependentChecksDeferred = false,
             ),
-            store.restore(),
+            store.restore(binding()),
         )
     }
 
@@ -46,7 +81,12 @@ class AndroidDeviceCheckResultStoreTest {
             PostLoginDeviceCheckFeature.HANDS_FREE_VOICE,
         )
 
-        assertTrue(store.save(snapshot(PostLoginDeviceCheckState.LIMITED, disabledFeatures)))
+        assertTrue(
+            store.save(
+                snapshot(PostLoginDeviceCheckState.LIMITED, disabledFeatures),
+                binding(),
+            ),
+        )
 
         assertEquals(
             "HANDS_FREE_VOICE,HAPTIC_FEEDBACK,VOICE_GUIDANCE",
@@ -58,7 +98,7 @@ class AndroidDeviceCheckResultStoreTest {
                 disabledFeatures = disabledFeatures,
                 cameraDependentChecksDeferred = false,
             ),
-            store.restore(),
+            store.restore(binding()),
         )
     }
 
@@ -70,6 +110,7 @@ class AndroidDeviceCheckResultStoreTest {
         assertTrue(
             store.save(
                 snapshot(PostLoginDeviceCheckState.FULL),
+                binding(),
                 cameraDependentChecksDeferred = true,
             ),
         )
@@ -81,7 +122,7 @@ class AndroidDeviceCheckResultStoreTest {
                 disabledFeatures = emptySet(),
                 cameraDependentChecksDeferred = true,
             ),
-            store.restore(),
+            store.restore(binding()),
         )
     }
 
@@ -104,7 +145,7 @@ class AndroidDeviceCheckResultStoreTest {
 
         rejected.forEach { snapshot ->
             val preferences = FakeSharedPreferences()
-            assertFalse(AndroidDeviceCheckResultStore(preferences).save(snapshot))
+            assertFalse(AndroidDeviceCheckResultStore(preferences).save(snapshot, binding()))
             assertTrue(preferences.all.isEmpty())
             assertEquals(0, preferences.commitCount)
         }
@@ -116,7 +157,7 @@ class AndroidDeviceCheckResultStoreTest {
 
         assertFalse(
             AndroidDeviceCheckResultStore(preferences)
-                .save(snapshot(PostLoginDeviceCheckState.FULL)),
+                .save(snapshot(PostLoginDeviceCheckState.FULL), binding()),
         )
 
         assertEquals(1, preferences.commitCount)
@@ -132,20 +173,25 @@ class AndroidDeviceCheckResultStoreTest {
         )
         val store = AndroidDeviceCheckResultStore(preferences)
 
-        assertFalse(store.save(snapshot(PostLoginDeviceCheckState.FULL)))
+        assertFalse(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
         assertEquals("FULL", preferences.getString(TIER_KEY, null))
-        assertNull(store.restore())
+        assertNull(store.restore(binding()))
 
         preferences.commitResult = true
         val disabledFeatures = setOf(PostLoginDeviceCheckFeature.HAPTIC_FEEDBACK)
-        assertTrue(store.save(snapshot(PostLoginDeviceCheckState.LIMITED, disabledFeatures)))
+        assertTrue(
+            store.save(
+                snapshot(PostLoginDeviceCheckState.LIMITED, disabledFeatures),
+                binding(),
+            ),
+        )
         assertEquals(
             PersistedPostLoginDeviceCheckResult(
                 state = PostLoginDeviceCheckState.LIMITED,
                 disabledFeatures = disabledFeatures,
                 cameraDependentChecksDeferred = false,
             ),
-            store.restore(),
+            store.restore(binding()),
         )
     }
 
@@ -154,6 +200,7 @@ class AndroidDeviceCheckResultStoreTest {
         val invalidRecords = listOf(
             emptyMap(),
             validRecord() - POLICY_VERSION_KEY,
+            validRecord() - BINDING_SHA256_KEY,
             validRecord() - TIER_KEY,
             validRecord() - DISABLED_FEATURES_KEY,
             validRecord() - CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY,
@@ -170,7 +217,7 @@ class AndroidDeviceCheckResultStoreTest {
 
         invalidRecords.forEach { values ->
             val preferences = FakeSharedPreferences(initialValues = values)
-            assertNull(AndroidDeviceCheckResultStore(preferences).restore())
+            assertNull(AndroidDeviceCheckResultStore(preferences).restore(binding()))
         }
     }
 
@@ -185,7 +232,7 @@ class AndroidDeviceCheckResultStoreTest {
             ),
         )
 
-        assertNull(AndroidDeviceCheckResultStore(oldLimitedResult).restore())
+        assertNull(AndroidDeviceCheckResultStore(oldLimitedResult).restore(binding()))
     }
 
     @Test
@@ -205,7 +252,7 @@ class AndroidDeviceCheckResultStoreTest {
             val preferences = FakeSharedPreferences(
                 initialValues = validRecord(tier = "LIMITED", disabledFeaturesCsv = csv),
             )
-            assertNull(AndroidDeviceCheckResultStore(preferences).restore())
+            assertNull(AndroidDeviceCheckResultStore(preferences).restore(binding()))
         }
     }
 
@@ -221,8 +268,8 @@ class AndroidDeviceCheckResultStoreTest {
             initialValues = validRecord(tier = "LIMITED", disabledFeaturesCsv = ""),
         )
 
-        assertNull(AndroidDeviceCheckResultStore(fullWithDisabledFeature).restore())
-        assertNull(AndroidDeviceCheckResultStore(limitedWithoutDisabledFeature).restore())
+        assertNull(AndroidDeviceCheckResultStore(fullWithDisabledFeature).restore(binding()))
+        assertNull(AndroidDeviceCheckResultStore(limitedWithoutDisabledFeature).restore(binding()))
     }
 
     @Test
@@ -236,7 +283,7 @@ class AndroidDeviceCheckResultStoreTest {
             ),
         )
 
-        assertNull(AndroidDeviceCheckResultStore(conflicting).restore())
+        assertNull(AndroidDeviceCheckResultStore(conflicting).restore(binding()))
         assertFalse(
             AndroidDeviceCheckResultStore(FakeSharedPreferences()).save(
                 snapshot(
@@ -246,6 +293,7 @@ class AndroidDeviceCheckResultStoreTest {
                         PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE,
                     ),
                 ),
+                binding(),
                 cameraDependentChecksDeferred = true,
             ),
         )
@@ -260,11 +308,68 @@ class AndroidDeviceCheckResultStoreTest {
                     PostLoginDeviceCheckState.LIMITED,
                     permanentlyDistanceLimited,
                 ),
+                binding(),
                 cameraDependentChecksDeferred = true,
             ),
         )
-        assertEquals(true, allowed.restore()?.cameraDependentChecksDeferred)
-        assertEquals(permanentlyDistanceLimited, allowed.restore()?.disabledFeatures)
+        assertEquals(true, allowed.restore(binding())?.cameraDependentChecksDeferred)
+        assertEquals(permanentlyDistanceLimited, allowed.restore(binding())?.disabledFeatures)
+    }
+
+    @Test
+    fun restoreRejectsAnotherActorWithoutPersistingTheActorValue() {
+        val preferences = FakeSharedPreferences()
+        val store = AndroidDeviceCheckResultStore(preferences)
+
+        assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
+
+        assertNull(store.restore(binding(actorId = "another-actor")))
+        assertFalse(preferences.all.values.contains("actor-must-not-be-persisted"))
+        assertFalse(preferences.all.values.contains("another-actor"))
+    }
+
+    @Test
+    fun restoreRejectsAnotherInstallationWithoutPersistingTheInstallationId() {
+        val preferences = FakeSharedPreferences()
+        val store = AndroidDeviceCheckResultStore(preferences)
+
+        assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
+
+        assertNull(store.restore(binding(installationId = "another-installation")))
+        assertFalse(preferences.all.values.contains("installation-must-not-be-persisted"))
+        assertFalse(preferences.all.values.contains("another-installation"))
+    }
+
+    @Test
+    fun restoreRejectsAppOsSdkAndProfilePolicyChanges() {
+        val store = AndroidDeviceCheckResultStore(FakeSharedPreferences())
+        assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
+
+        val mismatches = listOf(
+            binding(appVersionCode = 2L),
+            binding(osSdkInt = 36),
+            binding(osBuildFingerprint = "vendor/device/build-2"),
+            binding(environmentProfileRevision = "20260901-r002"),
+            binding(probePolicyVersion = "20260901-r002"),
+        )
+
+        mismatches.forEach { assertNull(store.restore(it)) }
+    }
+
+    @Test
+    fun restoreRejectsPermissionAndVoicePrerequisiteChanges() {
+        val store = AndroidDeviceCheckResultStore(FakeSharedPreferences())
+        assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
+
+        val changedPrerequisites = listOf(
+            binding(missingRequiredPermissions = setOf("android.permission.CAMERA")),
+            binding(locationServiceEnabled = false),
+            binding(voiceDisclosureAccepted = false),
+            binding(offlineKoreanTextToSpeechAvailable = false),
+            binding(onDeviceSpeechRecognitionAvailable = false),
+        )
+
+        changedPrerequisites.forEach { assertNull(store.restore(it)) }
     }
 
     private fun snapshot(
@@ -285,11 +390,64 @@ class AndroidDeviceCheckResultStoreTest {
         tier: String = "FULL",
         disabledFeaturesCsv: String = "",
         cameraDependentChecksDeferred: Boolean = false,
-    ): Map<String, Any> = mapOf(
-        POLICY_VERSION_KEY to policyVersion,
-        TIER_KEY to tier,
-        DISABLED_FEATURES_KEY to disabledFeaturesCsv,
-        CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY to cameraDependentChecksDeferred,
+    ): Map<String, Any> {
+        val preferences = FakeSharedPreferences()
+        assertTrue(
+            AndroidDeviceCheckResultStore(preferences).save(
+                snapshot(PostLoginDeviceCheckState.FULL),
+                binding(),
+            ),
+        )
+        return preferences.all
+            .mapValues { (_, value) -> requireNotNull(value) }
+            .plus(
+                mapOf(
+                    POLICY_VERSION_KEY to policyVersion,
+                    TIER_KEY to tier,
+                    DISABLED_FEATURES_KEY to disabledFeaturesCsv,
+                    CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY to
+                        cameraDependentChecksDeferred,
+                ),
+            )
+    }
+
+    private fun binding(
+        actorId: String = "actor-must-not-be-persisted",
+        installationId: String = "installation-must-not-be-persisted",
+        osSdkInt: Int = 35,
+        osBuildFingerprint: String = "vendor/device/build-1",
+        appVersionCode: Long = 1L,
+        probePolicyVersion: String = POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION,
+        environmentProfileRevision: String = "20260831-r001",
+        missingRequiredPermissions: Set<String> = emptySet(),
+        locationServiceEnabled: Boolean = true,
+        voiceDisclosureAccepted: Boolean = true,
+        offlineKoreanTextToSpeechAvailable: Boolean = true,
+        onDeviceSpeechRecognitionAvailable: Boolean = true,
+    ): PostLoginDeviceCheckResultBinding = PostLoginDeviceCheckResultBinding(
+        actorId = actorId,
+        installationId = installationId,
+        deviceManufacturer = "manufacturer",
+        deviceModel = "model",
+        deviceName = "device",
+        osSdkInt = osSdkInt,
+        osBuildFingerprint = osBuildFingerprint,
+        appId = "kr.co.hanium.dreamup.walksafe",
+        appVersionCode = appVersionCode,
+        appVersionName = "0.1.0",
+        appSourceRevision = "source-revision",
+        probePolicyVersion = probePolicyVersion,
+        environmentProfileId = "walksafe-environment-test-candidate-r001",
+        environmentProfileRevision = environmentProfileRevision,
+        approvedDeviceProfileRegistryRevision = "registry-r001",
+        approvedDeviceProfileRegistrySha256 = "a".repeat(64),
+        approvedDeviceProfileId = null,
+        approvedDeviceProfileVersion = null,
+        missingRequiredPermissions = missingRequiredPermissions,
+        locationServiceEnabled = locationServiceEnabled,
+        voiceDisclosureAccepted = voiceDisclosureAccepted,
+        offlineKoreanTextToSpeechAvailable = offlineKoreanTextToSpeechAvailable,
+        onDeviceSpeechRecognitionAvailable = onDeviceSpeechRecognitionAvailable,
     )
 
     private class FakeSharedPreferences(
@@ -373,6 +531,7 @@ class AndroidDeviceCheckResultStoreTest {
 
     private companion object {
         const val POLICY_VERSION_KEY = "device_check_result_policy_v1"
+        const val BINDING_SHA256_KEY = "device_check_result_binding_sha256_v3"
         const val TIER_KEY = "device_check_result_tier_v1"
         const val DISABLED_FEATURES_KEY = "device_check_result_disabled_features_v1"
         const val CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY =
