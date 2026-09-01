@@ -561,7 +561,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var accountPasswordInput: EditText
     private lateinit var accountPasswordConfirmationInput: EditText
     private lateinit var accountOtpInput: EditText
-    private lateinit var accountRememberMeCheck: CheckBox
     private lateinit var accountConsentDisclosureText: TextView
     private val accountConsentChecks = mutableMapOf<String, CheckBox>()
     private val accountConsentCards = linkedMapOf<String, LinearLayout>()
@@ -7062,7 +7061,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             AccountRemoteAction.CREATE_ACCOUNT,
             accountStateBinding(),
         ) ?: return
-        val rememberMe = false
         updateFirstRunOnboardingUi()
         try {
             gatewaySessionExecutor.execute {
@@ -7096,7 +7094,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         loginEmailAccount(
                             emailOverride = email,
                             passwordOverride = password,
-                            rememberMeOverride = rememberMe,
                             expectedCreatedActorId = created.actorId,
                         )
                     }
@@ -7116,7 +7113,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun loginEmailAccount(
         emailOverride: String? = null,
         passwordOverride: String? = null,
-        rememberMeOverride: Boolean? = null,
         expectedCreatedActorId: String? = null,
     ) {
         val email = emailOverride ?: accountEmailInput.text?.toString().orEmpty()
@@ -7168,7 +7164,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             showAccountMessage("다른 로그인 확인이 진행 중입니다. 잠시 후 다시 시도하세요.")
             return
         }
-        val rememberMe = rememberMeOverride ?: accountRememberMeCheck.isChecked
         updateFirstRunOnboardingUi()
         try {
             gatewaySessionExecutor.execute {
@@ -7177,7 +7172,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         gatewayBaseUrl = gatewayOrigin,
                         email = email,
                         password = password,
-                        rememberMe = rememberMe,
+                        rememberMe = false,
                         deviceId = installationDeviceId,
                     )
                     runOnUiThread {
@@ -12114,15 +12109,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
             },
         )
-        accountRememberMeCheck = CheckBox(this).apply {
-            id = View.generateViewId()
-            text = "이 기기에서 로그인 유지"
-            contentDescription = text
-            setTextColor(WS_COLOR_BUTTON_TEXT)
-            textSize = 18f
-            isChecked = false
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
-        }
         accountRequestOtpButton = accessiblePriorityUserButton(
             label = "이메일 인증번호 받기",
             emphasis = true,
@@ -12158,7 +12144,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     } else {
                         AccountSignupStep.CONSENT
                     }
-                accountRememberMeCheck.isChecked = false
                 updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
                 if (opening) {
                     val focusTarget =
@@ -12238,7 +12223,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(accountAccessStatusText)
             addView(accountEmailInput)
             addView(accountPasswordInput)
-            addView(accountRememberMeCheck)
             addView(accountLoginButton)
             addView(accountSignupToggleButton)
             addView(accountSignupControls)
@@ -13464,7 +13448,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             add(accountAccessStatusText)
             add(accountEmailInput)
             add(accountPasswordInput)
-            add(accountRememberMeCheck)
             add(accountLoginButton)
             add(accountSignupToggleButton)
             add(accountConsentDisclosureToggleButton)
@@ -16246,7 +16229,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (authenticated) {
             accountEmailInput.visibility = View.GONE
             accountPasswordInput.visibility = View.GONE
-            accountRememberMeCheck.visibility = View.GONE
             accountLoginButton.visibility = View.GONE
             accountSignupToggleButton.visibility = View.GONE
             accountSignupControls.visibility = View.GONE
@@ -16259,7 +16241,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (reauthenticationBlocked) {
             accountEmailInput.visibility = View.GONE
             accountPasswordInput.visibility = View.GONE
-            accountRememberMeCheck.visibility = View.GONE
             accountLoginButton.visibility = View.GONE
             accountSignupToggleButton.visibility = View.GONE
             accountSignupControls.visibility = View.GONE
@@ -16299,7 +16280,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (credentialFieldsVisible) View.VISIBLE else View.GONE
         accountPasswordInput.visibility =
             if (credentialFieldsVisible) View.VISIBLE else View.GONE
-        accountRememberMeCheck.visibility = if (signupVisible) View.GONE else View.VISIBLE
         accountLoginButton.visibility = if (signupVisible) View.GONE else View.VISIBLE
         accountSignupToggleButton.visibility = when {
             verifiedLogin || reauthenticationRequired -> View.GONE
@@ -16370,7 +16350,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountPasswordInput.isEnabled = !busy
         accountPasswordConfirmationInput.isEnabled = !busy
         accountOtpInput.isEnabled = !busy
-        accountRememberMeCheck.isEnabled = !busy
         val partial = emailEnrollmentPartial
         val status = when {
             busy -> "계정 요청을 안전하게 처리하고 있습니다. 버튼을 다시 누르지 마세요."

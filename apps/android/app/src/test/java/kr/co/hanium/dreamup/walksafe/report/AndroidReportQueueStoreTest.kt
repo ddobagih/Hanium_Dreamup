@@ -194,6 +194,68 @@ class AndroidReportQueueStoreTest {
     }
 
     @Test
+    fun recentPendingAutomaticReportBlocksSameRealDistanceScopeAfterStoreRecreation() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        var idCalls = 0
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2).map(UUID::fromString))
+        val firstStore = store(storage, aead, { 1_000L }) {
+            idCalls += 1
+            ids.removeFirst()
+        }
+        requireNotNull(firstStore.enqueueAutomatic(longitude = 127.000049))
+
+        val restoredStore = store(storage, aead, { 1_001L }) {
+            idCalls += 1
+            ids.removeFirst()
+        }
+        assertNull(restoredStore.enqueueAutomatic(longitude = 127.000051))
+
+        assertEquals(1, idCalls)
+        assertEquals(1, restoredStore.queuedReports().size)
+    }
+
+    @Test
+    fun pendingAutomaticWindowBlocksClockRollbackAndOpensAtCooldownBoundary() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        var now = 1_000L
+        var idCalls = 0
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2).map(UUID::fromString))
+        val store = store(storage, aead, { now }) {
+            idCalls += 1
+            ids.removeFirst()
+        }
+        requireNotNull(store.enqueueAutomatic())
+
+        now = 999L
+        assertNull(store.enqueueAutomatic())
+        now = 1_000L + AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS - 1L
+        assertNull(store.enqueueAutomatic())
+        now = 1_000L + AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS
+        assertTrue(store.enqueueAutomatic() != null)
+
+        assertEquals(2, idCalls)
+        assertEquals(2, store.queuedReports().size)
+    }
+
+    @Test
+    fun pendingAutomaticScopeDoesNotBlockDifferentActorOutsideRadiusOrExplicit() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        val ids = ArrayDeque(
+            listOf(REPORT_1, REPORT_2, REPORT_3, REPORT_4).map(UUID::fromString),
+        )
+        val store = store(storage, aead, { 1_000L }) { ids.removeFirst() }
+        requireNotNull(store.enqueueAutomatic())
+        assertTrue(store.enqueueAutomatic(actorId = OTHER_ACTOR_ID) != null)
+        assertTrue(store.enqueueAutomatic(latitude = 37.0003) != null)
+        assertTrue(store.enqueueAutomatic(priority = ReportQueuePriority.EXPLICIT) != null)
+
+        assertEquals(4, store.queuedReports().size)
+    }
+
+    @Test
     fun generatesCanonicalIdOnceAndRestoresFrozenBytesAfterRestart() {
         val storage = FakeReportQueueStorage()
         val aead = FakeQueueAead()
@@ -1311,6 +1373,20 @@ class AndroidReportQueueStoreTest {
         consentReceiptSha256 = consentReceiptSha256,
     )
 
+    private fun AndroidReportQueueStore.enqueueAutomatic(
+        actorId: String = ACTOR_ID,
+        latitude: Double = 37.0,
+        longitude: Double = 127.0,
+        priority: ReportQueuePriority = ReportQueuePriority.AUTOMATIC,
+    ): QueuedReport? = enqueue(
+        expectedReporterActorId = actorId,
+        metadataUtf8 = automaticMetadata(actorId, latitude, longitude),
+        imageJpeg = jpeg(),
+        priority = priority,
+        walkSessionId = WALK_ID,
+        consentReceiptSha256 = CONSENT,
+    )
+
     private fun receipt(
         id: String,
         hash: String,
@@ -1321,6 +1397,25 @@ class AndroidReportQueueStoreTest {
 
     private fun metadata(actorId: String = ACTOR_ID) =
         "{\"reporter_user_id\":\"$actorId\"}".toByteArray()
+
+    private fun automaticMetadata(
+        actorId: String = ACTOR_ID,
+        latitude: Double = 37.0,
+        longitude: Double = 127.0,
+    ): ByteArray = JSONObject()
+        .put("schema_version", "detect.v2")
+        .put("trigger", AndroidReportCandidatePolicy.TRIGGER_AUTO)
+        .put("auto_reported", true)
+        .put("reporter_user_id", actorId)
+        .put("class_name", AndroidReportCandidatePolicy.DAMAGED_TACTILE_BLOCK)
+        .put(
+            "gps",
+            JSONObject()
+                .put("latitude", latitude)
+                .put("longitude", longitude),
+        )
+        .toString()
+        .toByteArray()
 
     private fun jpeg() =
         byteArrayOf(0xff.toByte(), 0xd8.toByte(), 1, 2, 0xff.toByte(), 0xd9.toByte())

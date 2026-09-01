@@ -51,6 +51,10 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(login.contains("gatewaySessionClient.loginWithPassword("))
         assertTrue(login.contains("gatewaySessionStore.getOrCreateInstallDeviceId()"))
         assertTrue(login.contains("deviceId = installationDeviceId"))
+        assertTrue(login.contains("rememberMe = false"))
+        assertFalse(login.contains("val rememberMe"))
+        assertFalse(login.contains("rememberMeOverride"))
+        assertFalse(login.contains("accountRememberMeCheck"))
         assertTrue(login.contains("FirstRunOnboardingPolicy.recordVerifiedEmailLogin("))
         assertTrue(login.contains("FirstRunOnboardingPolicy.mayReauthenticateVerifiedEmailActor("))
         assertTrue(login.contains("val nextFirstRunSnapshot = if (reauthenticatesExistingProgress)"))
@@ -180,11 +184,12 @@ class MainActivityEmailAccountStaticTest {
             controls,
             "addView(accountEmailInput)",
             "addView(accountPasswordInput)",
-            "addView(accountRememberMeCheck)",
             "addView(accountLoginButton)",
             "addView(accountSignupToggleButton)",
             "addView(accountSignupControls)",
         )
+        assertFalse(source.contains("accountRememberMeCheck"))
+        assertFalse(source.contains("이 기기에서 로그인 유지"))
 
         val update = functionBlock("private fun updateEmailAccountAccessUi(")
         assertTrue(update.contains("if (verifiedLogin || reauthenticationRequired)"))
@@ -196,11 +201,6 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(update.contains("accountConsentDisclosureText.visibility ="))
         assertTrue(
             update.contains(
-                "accountRememberMeCheck.visibility = if (signupVisible) View.GONE else View.VISIBLE",
-            ),
-        )
-        assertTrue(
-            update.contains(
                 "accountLoginButton.visibility = if (signupVisible) View.GONE else View.VISIBLE",
             ),
         )
@@ -209,16 +209,6 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(update.contains("FirstRunOnboardingStage.VERIFIED_LOGIN"))
         assertFalse(update.contains("accountEmailInput.text?.clear()"))
         assertFalse(update.contains("accountPasswordInput.text?.clear()"))
-
-        val toggle = sourceBlock(
-            "accountSignupToggleButton = accessiblePriorityUserButton(",
-            "accountConsentDisclosureToggleButton = accessiblePriorityUserButton(",
-        )
-        assertTrue(toggle.contains("accountRememberMeCheck.isChecked = false"))
-
-        val create = functionBlock("private fun createEmailAccount()")
-        assertTrue(create.contains("val rememberMe = false"))
-        assertFalse(create.contains("val rememberMe = accountRememberMeCheck.isChecked"))
     }
 
     @Test

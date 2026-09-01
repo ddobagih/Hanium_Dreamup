@@ -95,6 +95,10 @@ internal class AndroidReportQueueStore private constructor(
             )
         ) return null
         pruneExpiredLocked(now)
+        if (
+            priority == ReportQueuePriority.AUTOMATIC &&
+            hasRecentPendingAutomaticReport(metadataUtf8, now)
+        ) return null
         val usage = storage.measureUsage() ?: return null
         val entryLimit = if (priority == ReportQueuePriority.AUTOMATIC) {
             profile.automaticMaxEntries
@@ -145,6 +149,29 @@ internal class AndroidReportQueueStore private constructor(
                 },
                 envelopeFactory = { sealReport(report) },
             )
+        }
+    }
+
+    private fun hasRecentPendingAutomaticReport(
+        metadataUtf8: ByteArray,
+        nowMs: Long,
+    ): Boolean {
+        val candidateScope = runCatching {
+            automaticReportCooldownScopeOrNull(
+                JSONObject(String(metadataUtf8, Charsets.UTF_8)),
+            )
+        }.getOrNull() ?: return false
+        return readAllLocked().any { report ->
+            AndroidReportCooldownPolicy.automaticCooldownRemainingMs(
+                report.createdAtEpochMs,
+                nowMs,
+            ) > 0L &&
+                report.automaticCooldownScopeOrNull()?.let { pendingScope ->
+                    AndroidReportCooldownPolicy.isSameCooldownArea(
+                        candidateScope,
+                        pendingScope,
+                    )
+                } == true
         }
     }
 
