@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import NoReturn
+from typing import Any, NoReturn
 import uuid
 
 from sqlalchemy import func, select, text
@@ -22,8 +22,18 @@ from backend.app.models import (
 )
 from backend.app.schemas import (
     AdminReportStatusUpdateV1,
+    ReportInstitutionDeliveryPageV1,
     ReportInstitutionDeliveryRequest,
+    ReportReviewDecisionPageV1,
     ReportReviewDecisionRequest,
+)
+from backend.app.services.admin_history_pagination import (
+    AdminHistoryCursorError,
+    AdminHistoryIntegrityError,
+    HISTORY_PAGE_MAX_LIMIT,
+    REPORT_HISTORY_RESPONSE_BUDGET_BYTES,
+    build_bounded_history_page,
+    decode_admin_history_cursor,
 )
 from backend.app.services.admin_security import (
     AdminSecurityError,
@@ -655,6 +665,126 @@ def list_report_review_decisions(
         _raise_database_unavailable(db, exc)
 
 
+def _report_history_snapshot(
+    db: Session,
+    *,
+    report_id: uuid.UUID,
+    history_model: Any,
+) -> int:
+    try:
+        row = db.execute(
+            select(
+                Report.id,
+                func.count(history_model.id),
+                func.max(history_model.revision),
+            )
+            .outerjoin(history_model, history_model.report_id == Report.id)
+            .where(Report.id == report_id)
+            .group_by(Report.id)
+        ).one_or_none()
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    if row is None:
+        raise AdminReportWorkflowError(
+            "report_not_found",
+            "Report was not found.",
+            status_code=404,
+        )
+    count = int(row[1])
+    maximum = 0 if row[2] is None else int(row[2])
+    if count != maximum:
+        raise AdminReportWorkflowError(
+            "report_history_integrity_invalid",
+            "Report history is temporarily unavailable.",
+            status_code=503,
+        )
+    return maximum
+
+
+def list_report_review_decision_history_page(
+    db: Session,
+    *,
+    report_id: uuid.UUID,
+    limit: int,
+    cursor: str | None,
+) -> ReportReviewDecisionPageV1:
+    if type(limit) is not int or not 1 <= limit <= HISTORY_PAGE_MAX_LIMIT:
+        raise AdminReportWorkflowError(
+            "report_review_history_query_invalid",
+            "The report review history query is invalid.",
+            status_code=422,
+        )
+    snapshot_revision = _report_history_snapshot(
+        db,
+        report_id=report_id,
+        history_model=ReportReviewDecision,
+    )
+    try:
+        decoded = (
+            decode_admin_history_cursor(
+                cursor,
+                expected_stream="report_review_decisions",
+                expected_resource_id=report_id,
+            )
+            if cursor is not None
+            else None
+        )
+    except AdminHistoryCursorError as exc:
+        raise AdminReportWorkflowError(
+            "report_review_history_cursor_invalid",
+            "The report review history cursor is invalid.",
+            status_code=422,
+        ) from exc
+    if decoded is not None and decoded.snapshot_revision > snapshot_revision:
+        raise AdminReportWorkflowError(
+            "report_review_history_cursor_invalid",
+            "The report review history cursor is invalid.",
+            status_code=422,
+        )
+    page_snapshot = (
+        decoded.snapshot_revision if decoded is not None else snapshot_revision
+    )
+    after_revision = decoded.after_revision if decoded is not None else 0
+    try:
+        rows = list(
+            db.scalars(
+                select(ReportReviewDecision)
+                .where(
+                    ReportReviewDecision.report_id == report_id,
+                    ReportReviewDecision.revision > after_revision,
+                    ReportReviewDecision.revision <= page_snapshot,
+                )
+                .order_by(ReportReviewDecision.revision)
+                .limit(limit)
+            ).all()
+        )
+        return build_bounded_history_page(
+            rows,
+            stream="report_review_decisions",
+            resource_id=report_id,
+            snapshot_revision=page_snapshot,
+            after_revision=after_revision,
+            byte_budget=REPORT_HISTORY_RESPONSE_BUDGET_BYTES,
+            revision_of=lambda item: item.revision,
+            page_factory=lambda items, next_cursor: ReportReviewDecisionPageV1(
+                schema_version="walksafe.report-review-decision-page.v1",
+                report_id=report_id,
+                snapshot_revision=page_snapshot,
+                total_count=page_snapshot,
+                items=items,
+                next_cursor=next_cursor,
+            ),
+        )
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    except (AdminHistoryIntegrityError, AttributeError, TypeError, ValueError) as exc:
+        raise AdminReportWorkflowError(
+            "report_history_integrity_invalid",
+            "Report history is temporarily unavailable.",
+            status_code=503,
+        ) from exc
+
+
 def _delivery_intent_matches(
     event: ReportInstitutionDeliveryEvent,
     payload: ReportInstitutionDeliveryRequest,
@@ -1050,6 +1180,90 @@ def list_report_institution_delivery_events(
         _raise_database_unavailable(db, exc)
 
 
+def list_report_institution_delivery_history_page(
+    db: Session,
+    *,
+    report_id: uuid.UUID,
+    limit: int,
+    cursor: str | None,
+) -> ReportInstitutionDeliveryPageV1:
+    if type(limit) is not int or not 1 <= limit <= HISTORY_PAGE_MAX_LIMIT:
+        raise AdminReportWorkflowError(
+            "report_delivery_history_query_invalid",
+            "The report delivery history query is invalid.",
+            status_code=422,
+        )
+    snapshot_revision = _report_history_snapshot(
+        db,
+        report_id=report_id,
+        history_model=ReportInstitutionDeliveryEvent,
+    )
+    try:
+        decoded = (
+            decode_admin_history_cursor(
+                cursor,
+                expected_stream="report_delivery_events",
+                expected_resource_id=report_id,
+            )
+            if cursor is not None
+            else None
+        )
+    except AdminHistoryCursorError as exc:
+        raise AdminReportWorkflowError(
+            "report_delivery_history_cursor_invalid",
+            "The report delivery history cursor is invalid.",
+            status_code=422,
+        ) from exc
+    if decoded is not None and decoded.snapshot_revision > snapshot_revision:
+        raise AdminReportWorkflowError(
+            "report_delivery_history_cursor_invalid",
+            "The report delivery history cursor is invalid.",
+            status_code=422,
+        )
+    page_snapshot = (
+        decoded.snapshot_revision if decoded is not None else snapshot_revision
+    )
+    after_revision = decoded.after_revision if decoded is not None else 0
+    try:
+        rows = list(
+            db.scalars(
+                select(ReportInstitutionDeliveryEvent)
+                .where(
+                    ReportInstitutionDeliveryEvent.report_id == report_id,
+                    ReportInstitutionDeliveryEvent.revision > after_revision,
+                    ReportInstitutionDeliveryEvent.revision <= page_snapshot,
+                )
+                .order_by(ReportInstitutionDeliveryEvent.revision)
+                .limit(limit)
+            ).all()
+        )
+        return build_bounded_history_page(
+            rows,
+            stream="report_delivery_events",
+            resource_id=report_id,
+            snapshot_revision=page_snapshot,
+            after_revision=after_revision,
+            byte_budget=REPORT_HISTORY_RESPONSE_BUDGET_BYTES,
+            revision_of=lambda item: item.revision,
+            page_factory=lambda items, next_cursor: ReportInstitutionDeliveryPageV1(
+                schema_version="walksafe.report-delivery-event-page.v1",
+                report_id=report_id,
+                snapshot_revision=page_snapshot,
+                total_count=page_snapshot,
+                items=items,
+                next_cursor=next_cursor,
+            ),
+        )
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    except (AdminHistoryIntegrityError, AttributeError, TypeError, ValueError) as exc:
+        raise AdminReportWorkflowError(
+            "report_history_integrity_invalid",
+            "Report history is temporarily unavailable.",
+            status_code=503,
+        ) from exc
+
+
 __all__ = [
     "AdminReportWorkflowError",
     "allowed_delivery_statuses_for_package",
@@ -1057,6 +1271,8 @@ __all__ = [
     "append_report_review_decision",
     "allowed_next_statuses",
     "list_report_institution_delivery_events",
+    "list_report_institution_delivery_history_page",
+    "list_report_review_decision_history_page",
     "list_report_review_decisions",
     "update_admin_report_status",
 ]

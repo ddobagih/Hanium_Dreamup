@@ -112,6 +112,13 @@ _ADMIN_INCIDENT_LIST_PATH = "/admin/incidents"
 _ADMIN_INCIDENT_DETAIL_PATH_PATTERN = re.compile(
     r"^/admin/incidents/[^/?#]{1,128}$"
 )
+_ADMIN_INCIDENT_HISTORY_PATH_PATTERN = re.compile(
+    r"^/admin/incidents/[^/?#]+/history$"
+)
+_ADMIN_INCIDENT_CANONICAL_HISTORY_PATH_PATTERN = re.compile(
+    r"^/admin/incidents/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
+    r"[89ab][0-9a-f]{3}-[0-9a-f]{12}/history$"
+)
 _ADMIN_INCIDENT_STATUS_PATH_PATTERN = re.compile(
     r"^/admin/incidents/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
     r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
@@ -121,6 +128,14 @@ _REPORT_WORKFLOW_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/"
     r"(?:review-decisions|deliveries)$"
+)
+_REPORT_WORKFLOW_HISTORY_PATH_PATTERN = re.compile(
+    r"^/reports/[^/?#]+/(?:review-decisions|deliveries)/history$"
+)
+_REPORT_WORKFLOW_CANONICAL_HISTORY_PATH_PATTERN = re.compile(
+    r"^/reports/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
+    r"[89ab][0-9a-f]{3}-[0-9a-f]{12}/"
+    r"(?:review-decisions|deliveries)/history$"
 )
 _REPORT_ORIGINAL_ACCESS_GRANT_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
@@ -363,10 +378,14 @@ def is_admin_device_proof_workflow_request(method: str, path: str) -> bool:
         return normalized_method == "GET"
     if _ADMIN_INCIDENT_DETAIL_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method == "GET"
+    if _ADMIN_INCIDENT_HISTORY_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "GET"
     if _ADMIN_INCIDENT_STATUS_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method == "PATCH"
     if _REPORT_WORKFLOW_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method in {"GET", "POST"}
+    if _REPORT_WORKFLOW_HISTORY_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "GET"
     if _REPORT_ORIGINAL_ACCESS_GRANT_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method == "POST"
     return (
@@ -401,6 +420,25 @@ def validate_device_proof_challenge_binding(
         raise ValueError("unsupported device proof method")
     if normalized_path is None or normalized_path != path:
         raise ValueError("device proof path is not canonical")
+    if normalized_method == "GET" and (
+        (
+            _ADMIN_INCIDENT_HISTORY_PATH_PATTERN.fullmatch(normalized_path)
+            is not None
+            and _ADMIN_INCIDENT_CANONICAL_HISTORY_PATH_PATTERN.fullmatch(
+                normalized_path
+            )
+            is None
+        )
+        or (
+            _REPORT_WORKFLOW_HISTORY_PATH_PATTERN.fullmatch(normalized_path)
+            is not None
+            and _REPORT_WORKFLOW_CANONICAL_HISTORY_PATH_PATTERN.fullmatch(
+                normalized_path
+            )
+            is None
+        )
+    ):
+        raise ValueError("device proof history path requires a canonical UUID")
     if _ADMIN_ID_PATTERN.fullmatch(admin_id) is None:
         raise ValueError("admin_id is invalid")
     if _DEVICE_ID_PATTERN.fullmatch(device_id) is None:

@@ -195,6 +195,62 @@ def project_admin_incident_summary(
     )
 
 
+def project_admin_incident_summary_at_event(
+    incident: CriticalIncident,
+    event: CriticalIncidentEvent,
+) -> AdminIncidentSummaryV1:
+    if (
+        event.incident_id != incident.id
+        or event.revision < 1
+        or event.next_state not in _TRANSITIONS
+    ):
+        raise ValueError("critical incident history snapshot is invalid")
+    return AdminIncidentSummaryV1(
+        incident_id=incident.id,
+        severity=incident.severity,
+        status=event.next_state,
+        status_version=event.revision,
+        reason_code=incident.reason_code,
+        summary=incident.summary,
+        started_at=incident.started_at,
+        detected_at=incident.detected_at,
+        updated_at=event.recorded_at,
+    )
+
+
+def validate_admin_incident_event_page(
+    incident: CriticalIncident,
+    events: list[CriticalIncidentEvent],
+    *,
+    after_event: CriticalIncidentEvent | None,
+) -> None:
+    if not events:
+        raise ValueError("critical incident history page is empty")
+    expected_revision = 1 if after_event is None else after_event.revision + 1
+    previous_state = None if after_event is None else after_event.next_state
+    for event in events:
+        if event.incident_id != incident.id or event.revision != expected_revision:
+            raise ValueError("critical incident event revisions are not contiguous")
+        if event.revision == 1:
+            if (
+                event.event_type != "OPENED"
+                or event.previous_state is not None
+                or event.next_state != "OPEN"
+                or event.actor_id is not None
+            ):
+                raise ValueError("critical incident opening event is invalid")
+        elif (
+            event.previous_state != previous_state
+            or event.next_state
+            not in allowed_next_incident_states(event.previous_state)
+            or event.event_type != event.next_state
+            or event.actor_id is None
+        ):
+            raise ValueError("critical incident event transition is invalid")
+        previous_state = event.next_state
+        expected_revision += 1
+
+
 def project_admin_incident_event(
     event: CriticalIncidentEvent,
 ) -> AdminIncidentEventV1:
@@ -267,4 +323,6 @@ __all__ = [
     "project_admin_incident_detail",
     "project_admin_incident_event",
     "project_admin_incident_summary",
+    "project_admin_incident_summary_at_event",
+    "validate_admin_incident_event_page",
 ]

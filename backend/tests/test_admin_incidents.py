@@ -16,6 +16,7 @@ from alembic.script import ScriptDirectory
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import ValidationError
 from sqlalchemy.dialects import postgresql
+from starlette.datastructures import QueryParams
 
 from backend.app.api import admin_incidents, health as health_api
 from backend.app.field_test_security import (
@@ -32,11 +33,16 @@ from backend.app.openapi_contract import install_walksafe_openapi_contract
 from backend.app.schemas import (
     AdminIncidentDetailV1,
     AdminIncidentEventV1,
+    AdminIncidentHistoryPageV1,
     AdminIncidentListPageV1,
     AdminIncidentStatusUpdateV1,
     AdminIncidentStatusV1,
     AdminIncidentSummaryV1,
     CriticalIncidentReasonCode,
+)
+from backend.app.services.admin_history_pagination import (
+    INCIDENT_HISTORY_RESPONSE_BUDGET_BYTES,
+    decode_admin_history_cursor,
 )
 from backend.app.services import admin_incident_workflow
 from backend.app.services.admin_device_proof import (
@@ -216,6 +222,99 @@ class _FakeSession:
         return None
 
 
+class _IncidentHistoryAggregateResult:
+    def __init__(
+        self,
+        value: tuple[CriticalIncident, int, int | None] | None,
+    ) -> None:
+        self.value = value
+
+    def one_or_none(
+        self,
+    ) -> tuple[CriticalIncident, int, int | None] | None:
+        return self.value
+
+
+class _IncidentHistoryRowsResult:
+    def __init__(self, rows: list[CriticalIncidentEvent]) -> None:
+        self.rows = rows
+
+    def all(self) -> list[CriticalIncidentEvent]:
+        return self.rows
+
+
+class _IncidentHistorySession:
+    def __init__(
+        self,
+        *,
+        incident: CriticalIncident | None,
+        count: int,
+        maximum: int | None,
+        scalar_results: list[CriticalIncidentEvent | None],
+        rows: list[CriticalIncidentEvent],
+    ) -> None:
+        self.incident = incident
+        self.count = count
+        self.maximum = maximum
+        self.scalar_results = list(scalar_results)
+        self.rows = rows
+        self.rollback_count = 0
+
+    def execute(self, _statement: object) -> _IncidentHistoryAggregateResult:
+        return _IncidentHistoryAggregateResult(
+            (
+                (self.incident, self.count, self.maximum)
+                if self.incident is not None
+                else None
+            )
+        )
+
+    def scalar(self, _statement: object) -> CriticalIncidentEvent | None:
+        assert self.scalar_results, "unexpected incident history scalar query"
+        return self.scalar_results.pop(0)
+
+    def scalars(self, _statement: object) -> _IncidentHistoryRowsResult:
+        return _IncidentHistoryRowsResult(self.rows)
+
+    def rollback(self) -> None:
+        self.rollback_count += 1
+
+
+def _incident_history_request(
+    *,
+    query: str = "limit=2",
+    path: str | None = None,
+    read_purpose: str = "admin.incident.history",
+) -> SimpleNamespace:
+    resolved_path = path or f"/admin/incidents/{INCIDENT_ID}/history"
+    identity = _identity()
+    proof = VerifiedAdminDeviceProof(
+        admin_id=identity.admin_id,
+        device_id=identity.device_id,
+        session_id=identity.session_id,
+        challenge_id=uuid.UUID("55555555-5555-4555-8555-555555555555"),
+        correlation_id=CORRELATION_ID,
+        action=None,
+        purpose="ACTION",
+        read_purpose=read_purpose,
+        method="GET",
+        path=resolved_path,
+        body_sha256="0" * 64,
+        query_sha256="1" * 64,
+        device_key_marker="2" * 64,
+        device_key_version=1,
+    )
+    return SimpleNamespace(
+        state=SimpleNamespace(
+            admin_security_identity=identity,
+            admin_device_proof=proof,
+        ),
+        method="GET",
+        url=SimpleNamespace(path=resolved_path),
+        query_params=QueryParams(query),
+    )
+
+
 def test_android_v1_schema_is_exact_and_content_minimized() -> None:
     assert set(get_args(CriticalIncidentReasonCode)) == REASON_CODES
     assert set(AdminIncidentSummaryV1.model_fields) == {
@@ -252,6 +351,15 @@ def test_android_v1_schema_is_exact_and_content_minimized() -> None:
         "schema_version",
         "allowed_next_states",
         "events",
+    }
+    assert set(AdminIncidentHistoryPageV1.model_fields) == {
+        "schema_version",
+        "incident",
+        "allowed_next_states",
+        "snapshot_revision",
+        "total_count",
+        "items",
+        "next_cursor",
     }
     assert set(AdminIncidentStatusUpdateV1.model_fields) == {
         "next_state",
@@ -404,6 +512,191 @@ def test_detail_requires_contiguous_history_and_accepts_exactly_256_events() -> 
             ),
             broken,
         )
+
+
+def test_incident_history_pages_keep_first_snapshot_and_exclude_new_appends(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audits: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        admin_incidents,
+        "_persist_audit",
+        lambda _db, **kwargs: audits.append(kwargs),
+    )
+    first_events = _event_history(3)
+    first_incident = _incident(
+        status=first_events[-1].next_state,
+        status_version=3,
+        updated_at=first_events[-1].recorded_at,
+    )
+    first_response = Response()
+    first_page = admin_incidents.get_admin_incident_history(
+        request=_incident_history_request(),  # type: ignore[arg-type]
+        response=first_response,
+        incident_id=str(INCIDENT_ID),
+        limit=2,
+        cursor=None,
+        db=_IncidentHistorySession(
+            incident=first_incident,
+            count=3,
+            maximum=3,
+            scalar_results=[first_events[2]],
+            rows=first_events[:2],
+        ),  # type: ignore[arg-type]
+    )
+
+    assert [event.revision for event in first_page.items] == [1, 2]
+    assert first_page.snapshot_revision == first_page.total_count == 3
+    assert first_page.incident.status_version == 3
+    assert first_page.incident.status == "RESOLVED"
+    assert first_page.next_cursor is not None
+    decoded = decode_admin_history_cursor(
+        first_page.next_cursor,
+        expected_stream="incident_events",
+        expected_resource_id=INCIDENT_ID,
+    )
+    assert (decoded.snapshot_revision, decoded.after_revision) == (3, 2)
+    assert first_response.headers["cache-control"] == "no-store"
+    assert first_response.headers["pragma"] == "no-cache"
+
+    current_events = _event_history(4)
+    current_incident = _incident(
+        status=current_events[-1].next_state,
+        status_version=4,
+        updated_at=current_events[-1].recorded_at,
+    )
+    second_page = admin_incidents.get_admin_incident_history(
+        request=_incident_history_request(
+            query=f"limit=2&cursor={first_page.next_cursor}"
+        ),  # type: ignore[arg-type]
+        response=Response(),
+        incident_id=str(INCIDENT_ID),
+        limit=2,
+        cursor=first_page.next_cursor,
+        db=_IncidentHistorySession(
+            incident=current_incident,
+            count=4,
+            maximum=4,
+            scalar_results=[current_events[2], current_events[1]],
+            rows=[current_events[2]],
+        ),  # type: ignore[arg-type]
+    )
+
+    assert [event.revision for event in second_page.items] == [3]
+    assert second_page.snapshot_revision == second_page.total_count == 3
+    assert second_page.incident.status_version == 3
+    assert second_page.incident.status == "RESOLVED"
+    assert second_page.next_cursor is None
+    assert [audit["result_count"] for audit in audits] == [2, 1]
+    assert all(audit["outcome"] == "SUCCEEDED" for audit in audits)
+
+
+def test_incident_history_enforces_utf8_budget_and_contiguous_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        admin_incidents,
+        "_persist_audit",
+        lambda *_args, **_kwargs: None,
+    )
+    events = _event_history(25)
+    for event in events:
+        event.reason = "\U0001f6b6" * 500
+        event.observation = "\U0001f9af" * 500
+    latest = events[-1]
+    incident = _incident(
+        status=latest.next_state,
+        status_version=25,
+        updated_at=latest.recorded_at,
+    )
+
+    page = admin_incidents.get_admin_incident_history(
+        request=_incident_history_request(query="limit=25"),  # type: ignore[arg-type]
+        response=Response(),
+        incident_id=str(INCIDENT_ID),
+        limit=25,
+        cursor=None,
+        db=_IncidentHistorySession(
+            incident=incident,
+            count=25,
+            maximum=25,
+            scalar_results=[latest],
+            rows=events,
+        ),  # type: ignore[arg-type]
+    )
+
+    assert 0 < len(page.items) < 25
+    assert [item.revision for item in page.items] == list(
+        range(1, len(page.items) + 1)
+    )
+    assert len(page.model_dump_json().encode("utf-8")) <= (
+        INCIDENT_HISTORY_RESPONSE_BUDGET_BYTES
+    )
+    assert page.next_cursor is not None
+
+
+def test_incident_history_rejects_integrity_gaps_and_duplicate_query_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audits: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        admin_incidents,
+        "_persist_audit",
+        lambda _db, **kwargs: audits.append(kwargs),
+    )
+    events = _event_history(3)
+    incident = _incident(
+        status=events[-1].next_state,
+        status_version=3,
+        updated_at=events[-1].recorded_at,
+    )
+    with pytest.raises(HTTPException) as gap:
+        admin_incidents.get_admin_incident_history(
+            request=_incident_history_request(),  # type: ignore[arg-type]
+            response=Response(),
+            incident_id=str(INCIDENT_ID),
+            limit=2,
+            cursor=None,
+            db=_IncidentHistorySession(
+                incident=incident,
+                count=2,
+                maximum=3,
+                scalar_results=[],
+                rows=[],
+            ),  # type: ignore[arg-type]
+        )
+    assert gap.value.status_code == 503
+    assert gap.value.detail["code"] == "admin_incident_history_integrity_invalid"
+    assert gap.value.headers == {
+        "Cache-Control": "no-store",
+        "Pragma": "no-cache",
+    }
+
+    with pytest.raises(HTTPException) as duplicate:
+        admin_incidents.get_admin_incident_history(
+            request=_incident_history_request(query="limit=2&limit=3"),  # type: ignore[arg-type]
+            response=Response(),
+            incident_id=str(INCIDENT_ID),
+            limit=2,
+            cursor=None,
+            db=_IncidentHistorySession(
+                incident=incident,
+                count=3,
+                maximum=3,
+                scalar_results=[],
+                rows=[],
+            ),  # type: ignore[arg-type]
+        )
+    assert duplicate.value.status_code == 422
+    assert duplicate.value.detail["code"] == "admin_incident_history_query_invalid"
+    assert duplicate.value.headers == {
+        "Cache-Control": "no-store",
+        "Pragma": "no-cache",
+    }
+    assert [(audit["outcome"], audit["error_code"]) for audit in audits] == [
+        ("ERROR", "admin_incident_history_integrity_invalid"),
+        ("DENIED", "admin_incident_history_query_invalid"),
+    ]
 
 
 def test_trusted_opening_is_exactly_idempotent_and_conflicts_on_changed_intent() -> None:
@@ -579,10 +872,12 @@ def test_status_transition_enforces_cas_and_transition_graph() -> None:
 
 def test_admin_incident_routes_are_admin_proof_scoped_and_patch_is_high_risk() -> None:
     incident_path = f"/admin/incidents/{INCIDENT_ID}"
+    history_path = incident_path + "/history"
     status_path = incident_path + "/status"
     for method, path in (
         ("GET", "/admin/incidents"),
         ("GET", incident_path),
+        ("GET", history_path),
         ("PATCH", status_path),
     ):
         assert required_field_test_access(path, method) is FieldTestAccess.ADMIN
@@ -600,6 +895,39 @@ def test_admin_incident_routes_are_admin_proof_scoped_and_patch_is_high_risk() -
         "/admin/incidents/not-a-uuid/status",
     ) is None
     assert is_admin_device_proof_workflow_request("POST", "/admin/incidents") is False
+
+
+def test_legacy_detail_validation_path_named_history_is_not_misclassified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audits: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        admin_incidents,
+        "_persist_audit",
+        lambda _db, **kwargs: audits.append(kwargs),
+    )
+
+    admin_incidents.persist_admin_incident_validation_audit(
+        _incident_history_request(
+            query="",
+            path="/admin/incidents/history",
+            read_purpose="admin.incident.detail",
+        ),  # type: ignore[arg-type]
+        object(),  # type: ignore[arg-type]
+    )
+
+    assert len(audits) == 1
+    observed = audits[0]
+    assert isinstance(observed.pop("proof"), VerifiedAdminDeviceProof)
+    assert observed == {
+        "identity": _identity(),
+        "operation": "admin.incident.detail",
+        "resource_type": "critical_incident",
+        "resource_id": "invalid-incident-id",
+        "outcome": "DENIED",
+        "result_count": None,
+        "error_code": "admin_incident_request_invalid",
+    }
 
 
 def test_incident_patch_reserves_409_for_status_version_conflict() -> None:
@@ -712,6 +1040,10 @@ def test_openapi_matches_android_read_and_high_risk_status_contract() -> None:
     for path, purpose in (
         ("/admin/incidents", "admin.incident.list"),
         ("/admin/incidents/{incident_id}", "admin.incident.detail"),
+        (
+            "/admin/incidents/{incident_id}/history",
+            "admin.incident.history",
+        ),
     ):
         operation = schema["paths"][path]["get"]
         assert set(operation["security"][0]) == {
@@ -763,6 +1095,10 @@ def test_router_has_no_public_create_or_automatic_control_path() -> None:
         (
             "/admin/incidents/{incident_id}/status",
             frozenset({"PATCH"}),
+        ),
+        (
+            "/admin/incidents/{incident_id}/history",
+            frozenset({"GET"}),
         ),
     }
     api_source = inspect.getsource(admin_incidents)

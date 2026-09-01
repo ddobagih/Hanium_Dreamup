@@ -23,10 +23,10 @@ import uuid
 import zipfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, Literal, NoReturn, Optional
+from typing import Annotated, Any, Callable, Iterable, List, Literal, NoReturn, Optional
 
 from anyio import to_thread
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Path as ApiPath, Query, Request, Response, UploadFile, status
 from geoalchemy2.elements import WKTElement
 from pydantic import AwareDatetime, ValidationError
 from sqlalchemy import func, not_, or_, select, text
@@ -45,6 +45,7 @@ from backend.app.schemas import (
     ClassName,
     DetectorSource,
     DuplicateCheckResponse,
+    ReportInstitutionDeliveryPageV1,
     ReportInstitutionDeliveryRequest,
     ReportInstitutionDeliveryResponse,
     ReportMetadata,
@@ -53,6 +54,7 @@ from backend.app.schemas import (
     ReportDemoFilter,
     ReportResponse,
     ReportReviewDecisionRequest,
+    ReportReviewDecisionPageV1,
     ReportReviewDecisionResponse,
     ReportStatus,
     ReportTransportReceiptV1,
@@ -106,7 +108,13 @@ from backend.app.services.admin_report_workflow import (
     append_report_institution_delivery_event,
     append_report_review_decision,
     list_report_institution_delivery_events,
+    list_report_institution_delivery_history_page,
+    list_report_review_decision_history_page,
     list_report_review_decisions,
+)
+from backend.app.services.admin_history_pagination import (
+    HISTORY_PAGE_DEFAULT_LIMIT,
+    HISTORY_PAGE_MAX_LIMIT,
 )
 from backend.app.uploads import image_suffix, read_image_upload
 
@@ -126,6 +134,30 @@ _ADMIN_RECONFIRMATION_OPENAPI_PARAMETER = {
         "pattern": "^[A-Za-z0-9_-]{22}$",
     },
 }
+
+_ADMIN_HISTORY_QUERY_FIELDS = frozenset({"limit", "cursor"})
+_ADMIN_HISTORY_NO_STORE_HEADERS = {
+    "Cache-Control": "no-store",
+    "Pragma": "no-cache",
+}
+_CANONICAL_HISTORY_UUID_PATTERN = (
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
+    r"[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
+
+
+def _admin_history_query_shape_allowed(request: Request) -> bool:
+    seen: set[str] = set()
+    for key, _value in request.query_params.multi_items():
+        if key not in _ADMIN_HISTORY_QUERY_FIELDS or key in seen:
+            return False
+        seen.add(key)
+    return True
+
+
+def _with_admin_history_no_store(exc: HTTPException) -> HTTPException:
+    exc.headers = {**(exc.headers or {}), **_ADMIN_HISTORY_NO_STORE_HEADERS}
+    return exc
 
 
 def _reauthorize_admin_high_risk_in_transaction(
@@ -231,6 +263,7 @@ def _raise_admin_report_workflow_error(
     identity: AdminSessionIdentity,
     proof: VerifiedAdminDeviceProof,
     audit_action: str,
+    response_headers: dict[str, str] | None = None,
 ) -> NoReturn:
     try:
         record_admin_security_failure(
@@ -245,19 +278,18 @@ def _raise_admin_report_workflow_error(
             correlation_id=proof.correlation_id,
         )
     except AdminSecurityError as audit_exc:
-        headers = (
-            {"Retry-After": str(audit_exc.retry_after)}
-            if audit_exc.retry_after is not None
-            else None
-        )
+        headers = dict(response_headers or {})
+        if audit_exc.retry_after is not None:
+            headers["Retry-After"] = str(audit_exc.retry_after)
         raise HTTPException(
             status_code=audit_exc.status_code,
             detail={"code": audit_exc.code, "message": audit_exc.message},
-            headers=headers,
+            headers=headers or None,
         ) from audit_exc
     raise HTTPException(
         status_code=exc.status_code,
         detail={"code": exc.code, "message": exc.message},
+        headers=response_headers,
     ) from exc
 
 
@@ -2884,6 +2916,92 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         )
         return decisions
 
+    @router.get(
+        "/reports/{report_id}/review-decisions/history",
+        response_model=ReportReviewDecisionPageV1,
+    )
+    def get_report_review_decision_history(
+        report_id: Annotated[str, ApiPath(
+            min_length=36,
+            max_length=36,
+            pattern=_CANONICAL_HISTORY_UUID_PATTERN,
+        )],
+        request: Request,
+        response: Response,
+        limit: int = Query(
+            default=HISTORY_PAGE_DEFAULT_LIMIT,
+            ge=1,
+            le=HISTORY_PAGE_MAX_LIMIT,
+        ),
+        cursor: str | None = Query(
+            default=None,
+            min_length=1,
+            max_length=1024,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+        db: Session = Depends(get_db),
+    ) -> ReportReviewDecisionPageV1:
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        try:
+            identity, proof = _require_admin_report_workflow_context(
+                request,
+                expected_action=None,
+                expected_read_purpose="report.review_decisions",
+            )
+        except HTTPException as exc:
+            raise _with_admin_history_no_store(exc) from exc
+        parsed_report_id = uuid.UUID(report_id)
+        if not _admin_history_query_shape_allowed(request):
+            _raise_admin_report_workflow_error(
+                AdminReportWorkflowError(
+                    "report_review_history_query_invalid",
+                    "The report review history query is invalid.",
+                    status_code=422,
+                ),
+                request=request,
+                identity=identity,
+                proof=proof,
+                audit_action="report.review_decisions.read",
+                response_headers=_ADMIN_HISTORY_NO_STORE_HEADERS,
+            )
+        try:
+            page = list_report_review_decision_history_page(
+                db,
+                report_id=parsed_report_id,
+                limit=limit,
+                cursor=cursor,
+            )
+        except AdminReportWorkflowError as exc:
+            _raise_admin_report_workflow_error(
+                exc,
+                request=request,
+                identity=identity,
+                proof=proof,
+                audit_action="report.review_decisions.read",
+                response_headers=_ADMIN_HISTORY_NO_STORE_HEADERS,
+            )
+        try:
+            persist_report_read_audit(
+                db,
+                actor_id=identity.admin_id,
+                purpose="report.review_decisions",
+                resource_type="report_detail",
+                resource_id=report_id,
+                details={
+                    "view": "review_decision_history_page",
+                    "result_count": len(page.items),
+                    "total_count": page.total_count,
+                    "snapshot_revision": page.snapshot_revision,
+                    "session_id": str(identity.session_id),
+                    "device_id": identity.device_id,
+                    "correlation_id": str(proof.correlation_id),
+                },
+            )
+        except HTTPException as exc:
+            raise _with_admin_history_no_store(exc) from exc
+        return page
+
     @router.post(
         "/reports/{report_id}/deliveries",
         response_model=ReportInstitutionDeliveryResponse,
@@ -2965,6 +3083,92 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             },
         )
         return events
+
+    @router.get(
+        "/reports/{report_id}/deliveries/history",
+        response_model=ReportInstitutionDeliveryPageV1,
+    )
+    def get_report_institution_delivery_history(
+        report_id: Annotated[str, ApiPath(
+            min_length=36,
+            max_length=36,
+            pattern=_CANONICAL_HISTORY_UUID_PATTERN,
+        )],
+        request: Request,
+        response: Response,
+        limit: int = Query(
+            default=HISTORY_PAGE_DEFAULT_LIMIT,
+            ge=1,
+            le=HISTORY_PAGE_MAX_LIMIT,
+        ),
+        cursor: str | None = Query(
+            default=None,
+            min_length=1,
+            max_length=1024,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+        db: Session = Depends(get_db),
+    ) -> ReportInstitutionDeliveryPageV1:
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        try:
+            identity, proof = _require_admin_report_workflow_context(
+                request,
+                expected_action=None,
+                expected_read_purpose="report.delivery_events",
+            )
+        except HTTPException as exc:
+            raise _with_admin_history_no_store(exc) from exc
+        parsed_report_id = uuid.UUID(report_id)
+        if not _admin_history_query_shape_allowed(request):
+            _raise_admin_report_workflow_error(
+                AdminReportWorkflowError(
+                    "report_delivery_history_query_invalid",
+                    "The report delivery history query is invalid.",
+                    status_code=422,
+                ),
+                request=request,
+                identity=identity,
+                proof=proof,
+                audit_action="report.delivery_events.read",
+                response_headers=_ADMIN_HISTORY_NO_STORE_HEADERS,
+            )
+        try:
+            page = list_report_institution_delivery_history_page(
+                db,
+                report_id=parsed_report_id,
+                limit=limit,
+                cursor=cursor,
+            )
+        except AdminReportWorkflowError as exc:
+            _raise_admin_report_workflow_error(
+                exc,
+                request=request,
+                identity=identity,
+                proof=proof,
+                audit_action="report.delivery_events.read",
+                response_headers=_ADMIN_HISTORY_NO_STORE_HEADERS,
+            )
+        try:
+            persist_report_read_audit(
+                db,
+                actor_id=identity.admin_id,
+                purpose="report.delivery_events",
+                resource_type="report_detail",
+                resource_id=report_id,
+                details={
+                    "view": "delivery_history_page",
+                    "result_count": len(page.items),
+                    "total_count": page.total_count,
+                    "snapshot_revision": page.snapshot_revision,
+                    "session_id": str(identity.session_id),
+                    "device_id": identity.device_id,
+                    "correlation_id": str(proof.correlation_id),
+                },
+            )
+        except HTTPException as exc:
+            raise _with_admin_history_no_store(exc) from exc
+        return page
 
     @router.get("/reports/{report_id}", response_model=ReportResponse)
     def get_report(

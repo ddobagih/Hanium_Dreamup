@@ -65,6 +65,19 @@ from backend.app.services.report_storage import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _is_admin_report_history_path(path: str) -> bool:
+    parts = path.split("/")
+    return (
+        len(parts) == 5
+        and parts[:2] == ["", "reports"]
+        and bool(parts[2])
+        and parts[3] in {"review-decisions", "deliveries"}
+        and parts[4] == "history"
+    )
+
+
 settings = get_settings()
 capacity_monitor_enabled = settings.capacity_measurement_interval_seconds is not None
 capacity_state = capacity_state_from_environment(
@@ -307,6 +320,20 @@ async def walksafe_request_validation_error(
         )
     if request.url.path.startswith("/raw-collections/"):
         return raw_collection_validation_error_response()
+    if _is_admin_report_history_path(request.url.path):
+        return JSONResponse(
+            status_code=422,
+            headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+            content={
+                "detail": {
+                    "code": "admin_report_history_request_validation_failed",
+                    "message": (
+                        "The administrator report history request does not "
+                        "match the required contract."
+                    ),
+                }
+            },
+        )
     if request.url.path == "/reports/mine" or request.url.path.startswith(
         "/reports/mine/"
     ):

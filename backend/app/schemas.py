@@ -902,6 +902,36 @@ class AdminIncidentEventV1(BaseModel):
     )
 
 
+class AdminIncidentHistoryPageV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-incident-history-page.v1"]
+    incident: AdminIncidentSummaryV1
+    allowed_next_states: List[CriticalIncidentStatus] = Field(
+        min_length=1,
+        max_length=1,
+    )
+    snapshot_revision: int = Field(ge=1, le=256)
+    total_count: int = Field(ge=1, le=256)
+    items: List[AdminIncidentEventV1] = Field(min_length=1, max_length=25)
+    next_cursor: str | None = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def validate_snapshot_page(self) -> "AdminIncidentHistoryPageV1":
+        if (
+            self.snapshot_revision != self.total_count
+            or self.incident.status_version != self.snapshot_revision
+        ):
+            raise ValueError("incident history snapshot is inconsistent")
+        revisions = [item.revision for item in self.items]
+        if (
+            revisions != list(range(revisions[0], revisions[0] + len(revisions)))
+            or revisions[-1] > self.snapshot_revision
+        ):
+            raise ValueError("incident history page is not contiguous")
+        return self
+
+
 class AdminIncidentDetailV1(AdminIncidentSummaryV1):
     model_config = ConfigDict(extra="forbid")
 
@@ -1129,6 +1159,30 @@ class ReportReviewDecisionResponse(BaseModel):
     created_at: AwareDatetime
 
 
+class ReportReviewDecisionPageV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.report-review-decision-page.v1"]
+    report_id: uuid.UUID
+    snapshot_revision: int = Field(ge=0, le=9_223_372_036_854_775_807)
+    total_count: int = Field(ge=0, le=9_223_372_036_854_775_807)
+    items: List[ReportReviewDecisionResponse] = Field(max_length=25)
+    next_cursor: str | None = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def validate_snapshot_page(self) -> "ReportReviewDecisionPageV1":
+        if self.snapshot_revision != self.total_count:
+            raise ValueError("review-decision history snapshot is inconsistent")
+        revisions = [item.revision for item in self.items]
+        if revisions and (
+            revisions != list(range(revisions[0], revisions[0] + len(revisions)))
+            or revisions[-1] > self.snapshot_revision
+            or any(item.report_id != self.report_id for item in self.items)
+        ):
+            raise ValueError("review-decision history page is not contiguous")
+        return self
+
+
 class ReportInstitutionDeliveryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -1206,6 +1260,30 @@ class ReportInstitutionDeliveryResponse(BaseModel):
     device_id: str
     correlation_id: uuid.UUID
     recorded_at: AwareDatetime
+
+
+class ReportInstitutionDeliveryPageV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.report-delivery-event-page.v1"]
+    report_id: uuid.UUID
+    snapshot_revision: int = Field(ge=0, le=9_223_372_036_854_775_807)
+    total_count: int = Field(ge=0, le=9_223_372_036_854_775_807)
+    items: List[ReportInstitutionDeliveryResponse] = Field(max_length=25)
+    next_cursor: str | None = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def validate_snapshot_page(self) -> "ReportInstitutionDeliveryPageV1":
+        if self.snapshot_revision != self.total_count:
+            raise ValueError("delivery history snapshot is inconsistent")
+        revisions = [item.revision for item in self.items]
+        if revisions and (
+            revisions != list(range(revisions[0], revisions[0] + len(revisions)))
+            or revisions[-1] > self.snapshot_revision
+            or any(item.report_id != self.report_id for item in self.items)
+        ):
+            raise ValueError("delivery history page is not contiguous")
+        return self
 
 
 class DuplicateCheckResponse(BaseModel):

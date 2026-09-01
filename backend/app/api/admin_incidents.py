@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,7 @@ from backend.app.database import get_db
 from backend.app.models import CriticalIncident, CriticalIncidentEvent
 from backend.app.schemas import (
     AdminIncidentDetailV1,
+    AdminIncidentHistoryPageV1,
     AdminIncidentListPageV1,
     AdminIncidentStatusUpdateV1,
     AdminIncidentStatusV1,
@@ -28,7 +29,19 @@ from backend.app.services.admin_incident_projection import (
     decode_admin_incident_cursor,
     encode_admin_incident_cursor,
     project_admin_incident_detail,
+    project_admin_incident_event,
     project_admin_incident_summary,
+    project_admin_incident_summary_at_event,
+    validate_admin_incident_event_page,
+)
+from backend.app.services.admin_history_pagination import (
+    AdminHistoryCursorError,
+    AdminHistoryIntegrityError,
+    HISTORY_PAGE_DEFAULT_LIMIT,
+    HISTORY_PAGE_MAX_LIMIT,
+    INCIDENT_HISTORY_RESPONSE_BUDGET_BYTES,
+    build_bounded_history_page,
+    decode_admin_history_cursor,
 )
 from backend.app.services.admin_incident_workflow import (
     CriticalIncidentWorkflowError,
@@ -40,12 +53,25 @@ from backend.app.services.report_read_audit import persist_admin_operation_audit
 
 ADMIN_INCIDENT_LIST_OPERATION = "admin.incident.list"
 ADMIN_INCIDENT_DETAIL_OPERATION = "admin.incident.detail"
+ADMIN_INCIDENT_HISTORY_OPERATION = "admin.incident.history"
 ADMIN_INCIDENT_STATUS_OPERATION = "admin.incident.status.update"
 _LIST_QUERY_FIELDS = frozenset({"limit", "cursor", "status"})
+_HISTORY_QUERY_FIELDS = frozenset({"limit", "cursor"})
 _CANONICAL_UUID_PATTERN = (
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
     r"[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 )
+_NO_STORE_HEADERS = {"Cache-Control": "no-store", "Pragma": "no-cache"}
+
+
+def _is_incident_history_path(path: str) -> bool:
+    parts = path.split("/")
+    return (
+        len(parts) == 5
+        and parts[:3] == ["", "admin", "incidents"]
+        and bool(parts[3])
+        and parts[4] == "history"
+    )
 
 
 def _require_read_context(
@@ -151,6 +177,15 @@ def _query_shape_is_allowed(request: Request) -> bool:
     return True
 
 
+def _history_query_shape_is_allowed(request: Request) -> bool:
+    seen: set[str] = set()
+    for key, _value in request.query_params.multi_items():
+        if key not in _HISTORY_QUERY_FIELDS or key in seen:
+            return False
+        seen.add(key)
+    return True
+
+
 def _persist_audit(
     db: Session,
     *,
@@ -179,6 +214,37 @@ def _persist_audit(
     )
 
 
+def _with_no_store_headers(exc: HTTPException) -> HTTPException:
+    exc.headers = {**(exc.headers or {}), **_NO_STORE_HEADERS}
+    return exc
+
+
+def _persist_incident_history_audit(
+    db: Session,
+    *,
+    identity: AdminSessionIdentity,
+    proof: VerifiedAdminDeviceProof,
+    resource_id: str,
+    outcome: str,
+    result_count: int | None,
+    error_code: str | None,
+) -> None:
+    try:
+        _persist_audit(
+            db,
+            identity=identity,
+            proof=proof,
+            operation=ADMIN_INCIDENT_HISTORY_OPERATION,
+            resource_type="critical_incident",
+            resource_id=resource_id,
+            outcome=outcome,
+            result_count=result_count,
+            error_code=error_code,
+        )
+    except HTTPException as exc:
+        raise _with_no_store_headers(exc) from exc
+
+
 def persist_admin_incident_validation_audit(
     request: Request,
     db: Session,
@@ -198,6 +264,16 @@ def persist_admin_incident_validation_audit(
         operation = ADMIN_INCIDENT_LIST_OPERATION
         resource_type = "incident_list"
         resource_id = "admin/incidents"
+    elif _is_incident_history_path(request.url.path):
+        identity, proof = _require_read_context(
+            request,
+            expected_operation=ADMIN_INCIDENT_HISTORY_OPERATION,
+        )
+        operation = ADMIN_INCIDENT_HISTORY_OPERATION
+        resource_type = "critical_incident"
+        resource_id = request.url.path.removeprefix(
+            "/admin/incidents/"
+        ).removesuffix("/history")
     else:
         identity, proof = _require_read_context(
             request,
@@ -476,6 +552,284 @@ def get_admin_incident_detail(
     return detail
 
 
+def get_admin_incident_history(
+    request: Request,
+    response: Response,
+    incident_id: str = Path(
+        ...,
+        min_length=36,
+        max_length=36,
+        pattern=_CANONICAL_UUID_PATTERN,
+    ),
+    limit: int = Query(
+        default=HISTORY_PAGE_DEFAULT_LIMIT,
+        ge=1,
+        le=HISTORY_PAGE_MAX_LIMIT,
+    ),
+    cursor: str | None = Query(
+        default=None,
+        min_length=1,
+        max_length=1024,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    ),
+    db: Session = Depends(get_db),
+) -> AdminIncidentHistoryPageV1:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    try:
+        identity, proof = _require_read_context(
+            request,
+            expected_operation=ADMIN_INCIDENT_HISTORY_OPERATION,
+        )
+    except HTTPException as exc:
+        raise _with_no_store_headers(exc) from exc
+    parsed_id = uuid.UUID(incident_id)
+    if (
+        type(limit) is not int
+        or not 1 <= limit <= HISTORY_PAGE_MAX_LIMIT
+        or not _history_query_shape_is_allowed(request)
+    ):
+        _persist_incident_history_audit(
+            db,
+            identity=identity,
+            proof=proof,
+            resource_id=incident_id,
+            outcome="DENIED",
+            result_count=None,
+            error_code="admin_incident_history_query_invalid",
+        )
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "admin_incident_history_query_invalid",
+                "message": "The administrator incident history query is invalid.",
+            },
+            headers=_NO_STORE_HEADERS,
+        )
+    try:
+        decoded = (
+            decode_admin_history_cursor(
+                cursor,
+                expected_stream="incident_events",
+                expected_resource_id=parsed_id,
+            )
+            if cursor is not None
+            else None
+        )
+    except AdminHistoryCursorError as exc:
+        _persist_incident_history_audit(
+            db,
+            identity=identity,
+            proof=proof,
+            resource_id=incident_id,
+            outcome="DENIED",
+            result_count=None,
+            error_code="admin_incident_history_cursor_invalid",
+        )
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "admin_incident_history_cursor_invalid",
+                "message": "The administrator incident history cursor is invalid.",
+            },
+            headers=_NO_STORE_HEADERS,
+        ) from exc
+
+    try:
+        snapshot_row = db.execute(
+            select(
+                CriticalIncident,
+                func.count(CriticalIncidentEvent.id),
+                func.max(CriticalIncidentEvent.revision),
+            )
+            .outerjoin(
+                CriticalIncidentEvent,
+                CriticalIncidentEvent.incident_id == CriticalIncident.id,
+            )
+            .where(CriticalIncident.id == parsed_id)
+            .group_by(CriticalIncident.id)
+        ).one_or_none()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        _persist_incident_history_audit(
+            db,
+            identity=identity,
+            proof=proof,
+            resource_id=incident_id,
+            outcome="ERROR",
+            result_count=None,
+            error_code="admin_incident_history_unavailable",
+        )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "admin_incident_history_unavailable",
+                "message": "The administrator incident history is temporarily unavailable.",
+            },
+            headers=_NO_STORE_HEADERS,
+        ) from exc
+    if snapshot_row is None:
+        _persist_incident_history_audit(
+            db,
+            identity=identity,
+            proof=proof,
+            resource_id=incident_id,
+            outcome="DENIED",
+            result_count=None,
+            error_code="admin_incident_not_found",
+        )
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "admin_incident_not_found",
+                "message": "The administrator incident was not found.",
+            },
+            headers=_NO_STORE_HEADERS,
+        )
+
+    incident = snapshot_row[0]
+    count = int(snapshot_row[1])
+    maximum = 0 if snapshot_row[2] is None else int(snapshot_row[2])
+    if (
+        count != maximum
+        or maximum != incident.status_version
+        or maximum < 1
+        or (decoded is not None and decoded.snapshot_revision > maximum)
+    ):
+        if decoded is not None and decoded.snapshot_revision > maximum:
+            outcome = "DENIED"
+            error_code = "admin_incident_history_cursor_invalid"
+            status_code = 422
+            message = "The administrator incident history cursor is invalid."
+        else:
+            outcome = "ERROR"
+            error_code = "admin_incident_history_integrity_invalid"
+            status_code = 503
+            message = "The administrator incident history is temporarily unavailable."
+        _persist_incident_history_audit(
+            db,
+            identity=identity,
+            proof=proof,
+            resource_id=incident_id,
+            outcome=outcome,
+            result_count=None,
+            error_code=error_code,
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail={"code": error_code, "message": message},
+            headers=_NO_STORE_HEADERS,
+        )
+
+    snapshot_revision = (
+        decoded.snapshot_revision if decoded is not None else maximum
+    )
+    after_revision = decoded.after_revision if decoded is not None else 0
+    try:
+        snapshot_event = db.scalar(
+            select(CriticalIncidentEvent).where(
+                CriticalIncidentEvent.incident_id == parsed_id,
+                CriticalIncidentEvent.revision == snapshot_revision,
+            )
+        )
+        after_event = (
+            db.scalar(
+                select(CriticalIncidentEvent).where(
+                    CriticalIncidentEvent.incident_id == parsed_id,
+                    CriticalIncidentEvent.revision == after_revision,
+                )
+            )
+            if after_revision > 0
+            else None
+        )
+        rows = list(
+            db.scalars(
+                select(CriticalIncidentEvent)
+                .where(
+                    CriticalIncidentEvent.incident_id == parsed_id,
+                    CriticalIncidentEvent.revision > after_revision,
+                    CriticalIncidentEvent.revision <= snapshot_revision,
+                )
+                .order_by(CriticalIncidentEvent.revision)
+                .limit(limit)
+            ).all()
+        )
+        if snapshot_event is None or (after_revision > 0 and after_event is None):
+            raise AdminHistoryIntegrityError(
+                "critical incident history boundary is incomplete"
+            )
+        if decoded is None and (
+            snapshot_event.next_state != incident.status
+            or snapshot_event.recorded_at != incident.updated_at
+        ):
+            raise AdminHistoryIntegrityError(
+                "critical incident projection does not match its history"
+            )
+        validate_admin_incident_event_page(
+            incident,
+            rows,
+            after_event=after_event,
+        )
+        snapshot = project_admin_incident_summary_at_event(
+            incident,
+            snapshot_event,
+        )
+        page = build_bounded_history_page(
+            rows,
+            stream="incident_events",
+            resource_id=parsed_id,
+            snapshot_revision=snapshot_revision,
+            after_revision=after_revision,
+            byte_budget=INCIDENT_HISTORY_RESPONSE_BUDGET_BYTES,
+            revision_of=lambda item: item.revision,
+            page_factory=lambda items, next_cursor: AdminIncidentHistoryPageV1(
+                schema_version="walksafe.admin-incident-history-page.v1",
+                incident=snapshot,
+                allowed_next_states=list(
+                    allowed_next_incident_states(snapshot.status)
+                ),
+                snapshot_revision=snapshot_revision,
+                total_count=snapshot_revision,
+                items=[project_admin_incident_event(item) for item in items],
+                next_cursor=next_cursor,
+            ),
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        error = exc
+    except (AdminHistoryIntegrityError, AttributeError, TypeError, ValueError) as exc:
+        error = exc
+    else:
+        _persist_incident_history_audit(
+            db,
+            identity=identity,
+            proof=proof,
+            resource_id=incident_id,
+            outcome="SUCCEEDED",
+            result_count=len(page.items),
+            error_code=None,
+        )
+        return page
+
+    _persist_incident_history_audit(
+        db,
+        identity=identity,
+        proof=proof,
+        resource_id=incident_id,
+        outcome="ERROR",
+        result_count=None,
+        error_code="admin_incident_history_integrity_invalid",
+    )
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "code": "admin_incident_history_integrity_invalid",
+            "message": "The administrator incident history is temporarily unavailable.",
+        },
+        headers=_NO_STORE_HEADERS,
+    ) from error
+
+
 def patch_admin_incident_status(
     incident_id: uuid.UUID,
     payload: AdminIncidentStatusUpdateV1,
@@ -536,6 +890,12 @@ def create_router() -> APIRouter:
         response_model=AdminIncidentStatusV1,
     )
     router.add_api_route(
+        "/admin/incidents/{incident_id}/history",
+        get_admin_incident_history,
+        methods=["GET"],
+        response_model=AdminIncidentHistoryPageV1,
+    )
+    router.add_api_route(
         "/admin/incidents/{incident_id}",
         get_admin_incident_detail,
         methods=["GET"],
@@ -546,6 +906,7 @@ def create_router() -> APIRouter:
 
 __all__ = [
     "ADMIN_INCIDENT_DETAIL_OPERATION",
+    "ADMIN_INCIDENT_HISTORY_OPERATION",
     "ADMIN_INCIDENT_LIST_OPERATION",
     "ADMIN_INCIDENT_STATUS_OPERATION",
     "create_router",

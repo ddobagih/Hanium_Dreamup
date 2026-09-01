@@ -80,6 +80,9 @@ _DEVICE_PROOF_WORKFLOW_PATHS = {
     "/admin/incidents/{incident_id}": {
         "get": (None, "admin.incident.detail"),
     },
+    "/admin/incidents/{incident_id}/history": {
+        "get": (None, "admin.incident.history"),
+    },
     "/admin/incidents/{incident_id}/status": {
         "patch": ("admin.incident.status.update", None),
     },
@@ -93,11 +96,17 @@ _DEVICE_PROOF_WORKFLOW_PATHS = {
         "post": ("report.review.decide", None),
         "get": (None, "report.review_decisions"),
     },
+    "/reports/{report_id}/review-decisions/history": {
+        "get": (None, "report.review_decisions"),
+    },
     "/reports/{report_id}/original-access-grants": {
         "post": ("report.original.grant", None),
     },
     "/reports/{report_id}/deliveries": {
         "post": ("report.delivery.create", None),
+        "get": (None, "report.delivery_events"),
+    },
+    "/reports/{report_id}/deliveries/history": {
         "get": (None, "report.delivery_events"),
     },
 }

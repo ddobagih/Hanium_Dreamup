@@ -20,16 +20,27 @@ from backend.app.models import (
     ReportReviewDecision,
 )
 from backend.app.schemas import (
+    ReportInstitutionDeliveryPageV1,
     ReportInstitutionDeliveryRequest,
     ReportInstitutionDeliveryResponse,
     ReportOriginalAccessGrantRequest,
+    ReportReviewDecisionPageV1,
     ReportReviewDecisionRequest,
+)
+from backend.app.services.admin_history_pagination import (
+    REPORT_HISTORY_RESPONSE_BUDGET_BYTES,
+    decode_admin_history_cursor,
+    encode_admin_history_cursor,
 )
 from backend.app.services.admin_device_proof import VerifiedAdminDeviceProof
 from backend.app.services.admin_report_workflow import (
     AdminReportWorkflowError,
     append_report_institution_delivery_event,
     append_report_review_decision,
+    list_report_institution_delivery_events,
+    list_report_institution_delivery_history_page,
+    list_report_review_decision_history_page,
+    list_report_review_decisions,
 )
 from backend.app.services.admin_security import (
     AdminSecurityStoreUnavailable,
@@ -147,6 +158,7 @@ def _request(
     identity: object | None = None,
     proof: object | None = None,
     reconfirm_nonce: str | None = None,
+    query: bytes = b"",
 ) -> Request:
     headers = []
     if reconfirm_nonce is not None:
@@ -161,7 +173,7 @@ def _request(
             "scheme": "https",
             "path": path,
             "raw_path": path.encode("ascii"),
-            "query_string": b"",
+            "query_string": query,
             "headers": headers,
             "client": ("127.0.0.1", 12345),
             "server": ("testserver", 443),
@@ -240,6 +252,44 @@ class _FakeSession:
 
     def expunge(self, _value: object) -> None:
         self.expunge_count += 1
+
+
+class _HistoryAggregateResult:
+    def __init__(self, value: tuple[object, int, int | None] | None) -> None:
+        self.value = value
+
+    def one_or_none(self) -> tuple[object, int, int | None] | None:
+        return self.value
+
+
+class _HistoryRowsResult:
+    def __init__(self, values: list[object]) -> None:
+        self.values = values
+
+    def all(self) -> list[object]:
+        return self.values
+
+
+class _HistorySession:
+    def __init__(
+        self,
+        *,
+        aggregate: tuple[object, int, int | None] | None,
+        rows: list[object],
+        report: object | None = None,
+    ) -> None:
+        self.aggregate = aggregate
+        self.rows = rows
+        self.report = report
+
+    def execute(self, _statement: object) -> _HistoryAggregateResult:
+        return _HistoryAggregateResult(self.aggregate)
+
+    def scalars(self, _statement: object) -> _HistoryRowsResult:
+        return _HistoryRowsResult(self.rows)
+
+    def get(self, _model: type[object], _key: object) -> object | None:
+        return self.report
 
 
 class _UnavailableSession(_FakeSession):
@@ -679,6 +729,8 @@ def test_report_workflow_routes_are_registered_before_generic_detail() -> None:
         (f"/reports/{{report_id}}/review-decisions", "GET"): None,
         (f"/reports/{{report_id}}/deliveries", "POST"): 201,
         (f"/reports/{{report_id}}/deliveries", "GET"): None,
+        (f"/reports/{{report_id}}/review-decisions/history", "GET"): None,
+        (f"/reports/{{report_id}}/deliveries/history", "GET"): None,
     }
 
     for key, status_code in expected.items():
@@ -1016,6 +1068,318 @@ def test_get_endpoints_require_read_bound_proof_and_call_history_services(
     assert all(audit["details"]["correlation_id"] == str(CORRELATION_ID) for audit in audits)
 
 
+def test_legacy_history_lists_still_return_the_original_unpaged_shape() -> None:
+    decision = _history_decision(1)
+    delivery = _history_delivery(1)
+
+    assert list_report_review_decisions(
+        _HistorySession(
+            aggregate=None,
+            rows=[decision],
+            report=Report(id=REPORT_ID),
+        ),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+    ) == [decision]
+    assert list_report_institution_delivery_events(
+        _HistorySession(
+            aggregate=None,
+            rows=[delivery],
+            report=Report(id=REPORT_ID),
+        ),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+    ) == [delivery]
+
+
+def test_report_history_pages_keep_the_first_snapshot_across_new_appends() -> None:
+    first_review = list_report_review_decision_history_page(
+        _HistorySession(
+            aggregate=(REPORT_ID, 3, 3),
+            rows=[_history_decision(1), _history_decision(2)],
+        ),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=2,
+        cursor=None,
+    )
+    assert [item.revision for item in first_review.items] == [1, 2]
+    assert first_review.snapshot_revision == first_review.total_count == 3
+    assert first_review.next_cursor is not None
+    review_cursor = decode_admin_history_cursor(
+        first_review.next_cursor,
+        expected_stream="report_review_decisions",
+        expected_resource_id=REPORT_ID,
+    )
+    assert (review_cursor.snapshot_revision, review_cursor.after_revision) == (3, 2)
+
+    second_review = list_report_review_decision_history_page(
+        _HistorySession(
+            aggregate=(REPORT_ID, 4, 4),
+            rows=[_history_decision(3)],
+        ),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=2,
+        cursor=first_review.next_cursor,
+    )
+    assert [item.revision for item in second_review.items] == [3]
+    assert second_review.snapshot_revision == second_review.total_count == 3
+    assert second_review.next_cursor is None
+
+    first_delivery = list_report_institution_delivery_history_page(
+        _HistorySession(
+            aggregate=(REPORT_ID, 3, 3),
+            rows=[_history_delivery(1), _history_delivery(2)],
+        ),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=2,
+        cursor=None,
+    )
+    assert [item.revision for item in first_delivery.items] == [1, 2]
+    assert first_delivery.next_cursor is not None
+    second_delivery = list_report_institution_delivery_history_page(
+        _HistorySession(
+            aggregate=(REPORT_ID, 4, 4),
+            rows=[_history_delivery(3)],
+        ),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=2,
+        cursor=first_delivery.next_cursor,
+    )
+    assert [item.revision for item in second_delivery.items] == [3]
+    assert second_delivery.snapshot_revision == second_delivery.total_count == 3
+    assert second_delivery.next_cursor is None
+
+
+def test_report_history_pages_reject_gaps_cross_stream_cursors_and_accept_empty() -> None:
+    with pytest.raises(AdminReportWorkflowError) as gap:
+        list_report_review_decision_history_page(
+            _HistorySession(aggregate=(REPORT_ID, 2, 3), rows=[]),  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            limit=2,
+            cursor=None,
+        )
+    assert (gap.value.code, gap.value.status_code) == (
+        "report_history_integrity_invalid",
+        503,
+    )
+
+    wrong_stream = encode_admin_history_cursor(
+        stream="report_delivery_events",
+        resource_id=REPORT_ID,
+        snapshot_revision=2,
+        after_revision=1,
+    )
+    with pytest.raises(AdminReportWorkflowError) as invalid_cursor:
+        list_report_review_decision_history_page(
+            _HistorySession(aggregate=(REPORT_ID, 2, 2), rows=[]),  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            limit=2,
+            cursor=wrong_stream,
+        )
+    assert (invalid_cursor.value.code, invalid_cursor.value.status_code) == (
+        "report_review_history_cursor_invalid",
+        422,
+    )
+
+    empty = list_report_institution_delivery_history_page(
+        _HistorySession(aggregate=(REPORT_ID, 0, None), rows=[]),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=25,
+        cursor=None,
+    )
+    assert empty.snapshot_revision == empty.total_count == 0
+    assert empty.items == [] and empty.next_cursor is None
+
+
+def test_report_history_pages_enforce_utf8_response_budgets() -> None:
+    review_rows = [
+        _history_decision(revision, reason="\U0001f6b6" * 500)
+        for revision in range(1, 26)
+    ]
+    review_page = list_report_review_decision_history_page(
+        _HistorySession(aggregate=(REPORT_ID, 25, 25), rows=review_rows),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=25,
+        cursor=None,
+    )
+    assert 0 < len(review_page.items) < 25
+    assert len(review_page.model_dump_json().encode("utf-8")) <= (
+        REPORT_HISTORY_RESPONSE_BUDGET_BYTES
+    )
+    assert review_page.next_cursor is not None
+
+    delivery_rows = [
+        _history_delivery(revision, long_text=True)
+        for revision in range(1, 26)
+    ]
+    delivery_page = list_report_institution_delivery_history_page(
+        _HistorySession(aggregate=(REPORT_ID, 25, 25), rows=delivery_rows),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=25,
+        cursor=None,
+    )
+    assert 0 < len(delivery_page.items) < 25
+    assert len(delivery_page.model_dump_json().encode("utf-8")) <= (
+        REPORT_HISTORY_RESPONSE_BUDGET_BYTES
+    )
+    assert delivery_page.next_cursor is not None
+
+
+def test_versioned_report_history_routes_call_paged_services_and_audit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, uuid.UUID, int, str | None]] = []
+    audits: list[dict[str, object]] = []
+    review_page = ReportReviewDecisionPageV1(
+        schema_version="walksafe.report-review-decision-page.v1",
+        report_id=REPORT_ID,
+        snapshot_revision=1,
+        total_count=1,
+        items=[_history_decision(1)],
+        next_cursor=None,
+    )
+    delivery_page = ReportInstitutionDeliveryPageV1(
+        schema_version="walksafe.report-delivery-event-page.v1",
+        report_id=REPORT_ID,
+        snapshot_revision=1,
+        total_count=1,
+        items=[_history_delivery(1)],
+        next_cursor=None,
+    )
+
+    def reviews(
+        _db: object,
+        *,
+        report_id: uuid.UUID,
+        limit: int,
+        cursor: str | None,
+    ) -> ReportReviewDecisionPageV1:
+        calls.append(("review", report_id, limit, cursor))
+        return review_page
+
+    def deliveries(
+        _db: object,
+        *,
+        report_id: uuid.UUID,
+        limit: int,
+        cursor: str | None,
+    ) -> ReportInstitutionDeliveryPageV1:
+        calls.append(("delivery", report_id, limit, cursor))
+        return delivery_page
+
+    monkeypatch.setattr(
+        reports_api,
+        "list_report_review_decision_history_page",
+        reviews,
+    )
+    monkeypatch.setattr(
+        reports_api,
+        "list_report_institution_delivery_history_page",
+        deliveries,
+    )
+    monkeypatch.setattr(
+        reports_api,
+        "persist_report_read_audit",
+        lambda _db, **kwargs: audits.append(kwargs),
+    )
+    identity = _identity()
+    db = object()
+    for path_suffix, purpose, page in (
+        ("review-decisions/history", "report.review_decisions", review_page),
+        ("deliveries/history", "report.delivery_events", delivery_page),
+    ):
+        path = f"/reports/{REPORT_ID}/{path_suffix}"
+        response = Response()
+        observed = _route_endpoint(
+            f"/reports/{{report_id}}/{path_suffix}",
+            "GET",
+        )(
+            report_id=str(REPORT_ID),
+            request=_request(
+                "GET",
+                path,
+                identity=identity,
+                proof=_proof(
+                    method="GET",
+                    path=path,
+                    action=None,
+                    read_purpose=purpose,
+                ),
+                query=b"limit=2",
+            ),
+            response=response,
+            limit=2,
+            cursor=None,
+            db=db,
+        )
+        assert observed is page
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["pragma"] == "no-cache"
+
+    assert calls == [
+        ("review", REPORT_ID, 2, None),
+        ("delivery", REPORT_ID, 2, None),
+    ]
+    assert [audit["purpose"] for audit in audits] == [
+        "report.review_decisions",
+        "report.delivery_events",
+    ]
+    assert all(audit["details"]["total_count"] == 1 for audit in audits)
+
+
+@pytest.mark.parametrize(
+    ("path_suffix", "purpose", "error_code"),
+    [
+        (
+            "review-decisions/history",
+            "report.review_decisions",
+            "report_review_history_query_invalid",
+        ),
+        (
+            "deliveries/history",
+            "report.delivery_events",
+            "report_delivery_history_query_invalid",
+        ),
+    ],
+)
+def test_versioned_report_history_routes_reject_duplicate_query_fields(
+    monkeypatch: pytest.MonkeyPatch,
+    path_suffix: str,
+    purpose: str,
+    error_code: str,
+) -> None:
+    monkeypatch.setattr(
+        reports_api,
+        "record_admin_security_failure",
+        lambda **_kwargs: None,
+    )
+    path = f"/reports/{REPORT_ID}/{path_suffix}"
+    with pytest.raises(HTTPException) as captured:
+        _route_endpoint(f"/reports/{{report_id}}/{path_suffix}", "GET")(
+            report_id=str(REPORT_ID),
+            request=_request(
+                "GET",
+                path,
+                identity=_identity(),
+                proof=_proof(
+                    method="GET",
+                    path=path,
+                    action=None,
+                    read_purpose=purpose,
+                ),
+                query=b"limit=2&limit=3",
+            ),
+            response=Response(),
+            limit=2,
+            cursor=None,
+            db=object(),
+        )
+    assert captured.value.status_code == 422
+    assert captured.value.detail["code"] == error_code
+    assert captured.value.headers == {
+        "Cache-Control": "no-store",
+        "Pragma": "no-cache",
+    }
+
+
 def test_review_append_is_monotonic_and_does_not_change_legacy_authority() -> None:
     report = Report(
         id=REPORT_ID,
@@ -1196,6 +1560,66 @@ def _typed_decision(decision: str = "APPROVED") -> ReportReviewDecision:
         location_reviewed=decision == "APPROVED",
         photo_reviewed=decision == "APPROVED",
         privacy_reviewed=decision == "APPROVED",
+    )
+
+
+def _history_decision(
+    revision: int,
+    *,
+    reason: str = "검수 결과를 사실대로 기록했습니다",
+) -> ReportReviewDecision:
+    timestamp = datetime(2026, 8, 9, 3, tzinfo=UTC)
+    return ReportReviewDecision(
+        id=uuid.uuid5(REPORT_ID, f"decision-{revision}"),
+        report_id=REPORT_ID,
+        revision=revision,
+        content_revision=0,
+        decision="APPROVED",
+        reason=reason,
+        user_visible_reason=None,
+        duplicate_of_report_id=None,
+        evidence_grant_id=uuid.uuid5(REPORT_ID, f"evidence-{revision}"),
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+        admin_id=_identity().admin_id,
+        session_id=SESSION_ID,
+        device_id=_identity().device_id,
+        correlation_id=uuid.uuid5(REPORT_ID, f"correlation-{revision}"),
+        decided_at=timestamp,
+        created_at=timestamp,
+    )
+
+
+def _history_delivery(
+    revision: int,
+    *,
+    long_text: bool = False,
+) -> ReportInstitutionDeliveryEvent:
+    timestamp = datetime(2026, 8, 9, 3, tzinfo=UTC)
+    text = "\U0001f6b6" if long_text else "서울"
+    return ReportInstitutionDeliveryEvent(
+        id=uuid.uuid5(REPORT_ID, f"delivery-{revision}"),
+        report_id=REPORT_ID,
+        review_decision_id=uuid.uuid5(REPORT_ID, f"decision-{revision}"),
+        package_id=uuid.uuid5(REPORT_ID, f"package-{revision}"),
+        package_revision=revision,
+        revision=revision,
+        institution=text * (160 if long_text else 2),
+        channel="WEB_PORTAL",
+        recipient=text * (255 if long_text else 2),
+        status="SUBMITTED",
+        external_receipt_id=None,
+        reason=text * (500 if long_text else 8),
+        evidence_sha256="a" * 64,
+        observed_at=timestamp,
+        expected_revision=revision - 1,
+        idempotency_key=uuid.uuid5(REPORT_ID, f"delivery-key-{revision}"),
+        admin_id=_identity().admin_id,
+        session_id=SESSION_ID,
+        device_id=_identity().device_id,
+        correlation_id=uuid.uuid5(REPORT_ID, f"delivery-correlation-{revision}"),
+        recorded_at=timestamp,
     )
 
 

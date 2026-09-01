@@ -46,6 +46,7 @@ from backend.app.services.admin_device_proof import (
     load_p256_spki_public_key,
     provision_admin_device_key,
     raw_body_sha256,
+    validate_device_proof_challenge_binding,
     verify_admin_device_proof,
 )
 from backend.app.services.admin_security import (
@@ -68,6 +69,7 @@ SESSION_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
 CHALLENGE_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
 CORRELATION_ID = uuid.UUID("33333333-3333-4333-8333-333333333333")
 REPORT_ID = "44444444-4444-4444-8444-444444444444"
+INCIDENT_ID = "55555555-5555-4555-8555-555555555555"
 
 
 def _repository_alembic_head() -> str:
@@ -1959,6 +1961,128 @@ def test_workflow_get_binds_read_purpose_and_nonworkflow_admin_route_is_unchange
     assert "admin_device_proof" not in downstream[-1]["state"]
 
 
+@pytest.mark.parametrize(
+    ("path", "read_purpose"),
+    [
+        (
+            f"/admin/incidents/{INCIDENT_ID}/history",
+            "admin.incident.history",
+        ),
+        (
+            f"/reports/{REPORT_ID}/review-decisions/history",
+            "report.review_decisions",
+        ),
+        (
+            f"/reports/{REPORT_ID}/deliveries/history",
+            "report.delivery_events",
+        ),
+    ],
+)
+def test_history_get_binds_exact_read_purpose(
+    path: str,
+    read_purpose: str,
+) -> None:
+    verifier, downstream, sent = _run_middleware(
+        method="GET",
+        path=path,
+        messages=[{"type": "http.request", "body": b"", "more_body": False}],
+        headers=_headers(read_purpose=read_purpose),
+        query=b"limit=25",
+    )
+
+    assert sent[0]["status"] == 204
+    assert verifier[0]["expected_action"] is None
+    assert verifier[0]["expected_path"] == path
+    assert verifier[0]["expected_read_purpose"] == read_purpose
+    assert verifier[0]["raw_query_string"] == b"limit=25"
+    assert downstream[-1]["state"]["admin_device_proof"].purpose == "ACTION"
+
+
+@pytest.mark.parametrize(
+    ("path", "read_purpose"),
+    [
+        (
+            f"/admin/incidents/{INCIDENT_ID}/history",
+            "admin.incident.history",
+        ),
+        (
+            f"/reports/{REPORT_ID}/review-decisions/history",
+            "report.review_decisions",
+        ),
+        (
+            f"/reports/{REPORT_ID}/deliveries/history",
+            "report.delivery_events",
+        ),
+    ],
+)
+def test_history_challenge_accepts_canonical_uuid_path(
+    path: str,
+    read_purpose: str,
+) -> None:
+    assert validate_device_proof_challenge_binding(
+        purpose="ACTION",
+        action=None,
+        admin_id=ADMIN_ID,
+        device_id=DEVICE_ID,
+        session_id=str(SESSION_ID),
+        method="GET",
+        path=path,
+        read_purpose=read_purpose,
+        identity=_identity(),
+    ) == SESSION_ID
+
+
+@pytest.mark.parametrize(
+    ("path", "read_purpose"),
+    [
+        (
+            "/admin/incidents/ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF/history",
+            "admin.incident.history",
+        ),
+        (
+            "/reports/not-a-uuid/review-decisions/history",
+            "report.review_decisions",
+        ),
+        (
+            "/reports/ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF/deliveries/history",
+            "report.delivery_events",
+        ),
+        (
+            f"/admin/incidents/{'a' * 129}/history",
+            "admin.incident.history",
+        ),
+        (
+            f"/reports/{'a' * 129}/review-decisions/history",
+            "report.review_decisions",
+        ),
+        (
+            "/reports/11111111-1111-0111-8111-111111111111/"
+            "deliveries/history",
+            "report.delivery_events",
+        ),
+    ],
+)
+def test_history_challenge_rejects_noncanonical_uuid_path(
+    path: str,
+    read_purpose: str,
+) -> None:
+    key = _device_key(_private_key())
+    request = {
+        **_challenge_request(key, body=b"", query=b"limit=25"),
+        "action": None,
+        "body_sha256": raw_body_sha256(b""),
+        "method": "GET",
+        "path": path,
+        "query_sha256": canonical_admin_query_sha256(b"limit=25"),
+        "read_purpose": read_purpose,
+    }
+
+    assert is_admin_device_proof_workflow_request("GET", path) is True
+    with pytest.raises(AdminSecurityError) as rejected:
+        AdminDeviceProofService(_FakeSession([])).issue_challenge(**request)
+    assert rejected.value.code == "admin_device_proof_binding_invalid"
+
+
 def test_proof_scope_predicate_is_closed_to_the_admin_workflow_routes() -> None:
     review = f"/reports/{REPORT_ID}/review-decisions"
     delivery = f"/reports/{REPORT_ID}/deliveries"
@@ -1968,10 +2092,28 @@ def test_proof_scope_predicate_is_closed_to_the_admin_workflow_routes() -> None:
     assert requires_admin_device_proof(review, "POST") is True
     assert requires_admin_device_proof(delivery, "GET") is True
     assert requires_admin_device_proof(delivery, "POST") is True
+    assert requires_admin_device_proof(
+        f"/admin/incidents/{INCIDENT_ID}/history", "GET"
+    ) is True
+    assert requires_admin_device_proof(
+        f"/reports/{REPORT_ID}/review-decisions/history", "GET"
+    ) is True
+    assert requires_admin_device_proof(
+        f"/reports/{REPORT_ID}/deliveries/history", "GET"
+    ) is True
     assert requires_admin_device_proof(custody, "POST") is True
     assert requires_admin_device_proof(report_lost, "POST") is True
     assert requires_admin_device_proof(review, "PATCH") is False
     assert requires_admin_device_proof(custody, "GET") is False
+    assert requires_admin_device_proof(
+        f"/admin/incidents/{INCIDENT_ID}/history", "POST"
+    ) is False
+    assert requires_admin_device_proof(
+        f"/reports/{REPORT_ID}/review-decisions/history", "POST"
+    ) is False
+    assert requires_admin_device_proof(
+        f"/reports/{REPORT_ID}/deliveries/history/extra", "GET"
+    ) is False
     assert requires_admin_device_proof(
         "/admin/security/devices/short/report-lost", "POST"
     ) is False
@@ -2479,6 +2621,11 @@ def test_openapi_exposes_exact_challenge_and_route_scoped_proof_headers() -> Non
         del report_id
         return []
 
+    @app.get("/reports/{report_id}/review-decisions/history")
+    def get_review_decision_history(report_id: uuid.UUID) -> list[Any]:
+        del report_id
+        return []
+
     @app.post("/reports/{report_id}/review-decisions")
     def post_review_decision(report_id: uuid.UUID) -> dict[str, Any]:
         del report_id
@@ -2487,6 +2634,16 @@ def test_openapi_exposes_exact_challenge_and_route_scoped_proof_headers() -> Non
     @app.get("/reports/{report_id}/deliveries")
     def get_deliveries(report_id: uuid.UUID) -> list[Any]:
         del report_id
+        return []
+
+    @app.get("/reports/{report_id}/deliveries/history")
+    def get_delivery_history(report_id: uuid.UUID) -> list[Any]:
+        del report_id
+        return []
+
+    @app.get("/admin/incidents/{incident_id}/history")
+    def get_incident_history(incident_id: uuid.UUID) -> list[Any]:
+        del incident_id
         return []
 
     @app.post("/reports/{report_id}/deliveries")
@@ -2602,6 +2759,24 @@ def test_openapi_exposes_exact_challenge_and_route_scoped_proof_headers() -> Non
         ),
         (
             "/reports/{report_id}/deliveries",
+            "get",
+            None,
+            "report.delivery_events",
+        ),
+        (
+            "/admin/incidents/{incident_id}/history",
+            "get",
+            None,
+            "admin.incident.history",
+        ),
+        (
+            "/reports/{report_id}/review-decisions/history",
+            "get",
+            None,
+            "report.review_decisions",
+        ),
+        (
+            "/reports/{report_id}/deliveries/history",
             "get",
             None,
             "report.delivery_events",

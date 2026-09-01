@@ -982,6 +982,79 @@
         "title": "AdminIncidentEventV1",
         "type": "object"
       },
+      "AdminIncidentHistoryPageV1": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_next_states": {
+            "items": {
+              "enum": [
+                "OPEN",
+                "ACKNOWLEDGED",
+                "RESOLVED",
+                "REOPENED"
+              ],
+              "type": "string"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "title": "Allowed Next States",
+            "type": "array"
+          },
+          "incident": {
+            "$ref": "#/components/schemas/AdminIncidentSummaryV1"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminIncidentEventV1"
+            },
+            "maxItems": 25,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "schema_version": {
+            "const": "walksafe.admin-incident-history-page.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "snapshot_revision": {
+            "maximum": 256.0,
+            "minimum": 1.0,
+            "title": "Snapshot Revision",
+            "type": "integer"
+          },
+          "total_count": {
+            "maximum": 256.0,
+            "minimum": 1.0,
+            "title": "Total Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "incident",
+          "allowed_next_states",
+          "snapshot_revision",
+          "total_count",
+          "items",
+          "next_cursor"
+        ],
+        "title": "AdminIncidentHistoryPageV1",
+        "type": "object"
+      },
       "AdminIncidentListPageV1": {
         "additionalProperties": false,
         "properties": {
@@ -6806,6 +6879,64 @@
         "title": "ReportDeletionStatusV2",
         "type": "object"
       },
+      "ReportInstitutionDeliveryPageV1": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReportInstitutionDeliveryResponse"
+            },
+            "maxItems": 25,
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "report_id": {
+            "format": "uuid",
+            "title": "Report Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "walksafe.report-delivery-event-page.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "snapshot_revision": {
+            "maximum": 9.223372036854776e+18,
+            "minimum": 0.0,
+            "title": "Snapshot Revision",
+            "type": "integer"
+          },
+          "total_count": {
+            "maximum": 9.223372036854776e+18,
+            "minimum": 0.0,
+            "title": "Total Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "report_id",
+          "snapshot_revision",
+          "total_count",
+          "items",
+          "next_cursor"
+        ],
+        "title": "ReportInstitutionDeliveryPageV1",
+        "type": "object"
+      },
       "ReportInstitutionDeliveryRequest": {
         "additionalProperties": false,
         "allOf": [
@@ -7473,6 +7604,64 @@
           "updated_at"
         ],
         "title": "ReportResponse",
+        "type": "object"
+      },
+      "ReportReviewDecisionPageV1": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReportReviewDecisionResponse"
+            },
+            "maxItems": 25,
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "report_id": {
+            "format": "uuid",
+            "title": "Report Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "walksafe.report-review-decision-page.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "snapshot_revision": {
+            "maximum": 9.223372036854776e+18,
+            "minimum": 0.0,
+            "title": "Snapshot Revision",
+            "type": "integer"
+          },
+          "total_count": {
+            "maximum": 9.223372036854776e+18,
+            "minimum": 0.0,
+            "title": "Total Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "report_id",
+          "snapshot_revision",
+          "total_count",
+          "items",
+          "next_cursor"
+        ],
+        "title": "ReportReviewDecisionPageV1",
         "type": "object"
       },
       "ReportReviewDecisionRequest": {
@@ -9402,6 +9591,101 @@
           "action": null,
           "purpose": "ACTION",
           "read_purpose": "admin.incident.detail",
+          "session_id": "authenticated-admin-session"
+        },
+        "x-walksafe-required-role": "admin"
+      }
+    },
+    "/admin/incidents/{incident_id}/history": {
+      "get": {
+        "operationId": "get_admin_incident_history_admin_incidents__incident_id__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIncidentHistoryPageV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAdminAppKind": [],
+            "WalkSafeAdminAudience": [],
+            "WalkSafeAdminBearer": [],
+            "WalkSafeAdminDeviceChallengeId": [],
+            "WalkSafeAdminDeviceId": [],
+            "WalkSafeAdminDeviceSignature": [],
+            "WalkSafeAdminRole": [],
+            "WalkSafeCorrelationId": [],
+            "WalkSafeReadPurpose": []
+          }
+        ],
+        "summary": "Get Admin Incident History",
+        "x-walksafe-actor-identity-required": false,
+        "x-walksafe-actor-identity-source": "admin-session",
+        "x-walksafe-admin-device-proof": {
+          "action": null,
+          "purpose": "ACTION",
+          "read_purpose": "admin.incident.history",
           "session_id": "authenticated-admin-session"
         },
         "x-walksafe-required-role": "admin"
@@ -16977,6 +17261,101 @@
         "x-walksafe-required-role": "admin"
       }
     },
+    "/reports/{report_id}/deliveries/history": {
+      "get": {
+        "operationId": "get_report_institution_delivery_history_reports__report_id__deliveries_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "title": "Report Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportInstitutionDeliveryPageV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAdminAppKind": [],
+            "WalkSafeAdminAudience": [],
+            "WalkSafeAdminBearer": [],
+            "WalkSafeAdminDeviceChallengeId": [],
+            "WalkSafeAdminDeviceId": [],
+            "WalkSafeAdminDeviceSignature": [],
+            "WalkSafeAdminRole": [],
+            "WalkSafeCorrelationId": [],
+            "WalkSafeReadPurpose": []
+          }
+        ],
+        "summary": "Get Report Institution Delivery History",
+        "x-walksafe-actor-identity-required": false,
+        "x-walksafe-actor-identity-source": "admin-session",
+        "x-walksafe-admin-device-proof": {
+          "action": null,
+          "purpose": "ACTION",
+          "read_purpose": "report.delivery_events",
+          "session_id": "authenticated-admin-session"
+        },
+        "x-walksafe-required-role": "admin"
+      }
+    },
     "/reports/{report_id}/original-access-grants": {
       "post": {
         "operationId": "create_report_original_access_grant_reports__report_id__original_access_grants_post",
@@ -17191,6 +17570,101 @@
           "action": "report.review.decide",
           "purpose": "ACTION",
           "read_purpose": null,
+          "session_id": "authenticated-admin-session"
+        },
+        "x-walksafe-required-role": "admin"
+      }
+    },
+    "/reports/{report_id}/review-decisions/history": {
+      "get": {
+        "operationId": "get_report_review_decision_history_reports__report_id__review_decisions_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "title": "Report Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportReviewDecisionPageV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAdminAppKind": [],
+            "WalkSafeAdminAudience": [],
+            "WalkSafeAdminBearer": [],
+            "WalkSafeAdminDeviceChallengeId": [],
+            "WalkSafeAdminDeviceId": [],
+            "WalkSafeAdminDeviceSignature": [],
+            "WalkSafeAdminRole": [],
+            "WalkSafeCorrelationId": [],
+            "WalkSafeReadPurpose": []
+          }
+        ],
+        "summary": "Get Report Review Decision History",
+        "x-walksafe-actor-identity-required": false,
+        "x-walksafe-actor-identity-source": "admin-session",
+        "x-walksafe-admin-device-proof": {
+          "action": null,
+          "purpose": "ACTION",
+          "read_purpose": "report.review_decisions",
           "session_id": "authenticated-admin-session"
         },
         "x-walksafe-required-role": "admin"

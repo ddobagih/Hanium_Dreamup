@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 import subprocess
@@ -10,7 +11,10 @@ from backend.app.field_test_security import (
     required_field_test_access,
     requires_account_generation,
 )
-from backend.app.main import app
+from fastapi.exceptions import RequestValidationError
+from starlette.requests import Request
+
+from backend.app.main import app, walksafe_request_validation_error
 from backend.app.schemas import WalkingRouteRequest, WalkingRouteResponse
 
 
@@ -25,6 +29,37 @@ def _operations(schema: dict):
         for method, operation in path_item.items():
             if method in HTTP_METHODS:
                 yield path, method, operation
+
+
+def test_report_history_validation_errors_are_no_store() -> None:
+    report_id = "11111111-1111-4111-8111-111111111111"
+    request = Request(
+        {
+            "type": "http",
+            "http_version": "1.1",
+            "method": "GET",
+            "scheme": "https",
+            "path": f"/reports/{report_id}/review-decisions/history",
+            "raw_path": (
+                f"/reports/{report_id}/review-decisions/history".encode("ascii")
+            ),
+            "query_string": b"limit=0",
+            "headers": [],
+            "client": ("127.0.0.1", 12345),
+            "server": ("testserver", 443),
+        }
+    )
+
+    response = asyncio.run(
+        walksafe_request_validation_error(request, RequestValidationError([]))
+    )
+
+    assert response.status_code == 422
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    assert json.loads(response.body)["detail"]["code"] == (
+        "admin_report_history_request_validation_failed"
+    )
 
 
 def test_openapi_expresses_runtime_role_and_actor_security() -> None:
@@ -201,6 +236,29 @@ def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
     }
     assert proof_schemes <= set(audit["security"][0])
     assert "WalkSafeReadPurpose" in audit["security"][0]
+    for path, read_purpose in (
+        (
+            "/admin/incidents/{incident_id}/history",
+            "admin.incident.history",
+        ),
+        (
+            "/reports/{report_id}/review-decisions/history",
+            "report.review_decisions",
+        ),
+        (
+            "/reports/{report_id}/deliveries/history",
+            "report.delivery_events",
+        ),
+    ):
+        operation = schema["paths"][path]["get"]
+        assert operation["x-walksafe-admin-device-proof"] == {
+            "purpose": "ACTION",
+            "action": None,
+            "read_purpose": read_purpose,
+            "session_id": "authenticated-admin-session",
+        }
+        assert proof_schemes <= set(operation["security"][0])
+        assert "WalkSafeReadPurpose" in operation["security"][0]
     for path, method, action in (
         (
             "/admin/reports/{report_id}/status",
