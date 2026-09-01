@@ -31,6 +31,7 @@ internal enum class UserReportUiPhase {
     LOADING_MORE,
     LOADING_DETAIL,
     LOADING_CONTENT,
+    LOADING_REQUEST_STATUS,
     LOADING_DELETION_STATUS,
     SUBMITTING_REQUEST,
     SUBMITTING_CORRECTION,
@@ -42,6 +43,7 @@ internal enum class UserReportUiPhase {
 internal enum class UserReportFailure {
     NOT_FOUND_OR_SIGNED_OUT,
     INVALID_REQUEST,
+    LOCAL_TRACKING,
     TEMPORARY,
     MALFORMED_RESPONSE,
 }
@@ -55,6 +57,8 @@ internal data class UserReportUiState(
     val selectedContent: UserReportContentCurrent? = null,
     val latestCorrection: UserReportContentRevision? = null,
     val latestCreatedRequest: UserReportRequestSummary? = null,
+    val trackedRequestReferences: List<UserReportRequestReference> = emptyList(),
+    val selectedRequestStatus: UserReportRequestSummary? = null,
     val trackedDeletionRequestIds: List<String> = emptyList(),
     val selectedDeletionStatus: UserReportDeletionStatus? = null,
     val failure: UserReportFailure? = null,
@@ -73,6 +77,7 @@ internal class UserReportController(
 ) {
     private val lock = Any()
     private var generation = 0L
+    private var authorityChangeSequence = 0L
     private var destroyed = false
     private var state = UserReportUiState()
     private var boundAuthority: UserReportAuthority? = null
@@ -84,15 +89,31 @@ internal class UserReportController(
     fun snapshot(): UserReportUiState = synchronized(lock) { state }
 
     fun onAuthorityChanged() {
+        val sequence = synchronized(lock) {
+            if (destroyed) return
+            authorityChangeSequence += 1L
+            authorityChangeSequence
+        }
         val next = authorityProvider()
-        val trackedDeletionRequestIds = next?.let { authority ->
+        val trackedRequests = next?.let { authority ->
             runCatching {
-                deletionTracker?.trackedRequestIds(authority.session)
+                TrackedRequests(
+                    references = deletionTracker
+                        ?.trackedRequestReferences(authority.session)
+                        .orEmpty(),
+                    deletionRequestIds = deletionTracker
+                        ?.trackedRequestIds(authority.session)
+                        .orEmpty(),
+                )
             }.getOrNull()
-        }.orEmpty()
+        } ?: TrackedRequests()
         val nextState: UserReportUiState?
         synchronized(lock) {
-            if (destroyed) return
+            if (
+                destroyed ||
+                sequence != authorityChangeSequence ||
+                !exactNullableAuthority(next, authorityProvider())
+            ) return
             val previous = boundAuthority
             if (previous != null && next != null && exactAuthority(previous, next)) return
             generation += 1L
@@ -109,7 +130,8 @@ internal class UserReportController(
                     UserReportUiPhase.IDLE
                 },
                 statusFilter = state.statusFilter,
-                trackedDeletionRequestIds = trackedDeletionRequestIds,
+                trackedRequestReferences = trackedRequests.references,
+                trackedDeletionRequestIds = trackedRequests.deletionRequestIds,
             )
             nextState = state
         }
@@ -138,6 +160,7 @@ internal class UserReportController(
                     selectedContent = null,
                     latestCorrection = null,
                     latestCreatedRequest = null,
+                    selectedRequestStatus = null,
                     selectedDeletionStatus = null,
                 )
             },
@@ -223,6 +246,59 @@ internal class UserReportController(
         }
     }
 
+    fun refreshRequestStatus(reportId: String, requestId: String): Boolean {
+        if (
+            !validCanonicalUserReportUuid(reportId) ||
+            !validCanonicalUserReportUuid(requestId)
+        ) return false
+        val current = snapshot()
+        if (current.selectedDetail?.reportId != reportId) return false
+        val reference = current.trackedRequestReferences.singleOrNull {
+            it.reportId == reportId && it.requestId == requestId
+        } ?: current.selectedDetail.latestRequest
+            ?.takeIf { it.requestId == requestId }
+            ?.let {
+                UserReportRequestReference(
+                    reportId = reportId,
+                    requestId = it.requestId,
+                    requestType = it.requestType,
+                )
+            }
+            ?: return false
+        return start(
+            action = Action.RequestStatus(reference),
+            loadingPhase = UserReportUiPhase.LOADING_REQUEST_STATUS,
+            precondition = { locked ->
+                val selected = locked.selectedDetail
+                selected?.reportId == reference.reportId &&
+                    (
+                        locked.trackedRequestReferences.any { it == reference } ||
+                            selected.latestRequest?.let {
+                                it.requestId == reference.requestId &&
+                                    it.requestType == reference.requestType
+                            } == true
+                    )
+            },
+            prepare = { before -> before.copy(selectedRequestStatus = null) },
+            createCall = { authority ->
+                client.reportRequestStatusCall(
+                    session = authority.session,
+                    reportId = reference.reportId,
+                    requestId = reference.requestId,
+                )
+            },
+        ) { result, before, _ ->
+            require(result.requestId == reference.requestId)
+            require(result.requestType == reference.requestType)
+            before.copy(
+                phase = UserReportUiPhase.READY,
+                selectedRequestStatus = result,
+                failure = null,
+                retryAvailable = false,
+            )
+        }
+    }
+
     fun submitRequest(
         reportId: String,
         requestType: UserReportRequestType,
@@ -268,6 +344,10 @@ internal class UserReportController(
         is Action.List -> startList(action.cursor, action.statusFilter)
         is Action.Detail -> openDetail(action.reportId)
         is Action.Content -> loadContent(action.reportId)
+        is Action.RequestStatus -> refreshRequestStatus(
+            action.reference.reportId,
+            action.reference.requestId,
+        )
         is Action.Request -> {
             val pending = synchronized(lock) { pendingRequestIntent }
             if (pending != action.intent) false else startRequest(action.intent)
@@ -317,6 +397,7 @@ internal class UserReportController(
                         selectedContent = null,
                         latestCorrection = null,
                         latestCreatedRequest = null,
+                        selectedRequestStatus = null,
                         selectedDeletionStatus = null,
                     )
                 } else {
@@ -357,14 +438,31 @@ internal class UserReportController(
         start(
             action = Action.Request(intent),
             loadingPhase = UserReportUiPhase.SUBMITTING_REQUEST,
+            prepare = { before -> before.copy(selectedRequestStatus = null) },
             createCall = { authority -> client.createRequestCall(authority.session, intent) },
         ) { result, before, authority ->
             require(result.requestType == intent.requestType)
-            val trackedDeletionRequestIds = if (intent.requestType == UserReportRequestType.DELETE) {
+            val reference = UserReportRequestReference(
+                reportId = intent.reportId,
+                requestId = result.requestId,
+                requestType = result.requestType,
+            )
+            val trackingSucceeded = deletionTracker?.let { tracker ->
+                runCatching { tracker.trackRequest(authority.session, reference) }
+                    .getOrDefault(false)
+            } ?: true
+            val trackedRequestReferences = if (
+                deletionTracker != null && trackingSucceeded
+            ) {
+                (before.trackedRequestReferences + reference)
+                    .distinctBy(UserReportRequestReference::requestId)
+            } else {
+                before.trackedRequestReferences
+            }
+            val trackedDeletionRequestIds = if (
+                intent.requestType == UserReportRequestType.DELETE && trackingSucceeded
+            ) {
                 requireNotNull(deletionTracker)
-                if (!deletionTracker.track(authority.session, result.requestId)) {
-                    throw UserReportDeletionTrackingException()
-                }
                 (before.trackedDeletionRequestIds + result.requestId).distinct()
             } else {
                 before.trackedDeletionRequestIds
@@ -385,12 +483,17 @@ internal class UserReportController(
                 }
             }
             before.copy(
-                phase = UserReportUiPhase.READY,
+                phase = if (trackingSucceeded) {
+                    UserReportUiPhase.READY
+                } else {
+                    UserReportUiPhase.ERROR
+                },
                 reports = reports,
                 selectedDetail = detail,
                 latestCreatedRequest = result,
+                trackedRequestReferences = trackedRequestReferences,
                 trackedDeletionRequestIds = trackedDeletionRequestIds,
-                failure = null,
+                failure = if (trackingSucceeded) null else UserReportFailure.LOCAL_TRACKING,
                 retryAvailable = false,
             )
         }
@@ -426,6 +529,7 @@ internal class UserReportController(
     private fun <T> start(
         action: Action,
         loadingPhase: UserReportUiPhase,
+        precondition: (UserReportUiState) -> Boolean = { true },
         prepare: (UserReportUiState) -> UserReportUiState = { it },
         createCall: (UserReportAuthority) -> CancellableNetworkCall<T>,
         applyResult: (T, UserReportUiState, UserReportAuthority) -> UserReportUiState,
@@ -435,23 +539,31 @@ internal class UserReportController(
         val loading: UserReportUiState
         synchronized(lock) {
             if (destroyed || active != null) return false
-            val authority = authorityProvider() ?: run {
-                state = state.copy(
-                    phase = UserReportUiPhase.SIGNED_OUT,
-                    failure = UserReportFailure.NOT_FOUND_OR_SIGNED_OUT,
-                    retryAvailable = false,
+            val authority = authorityProvider()
+            val bound = boundAuthority
+            if (authority == null || bound == null || !exactAuthority(bound, authority)) {
+                generation += 1L
+                retryAction = null
+                pendingRequestIntent = null
+                pendingCorrectionIntent = null
+                boundAuthority = null
+                state = UserReportUiState(
+                    phase = if (authority == null) {
+                        UserReportUiPhase.SIGNED_OUT
+                    } else {
+                        UserReportUiPhase.IDLE
+                    },
+                    statusFilter = state.statusFilter,
+                    failure = if (authority == null) {
+                        UserReportFailure.NOT_FOUND_OR_SIGNED_OUT
+                    } else {
+                        null
+                    },
                 )
                 publish(state)
                 return false
             }
-            val bound = boundAuthority
-            if (bound != null && !exactAuthority(bound, authority)) {
-                state = UserReportUiState(
-                    phase = UserReportUiPhase.IDLE,
-                    statusFilter = state.statusFilter,
-                )
-            }
-            boundAuthority = authority
+            if (!precondition(state)) return false
             call = runCatching { createCall(authority) }.getOrElse {
                 state = state.copy(
                     phase = UserReportUiPhase.ERROR,
@@ -486,12 +598,13 @@ internal class UserReportController(
                         complete(operation, call, result, applyResult)
                     }
                 } catch (_: RejectedExecutionException) {
-                    call.cancel()
+                    runCatching { call.cancel() }
+                    failToSchedule(operation)
                 }
             }
             true
         } catch (_: RejectedExecutionException) {
-            call.cancel()
+            runCatching { call.cancel() }
             failToSchedule(operation)
             false
         }
@@ -529,11 +642,7 @@ internal class UserReportController(
                             retryAction = operation.action
                             state = state.copy(
                                 phase = UserReportUiPhase.ERROR,
-                                failure = if (it is UserReportDeletionTrackingException) {
-                                    UserReportFailure.TEMPORARY
-                                } else {
-                                    UserReportFailure.MALFORMED_RESPONSE
-                                },
+                                failure = UserReportFailure.MALFORMED_RESPONSE,
                                 retryAvailable = true,
                             )
                             state
@@ -612,6 +721,14 @@ internal class UserReportController(
             current.sessionGeneration == expected.sessionGeneration &&
             current.localIdentityEpoch == expected.localIdentityEpoch
 
+    private fun exactNullableAuthority(
+        expected: UserReportAuthority?,
+        current: UserReportAuthority?,
+    ): Boolean = when {
+        expected == null || current == null -> expected == null && current == null
+        else -> exactAuthority(expected, current)
+    }
+
     private data class ActiveOperation(
         val generation: Long,
         val authority: UserReportAuthority,
@@ -629,6 +746,8 @@ internal class UserReportController(
 
         data class Content(val reportId: String) : Action
 
+        data class RequestStatus(val reference: UserReportRequestReference) : Action
+
         data class Request(val intent: UserReportRequestIntent) : Action
 
         data class Correction(val intent: UserReportCorrectionIntent) : Action
@@ -636,11 +755,13 @@ internal class UserReportController(
         data class DeletionStatus(val requestId: String) : Action
     }
 
+    private data class TrackedRequests(
+        val references: List<UserReportRequestReference> = emptyList(),
+        val deletionRequestIds: List<String> = emptyList(),
+    )
+
     private companion object {
         const val PAGE_LIMIT = 25
         val TERMINAL_REQUEST_STATUS_CODES = setOf(404, 409, 413, 415, 422)
     }
 }
-
-private class UserReportDeletionTrackingException :
-    IllegalStateException("report deletion request tracking is unavailable")

@@ -22,6 +22,11 @@ import org.json.JSONObject
 internal interface UserReportDeletionTracker {
     fun track(session: GatewayFieldSession, requestId: String): Boolean
     fun trackedRequestIds(session: GatewayFieldSession): List<String>
+    fun trackRequest(
+        session: GatewayFieldSession,
+        reference: UserReportRequestReference,
+    ): Boolean
+    fun trackedRequestReferences(session: GatewayFieldSession): List<UserReportRequestReference>
 }
 
 /**
@@ -54,19 +59,80 @@ internal class AndroidReportDeletionTrackerStore private constructor(
         if (!validCanonicalUserReportUuid(requestId)) return false
         val loaded = read(binding)
         val current = when (loaded) {
-            TrackerRead.Absent -> emptyList()
-            is TrackerRead.Loaded -> loaded.requestIds
+            TrackerRead.Absent -> TrackerSnapshot()
+            is TrackerRead.Loaded -> loaded.snapshot
             TrackerRead.Blocked -> return false
         }
-        if (requestId in current) return true
-        if (current.size >= MAX_TRACKED_REQUESTS) return false
-        return write(binding, current + requestId)
+        if (current.requestReferences.any {
+            it.requestId == requestId && it.requestType != UserReportRequestType.DELETE
+        }) return false
+        if (requestId in current.deletionRequestIds) return true
+        if (current.distinctRequestIdCount() >= MAX_TRACKED_REQUESTS) return false
+        return write(
+            binding,
+            current.copy(deletionRequestIds = current.deletionRequestIds + requestId),
+        )
     }
 
     @Synchronized
     override fun trackedRequestIds(session: GatewayFieldSession): List<String> {
         val binding = session.bindingOrNull() ?: return emptyList()
-        return (read(binding) as? TrackerRead.Loaded)?.requestIds.orEmpty()
+        return (read(binding) as? TrackerRead.Loaded)?.snapshot?.deletionRequestIds.orEmpty()
+    }
+
+    @Synchronized
+    override fun trackRequest(
+        session: GatewayFieldSession,
+        reference: UserReportRequestReference,
+    ): Boolean {
+        val binding = session.bindingOrNull() ?: return false
+        val current = when (val loaded = read(binding)) {
+            TrackerRead.Absent -> TrackerSnapshot()
+            is TrackerRead.Loaded -> loaded.snapshot
+            TrackerRead.Blocked -> return false
+        }
+        val existing = current.requestReferences.singleOrNull {
+            it.requestId == reference.requestId
+        }
+        if (existing != null && existing != reference) return false
+        if (
+            reference.requestType != UserReportRequestType.DELETE &&
+            reference.requestId in current.deletionRequestIds
+        ) return false
+        if (
+            existing == null &&
+            reference.requestId !in current.deletionRequestIds &&
+            current.distinctRequestIdCount() >= MAX_TRACKED_REQUESTS
+        ) return false
+        val nextReferences = if (existing == null) {
+            current.requestReferences + reference
+        } else {
+            current.requestReferences
+        }
+        val nextDeletionIds = if (
+            reference.requestType == UserReportRequestType.DELETE &&
+            reference.requestId !in current.deletionRequestIds
+        ) {
+            current.deletionRequestIds + reference.requestId
+        } else {
+            current.deletionRequestIds
+        }
+        if (existing != null && nextDeletionIds == current.deletionRequestIds) return true
+        return write(
+            binding,
+            TrackerSnapshot(
+                deletionRequestIds = nextDeletionIds,
+                requestReferences = nextReferences,
+            ),
+        )
+    }
+
+    @Synchronized
+    override fun trackedRequestReferences(
+        session: GatewayFieldSession,
+    ): List<UserReportRequestReference> {
+        val binding = session.bindingOrNull() ?: return emptyList()
+        return (read(binding) as? TrackerRead.Loaded)?.snapshot?.requestReferences.orEmpty()
     }
 
     private fun read(binding: TrackerBinding): TrackerRead {
@@ -81,25 +147,50 @@ internal class AndroidReportDeletionTrackerStore private constructor(
                 runCatching { storage.delete(binding.storageKey) }
                 return TrackerRead.Blocked
             }
-        val requestIds = decode(opened.plaintext)
+        val decoded = decode(opened.plaintext)
         opened.plaintext.fill(0)
-        if (requestIds == null) {
+        if (decoded == null) {
             runCatching { storage.delete(binding.storageKey) }
             return TrackerRead.Blocked
         }
-        if (opened.needsRewrap && !write(binding, requestIds)) return TrackerRead.Blocked
-        return TrackerRead.Loaded(requestIds)
+        if (opened.needsRewrap) {
+            if (!write(binding, decoded.snapshot)) return TrackerRead.Blocked
+        } else if (decoded.needsSchemaUpgrade) {
+            write(binding, decoded.snapshot)
+        }
+        return TrackerRead.Loaded(decoded.snapshot)
     }
 
-    private fun write(binding: TrackerBinding, requestIds: List<String>): Boolean {
+    private fun write(binding: TrackerBinding, snapshot: TrackerSnapshot): Boolean {
         if (
-            requestIds.size > MAX_TRACKED_REQUESTS ||
-            requestIds.distinct().size != requestIds.size ||
-            requestIds.any { !validCanonicalUserReportUuid(it) }
+            snapshot.distinctRequestIdCount() > MAX_TRACKED_REQUESTS ||
+            snapshot.deletionRequestIds.distinct().size != snapshot.deletionRequestIds.size ||
+            snapshot.deletionRequestIds.any { !validCanonicalUserReportUuid(it) } ||
+            snapshot.requestReferences.map(UserReportRequestReference::requestId)
+                .distinct().size != snapshot.requestReferences.size ||
+            snapshot.requestReferences.any {
+                it.requestType == UserReportRequestType.DELETE &&
+                    it.requestId !in snapshot.deletionRequestIds
+            } ||
+            snapshot.requestReferences.any {
+                it.requestType != UserReportRequestType.DELETE &&
+                    it.requestId in snapshot.deletionRequestIds
+            }
         ) return false
+        val references = JSONArray().apply {
+            snapshot.requestReferences.forEach { reference ->
+                put(
+                    JSONObject()
+                        .put("report_id", reference.reportId)
+                        .put("request_id", reference.requestId)
+                        .put("request_type", reference.requestType.wireValue),
+                )
+            }
+        }
         val plaintext = JSONObject()
-            .put("schema_version", SCHEMA_VERSION)
-            .put("request_ids", JSONArray(requestIds))
+            .put("schema_version", SCHEMA_VERSION_V2)
+            .put("request_ids", JSONArray(snapshot.deletionRequestIds))
+            .put("request_references", references)
             .toString()
             .toByteArray(Charsets.UTF_8)
         val sealed = runCatching { aead.seal(plaintext, binding.aad, LIMITS) }.getOrNull()
@@ -108,22 +199,83 @@ internal class AndroidReportDeletionTrackerStore private constructor(
         return runCatching { storage.write(binding.storageKey, envelope) }.getOrDefault(false)
     }
 
-    private fun decode(plaintext: ByteArray): List<String>? = runCatching {
+    private fun decode(plaintext: ByteArray): DecodedTrackerSnapshot? = runCatching {
         val root = JSONObject(String(plaintext, Charsets.UTF_8))
-        require(root.keysAsSet() == setOf("schema_version", "request_ids"))
-        require(root.getString("schema_version") == SCHEMA_VERSION)
-        val values = root.get("request_ids") as? JSONArray ?: error("request_ids must be an array")
-        require(values.length() <= MAX_TRACKED_REQUESTS)
-        val requestIds = buildList {
-            repeat(values.length()) { index ->
-                val requestId = values.get(index) as? String
-                    ?: error("request id must be a string")
-                require(validCanonicalUserReportUuid(requestId))
-                add(requestId)
+        when (root.getString("schema_version")) {
+            SCHEMA_VERSION_V1 -> {
+                require(root.keysAsSet() == setOf("schema_version", "request_ids"))
+                DecodedTrackerSnapshot(
+                    snapshot = TrackerSnapshot(
+                        deletionRequestIds = root.strictRequestIds(
+                            "request_ids",
+                            MAX_TRACKED_REQUESTS,
+                        ),
+                    ),
+                    needsSchemaUpgrade = true,
+                )
             }
+            SCHEMA_VERSION_V2 -> {
+                require(
+                    root.keysAsSet() ==
+                        setOf("schema_version", "request_ids", "request_references"),
+                )
+                val deletionRequestIds = root.strictRequestIds(
+                    "request_ids",
+                    MAX_TRACKED_REQUESTS,
+                )
+                val rawReferences = root.get("request_references") as? JSONArray
+                    ?: error("request_references must be an array")
+                require(rawReferences.length() <= MAX_TRACKED_REQUESTS)
+                val requestReferences = buildList {
+                    repeat(rawReferences.length()) { index ->
+                        val item = rawReferences.get(index) as? JSONObject
+                            ?: error("request reference must be an object")
+                        require(
+                            item.keysAsSet() ==
+                                setOf("report_id", "request_id", "request_type"),
+                        )
+                        add(
+                            UserReportRequestReference(
+                                reportId = item.get("report_id") as? String
+                                    ?: error("report_id must be a string"),
+                                requestId = item.get("request_id") as? String
+                                    ?: error("request_id must be a string"),
+                                requestType = UserReportRequestType.fromWireOrNull(
+                                    item.get("request_type") as? String
+                                        ?: error("request_type must be a string"),
+                                ) ?: error("request_type is unknown"),
+                            ),
+                        )
+                    }
+                }
+                require(
+                    requestReferences.map(UserReportRequestReference::requestId)
+                        .distinct().size == requestReferences.size,
+                )
+                require(
+                    requestReferences.none {
+                        it.requestType == UserReportRequestType.DELETE &&
+                            it.requestId !in deletionRequestIds
+                    },
+                )
+                require(
+                    requestReferences.none {
+                        it.requestType != UserReportRequestType.DELETE &&
+                            it.requestId in deletionRequestIds
+                    },
+                )
+                val snapshot = TrackerSnapshot(
+                    deletionRequestIds = deletionRequestIds,
+                    requestReferences = requestReferences,
+                )
+                require(snapshot.distinctRequestIdCount() <= MAX_TRACKED_REQUESTS)
+                DecodedTrackerSnapshot(
+                    snapshot = snapshot,
+                    needsSchemaUpgrade = false,
+                )
+            }
+            else -> error("unknown report request tracker schema")
         }
-        require(requestIds.distinct().size == requestIds.size)
-        requestIds
     }.getOrNull()
 
     private fun GatewayFieldSession.bindingOrNull(): TrackerBinding? {
@@ -154,12 +306,27 @@ internal class AndroidReportDeletionTrackerStore private constructor(
     private sealed interface TrackerRead {
         data object Absent : TrackerRead
         data object Blocked : TrackerRead
-        data class Loaded(val requestIds: List<String>) : TrackerRead
+        data class Loaded(val snapshot: TrackerSnapshot) : TrackerRead
     }
+
+    private data class TrackerSnapshot(
+        val deletionRequestIds: List<String> = emptyList(),
+        val requestReferences: List<UserReportRequestReference> = emptyList(),
+    ) {
+        fun distinctRequestIdCount(): Int =
+            (deletionRequestIds + requestReferences.map(UserReportRequestReference::requestId))
+                .toSet().size
+    }
+
+    private data class DecodedTrackerSnapshot(
+        val snapshot: TrackerSnapshot,
+        val needsSchemaUpgrade: Boolean,
+    )
 
     private companion object {
         const val DIRECTORY_NAME = "report-deletion-trackers"
-        const val SCHEMA_VERSION = "walksafe.android-report-deletion-tracker.v1"
+        const val SCHEMA_VERSION_V1 = "walksafe.android-report-deletion-tracker.v1"
+        const val SCHEMA_VERSION_V2 = "walksafe.android-report-deletion-tracker.v2"
         const val BINDING_DOMAIN =
             "kr.co.hanium.dreamup.walksafe|USER|report-deletion-tracker|schema=1"
         const val MAX_TRACKED_REQUESTS = 256
@@ -170,11 +337,26 @@ internal class AndroidReportDeletionTrackerStore private constructor(
             readableVersions = setOf(1),
         )
         val LIMITS = AeadLimits(
-            maxPlaintextBytes = 16 * 1_024,
-            maxCiphertextBytes = 16 * 1_024 + 16,
-            maxEnvelopeChars = 32 * 1_024,
+            maxPlaintextBytes = 64 * 1_024,
+            maxCiphertextBytes = 64 * 1_024 + 16,
+            maxEnvelopeChars = 128 * 1_024,
         )
     }
+}
+
+private fun JSONObject.strictRequestIds(name: String, maximumCount: Int): List<String> {
+    val values = get(name) as? JSONArray ?: error("$name must be an array")
+    require(values.length() <= maximumCount)
+    val requestIds = buildList {
+        repeat(values.length()) { index ->
+            val requestId = values.get(index) as? String
+                ?: error("request id must be a string")
+            require(validCanonicalUserReportUuid(requestId))
+            add(requestId)
+        }
+    }
+    require(requestIds.distinct().size == requestIds.size)
+    return requestIds
 }
 
 private fun JSONObject.keysAsSet(): Set<String> = buildSet {
@@ -245,6 +427,6 @@ private class AtomicReportDeletionTrackerStorage(
 
     private companion object {
         val STORAGE_KEY = Regex("^[0-9a-f]{64}$")
-        const val MAX_STORED_ENVELOPE_BYTES = 32 * 1_024
+        const val MAX_STORED_ENVELOPE_BYTES = 128 * 1_024
     }
 }

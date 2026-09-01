@@ -705,6 +705,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var userReportCorrectionCategoryButton: Button
     private lateinit var userReportCorrectionButton: Button
     private lateinit var userReportDeleteButton: Button
+    private lateinit var userReportRequestStatusButton: Button
     private lateinit var userReportDeletionStatusButton: Button
     private lateinit var userReportController: UserReportController
     private var restoredUserReportStatusFilter: UserReportStatus? = null
@@ -8678,6 +8679,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             UserReportUiPhase.LOADING_MORE,
             UserReportUiPhase.LOADING_DETAIL,
             UserReportUiPhase.LOADING_CONTENT,
+            UserReportUiPhase.LOADING_REQUEST_STATUS,
             UserReportUiPhase.LOADING_DELETION_STATUS,
             UserReportUiPhase.SUBMITTING_REQUEST,
             UserReportUiPhase.SUBMITTING_CORRECTION,
@@ -8689,6 +8691,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             UserReportUiPhase.LOADING_MORE -> "내 신고 상태: 다음 목록을 불러오는 중입니다."
             UserReportUiPhase.LOADING_DETAIL -> "내 신고 상태: 상세 상태를 불러오는 중입니다."
             UserReportUiPhase.LOADING_CONTENT -> "내 신고 상태: 현재 신고 내용을 불러오는 중입니다."
+            UserReportUiPhase.LOADING_REQUEST_STATUS ->
+                "내 신고 상태: 정정·삭제 요청 처리 상태를 불러오는 중입니다."
             UserReportUiPhase.LOADING_DELETION_STATUS ->
                 "내 신고 상태: 물리 삭제 진행 상태를 불러오는 중입니다."
             UserReportUiPhase.SUBMITTING_REQUEST -> "내 신고 상태: 요청을 접수하는 중입니다."
@@ -8701,6 +8705,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     "내 신고 상태 오류: 로그인 또는 신고 소유 상태를 확인할 수 없습니다."
                 UserReportFailure.INVALID_REQUEST ->
                     "내 신고 상태 오류: 요청 내용을 확인한 뒤 다시 시도하세요."
+                UserReportFailure.LOCAL_TRACKING ->
+                    "내 신고 상태 오류: 요청은 접수됐지만 이 기기에 상태 추적 정보를 저장하지 못했습니다."
                 UserReportFailure.MALFORMED_RESPONSE ->
                     "내 신고 상태 오류: 서버 응답 형식을 확인할 수 없습니다."
                 UserReportFailure.TEMPORARY,
@@ -8745,11 +8751,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         userReportCorrectionDescriptionClearButton.isEnabled = correctionAvailable
         userReportCorrectionCategoryButton.isEnabled = correctionAvailable
         userReportCorrectionButton.isEnabled = correctionAvailable
+        val selectedReportHasRequest = detail?.let { selected ->
+            selected.latestRequest != null || state.trackedRequestReferences.any {
+                it.reportId == selected.reportId
+            }
+        } == true
+        userReportRequestStatusButton.text = if (selectedReportHasRequest) {
+            "선택 신고 요청 처리 상태 확인"
+        } else {
+            "선택 신고 요청 처리 상태 없음"
+        }
+        userReportRequestStatusButton.contentDescription =
+            userReportRequestStatusButton.text
+        userReportRequestStatusButton.isEnabled =
+            requestAvailable && selectedReportHasRequest
         val trackedDeletionCount = state.trackedDeletionRequestIds.size
         userReportDeletionStatusButton.text = if (trackedDeletionCount == 0) {
-            "신고 삭제 처리 상태 없음"
+            "신고 물리 삭제 상태 없음"
         } else {
-            "신고 삭제 처리 상태 확인 ($trackedDeletionCount 건)"
+            "신고 물리 삭제 상태 확인 ($trackedDeletionCount 건)"
         }
         userReportDeletionStatusButton.contentDescription =
             userReportDeletionStatusButton.text
@@ -8917,7 +8937,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             append("\n공개 기각 사유: ")
             append(it)
         }
-        detail.latestRequest?.let {
+        val selectedRequestStatus = state.selectedRequestStatus
+        detail.latestRequest?.takeUnless {
+            it.requestId == selectedRequestStatus?.requestId
+        }?.let {
             append("\n")
             append(userReportRequestResultText(it))
         }
@@ -8934,7 +8957,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         }
         state.selectedDeletionStatus?.takeIf { it.reportId == detail.reportId }?.let { deletion ->
-            append("\n삭제 처리 상태: ")
+            append("\n물리 삭제 상태: ")
             append(deletion.state.labelKo)
             append("\n삭제 상태 갱신 시각: ")
             append(deletion.updatedAt)
@@ -8942,6 +8965,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 append("\n외부 사본 확인 수: ")
                 append(deletion.externalCopyCount)
             }
+        }
+        selectedRequestStatus?.let { request ->
+            append("\n")
+            append(userReportExactRequestStatusText(request))
         }
     }
 
@@ -8955,6 +8982,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 append("\n공개 답변: ")
                 append(it)
             }
+        }
+
+    private fun userReportExactRequestStatusText(request: UserReportRequestSummary): String =
+        buildString {
+            append("확인한 ")
+            append(request.requestType.labelKo)
+            append(" 처리 상태: ")
+            append(request.status.labelKo)
+            request.publicResponse?.let {
+                append("\n요청 공개 답변: ")
+                append(it)
+            }
+            append("\n요청 상태 갱신 시각: ")
+            append(request.updatedAt)
         }
 
     private fun nextUserReportCorrectionCategoryPatch(
@@ -9064,7 +9105,26 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 return
             }
         if (!userReportController.refreshDeletionStatus(requestId)) {
-            setUserReportStatusMessage("내 신고 상태: 삭제 처리 상태를 다시 확인할 수 없습니다.")
+            setUserReportStatusMessage("내 신고 상태: 물리 삭제 상태를 다시 확인할 수 없습니다.")
+        }
+    }
+
+    private fun refreshLatestUserReportRequestStatus() {
+        val state = userReportController.snapshot()
+        val detail = state.selectedDetail ?: run {
+            setUserReportStatusMessage("내 신고 상태: 먼저 신고 상세를 선택하세요.")
+            return
+        }
+        val requestId = detail.latestRequest?.requestId
+            ?: state.trackedRequestReferences
+                .lastOrNull { it.reportId == detail.reportId }
+                ?.requestId
+            ?: run {
+                setUserReportStatusMessage("내 신고 상태: 확인할 정정·삭제 요청이 없습니다.")
+                return
+            }
+        if (!userReportController.refreshRequestStatus(detail.reportId, requestId)) {
+            setUserReportStatusMessage("내 신고 상태: 요청 처리 상태를 다시 확인할 수 없습니다.")
         }
     }
 
@@ -12621,8 +12681,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             spokenLabel = "선택한 신고 한 건의 삭제 요청 확인. 계정 전체 삭제가 아닙니다.",
             onClick = ::confirmUserReportDeleteRequest,
         )
+        userReportRequestStatusButton = accessiblePriorityUserButton(
+            label = "선택 신고 요청 처리 상태 확인",
+            spokenLabel = "선택한 신고의 정정 또는 삭제 요청 처리 상태 확인",
+            onClick = ::refreshLatestUserReportRequestStatus,
+        )
         userReportDeletionStatusButton = accessiblePriorityUserButton(
-            label = "신고 삭제 처리 상태 확인",
+            label = "신고 물리 삭제 상태 확인",
             onClick = ::refreshLatestUserReportDeletionStatus,
         )
         userReportControls = LinearLayout(this).apply {
@@ -12642,6 +12707,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(userReportCorrectionButton)
             addView(userReportRequestTextInput)
             addView(userReportDeleteButton)
+            addView(userReportRequestStatusButton)
             addView(userReportDeletionStatusButton)
         }
         userReportController = UserReportController(

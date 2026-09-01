@@ -33,6 +33,7 @@ class MainActivityUserReportStaticTest {
             "공개 기각 사유",
             "최신 ",
             "공개 답변",
+            "요청 상태 갱신 시각",
         ).forEach { assertTrue((main + models).contains(it)) }
         assertTrue(views.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"))
         assertTrue(views.contains("contentDescription"))
@@ -64,7 +65,7 @@ class MainActivityUserReportStaticTest {
     }
 
     @Test
-    fun contentCorrectionAndPhysicalDeletionStatusAreReachableFromTheUi() {
+    fun contentCorrectionRequestStatusAndPhysicalDeletionStatusAreReachableFromTheUi() {
         val views = main.substringAfter("userReportStatusText = TextView(this).apply")
             .substringBefore("accountDeletionStatusText = TextView(this).apply")
         val rendering = main.substringAfter("private fun renderUserReportState(")
@@ -72,12 +73,20 @@ class MainActivityUserReportStaticTest {
 
         assertTrue(views.contains("userReportController.loadContent(detail.reportId)"))
         assertTrue(views.contains("AndroidReportDeletionTrackerStore(applicationContext)"))
+        assertTrue(views.contains("refreshLatestUserReportRequestStatus"))
         assertTrue(views.contains("refreshLatestUserReportDeletionStatus"))
         assertTrue(rendering.contains("UserReportUiPhase.LOADING_CONTENT"))
+        assertTrue(rendering.contains("UserReportUiPhase.LOADING_REQUEST_STATUS"))
         assertTrue(rendering.contains("UserReportUiPhase.LOADING_DELETION_STATUS"))
         assertTrue(rendering.contains("UserReportUiPhase.SUBMITTING_CORRECTION"))
         assertTrue(rendering.contains("state.selectedContent"))
+        assertTrue(main.contains("state.selectedRequestStatus"))
         assertTrue(rendering.contains("state.trackedDeletionRequestIds.size"))
+        assertTrue(views.contains("선택 신고 요청 처리 상태 확인"))
+        assertTrue(views.contains("신고 물리 삭제 상태 확인"))
+        assertTrue(main.contains("물리 삭제 상태:"))
+        assertTrue(main.contains("요청은 접수됐지만 이 기기에 상태 추적 정보를 저장하지 못했습니다."))
+        assertFalse(main.contains("삭제 처리 상태:"))
     }
 
     @Test

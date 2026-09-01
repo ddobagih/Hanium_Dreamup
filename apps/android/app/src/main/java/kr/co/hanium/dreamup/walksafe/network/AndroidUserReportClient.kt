@@ -41,6 +41,12 @@ internal interface UserReportNetworkClient {
         intent: UserReportRequestIntent,
     ): CancellableNetworkCall<UserReportRequestSummary>
 
+    fun reportRequestStatusCall(
+        session: GatewayFieldSession,
+        reportId: String,
+        requestId: String,
+    ): CancellableNetworkCall<UserReportRequestSummary>
+
     fun reportContentCall(
         session: GatewayFieldSession,
         reportId: String,
@@ -125,6 +131,27 @@ internal class AndroidUserReportClient : UserReportNetworkClient {
             requestBody = body,
             acceptedStatusCodes = setOf(200, 201),
         ) { responseBody -> validatedUserReportRequestOrNull(responseBody) }
+    }
+
+    override fun reportRequestStatusCall(
+        session: GatewayFieldSession,
+        reportId: String,
+        requestId: String,
+    ): CancellableNetworkCall<UserReportRequestSummary> {
+        require(validCanonicalUserReportUuid(reportId))
+        require(validCanonicalUserReportUuid(requestId))
+        return requestCall(
+            session = session,
+            endpoint = session.gatewayBaseUrl.trimEnd('/') +
+                "$USER_REPORT_LIST_PATH/$reportId/requests/$requestId",
+            method = "GET",
+            requestBody = null,
+            acceptedStatusCodes = setOf(200),
+        ) { body ->
+            validatedUserReportRequestOrNull(body)?.takeIf {
+                it.requestId == requestId
+            }
+        }
     }
 
     override fun reportContentCall(

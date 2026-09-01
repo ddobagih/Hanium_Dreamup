@@ -3,7 +3,12 @@ package kr.co.hanium.dreamup.walksafe.report
 import java.io.IOException
 import java.util.ArrayDeque
 import java.util.Base64
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 import kr.co.hanium.dreamup.walksafe.network.BackendAccountDeviceCookieBinding
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
 import kr.co.hanium.dreamup.walksafe.network.GatewayFieldSession
@@ -217,6 +222,7 @@ class UserReportControllerTest {
         val client = FakeClient().apply {
             listResults += Result.success(page(REPORT_ID, null))
             listResults += Result.success(page(REPORT_ID, null))
+            listCancelFailure = IllegalStateException("cancel failed")
         }
         val stableAuthority = authority(session())
         val controller = controller(client, worker) { stableAuthority }
@@ -368,6 +374,10 @@ class UserReportControllerTest {
         )
         worker.runNext()
         assertEquals(listOf(REQUEST_ID), controller.snapshot().trackedDeletionRequestIds)
+        assertEquals(
+            listOf(UserReportRequestReference(REPORT_ID, REQUEST_ID, UserReportRequestType.DELETE)),
+            controller.snapshot().trackedRequestReferences,
+        )
         assertEquals(listOf(REQUEST_ID), tracker.trackedRequestIds(stableAuthority.session))
 
         assertTrue(controller.openDetail(REPORT_ID))
@@ -378,6 +388,342 @@ class UserReportControllerTest {
 
         assertEquals(UserReportDeletionState.DELETED, controller.snapshot().selectedDeletionStatus?.state)
         assertEquals(listOf(REQUEST_ID), client.deletionStatusRequestIds)
+    }
+
+    @Test
+    fun exactRequestStatusUsesRestoredReportBindingAndDisplaysCurrentPublicResult() {
+        val worker = QueuedExecutor()
+        val tracker = FakeDeletionTracker()
+        val stableAuthority = authority(backendSession())
+        val reference = UserReportRequestReference(
+            reportId = REPORT_ID,
+            requestId = REQUEST_ID,
+            requestType = UserReportRequestType.DELETE,
+        )
+        assertTrue(tracker.trackRequest(stableAuthority.session, reference))
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+            detailResults += Result.success(detail(REPORT_ID))
+            requestStatusResults += Result.success(
+                requestSummary(
+                    requestType = UserReportRequestType.DELETE,
+                    status = UserReportRequestStatus.ACKNOWLEDGED,
+                    publicResponse = "삭제 요청을 확인했습니다.",
+                ),
+            )
+        }
+        val controller = UserReportController(
+            client = client,
+            workerExecutor = worker,
+            callbackExecutor = DIRECT_EXECUTOR,
+            authorityProvider = { stableAuthority },
+            observer = {},
+            deletionTracker = tracker,
+        )
+
+        controller.onAuthorityChanged()
+        assertEquals(listOf(reference), controller.snapshot().trackedRequestReferences)
+        selectReport(controller, worker)
+        assertTrue(controller.refreshRequestStatus(REPORT_ID, REQUEST_ID))
+        worker.runNext()
+
+        assertEquals(UserReportUiPhase.READY, controller.snapshot().phase)
+        assertEquals(
+            UserReportRequestStatus.ACKNOWLEDGED,
+            controller.snapshot().selectedRequestStatus?.status,
+        )
+        assertEquals(
+            "삭제 요청을 확인했습니다.",
+            controller.snapshot().selectedRequestStatus?.publicResponse,
+        )
+        assertEquals(listOf(REPORT_ID to REQUEST_ID), client.requestStatusBindings)
+    }
+
+    @Test
+    fun staleAuthorityTrackerReadCannotOverwriteTheNewerAuthoritySnapshot() {
+        val authorityA = authority(backendSession(BACKEND_ACTOR_ID))
+        val authorityB = authority(backendSession(SECOND_BACKEND_ACTOR_ID))
+        val referenceA = UserReportRequestReference(
+            REPORT_ID,
+            REQUEST_ID,
+            UserReportRequestType.DELETE,
+        )
+        val referenceB = UserReportRequestReference(
+            SECOND_REPORT_ID,
+            SECOND_REQUEST_ID,
+            UserReportRequestType.DELETE,
+        )
+        val delegate = FakeDeletionTracker().apply {
+            assertTrue(trackRequest(authorityA.session, referenceA))
+            assertTrue(trackRequest(authorityB.session, referenceB))
+        }
+        val tracker = BlockingReadDeletionTracker(BACKEND_ACTOR_ID, delegate)
+        val current = AtomicReference<UserReportAuthority?>(authorityA)
+        val controller = UserReportController(
+            client = FakeClient(),
+            workerExecutor = QueuedExecutor(),
+            callbackExecutor = DIRECT_EXECUTOR,
+            authorityProvider = { current.get() },
+            observer = {},
+            deletionTracker = tracker,
+        )
+        val staleFailure = AtomicReference<Throwable?>()
+        val staleRead = thread(isDaemon = true) {
+            runCatching { controller.onAuthorityChanged() }
+                .exceptionOrNull()
+                ?.let(staleFailure::set)
+        }
+
+        try {
+            assertTrue(tracker.readStarted.await(5, TimeUnit.SECONDS))
+            current.set(authorityB)
+            controller.onAuthorityChanged()
+        } finally {
+            tracker.releaseRead.countDown()
+            staleRead.join(5_000)
+        }
+
+        assertFalse(staleRead.isAlive)
+        assertNull(staleFailure.get())
+        assertEquals(UserReportUiPhase.IDLE, controller.snapshot().phase)
+        assertEquals(listOf(referenceB), controller.snapshot().trackedRequestReferences)
+        assertEquals(listOf(SECOND_REQUEST_ID), controller.snapshot().trackedDeletionRequestIds)
+    }
+
+    @Test
+    fun requestStatusDoesNotCreateACallAcrossAuthorityChangeAndRestoresNewTrackerState() {
+        val worker = QueuedExecutor()
+        val authorityA = authority(backendSession(BACKEND_ACTOR_ID))
+        val authorityB = authority(backendSession(SECOND_BACKEND_ACTOR_ID))
+        val referenceA = UserReportRequestReference(
+            REPORT_ID,
+            REQUEST_ID,
+            UserReportRequestType.DELETE,
+        )
+        val referenceB = UserReportRequestReference(
+            SECOND_REPORT_ID,
+            SECOND_REQUEST_ID,
+            UserReportRequestType.CORRECTION,
+        )
+        val tracker = FakeDeletionTracker().apply {
+            assertTrue(trackRequest(authorityA.session, referenceA))
+            assertTrue(trackRequest(authorityB.session, referenceB))
+        }
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+            detailResults += Result.success(detail(REPORT_ID))
+        }
+        val current = AtomicReference<UserReportAuthority?>(authorityA)
+        val controller = UserReportController(
+            client = client,
+            workerExecutor = worker,
+            callbackExecutor = DIRECT_EXECUTOR,
+            authorityProvider = { current.get() },
+            observer = {},
+            deletionTracker = tracker,
+        )
+        controller.onAuthorityChanged()
+        selectReport(controller, worker)
+
+        current.set(authorityB)
+        assertFalse(controller.refreshRequestStatus(REPORT_ID, REQUEST_ID))
+        assertTrue(client.requestStatusBindings.isEmpty())
+        assertEquals(UserReportUiPhase.IDLE, controller.snapshot().phase)
+        assertTrue(controller.snapshot().reports.isEmpty())
+        assertNull(controller.snapshot().selectedDetail)
+        assertTrue(controller.snapshot().trackedRequestReferences.isEmpty())
+
+        controller.onAuthorityChanged()
+        assertEquals(listOf(referenceB), controller.snapshot().trackedRequestReferences)
+        assertTrue(controller.snapshot().trackedDeletionRequestIds.isEmpty())
+    }
+
+    @Test
+    fun requestStatusPreconditionRejectsAStaleSnapshotAfterAuthorityStateReplacement() {
+        val worker = QueuedExecutor()
+        val authorityA = authority(backendSession(BACKEND_ACTOR_ID))
+        val authorityB = authority(backendSession(SECOND_BACKEND_ACTOR_ID))
+        val referenceA = UserReportRequestReference(
+            REPORT_ID,
+            REQUEST_ID,
+            UserReportRequestType.DELETE,
+        )
+        val referenceB = UserReportRequestReference(
+            SECOND_REPORT_ID,
+            SECOND_REQUEST_ID,
+            UserReportRequestType.CORRECTION,
+        )
+        val delegate = FakeDeletionTracker().apply {
+            assertTrue(trackRequest(authorityA.session, referenceA))
+            assertTrue(trackRequest(authorityB.session, referenceB))
+        }
+        val tracker = BlockingIterationDeletionTracker(
+            blockedActorId = BACKEND_ACTOR_ID,
+            blockedReference = referenceA,
+            delegate = delegate,
+        )
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+            detailResults += Result.success(detail(REPORT_ID))
+            requestStatusResults += Result.success(
+                requestSummary(requestType = UserReportRequestType.DELETE),
+            )
+        }
+        val current = AtomicReference<UserReportAuthority?>(authorityA)
+        val controller = UserReportController(
+            client = client,
+            workerExecutor = worker,
+            callbackExecutor = DIRECT_EXECUTOR,
+            authorityProvider = { current.get() },
+            observer = {},
+            deletionTracker = tracker,
+        )
+        controller.onAuthorityChanged()
+        selectReport(controller, worker)
+        val refreshResult = AtomicReference<Boolean?>()
+        val refreshFailure = AtomicReference<Throwable?>()
+        val refresh = thread(isDaemon = true) {
+            runCatching { controller.refreshRequestStatus(REPORT_ID, REQUEST_ID) }
+                .onSuccess(refreshResult::set)
+                .exceptionOrNull()
+                ?.let(refreshFailure::set)
+        }
+
+        try {
+            assertTrue(tracker.iterationStarted.await(5, TimeUnit.SECONDS))
+            current.set(authorityB)
+            controller.onAuthorityChanged()
+        } finally {
+            tracker.releaseIteration.countDown()
+            refresh.join(5_000)
+        }
+
+        assertFalse(refresh.isAlive)
+        assertNull(refreshFailure.get())
+        assertEquals(false, refreshResult.get())
+        assertTrue(client.requestStatusBindings.isEmpty())
+        assertEquals(listOf(referenceB), controller.snapshot().trackedRequestReferences)
+    }
+
+    @Test
+    fun unboundStartDoesNotCreateAClientCallAndCanRecoverAfterAuthorityBinding() {
+        val worker = QueuedExecutor()
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+        }
+        val stableAuthority = authority(session())
+        val controller = controller(client, worker) { stableAuthority }
+
+        assertFalse(controller.loadReports())
+        assertTrue(client.listBindings.isEmpty())
+        assertEquals(UserReportUiPhase.IDLE, controller.snapshot().phase)
+        assertTrue(controller.snapshot().reports.isEmpty())
+
+        controller.onAuthorityChanged()
+        assertTrue(controller.loadReports())
+        worker.runNext()
+        assertEquals(UserReportUiPhase.READY, controller.snapshot().phase)
+        assertEquals(1, client.listBindings.size)
+    }
+
+    @Test
+    fun successfulPostWithLocalTrackingFailureIsNotRetriedAndKeepsCreatedResult() {
+        val worker = QueuedExecutor()
+        val tracker = FakeDeletionTracker(acceptTracks = false)
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+            detailResults += Result.success(detail(REPORT_ID))
+            requestResults += Result.success(
+                requestSummary(
+                    requestId = REQUEST_ID,
+                    requestType = UserReportRequestType.DELETE,
+                ),
+            )
+            requestResults += Result.success(
+                requestSummary(
+                    requestId = SECOND_REQUEST_ID,
+                    requestType = UserReportRequestType.DELETE,
+                ),
+            )
+        }
+        val requestIds = ArrayDeque(listOf(CLIENT_REQUEST_ID, SECOND_CLIENT_REQUEST_ID))
+        val stableAuthority = authority(backendSession())
+        val controller = UserReportController(
+            client = client,
+            workerExecutor = worker,
+            callbackExecutor = DIRECT_EXECUTOR,
+            authorityProvider = { stableAuthority },
+            observer = {},
+            deletionTracker = tracker,
+            requestIdFactory = { requestIds.removeFirst() },
+        )
+        controller.onAuthorityChanged()
+        selectReport(controller, worker)
+
+        assertTrue(
+            controller.submitRequest(
+                REPORT_ID,
+                UserReportRequestType.DELETE,
+                REQUEST_TEXT,
+            ),
+        )
+        worker.runNext()
+
+        assertEquals(UserReportUiPhase.ERROR, controller.snapshot().phase)
+        assertEquals(UserReportFailure.LOCAL_TRACKING, controller.snapshot().failure)
+        assertFalse(controller.snapshot().retryAvailable)
+        assertFalse(controller.retry())
+        assertEquals(REQUEST_ID, controller.snapshot().latestCreatedRequest?.requestId)
+        assertEquals(REQUEST_ID, controller.snapshot().selectedDetail?.latestRequest?.requestId)
+        assertTrue(controller.snapshot().trackedRequestReferences.isEmpty())
+        assertTrue(controller.snapshot().trackedDeletionRequestIds.isEmpty())
+
+        assertTrue(
+            controller.submitRequest(
+                REPORT_ID,
+                UserReportRequestType.DELETE,
+                SECOND_REQUEST_TEXT,
+            ),
+        )
+        worker.runNext()
+        assertEquals(2, client.requestIntents.size)
+        assertEquals(
+            listOf(CLIENT_REQUEST_ID, SECOND_CLIENT_REQUEST_ID),
+            client.requestIntents.map(UserReportRequestIntent::clientRequestId),
+        )
+        assertEquals(SECOND_REQUEST_ID, controller.snapshot().latestCreatedRequest?.requestId)
+    }
+
+    @Test
+    fun rejectedCompletionDispatchReleasesActiveOperationForRetry() {
+        val worker = QueuedExecutor()
+        val callbacks = SwitchableCallbackExecutor()
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+            listResults += Result.success(page(REPORT_ID, null))
+        }
+        val stableAuthority = authority(session())
+        val controller = UserReportController(
+            client = client,
+            workerExecutor = worker,
+            callbackExecutor = callbacks,
+            authorityProvider = { stableAuthority },
+            observer = {},
+        )
+        controller.onAuthorityChanged()
+        assertTrue(controller.loadReports())
+
+        callbacks.reject = true
+        worker.runNext()
+        assertEquals(UserReportUiPhase.ERROR, controller.snapshot().phase)
+        assertEquals(UserReportFailure.TEMPORARY, controller.snapshot().failure)
+        assertTrue(controller.snapshot().retryAvailable)
+
+        callbacks.reject = false
+        assertTrue(controller.retry())
+        worker.runNext()
+        assertEquals(UserReportUiPhase.READY, controller.snapshot().phase)
+        assertEquals(2, client.listBindings.size)
     }
 
     @Test
@@ -525,13 +871,16 @@ class UserReportControllerTest {
     )
 
     private fun requestSummary(
+        requestId: String = REQUEST_ID,
         requestType: UserReportRequestType = UserReportRequestType.CORRECTION,
+        status: UserReportRequestStatus = UserReportRequestStatus.RECEIVED,
+        publicResponse: String? = null,
     ) = UserReportRequestSummary(
-        requestId = REQUEST_ID,
+        requestId = requestId,
         requestType = requestType,
-        status = UserReportRequestStatus.RECEIVED,
+        status = status,
         statusVersion = 1L,
-        publicResponse = null,
+        publicResponse = publicResponse,
         createdAt = TIMESTAMP,
         updatedAt = TIMESTAMP,
     )
@@ -585,17 +934,29 @@ class UserReportControllerTest {
         }
     }
 
+    private class SwitchableCallbackExecutor : Executor {
+        var reject = false
+
+        override fun execute(command: Runnable) {
+            if (reject) throw RejectedExecutionException("callback rejected")
+            command.run()
+        }
+    }
+
     private class FakeClient : UserReportNetworkClient {
         val listResults = ArrayDeque<Result<UserReportListPage>>()
         val detailResults = ArrayDeque<Result<UserReportDetail>>()
         val requestResults = ArrayDeque<Result<UserReportRequestSummary>>()
+        val requestStatusResults = ArrayDeque<Result<UserReportRequestSummary>>()
         val contentResults = ArrayDeque<Result<UserReportContentCurrent>>()
         val correctionResults = ArrayDeque<Result<UserReportContentRevision>>()
         val deletionStatusResults = ArrayDeque<Result<UserReportDeletionStatus>>()
         val listBindings = mutableListOf<Pair<String?, UserReportStatus?>>()
         val requestIntents = mutableListOf<UserReportRequestIntent>()
+        val requestStatusBindings = mutableListOf<Pair<String, String>>()
         val correctionIntents = mutableListOf<UserReportCorrectionIntent>()
         val deletionStatusRequestIds = mutableListOf<String>()
+        var listCancelFailure: Throwable? = null
 
         override fun listReportsCall(
             session: GatewayFieldSession,
@@ -605,7 +966,10 @@ class UserReportControllerTest {
         ): CancellableNetworkCall<UserReportListPage> {
             listBindings += cursor to userStatus
             val result = listResults.removeFirst()
-            return CancellableNetworkCall.blocking { result.getOrThrow() }
+            return CancellableNetworkCall(
+                executeBlock = { result.getOrThrow() },
+                cancelBlock = { listCancelFailure?.let { throw it } },
+            )
         }
 
         override fun reportDetailCall(
@@ -622,6 +986,16 @@ class UserReportControllerTest {
         ): CancellableNetworkCall<UserReportRequestSummary> {
             requestIntents += intent
             val result = requestResults.removeFirst()
+            return CancellableNetworkCall.blocking { result.getOrThrow() }
+        }
+
+        override fun reportRequestStatusCall(
+            session: GatewayFieldSession,
+            reportId: String,
+            requestId: String,
+        ): CancellableNetworkCall<UserReportRequestSummary> {
+            requestStatusBindings += reportId to requestId
+            val result = requestStatusResults.removeFirst()
             return CancellableNetworkCall.blocking { result.getOrThrow() }
         }
 
@@ -652,8 +1026,12 @@ class UserReportControllerTest {
         }
     }
 
-    private class FakeDeletionTracker : UserReportDeletionTracker {
+    private class FakeDeletionTracker(
+        private val acceptTracks: Boolean = true,
+    ) : UserReportDeletionTracker {
         private val requestIdsByBinding = mutableMapOf<Pair<String, Long>, MutableList<String>>()
+        private val referencesByBinding =
+            mutableMapOf<Pair<String, Long>, MutableList<UserReportRequestReference>>()
 
         override fun track(session: GatewayFieldSession, requestId: String): Boolean {
             val generation = session.backendAccountGeneration ?: return false
@@ -666,6 +1044,74 @@ class UserReportControllerTest {
             val generation = session.backendAccountGeneration ?: return emptyList()
             return requestIdsByBinding[session.actorId to generation].orEmpty()
         }
+
+        override fun trackRequest(
+            session: GatewayFieldSession,
+            reference: UserReportRequestReference,
+        ): Boolean {
+            if (!acceptTracks) return false
+            val generation = session.backendAccountGeneration ?: return false
+            val binding = session.actorId to generation
+            referencesByBinding.getOrPut(binding) { mutableListOf() }
+                .apply { if (none { it.requestId == reference.requestId }) add(reference) }
+            if (reference.requestType == UserReportRequestType.DELETE) {
+                requestIdsByBinding.getOrPut(binding) { mutableListOf() }
+                    .apply { if (reference.requestId !in this) add(reference.requestId) }
+            }
+            return true
+        }
+
+        override fun trackedRequestReferences(
+            session: GatewayFieldSession,
+        ): List<UserReportRequestReference> {
+            val generation = session.backendAccountGeneration ?: return emptyList()
+            return referencesByBinding[session.actorId to generation].orEmpty()
+        }
+    }
+
+    private class BlockingReadDeletionTracker(
+        private val blockedActorId: String,
+        private val delegate: UserReportDeletionTracker,
+    ) : UserReportDeletionTracker by delegate {
+        val readStarted = CountDownLatch(1)
+        val releaseRead = CountDownLatch(1)
+
+        override fun trackedRequestReferences(
+            session: GatewayFieldSession,
+        ): List<UserReportRequestReference> {
+            if (session.actorId == blockedActorId) {
+                readStarted.countDown()
+                check(releaseRead.await(5, TimeUnit.SECONDS))
+            }
+            return delegate.trackedRequestReferences(session)
+        }
+    }
+
+    private class BlockingIterationDeletionTracker(
+        private val blockedActorId: String,
+        blockedReference: UserReportRequestReference,
+        private val delegate: UserReportDeletionTracker,
+    ) : UserReportDeletionTracker by delegate {
+        val iterationStarted = CountDownLatch(1)
+        val releaseIteration = CountDownLatch(1)
+        private val blockedReferences = object : AbstractList<UserReportRequestReference>() {
+            override val size: Int = 1
+
+            override fun get(index: Int): UserReportRequestReference {
+                require(index == 0)
+                iterationStarted.countDown()
+                check(releaseIteration.await(5, TimeUnit.SECONDS))
+                return blockedReference
+            }
+        }
+
+        override fun trackedRequestReferences(
+            session: GatewayFieldSession,
+        ): List<UserReportRequestReference> = if (session.actorId == blockedActorId) {
+            blockedReferences
+        } else {
+            delegate.trackedRequestReferences(session)
+        }
     }
 
     private companion object {
@@ -673,6 +1119,7 @@ class UserReportControllerTest {
         const val REPORT_ID = "44444444-4444-4444-8444-444444444444"
         const val SECOND_REPORT_ID = "44444444-4444-4444-8444-444444444445"
         const val REQUEST_ID = "55555555-5555-4555-8555-555555555555"
+        const val SECOND_REQUEST_ID = "55555555-5555-4555-8555-555555555556"
         const val CLIENT_REQUEST_ID = "66666666-6666-4666-8666-666666666666"
         const val SECOND_CLIENT_REQUEST_ID = "77777777-7777-4777-8777-777777777777"
         const val CORRECTION_ID = "88888888-8888-4888-8888-888888888888"
@@ -683,6 +1130,7 @@ class UserReportControllerTest {
         const val DEVICE_ID = "android-report-device"
         const val AUTH_EPOCH = 3L
         const val BACKEND_ACTOR_ID = "123e4567-e89b-42d3-a456-426614174000"
+        const val SECOND_BACKEND_ACTOR_ID = "123e4567-e89b-42d3-a456-426614174001"
         val EXPIRES_AT_EPOCH_SECONDS = System.currentTimeMillis() / 1_000L + 3_600L
         val EXPIRES_AT_EPOCH_MS = EXPIRES_AT_EPOCH_SECONDS * 1_000L
         val SESSION_ID = "i".repeat(43)

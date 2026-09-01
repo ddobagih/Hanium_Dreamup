@@ -87,6 +87,32 @@ class AndroidUserReportClientNetworkTest {
     }
 
     @Test
+    fun exactRequestStatusUsesBoundGatewayPathNoStoreAndNoRequestBody() {
+        CapturingServer(responses = listOf(REQUEST_RESPONSE)).use { server ->
+            val client = AndroidUserReportClient()
+
+            val status = client.reportRequestStatusCall(
+                session = session(server.baseUrl),
+                reportId = REPORT_ID,
+                requestId = REQUEST_ID,
+            ).execute()
+            assertTrue(server.awaitRequests())
+
+            assertEquals(REQUEST_ID, status.requestId)
+            val request = server.requests.single()
+            assertEquals(
+                "GET /api/reports/mine/$REPORT_ID/requests/$REQUEST_ID HTTP/1.1",
+                request.startLine,
+            )
+            assertEquals(COOKIE, request.headers["cookie"])
+            assertEquals("no-store", request.headers["cache-control"])
+            assertEquals("", request.body)
+            assertFalse(request.headers.keys.any { it.contains("consent") })
+            assertFalse(request.headers.keys.any { it.contains("audit") })
+        }
+    }
+
+    @Test
     fun responseIsBoundedBeforeJsonParsing() {
         val releaseServer = CountDownLatch(1)
         LocalHttpTestServer { _, socket ->
@@ -219,6 +245,9 @@ class AndroidUserReportClientNetworkTest {
             client.reportContentCall(legacy, REPORT_ID)
         }
         assertThrows(IllegalArgumentException::class.java) {
+            client.reportRequestStatusCall(legacy, REPORT_ID, REQUEST_ID)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
             client.reportDeletionStatusCall(legacy, REQUEST_ID)
         }
     }
@@ -230,6 +259,8 @@ class AndroidUserReportClientNetworkTest {
                 CONTENT_RESPONSE.replace(REPORT_ID, OTHER_REPORT_ID),
                 CORRECTION_CATEGORY_RESPONSE.replace(CORRECTION_ID, SECOND_CORRECTION_ID),
                 DELETION_RESPONSE.replace(REQUEST_ID, OTHER_REQUEST_ID),
+                REQUEST_RESPONSE.replace(REQUEST_ID, OTHER_REQUEST_ID),
+                REQUEST_RESPONSE.dropLast(1) + ",\"internal_note\":\"비공개\"}",
             ),
         ).use { server ->
             val session = session(server.baseUrl)
@@ -253,6 +284,12 @@ class AndroidUserReportClientNetworkTest {
             }
             assertThrows(UserReportProtocolException::class.java) {
                 client.reportDeletionStatusCall(session, REQUEST_ID).execute()
+            }
+            assertThrows(UserReportProtocolException::class.java) {
+                client.reportRequestStatusCall(session, REPORT_ID, REQUEST_ID).execute()
+            }
+            assertThrows(UserReportProtocolException::class.java) {
+                client.reportRequestStatusCall(session, REPORT_ID, REQUEST_ID).execute()
             }
             assertTrue(server.awaitRequests())
         }

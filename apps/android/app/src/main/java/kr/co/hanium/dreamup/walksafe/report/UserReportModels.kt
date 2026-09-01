@@ -62,6 +62,17 @@ internal data class UserReportRequestSummary(
     val updatedAt: String,
 )
 
+internal data class UserReportRequestReference(
+    val reportId: String,
+    val requestId: String,
+    val requestType: UserReportRequestType,
+) {
+    init {
+        require(validCanonicalUserReportUuid(reportId))
+        require(validCanonicalUserReportUuid(requestId))
+    }
+}
+
 internal data class UserReportSummary(
     val reportId: String,
     val createdAt: String,
