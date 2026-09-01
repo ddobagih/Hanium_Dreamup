@@ -20263,6 +20263,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         startupCapabilityConfirmButton.apply {
             val walkSession = walkSessionLifecycle.snapshot()
             val paused = walkSession.state == WalkSessionState.PAUSED
+            val preparesNewWalk = walkSession.state in setOf(
+                WalkSessionState.SAFE_STOP,
+                WalkSessionState.ENDED,
+            )
             val resumeRecheckRequired =
                 paused &&
                     walkSession.recoveryStage == WalkSessionRecoveryStage.RECHECK_REQUIRED
@@ -20281,21 +20285,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     walkSession.confirmationToken != null
                 else -> true
             }
-            if (awaitingExplicitResume) {
+            if (awaitingExplicitResume && !preparesNewWalk) {
                 renderAwaitingExplicitResumeControl()
             } else {
                 isEnabled = firstRunOnboardingComplete() &&
-                    decision.mayConfirmAndStart &&
-                    priorityUserDecision.mayStartWalk &&
-                    officialEnvironmentReady &&
-                    phoneMountingReady &&
                     mayConfirmSession &&
-                    confirmationTokenReady &&
                     !startupCapabilityConfirmationPending &&
                     !walkSessionResumePromptPending &&
-                    (!confirmed || paused)
+                    (
+                        preparesNewWalk ||
+                            (
+                                decision.mayConfirmAndStart &&
+                                    priorityUserDecision.mayStartWalk &&
+                                    officialEnvironmentReady &&
+                                    phoneMountingReady &&
+                                    confirmationTokenReady &&
+                                    (!confirmed || paused)
+                            )
+                    )
                 text = when {
                     !firstRunOnboardingComplete() -> "첫 실행 등록 완료 필요"
+                    preparesNewWalk -> "새 보행 준비"
                     !priorityUserDecision.mayStartWalk -> "교육과 연습 완료 필요"
                     !officialEnvironmentReady -> "공식 사용환경 확인 필요"
                     !phoneMountingReady -> "휴대전화 장착 확인 필요"
@@ -20303,8 +20313,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     !confirmationTokenReady -> "보행 준비 확인 중"
                     paused && walkSessionResumePromptPending -> "보행 재개 음성 확인 중"
                     paused -> "보행 안내 재개 확인"
-                    walkSession.state == WalkSessionState.SAFE_STOP -> "새 보행 준비"
-                    walkSession.state == WalkSessionState.ENDED -> "새 보행 준비"
                     startupCapabilityRetryRequiresUserAction -> "보행 시작 다시 시도"
                     confirmed && decision.tier == WalkSafeStartupCapabilityTier.FULL -> "목적과 안전 제한 확인 완료"
                     confirmed -> "기능 제한 확인 완료"
@@ -23052,19 +23060,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun handleStartupCapabilityConfirmAction() {
         val session = walkSessionLifecycle.snapshot()
+        val preparesNewWalk = session.state in setOf(
+            WalkSessionState.SAFE_STOP,
+            WalkSessionState.ENDED,
+        )
         startupCapabilityRetryRequiresUserAction = false
         if (session.state == WalkSessionState.PAUSED) {
             walkSessionResumePromptPending = false
             walkSessionResumeRetryRequiresUserAction = false
         }
+        if (preparesNewWalk) {
+            startFreshWalk("user_requested_after_${session.state.name.lowercase(Locale.US)}")
+            refreshStartupCapabilityUi()
+            return
+        }
         if (resumePermissionRecoveryFromExplicitUserAction()) return
         when (session.state) {
-            WalkSessionState.SAFE_STOP,
-            WalkSessionState.ENDED,
-            -> {
-                startFreshWalk("user_requested_after_${session.state.name.lowercase(Locale.US)}")
-                refreshStartupCapabilityUi()
-            }
             WalkSessionState.PAUSED -> {
                 if (session.recoveryStage == WalkSessionRecoveryStage.RECHECK_REQUIRED) {
                     refreshStartupCapabilityUi()

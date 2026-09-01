@@ -141,6 +141,30 @@ class MainActivityWalkSessionLifecycleStaticTest {
     }
 
     @Test
+    fun terminalWalkOffersFreshPreparationBeforeRecoveryAndReadinessGates() {
+        val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
+        val action = functionBlock("private fun handleStartupCapabilityConfirmAction()")
+        val freshLabel = refresh.indexOf("preparesNewWalk -> \"새 보행 준비\"")
+        val environmentLabel = refresh.indexOf("!officialEnvironmentReady")
+        val freshAction = action.indexOf("if (preparesNewWalk)")
+        val permissionRecovery =
+            action.indexOf("resumePermissionRecoveryFromExplicitUserAction()")
+
+        assertTrue(refresh.contains("WalkSessionState.SAFE_STOP"))
+        assertTrue(refresh.contains("WalkSessionState.ENDED"))
+        assertTrue(refresh.contains("preparesNewWalk ||"))
+        assertTrue(refresh.contains("awaitingExplicitResume && !preparesNewWalk"))
+        assertTrue(freshLabel >= 0)
+        assertTrue(environmentLabel > freshLabel)
+        assertTrue(action.contains("WalkSessionState.SAFE_STOP"))
+        assertTrue(action.contains("WalkSessionState.ENDED"))
+        assertTrue(freshAction >= 0)
+        assertTrue(permissionRecovery > freshAction)
+        assertTrue(action.substring(freshAction, permissionRecovery).contains("startFreshWalk("))
+        assertTrue(action.substring(freshAction, permissionRecovery).contains("return"))
+    }
+
+    @Test
     fun processRestartMarkerPreventsFreshAutomaticRestart() {
         val create = functionBlock("override fun onCreate(savedInstanceState: Bundle?)")
         val persistence = functionBlock("private fun persistWalkSessionInterruptionMarker()")
