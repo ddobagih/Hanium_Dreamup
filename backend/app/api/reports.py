@@ -2728,6 +2728,11 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                     "message": "Database-backed administrator security is required for original access.",
                 },
             )
+        workflow_identity, proof = _require_admin_report_workflow_context(
+            request,
+            expected_action="report.original.grant",
+            expected_read_purpose=None,
+        )
         identity = _reauthorize_admin_high_risk_in_transaction(
             request,
             db,
@@ -2742,15 +2747,36 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                     "message": "Database-backed administrator security is required for original access.",
                 },
             )
+        if (
+            identity.admin_id != workflow_identity.admin_id
+            or identity.session_id != workflow_identity.session_id
+            or identity.device_id != workflow_identity.device_id
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "admin_device_proof_invalid",
+                    "message": "The administrator device proof does not match this request.",
+                },
+            )
         try:
             grant = issue_report_original_access_grant(
                 db,
                 report_id=report_id,
                 purpose=payload.purpose,
                 reason=payload.reason,
+                expected_content_revision=payload.expected_content_revision,
                 identity=identity,
                 ttl_seconds=settings.report_original_grant_ttl_seconds,
                 key_manager=key_manager,
+                proof_challenge_id=proof.challenge_id,
+                proof_request_body=proof.request_body,
+                reconfirmation_nonce_sha256=hashlib.sha256(
+                    request.headers[
+                        ADMIN_RECONFIRM_NONCE_HEADER_NAME
+                    ].strip().encode("ascii")
+                ).hexdigest(),
+                runtime_totp_secret=getattr(settings, "admin_totp_secret", None),
             )
         except ReportOriginalAccessError as exc:
             raise HTTPException(
@@ -2758,12 +2784,22 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 detail={"code": exc.code, "message": exc.message},
             ) from exc
         return ReportOriginalAccessGrantResponse(
-            schema_version="walksafe.report-original-access-grant.v1",
+            schema_version="walksafe.report-original-access-grant.v2",
             grant_id=grant.grant_id,
-            report_id=grant.report_id,
-            purpose=grant.purpose,
-            access_token=grant.access_token,
+            content_revision=grant.content_revision,
             expires_at=grant.expires_at,
+            exact_location={
+                "lat": grant.latitude,
+                "lon": grant.longitude,
+                "accuracy": grant.accuracy_m,
+            },
+            image={
+                "resource_path": grant.resource_path,
+                "content_type": grant.content_type,
+                "sha256": grant.image_sha256,
+                "byte_count": grant.image_byte_count,
+                "access_token": grant.access_token,
+            },
         )
 
     @router.post(
@@ -2792,6 +2828,9 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 payload=payload,
                 identity=identity,
                 correlation_id=proof.correlation_id,
+                proof_challenge_id=proof.challenge_id,
+                proof_request_body=proof.request_body,
+                runtime_totp_secret=getattr(settings, "admin_totp_secret", None),
             )
         except AdminReportWorkflowError as exc:
             _raise_admin_report_workflow_error(
@@ -2871,6 +2910,9 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 payload=payload,
                 identity=identity,
                 correlation_id=proof.correlation_id,
+                proof_challenge_id=proof.challenge_id,
+                proof_request_body=proof.request_body,
+                runtime_totp_secret=getattr(settings, "admin_totp_secret", None),
             )
         except AdminReportWorkflowError as exc:
             _raise_admin_report_workflow_error(

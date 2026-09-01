@@ -395,6 +395,29 @@ class ReportOriginalAccessGrant(Base):
             name="ck_report_original_access_grants_token_sha256",
         ),
         CheckConstraint("expires_at > issued_at", name="ck_report_original_access_grants_expiry"),
+        CheckConstraint(
+            "(content_revision IS NULL AND location_disclosed_at IS NULL) OR "
+            "(content_revision >= 0 AND location_disclosed_at IS NOT NULL)",
+            name="ck_report_original_access_grants_location_disclosure",
+        ),
+        CheckConstraint(
+            "access_granted_at IS NULL OR "
+            "(consumed_at IS NOT NULL AND content_revision IS NOT NULL)",
+            name="ck_report_original_access_grants_access_granted",
+        ),
+        CheckConstraint(
+            "(review_decision_id IS NULL AND review_bound_at IS NULL) OR "
+            "(review_decision_id IS NOT NULL AND review_bound_at IS NOT NULL "
+            "AND access_granted_at IS NOT NULL "
+            "AND location_disclosed_at IS NOT NULL "
+            "AND content_revision IS NOT NULL)",
+            name="ck_report_original_access_grants_review_binding",
+        ),
+        Index(
+            "uq_report_original_access_grants_review_decision_id",
+            "review_decision_id",
+            unique=True,
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -412,7 +435,12 @@ class ReportOriginalAccessGrant(Base):
     token_sha256 = Column(String(64), nullable=False, unique=True, index=True)
     issued_at = Column(DateTime(timezone=True), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    content_revision = Column(BigInteger, nullable=True)
+    location_disclosed_at = Column(DateTime(timezone=True), nullable=True)
     consumed_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    access_granted_at = Column(DateTime(timezone=True), nullable=True)
+    review_decision_id = Column(UUID(as_uuid=True), nullable=True)
+    review_bound_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
@@ -423,7 +451,7 @@ class ReportOriginalAccessAudit(Base):
     __table_args__ = (
         CheckConstraint(
             "action IN ('GRANT_ISSUED', 'GRANT_DENIED', 'GRANT_ERROR', "
-            "'ACCESS_GRANTED', 'ACCESS_DENIED', 'ACCESS_ERROR')",
+            "'LOCATION_DISCLOSED', 'ACCESS_GRANTED', 'ACCESS_DENIED', 'ACCESS_ERROR')",
             name="ck_report_original_access_audits_action",
         ),
         CheckConstraint(
@@ -984,6 +1012,11 @@ class ReportReviewDecision(Base):
             "(location_reviewed AND photo_reviewed AND privacy_reviewed)",
             name="ck_report_review_decisions_approved_reviewed",
         ),
+        CheckConstraint(
+            "(decision = 'APPROVED' AND evidence_grant_id IS NOT NULL) OR "
+            "(decision <> 'APPROVED' AND evidence_grant_id IS NULL)",
+            name="ck_report_review_decisions_evidence_grant",
+        ),
         Index(
             "ix_report_review_decisions_duplicate_of_report_id",
             "duplicate_of_report_id",
@@ -996,6 +1029,11 @@ class ReportReviewDecision(Base):
         Index(
             "ix_report_review_decisions_correlation_id",
             "correlation_id",
+        ),
+        Index(
+            "uq_report_review_decisions_evidence_grant_id",
+            "evidence_grant_id",
+            unique=True,
         ),
     )
 
@@ -1012,6 +1050,7 @@ class ReportReviewDecision(Base):
     reason = Column(String(500), nullable=False)
     user_visible_reason = Column(String(500), nullable=True)
     duplicate_of_report_id = Column(UUID(as_uuid=True), nullable=True)
+    evidence_grant_id = Column(UUID(as_uuid=True), nullable=True)
     location_reviewed = Column(Boolean, nullable=False)
     photo_reviewed = Column(Boolean, nullable=False)
     privacy_reviewed = Column(Boolean, nullable=False)
@@ -2234,6 +2273,14 @@ class AccountDeletionRequest(Base):
             "account_generation",
             name="uq_account_deletion_request_subject_generation",
         ),
+        UniqueConstraint(
+            "credential_account_id",
+            name="uq_account_deletion_requests_credential_account",
+        ),
+        Index(
+            "ix_account_deletion_requests_credential_account_id",
+            "credential_account_id",
+        ),
         ForeignKeyConstraint(
             [
                 "tombstone_id",
@@ -2293,8 +2340,6 @@ class AccountDeletionRequest(Base):
     credential_account_id = Column(
         UUID(as_uuid=True),
         nullable=True,
-        unique=True,
-        index=True,
     )
     tombstone_id = Column(
         UUID(as_uuid=True),

@@ -30,7 +30,10 @@ def test_legacy_plaintext_upload_is_never_served_without_database_admin_grant(tm
     (tmp_path / "sample.jpg").write_bytes(b"\xff\xd8\xff\xe0" + (b"0" * 16))
 
     try:
-        response = ASGITestClient(app).get("/uploads/sample.jpg")
+        response = ASGITestClient(app).get(
+            "/uploads/sample.jpg",
+            headers={"X-WalkSafe-Original-Access-Grant": "invalid"},
+        )
     finally:
         settings.upload_dir = previous_upload_dir
 
@@ -63,7 +66,10 @@ def test_upload_route_never_falls_back_to_a_plaintext_symlink(tmp_path: Path) ->
     settings.upload_dir = upload_dir
 
     try:
-        response = ASGITestClient(app).get("/uploads/linked.jpg")
+        response = ASGITestClient(app).get(
+            "/uploads/linked.jpg",
+            headers={"X-WalkSafe-Original-Access-Grant": "invalid"},
+        )
     finally:
         settings.upload_dir = previous_upload_dir
 

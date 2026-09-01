@@ -42,6 +42,7 @@ from backend.app.services.admin_security import (
     AdminSessionIdentity,
     classify_admin_operation,
 )
+from backend.app.services.privacy_lifecycle import privacy_subject_hmac
 from backend.app.services.report_user_requests import (
     ReportUserRequestError,
     admin_request_filter_digest,
@@ -61,6 +62,7 @@ from backend.tests.asgi_client import ASGITestClient
 
 REPORT_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
 REQUEST_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
+REQUEST_ID_2 = uuid.UUID("66666666-6666-4666-8666-666666666666")
 SESSION_ID = uuid.UUID("33333333-3333-4333-8333-333333333333")
 CORRELATION_ID = uuid.UUID("44444444-4444-4444-8444-444444444444")
 CREATED_AT = datetime(2026, 8, 29, 2, 0, tzinfo=UTC)
@@ -132,6 +134,88 @@ class _OwnedSession:
 
     def rollback(self) -> None:
         self.rollback_count += 1
+
+
+class _OwnedRequestSession:
+    def __init__(
+        self,
+        items: list[ReportUserRequest],
+        *,
+        report_id: uuid.UUID,
+        privacy_subject: str,
+        account_generation: int,
+    ) -> None:
+        self.items = {item.id: item for item in items}
+        self.report_id = report_id
+        self.privacy_subject = privacy_subject
+        self.account_generation = account_generation
+        self.statements: list[object] = []
+        self.rollback_count = 0
+        self.commit_count = 0
+        self.added: list[object] = []
+
+    def execute(
+        self, statement: object, params: object | None = None
+    ) -> _Result:
+        self.statements.append(statement)
+        if params is not None:
+            return _Result(None)
+        sql = str(statement)
+        values = set(statement.compile().params.values())
+        if "JOIN reports" not in sql and "FROM reports" in sql:
+            if {
+                self.report_id,
+                self.privacy_subject,
+                self.account_generation,
+            }.issubset(values):
+                return _Result(SimpleNamespace(id=self.report_id))
+            return _Result(None)
+        if "JOIN reports" not in sql and "FROM report_user_requests" in sql:
+            item = next(
+                (
+                    item
+                    for item in self.items.values()
+                    if item.id in values or item.client_request_id in values
+                ),
+                None,
+            )
+            return _Result(item)
+        if not {
+            self.report_id,
+            self.privacy_subject,
+            self.account_generation,
+        }.issubset(values):
+            return _Result(None)
+        item = next((item for item in self.items.values() if item.id in values), None)
+        if item is None or item.report_id != self.report_id:
+            return _Result(None)
+        return _Result(
+            SimpleNamespace(
+                request_id=item.id,
+                report_id=item.report_id,
+                request_type=item.request_type,
+                status=item.status,
+                status_version=item.status_version,
+                public_response=item.public_response,
+                created_at=item.created_at,
+                updated_at=item.updated_at,
+            )
+        )
+
+    def scalar(self, statement: object) -> None:
+        self.statements.append(statement)
+        return None
+
+    def rollback(self) -> None:
+        self.rollback_count += 1
+
+    def add(self, item: object) -> None:
+        self.added.append(item)
+        if isinstance(item, ReportUserRequest):
+            self.items[item.id] = item
+
+    def commit(self) -> None:
+        self.commit_count += 1
 
 
 class _CreateIntegritySession:
@@ -206,6 +290,24 @@ def _request_item() -> ReportUserRequest:
         created_at=CREATED_AT,
         updated_at=CREATED_AT,
     )
+
+
+def _owned_request_client(db: _OwnedRequestSession) -> ASGITestClient:
+    app = FastAPI()
+    app.include_router(
+        api.create_router(
+            SimpleNamespace(
+                field_test_security_enabled=False,
+                privacy_hmac_secret="test-privacy-secret-at-least-32-bytes",
+            )
+        )
+    )
+
+    def database_override():
+        yield db
+
+    app.dependency_overrides[get_db] = database_override
+    return ASGITestClient(app)
 
 
 @pytest.mark.parametrize(
@@ -368,6 +470,174 @@ def test_user_report_dto_has_only_public_minimum_fields() -> None:
             "external_receipt_id",
         }
     )
+
+
+def test_user_can_retrieve_each_request_and_observe_admin_status_immediately() -> None:
+    secret = "test-privacy-secret-at-least-32-bytes"
+    subject = privacy_subject_hmac("field@example.com", 1, secret)
+    db = _OwnedRequestSession(
+        [],
+        report_id=REPORT_ID,
+        privacy_subject=subject,
+        account_generation=1,
+    )
+    first_state, first_created = create_report_user_request(
+        db,  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        payload=ReportUserRequestCreateV1(
+            client_request_id=REQUEST_ID,
+            request_type="CORRECTION",
+            request_text="신고 내용을 정정해 주세요",
+        ),
+        privacy_subject=subject,
+        account_generation=1,
+        now=CREATED_AT,
+    )
+    second_state, second_created = create_report_user_request(
+        db,  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        payload=ReportUserRequestCreateV1(
+            client_request_id=REQUEST_ID_2,
+            request_type="DELETE",
+            request_text="신고를 삭제해 주세요",
+        ),
+        privacy_subject=subject,
+        account_generation=1,
+        now=CREATED_AT,
+    )
+    assert first_created is second_created is True
+    client = _owned_request_client(db)
+    headers = {
+        "x-walksafe-actor-id": "field@example.com",
+        "x-walksafe-account-generation": "1",
+    }
+
+    first_response = client.get(
+        f"/reports/mine/{REPORT_ID}/requests/{first_state.id}", headers=headers
+    )
+    second_response = client.get(
+        f"/reports/mine/{REPORT_ID}/requests/{second_state.id}", headers=headers
+    )
+    assert first_response.status_code == second_response.status_code == 200
+    assert first_response.json()["request_id"] == str(first_state.id)
+    assert second_response.json()["request_id"] == str(second_state.id)
+    assert second_response.json()["request_type"] == "DELETE"
+
+    second = db.items[second_state.id]
+    update_admin_request_status(
+        db,  # type: ignore[arg-type]
+        request_id=second_state.id,
+        payload=AdminReportUserRequestStatusUpdateV1(
+            status="ACKNOWLEDGED",
+            expected_version=1,
+            public_response="삭제 요청을 확인했습니다",
+            internal_note="사용자에게 노출하면 안 되는 메모",
+        ),
+        identity=_identity(),
+        correlation_id=CORRELATION_ID,
+        query_sha256="b" * 64,
+        now=CREATED_AT + timedelta(minutes=1),
+    )
+    updated_response = client.get(
+        f"/reports/mine/{REPORT_ID}/requests/{second_state.id}", headers=headers
+    )
+    assert updated_response.status_code == 200
+    assert updated_response.headers["cache-control"] == "no-store"
+    assert updated_response.json() == {
+        "request_id": str(second_state.id),
+        "request_type": "DELETE",
+        "status": "ACKNOWLEDGED",
+        "status_version": 2,
+        "public_response": "삭제 요청을 확인했습니다",
+        "created_at": CREATED_AT.isoformat().replace("+00:00", "Z"),
+        "updated_at": (CREATED_AT + timedelta(minutes=1))
+        .isoformat()
+        .replace("+00:00", "Z"),
+    }
+    assert set(updated_response.json()).isdisjoint(
+        {"request_text", "internal_note", "intent_sha256", "client_request_id"}
+    )
+    lookup_sql = str(db.statements[-1])
+    assert "JOIN reports" in lookup_sql
+    assert "request_text" not in lookup_sql
+    assert "internal_note" not in lookup_sql
+    assert "intent_sha256" not in lookup_sql
+
+
+@pytest.mark.parametrize(
+    ("path", "headers"),
+    [
+        (
+            f"/reports/mine/{REPORT_ID}/requests/{REQUEST_ID}",
+            {
+                "x-walksafe-actor-id": "other@example.com",
+                "x-walksafe-account-generation": "1",
+            },
+        ),
+        (
+            f"/reports/mine/{REPORT_ID}/requests/{REQUEST_ID}",
+            {
+                "x-walksafe-actor-id": "field@example.com",
+                "x-walksafe-account-generation": "2",
+            },
+        ),
+        (
+            f"/reports/mine/{uuid.UUID('77777777-7777-4777-8777-777777777777')}/requests/{REQUEST_ID}",
+            {
+                "x-walksafe-actor-id": "field@example.com",
+                "x-walksafe-account-generation": "1",
+            },
+        ),
+        (
+            f"/reports/mine/{REPORT_ID}/requests/{uuid.UUID('88888888-8888-4888-8888-888888888888')}",
+            {
+                "x-walksafe-actor-id": "field@example.com",
+                "x-walksafe-account-generation": "1",
+            },
+        ),
+    ],
+)
+def test_user_request_lookup_conceals_owner_generation_report_and_id_mismatch(
+    path: str, headers: dict[str, str]
+) -> None:
+    secret = "test-privacy-secret-at-least-32-bytes"
+    db = _OwnedRequestSession(
+        [_request_item()],
+        report_id=REPORT_ID,
+        privacy_subject=privacy_subject_hmac("field@example.com", 1, secret),
+        account_generation=1,
+    )
+    response = _owned_request_client(db).get(path, headers=headers)
+    assert response.status_code == 404
+    assert response.json() == {"detail": {"code": "report_not_found"}}
+    assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        f"/reports/mine/{REPORT_ID}/requests/{REQUEST_ID}?debug=1",
+        f"/reports/mine/{REPORT_ID}/requests/22222222-2222-4222-8222-22222222222A",
+    ],
+)
+def test_user_request_lookup_rejects_query_and_noncanonical_uuid(path: str) -> None:
+    secret = "test-privacy-secret-at-least-32-bytes"
+    db = _OwnedRequestSession(
+        [_request_item()],
+        report_id=REPORT_ID,
+        privacy_subject=privacy_subject_hmac("field@example.com", 1, secret),
+        account_generation=1,
+    )
+    response = _owned_request_client(db).get(
+        path,
+        headers={
+            "x-walksafe-actor-id": "field@example.com",
+            "x-walksafe-account-generation": "1",
+        },
+    )
+    assert response.status_code == 404
+    assert response.json() == {"detail": {"code": "report_not_found"}}
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_review_reason_requires_public_internal_separation() -> None:
@@ -603,6 +873,7 @@ def test_field_and_admin_security_contracts_are_route_exact() -> None:
         ("GET", "/reports/mine"),
         ("GET", f"/reports/mine/{REPORT_ID}"),
         ("POST", f"/reports/mine/{REPORT_ID}/requests"),
+        ("GET", f"/reports/mine/{REPORT_ID}/requests/{REQUEST_ID}"),
     )
     for method, path in field_routes:
         assert required_field_test_access(path, method) is FieldTestAccess.FIELD

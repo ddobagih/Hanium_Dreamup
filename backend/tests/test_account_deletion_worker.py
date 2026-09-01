@@ -682,6 +682,7 @@ def test_v2_journal_rejects_missing_or_mismatched_raw_objects(
         "storage_name": storage_name,
         "envelope_sha256": "b" * 64,
         "envelope_size": 123,
+        "quarantine_expires_at": None,
     }
     mismatched_object = {
         "collection_id": collection_id,
@@ -719,6 +720,30 @@ def test_v2_journal_rejects_missing_or_mismatched_raw_objects(
             match="raw journal inventory",
         ):
             _read_journal(journal_path)
+
+
+def test_raw_journal_binds_quarantine_expiry_to_terminal_state() -> None:
+    item = {
+        "collection_id": "123e4567-e89b-42d3-a456-426614174000",
+        "object_id": "123e4567-e89b-42d3-a456-426614174001",
+        "chunk_index": 0,
+        "state": "QUARANTINED",
+        "quarantine_expires_at": "2026-09-12T00:00:00Z",
+        "storage_name": None,
+        "envelope_sha256": None,
+        "envelope_size": None,
+    }
+    account_deletion_worker._validate_raw_journal_inventory([item], [])
+
+    invalid_items = (
+        {key: value for key, value in item.items() if key != "quarantine_expires_at"},
+        {**item, "quarantine_expires_at": None},
+        {**item, "quarantine_expires_at": "not-a-time"},
+        {**item, "state": "MANIFEST_ACCEPTED"},
+    )
+    for invalid in invalid_items:
+        with pytest.raises(AccountDeletionWorkerError, match="raw journal inventory"):
+            account_deletion_worker._validate_raw_journal_inventory([invalid], [])
 
 
 def test_v3_journal_validates_credential_and_retained_receipt_counts(

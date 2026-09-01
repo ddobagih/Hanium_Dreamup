@@ -5,7 +5,7 @@ import os
 import uuid
 
 import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import sessionmaker
 
@@ -30,6 +30,7 @@ from backend.app.services.report_user_requests import (
     create_report_user_request,
     update_admin_request_status,
 )
+from scripts.delete_reports import _assert_manual_role
 
 
 pytestmark = pytest.mark.skipif(
@@ -216,6 +217,9 @@ def test_acknowledged_request_and_physical_effect_are_separate_and_idempotent(
                     f'SET SESSION AUTHORIZATION "{worker_session_role}"'
                 )
                 connection.commit()
+                with SessionFactory(bind=connection) as worker_db:
+                    _assert_manual_role(worker_db)
+                    worker_db.rollback()
                 session_user, table_owner, is_worker = connection.execute(
                     text(
                         "SELECT session_user, tableowner, "
@@ -229,6 +233,57 @@ def test_acknowledged_request_and_physical_effect_are_separate_and_idempotent(
                 assert session_user == worker_session_role
                 assert session_user != table_owner
                 assert is_worker is True
+                privileges = connection.execute(
+                    text(
+                        "SELECT "
+                        "has_function_privilege(session_user, "
+                        "'public.walksafe_lock_report_deletion_candidate"
+                        "(uuid,uuid,bigint,text,bigint)', 'EXECUTE'), "
+                        "has_table_privilege(session_user, "
+                        "'public.report_user_requests', 'UPDATE'), "
+                        "has_table_privilege(session_user, 'public.reports', 'UPDATE')"
+                    )
+                ).one()
+                can_execute, can_update_request, can_update_report = privileges
+                assert can_execute is True
+                assert can_update_request is False
+                assert can_update_report is False
+                connection.commit()
+                stale_locked = connection.scalar(
+                    select(
+                        func.walksafe_lock_report_deletion_candidate(
+                            candidate.request_id,
+                            candidate.report_id,
+                            candidate.request_status_version + 1,
+                            candidate.privacy_subject_hmac,
+                            candidate.account_generation,
+                        )
+                    )
+                )
+                assert stale_locked is False
+                connection.commit()
+                exact_locked = connection.scalar(
+                    select(
+                        func.walksafe_lock_report_deletion_candidate(
+                            candidate.request_id,
+                            candidate.report_id,
+                            candidate.request_status_version,
+                            candidate.privacy_subject_hmac,
+                            candidate.account_generation,
+                        )
+                    )
+                )
+                assert exact_locked is True
+                with engine.connect() as concurrent:
+                    concurrent.exec_driver_sql("SET lock_timeout = '250ms'")
+                    with pytest.raises(DBAPIError) as blocked:
+                        concurrent.execute(
+                            select(ReportUserRequest)
+                            .where(ReportUserRequest.id == candidate.request_id)
+                            .with_for_update()
+                        ).scalar_one()
+                    assert blocked.value.orig.sqlstate == "55P03"
+                    concurrent.rollback()
                 connection.commit()
                 with SessionFactory(bind=connection) as db:
                     effect = apply_report_deletion(
@@ -271,4 +326,64 @@ def test_acknowledged_request_and_physical_effect_are_separate_and_idempotent(
                 connection.exec_driver_sql(
                     f'DROP ROLE IF EXISTS "{worker_session_role}"'
                 )
+        engine.dispose()
+
+
+def test_candidate_lock_rejects_a_non_worker_with_insufficient_privilege() -> None:
+    engine = create_engine(
+        os.environ["WALKSAFE_TEST_DATABASE_URL"].strip(), pool_pre_ping=True
+    )
+    caller_role = f"walksafe_report_delete_denied_{uuid.uuid4().hex}"
+    role_created = False
+    try:
+        with engine.begin() as connection:
+            if not bool(
+                connection.execute(
+                    text(
+                        "SELECT rolsuper FROM pg_catalog.pg_roles "
+                        "WHERE rolname = session_user"
+                    )
+                ).scalar_one()
+            ):
+                pytest.skip(
+                    "non-owner session_user regression requires a PostgreSQL "
+                    "superuser test connection"
+                )
+            connection.exec_driver_sql(f'CREATE ROLE "{caller_role}" NOLOGIN')
+            connection.exec_driver_sql(
+                f'GRANT USAGE ON SCHEMA public TO "{caller_role}"'
+            )
+            role_created = True
+
+        with engine.connect() as connection:
+            try:
+                connection.exec_driver_sql(
+                    f'SET SESSION AUTHORIZATION "{caller_role}"'
+                )
+                connection.commit()
+                with pytest.raises(DBAPIError) as denied:
+                    connection.scalar(
+                        select(
+                            func.walksafe_lock_report_deletion_candidate(
+                                uuid.uuid4(),
+                                uuid.uuid4(),
+                                1,
+                                "f" * 64,
+                                1,
+                            )
+                        )
+                    )
+                assert denied.value.orig.sqlstate == "42501"
+            finally:
+                if connection.in_transaction():
+                    connection.rollback()
+                connection.exec_driver_sql("RESET SESSION AUTHORIZATION")
+                connection.commit()
+    finally:
+        if role_created:
+            with engine.begin() as connection:
+                connection.exec_driver_sql(
+                    f'REVOKE ALL PRIVILEGES ON SCHEMA public FROM "{caller_role}"'
+                )
+                connection.exec_driver_sql(f'DROP ROLE IF EXISTS "{caller_role}"')
         engine.dispose()

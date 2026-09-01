@@ -23,6 +23,9 @@ from backend.app.services.admin_security import (
     AdminCredentialIssuerUnavailable,
     load_admin_credential_issuer_key_for_settings,
 )
+from backend.app.services.admin_report_integrity import (
+    admin_report_integrity_boundary_state,
+)
 from backend.app.services.accounts import (
     AccountServiceError,
     account_email_crypto_for_settings,
@@ -52,7 +55,7 @@ from backend.app.services.tmap_pedestrian import (
 )
 
 
-EXPECTED_ALEMBIC_HEAD = "202608290016"
+EXPECTED_ALEMBIC_HEAD = "202608300005"
 READINESS_LOCAL_CHECK_TIMEOUT_SECONDS = 5.0
 TMAP_READINESS_FAILURE_COOLDOWN_SECONDS = 5.0
 ACTOR_RATE_LIMIT_GROUP_CONSTRAINT = "ck_actor_rate_limit_events_group"
@@ -155,6 +158,10 @@ def _database_readiness(database_url: str) -> dict[str, object]:
                     "'ck_actor_rate_limit_events_group'"
                 )
             ).mappings().all()
+            admin_report_boundary = admin_report_integrity_boundary_state(
+                connection,
+                revision=migration,
+            )
         if migration != EXPECTED_ALEMBIC_HEAD:
             return {
                 "ready": False,
@@ -166,6 +173,12 @@ def _database_readiness(database_url: str) -> dict[str, object]:
             return {
                 "ready": False,
                 "reason": "actor_rate_limit_group_constraint_invalid",
+                "current_revision": migration,
+            }
+        if admin_report_boundary is not True:
+            return {
+                "ready": False,
+                "reason": "admin_report_integrity_boundary_invalid",
                 "current_revision": migration,
             }
         return {"ready": True, "current_revision": migration}

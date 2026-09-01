@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -15,7 +16,7 @@ import uuid
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 import backend.app.main as main_app
 import backend.app.services.report_storage as report_storage
@@ -47,6 +48,32 @@ TEST_DATABASE_CONFIGURED = bool(
 def migrated_database() -> None:
     if TEST_DATABASE_CONFIGURED:
         command.upgrade(Config(str(ROOT / "backend" / "alembic.ini")), "head")
+
+
+@pytest.fixture
+def report_storage_delete_guard_bypass() -> Iterator[None]:
+    """Bypass only the durable-effect guard for this transaction-atomicity test."""
+
+    with SessionLocal.begin() as db:
+        database_name = db.scalar(text("SELECT current_database()"))
+        if not isinstance(database_name, str) or "test" not in database_name.lower():
+            raise RuntimeError("refusing to disable a report guard outside a test database")
+        db.execute(
+            text(
+                "ALTER TABLE public.reports "
+                "DISABLE TRIGGER reports_deletion_effect_guard"
+            )
+        )
+    try:
+        yield
+    finally:
+        with SessionLocal.begin() as db:
+            db.execute(
+                text(
+                    "ALTER TABLE public.reports "
+                    "ENABLE TRIGGER reports_deletion_effect_guard"
+                )
+            )
 
 
 class StaticKeyManager:
@@ -715,7 +742,9 @@ def test_reconciliation_waits_for_inflight_encrypted_report_commit(
     not TEST_DATABASE_CONFIGURED,
     reason="WALKSAFE_TEST_DATABASE_URL is not configured",
 )
-def test_postgres_multi_candidate_retention_delete_is_all_or_none() -> None:
+def test_postgres_multi_candidate_retention_delete_is_all_or_none(
+    report_storage_delete_guard_bypass: None,
+) -> None:
     report_ids = [uuid.uuid4(), uuid.uuid4()]
     encrypted_objects = [
         encrypt_report_image(

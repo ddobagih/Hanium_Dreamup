@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
@@ -10,7 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from backend.app.config import Settings
 from backend.app.database import get_db
+from backend.app.field_test_security import ADMIN_RECONFIRM_NONCE_HEADER_NAME
 from backend.app.models import (
     Report,
     ReportDeliveryPackage,
@@ -20,8 +23,10 @@ from backend.app.models import (
 from backend.app.schemas import (
     AdminAuditEventType,
     AdminAuditListPageV1,
-    AdminReportDetailV1,
+    AdminReportDeliveryPackageProofV1,
+    AdminReportDetailV2,
     AdminReportListPageV1,
+    AdminReportPackageCreateRequest,
     AdminReportStatusUpdateV1,
     AdminReportStatusV1,
     ClassName,
@@ -56,6 +61,7 @@ from backend.app.services.admin_audit_projection import (
 )
 from backend.app.services.admin_report_delivery_package import (
     create_admin_report_delivery_package,
+    get_admin_report_delivery_package_proof,
 )
 from backend.app.services.admin_report_workflow import (
     AdminReportWorkflowError,
@@ -73,6 +79,7 @@ ADMIN_REPORT_DETAIL_OPERATION = "admin.report.detail"
 ADMIN_REPORT_DETAIL_RESOURCE_TYPE = "admin_report_detail"
 ADMIN_REPORT_STATUS_OPERATION = "admin.report.status.update"
 ADMIN_REPORT_PACKAGE_OPERATION = "admin.report.delivery_package.create"
+ADMIN_REPORT_PACKAGE_PROOF_OPERATION = "admin.report.delivery_package.proof"
 ADMIN_AUDIT_LIST_OPERATION = "admin.audit.list"
 ADMIN_REPORT_LIST_QUERY_FIELDS = frozenset(
     {
@@ -180,6 +187,15 @@ def require_admin_report_detail_context(
     )
 
 
+def require_admin_report_package_proof_context(
+    request: Request,
+) -> tuple[AdminSessionIdentity, VerifiedAdminDeviceProof]:
+    return _require_admin_report_read_context(
+        request,
+        expected_operation=ADMIN_REPORT_PACKAGE_PROOF_OPERATION,
+    )
+
+
 def _persist_list_audit(
     db: Session,
     *,
@@ -224,6 +240,32 @@ def _persist_detail_audit(
         operation=ADMIN_REPORT_DETAIL_OPERATION,
         outcome=outcome,
         resource_type=ADMIN_REPORT_DETAIL_RESOURCE_TYPE,
+        resource_id=resource_id,
+        query_sha256=proof.query_sha256,
+        result_count=result_count,
+        error_code=error_code,
+    )
+
+
+def _persist_package_proof_audit(
+    db: Session,
+    *,
+    identity: AdminSessionIdentity,
+    proof: VerifiedAdminDeviceProof,
+    resource_id: str,
+    outcome: str,
+    result_count: int | None,
+    error_code: str | None,
+) -> None:
+    persist_admin_operation_audit(
+        db,
+        actor_id=identity.admin_id,
+        session_id=identity.session_id,
+        device_id=identity.device_id,
+        correlation_id=proof.correlation_id,
+        operation=ADMIN_REPORT_PACKAGE_PROOF_OPERATION,
+        outcome=outcome,
+        resource_type="delivery_package",
         resource_id=resource_id,
         query_sha256=proof.query_sha256,
         result_count=result_count,
@@ -474,7 +516,7 @@ def get_admin_report_detail(
         ),
     ),
     db: Session = Depends(get_db),
-) -> AdminReportDetailV1:
+) -> AdminReportDetailV2:
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     identity, proof = require_admin_report_detail_context(request)
@@ -630,6 +672,102 @@ def get_admin_report_detail(
     return detail
 
 
+def get_delivery_package_proof(
+    request: Request,
+    response: Response,
+    report_id: str = Path(
+        ...,
+        min_length=36,
+        max_length=36,
+        pattern=(
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+            r"[0-9a-f]{4}-[0-9a-f]{12}$"
+        ),
+    ),
+    package_revision: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+) -> AdminReportDeliveryPackageProofV1:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    identity, proof = require_admin_report_package_proof_context(request)
+    try:
+        parsed_report_id = _parse_canonical_report_id(report_id)
+        if parsed_report_id is None:
+            raise ValueError("report_id is required")
+    except ValueError as exc:
+        _persist_package_proof_audit(
+            db,
+            identity=identity,
+            proof=proof,
+            resource_id="invalid-delivery-package",
+            outcome="DENIED",
+            result_count=None,
+            error_code="admin_report_id_invalid",
+        )
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "admin_report_id_invalid",
+                "message": "The administrator report identifier is invalid.",
+            },
+        ) from exc
+    if request.query_params:
+        _persist_package_proof_audit(
+            db,
+            identity=identity,
+            proof=proof,
+            resource_id=f"{parsed_report_id}:{package_revision}",
+            outcome="DENIED",
+            result_count=None,
+            error_code="admin_report_query_invalid",
+        )
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "admin_report_query_invalid",
+                "message": "The delivery package proof does not accept query fields.",
+            },
+        )
+    try:
+        package = get_admin_report_delivery_package_proof(
+            db,
+            report_id=parsed_report_id,
+            package_revision=package_revision,
+        )
+    except AdminReportWorkflowError as exc:
+        _persist_package_proof_audit(
+            db,
+            identity=identity,
+            proof=proof,
+            resource_id=f"{parsed_report_id}:{package_revision}",
+            outcome="ERROR" if exc.status_code >= 500 else "DENIED",
+            result_count=None,
+            error_code=exc.code,
+        )
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+    _persist_package_proof_audit(
+        db,
+        identity=identity,
+        proof=proof,
+        resource_id=f"{parsed_report_id}:{package_revision}",
+        outcome="SUCCEEDED",
+        result_count=1,
+        error_code=None,
+    )
+    return AdminReportDeliveryPackageProofV1(
+        schema_version="walksafe.admin-report-delivery-package-proof.v1",
+        package_revision=package.package_revision,
+        content_revision=package.content_revision,
+        review_revision=package.review_revision,
+        package_schema_version=package.package_schema_version,
+        package_byte_count=package.package_byte_count,
+        package_sha256=package.package_sha256,
+    )
+
+
 def patch_admin_report_status(
     report_id: uuid.UUID,
     payload: AdminReportStatusUpdateV1,
@@ -682,8 +820,10 @@ def patch_admin_report_status(
 
 def create_delivery_package(
     report_id: uuid.UUID,
+    payload: AdminReportPackageCreateRequest,
     request: Request,
     db: Session = Depends(get_db),
+    runtime_totp_secret: str | None = None,
 ) -> Response:
     identity, proof = _require_admin_report_action_context(
         request, expected_action=ADMIN_REPORT_PACKAGE_OPERATION
@@ -692,9 +832,19 @@ def create_delivery_package(
         created = create_admin_report_delivery_package(
             db,
             report_id=report_id,
+            expected_content_revision=payload.expected_content_revision,
+            expected_review_revision=payload.expected_review_revision,
             identity=identity,
             correlation_id=proof.correlation_id,
             query_sha256=proof.query_sha256,
+            proof_challenge_id=getattr(proof, "challenge_id", None),
+            proof_request_body=proof.request_body,
+            reconfirmation_nonce_sha256=hashlib.sha256(
+                request.headers[ADMIN_RECONFIRM_NONCE_HEADER_NAME]
+                .strip()
+                .encode("ascii")
+            ).hexdigest(),
+            runtime_totp_secret=runtime_totp_secret,
         )
     except AdminReportWorkflowError as exc:
         persist_admin_operation_audit(
@@ -717,6 +867,7 @@ def create_delivery_package(
         ) from exc
     return Response(
         content=created.package_bytes,
+        status_code=201,
         media_type="application/zip",
         headers={
             "Cache-Control": "no-store",
@@ -725,6 +876,8 @@ def create_delivery_package(
             "X-WalkSafe-Package-Id": str(created.record.id),
             "X-WalkSafe-Package-Revision": str(created.record.revision),
             "X-WalkSafe-Content-Revision": str(created.record.content_revision),
+            "X-WalkSafe-Review-Revision": str(created.review_revision),
+            "X-WalkSafe-Package-Byte-Count": str(created.record.package_byte_count),
             "X-WalkSafe-Supersedes-Package-Id": (
                 str(created.record.supersedes_package_id)
                 if created.record.supersedes_package_id is not None
@@ -807,7 +960,21 @@ def list_admin_audit_events(
     return page
 
 
-def create_router() -> APIRouter:
+def create_router(settings: Settings | None = None) -> APIRouter:
+    def create_delivery_package_route(
+        report_id: uuid.UUID,
+        payload: AdminReportPackageCreateRequest,
+        request: Request,
+        db: Session = Depends(get_db),
+    ) -> Response:
+        return create_delivery_package(
+            report_id,
+            payload,
+            request,
+            db=db,
+            runtime_totp_secret=getattr(settings, "admin_totp_secret", None),
+        )
+
     router = APIRouter()
     router.add_api_route(
         "/admin/reports",
@@ -829,14 +996,67 @@ def create_router() -> APIRouter:
     )
     router.add_api_route(
         "/admin/reports/{report_id}/delivery-packages",
-        create_delivery_package,
+        create_delivery_package_route,
         methods=["POST"],
+        name="create_delivery_package",
         status_code=201,
+        response_class=Response,
+        responses={
+            201: {
+                "description": "A deterministic report delivery package.",
+                "content": {
+                    "application/zip": {
+                        "schema": {"type": "string", "format": "binary"},
+                    },
+                },
+                "headers": {
+                    "X-WalkSafe-Package-Id": {
+                        "schema": {"type": "string", "format": "uuid"}
+                    },
+                    "X-WalkSafe-Package-Revision": {
+                        "schema": {"type": "integer", "minimum": 1}
+                    },
+                    "X-WalkSafe-Content-Revision": {
+                        "schema": {"type": "integer", "minimum": 0}
+                    },
+                    "X-WalkSafe-Review-Revision": {
+                        "schema": {"type": "integer", "minimum": 1}
+                    },
+                    "X-WalkSafe-Package-Byte-Count": {
+                        "schema": {"type": "integer", "minimum": 1}
+                    },
+                    "X-WalkSafe-Supersedes-Package-Id": {
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        }
+                    },
+                    "X-WalkSafe-Export-Audit-Id": {
+                        "schema": {"type": "string", "format": "uuid"}
+                    },
+                    "X-WalkSafe-Package-SHA256": {
+                        "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+                    },
+                    "X-WalkSafe-CSV-SHA256": {
+                        "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+                    },
+                    "X-WalkSafe-Manifest-SHA256": {
+                        "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+                    },
+                },
+            },
+        },
+    )
+    router.add_api_route(
+        "/admin/reports/{report_id}/delivery-packages/{package_revision}/proof",
+        get_delivery_package_proof,
+        methods=["GET"],
+        response_model=AdminReportDeliveryPackageProofV1,
     )
     router.add_api_route(
         "/admin/reports/{report_id}",
         get_admin_report_detail,
         methods=["GET"],
-        response_model=AdminReportDetailV1,
+        response_model=AdminReportDetailV2,
     )
     return router

@@ -26,6 +26,7 @@ export const GATEWAY_ROUTE_TEMPLATES = Object.freeze([
   "/api/reports/mine/{report_id}/content",
   "/api/reports/mine/{report_id}/corrections",
   "/api/reports/mine/{report_id}/requests",
+  "/api/reports/mine/{report_id}/requests/{request_id}",
   "/api/raw-collections/{collection_id}/manifest",
   "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}",
   "/api/raw-collections/{collection_id}",
@@ -63,6 +64,8 @@ const USER_REPORT_DETAIL_ROUTE =
   /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const USER_REPORT_REQUEST_ROUTE =
   /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/requests$/;
+const USER_REPORT_REQUEST_DETAIL_ROUTE =
+  /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/requests\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const USER_REPORT_CONTENT_ROUTE =
   /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/;
 const USER_REPORT_CORRECTION_ROUTE =
@@ -106,6 +109,9 @@ export function gatewayRouteTemplate(request: Request): GatewayRouteTemplate | n
   }
   if (USER_REPORT_CORRECTION_ROUTE.test(pathname)) {
     return "/api/reports/mine/{report_id}/corrections";
+  }
+  if (USER_REPORT_REQUEST_DETAIL_ROUTE.test(pathname)) {
+    return "/api/reports/mine/{report_id}/requests/{request_id}";
   }
   if (USER_REPORT_REQUEST_ROUTE.test(pathname)) {
     return "/api/reports/mine/{report_id}/requests";

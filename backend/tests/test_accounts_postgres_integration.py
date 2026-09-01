@@ -74,26 +74,33 @@ def _clear_account_downgrade_fixtures(engine) -> None:
         connection.execute(text("TRUNCATE TABLE public.actor_rate_limit_events"))
 
 
+def _insert_user_account_downgrade_fixture(connection) -> uuid.UUID:
+    observed_at = utc_now()
+    account_id = uuid.uuid4()
+    connection.execute(
+        UserAccount.__table__.insert().values(
+            id=account_id,
+            actor_id=str(uuid.uuid4()),
+            privacy_subject_hmac="a" * 64,
+            email_lookup_hmac="b" * 64,
+            email_ciphertext=b"c" * 17,
+            email_nonce=b"n" * 12,
+            email_key_version=1,
+            password_hash="p" * 32,
+            status="ACTIVE",
+            account_generation=1,
+            auth_epoch=1,
+            created_at=observed_at,
+            updated_at=observed_at,
+        )
+    )
+    return account_id
+
+
 def _insert_account_downgrade_fixture(connection, table_name: str) -> None:
     observed_at = utc_now()
     if table_name == "user_accounts":
-        connection.execute(
-            UserAccount.__table__.insert().values(
-                id=uuid.uuid4(),
-                actor_id=str(uuid.uuid4()),
-                privacy_subject_hmac="a" * 64,
-                email_lookup_hmac="b" * 64,
-                email_ciphertext=b"c" * 17,
-                email_nonce=b"n" * 12,
-                email_key_version=1,
-                password_hash="p" * 32,
-                status="ACTIVE",
-                account_generation=1,
-                auth_epoch=1,
-                created_at=observed_at,
-                updated_at=observed_at,
-            )
-        )
+        _insert_user_account_downgrade_fixture(connection)
         return
     if table_name == "account_enrollments":
         connection.execute(
@@ -121,10 +128,11 @@ def _insert_account_downgrade_fixture(connection, table_name: str) -> None:
         )
         return
     if table_name == "signup_consent_receipts":
+        account_id = _insert_user_account_downgrade_fixture(connection)
         connection.execute(
             SignupConsentReceipt.__table__.insert().values(
                 id=uuid.uuid4(),
-                account_id=uuid.uuid4(),
+                account_id=account_id,
                 schema_version="walksafe.signup-consent.v1",
                 document_versions={
                     "terms_of_service": "v1",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -84,6 +84,10 @@ _ADMIN_REPORT_ACTION_PATH_PATTERN = re.compile(
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/"
     r"(?:status|delivery-packages)$"
 )
+_ADMIN_REPORT_PACKAGE_PROOF_PATH_PATTERN = re.compile(
+    r"^/admin/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
+    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/delivery-packages/[1-9][0-9]*/proof$"
+)
 _ADMIN_REPORT_REQUEST_LIST_PATH = "/admin/report-requests"
 _ADMIN_REPORT_REQUEST_DETAIL_PATH_PATTERN = re.compile(
     r"^/admin/report-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
@@ -107,6 +111,10 @@ _REPORT_WORKFLOW_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/"
     r"(?:review-decisions|deliveries)$"
+)
+_REPORT_ORIGINAL_ACCESS_GRANT_PATH_PATTERN = re.compile(
+    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
+    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/original-access-grants$"
 )
 _ADMIN_WRITE_WORKFLOW_PATH_PATTERN = re.compile(
     r"^(?:/admin/security/recovery-custody/attest|"
@@ -140,6 +148,7 @@ class VerifiedAdminDeviceProof:
     query_sha256: str
     device_key_marker: str
     device_key_version: int
+    request_body: bytes = field(repr=False, default=b"")
 
 
 @dataclass(frozen=True)
@@ -325,6 +334,8 @@ def is_admin_device_proof_workflow_request(method: str, path: str) -> bool:
         return normalized_method == "GET"
     if _ADMIN_REPORT_ACTION_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method in {"PATCH", "POST"}
+    if _ADMIN_REPORT_PACKAGE_PROOF_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "GET"
     if path == _ADMIN_REPORT_REQUEST_LIST_PATH:
         return normalized_method == "GET"
     if _ADMIN_REPORT_REQUEST_DETAIL_PATH_PATTERN.fullmatch(path) is not None:
@@ -339,6 +350,8 @@ def is_admin_device_proof_workflow_request(method: str, path: str) -> bool:
         return normalized_method == "PATCH"
     if _REPORT_WORKFLOW_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method in {"GET", "POST"}
+    if _REPORT_ORIGINAL_ACCESS_GRANT_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "POST"
     return (
         normalized_method == "POST"
         and _ADMIN_WRITE_WORKFLOW_PATH_PATTERN.fullmatch(path) is not None
@@ -978,6 +991,7 @@ def verify_admin_device_proof(
             query_sha256=challenge.query_sha256,
             device_key_marker=challenge.device_key_marker,
             device_key_version=challenge.device_key_version,
+            request_body=bytes(raw_body),
         )
     except AdminSecurityError:
         raise

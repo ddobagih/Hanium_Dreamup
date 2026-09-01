@@ -13,7 +13,9 @@ from types import SimpleNamespace
 import uuid
 
 from alembic.autogenerate import compare_metadata
+from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine, delete, inspect, select, text, update
@@ -28,6 +30,13 @@ from backend.app.account_schemas import (
     EmailOtpEnrollmentRequestV1,
 )
 from backend.app.main import app
+
+
+def _repository_alembic_head() -> str:
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head is not None
+    return head
 from backend.app.main import settings as app_settings
 from backend.app.api.health import _privacy_hmac_binding_readiness
 from backend.app.api.reports import _privacy_report_binding
@@ -54,6 +63,8 @@ from backend.app.schemas import (
     AccountDeletionRequestV2,
     AccountDeletionStatusV2,
     DeviceDeletionEvidenceV2,
+    PRIVACY_CONSENT_ITEM_VERSIONS,
+    PRIVACY_CONSENT_POLICY_VERSION,
     RawCollectionCommitV1,
     RawCollectionManifestV1,
     raw_collection_manifest_sha256,
@@ -164,23 +175,27 @@ def _request(request_id: str) -> AccountDeletionRequestV2:
     )
 
 
-def _consent_payload(*, request_id: str, installation_id: str, revision: int = 1):
+def _consent_payload(
+    *,
+    request_id: str,
+    installation_id: str,
+    revision: int = 1,
+    expected_previous_backend_receipt_sha256: str | None = None,
+):
     return {
         "schema_version": "walksafe.privacy-consent-event.v2",
         "installation_id": installation_id,
         "request_id": request_id,
         "client_revision": revision,
-        "policy_version": "FP-013-1.0.0",
-        "item_versions": {
-            "raw_source_collection": "FP-013-RAW-1.0.0",
-            "automatic_reporting": "FP-013-AUTO-1.0.0",
-            "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
-            "training_reuse": "FP-013-TRAINING-1.0.0",
-        },
+        "policy_version": PRIVACY_CONSENT_POLICY_VERSION,
+        "item_versions": dict(PRIVACY_CONSENT_ITEM_VERSIONS),
         "raw_source_collection": True,
         "automatic_reporting": True,
         "mobile_network_transfer": False,
         "training_reuse": False,
+        "expected_previous_backend_receipt_sha256": (
+            expected_previous_backend_receipt_sha256
+        ),
     }
 
 
@@ -199,14 +214,9 @@ def _consent_receipt_sha256(
             "automatic_reporting": True,
             "client_revision": client_revision,
             "installation_subject_hmac": installation_subject,
-            "item_versions": {
-                "raw_source_collection": "FP-013-RAW-1.0.0",
-                "automatic_reporting": "FP-013-AUTO-1.0.0",
-                "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
-                "training_reuse": "FP-013-TRAINING-1.0.0",
-            },
+            "item_versions": dict(PRIVACY_CONSENT_ITEM_VERSIONS),
             "mobile_network_transfer": False,
-            "policy_version": "FP-013-1.0.0",
+            "policy_version": PRIVACY_CONSENT_POLICY_VERSION,
             "privacy_subject_hmac": privacy_subject,
             "raw_source_collection": True,
             "request_id": request_id,
@@ -235,6 +245,16 @@ def _record_consent(
     training_reuse: bool = False,
 ):
     with SessionFactory() as db:
+        privacy_subject = privacy_subject_hmac(actor_id, 1, PRIVACY_SECRET)
+        previous_receipt = db.scalar(
+            select(PrivacyConsentEvent.receipt_sha256)
+            .where(
+                PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
+                PrivacyConsentEvent.account_generation == 1,
+            )
+            .order_by(PrivacyConsentEvent.subject_revision.desc())
+            .limit(1)
+        )
         return record_consent_event(
             db,
             actor_id=actor_id,
@@ -242,18 +262,14 @@ def _record_consent(
             installation_id=installation_id or _installation_id(actor_id),
             request_id=f"consent_{uuid.uuid4().hex}",
             client_revision=client_revision,
-            policy_version="FP-013-1.0.0",
-            item_versions={
-                "raw_source_collection": "FP-013-RAW-1.0.0",
-                "automatic_reporting": "FP-013-AUTO-1.0.0",
-                "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
-                "training_reuse": "FP-013-TRAINING-1.0.0",
-            },
+            policy_version=PRIVACY_CONSENT_POLICY_VERSION,
+            item_versions=PRIVACY_CONSENT_ITEM_VERSIONS,
             raw_source_collection=raw_source_collection,
             automatic_reporting=automatic_reporting,
             mobile_network_transfer=False,
             training_reuse=training_reuse,
             secret=PRIVACY_SECRET,
+            expected_previous_backend_receipt_sha256=previous_receipt,
         )
 
 
@@ -329,7 +345,7 @@ def test_fp046_schema_migration_constraints_and_append_only_evidence() -> None:
         return table is not None and table.name in privacy_tables
 
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "202608290011"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == _repository_alembic_head()
         assert compare_metadata(
             MigrationContext.configure(
                 connection,
@@ -459,7 +475,7 @@ def test_fp046_database_rejects_raw_consent_revision_time_and_digest_forgery(
                     "automatic_reporting, mobile_network_transfer, training_reuse, "
                     "receipt_sha256, recorded_at) VALUES ("
                     ":id, :request_id, :privacy_subject, 1, :installation_subject, "
-                    ":client_revision, :subject_revision, 'FP-013-1.0.0', "
+                    ":client_revision, :subject_revision, :policy_version, "
                     "CAST(:item_versions AS jsonb), true, true, false, false, "
                     ":receipt_sha256, :recorded_at)"
                 ),
@@ -470,14 +486,8 @@ def test_fp046_database_rejects_raw_consent_revision_time_and_digest_forgery(
                     "installation_subject": first.installation_subject_hmac,
                     "client_revision": client_revision,
                     "subject_revision": subject_revision,
-                    "item_versions": json.dumps(
-                        {
-                            "raw_source_collection": "FP-013-RAW-1.0.0",
-                            "automatic_reporting": "FP-013-AUTO-1.0.0",
-                            "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
-                            "training_reuse": "FP-013-TRAINING-1.0.0",
-                        }
-                    ),
+                    "policy_version": PRIVACY_CONSENT_POLICY_VERSION,
+                    "item_versions": json.dumps(PRIVACY_CONSENT_ITEM_VERSIONS),
                     "receipt_sha256": receipt_sha256,
                     "recorded_at": datetime.now(timezone.utc)
                     + timedelta(seconds=future_seconds),
@@ -652,6 +662,9 @@ def test_fp046_accept_replay_capability_device_evidence_and_api_status() -> None
         json=_consent_payload(
             request_id=f"consent_api_second_{api_suffix}",
             installation_id=second_installation,
+            expected_previous_backend_receipt_sha256=(
+                consent.json()["receipt_sha256"]
+            ),
         ),
     )
     assert second_consent.status_code == 201, second_consent.text
@@ -948,13 +961,8 @@ def test_fp046_optional_training_refusal_does_not_block_service_report_gate() ->
             installation_id=_installation_id(actor_id),
             request_id=f"consent_{suffix}",
             client_revision=1,
-            policy_version="FP-013-1.0.0",
-            item_versions={
-                "raw_source_collection": "FP-013-RAW-1.0.0",
-                "automatic_reporting": "FP-013-AUTO-1.0.0",
-                "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
-                "training_reuse": "FP-013-TRAINING-1.0.0",
-            },
+            policy_version=PRIVACY_CONSENT_POLICY_VERSION,
+            item_versions=PRIVACY_CONSENT_ITEM_VERSIONS,
             raw_source_collection=True,
             automatic_reporting=True,
             mobile_network_transfer=False,
@@ -1480,10 +1488,11 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
             "chunk_index": 0,
             "manifest_sha256": raw_manifest.manifest_sha256,
             "consent_receipt_sha256": consent.event.receipt_sha256,
-            "state": "COMMITTED",
-            "retention_class": "RAW_ORIGINAL_180D",
+            "state": "QUARANTINED",
+            "retention_class": "RAW_QUARANTINE_14D",
             "committed_at": raw_receipt.committed_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "retention_expires_at": raw_receipt.retention_expires_at.strftime(
+            "retention_expires_at": None,
+            "quarantine_expires_at": raw_receipt.quarantine_expires_at.strftime(
                 "%Y-%m-%dT%H:%M:%SZ"
             ),
             "receipt_sha256": raw_receipt.receipt_sha256,
@@ -1498,9 +1507,10 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
             "manifest_sha256": pending_manifest.manifest_sha256,
             "consent_receipt_sha256": consent.event.receipt_sha256,
             "state": "MANIFEST_ACCEPTED",
-            "retention_class": "RAW_ORIGINAL_180D",
+            "retention_class": "RAW_QUARANTINE_14D",
             "committed_at": None,
             "retention_expires_at": None,
+            "quarantine_expires_at": None,
             "receipt_sha256": None,
             "storage_name": None,
             "envelope_sha256": None,
@@ -2569,7 +2579,7 @@ def test_fp046_consent_withdrawal_serializes_before_report_ingest() -> None:
     actor_id = f"withdraw.{suffix}"
     subject = privacy_subject_hmac(actor_id, 1, PRIVACY_SECRET)
     installation_id = _installation_id(actor_id)
-    _record_consent(
+    initial_consent = _record_consent(
         SessionFactory,
         actor_id=actor_id,
         installation_id=installation_id,
@@ -2590,18 +2600,16 @@ def test_fp046_consent_withdrawal_serializes_before_report_ingest() -> None:
                 installation_id=installation_id,
                 request_id=f"withdraw_consent_{suffix}",
                 client_revision=2,
-                policy_version="FP-013-1.0.0",
-                item_versions={
-                    "raw_source_collection": "FP-013-RAW-1.0.0",
-                    "automatic_reporting": "FP-013-AUTO-1.0.0",
-                    "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
-                    "training_reuse": "FP-013-TRAINING-1.0.0",
-                },
+                policy_version=PRIVACY_CONSENT_POLICY_VERSION,
+                item_versions=PRIVACY_CONSENT_ITEM_VERSIONS,
                 raw_source_collection=False,
                 automatic_reporting=False,
                 mobile_network_transfer=False,
                 training_reuse=False,
                 secret=PRIVACY_SECRET,
+                expected_previous_backend_receipt_sha256=(
+                    initial_consent.event.receipt_sha256
+                ),
             )
 
     def ingest() -> str:
@@ -2627,7 +2635,9 @@ def test_fp046_consent_withdrawal_serializes_before_report_ingest() -> None:
         assert not report.done()
         release_withdrawal.set()
         withdrawal.result(timeout=5)
-        assert report.result(timeout=5) == "raw_source_collection_consent_required"
+        # Manual report ingest remains allowed when current-policy optional
+        # selections are false; the assertion above proves it waited for withdrawal.
+        assert report.result(timeout=5) == "allowed"
     engine.dispose()
 
 
@@ -2983,12 +2993,12 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
         }
         expected_update_tables = {
             "reports",
-            "report_original_access_grants",
             "account_deletion_requests",
             "account_deletion_items",
             "account_deletion_device_targets",
+            "account_enrollments",
         }
-        assert len(app_table_privileges) == 37
+        assert len(app_table_privileges) == 61
         assert {
             table_name
             for table_name, row in app_table_privileges.items()
@@ -2996,6 +3006,8 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
         } == {
             "admin_security_recovery_codes",
             "admin_security_recovery_transactions",
+            "report_restore_reapply_authorizations",
+            "report_restore_reapply_authorized_actions",
             "report_user_request_status_events",
             "walksafe_recovery_custody_capabilities",
             "walksafe_recovery_custody_markers",
@@ -3006,11 +3018,25 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
             if not row["runtime_insert"]
         } == {
             "admin_device_keys",
+            "admin_report_mutation_claims",
             "admin_security_controls",
             "admin_security_reconfirmations",
             "admin_security_recovery_codes",
             "admin_security_recovery_transactions",
             "admin_security_sessions",
+            "report_deletion_external_copy_states",
+            "report_deletion_legal_holds",
+            "report_deletion_tombstones",
+            "report_delivery_packages",
+            "report_institution_delivery_events",
+            "report_original_access_audits",
+            "report_original_access_grants",
+            "report_restore_reapply_authorizations",
+            "report_restore_reapply_authorized_actions",
+            "report_restore_reapply_effects",
+            "report_restore_reapply_postchecks",
+            "report_restore_reapply_receipts",
+            "report_review_decisions",
             "walksafe_recovery_custody_capabilities",
             "walksafe_recovery_custody_markers",
         }
@@ -3064,7 +3090,7 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
                         "automatic_reporting, mobile_network_transfer, training_reuse, "
                         "receipt_sha256, recorded_at) VALUES ("
                         ":id, :request_id, :privacy_subject, 1, :installation_subject, "
-                        "99, 99, 'FP-013-1.0.0', CAST(:item_versions AS jsonb), "
+                        "99, 99, :policy_version, CAST(:item_versions AS jsonb), "
                         "true, true, false, false, :receipt_sha256, clock_timestamp())"
                     ),
                     {
@@ -3072,14 +3098,8 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
                         "request_id": f"runtime_consent_{suffix}",
                         "privacy_subject": "c" * 64,
                         "installation_subject": "d" * 64,
-                        "item_versions": json.dumps(
-                            {
-                                "raw_source_collection": "FP-013-RAW-1.0.0",
-                                "automatic_reporting": "FP-013-AUTO-1.0.0",
-                                "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
-                                "training_reuse": "FP-013-TRAINING-1.0.0",
-                            }
-                        ),
+                        "policy_version": PRIVACY_CONSENT_POLICY_VERSION,
+                        "item_versions": json.dumps(PRIVACY_CONSENT_ITEM_VERSIONS),
                         "receipt_sha256": "e" * 64,
                     },
                 )

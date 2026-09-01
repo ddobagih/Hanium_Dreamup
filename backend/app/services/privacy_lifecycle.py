@@ -354,6 +354,18 @@ def assert_privacy_runtime_database_role(db: Session) -> None:
             "OR has_table_privilege(current_user, 'public.alembic_version', 'DELETE') "
             "OR has_table_privilege(current_user, 'public.alembic_version', 'TRUNCATE')) "
             "AS can_mutate_migration_state, "
+            "EXISTS (SELECT 1 FROM pg_class AS evidence_class "
+            "WHERE evidence_class.oid IN ("
+            "'public.report_original_access_grants'::regclass, "
+            "'public.report_original_access_audits'::regclass, "
+            "'public.report_review_decisions'::regclass) "
+            "AND (has_table_privilege(current_user, evidence_class.oid, 'INSERT') "
+            "OR has_table_privilege(current_user, evidence_class.oid, 'UPDATE') "
+            "OR has_table_privilege(current_user, evidence_class.oid, 'DELETE') "
+            "OR has_table_privilege(current_user, evidence_class.oid, 'TRUNCATE') "
+            "OR has_any_column_privilege(current_user, evidence_class.oid, 'INSERT') "
+            "OR has_any_column_privilege(current_user, evidence_class.oid, 'UPDATE'))) "
+            "AS can_mutate_original_evidence, "
             "EXISTS (SELECT 1 FROM pg_class AS public_sequence "
             "JOIN pg_namespace AS sequence_namespace "
             "ON sequence_namespace.oid = public_sequence.relnamespace "
@@ -431,6 +443,7 @@ def assert_privacy_runtime_database_role(db: Session) -> None:
         or role["can_update"]
         or role["can_truncate"]
         or role["can_mutate_migration_state"]
+        or role["can_mutate_original_evidence"]
         or role["can_update_public_sequence"]
         or role["can_mutate_extension_object"]
         or role["is_privileged_role_member"]
@@ -866,20 +879,14 @@ def assert_report_consent_active(
     )
     if latest is None:
         raise PrivacyLifecycleError(
-            "raw_source_collection_consent_required",
-            "Current raw-source collection consent is required for reports.",
+            "privacy_consent_reconsent_required",
+            "Current integrated consent is required.",
             status_code=409,
         )
     if not consent_event_is_current(latest):
         raise PrivacyLifecycleError(
             "privacy_consent_reconsent_required",
             "Current integrated consent is required.",
-            status_code=409,
-        )
-    if latest.raw_source_collection is not True:
-        raise PrivacyLifecycleError(
-            "raw_source_collection_consent_required",
-            "Current raw-source collection consent is required for reports.",
             status_code=409,
         )
     if automatic_reporting and latest.automatic_reporting is not True:

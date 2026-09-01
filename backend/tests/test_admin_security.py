@@ -17,6 +17,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from fastapi import FastAPI, HTTPException, Request
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -28,6 +29,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from conftest import _ADMIN_SECURITY_CLEANUP_TABLES
+
+
+def _repository_alembic_head() -> str:
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head is not None
+    return head
 from backend.app import database as database_api
 from backend.app import field_test_security as field_test_security_api
 from backend.app.api import admin_security as admin_security_api
@@ -2065,7 +2073,7 @@ def test_postgres_recovery_custody_migration_preflights_control_count(
             assert revision == prior_revision
             assert custody_column_count == 0
         else:
-            assert revision == "202608290011"
+            assert revision == _repository_alembic_head()
             assert custody_column_count == 1
     finally:
         engine.dispose()
@@ -3385,6 +3393,10 @@ def test_postgres_admin_security_full_recovery_and_high_risk_path(
                 "p.proacl, pg_catalog.acldefault('f', p.proowner))) AS acl "
                 "WHERE acl.grantee NOT IN (0, p.proowner, "
                 "'walksafe_backend_runtime'::regrole::oid) "
+                "AND NOT (p.proname = "
+                "'walksafe_lock_admin_original_access_session' "
+                "AND acl.grantee = "
+                "'walksafe_report_evidence_owner'::regrole::oid) "
                 "AND acl.privilege_type = 'EXECUTE') AS unexpected_execute "
                 "FROM pg_catalog.pg_proc AS p "
                 "JOIN pg_catalog.pg_namespace AS namespace "

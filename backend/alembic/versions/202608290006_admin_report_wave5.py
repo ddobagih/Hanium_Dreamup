@@ -166,6 +166,41 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute(
+        """
+        DO $guard$
+        BEGIN
+          LOCK TABLE public.reports,
+                     public.report_status_audits,
+                     public.report_delivery_packages,
+                     public.report_institution_delivery_events
+            IN ACCESS EXCLUSIVE MODE;
+          IF EXISTS (SELECT 1 FROM public.report_delivery_packages)
+            OR EXISTS (
+              SELECT 1 FROM public.report_institution_delivery_events
+               WHERE package_id IS NOT NULL OR package_revision IS NOT NULL
+            )
+            OR EXISTS (
+              SELECT 1 FROM public.reports
+               WHERE status_version IS DISTINCT FROM 1
+            )
+            OR EXISTS (
+              SELECT 1 FROM public.report_status_audits
+               WHERE previous_version IS NOT NULL
+                  OR next_version IS NOT NULL
+                  OR session_id IS NOT NULL
+                  OR device_id IS NOT NULL
+                  OR correlation_id IS NOT NULL
+            )
+          THEN
+            RAISE EXCEPTION
+              'cannot downgrade admin report wave5 while successor data exists'
+              USING ERRCODE = '55000';
+          END IF;
+        END
+        $guard$
+        """
+    )
     op.drop_index(
         "ix_report_institution_delivery_package_id",
         table_name="report_institution_delivery_events",

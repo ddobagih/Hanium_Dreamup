@@ -15,7 +15,12 @@ from backend.app.field_test_security import (
     requires_account_generation,
     requires_actor_identity,
 )
-from backend.app.models import Report, ReportContentRevision, ReportDeliveryPackage
+from backend.app.models import (
+    Report,
+    ReportContentRevision,
+    ReportDeliveryPackage,
+    ReportOriginalAccessGrant,
+)
 from backend.app.request_limits import (
     REPORT_CORRECTION_BODY_LIMIT_BYTES,
     max_request_body_bytes,
@@ -51,6 +56,8 @@ REPORT_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
 KEY = uuid.UUID("22222222-2222-4222-8222-222222222222")
 SUBJECT = "a" * 64
 NOW = datetime(2026, 8, 29, 8, tzinfo=UTC)
+ADMIN_SESSION_ID = uuid.UUID("33333333-3333-4333-8333-333333333333")
+EVIDENCE_GRANT_ID = uuid.UUID("44444444-4444-4444-8444-444444444444")
 
 
 def _payload(**overrides: object) -> ReportContentCorrectionRequestV1:
@@ -115,6 +122,9 @@ class _Result:
     def scalar_one_or_none(self) -> object | None:
         return self.value
 
+    def scalar_one(self) -> object:
+        return self.value
+
 
 class _Session:
     def __init__(self, results: list[object | None]) -> None:
@@ -124,6 +134,8 @@ class _Session:
         self.rollbacks = 0
 
     def execute(self, _statement: object, _params: object | None = None) -> _Result:
+        if "report_original_access_audits" in str(_statement):
+            return _Result(2)
         return _Result(self.results.pop(0))
 
     def scalar(self, _statement: object) -> None:
@@ -309,14 +321,30 @@ class _AdminSession(_Session):
     def refresh(self, _value: object) -> None:
         return None
 
-    def get(self, _model: object, _key: object) -> None:
+    def get(self, model: object, key: object, **_kwargs: object) -> object | None:
+        if model is ReportOriginalAccessGrant and key == EVIDENCE_GRANT_ID:
+            identity = _identity()
+            return ReportOriginalAccessGrant(
+                id=EVIDENCE_GRANT_ID,
+                report_id=REPORT_ID,
+                admin_id=identity.admin_id,
+                session_id=identity.session_id,
+                device_id=identity.device_id,
+                purpose="report_review",
+                content_revision=1,
+                issued_at=NOW,
+                expires_at=datetime(2030, 8, 29, 8, tzinfo=UTC),
+                location_disclosed_at=NOW,
+                consumed_at=NOW,
+                access_granted_at=NOW,
+            )
         return None
 
 
 def _identity() -> AdminSessionIdentity:
     return AdminSessionIdentity(
         admin_id="reviewer@example.com",
-        session_id=uuid.uuid4(),
+        session_id=ADMIN_SESSION_ID,
         device_id="admin-device-1",
         device_label="review tablet",
         expires_at=NOW,
@@ -334,6 +362,7 @@ def _review_payload(content_revision: int) -> ReportReviewDecisionRequest:
         photo_reviewed=True,
         privacy_reviewed=True,
         content_revision=content_revision,
+        evidence_grant_id=EVIDENCE_GRANT_ID,
     )
 
 
@@ -376,8 +405,10 @@ def test_correction_invalidates_old_approval_then_new_package_supersedes() -> No
     )
     with pytest.raises(AdminReportWorkflowError) as stale:
         create_admin_report_delivery_package(
-            _AdminSession([report, stale_review, None, content]),  # type: ignore[arg-type]
+            _AdminSession([report, None, content, stale_review]),  # type: ignore[arg-type]
             report_id=REPORT_ID,
+            expected_content_revision=1,
+            expected_review_revision=1,
             identity=_identity(),
             correlation_id=uuid.uuid4(),
             query_sha256="d" * 64,
@@ -408,10 +439,12 @@ def test_correction_invalidates_old_approval_then_new_package_supersedes() -> No
         previous.csv_sha256,
         previous.manifest_sha256,
     )
-    package_db = _AdminSession([report, current_review, previous, content])
+    package_db = _AdminSession([report, previous, content, current_review])
     created = create_admin_report_delivery_package(
         package_db,  # type: ignore[arg-type]
         report_id=REPORT_ID,
+        expected_content_revision=1,
+        expected_review_revision=2,
         identity=_identity(),
         correlation_id=uuid.uuid4(),
         query_sha256="e" * 64,
@@ -424,6 +457,60 @@ def test_correction_invalidates_old_approval_then_new_package_supersedes() -> No
         previous.csv_sha256,
         previous.manifest_sha256,
     )
+
+
+def test_corrected_report_rejects_stale_package_create_content_revision_zero() -> None:
+    report = Report(
+        id=REPORT_ID,
+        status="reviewed",
+        content_revision=1,
+        class_name="damaged_tactile_block",
+        confidence=0.75,
+        latitude=37.5,
+        longitude=127.0,
+        accuracy_m=4.0,
+        captured_at=NOW,
+        created_at=NOW,
+    )
+    content = ReportContentRevision(
+        report_id=REPORT_ID,
+        revision=1,
+        expected_revision=0,
+        idempotency_key=KEY,
+        privacy_subject_hmac=SUBJECT,
+        account_generation=3,
+        user_description="보행로를 막고 있습니다",
+        category_hint="SIDEWALK_OBSTRUCTION",
+        intent_sha256="b" * 64,
+        content_sha256="c" * 64,
+        created_at=NOW,
+    )
+    approved = SimpleNamespace(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        revision=2,
+        content_revision=1,
+        decision="APPROVED",
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+        duplicate_of_report_id=None,
+        evidence_grant_id=EVIDENCE_GRANT_ID,
+    )
+
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        create_admin_report_delivery_package(
+            _AdminSession([report, None, content, approved]),  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            expected_content_revision=0,
+            expected_review_revision=2,
+            identity=_identity(),
+            correlation_id=uuid.uuid4(),
+            query_sha256="f" * 64,
+        )
+
+    assert captured.value.code == "delivery_package_content_revision_conflict"
+    assert captured.value.status_code == 409
 
 
 def test_routes_and_migration_keep_field_binding_and_deletion_cascade() -> None:

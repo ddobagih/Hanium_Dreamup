@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from anyio import to_thread
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from sqlalchemy.orm import Session
@@ -24,12 +22,25 @@ ORIGINAL_ACCESS_GRANT_HEADER_NAME = "X-WalkSafe-Original-Access-Grant"
 def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> APIRouter:
     router = APIRouter()
 
-    @router.get("/uploads/{filename}")
+    @router.get(
+        "/uploads/{filename}",
+        response_class=Response,
+        responses={
+            200: {
+                "description": "One-time authenticated report original bytes.",
+                "content": {
+                    "image/jpeg": {},
+                    "image/png": {},
+                    "image/webp": {},
+                },
+            }
+        },
+    )
     async def get_upload(
         filename: str,
         request: Request,
-        x_walksafe_original_access_grant: Optional[str] = Header(
-            default=None,
+        x_walksafe_original_access_grant: str = Header(
+            ...,
             alias=ORIGINAL_ACCESS_GRANT_HEADER_NAME,
         ),
         db: Session = Depends(get_db),
@@ -57,7 +68,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                     db,
                     upload_root=settings.upload_dir,
                     filename=filename,
-                    raw_access_token=(x_walksafe_original_access_grant or "").strip(),
+                    raw_access_token=x_walksafe_original_access_grant,
                     identity=identity,
                     key_manager=key_manager,
                     runtime_totp_secret=settings.admin_totp_secret,

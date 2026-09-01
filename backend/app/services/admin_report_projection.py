@@ -10,18 +10,19 @@ import json
 import re
 import uuid
 
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, case, func, or_, select
 
 from backend.app.models import (
     Report,
+    ReportDeliveryPackage,
     ReportInstitutionDeliveryEvent,
     ReportReviewDecision,
 )
 from backend.app.schemas import (
-    AdminReportCapabilitiesV1,
+    AdminReportCapabilitiesV2,
     AdminReportDeliverySummaryV1,
-    AdminReportDetailV1,
-    AdminReportReviewSummaryV1,
+    AdminReportDetailV2,
+    AdminReportReviewSummaryV2,
     AdminReportSummaryV1,
 )
 from backend.app.services.report_serialization import (
@@ -76,6 +77,7 @@ class AdminReportDetailRow:
     status: str
     status_version: int
     content_revision: int
+    latest_delivery_revision: int
     class_name: str
     confidence: float
     latitude: float | None
@@ -101,7 +103,16 @@ class AdminReportReviewRow:
 @dataclass(frozen=True)
 class AdminReportDeliveryRow:
     revision: int
-    package_revision: int | None
+    package_id: uuid.UUID
+    package_revision: int
+    package_content_revision: int
+    package_schema_version: str
+    package_version: int
+    export_audit_id: uuid.UUID
+    package_sha256: str
+    csv_sha256: str
+    manifest_sha256: str
+    package_byte_count: int
     status: str
     external_receipt_id: str | None
     evidence_sha256: str | None
@@ -298,10 +309,18 @@ def project_admin_report_summary(report: AdminReportListRow) -> AdminReportSumma
 
 
 def admin_report_detail_columns() -> tuple[object, ...]:
+    latest_delivery_revision = func.coalesce(
+        select(func.max(ReportInstitutionDeliveryEvent.revision))
+        .where(ReportInstitutionDeliveryEvent.report_id == Report.id)
+        .scalar_subquery(),
+        0,
+    )
     return (
         Report.id,
         Report.status,
         Report.status_version,
+        Report.content_revision,
+        latest_delivery_revision.label("latest_delivery_revision"),
         Report.class_name,
         Report.confidence,
         Report.latitude,
@@ -326,7 +345,24 @@ def coerce_admin_report_review_row(row: object) -> AdminReportReviewRow:
 
 
 def admin_report_delivery_columns() -> tuple[object, ...]:
-    return tuple(getattr(ReportInstitutionDeliveryEvent, field) for field in AdminReportDeliveryRow.__dataclass_fields__)
+    return (
+        ReportInstitutionDeliveryEvent.revision,
+        ReportInstitutionDeliveryEvent.package_id,
+        ReportInstitutionDeliveryEvent.package_revision,
+        ReportDeliveryPackage.content_revision.label("package_content_revision"),
+        ReportDeliveryPackage.schema_version.label("package_schema_version"),
+        ReportDeliveryPackage.package_version,
+        ReportDeliveryPackage.export_audit_id,
+        ReportDeliveryPackage.package_sha256,
+        ReportDeliveryPackage.csv_sha256,
+        ReportDeliveryPackage.manifest_sha256,
+        ReportDeliveryPackage.package_byte_count,
+        ReportInstitutionDeliveryEvent.status,
+        ReportInstitutionDeliveryEvent.external_receipt_id,
+        ReportInstitutionDeliveryEvent.evidence_sha256,
+        ReportInstitutionDeliveryEvent.observed_at,
+        ReportInstitutionDeliveryEvent.recorded_at,
+    )
 
 
 def coerce_admin_report_delivery_row(row: object) -> AdminReportDeliveryRow:
@@ -337,15 +373,22 @@ def project_admin_report_detail(
     report: AdminReportDetailRow | Report,
     review: AdminReportReviewRow | ReportReviewDecision | None,
     delivery: AdminReportDeliveryRow | ReportInstitutionDeliveryEvent | None,
-) -> AdminReportDetailV1:
+) -> AdminReportDetailV2:
     from backend.app.services.admin_report_workflow import allowed_next_statuses
 
     report_id = str(report.id)
-    return AdminReportDetailV1(
-        schema_version="walksafe.admin-report-detail.v1",
+    latest_delivery_revision = int(
+        getattr(report, "latest_delivery_revision", 0) or 0
+    )
+    if delivery is not None:
+        latest_delivery_revision = max(latest_delivery_revision, int(delivery.revision))
+    return AdminReportDetailV2(
+        schema_version="walksafe.admin-report-detail.v2",
         id=report.id,
         status=report.status,
         status_version=getattr(report, "status_version", None) or 1,
+        content_revision=int(getattr(report, "content_revision", 0) or 0),
+        latest_delivery_revision=latest_delivery_revision,
         allowed_next_statuses=list(allowed_next_statuses(report.status)),
         class_name=report.class_name,
         confidence=report.confidence,
@@ -354,7 +397,7 @@ def project_admin_report_detail(
         created_at=report.created_at,
         updated_at=report.updated_at,
         current_review=(
-            AdminReportReviewSummaryV1(
+            AdminReportReviewSummaryV2(
                 revision=review.revision,
                 decision=review.decision,
                 user_visible_reason=review.user_visible_reason,
@@ -370,7 +413,16 @@ def project_admin_report_detail(
         current_delivery=(
             AdminReportDeliverySummaryV1(
                 revision=delivery.revision,
-                package_revision=getattr(delivery, "package_revision", None),
+                package_id=delivery.package_id,
+                package_revision=delivery.package_revision,
+                package_content_revision=delivery.package_content_revision,
+                package_schema_version=delivery.package_schema_version,
+                package_version=delivery.package_version,
+                export_audit_id=delivery.export_audit_id,
+                package_sha256=delivery.package_sha256,
+                csv_sha256=delivery.csv_sha256,
+                manifest_sha256=delivery.manifest_sha256,
+                package_byte_count=delivery.package_byte_count,
                 status=delivery.status,
                 external_receipt_present=delivery.external_receipt_id is not None,
                 evidence_present=delivery.evidence_sha256 is not None,
@@ -380,7 +432,7 @@ def project_admin_report_detail(
             if delivery is not None
             else None
         ),
-        capabilities=AdminReportCapabilitiesV1(
+        capabilities=AdminReportCapabilitiesV2(
             review_decisions_path=f"/reports/{report_id}/review-decisions",
             deliveries_path=f"/reports/{report_id}/deliveries",
             original_access_grants_path=(

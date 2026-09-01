@@ -319,7 +319,7 @@ def test_b1c_migration_is_linear_and_refuses_receipt_data_loss(
 
     assert migration.revision == "202608290002"
     assert migration.down_revision == "202608290001"
-    assert "state = 'COMMITTED'" in migration._UNSAFE_DOWNGRADE_SQL
+    assert "receipt_sha256 IS NOT NULL" in migration._UNSAFE_DOWNGRADE_SQL
     assert "ERRCODE = '55000'" in migration._UNSAFE_DOWNGRADE_SQL
 
     executed: list[object] = []

@@ -29,22 +29,33 @@ LEDGER_SCHEMA = "walksafe.report-deletion-tombstone-ledger.v1"
 HEAD_SCHEMA = "walksafe.report-deletion-tombstone-head.v1"
 SIGNATURE_SCHEMA = "walksafe.report-deletion-tombstone-signature.v1"
 KEY_SCHEMA = "walksafe.report-deletion-tombstone-key.v1"
-INVENTORY_SCHEMA = "walksafe.report-restore-inventory.v1"
-PLAN_SCHEMA = "walksafe.report-restore-reapply-plan.v1"
+INVENTORY_SCHEMA = "walksafe.report-restore-inventory.v2"
+SOURCE_FENCE_REQUEST_SCHEMA = "walksafe.report-restore-source-fence-request.v1"
+SOURCE_FENCE_BINDING_SCHEMA = "walksafe.report-restore-source-fence-binding.v1"
+SOURCE_FENCE_SCHEMA = "walksafe.report-restore-source-fence.v1"
+PLAN_SCHEMA = "walksafe.report-restore-reapply-plan.v2"
 RECEIPT_SCHEMA = "walksafe.report-restore-reapply-receipt.v1"
-GATE_SCHEMA = "walksafe.report-restore-publish-gate.v1"
+GATE_SCHEMA = "walksafe.report-restore-publish-gate.v2"
 
 LEDGER_SIGNATURE_DOMAIN = b"walksafe/report-deletion-tombstone-ledger/v1\0"
 HEAD_SIGNATURE_DOMAIN = b"walksafe/report-deletion-tombstone-head/v1\0"
 ENTRY_HASH_DOMAIN = b"walksafe/report-deletion-tombstone-entry/v1\0"
-INVENTORY_HASH_DOMAIN = b"walksafe/report-restore-inventory/v1\0"
-PLAN_HASH_DOMAIN = b"walksafe/report-restore-reapply-plan/v1\0"
+INVENTORY_HASH_DOMAIN = b"walksafe/report-restore-inventory/v2\0"
+PLAN_HASH_DOMAIN = b"walksafe/report-restore-reapply-plan/v2\0"
 RECEIPT_HASH_DOMAIN = b"walksafe/report-restore-reapply-receipt/v1\0"
+SOURCE_FENCE_HASH_DOMAIN = b"walksafe/report-restore-source-fence/v1\0"
+SOURCE_FENCE_REQUEST_HASH_DOMAIN = (
+    b"walksafe/report-restore-source-fence-request/v1\0"
+)
+SOURCE_FENCE_BINDING_SIGNATURE_DOMAIN = (
+    b"walksafe/report-restore-source-fence-binding/v1\0"
+)
 
 REPORT_SCOPE = "REPORT_PHYSICAL_DELETION"
 ACTION_SCOPE = "REPORT_ROW_AND_BOUND_SERVER_ARTIFACTS"
 REQUIRED_STORES = ("REPORT_DATABASE", "REPORT_UPLOADS")
 APPLY_CONFIRMATION = "REAPPLY-RESTORED-REPORT-TOMBSTONES"
+REPORT_DELETION_ADVISORY_LOCK_KEY = "walksafe-report-deletion-worker-v1"
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _SUBJECT_HMAC = _SHA256
@@ -53,10 +64,21 @@ _TIMESTAMP = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
     r"(?:\.[0-9]{1,6})?Z$"
 )
+_DEVICE_INODE = re.compile(r"^[0-9]+:[0-9]+$")
+_ARTIFACT_STORAGE_NAME = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
+    r"[89ab][0-9a-f]{3}-[0-9a-f]{12}\.wse$"
+)
+_IMAGE_CONTENT_SUFFIX = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
 _ZERO_HASH = "0" * 64
 _MAX_LEDGER_BYTES = 64 * 1024 * 1024
 _MAX_INVENTORY_BYTES = 64 * 1024 * 1024
 _MAX_CONTROL_BYTES = 64 * 1024
+_MAX_RECEIPT_BYTES = 64 * 1024 * 1024
 _MAX_RECORDS = 200_000
 
 
@@ -67,6 +89,10 @@ class ReportRestoreTombstoneError(RuntimeError):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+class ReportRestorePostCommitError(ReportRestoreTombstoneError):
+    """The database committed, but a semantic post-commit check failed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +144,12 @@ class RestoredReportInventoryItem:
     account_generation: int | None
     report_row_present: bool
     bound_artifact_count: int
+    image_path: str | None
+    image_content_type: str | None
+    artifact_storage_name: str | None
+    artifact_sha256: str | None
+    artifact_size: int | None
+    artifact_device_inode: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +169,59 @@ class RestoredReportInventory:
 
 
 @dataclass(frozen=True, slots=True)
+class ReportRestoreSourceFenceRequest:
+    """Non-secret request emitted only after both source locks are held."""
+
+    fence_id: uuid.UUID
+    restore_run_id: uuid.UUID
+    backup_run_id: str
+    backup_manifest_sha256: str
+    source_identity_sha256: str
+    data_boundary_id: str
+    source_backend_pid: int
+    maintenance_lock_identity_sha256: str
+    maintenance_lock_device_inode: str
+    report_deletion_lock_key: str
+    report_deletion_lock_identity_sha256: str
+    acquired_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedReportRestoreFenceBinding:
+    source_fence_request_sha256: str
+    ledger_sha256: str
+    trusted_head_sha256: str
+    cutoff_at: datetime
+    signer_key_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class ReportRestoreSourceFence:
+    """Immutable source-write fence bound to one restore and trusted head."""
+
+    fence_id: uuid.UUID
+    restore_run_id: uuid.UUID
+    backup_run_id: str
+    backup_manifest_sha256: str
+    source_identity_sha256: str
+    data_boundary_id: str
+    source_backend_pid: int
+    maintenance_lock_identity_sha256: str
+    maintenance_lock_device_inode: str
+    report_deletion_lock_key: str
+    report_deletion_lock_identity_sha256: str
+    acquired_at: datetime
+    source_fence_request_sha256: str
+    trusted_head_sha256: str
+
+
+class ReportRestoreSourceFenceVerifier(Protocol):
+    """Trusted integration boundary that checks the real locks are still held."""
+
+    def is_held(self, fence: ReportRestoreSourceFence) -> bool: ...
+
+
+@dataclass(frozen=True, slots=True)
 class ReportRestoreReapplyAction:
     tombstone_id: uuid.UUID
     request_id: uuid.UUID
@@ -147,12 +232,19 @@ class ReportRestoreReapplyAction:
     entry_sha256: str
     report_row_present: bool
     bound_artifact_count: int
+    image_path: str | None
+    image_content_type: str | None
+    artifact_storage_name: str
+    artifact_sha256: str
+    artifact_size: int
+    artifact_device_inode: str
 
 
 @dataclass(frozen=True, slots=True)
 class ReportRestoreReapplyPlan:
     ledger_id: uuid.UUID
     trusted_head_sha256: str
+    source_fence: ReportRestoreSourceFence
     head_sequence: int
     cutoff_at: datetime
     restore_run_id: uuid.UUID
@@ -198,6 +290,9 @@ class ReportRestoreReapplyOutcome:
 class ReportRestorePublishGate:
     restore_run_id: uuid.UUID
     trusted_head_sha256: str
+    source_fence_id: uuid.UUID
+    source_fence_sha256: str
+    reapply_plan_sha256: str
     cutoff_at: datetime
     post_inventory_sha256: str
     receipt_sha256: str | None
@@ -819,44 +914,67 @@ def verify_report_tombstone_bundle(
 
 
 def _read_stable_regular(path: Path, *, maximum: int, label: str) -> bytes:
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-    try:
-        before = path.stat(follow_symlinks=False)
-        descriptor = os.open(path, flags)
-        try:
-            opened = os.fstat(descriptor)
-            chunks: list[bytes] = []
-            total = 0
-            while total <= maximum:
-                chunk = os.read(descriptor, min(1024 * 1024, maximum + 1 - total))
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                total += len(chunk)
-            raw = b"".join(chunks)
-            after = os.fstat(descriptor)
-        finally:
-            os.close(descriptor)
-        current = path.stat(follow_symlinks=False)
-    except OSError as exc:
+    no_follow = getattr(os, "O_NOFOLLOW", None)
+    non_block = getattr(os, "O_NONBLOCK", None)
+    if no_follow is None or non_block is None or maximum < 1:
         raise ReportRestoreTombstoneError(
             "restore_tombstone_evidence_unavailable", f"{label} is unavailable."
-        ) from exc
-    def identity(value: os.stat_result) -> tuple[int, int, int, int, int]:
+        )
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | no_follow | non_block
+
+    def identity(value: os.stat_result) -> tuple[int, ...]:
         return (
             value.st_dev,
             value.st_ino,
+            value.st_mode,
+            value.st_uid,
+            value.st_gid,
+            value.st_nlink,
             value.st_size,
             value.st_mtime_ns,
             value.st_ctime_ns,
         )
+
+    def require_safe(value: os.stat_result) -> None:
+        if (
+            not stat.S_ISREG(value.st_mode)
+            or value.st_nlink != 1
+            or not 0 < value.st_size <= maximum
+        ):
+            raise OSError("evidence metadata is unsafe")
+
+    try:
+        before = os.lstat(path)
+        require_safe(before)
+        descriptor = os.open(path, flags)
+        try:
+            opened = os.fstat(descriptor)
+            require_safe(opened)
+            if identity(opened) != identity(before):
+                raise OSError("evidence changed while opening")
+            chunks: list[bytes] = []
+            remaining = opened.st_size
+            while remaining:
+                chunk = os.read(descriptor, min(1024 * 1024, remaining))
+                if not chunk:
+                    raise OSError("evidence was truncated")
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            if os.read(descriptor, 1):
+                raise OSError("evidence grew while reading")
+            raw = b"".join(chunks)
+            after = os.fstat(descriptor)
+            require_safe(after)
+        finally:
+            os.close(descriptor)
+        current = os.lstat(path)
+        require_safe(current)
+    except OSError as exc:
+        raise ReportRestoreTombstoneError(
+            "restore_tombstone_evidence_unavailable", f"{label} is unavailable."
+        ) from exc
     if (
-        path.is_symlink()
-        or not stat.S_ISREG(opened.st_mode)
-        or opened.st_nlink != 1
-        or len(raw) > maximum
-        or identity(before) != identity(opened)
-        or identity(opened) != identity(after)
+        identity(opened) != identity(after)
         or identity(after) != identity(current)
     ):
         raise ReportRestoreTombstoneError(
@@ -989,7 +1107,13 @@ def parse_restored_report_inventory(raw: bytes) -> RestoredReportInventory:
             raw_item,
             {
                 "account_generation",
+                "artifact_device_inode",
+                "artifact_sha256",
+                "artifact_size",
+                "artifact_storage_name",
                 "bound_artifact_count",
+                "image_content_type",
+                "image_path",
                 "privacy_subject_hmac",
                 "report_id",
                 "report_row_present",
@@ -1004,15 +1128,27 @@ def parse_restored_report_inventory(raw: bytes) -> RestoredReportInventory:
             label="bound_artifact_count",
             allow_zero=True,
         )
-        if type(row_present) is not bool or (not row_present and artifacts == 0):
+        if type(row_present) is not bool or artifacts != 1:
             raise ReportRestoreTombstoneError(
-                "restore_tombstone_evidence_invalid", "A restore inventory item is empty."
+                "restore_tombstone_evidence_invalid",
+                "A restore inventory item must bind exactly one artifact.",
             )
         if row_present:
-            subject = _sha256(raw_item["privacy_subject_hmac"], label="inventory owner")
-            generation = _positive_int(
-                raw_item["account_generation"], label="inventory account_generation"
-            )
+            if (
+                raw_item["privacy_subject_hmac"] is None
+                and raw_item["account_generation"] is None
+            ):
+                subject = None
+                generation = None
+            else:
+                subject = _sha256(
+                    raw_item["privacy_subject_hmac"],
+                    label="inventory owner",
+                )
+                generation = _positive_int(
+                    raw_item["account_generation"],
+                    label="inventory account_generation",
+                )
             report_count += 1
         else:
             if (
@@ -1025,6 +1161,46 @@ def parse_restored_report_inventory(raw: bytes) -> RestoredReportInventory:
                 )
             subject = None
             generation = None
+        storage_name = raw_item["artifact_storage_name"]
+        artifact_device_inode = raw_item["artifact_device_inode"]
+        if (
+            not isinstance(storage_name, str)
+            or _ARTIFACT_STORAGE_NAME.fullmatch(storage_name) is None
+            or storage_name != f"{report_id}.wse"
+            or not isinstance(artifact_device_inode, str)
+            or _DEVICE_INODE.fullmatch(artifact_device_inode) is None
+        ):
+            raise ReportRestoreTombstoneError(
+                "restore_tombstone_evidence_invalid",
+                "A restore inventory artifact binding is invalid.",
+            )
+        artifact_sha256 = _sha256(
+            raw_item["artifact_sha256"],
+            label="inventory artifact sha256",
+            allow_zero=False,
+        )
+        artifact_size = _positive_int(
+            raw_item["artifact_size"],
+            label="inventory artifact size",
+        )
+        image_path = raw_item["image_path"]
+        image_content_type = raw_item["image_content_type"]
+        if row_present:
+            suffix = _IMAGE_CONTENT_SUFFIX.get(image_content_type)
+            if (
+                not isinstance(image_path, str)
+                or suffix is None
+                or image_path != f"/uploads/{report_id}.{suffix}"
+            ):
+                raise ReportRestoreTombstoneError(
+                    "restore_tombstone_evidence_invalid",
+                    "A restore inventory report/image binding is invalid.",
+                )
+        elif image_path is not None or image_content_type is not None:
+            raise ReportRestoreTombstoneError(
+                "restore_tombstone_evidence_invalid",
+                "An artifact-only inventory item must not claim report image metadata.",
+            )
         if report_id_text <= previous_report_id:
             raise ReportRestoreTombstoneError(
                 "restore_tombstone_evidence_invalid",
@@ -1039,6 +1215,12 @@ def parse_restored_report_inventory(raw: bytes) -> RestoredReportInventory:
                 account_generation=generation,
                 report_row_present=row_present,
                 bound_artifact_count=artifacts,
+                image_path=image_path,
+                image_content_type=image_content_type,
+                artifact_storage_name=storage_name,
+                artifact_sha256=artifact_sha256,
+                artifact_size=artifact_size,
+                artifact_device_inode=artifact_device_inode,
             )
         )
     expected_reports = _positive_int(
@@ -1069,6 +1251,68 @@ def parse_restored_report_inventory(raw: bytes) -> RestoredReportInventory:
     )
 
 
+def build_restored_report_inventory_bytes(
+    *,
+    restore_run_id: uuid.UUID,
+    backup_run_id: str,
+    backup_manifest_sha256: str,
+    restore_receipt_sha256: str,
+    data_boundary_id: str,
+    privacy_hmac_key_version: int,
+    source_identity_sha256: str,
+    target_identity_sha256: str,
+    source_backup_created_at: datetime,
+    observed_at: datetime,
+    items: tuple[RestoredReportInventoryItem, ...],
+) -> bytes:
+    """Build one canonical complete DB/upload inventory for an isolated target."""
+
+    ordered = tuple(sorted(items, key=lambda item: str(item.report_id)))
+    raw = canonical_json_bytes(
+        {
+            "backup_manifest_sha256": backup_manifest_sha256,
+            "backup_run_id": backup_run_id,
+            "capture_status": "COMPLETE",
+            "covered_stores": list(REQUIRED_STORES),
+            "data_boundary_id": data_boundary_id,
+            "items": [
+                {
+                    "account_generation": item.account_generation,
+                    "artifact_device_inode": item.artifact_device_inode,
+                    "artifact_sha256": item.artifact_sha256,
+                    "artifact_size": item.artifact_size,
+                    "artifact_storage_name": item.artifact_storage_name,
+                    "bound_artifact_count": item.bound_artifact_count,
+                    "image_content_type": item.image_content_type,
+                    "image_path": item.image_path,
+                    "privacy_subject_hmac": item.privacy_subject_hmac,
+                    "report_id": str(item.report_id),
+                    "report_row_present": item.report_row_present,
+                }
+                for item in ordered
+            ],
+            "observed_at": _timestamp_text(observed_at),
+            "privacy_hmac_key_version": privacy_hmac_key_version,
+            "restore_receipt_sha256": restore_receipt_sha256,
+            "restore_run_id": str(restore_run_id),
+            "schema_version": INVENTORY_SCHEMA,
+            "source_backup_created_at": _timestamp_text(
+                source_backup_created_at
+            ),
+            "source_identity_sha256": source_identity_sha256,
+            "target_identity_sha256": target_identity_sha256,
+            "total_bound_artifact_count": sum(
+                item.bound_artifact_count for item in ordered
+            ),
+            "total_report_row_count": sum(
+                1 for item in ordered if item.report_row_present
+            ),
+        }
+    )
+    parse_restored_report_inventory(raw)
+    return raw
+
+
 def restored_report_inventory_sha256(raw: bytes) -> str:
     return hashlib.sha256(INVENTORY_HASH_DOMAIN + raw).hexdigest()
 
@@ -1094,11 +1338,533 @@ def load_restored_report_inventory(
     return inventory
 
 
+def _source_fence_request_document(
+    request: ReportRestoreSourceFenceRequest,
+) -> dict[str, object]:
+    return {
+        "acquired_at": _timestamp_text(request.acquired_at),
+        "backup_manifest_sha256": request.backup_manifest_sha256,
+        "backup_run_id": request.backup_run_id,
+        "data_boundary_id": request.data_boundary_id,
+        "fence_id": str(request.fence_id),
+        "maintenance_lock_identity_sha256": (
+            request.maintenance_lock_identity_sha256
+        ),
+        "maintenance_lock_device_inode": request.maintenance_lock_device_inode,
+        "report_deletion_lock_identity_sha256": (
+            request.report_deletion_lock_identity_sha256
+        ),
+        "report_deletion_lock_key": request.report_deletion_lock_key,
+        "restore_run_id": str(request.restore_run_id),
+        "schema_version": SOURCE_FENCE_REQUEST_SCHEMA,
+        "source_backend_pid": request.source_backend_pid,
+        "source_identity_sha256": request.source_identity_sha256,
+    }
+
+
+def _validate_source_fence_request(
+    request: ReportRestoreSourceFenceRequest,
+) -> ReportRestoreSourceFenceRequest:
+    try:
+        _uuid(str(request.fence_id), label="source fence request fence_id")
+        _uuid(
+            str(request.restore_run_id),
+            label="source fence request restore_run_id",
+        )
+        _identifier(
+            request.backup_run_id,
+            label="source fence request backup_run_id",
+        )
+        _sha256(
+            request.backup_manifest_sha256,
+            label="source fence request backup manifest",
+            allow_zero=False,
+        )
+        _sha256(
+            request.source_identity_sha256,
+            label="source fence request source identity",
+            allow_zero=False,
+        )
+        _identifier(
+            request.data_boundary_id,
+            label="source fence request boundary",
+        )
+        _positive_int(
+            request.source_backend_pid,
+            label="source fence request backend pid",
+        )
+        _sha256(
+            request.maintenance_lock_identity_sha256,
+            label="source fence request maintenance lock identity",
+            allow_zero=False,
+        )
+        if _DEVICE_INODE.fullmatch(request.maintenance_lock_device_inode) is None:
+            raise ValueError("invalid maintenance lock device/inode")
+        _identifier(
+            request.report_deletion_lock_key,
+            label="source fence request report deletion lock key",
+        )
+        _sha256(
+            request.report_deletion_lock_identity_sha256,
+            label="source fence request report deletion lock identity",
+            allow_zero=False,
+        )
+        _utc_datetime(
+            request.acquired_at,
+            label="source fence request acquired_at",
+        )
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_invalid",
+            "The source-write fence request is invalid.",
+        ) from exc
+    if request.report_deletion_lock_key != REPORT_DELETION_ADVISORY_LOCK_KEY:
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_invalid",
+            "The source-write fence request uses the wrong deletion lock.",
+        )
+    return request
+
+
+def report_restore_source_fence_request_bytes(
+    request: ReportRestoreSourceFenceRequest,
+) -> bytes:
+    return canonical_json_bytes(
+        _source_fence_request_document(_validate_source_fence_request(request))
+    )
+
+
+def parse_report_restore_source_fence_request(
+    raw: bytes,
+) -> ReportRestoreSourceFenceRequest:
+    document = _parse_canonical(
+        raw,
+        maximum=_MAX_CONTROL_BYTES,
+        label="source fence request",
+    )
+    _exact(
+        document,
+        {
+            "acquired_at",
+            "backup_manifest_sha256",
+            "backup_run_id",
+            "data_boundary_id",
+            "fence_id",
+            "maintenance_lock_device_inode",
+            "maintenance_lock_identity_sha256",
+            "report_deletion_lock_identity_sha256",
+            "report_deletion_lock_key",
+            "restore_run_id",
+            "schema_version",
+            "source_backend_pid",
+            "source_identity_sha256",
+        },
+        label="source fence request",
+    )
+    if document["schema_version"] != SOURCE_FENCE_REQUEST_SCHEMA:
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_invalid",
+            "The source-write fence request schema is invalid.",
+        )
+    return _validate_source_fence_request(
+        ReportRestoreSourceFenceRequest(
+            fence_id=_uuid(document["fence_id"], label="source fence request fence_id"),
+            restore_run_id=_uuid(
+                document["restore_run_id"],
+                label="source fence request restore_run_id",
+            ),
+            backup_run_id=_identifier(
+                document["backup_run_id"],
+                label="source fence request backup_run_id",
+            ),
+            backup_manifest_sha256=_sha256(
+                document["backup_manifest_sha256"],
+                label="source fence request backup manifest",
+                allow_zero=False,
+            ),
+            source_identity_sha256=_sha256(
+                document["source_identity_sha256"],
+                label="source fence request source identity",
+                allow_zero=False,
+            ),
+            data_boundary_id=_identifier(
+                document["data_boundary_id"],
+                label="source fence request boundary",
+            ),
+            source_backend_pid=_positive_int(
+                document["source_backend_pid"],
+                label="source fence request backend pid",
+            ),
+            maintenance_lock_identity_sha256=_sha256(
+                document["maintenance_lock_identity_sha256"],
+                label="source fence request maintenance lock identity",
+                allow_zero=False,
+            ),
+            maintenance_lock_device_inode=str(
+                document["maintenance_lock_device_inode"]
+            ),
+            report_deletion_lock_key=_identifier(
+                document["report_deletion_lock_key"],
+                label="source fence request report deletion lock key",
+            ),
+            report_deletion_lock_identity_sha256=_sha256(
+                document["report_deletion_lock_identity_sha256"],
+                label="source fence request report deletion lock identity",
+                allow_zero=False,
+            ),
+            acquired_at=_timestamp(
+                document["acquired_at"],
+                label="source fence request acquired_at",
+            ),
+        )
+    )
+
+
+def report_restore_source_fence_request_sha256(
+    request: ReportRestoreSourceFenceRequest,
+) -> str:
+    return hashlib.sha256(
+        SOURCE_FENCE_REQUEST_HASH_DOMAIN
+        + report_restore_source_fence_request_bytes(request)
+    ).hexdigest()
+
+
+def build_report_restore_source_fence_binding_bytes(
+    request: ReportRestoreSourceFenceRequest,
+    *,
+    ledger_bytes: bytes,
+    trusted_head_bytes: bytes,
+) -> bytes:
+    """Build the non-signing handoff document an external publisher must sign."""
+
+    ledger, _entries = _parse_ledger(ledger_bytes)
+    head = _parse_head(trusted_head_bytes)
+    if (
+        head["ledger_sha256"] != hashlib.sha256(ledger_bytes).hexdigest()
+        or any(
+            ledger[field] != head[field]
+            for field in (
+                "ledger_id",
+                "scope",
+                "data_boundary_id",
+                "privacy_hmac_key_version",
+                "cutoff_at",
+                "head_sequence",
+                "head_entry_sha256",
+            )
+        )
+    ):
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_binding_invalid",
+            "The fence binding inputs are not one exact ledger head.",
+        )
+    validated_request = _validate_source_fence_request(request)
+    cutoff_at = _timestamp(head["cutoff_at"], label="fence binding cutoff")
+    if cutoff_at < validated_request.acquired_at:
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_binding_invalid",
+            "The fence binding cutoff predates source fencing.",
+        )
+    return canonical_json_bytes(
+        {
+            "cutoff_at": head["cutoff_at"],
+            "ledger_sha256": hashlib.sha256(ledger_bytes).hexdigest(),
+            "schema_version": SOURCE_FENCE_BINDING_SCHEMA,
+            "scope": REPORT_SCOPE,
+            "source_fence_request_sha256": (
+                report_restore_source_fence_request_sha256(validated_request)
+            ),
+            "trusted_head_sha256": hashlib.sha256(
+                trusted_head_bytes
+            ).hexdigest(),
+        }
+    )
+
+
+def verify_report_restore_source_fence_binding(
+    *,
+    request: ReportRestoreSourceFenceRequest,
+    binding_bytes: bytes,
+    binding_signature_bytes: bytes,
+    ledger_bytes: bytes,
+    trusted_head_bytes: bytes,
+    key_descriptor_bytes: bytes,
+    expected_key_id: str,
+) -> VerifiedReportRestoreFenceBinding:
+    key_id, public_key = _verification_key(
+        key_descriptor_bytes,
+        expected_key_id=expected_key_id,
+    )
+    _verify_signature(
+        binding_bytes,
+        binding_signature_bytes,
+        key_id=key_id,
+        public_key=public_key,
+        domain=SOURCE_FENCE_BINDING_SIGNATURE_DOMAIN,
+        label="source fence binding",
+    )
+    document = _parse_canonical(
+        binding_bytes,
+        maximum=_MAX_CONTROL_BYTES,
+        label="source fence binding",
+    )
+    _exact(
+        document,
+        {
+            "cutoff_at",
+            "ledger_sha256",
+            "schema_version",
+            "scope",
+            "source_fence_request_sha256",
+            "trusted_head_sha256",
+        },
+        label="source fence binding",
+    )
+    cutoff_at = _timestamp(document["cutoff_at"], label="fence binding cutoff")
+    request_hash = _sha256(
+        document["source_fence_request_sha256"],
+        label="fence request hash",
+        allow_zero=False,
+    )
+    ledger_hash = _sha256(
+        document["ledger_sha256"],
+        label="fence ledger hash",
+        allow_zero=False,
+    )
+    head_hash = _sha256(
+        document["trusted_head_sha256"],
+        label="fence trusted head hash",
+        allow_zero=False,
+    )
+    head = _parse_head(trusted_head_bytes)
+    if (
+        document["schema_version"] != SOURCE_FENCE_BINDING_SCHEMA
+        or document["scope"] != REPORT_SCOPE
+        or request_hash != report_restore_source_fence_request_sha256(request)
+        or ledger_hash != hashlib.sha256(ledger_bytes).hexdigest()
+        or head_hash != hashlib.sha256(trusted_head_bytes).hexdigest()
+        or document["cutoff_at"] != head["cutoff_at"]
+        or cutoff_at < _validate_source_fence_request(request).acquired_at
+    ):
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_binding_invalid",
+            "The signed evidence is not bound to the held source fence.",
+        )
+    return VerifiedReportRestoreFenceBinding(
+        source_fence_request_sha256=request_hash,
+        ledger_sha256=ledger_hash,
+        trusted_head_sha256=head_hash,
+        cutoff_at=cutoff_at,
+        signer_key_id=key_id,
+    )
+
+
+def bind_report_restore_source_fence(
+    request: ReportRestoreSourceFenceRequest,
+    *,
+    bundle: VerifiedReportTombstoneBundle,
+    binding: VerifiedReportRestoreFenceBinding,
+) -> ReportRestoreSourceFence:
+    validated = _validate_source_fence_request(request)
+    request_hash = report_restore_source_fence_request_sha256(validated)
+    if (
+        binding.source_fence_request_sha256 != request_hash
+        or binding.trusted_head_sha256 != bundle.head_sha256
+        or binding.cutoff_at != bundle.cutoff_at
+        or binding.signer_key_id != bundle.signer_key_id
+        or validated.data_boundary_id != bundle.data_boundary_id
+    ):
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_binding_invalid",
+            "The source fence and trusted tombstone head are not exactly bound.",
+        )
+    return ReportRestoreSourceFence(
+        fence_id=validated.fence_id,
+        restore_run_id=validated.restore_run_id,
+        backup_run_id=validated.backup_run_id,
+        backup_manifest_sha256=validated.backup_manifest_sha256,
+        source_identity_sha256=validated.source_identity_sha256,
+        data_boundary_id=validated.data_boundary_id,
+        source_backend_pid=validated.source_backend_pid,
+        maintenance_lock_identity_sha256=(
+            validated.maintenance_lock_identity_sha256
+        ),
+        maintenance_lock_device_inode=validated.maintenance_lock_device_inode,
+        report_deletion_lock_key=validated.report_deletion_lock_key,
+        report_deletion_lock_identity_sha256=(
+            validated.report_deletion_lock_identity_sha256
+        ),
+        acquired_at=validated.acquired_at,
+        source_fence_request_sha256=request_hash,
+        trusted_head_sha256=bundle.head_sha256,
+    )
+
+
+def _source_fence_document(
+    fence: ReportRestoreSourceFence,
+) -> dict[str, object]:
+    return {
+        **_source_fence_request_document(
+            ReportRestoreSourceFenceRequest(
+                fence_id=fence.fence_id,
+                restore_run_id=fence.restore_run_id,
+                backup_run_id=fence.backup_run_id,
+                backup_manifest_sha256=fence.backup_manifest_sha256,
+                source_identity_sha256=fence.source_identity_sha256,
+                data_boundary_id=fence.data_boundary_id,
+                source_backend_pid=fence.source_backend_pid,
+                maintenance_lock_identity_sha256=(
+                    fence.maintenance_lock_identity_sha256
+                ),
+                maintenance_lock_device_inode=(
+                    fence.maintenance_lock_device_inode
+                ),
+                report_deletion_lock_key=fence.report_deletion_lock_key,
+                report_deletion_lock_identity_sha256=(
+                    fence.report_deletion_lock_identity_sha256
+                ),
+                acquired_at=fence.acquired_at,
+            )
+        ),
+        "schema_version": SOURCE_FENCE_SCHEMA,
+        "source_fence_request_sha256": fence.source_fence_request_sha256,
+        "trusted_head_sha256": fence.trusted_head_sha256,
+    }
+
+
+def report_restore_source_fence_sha256(
+    fence: ReportRestoreSourceFence,
+) -> str:
+    return hashlib.sha256(
+        SOURCE_FENCE_HASH_DOMAIN + canonical_json_bytes(_source_fence_document(fence))
+    ).hexdigest()
+
+
+def _require_source_fence(
+    bundle: VerifiedReportTombstoneBundle,
+    inventory: RestoredReportInventory,
+    source_fence: ReportRestoreSourceFence | None,
+) -> ReportRestoreSourceFence:
+    if source_fence is None:
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_required",
+            "A verified source-write fence is required for restore planning.",
+        )
+    try:
+        _uuid(str(source_fence.fence_id), label="source fence_id")
+        _uuid(str(source_fence.restore_run_id), label="source fence restore_run_id")
+        _identifier(source_fence.backup_run_id, label="source fence backup_run_id")
+        _sha256(
+            source_fence.backup_manifest_sha256,
+            label="source fence backup manifest",
+            allow_zero=False,
+        )
+        _sha256(
+            source_fence.source_identity_sha256,
+            label="source fence source identity",
+            allow_zero=False,
+        )
+        _identifier(source_fence.data_boundary_id, label="source fence boundary")
+        _positive_int(
+            source_fence.source_backend_pid,
+            label="source fence backend pid",
+        )
+        _sha256(
+            source_fence.maintenance_lock_identity_sha256,
+            label="source fence maintenance lock identity",
+            allow_zero=False,
+        )
+        if _DEVICE_INODE.fullmatch(source_fence.maintenance_lock_device_inode) is None:
+            raise ValueError("invalid maintenance lock device/inode")
+        _identifier(
+            source_fence.report_deletion_lock_key,
+            label="source fence report deletion lock key",
+        )
+        _sha256(
+            source_fence.report_deletion_lock_identity_sha256,
+            label="source fence report deletion lock identity",
+            allow_zero=False,
+        )
+        acquired_at = _utc_datetime(
+            source_fence.acquired_at,
+            label="source fence acquired_at",
+        )
+        _sha256(
+            source_fence.source_fence_request_sha256,
+            label="source fence request hash",
+            allow_zero=False,
+        )
+        _sha256(
+            source_fence.trusted_head_sha256,
+            label="source fence trusted head",
+            allow_zero=False,
+        )
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_invalid",
+            "The source-write fence is invalid.",
+        ) from exc
+    request = ReportRestoreSourceFenceRequest(
+        fence_id=source_fence.fence_id,
+        restore_run_id=source_fence.restore_run_id,
+        backup_run_id=source_fence.backup_run_id,
+        backup_manifest_sha256=source_fence.backup_manifest_sha256,
+        source_identity_sha256=source_fence.source_identity_sha256,
+        data_boundary_id=source_fence.data_boundary_id,
+        source_backend_pid=source_fence.source_backend_pid,
+        maintenance_lock_identity_sha256=(
+            source_fence.maintenance_lock_identity_sha256
+        ),
+        maintenance_lock_device_inode=(
+            source_fence.maintenance_lock_device_inode
+        ),
+        report_deletion_lock_key=source_fence.report_deletion_lock_key,
+        report_deletion_lock_identity_sha256=(
+            source_fence.report_deletion_lock_identity_sha256
+        ),
+        acquired_at=source_fence.acquired_at,
+    )
+    if (
+        source_fence.restore_run_id != inventory.restore_run_id
+        or source_fence.backup_run_id != inventory.backup_run_id
+        or source_fence.backup_manifest_sha256
+        != inventory.backup_manifest_sha256
+        or source_fence.source_identity_sha256 != inventory.source_identity_sha256
+        or source_fence.data_boundary_id != inventory.data_boundary_id
+        or source_fence.trusted_head_sha256 != bundle.head_sha256
+        or source_fence.report_deletion_lock_key
+        != REPORT_DELETION_ADVISORY_LOCK_KEY
+        or source_fence.source_fence_request_sha256
+        != report_restore_source_fence_request_sha256(request)
+    ):
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_mismatch",
+            "The source-write fence is outside the restore or trusted-head scope.",
+        )
+    if inventory.source_backup_created_at > bundle.cutoff_at:
+        raise ReportRestoreTombstoneError(
+            "restore_tombstone_head_stale",
+            "The trusted tombstone cutoff predates the restored backup.",
+        )
+    if acquired_at > bundle.cutoff_at:
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_invalid",
+            "The trusted tombstone cutoff predates source fencing.",
+        )
+    return source_fence
+
+
 def _action_document(action: ReportRestoreReapplyAction) -> dict[str, object]:
     return {
         "account_generation": action.account_generation,
+        "artifact_device_inode": action.artifact_device_inode,
+        "artifact_sha256": action.artifact_sha256,
+        "artifact_size": action.artifact_size,
+        "artifact_storage_name": action.artifact_storage_name,
         "bound_artifact_count": action.bound_artifact_count,
         "entry_sha256": action.entry_sha256,
+        "image_content_type": action.image_content_type,
+        "image_path": action.image_path,
         "privacy_subject_hmac": action.privacy_subject_hmac,
         "report_id": str(action.report_id),
         "report_row_present": action.report_row_present,
@@ -1123,6 +1889,10 @@ def _plan_payload(plan: ReportRestoreReapplyPlan, *, include_hash: bool) -> dict
         "restore_receipt_sha256": plan.restore_receipt_sha256,
         "restore_run_id": str(plan.restore_run_id),
         "schema_version": PLAN_SCHEMA,
+        "source_fence": _source_fence_document(plan.source_fence),
+        "source_fence_sha256": report_restore_source_fence_sha256(
+            plan.source_fence
+        ),
         "source_identity_sha256": plan.source_identity_sha256,
         "target_identity_sha256": plan.target_identity_sha256,
         "trusted_head_sha256": plan.trusted_head_sha256,
@@ -1140,6 +1910,8 @@ def report_restore_reapply_plan_bytes(plan: ReportRestoreReapplyPlan) -> bytes:
 def plan_report_restore_reapply(
     bundle: VerifiedReportTombstoneBundle,
     inventory: RestoredReportInventory,
+    *,
+    source_fence: ReportRestoreSourceFence | None = None,
 ) -> ReportRestoreReapplyPlan:
     if (
         inventory.data_boundary_id != bundle.data_boundary_id
@@ -1149,11 +1921,7 @@ def plan_report_restore_reapply(
             "restore_tombstone_scope_mismatch",
             "The restore inventory is outside the trusted tombstone owner namespace.",
         )
-    if bundle.cutoff_at < inventory.observed_at:
-        raise ReportRestoreTombstoneError(
-            "restore_tombstone_head_stale",
-            "The trusted tombstone cutoff does not cover the restore inventory.",
-        )
+    verified_fence = _require_source_fence(bundle, inventory, source_fence)
     tombstones = {entry.report_id: entry for entry in bundle.entries}
     actions: list[ReportRestoreReapplyAction] = []
     for item in inventory.items:
@@ -1173,6 +1941,16 @@ def plan_report_restore_reapply(
                 "restore_tombstone_owner_mismatch",
                 "A restored report conflicts with its tombstone owner or account generation.",
             )
+        if (
+            item.artifact_storage_name is None
+            or item.artifact_sha256 is None
+            or item.artifact_size is None
+            or item.artifact_device_inode is None
+        ):
+            raise ReportRestoreTombstoneError(
+                "restore_tombstone_evidence_invalid",
+                "A restored report action lacks its exact artifact binding.",
+            )
         actions.append(
             ReportRestoreReapplyAction(
                 tombstone_id=tombstone.tombstone_id,
@@ -1184,6 +1962,12 @@ def plan_report_restore_reapply(
                 entry_sha256=tombstone.entry_sha256,
                 report_row_present=item.report_row_present,
                 bound_artifact_count=item.bound_artifact_count,
+                image_path=item.image_path,
+                image_content_type=item.image_content_type,
+                artifact_storage_name=item.artifact_storage_name,
+                artifact_sha256=item.artifact_sha256,
+                artifact_size=item.artifact_size,
+                artifact_device_inode=item.artifact_device_inode,
             )
         )
     actions.sort(key=lambda action: str(action.report_id))
@@ -1193,6 +1977,7 @@ def plan_report_restore_reapply(
     placeholder = ReportRestoreReapplyPlan(
         ledger_id=bundle.ledger_id,
         trusted_head_sha256=bundle.head_sha256,
+        source_fence=verified_fence,
         head_sequence=bundle.head_sequence,
         cutoff_at=bundle.cutoff_at,
         restore_run_id=inventory.restore_run_id,
@@ -1214,6 +1999,7 @@ def plan_report_restore_reapply(
     return ReportRestoreReapplyPlan(
         ledger_id=placeholder.ledger_id,
         trusted_head_sha256=placeholder.trusted_head_sha256,
+        source_fence=placeholder.source_fence,
         head_sequence=placeholder.head_sequence,
         cutoff_at=placeholder.cutoff_at,
         restore_run_id=placeholder.restore_run_id,
@@ -1295,7 +2081,7 @@ def parse_report_restore_reapply_receipt(
     *,
     plan: ReportRestoreReapplyPlan,
 ) -> ReportRestoreReapplyReceipt:
-    document = _parse_canonical(raw, maximum=_MAX_CONTROL_BYTES, label="reapply receipt")
+    document = _parse_canonical(raw, maximum=_MAX_RECEIPT_BYTES, label="reapply receipt")
     _exact(
         document,
         {
@@ -1368,7 +2154,7 @@ def load_report_restore_reapply_receipt_bytes(path: Path) -> bytes:
     """Read a receipt once through the same stable-file boundary as other evidence."""
 
     return _read_stable_regular(
-        path, maximum=_MAX_CONTROL_BYTES, label="reapply receipt"
+        path, maximum=_MAX_RECEIPT_BYTES, label="reapply receipt"
     )
 
 
@@ -1379,6 +2165,7 @@ def execute_report_restore_reapply(
     dry_run: bool = True,
     confirmation: str | None = None,
     applied_at: datetime | None = None,
+    source_fence_verifier: ReportRestoreSourceFenceVerifier | None = None,
 ) -> ReportRestoreReapplyOutcome:
     """Execute through an atomic adapter; dry-run performs no adapter calls."""
 
@@ -1391,8 +2178,11 @@ def execute_report_restore_reapply(
             "restore_reapply_confirmation_required",
             "Explicit report tombstone reapply confirmation is required.",
         )
+    _assert_source_fence_held(plan.source_fence, source_fence_verifier)
     try:
         existing = target.load_receipt(plan.plan_sha256)
+    except ReportRestoreTombstoneError:
+        raise
     except Exception as exc:
         raise ReportRestoreTombstoneError(
             "restore_reapply_receipt_unavailable",
@@ -1400,16 +2190,19 @@ def execute_report_restore_reapply(
         ) from exc
     if existing is not None:
         receipt = parse_report_restore_reapply_receipt(existing, plan=plan)
+        _assert_source_fence_held(plan.source_fence, source_fence_verifier)
         return ReportRestoreReapplyOutcome("REPLAYED", plan, receipt)
 
     began = False
     commit_attempted = False
     receipt: ReportRestoreReapplyReceipt | None = None
     try:
+        _assert_source_fence_held(plan.source_fence, source_fence_verifier)
         target.begin(plan)
         began = True
         results: list[ReportRestoreReapplyResult] = []
         for action in plan.actions:
+            _assert_source_fence_held(plan.source_fence, source_fence_verifier)
             result = target.reapply(action)
             if result not in {"DELETED", "ALREADY_ABSENT"}:
                 raise ReportRestoreTombstoneError(
@@ -1428,22 +2221,35 @@ def execute_report_restore_reapply(
             tuple(results),
             applied_at=applied_at or datetime.now(UTC),
         )
+        _assert_source_fence_held(plan.source_fence, source_fence_verifier)
         commit_attempted = True
         target.commit(report_restore_reapply_receipt_bytes(receipt))
     except Exception as exc:
-        if commit_attempted and receipt is not None:
+        if isinstance(exc, ReportRestorePostCommitError):
+            raise
+        recoverable_commit_failure = (
+            not isinstance(exc, ReportRestoreTombstoneError)
+            or exc.code == "restore_artifact_reconciliation_required"
+        )
+        if commit_attempted and receipt is not None and recoverable_commit_failure:
             try:
                 committed_bytes = target.load_receipt(plan.plan_sha256)
-                if committed_bytes is not None:
-                    committed = parse_report_restore_reapply_receipt(
-                        committed_bytes, plan=plan
-                    )
-                    return ReportRestoreReapplyOutcome("REPLAYED", plan, committed)
             except Exception as recovery_exc:
+                if isinstance(recovery_exc, ReportRestoreTombstoneError):
+                    raise recovery_exc from exc
                 raise ReportRestoreTombstoneError(
                     "restore_reapply_commit_ambiguous",
                     "The reapply commit outcome is ambiguous; publish is blocked.",
                 ) from recovery_exc
+            if committed_bytes is not None:
+                committed = parse_report_restore_reapply_receipt(
+                    committed_bytes, plan=plan
+                )
+                _assert_source_fence_held(
+                    plan.source_fence,
+                    source_fence_verifier,
+                )
+                return ReportRestoreReapplyOutcome("REPLAYED", plan, committed)
         if began:
             try:
                 target.rollback()
@@ -1458,7 +2264,31 @@ def execute_report_restore_reapply(
             "restore_reapply_failed",
             "The report tombstone reapply failed; publish is blocked.",
         ) from exc
+    _assert_source_fence_held(plan.source_fence, source_fence_verifier)
     return ReportRestoreReapplyOutcome("APPLIED", plan, receipt)
+
+
+def _assert_source_fence_held(
+    source_fence: ReportRestoreSourceFence,
+    verifier: ReportRestoreSourceFenceVerifier | None,
+) -> None:
+    if verifier is None:
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_verifier_required",
+            "A live source-write fence verifier is required for publish.",
+        )
+    try:
+        held = verifier.is_held(source_fence)
+    except Exception as exc:
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_unavailable",
+            "The live source-write fence could not be verified.",
+        ) from exc
+    if held is not True:
+        raise ReportRestoreTombstoneError(
+            "restore_source_fence_not_held",
+            "The source-write fence is no longer held; publish is blocked.",
+        )
 
 
 def assert_report_restore_publishable(
@@ -1467,10 +2297,18 @@ def assert_report_restore_publishable(
     before_inventory: RestoredReportInventory,
     post_inventory: RestoredReportInventory,
     receipt_bytes: bytes | None,
+    source_fence: ReportRestoreSourceFence | None = None,
+    source_fence_verifier: ReportRestoreSourceFenceVerifier | None = None,
 ) -> ReportRestorePublishGate:
     """Return PASS only after exact reapply and a fresh complete inventory."""
 
-    before_plan = plan_report_restore_reapply(bundle, before_inventory)
+    verified_fence = _require_source_fence(bundle, before_inventory, source_fence)
+    _assert_source_fence_held(verified_fence, source_fence_verifier)
+    before_plan = plan_report_restore_reapply(
+        bundle,
+        before_inventory,
+        source_fence=verified_fence,
+    )
     if (
         post_inventory.restore_run_id != before_inventory.restore_run_id
         or post_inventory.backup_run_id != before_inventory.backup_run_id
@@ -1490,7 +2328,16 @@ def assert_report_restore_publishable(
             "restore_publish_inventory_mismatch",
             "The post-reapply inventory is outside the original restore target.",
         )
-    post_plan = plan_report_restore_reapply(bundle, post_inventory)
+    if post_inventory.observed_at < before_inventory.observed_at:
+        raise ReportRestoreTombstoneError(
+            "restore_publish_inventory_stale",
+            "The post-reapply inventory predates the original restore inventory.",
+        )
+    post_plan = plan_report_restore_reapply(
+        bundle,
+        post_inventory,
+        source_fence=verified_fence,
+    )
     if post_plan.actions:
         raise ReportRestoreTombstoneError(
             "restore_publish_reapply_pending",
@@ -1524,13 +2371,18 @@ def assert_report_restore_publishable(
             "restore_reapply_receipt_unexpected",
             "A reapply receipt was supplied for a restore with no tombstone actions.",
         )
-    return ReportRestorePublishGate(
+    gate = ReportRestorePublishGate(
         restore_run_id=before_inventory.restore_run_id,
         trusted_head_sha256=bundle.head_sha256,
+        source_fence_id=verified_fence.fence_id,
+        source_fence_sha256=report_restore_source_fence_sha256(verified_fence),
+        reapply_plan_sha256=before_plan.plan_sha256,
         cutoff_at=bundle.cutoff_at,
         post_inventory_sha256=post_inventory.inventory_sha256,
         receipt_sha256=receipt.receipt_sha256 if receipt is not None else None,
     )
+    _assert_source_fence_held(verified_fence, source_fence_verifier)
+    return gate
 
 
 def report_restore_publish_gate_bytes(gate: ReportRestorePublishGate) -> bytes:
@@ -1538,9 +2390,12 @@ def report_restore_publish_gate_bytes(gate: ReportRestorePublishGate) -> bytes:
         {
             "cutoff_at": _timestamp_text(gate.cutoff_at),
             "post_inventory_sha256": gate.post_inventory_sha256,
+            "reapply_plan_sha256": gate.reapply_plan_sha256,
             "receipt_sha256": gate.receipt_sha256,
             "restore_run_id": str(gate.restore_run_id),
             "schema_version": GATE_SCHEMA,
+            "source_fence_id": str(gate.source_fence_id),
+            "source_fence_sha256": gate.source_fence_sha256,
             "trusted_head_sha256": gate.trusted_head_sha256,
             "verdict": gate.verdict,
         }
@@ -1557,22 +2412,35 @@ __all__ = [
     "LEDGER_SCHEMA",
     "LEDGER_SIGNATURE_DOMAIN",
     "PLAN_SCHEMA",
+    "REPORT_DELETION_ADVISORY_LOCK_KEY",
     "RECEIPT_SCHEMA",
     "REPORT_SCOPE",
     "SIGNATURE_SCHEMA",
+    "SOURCE_FENCE_BINDING_SCHEMA",
+    "SOURCE_FENCE_BINDING_SIGNATURE_DOMAIN",
+    "SOURCE_FENCE_REQUEST_SCHEMA",
+    "SOURCE_FENCE_SCHEMA",
     "ReportDeletionLedgerEntry",
     "ReportDeletionTombstoneRecord",
     "ReportRestorePublishGate",
+    "ReportRestorePostCommitError",
     "ReportRestoreReapplyAction",
     "ReportRestoreReapplyOutcome",
     "ReportRestoreReapplyPlan",
     "ReportRestoreReapplyReceipt",
     "ReportRestoreReapplyTarget",
+    "ReportRestoreSourceFence",
+    "ReportRestoreSourceFenceRequest",
+    "ReportRestoreSourceFenceVerifier",
     "ReportRestoreTombstoneError",
     "RestoredReportInventory",
     "RestoredReportInventoryItem",
+    "VerifiedReportRestoreFenceBinding",
     "VerifiedReportTombstoneBundle",
     "assert_report_restore_publishable",
+    "bind_report_restore_source_fence",
+    "build_report_restore_source_fence_binding_bytes",
+    "build_restored_report_inventory_bytes",
     "build_key_descriptor",
     "build_report_tombstone_head_bytes",
     "build_report_tombstone_ledger_bytes",
@@ -1584,11 +2452,16 @@ __all__ = [
     "load_report_restore_reapply_receipt_bytes",
     "load_verified_report_tombstone_bundle",
     "parse_report_restore_reapply_receipt",
+    "parse_report_restore_source_fence_request",
     "parse_restored_report_inventory",
     "plan_report_restore_reapply",
     "report_restore_publish_gate_bytes",
     "restored_report_inventory_sha256",
     "report_restore_reapply_plan_bytes",
     "report_restore_reapply_receipt_bytes",
+    "report_restore_source_fence_sha256",
+    "report_restore_source_fence_request_bytes",
+    "report_restore_source_fence_request_sha256",
+    "verify_report_restore_source_fence_binding",
     "verify_report_tombstone_bundle",
 ]

@@ -358,6 +358,38 @@ def test_record_exact_replay_checks_original_previous_receipt_before_latest_cas(
     assert conflict.value.code == "privacy_consent_request_conflict"
 
 
+def test_direct_report_uses_current_consent_without_optional_raw_selection(
+    isolated_consent_service: None,
+) -> None:
+    current = _event(
+        raw_source_collection=False,
+        automatic_reporting=False,
+    )
+
+    assert privacy_lifecycle.assert_report_consent_active(
+        FakeSession([current]),  # type: ignore[arg-type]
+        "a" * 64,
+        1,
+        automatic_reporting=False,
+    ) is current
+    with pytest.raises(PrivacyLifecycleError) as automatic:
+        privacy_lifecycle.assert_report_consent_active(
+            FakeSession([current]),  # type: ignore[arg-type]
+            "a" * 64,
+            1,
+            automatic_reporting=True,
+        )
+    assert automatic.value.code == "automatic_reporting_consent_required"
+    with pytest.raises(PrivacyLifecycleError) as missing:
+        privacy_lifecycle.assert_report_consent_active(
+            FakeSession([None]),  # type: ignore[arg-type]
+            "a" * 64,
+            1,
+            automatic_reporting=False,
+        )
+    assert missing.value.code == "privacy_consent_reconsent_required"
+
+
 def test_legacy_event_is_evidence_only_for_report_and_training_admission(
     isolated_consent_service: None,
 ) -> None:

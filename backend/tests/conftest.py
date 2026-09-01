@@ -54,6 +54,14 @@ _CRITICAL_INCIDENT_CLEANUP_TABLES = (
     "critical_incidents",
 )
 _PRIVACY_CLEANUP_TABLES = (
+    "training_dataset_lifecycle_events",
+    "training_dataset_members",
+    "training_dataset_revisions",
+    "training_artifact_deletion_receipts",
+    "approved_training_artifacts",
+    "raw_collection_deletion_receipts",
+    "raw_collection_legal_hold_events",
+    "raw_collection_purpose_decisions",
     "raw_collection_chunks",
     "raw_collection_objects",
     "raw_collections",
@@ -260,9 +268,10 @@ def clean_test_storage() -> Iterator[Callable[[], None] | None]:
                         text(f"ALTER TABLE {table_name} ENABLE TRIGGER USER")
                     )
             cleanup_tables = [
-                table_name
-                for table_name in (
-                    *_FP008_CLEANUP_TABLES,
+                    table_name
+                    for table_name in (
+                        "admin_report_mutation_claims",
+                        *_FP008_CLEANUP_TABLES,
                     *_CRITICAL_INCIDENT_CLEANUP_TABLES,
                     *_REPORT_IMAGE_CLEANUP_TABLES,
                         *_ADMIN_SECURITY_CLEANUP_TABLES,

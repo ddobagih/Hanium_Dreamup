@@ -17,6 +17,8 @@ from sqlalchemy import create_engine, delete, func, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
+import backend.app.services.admin_report_delivery_package as delivery_package_service
+import backend.app.services.admin_report_workflow as report_workflow_service
 from backend.app.models import (
     AdminOperationAudit,
     AdminDeviceKey,
@@ -27,6 +29,8 @@ from backend.app.models import (
     Report,
     ReportDeliveryPackage,
     ReportInstitutionDeliveryEvent,
+    ReportOriginalAccessAudit,
+    ReportOriginalAccessGrant,
     ReportReviewDecision,
     ReportStatusAudit,
 )
@@ -385,11 +389,27 @@ def test_fp008_postgres_schema_device_key_and_single_use_proof(tmp_path: Path) -
     engine.dispose()
 
 
-def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> None:
+def test_fp008_postgres_review_delivery_authority_and_append_only_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # This predecessor contract test intentionally uses the migration/superuser
+    # connection to seed append-only evidence rows directly. Head005 proof-bound
+    # Runtime proof behavior is covered by the original-access v3 integration test.
+    monkeypatch.setattr(
+        report_workflow_service,
+        "admin_report_integrity_boundary_state",
+        lambda _db: None,
+    )
+    monkeypatch.setattr(
+        delivery_package_service,
+        "admin_report_integrity_boundary_state",
+        lambda _db: None,
+    )
     engine, SessionFactory = _session_factory()
     suffix = uuid.uuid4().hex[:12]
     identity = _identity(f"fp008.admin.{suffix}", f"fp008-device-{suffix}")
     report_id = uuid.uuid4()
+    evidence_grant_id = uuid.uuid4()
     captured_at = datetime.now(timezone.utc)
     with SessionFactory.begin() as db:
         db.add(
@@ -410,6 +430,42 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> N
                 payload={"agency_review_verified": True},
             )
         )
+        db.add(
+            ReportOriginalAccessGrant(
+                id=evidence_grant_id,
+                report_id=report_id,
+                admin_id=identity.admin_id,
+                session_id=identity.session_id,
+                device_id=identity.device_id,
+                purpose="report_review",
+                reason="Review the original report evidence.",
+                token_sha256=hashlib.sha256(uuid.uuid4().bytes).hexdigest(),
+                issued_at=captured_at,
+                expires_at=captured_at + timedelta(minutes=5),
+                content_revision=0,
+                location_disclosed_at=captured_at,
+                consumed_at=captured_at + timedelta(milliseconds=100),
+                access_granted_at=captured_at + timedelta(milliseconds=100),
+            )
+        )
+        for action, reason_code in (
+            ("LOCATION_DISCLOSED", "exact_location_disclosed"),
+            ("ACCESS_GRANTED", "approved_grant_consumed"),
+        ):
+            db.add(
+                ReportOriginalAccessAudit(
+                    grant_id=evidence_grant_id,
+                    report_id=report_id,
+                    admin_id=identity.admin_id,
+                    session_id=identity.session_id,
+                    device_id=identity.device_id,
+                    purpose="report_review",
+                    action=action,
+                    outcome="SUCCESS",
+                    reason_code=reason_code,
+                    created_at=captured_at + timedelta(milliseconds=200),
+                )
+            )
 
     approved_request = ReportReviewDecisionRequest(
         decision="APPROVED",
@@ -418,6 +474,7 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> N
         location_reviewed=True,
         photo_reviewed=True,
         privacy_reviewed=True,
+        evidence_grant_id=evidence_grant_id,
     )
     with SessionFactory() as db:
         approved = append_report_review_decision(
@@ -432,6 +489,8 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> N
         created_package = create_admin_report_delivery_package(
             db,
             report_id=report_id,
+            expected_content_revision=0,
+            expected_review_revision=approved.revision,
             identity=identity,
             correlation_id=uuid.uuid4(),
             query_sha256=hashlib.sha256(b"").hexdigest(),

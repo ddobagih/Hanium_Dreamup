@@ -688,6 +688,7 @@ def exclusive_maintenance_lock(
                         f"{authority_metadata.st_dev}:{authority_metadata.st_ino}"
                     ),
                     "acquired_at": datetime.now(UTC),
+                    "verify_held": verify_binding,
                 }
             finally:
                 verify_binding()

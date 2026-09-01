@@ -184,6 +184,34 @@ def test_migration_and_worker_are_manual_and_minimum_privilege() -> None:
     assert "httpx" not in worker
 
 
+def test_candidate_lock_is_narrow_and_does_not_grant_update() -> None:
+    root = Path(__file__).resolve().parents[2]
+    migration = (
+        root
+        / "backend/alembic/versions/202608300001_report_deletion_candidate_lock.py"
+    ).read_text(encoding="utf-8")
+    service = (
+        root / "backend/app/services/report_deletion.py"
+    ).read_text(encoding="utf-8")
+    worker = (root / "scripts/delete_reports.py").read_text(encoding="utf-8")
+
+    assert 'down_revision = "202608290016"' in migration
+    assert "SECURITY DEFINER" in migration
+    assert "SET search_path = pg_catalog, pg_temp" in migration
+    assert "request.status = 'ACKNOWLEDGED'" in migration
+    assert "request.status_version = p_request_status_version" in migration
+    assert "FOR UPDATE OF request, report" in migration
+    assert "USING ERRCODE = '42501'" in migration
+    assert "FROM PUBLIC, walksafe_backend_runtime" in migration
+    assert "TO walksafe_report_deletion_worker" in migration
+    assert "GRANT UPDATE" not in migration
+    assert "walksafe_lock_report_deletion_candidate" in service
+    assert ".with_for_update(of=(ReportUserRequest, Report))" not in service
+    assert "walksafe_lock_report_deletion_candidate" in worker
+    assert "'public.reports', 'UPDATE'" in worker
+    assert "'public.report_user_requests', 'UPDATE'" in worker
+
+
 def test_user_deletion_status_route_is_no_store_and_owner_bound() -> None:
     source = (
         Path(__file__).resolve().parents[1] / "app/api/report_user_requests.py"

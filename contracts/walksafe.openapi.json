@@ -1391,7 +1391,7 @@
         "title": "AdminRecoveryExpiredErrorResponse",
         "type": "object"
       },
-      "AdminReportCapabilitiesV1": {
+      "AdminReportCapabilitiesV2": {
         "additionalProperties": false,
         "properties": {
           "deliveries_path": {
@@ -1401,17 +1401,10 @@
             "type": "string"
           },
           "delivery_packages_path": {
-            "anyOf": [
-              {
-                "maxLength": 512,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Delivery Packages Path"
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Delivery Packages Path",
+            "type": "string"
           },
           "original_access_grants_path": {
             "maxLength": 512,
@@ -1426,54 +1419,139 @@
             "type": "string"
           },
           "status_path": {
-            "anyOf": [
-              {
-                "maxLength": 512,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status Path"
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Status Path",
+            "type": "string"
           }
         },
         "required": [
           "review_decisions_path",
           "deliveries_path",
-          "original_access_grants_path"
+          "original_access_grants_path",
+          "status_path",
+          "delivery_packages_path"
         ],
-        "title": "AdminReportCapabilitiesV1",
+        "title": "AdminReportCapabilitiesV2",
+        "type": "object"
+      },
+      "AdminReportDeliveryPackageProofV1": {
+        "additionalProperties": false,
+        "properties": {
+          "content_revision": {
+            "minimum": 0.0,
+            "title": "Content Revision",
+            "type": "integer"
+          },
+          "package_byte_count": {
+            "exclusiveMinimum": 0.0,
+            "title": "Package Byte Count",
+            "type": "integer"
+          },
+          "package_revision": {
+            "minimum": 1.0,
+            "title": "Package Revision",
+            "type": "integer"
+          },
+          "package_schema_version": {
+            "const": "walksafe.admin-report-delivery-package.v2",
+            "title": "Package Schema Version",
+            "type": "string"
+          },
+          "package_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Package Sha256",
+            "type": "string"
+          },
+          "review_revision": {
+            "minimum": 1.0,
+            "title": "Review Revision",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "walksafe.admin-report-delivery-package-proof.v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "package_revision",
+          "content_revision",
+          "review_revision",
+          "package_schema_version",
+          "package_byte_count",
+          "package_sha256"
+        ],
+        "title": "AdminReportDeliveryPackageProofV1",
         "type": "object"
       },
       "AdminReportDeliverySummaryV1": {
         "additionalProperties": false,
         "properties": {
+          "csv_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Csv Sha256",
+            "type": "string"
+          },
           "evidence_present": {
             "title": "Evidence Present",
             "type": "boolean"
           },
+          "export_audit_id": {
+            "format": "uuid",
+            "title": "Export Audit Id",
+            "type": "string"
+          },
           "external_receipt_present": {
             "title": "External Receipt Present",
             "type": "boolean"
+          },
+          "manifest_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Manifest Sha256",
+            "type": "string"
           },
           "observed_at": {
             "format": "date-time",
             "title": "Observed At",
             "type": "string"
           },
+          "package_byte_count": {
+            "exclusiveMinimum": 0.0,
+            "title": "Package Byte Count",
+            "type": "integer"
+          },
+          "package_content_revision": {
+            "minimum": 0.0,
+            "title": "Package Content Revision",
+            "type": "integer"
+          },
+          "package_id": {
+            "format": "uuid",
+            "title": "Package Id",
+            "type": "string"
+          },
           "package_revision": {
-            "anyOf": [
-              {
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Package Revision"
+            "minimum": 1.0,
+            "title": "Package Revision",
+            "type": "integer"
+          },
+          "package_schema_version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Package Schema Version",
+            "type": "string"
+          },
+          "package_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Package Sha256",
+            "type": "string"
+          },
+          "package_version": {
+            "minimum": 1.0,
+            "title": "Package Version",
+            "type": "integer"
           },
           "recorded_at": {
             "format": "date-time",
@@ -1498,6 +1576,16 @@
         },
         "required": [
           "revision",
+          "package_id",
+          "package_revision",
+          "package_content_revision",
+          "package_schema_version",
+          "package_version",
+          "export_audit_id",
+          "package_sha256",
+          "csv_sha256",
+          "manifest_sha256",
+          "package_byte_count",
           "status",
           "external_receipt_present",
           "evidence_present",
@@ -1507,7 +1595,7 @@
         "title": "AdminReportDeliverySummaryV1",
         "type": "object"
       },
-      "AdminReportDetailV1": {
+      "AdminReportDetailV2": {
         "additionalProperties": false,
         "properties": {
           "allowed_next_statuses": {
@@ -1524,7 +1612,7 @@
             "type": "array"
           },
           "capabilities": {
-            "$ref": "#/components/schemas/AdminReportCapabilitiesV1"
+            "$ref": "#/components/schemas/AdminReportCapabilitiesV2"
           },
           "captured_at": {
             "format": "date-time",
@@ -1547,6 +1635,11 @@
             "title": "Confidence",
             "type": "number"
           },
+          "content_revision": {
+            "minimum": 0.0,
+            "title": "Content Revision",
+            "type": "integer"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -1565,7 +1658,7 @@
           "current_review": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AdminReportReviewSummaryV1"
+                "$ref": "#/components/schemas/AdminReportReviewSummaryV2"
               },
               {
                 "type": "null"
@@ -1576,6 +1669,11 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "latest_delivery_revision": {
+            "minimum": 0.0,
+            "title": "Latest Delivery Revision",
+            "type": "integer"
           },
           "location_quality": {
             "enum": [
@@ -1588,7 +1686,7 @@
             "type": "string"
           },
           "schema_version": {
-            "const": "walksafe.admin-report-detail.v1",
+            "const": "walksafe.admin-report-detail.v2",
             "title": "Schema Version",
             "type": "string"
           },
@@ -1602,7 +1700,6 @@
             "type": "string"
           },
           "status_version": {
-            "default": 1,
             "minimum": 1.0,
             "title": "Status Version",
             "type": "integer"
@@ -1617,6 +1714,10 @@
           "schema_version",
           "id",
           "status",
+          "status_version",
+          "content_revision",
+          "latest_delivery_revision",
+          "allowed_next_statuses",
           "class_name",
           "confidence",
           "location_quality",
@@ -1627,7 +1728,7 @@
           "current_delivery",
           "capabilities"
         ],
-        "title": "AdminReportDetailV1",
+        "title": "AdminReportDetailV2",
         "type": "object"
       },
       "AdminReportListPageV1": {
@@ -1667,7 +1768,28 @@
         "title": "AdminReportListPageV1",
         "type": "object"
       },
-      "AdminReportReviewSummaryV1": {
+      "AdminReportPackageCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_content_revision": {
+            "minimum": 0.0,
+            "title": "Expected Content Revision",
+            "type": "integer"
+          },
+          "expected_review_revision": {
+            "minimum": 1.0,
+            "title": "Expected Review Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_content_revision",
+          "expected_review_revision"
+        ],
+        "title": "AdminReportPackageCreateRequest",
+        "type": "object"
+      },
+      "AdminReportReviewSummaryV2": {
         "additionalProperties": false,
         "properties": {
           "decided_at": {
@@ -1730,13 +1852,14 @@
         "required": [
           "revision",
           "decision",
+          "user_visible_reason",
           "duplicate_of_report_id",
           "location_reviewed",
           "photo_reviewed",
           "privacy_reviewed",
           "decided_at"
         ],
-        "title": "AdminReportReviewSummaryV1",
+        "title": "AdminReportReviewSummaryV2",
         "type": "object"
       },
       "AdminReportStatusUpdateV1": {
@@ -6332,6 +6455,35 @@
       },
       "ReportInstitutionDeliveryRequest": {
         "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "ACKNOWLEDGED",
+                    "RESOLVED"
+                  ]
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "external_receipt_id": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "external_receipt_id"
+              ]
+            }
+          }
+        ],
         "properties": {
           "channel": {
             "maxLength": 32,
@@ -6669,9 +6821,50 @@
         "title": "ReportMetadata",
         "type": "object"
       },
+      "ReportOriginalAccessExactLocation": {
+        "additionalProperties": false,
+        "properties": {
+          "accuracy": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "lat": {
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Lon",
+            "type": "number"
+          }
+        },
+        "required": [
+          "lat",
+          "lon",
+          "accuracy"
+        ],
+        "title": "ReportOriginalAccessExactLocation",
+        "type": "object"
+      },
       "ReportOriginalAccessGrantRequest": {
         "additionalProperties": false,
         "properties": {
+          "expected_content_revision": {
+            "minimum": 0.0,
+            "title": "Expected Content Revision",
+            "type": "integer"
+          },
           "purpose": {
             "enum": [
               "report_review",
@@ -6690,16 +6883,22 @@
         },
         "required": [
           "purpose",
-          "reason"
+          "reason",
+          "expected_content_revision"
         ],
         "title": "ReportOriginalAccessGrantRequest",
         "type": "object"
       },
       "ReportOriginalAccessGrantResponse": {
+        "additionalProperties": false,
         "properties": {
-          "access_token": {
-            "title": "Access Token",
-            "type": "string"
+          "content_revision": {
+            "minimum": 0.0,
+            "title": "Content Revision",
+            "type": "integer"
+          },
+          "exact_location": {
+            "$ref": "#/components/schemas/ReportOriginalAccessExactLocation"
           },
           "expires_at": {
             "format": "date-time",
@@ -6711,22 +6910,11 @@
             "title": "Grant Id",
             "type": "string"
           },
-          "purpose": {
-            "enum": [
-              "report_review",
-              "security_incident",
-              "data_subject_request"
-            ],
-            "title": "Purpose",
-            "type": "string"
-          },
-          "report_id": {
-            "format": "uuid",
-            "title": "Report Id",
-            "type": "string"
+          "image": {
+            "$ref": "#/components/schemas/ReportOriginalAccessImage"
           },
           "schema_version": {
-            "const": "walksafe.report-original-access-grant.v1",
+            "const": "walksafe.report-original-access-grant.v2",
             "title": "Schema Version",
             "type": "string"
           }
@@ -6734,12 +6922,58 @@
         "required": [
           "schema_version",
           "grant_id",
-          "report_id",
-          "purpose",
-          "access_token",
-          "expires_at"
+          "content_revision",
+          "expires_at",
+          "exact_location",
+          "image"
         ],
         "title": "ReportOriginalAccessGrantResponse",
+        "type": "object"
+      },
+      "ReportOriginalAccessImage": {
+        "additionalProperties": false,
+        "properties": {
+          "access_token": {
+            "maxLength": 43,
+            "minLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+            "title": "Access Token",
+            "type": "string"
+          },
+          "byte_count": {
+            "exclusiveMinimum": 0.0,
+            "title": "Byte Count",
+            "type": "integer"
+          },
+          "content_type": {
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ],
+            "title": "Content Type",
+            "type": "string"
+          },
+          "resource_path": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Resource Path",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_path",
+          "content_type",
+          "sha256",
+          "byte_count",
+          "access_token"
+        ],
+        "title": "ReportOriginalAccessImage",
         "type": "object"
       },
       "ReportResponse": {
@@ -6890,6 +7124,110 @@
       },
       "ReportReviewDecisionRequest": {
         "additionalProperties": false,
+        "allOf": [
+          {
+            "else": {
+              "properties": {
+                "evidence_grant_id": {
+                  "type": "null"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "decision": {
+                  "const": "APPROVED"
+                }
+              },
+              "required": [
+                "decision"
+              ]
+            },
+            "then": {
+              "properties": {
+                "duplicate_of_report_id": {
+                  "type": "null"
+                },
+                "evidence_grant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "location_reviewed": {
+                  "const": true
+                },
+                "photo_reviewed": {
+                  "const": true
+                },
+                "privacy_reviewed": {
+                  "const": true
+                },
+                "user_visible_reason": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "evidence_grant_id"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "decision": {
+                  "enum": [
+                    "REJECTED",
+                    "DUPLICATE"
+                  ]
+                }
+              },
+              "required": [
+                "decision"
+              ]
+            },
+            "then": {
+              "properties": {
+                "user_visible_reason": {
+                  "maxLength": 500,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "user_visible_reason"
+              ]
+            }
+          },
+          {
+            "else": {
+              "properties": {
+                "duplicate_of_report_id": {
+                  "type": "null"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "decision": {
+                  "const": "DUPLICATE"
+                }
+              },
+              "required": [
+                "decision"
+              ]
+            },
+            "then": {
+              "properties": {
+                "duplicate_of_report_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "duplicate_of_report_id"
+              ]
+            }
+          }
+        ],
         "properties": {
           "content_revision": {
             "default": 0,
@@ -6917,6 +7255,18 @@
               }
             ],
             "title": "Duplicate Of Report Id"
+          },
+          "evidence_grant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Grant Id"
           },
           "location_reviewed": {
             "title": "Location Reviewed",
@@ -9654,7 +10004,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminReportDetailV1"
+                  "$ref": "#/components/schemas/AdminReportDetailV2"
                 }
               }
             },
@@ -9723,14 +10073,89 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminReportPackageCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "201": {
             "content": {
-              "application/json": {
-                "schema": {}
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
               }
             },
-            "description": "Successful Response"
+            "description": "A deterministic report delivery package.",
+            "headers": {
+              "X-WalkSafe-CSV-SHA256": {
+                "schema": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "X-WalkSafe-Content-Revision": {
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "X-WalkSafe-Export-Audit-Id": {
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "X-WalkSafe-Manifest-SHA256": {
+                "schema": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "X-WalkSafe-Package-Byte-Count": {
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "X-WalkSafe-Package-Id": {
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "X-WalkSafe-Package-Revision": {
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "X-WalkSafe-Package-SHA256": {
+                "schema": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              },
+              "X-WalkSafe-Review-Revision": {
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "X-WalkSafe-Supersedes-Package-Id": {
+                "schema": {
+                  "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "content": {
@@ -9765,6 +10190,80 @@
           "session_id": "authenticated-admin-session"
         },
         "x-walksafe-high-risk-action": "admin.report.delivery_package.create",
+        "x-walksafe-required-role": "admin"
+      }
+    },
+    "/admin/reports/{report_id}/delivery-packages/{package_revision}/proof": {
+      "get": {
+        "operationId": "get_delivery_package_proof_admin_reports__report_id__delivery_packages__package_revision__proof_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "title": "Report Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "package_revision",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Package Revision",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReportDeliveryPackageProofV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAdminAppKind": [],
+            "WalkSafeAdminAudience": [],
+            "WalkSafeAdminBearer": [],
+            "WalkSafeAdminDeviceChallengeId": [],
+            "WalkSafeAdminDeviceId": [],
+            "WalkSafeAdminDeviceSignature": [],
+            "WalkSafeAdminRole": [],
+            "WalkSafeCorrelationId": [],
+            "WalkSafeReadPurpose": []
+          }
+        ],
+        "summary": "Get Delivery Package Proof",
+        "x-walksafe-actor-identity-required": false,
+        "x-walksafe-actor-identity-source": "admin-session",
+        "x-walksafe-admin-device-proof": {
+          "action": null,
+          "purpose": "ACTION",
+          "read_purpose": "admin.report.delivery_package.proof",
+          "session_id": "authenticated-admin-session"
+        },
         "x-walksafe-required-role": "admin"
       }
     },
@@ -15104,6 +15603,82 @@
         "x-walksafe-required-role": "field"
       }
     },
+    "/reports/mine/{report_id}/requests/{request_id}": {
+      "get": {
+        "operationId": "get_my_report_request_reports_mine__report_id__requests__request_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "title": "Report Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-walksafe-actor-id",
+            "required": true,
+            "schema": {
+              "title": "X-Walksafe-Actor-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-walksafe-account-generation",
+            "required": true,
+            "schema": {
+              "title": "X-Walksafe-Account-Generation",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportUserRequestSummaryV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAccountGeneration": [],
+            "WalkSafeActorAssertion": [],
+            "WalkSafeActorId": [],
+            "WalkSafeFieldToken": []
+          }
+        ],
+        "summary": "Get My Report Request",
+        "x-walksafe-actor-identity-required": true,
+        "x-walksafe-required-role": "field"
+      }
+    },
     "/reports/summary": {
       "get": {
         "operationId": "summarize_reports_reports_summary_get",
@@ -15923,13 +16498,23 @@
             "WalkSafeAdminAppKind": [],
             "WalkSafeAdminAudience": [],
             "WalkSafeAdminBearer": [],
+            "WalkSafeAdminDeviceChallengeId": [],
             "WalkSafeAdminDeviceId": [],
-            "WalkSafeAdminRole": []
+            "WalkSafeAdminDeviceSignature": [],
+            "WalkSafeAdminRole": [],
+            "WalkSafeCorrelationId": []
           }
         ],
         "summary": "Create Report Original Access Grant",
         "x-walksafe-actor-identity-required": false,
         "x-walksafe-actor-identity-source": "admin-session",
+        "x-walksafe-admin-device-proof": {
+          "action": "report.original.grant",
+          "purpose": "ACTION",
+          "read_purpose": null,
+          "session_id": "authenticated-admin-session"
+        },
+        "x-walksafe-high-risk-action": "report.original.grant",
         "x-walksafe-required-role": "admin"
       }
     },
@@ -16174,28 +16759,24 @@
           {
             "in": "header",
             "name": "X-WalkSafe-Original-Access-Grant",
-            "required": false,
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Walksafe-Original-Access-Grant"
+              "maxLength": 43,
+              "minLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+              "title": "X-Walksafe-Original-Access-Grant",
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
             "content": {
-              "application/json": {
-                "schema": {}
-              }
+              "image/jpeg": {},
+              "image/png": {},
+              "image/webp": {}
             },
-            "description": "Successful Response"
+            "description": "One-time authenticated report original bytes."
           },
           "422": {
             "content": {

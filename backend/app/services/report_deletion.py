@@ -300,6 +300,24 @@ def apply_report_deletion(
         candidate.privacy_subject_hmac,
         candidate.account_generation,
     )
+    candidate_locked = db.scalar(
+        select(
+            func.walksafe_lock_report_deletion_candidate(
+                candidate.request_id,
+                candidate.report_id,
+                candidate.request_status_version,
+                candidate.privacy_subject_hmac,
+                candidate.account_generation,
+            )
+        )
+    )
+    if candidate_locked is not True:
+        db.rollback()
+        raise ReportDeletionError(
+            "report_deletion_candidate_stale",
+            "The deletion candidate changed before it was applied.",
+            status_code=409,
+        )
     row = db.execute(
         select(
             ReportUserRequest.id.label("request_id"),
@@ -321,7 +339,6 @@ def apply_report_deletion(
             Report.privacy_subject_hmac == candidate.privacy_subject_hmac,
             Report.account_generation == candidate.account_generation,
         )
-        .with_for_update(of=(ReportUserRequest, Report))
     ).one_or_none()
     if row is None:
         db.rollback()

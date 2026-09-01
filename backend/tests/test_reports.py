@@ -152,7 +152,11 @@ def test_sensitive_reads_persist_actor_resource_time_and_purpose(
     )
     report_image = client.get(
         str(created["image_path"]),
-        headers={**base_headers, "x-walksafe-read-purpose": "admin_report_image"},
+        headers={
+            **base_headers,
+            "x-walksafe-read-purpose": "admin_report_image",
+            "x-walksafe-original-access-grant": "A" * 43,
+        },
     )
     duplicate_check = client.get(
         "/reports/duplicate-check",

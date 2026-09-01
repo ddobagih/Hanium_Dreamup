@@ -560,7 +560,8 @@ def _opened_flat_upload_inventory(upload_root: Path) -> Iterator[dict[str, Path]
                 name,
                 os.O_RDONLY
                 | getattr(os, "O_CLOEXEC", 0)
-                | getattr(os, "O_NOFOLLOW", 0),
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_NONBLOCK", 0),
                 dir_fd=descriptor,
             )
             try:

@@ -825,13 +825,33 @@ def test_migration_015_is_append_only_event_bound_and_least_privilege(
     migration = importlib.import_module(
         "backend.alembic.versions.202608290015_critical_incident_record_only"
     )
-    successor = importlib.import_module(
+    consent_successor = importlib.import_module(
         "backend.alembic.versions.202608290016_integrated_consent_v11"
+    )
+    deletion_successor = importlib.import_module(
+        "backend.alembic.versions.202608300001_report_deletion_candidate_lock"
+    )
+    evidence_successor = importlib.import_module(
+        "backend.alembic.versions.202608300002_report_original_evidence_v2"
+    )
+    restore_successor = importlib.import_module(
+        "backend.alembic.versions.202608300003_report_restore_reapply"
+    )
+    acl_successor = importlib.import_module(
+        "backend.alembic.versions.202608300004_admin_original_evidence_acl"
+    )
+    head = importlib.import_module(
+        "backend.alembic.versions.202608300005_admin_report_integrity_boundary"
     )
     assert migration.revision == "202608290015"
     assert migration.down_revision == "202608290014"
-    assert successor.down_revision == migration.revision
-    assert health_api.EXPECTED_ALEMBIC_HEAD == successor.revision
+    assert consent_successor.down_revision == migration.revision
+    assert deletion_successor.down_revision == consent_successor.revision
+    assert evidence_successor.down_revision == deletion_successor.revision
+    assert restore_successor.down_revision == evidence_successor.revision
+    assert acl_successor.down_revision == restore_successor.revision
+    assert head.down_revision == acl_successor.revision
+    assert health_api.EXPECTED_ALEMBIC_HEAD == head.revision
     alembic_config = Config(
         str(Path(__file__).resolve().parents[1] / "alembic.ini")
     )
@@ -840,7 +860,7 @@ def test_migration_015_is_append_only_event_bound_and_least_privilege(
         str(Path(__file__).resolve().parents[1] / "alembic"),
     )
     assert ScriptDirectory.from_config(alembic_config).get_heads() == [
-        successor.revision
+        head.revision
     ]
 
     created_tables: list[str] = []

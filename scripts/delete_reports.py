@@ -34,6 +34,7 @@ from backend.app.services.report_deletion import (  # noqa: E402
 from backend.app.models import ReportDeletionTombstone  # noqa: E402
 from backend.app.services.report_storage import (  # noqa: E402
     REPORT_DELETION_QUARANTINE_DIRECTORY_NAME,
+    REPORT_STORAGE_TRANSACTION_LOCK_KEY,
 )
 
 
@@ -110,6 +111,9 @@ def _assert_manual_role(db: Session) -> None:
                 "AND NOT pg_has_role(current_user, 'walksafe_backend_runtime', 'USAGE') "
                 "AND NOT pg_has_role(current_user, 'walksafe_account_deletion_worker', 'USAGE') "
                 "AND pg_has_role(current_user, 'walksafe_report_deletion_worker', 'USAGE') "
+                "AND has_function_privilege(current_user, "
+                "'public.walksafe_lock_report_deletion_candidate(uuid,uuid,bigint,text,bigint)', "
+                "'EXECUTE') "
                 "AND has_table_privilege(current_user, 'public.reports', 'DELETE') "
                 "AND has_column_privilege(current_user, 'public.reports', 'id', 'SELECT') "
                 "AND has_column_privilege(current_user, 'public.reports', 'privacy_subject_hmac', 'SELECT') "
@@ -137,6 +141,8 @@ def _assert_manual_role(db: Session) -> None:
                 "AND has_column_privilege(current_user, 'public.report_institution_delivery_events', 'status', 'SELECT') "
                 "AND has_column_privilege(current_user, 'public.report_institution_delivery_events', 'observed_at', 'SELECT') "
                 "AND NOT has_column_privilege(current_user, 'public.report_institution_delivery_events', 'recipient', 'SELECT') "
+                "AND NOT has_table_privilege(current_user, 'public.reports', 'UPDATE') "
+                "AND NOT has_table_privilege(current_user, 'public.report_user_requests', 'UPDATE') "
                 "AND NOT has_table_privilege(current_user, 'public.report_deletion_tombstones', 'UPDATE,DELETE,TRUNCATE') "
                 "AND NOT has_table_privilege(current_user, 'public.report_deletion_external_copy_states', 'UPDATE,DELETE,TRUNCATE') "
                 "AND NOT has_table_privilege(current_user, 'public.report_institution_delivery_events', 'INSERT,UPDATE,DELETE,TRUNCATE')"
@@ -220,34 +226,82 @@ class ReportDeletionQuarantine:
         *,
         request_id: uuid.UUID,
         report_id: uuid.UUID,
+        expected_upload_root_identity: tuple[int, int] | None = None,
     ) -> None:
         self.upload_root = upload_root
         self.request_id = request_id
         self.report_id = report_id
+        self.expected_upload_root_identity = expected_upload_root_identity
         self.quarantine_root = upload_root / QUARANTINE_DIRECTORY
 
-    def _prepare_directory(self) -> None:
-        self.quarantine_root.mkdir(mode=0o700, exist_ok=True)
-        metadata = self.quarantine_root.stat(follow_symlinks=False)
-        root_metadata = self.upload_root.stat(follow_symlinks=False)
+    def _open_root(self) -> int:
+        flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(self.upload_root, flags)
+        try:
+            metadata = os.fstat(descriptor)
+            path_metadata = self.upload_root.stat(follow_symlinks=False)
+            identity = (metadata.st_dev, metadata.st_ino)
+            if (
+                not stat.S_ISDIR(metadata.st_mode)
+                or self.upload_root.is_symlink()
+                or identity != (path_metadata.st_dev, path_metadata.st_ino)
+                or (
+                    self.expected_upload_root_identity is not None
+                    and identity != self.expected_upload_root_identity
+                )
+            ):
+                raise ReportDeletionWorkerError("upload root identity changed")
+            return descriptor
+        except BaseException:
+            os.close(descriptor)
+            raise
+
+    def _prepare_directory_at(self, root_descriptor: int) -> None:
+        try:
+            os.mkdir(QUARANTINE_DIRECTORY, mode=0o700, dir_fd=root_descriptor)
+        except FileExistsError:
+            pass
+        metadata = os.stat(
+            QUARANTINE_DIRECTORY,
+            dir_fd=root_descriptor,
+            follow_symlinks=False,
+        )
+        root_metadata = os.fstat(root_descriptor)
         if (
-            self.quarantine_root.is_symlink()
-            or not stat.S_ISDIR(metadata.st_mode)
+            not stat.S_ISDIR(metadata.st_mode)
             or metadata.st_uid != os.geteuid()
             or stat.S_IMODE(metadata.st_mode) != 0o700
             or metadata.st_dev != root_metadata.st_dev
         ):
             raise ReportDeletionWorkerError("quarantine directory is unsafe")
 
+    def _prepare_directory(self) -> None:
+        root_descriptor = self._open_root()
+        try:
+            self._prepare_directory_at(root_descriptor)
+        finally:
+            os.close(root_descriptor)
+
     @property
     def journal_name(self) -> str:
         return f"{self.request_id}.json"
 
     def _open_directories(self) -> tuple[int, int]:
-        self._prepare_directory()
         flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0)
         flags |= getattr(os, "O_NOFOLLOW", 0)
-        return os.open(self.upload_root, flags), os.open(self.quarantine_root, flags)
+        root_descriptor = self._open_root()
+        try:
+            self._prepare_directory_at(root_descriptor)
+            quarantine_descriptor = os.open(
+                QUARANTINE_DIRECTORY,
+                flags,
+                dir_fd=root_descriptor,
+            )
+            return root_descriptor, quarantine_descriptor
+        except BaseException:
+            os.close(root_descriptor)
+            raise
 
     @staticmethod
     def _safe_regular(metadata: os.stat_result) -> bool:
@@ -257,28 +311,81 @@ class ReportDeletionQuarantine:
             and metadata.st_nlink == 1
         )
 
-    def _load(self, quarantine_descriptor: int) -> QuarantineJournal:
+    @staticmethod
+    def _file_identity(metadata: os.stat_result) -> tuple[int, ...]:
+        return (
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_mode,
+            metadata.st_uid,
+            metadata.st_gid,
+            metadata.st_nlink,
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
+        )
+
+    def _read_journal_bytes(
+        self,
+        quarantine_descriptor: int,
+        journal_name: str,
+    ) -> bytes:
         try:
             metadata = os.stat(
-                self.journal_name,
+                journal_name,
                 dir_fd=quarantine_descriptor,
                 follow_symlinks=False,
             )
-        except FileNotFoundError as exc:
-            raise ReportDeletionWorkerError("quarantine journal is missing") from exc
-        if not self._safe_regular(metadata) or stat.S_IMODE(metadata.st_mode) != 0o600:
-            raise ReportDeletionWorkerError("quarantine journal is unsafe")
-        descriptor = os.open(
+            if (
+                not self._safe_regular(metadata)
+                or stat.S_IMODE(metadata.st_mode) != 0o600
+                or not 0 < metadata.st_size <= 65_536
+            ):
+                raise OSError("quarantine journal metadata is unsafe")
+            descriptor = os.open(
+                journal_name,
+                os.O_RDONLY
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_NONBLOCK", 0),
+                dir_fd=quarantine_descriptor,
+            )
+            try:
+                opened = os.fstat(descriptor)
+                if self._file_identity(opened) != self._file_identity(metadata):
+                    raise OSError("quarantine journal changed while opening")
+                chunks: list[bytes] = []
+                remaining = opened.st_size
+                while remaining:
+                    chunk = os.read(descriptor, remaining)
+                    if not chunk:
+                        raise OSError("quarantine journal was truncated")
+                    chunks.append(chunk)
+                    remaining -= len(chunk)
+                if os.read(descriptor, 1):
+                    raise OSError("quarantine journal grew while reading")
+                after = os.fstat(descriptor)
+            finally:
+                os.close(descriptor)
+            current = os.stat(
+                journal_name,
+                dir_fd=quarantine_descriptor,
+                follow_symlinks=False,
+            )
+        except OSError as exc:
+            raise ReportDeletionWorkerError("quarantine journal is unsafe") from exc
+        if (
+            self._file_identity(after) != self._file_identity(opened)
+            or self._file_identity(current) != self._file_identity(opened)
+        ):
+            raise ReportDeletionWorkerError("quarantine journal changed while reading")
+        return b"".join(chunks)
+
+    def _load(self, quarantine_descriptor: int) -> QuarantineJournal:
+        raw = self._read_journal_bytes(
+            quarantine_descriptor,
             self.journal_name,
-            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
-            dir_fd=quarantine_descriptor,
         )
-        try:
-            raw = os.read(descriptor, 65_537)
-            if len(raw) > 65_536 or os.read(descriptor, 1):
-                raise ReportDeletionWorkerError("quarantine journal is too large")
-        finally:
-            os.close(descriptor)
         try:
             payload = json.loads(raw.decode("ascii"), object_pairs_hook=_strict_object)
             if not isinstance(payload, dict) or set(payload) != {
@@ -457,18 +564,39 @@ class ReportDeletionQuarantine:
         return True
 
     @classmethod
-    def assert_no_pending(cls, upload_root: Path) -> None:
-        quarantine = upload_root / QUARANTINE_DIRECTORY
+    def assert_no_pending(
+        cls,
+        upload_root: Path,
+        *,
+        expected_upload_root_identity: tuple[int, int] | None = None,
+    ) -> None:
+        probe = cls(
+            upload_root,
+            request_id=uuid.uuid4(),
+            report_id=uuid.uuid4(),
+            expected_upload_root_identity=expected_upload_root_identity,
+        )
+        root_descriptor = probe._open_root()
         try:
-            os.lstat(quarantine)
-        except FileNotFoundError:
-            return
-        probe = cls(upload_root, request_id=uuid.uuid4(), report_id=uuid.uuid4())
-        probe._prepare_directory()
-        if any(probe.quarantine_root.iterdir()):
-            raise ReportDeletionWorkerError(
-                "pending quarantine requires explicit --reconcile"
-            )
+            try:
+                os.stat(
+                    QUARANTINE_DIRECTORY,
+                    dir_fd=root_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                return
+        finally:
+            os.close(root_descriptor)
+        root_descriptor, quarantine_descriptor = probe._open_directories()
+        try:
+            if os.listdir(quarantine_descriptor):
+                raise ReportDeletionWorkerError(
+                    "pending quarantine requires explicit --reconcile"
+                )
+        finally:
+            os.close(quarantine_descriptor)
+            os.close(root_descriptor)
 
     @classmethod
     def reconcile_all(
@@ -476,10 +604,20 @@ class ReportDeletionQuarantine:
         upload_root: Path,
         *,
         is_committed: Callable[[uuid.UUID, uuid.UUID], bool],
+        expected_upload_root_identity: tuple[int, int] | None = None,
     ) -> tuple[int, int]:
-        probe = cls(upload_root, request_id=uuid.uuid4(), report_id=uuid.uuid4())
-        probe._prepare_directory()
-        names = sorted(item.name for item in probe.quarantine_root.iterdir())
+        probe = cls(
+            upload_root,
+            request_id=uuid.uuid4(),
+            report_id=uuid.uuid4(),
+            expected_upload_root_identity=expected_upload_root_identity,
+        )
+        root_descriptor, quarantine_descriptor = probe._open_directories()
+        try:
+            names = sorted(os.listdir(quarantine_descriptor))
+        finally:
+            os.close(quarantine_descriptor)
+            os.close(root_descriptor)
         journal_names = [name for name in names if _JOURNAL_NAME.fullmatch(name)]
         if not journal_names and names:
             raise ReportDeletionWorkerError("quarantine contains unknown entries")
@@ -487,25 +625,19 @@ class ReportDeletionQuarantine:
         journals: list[QuarantineJournal] = []
         for journal_name in journal_names:
             request_id = uuid.UUID(_JOURNAL_NAME.fullmatch(journal_name).group("request_id"))
-            bound = cls(upload_root, request_id=request_id, report_id=uuid.UUID(int=0))
+            bound = cls(
+                upload_root,
+                request_id=request_id,
+                report_id=uuid.UUID(int=0),
+                expected_upload_root_identity=expected_upload_root_identity,
+            )
             root_descriptor, quarantine_descriptor = bound._open_directories()
             try:
                 # Parse once without trusting the caller-provided report binding.
-                journal_descriptor = os.open(
+                raw = bound._read_journal_bytes(
+                    quarantine_descriptor,
                     journal_name,
-                    os.O_RDONLY
-                    | getattr(os, "O_CLOEXEC", 0)
-                    | getattr(os, "O_NOFOLLOW", 0),
-                    dir_fd=quarantine_descriptor,
                 )
-                try:
-                    raw = os.read(journal_descriptor, 65_537)
-                    if len(raw) > 65_536 or os.read(journal_descriptor, 1):
-                        raise ReportDeletionWorkerError(
-                            "quarantine journal is too large"
-                        )
-                finally:
-                    os.close(journal_descriptor)
             finally:
                 os.close(quarantine_descriptor)
                 os.close(root_descriptor)
@@ -520,7 +652,12 @@ class ReportDeletionQuarantine:
                 json.JSONDecodeError,
             ) as exc:
                 raise ReportDeletionWorkerError("quarantine journal is invalid") from exc
-            bound = cls(upload_root, request_id=request_id, report_id=report_id)
+            bound = cls(
+                upload_root,
+                request_id=request_id,
+                report_id=report_id,
+                expected_upload_root_identity=expected_upload_root_identity,
+            )
             root_descriptor, quarantine_descriptor = bound._open_directories()
             try:
                 journal = bound._load(quarantine_descriptor)
@@ -537,6 +674,7 @@ class ReportDeletionQuarantine:
                 upload_root,
                 request_id=journal.request_id,
                 report_id=journal.report_id,
+                expected_upload_root_identity=expected_upload_root_identity,
             )
             if is_committed(journal.request_id, journal.report_id):
                 bound.finalize()
@@ -596,18 +734,34 @@ def main(argv: list[str] | None = None) -> int:
             with Session(engine) as db:
                 if args.manual_one_shot:
                     _assert_manual_role(db)
-                locked = bool(
-                    db.scalar(
-                        text(
-                            "SELECT pg_try_advisory_lock("
-                            "hashtextextended('walksafe-report-deletion-worker-v1', 0))"
-                        )
-                    )
-                )
+                locked = db.execute(
+                    text(
+                        "SELECT pg_try_advisory_lock("
+                        "hashtextextended('walksafe-report-deletion-worker-v1', 0)), "
+                        "pg_try_advisory_lock(hashtextextended(:storage_lock_key, 0))"
+                    ),
+                    {"storage_lock_key": REPORT_STORAGE_TRANSACTION_LOCK_KEY},
+                ).one()
                 db.rollback()
-                if not locked:
+                if tuple(locked) != (True, True):
+                    if locked[0] is True:
+                        db.scalar(
+                            text(
+                                "SELECT pg_advisory_unlock("
+                                "hashtextextended('walksafe-report-deletion-worker-v1', 0))"
+                            )
+                        )
+                    if locked[1] is True:
+                        db.scalar(
+                            text(
+                                "SELECT pg_advisory_unlock("
+                                "hashtextextended(:storage_lock_key, 0))"
+                            ),
+                            {"storage_lock_key": REPORT_STORAGE_TRANSACTION_LOCK_KEY},
+                        )
+                    db.rollback()
                     raise ReportDeletionWorkerError(
-                        "another report deletion worker is active"
+                        "another report deletion or storage operation is active"
                     )
                 try:
                     if args.reconcile:
@@ -653,11 +807,14 @@ def main(argv: list[str] | None = None) -> int:
                                     legal_hold_count += 1
                 finally:
                     db.rollback()
-                    db.scalar(
+                    db.execute(
                         text(
                             "SELECT pg_advisory_unlock("
+                            "hashtextextended(:storage_lock_key, 0)), "
+                            "pg_advisory_unlock("
                             "hashtextextended('walksafe-report-deletion-worker-v1', 0))"
-                        )
+                        ),
+                        {"storage_lock_key": REPORT_STORAGE_TRANSACTION_LOCK_KEY},
                     )
                     db.rollback()
         finally:

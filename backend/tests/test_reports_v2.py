@@ -28,6 +28,10 @@ from backend.app.database import SessionLocal  # noqa: E402
 from backend.app.field_test_security import FieldTestAccess, create_actor_assertion  # noqa: E402
 from backend.app.main import app, settings as app_settings  # noqa: E402
 from backend.app.models import ReportExportAudit, ReportImageObject, ReportStatusAudit  # noqa: E402
+from backend.app.schemas import (  # noqa: E402
+    PRIVACY_CONSENT_ITEM_VERSIONS,
+    PRIVACY_CONSENT_POLICY_VERSION,
+)
 from backend.app.services.privacy_lifecycle import record_consent_event  # noqa: E402
 from asgi_client import ASGITestClient  # noqa: E402
 
@@ -120,13 +124,8 @@ def record_report_consent(actor_id: str) -> None:
             installation_id=f"install_{suffix}",
             request_id=f"consent_{suffix}",
             client_revision=1,
-            policy_version="FP-013-1.0.0",
-            item_versions={
-                "raw_source_collection": "FP-013-RAW-1.0.0",
-                "automatic_reporting": "FP-013-AUTO-1.0.0",
-                "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
-                "training_reuse": "FP-013-TRAINING-1.0.0",
-            },
+            policy_version=PRIVACY_CONSENT_POLICY_VERSION,
+            item_versions=PRIVACY_CONSENT_ITEM_VERSIONS,
             raw_source_collection=True,
             automatic_reporting=True,
             mobile_network_transfer=False,

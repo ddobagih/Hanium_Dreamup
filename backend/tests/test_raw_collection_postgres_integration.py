@@ -19,6 +19,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from fastapi import FastAPI, Request
 import httpx
 import pytest
@@ -28,6 +29,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
 import backend.app.main as main_app
+
+
+def _repository_alembic_head() -> str:
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head is not None
+    return head
 import backend.app.services.raw_collection_storage as raw_storage
 from backend.app.api.health import _exact_actor_rate_limit_group_expression
 from backend.app.api.raw_collections import create_router
@@ -40,6 +48,7 @@ from backend.app.field_test_security import (
 )
 from backend.app.models import (
     Base,
+    PrivacyConsentEvent,
     RawCollection,
     RawCollectionChunk,
     RawCollectionObject,
@@ -56,7 +65,10 @@ from backend.app.services.privacy_lifecycle import (
     PRIVACY_CONSENT_ITEM_VERSIONS,
     PRIVACY_CONSENT_POLICY_VERSION,
     PrivacyLifecycleError,
+    _consent_receipt_sha256 as privacy_consent_receipt_sha256,
     accept_account_deletion,
+    bind_or_verify_privacy_hmac_key,
+    installation_subject_hmac,
     lock_privacy_subject_exclusive,
     privacy_subject_hmac,
     record_consent_event,
@@ -81,6 +93,13 @@ pytestmark = pytest.mark.skipif(
 
 PRIVACY_SECRET = "walksafe-pytest-privacy-hmac-secret-boundary-v2"
 MASTER_KEY = bytes(range(32))
+_HISTORICAL_V1_CONSENT_POLICY_VERSION = "FP-013-1.0.0"
+_HISTORICAL_V1_CONSENT_ITEM_VERSIONS = {
+    "raw_source_collection": "FP-013-RAW-1.0.0",
+    "automatic_reporting": "FP-013-AUTO-1.0.0",
+    "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
+    "training_reuse": "FP-013-TRAINING-1.0.0",
+}
 
 
 class _StaticKeyManager:
@@ -111,6 +130,22 @@ def _truncate_raw_tables(engine) -> None:
                 "TRUNCATE TABLE raw_collection_chunks, "
                 "raw_collection_objects, raw_collections"
             )
+        )
+
+
+def _truncate_raw_and_privacy_consent_events(engine) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE privacy_consent_events DISABLE TRIGGER USER")
+        )
+        connection.execute(
+            text(
+                "TRUNCATE TABLE raw_collection_chunks, raw_collection_objects, "
+                "raw_collections, privacy_consent_events"
+            )
+        )
+        connection.execute(
+            text("ALTER TABLE privacy_consent_events ENABLE TRIGGER USER")
         )
 
 
@@ -160,6 +195,62 @@ def _record_admission(
         privacy_subject_hmac=privacy_subject_hmac(actor_id, 1, PRIVACY_SECRET),
         purpose="GENERAL_RAW",
         consent_receipt_sha256=recording.event.receipt_sha256,
+    )
+
+
+def _record_historical_v1_admission(
+    SessionFactory,
+    *,
+    actor_id: str,
+    installation_id: str | None = None,
+) -> RawCollectionAdmission:
+    installation_id = installation_id or f"install_{uuid.uuid4().hex}"
+    privacy_subject = privacy_subject_hmac(actor_id, 1, PRIVACY_SECRET)
+    installation_subject = installation_subject_hmac(
+        installation_id,
+        privacy_subject,
+        PRIVACY_SECRET,
+    )
+    request_id = f"raw_consent_{uuid.uuid4().hex}"
+    receipt_sha256 = privacy_consent_receipt_sha256(
+        account_generation=1,
+        automatic_reporting=True,
+        client_revision=1,
+        installation_subject_hmac=installation_subject,
+        item_versions=_HISTORICAL_V1_CONSENT_ITEM_VERSIONS,
+        mobile_network_transfer=False,
+        policy_version=_HISTORICAL_V1_CONSENT_POLICY_VERSION,
+        privacy_subject_hmac=privacy_subject,
+        raw_source_collection=True,
+        request_id=request_id,
+        subject_revision=1,
+        training_reuse=False,
+    )
+    with SessionFactory.begin() as db:
+        bind_or_verify_privacy_hmac_key(db, secret=PRIVACY_SECRET)
+        db.add(
+            PrivacyConsentEvent(
+                request_id=request_id,
+                privacy_subject_hmac=privacy_subject,
+                account_generation=1,
+                installation_subject_hmac=installation_subject,
+                client_revision=1,
+                subject_revision=1,
+                policy_version=_HISTORICAL_V1_CONSENT_POLICY_VERSION,
+                item_versions=dict(_HISTORICAL_V1_CONSENT_ITEM_VERSIONS),
+                raw_source_collection=True,
+                automatic_reporting=True,
+                mobile_network_transfer=False,
+                training_reuse=False,
+                receipt_sha256=receipt_sha256,
+            )
+        )
+    return RawCollectionAdmission(
+        actor_id=actor_id,
+        account_generation=1,
+        privacy_subject_hmac=privacy_subject,
+        purpose="GENERAL_RAW",
+        consent_receipt_sha256=receipt_sha256,
     )
 
 
@@ -354,6 +445,17 @@ def _apply_privacy_action(
     suffix: str,
 ) -> str:
     if action == "withdraw":
+        privacy_subject = privacy_subject_hmac(actor_id, 1, PRIVACY_SECRET)
+        lock_privacy_subject_exclusive(db, privacy_subject, 1)
+        previous_receipt = db.scalar(
+            select(PrivacyConsentEvent.receipt_sha256)
+            .where(
+                PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
+                PrivacyConsentEvent.account_generation == 1,
+            )
+            .order_by(PrivacyConsentEvent.subject_revision.desc())
+            .limit(1)
+        )
         recording = record_consent_event(
             db,
             actor_id=actor_id,
@@ -368,6 +470,7 @@ def _apply_privacy_action(
             mobile_network_transfer=False,
             training_reuse=False,
             secret=PRIVACY_SECRET,
+            expected_previous_backend_receipt_sha256=previous_receipt,
         )
         assert recording.created is True
         return "withdrawn"
@@ -458,13 +561,8 @@ def test_raw_b1b_one_step_downgrade_drops_ephemeral_rate_rows(
     database_url = os.environ["WALKSAFE_TEST_DATABASE_URL"].strip()
     engine = create_engine(database_url, pool_pre_ping=True)
     try:
+        _truncate_raw_and_privacy_consent_events(engine)
         with engine.begin() as connection:
-            connection.execute(
-                text(
-                    "TRUNCATE TABLE raw_collection_chunks, "
-                    "raw_collection_objects, raw_collections"
-                )
-            )
             connection.execute(
                 text(
                     "INSERT INTO actor_rate_limit_events "
@@ -503,7 +601,7 @@ def test_raw_b1b_one_step_downgrade_drops_ephemeral_rate_rows(
         with restored_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == _repository_alembic_head()
     finally:
         restored_engine.dispose()
 
@@ -518,9 +616,9 @@ def test_raw_b1e_upgrade_backfills_retention_and_refuses_data_loss(
     monkeypatch.setenv("WALKSAFE_MIGRATION_DATABASE_URL", database_url)
     collection_id = uuid.uuid4()
     try:
-        _truncate_raw_tables(engine)
+        _truncate_raw_and_privacy_consent_events(engine)
         command.downgrade(config, "202608290002")
-        admission = _record_admission(
+        admission = _record_historical_v1_admission(
             SessionFactory,
             actor_id=f"raw.retention-migration.{uuid.uuid4().hex}",
         )
@@ -558,7 +656,7 @@ def test_raw_b1e_upgrade_backfills_retention_and_refuses_data_loss(
         with engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == _repository_alembic_head()
             assert connection.execute(
                 text(
                     "SELECT retention_class FROM raw_collections "
@@ -570,10 +668,14 @@ def test_raw_b1e_upgrade_backfills_retention_and_refuses_data_loss(
         with pytest.raises(SQLAlchemyError) as rejected:
             command.downgrade(config, "202608290002")
         assert getattr(rejected.value.orig, "sqlstate", None) == "55000"
+        assert (
+            "cannot downgrade B1e while raw collection retention data exists"
+            in str(rejected.value.orig)
+        )
         with engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == _repository_alembic_head()
     finally:
         command.upgrade(config, "head")
         with engine.begin() as connection:
@@ -581,6 +683,7 @@ def test_raw_b1e_upgrade_backfills_retention_and_refuses_data_loss(
                 text("DELETE FROM raw_collections WHERE collection_id = :collection_id"),
                 {"collection_id": collection_id},
             )
+        _truncate_raw_and_privacy_consent_events(engine)
         engine.dispose()
 
 
@@ -614,7 +717,7 @@ def test_raw_b1b_schema_acl_rate_group_and_state_guards(tmp_path: Path) -> None:
         with engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == _repository_alembic_head()
             assert compare_metadata(
                 MigrationContext.configure(
                     connection,

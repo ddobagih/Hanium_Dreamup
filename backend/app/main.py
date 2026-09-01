@@ -457,7 +457,7 @@ app.include_router(
 )
 app.include_router(report_user_requests.create_router(settings))
 app.include_router(reports.create_router(settings, report_image_key_manager))
-app.include_router(admin_reports.create_router())
+app.include_router(admin_reports.create_router(settings))
 app.include_router(admin_incidents.create_router())
 app.include_router(admin_raw_collections.create_router())
 app.include_router(android_debug.create_router(settings))

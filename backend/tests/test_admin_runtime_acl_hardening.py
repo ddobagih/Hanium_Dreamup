@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
@@ -28,6 +29,13 @@ CURRENT_TOTP = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 CANDIDATE_TOTP = "KRUGS4ZANFZSAYJAORUGS4ZANFZSAYJA"
 OTHER_TOTP = "KRSXG5DSNFXGOIDBNZQWY5BAMFZXGZJA"
 ISSUER_KEY = base64.urlsafe_b64encode(bytes(range(32))).decode("ascii").rstrip("=")
+
+
+def _repository_alembic_head() -> str:
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head is not None
+    return head
 
 
 def _sha256(value: str) -> str:
@@ -716,7 +724,7 @@ def test_postgres_startup_totp_candidate_exact_binding_and_normal_ops_blocked() 
         with engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == _repository_alembic_head()
 
         with engine.connect() as connection:
             transaction = connection.begin()
@@ -1026,7 +1034,7 @@ def test_postgres_runtime_acl_migration_downgrade_and_reupgrade_on_fresh_databas
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == _repository_alembic_head()
             assert connection.execute(
                 text(
                     "SELECT EXISTS (SELECT 1 FROM pg_extension "
@@ -1080,7 +1088,7 @@ def test_postgres_runtime_acl_migration_downgrade_and_reupgrade_on_fresh_databas
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == _repository_alembic_head()
             assert connection.execute(
                 text(
                     "SELECT count(*) FROM pg_trigger "

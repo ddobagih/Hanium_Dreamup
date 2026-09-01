@@ -461,6 +461,54 @@ def get_owned_user_report(
     )
 
 
+def get_owned_report_user_request(
+    db: Session,
+    *,
+    report_id: uuid.UUID,
+    request_id: uuid.UUID,
+    privacy_subject: str,
+    account_generation: int,
+) -> ReportUserRequestState:
+    lock_privacy_subject_shared(db, privacy_subject, account_generation)
+    assert_subject_active(
+        db,
+        privacy_subject=privacy_subject,
+        account_generation=account_generation,
+    )
+    row = db.execute(
+        select(
+            ReportUserRequest.id.label("request_id"),
+            ReportUserRequest.report_id,
+            ReportUserRequest.request_type,
+            ReportUserRequest.status,
+            ReportUserRequest.status_version,
+            ReportUserRequest.public_response,
+            ReportUserRequest.created_at,
+            ReportUserRequest.updated_at,
+        )
+        .join(Report, Report.id == ReportUserRequest.report_id)
+        .where(
+            ReportUserRequest.id == request_id,
+            ReportUserRequest.report_id == report_id,
+            Report.id == report_id,
+            Report.privacy_subject_hmac == privacy_subject,
+            Report.account_generation == account_generation,
+        )
+    ).one_or_none()
+    if row is None:
+        raise _not_found()
+    return ReportUserRequestState(
+        id=row.request_id,
+        report_id=row.report_id,
+        request_type=row.request_type,
+        status=row.status,
+        status_version=row.status_version,
+        public_response=row.public_response,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
 def request_intent_sha256(
     report_id: uuid.UUID, payload: ReportUserRequestCreateV1
 ) -> str:
@@ -878,6 +926,7 @@ __all__ = [
     "decode_cursor",
     "derive_user_report_status",
     "encode_cursor",
+    "get_owned_report_user_request",
     "get_owned_user_report",
     "latest_request_summaries",
     "project_admin_request_detail",

@@ -76,6 +76,11 @@ def test_openapi_expresses_runtime_role_and_actor_security() -> None:
             "post",
             "ReportUserRequestSummaryV1",
         ),
+        (
+            "/reports/mine/{report_id}/requests/{request_id}",
+            "get",
+            "ReportUserRequestSummaryV1",
+        ),
     ):
         operation = schema["paths"][path][method]
         assert operation["x-walksafe-required-role"] == "field"
@@ -310,7 +315,8 @@ def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
             "read_purpose": None,
             "session_id": "authenticated-admin-session",
         }
-    upload_security = schema["paths"]["/uploads/{filename}"]["get"]["security"]
+    upload_operation = schema["paths"]["/uploads/{filename}"]["get"]
+    upload_security = upload_operation["security"]
     assert upload_security == [
         {
             "WalkSafeAdminAppKind": [],
@@ -321,11 +327,118 @@ def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
             "WalkSafeOriginalAccessGrant": [],
         }
     ]
-    grant_parameters = schema["paths"]["/reports/{report_id}/original-access-grants"]["post"]["parameters"]
+    upload_grant_header = next(
+        parameter
+        for parameter in upload_operation["parameters"]
+        if parameter["name"] == "X-WalkSafe-Original-Access-Grant"
+    )
+    assert upload_grant_header["required"] is True
+    assert upload_grant_header["schema"] == {
+        "type": "string",
+        "minLength": 43,
+        "maxLength": 43,
+        "pattern": r"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+        "title": "X-Walksafe-Original-Access-Grant",
+    }
+    assert set(upload_operation["responses"]["200"]["content"]) == {
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+    }
+    grant_operation = schema["paths"][
+        "/reports/{report_id}/original-access-grants"
+    ]["post"]
+    assert grant_operation["x-walksafe-admin-device-proof"] == {
+        "purpose": "ACTION",
+        "action": "report.original.grant",
+        "read_purpose": None,
+        "session_id": "authenticated-admin-session",
+    }
+    assert grant_operation["x-walksafe-high-risk-action"] == "report.original.grant"
+    assert proof_schemes <= set(grant_operation["security"][0])
+    grant_parameters = grant_operation["parameters"]
     assert any(
         parameter["name"] == "X-WalkSafe-Reconfirm-Nonce" and parameter["required"] is True
         for parameter in grant_parameters
     )
+    grant_request = schema["components"]["schemas"][
+        "ReportOriginalAccessGrantRequest"
+    ]
+    assert grant_request["additionalProperties"] is False
+    assert set(grant_request["required"]) == {
+        "purpose",
+        "reason",
+        "expected_content_revision",
+    }
+    grant_response = schema["components"]["schemas"][
+        "ReportOriginalAccessGrantResponse"
+    ]
+    assert grant_response["additionalProperties"] is False
+    assert set(grant_response["required"]) == {
+        "schema_version",
+        "grant_id",
+        "content_revision",
+        "expires_at",
+        "exact_location",
+        "image",
+    }
+    assert grant_response["properties"]["schema_version"]["const"] == (
+        "walksafe.report-original-access-grant.v2"
+    )
+    exact_location = schema["components"]["schemas"][
+        "ReportOriginalAccessExactLocation"
+    ]
+    assert exact_location["additionalProperties"] is False
+    assert set(exact_location["required"]) == {"lat", "lon", "accuracy"}
+    image = schema["components"]["schemas"]["ReportOriginalAccessImage"]
+    assert image["additionalProperties"] is False
+    assert set(image["required"]) == {
+        "resource_path",
+        "content_type",
+        "sha256",
+        "byte_count",
+        "access_token",
+    }
+    review_request = schema["components"]["schemas"][
+        "ReportReviewDecisionRequest"
+    ]
+    evidence_rule = review_request["allOf"][0]
+    assert evidence_rule["if"]["properties"]["decision"] == {
+        "const": "APPROVED"
+    }
+    assert evidence_rule["then"]["required"] == ["evidence_grant_id"]
+    assert evidence_rule["then"]["properties"]["location_reviewed"] == {
+        "const": True
+    }
+    assert evidence_rule["then"]["properties"]["photo_reviewed"] == {
+        "const": True
+    }
+    assert evidence_rule["then"]["properties"]["privacy_reviewed"] == {
+        "const": True
+    }
+    assert evidence_rule["then"]["properties"]["user_visible_reason"] == {
+        "type": "null"
+    }
+    assert evidence_rule["then"]["properties"]["duplicate_of_report_id"] == {
+        "type": "null"
+    }
+    assert evidence_rule["else"]["properties"]["evidence_grant_id"] == {
+        "type": "null"
+    }
+    assert review_request["allOf"][1]["then"]["required"] == [
+        "user_visible_reason"
+    ]
+    assert review_request["allOf"][2]["then"]["required"] == [
+        "duplicate_of_report_id"
+    ]
+    delivery_request = schema["components"]["schemas"][
+        "ReportInstitutionDeliveryRequest"
+    ]
+    receipt_rule = delivery_request["allOf"][0]
+    assert receipt_rule["if"]["properties"]["status"] == {
+        "enum": ["ACKNOWLEDGED", "RESOLVED"]
+    }
+    assert receipt_rule["then"]["required"] == ["external_receipt_id"]
     delivery_observed_at = schema["components"]["schemas"][
         "ReportInstitutionDeliveryRequest"
     ]["properties"]["observed_at"]
@@ -340,6 +453,79 @@ def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
     assert "recorded_at" in delivery_response["required"]
     assert "created_at" not in delivery_response["properties"]
     assert "created_at" not in delivery_response["required"]
+    detail_operation = schema["paths"]["/admin/reports/{report_id}"]["get"]
+    assert detail_operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/AdminReportDetailV2"}
+    detail_schema = schema["components"]["schemas"]["AdminReportDetailV2"]
+    assert detail_schema["properties"]["schema_version"]["const"] == (
+        "walksafe.admin-report-detail.v2"
+    )
+    assert {
+        "status_version",
+        "latest_delivery_revision",
+        "allowed_next_statuses",
+    } <= set(detail_schema["required"])
+    capabilities_schema = schema["components"]["schemas"]["AdminReportCapabilitiesV2"]
+    assert set(capabilities_schema["required"]) == {
+        "review_decisions_path",
+        "deliveries_path",
+        "original_access_grants_path",
+        "status_path",
+        "delivery_packages_path",
+    }
+    review_summary_schema = schema["components"]["schemas"]["AdminReportReviewSummaryV2"]
+    assert "user_visible_reason" in review_summary_schema["required"]
+    package_create = schema["paths"]["/admin/reports/{report_id}/delivery-packages"][
+        "post"
+    ]
+    assert package_create["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/AdminReportPackageCreateRequest"
+    }
+    assert set(package_create["responses"]["201"]["headers"]) == {
+        "X-WalkSafe-Package-Id",
+        "X-WalkSafe-Package-Revision",
+        "X-WalkSafe-Content-Revision",
+        "X-WalkSafe-Review-Revision",
+        "X-WalkSafe-Package-Byte-Count",
+        "X-WalkSafe-Supersedes-Package-Id",
+        "X-WalkSafe-Export-Audit-Id",
+        "X-WalkSafe-Package-SHA256",
+        "X-WalkSafe-CSV-SHA256",
+        "X-WalkSafe-Manifest-SHA256",
+    }
+    create_request = schema["components"]["schemas"]["AdminReportPackageCreateRequest"]
+    assert set(create_request["required"]) == {
+        "expected_content_revision",
+        "expected_review_revision",
+    }
+    proof_operation = schema["paths"][
+        "/admin/reports/{report_id}/delivery-packages/{package_revision}/proof"
+    ]["get"]
+    assert proof_operation["x-walksafe-admin-device-proof"] == {
+        "purpose": "ACTION",
+        "action": None,
+        "read_purpose": "admin.report.delivery_package.proof",
+        "session_id": "authenticated-admin-session",
+    }
+    assert proof_operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/AdminReportDeliveryPackageProofV1"}
+    proof_schema = schema["components"]["schemas"][
+        "AdminReportDeliveryPackageProofV1"
+    ]
+    assert set(proof_schema["required"]) == {
+        "schema_version",
+        "package_revision",
+        "content_revision",
+        "review_revision",
+        "package_schema_version",
+        "package_byte_count",
+        "package_sha256",
+    }
+    assert "csv_sha256" not in proof_schema["properties"]
+    assert "manifest_sha256" not in proof_schema["properties"]
+    assert "export_audit_id" not in proof_schema["properties"]
     checked = subprocess.run(
         [sys.executable, "scripts/generate_walksafe_openapi.py", "--check"],
         cwd=REPO_ROOT,

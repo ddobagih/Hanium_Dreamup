@@ -186,6 +186,13 @@ function allowedRouteCases(secret: string, deletionId: string): RouteCase[] {
       )
     },
     {
+      template: "/api/reports/mine/{report_id}/requests/{request_id}",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/reports/mine/11111111-1111-4111-8111-111111111111/requests/22222222-2222-4222-8222-222222222222",
+        { headers }
+      )
+    },
+    {
       template: "/api/raw-collections/{collection_id}/manifest",
       request: () => new Request(
         "http://127.0.0.1:8081/api/raw-collections/00000000-0000-0000-0000-000000000001/manifest",

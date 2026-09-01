@@ -9,7 +9,8 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from backend.app.schemas import AdminReportStatusUpdateV1
+from backend.app.api import admin_reports
+from backend.app.schemas import AdminReportPackageCreateRequest, AdminReportStatusUpdateV1
 from backend.app.models import (
     AdminOperationAudit,
     Report,
@@ -30,6 +31,7 @@ from backend.app.services.admin_report_delivery_package import (
     DELIVERY_PACKAGE_SCHEMA_VERSION,
     build_admin_report_delivery_package,
     create_admin_report_delivery_package,
+    get_admin_report_delivery_package_proof,
 )
 from backend.app.services.admin_report_workflow import (
     AdminReportWorkflowError,
@@ -196,8 +198,10 @@ class _PackageSession:
         self.commit_count = 0
         self.rollback_count = 0
         self.flush_count = 0
+        self.statements: list[object] = []
 
-    def execute(self, _statement: object) -> _ScalarResult:
+    def execute(self, statement: object) -> _ScalarResult:
+        self.statements.append(statement)
         return _ScalarResult(self.results.pop(0))
 
     def add(self, value: object) -> None:
@@ -231,15 +235,18 @@ def test_package_export_record_and_success_action_audit_share_one_commit() -> No
         revision=4,
         decision="APPROVED",
         duplicate_of_report_id=None,
+        evidence_grant_id=uuid.UUID("55555555-5555-4555-8555-555555555555"),
         location_reviewed=True,
         photo_reviewed=True,
         privacy_reviewed=True,
     )
-    db = _PackageSession([report, review, None])
+    db = _PackageSession([report, None, review])
 
     created = create_admin_report_delivery_package(
         db,  # type: ignore[arg-type]
         report_id=REPORT_ID,
+        expected_content_revision=0,
+        expected_review_revision=4,
         identity=_identity(),
         correlation_id=CORRELATION_ID,
         query_sha256="0" * 64,
@@ -259,6 +266,498 @@ def test_package_export_record_and_success_action_audit_share_one_commit() -> No
         item for item in db.added if isinstance(item, AdminOperationAudit)
     )
     assert operation.resource_id == str(created.record.id)
+
+
+def test_delivery_package_http_response_is_201_zip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package_id = uuid.UUID("77777777-7777-4777-8777-777777777777")
+    monkeypatch.setattr(
+        admin_reports,
+        "_require_admin_report_action_context",
+        lambda *_args, **_kwargs: (
+            _identity(),
+            SimpleNamespace(
+                correlation_id=CORRELATION_ID,
+                query_sha256="0" * 64,
+                request_body=b'{"expected_content_revision":3,"expected_review_revision":5}',
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        admin_reports,
+        "create_admin_report_delivery_package",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            package_bytes=b"PK\x03\x04walksafe",
+            review_revision=5,
+            record=SimpleNamespace(
+                id=package_id,
+                revision=2,
+                content_revision=3,
+                package_byte_count=13,
+                supersedes_package_id=None,
+                export_audit_id=EXPORT_AUDIT_ID,
+                package_sha256="a" * 64,
+                csv_sha256="b" * 64,
+                manifest_sha256="c" * 64,
+            ),
+        ),
+    )
+
+    response = admin_reports.create_delivery_package(
+        REPORT_ID,
+        AdminReportPackageCreateRequest(
+            expected_content_revision=3,
+            expected_review_revision=5,
+        ),
+        SimpleNamespace(
+            headers={"X-WalkSafe-Reconfirm-Nonce": "A" * 22},
+        ),
+        db=SimpleNamespace(),  # type: ignore[arg-type]
+    )
+
+    assert response.status_code == 201
+    assert response.media_type == "application/zip"
+    assert response.body == b"PK\x03\x04walksafe"
+    assert response.headers["x-walksafe-package-id"] == str(package_id)
+    assert response.headers["x-walksafe-review-revision"] == "5"
+    assert response.headers["x-walksafe-package-byte-count"] == "13"
+
+
+def test_package_create_rejects_stale_approved_review_revision() -> None:
+    report = Report(
+        id=REPORT_ID,
+        status="reviewed",
+        content_revision=0,
+        class_name="damaged_tactile_block",
+        confidence=0.75,
+        latitude=37.5665,
+        longitude=126.978,
+        accuracy_m=4.0,
+        captured_at=datetime(2026, 8, 29, 1, 0, tzinfo=UTC),
+        created_at=datetime(2026, 8, 29, 1, 1, tzinfo=UTC),
+    )
+    review = ReportReviewDecision(
+        id=REVIEW_ID,
+        report_id=REPORT_ID,
+        revision=4,
+        content_revision=0,
+        decision="APPROVED",
+        duplicate_of_report_id=None,
+        evidence_grant_id=uuid.UUID("55555555-5555-4555-8555-555555555555"),
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    db = _PackageSession([report, None, review])
+
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        create_admin_report_delivery_package(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            expected_content_revision=0,
+            expected_review_revision=3,
+            identity=_identity(),
+            correlation_id=CORRELATION_ID,
+            query_sha256="0" * 64,
+        )
+
+    assert captured.value.code == "delivery_package_review_revision_conflict"
+    assert captured.value.status_code == 409
+    assert db.rollback_count == 1
+
+
+def test_package_create_uses_latest_typed_decision_not_latest_approval() -> None:
+    report = Report(id=REPORT_ID, content_revision=0)
+    rejected = ReportReviewDecision(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        revision=5,
+        content_revision=0,
+        decision="REJECTED",
+        user_visible_reason="기관 전달 대상이 아닙니다",
+        duplicate_of_report_id=None,
+        evidence_grant_id=None,
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    db = _PackageSession([report, None, rejected])
+
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        create_admin_report_delivery_package(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            expected_content_revision=0,
+            expected_review_revision=5,
+            identity=_identity(),
+            correlation_id=CORRELATION_ID,
+            query_sha256="0" * 64,
+        )
+
+    assert captured.value.code == "latest_review_approval_required"
+    review_sql = str(db.statements[2])
+    assert "report_review_decisions.decision =" not in review_sql
+    assert "report_review_decisions.content_revision =" not in review_sql
+
+
+def test_package_proof_rejects_after_latest_typed_review_revokes_approval() -> None:
+    rejected = ReportReviewDecision(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        revision=5,
+        content_revision=0,
+        decision="REJECTED",
+        user_visible_reason="기관 전달 대상이 아닙니다",
+        duplicate_of_report_id=None,
+        evidence_grant_id=None,
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    package = ReportDeliveryPackage(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        review_decision_id=REVIEW_ID,
+        revision=2,
+        content_revision=0,
+        package_version=2,
+        schema_version="walksafe.admin-report-delivery-package.v2",
+        package_byte_count=2048,
+        package_sha256="f" * 64,
+    )
+    db = _PackageSession(
+        [Report(id=REPORT_ID, content_revision=0), None, rejected, package]
+    )
+
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        get_admin_report_delivery_package_proof(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            package_revision=2,
+        )
+
+    assert captured.value.code == "latest_review_approval_required"
+    assert captured.value.status_code == 409
+
+
+def test_package_proof_returns_minimum_v2_metadata_before_first_delivery_event() -> None:
+    report = Report(id=REPORT_ID, content_revision=0)
+    review = ReportReviewDecision(
+        id=REVIEW_ID,
+        report_id=REPORT_ID,
+        revision=4,
+        content_revision=0,
+        decision="APPROVED",
+        duplicate_of_report_id=None,
+        evidence_grant_id=uuid.UUID("55555555-5555-4555-8555-555555555555"),
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    package_id = uuid.UUID("12121212-1212-4212-8212-121212121212")
+    package = ReportDeliveryPackage(
+        id=package_id,
+        report_id=REPORT_ID,
+        review_decision_id=REVIEW_ID,
+        revision=2,
+        content_revision=0,
+        package_version=2,
+        schema_version="walksafe.admin-report-delivery-package.v2",
+        package_byte_count=2048,
+        package_sha256="f" * 64,
+    )
+    db = _PackageSession([report, None, review, package])
+
+    proof = get_admin_report_delivery_package_proof(
+        db,  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        package_revision=2,
+    )
+
+    assert package_id == package.id
+    assert proof.package_revision == 2
+    assert proof.content_revision == 0
+    assert proof.review_revision == 4
+    assert proof.package_schema_version == "walksafe.admin-report-delivery-package.v2"
+    assert proof.package_byte_count == 2048
+    assert proof.package_sha256 == "f" * 64
+    assert "csv_sha256" not in proof.__dict__
+
+
+@pytest.mark.parametrize(
+    "status",
+    ["SUBMITTED", "ACKNOWLEDGED"],
+    ids=["SUBMITTED-to-ACKNOWLEDGED", "ACKNOWLEDGED-to-RESOLVED"],
+)
+def test_package_proof_reconnects_same_v2_package_for_next_transition(
+    status: str,
+) -> None:
+    report = Report(id=REPORT_ID, content_revision=0)
+    review = ReportReviewDecision(
+        id=REVIEW_ID,
+        report_id=REPORT_ID,
+        revision=4,
+        content_revision=0,
+        decision="APPROVED",
+        duplicate_of_report_id=None,
+        evidence_grant_id=uuid.UUID("55555555-5555-4555-8555-555555555555"),
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    package = ReportDeliveryPackage(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        review_decision_id=REVIEW_ID,
+        revision=2,
+        content_revision=0,
+        package_version=2,
+        schema_version="walksafe.admin-report-delivery-package.v2",
+        package_byte_count=2048,
+        package_sha256="f" * 64,
+    )
+    latest_delivery = SimpleNamespace(
+        status=status,
+        package_id=package.id,
+        package_revision=package.revision,
+    )
+    db = _PackageSession([report, latest_delivery, review, package])
+
+    proof = get_admin_report_delivery_package_proof(
+        db,  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        package_revision=2,
+    )
+
+    assert proof.package_revision == package.revision
+    assert proof.package_sha256 == package.package_sha256
+
+
+@pytest.mark.parametrize(
+    ("status", "package_version", "expected_code"),
+    [
+        ("RESOLVED", 2, "delivery_package_proof_resolved"),
+        ("FAILED", 1, "delivery_package_proof_ineligible"),
+    ],
+)
+def test_package_proof_rejects_resolved_or_legacy_package(
+    status: str,
+    package_version: int,
+    expected_code: str,
+) -> None:
+    report = Report(id=REPORT_ID, content_revision=0)
+    review = ReportReviewDecision(
+        id=REVIEW_ID,
+        report_id=REPORT_ID,
+        revision=4,
+        content_revision=0,
+        decision="APPROVED",
+        duplicate_of_report_id=None,
+        evidence_grant_id=uuid.UUID("55555555-5555-4555-8555-555555555555"),
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    event = ReportDeliveryPackage(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        review_decision_id=REVIEW_ID,
+        revision=2,
+        content_revision=0,
+        package_version=package_version,
+        schema_version=(
+            "walksafe.admin-report-delivery-package.v2"
+            if package_version == 2
+            else "walksafe.admin-report-delivery-package.v1"
+        ),
+        package_byte_count=2048,
+        package_sha256="f" * 64,
+    )
+    latest_delivery = SimpleNamespace(
+        status=status,
+        package_id=event.id,
+        package_revision=event.revision,
+    )
+    db = _PackageSession([report, latest_delivery, review, event])
+
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        get_admin_report_delivery_package_proof(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            package_revision=2,
+        )
+
+    assert captured.value.code == expected_code
+    assert captured.value.status_code == 409
+
+
+def test_package_proof_allows_failed_same_v2_package_retry() -> None:
+    review = ReportReviewDecision(
+        id=REVIEW_ID,
+        report_id=REPORT_ID,
+        revision=4,
+        content_revision=0,
+        decision="APPROVED",
+        duplicate_of_report_id=None,
+        evidence_grant_id=uuid.uuid4(),
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    package = ReportDeliveryPackage(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        review_decision_id=REVIEW_ID,
+        revision=2,
+        content_revision=0,
+        package_version=2,
+        schema_version="walksafe.admin-report-delivery-package.v2",
+        package_byte_count=2048,
+        package_sha256="f" * 64,
+    )
+    latest_delivery = SimpleNamespace(
+        status="FAILED",
+        package_id=package.id,
+        package_revision=package.revision,
+    )
+    db = _PackageSession(
+        [Report(id=REPORT_ID, content_revision=0), latest_delivery, review, package]
+    )
+
+    proof = get_admin_report_delivery_package_proof(
+        db,  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        package_revision=2,
+    )
+
+    assert proof.package_revision == package.revision
+    assert proof.package_sha256 == package.package_sha256
+
+
+def test_package_proof_rejects_new_package_after_failed_same_content_workflow() -> None:
+    review = ReportReviewDecision(
+        id=REVIEW_ID,
+        report_id=REPORT_ID,
+        revision=4,
+        content_revision=0,
+        decision="APPROVED",
+        duplicate_of_report_id=None,
+        evidence_grant_id=uuid.uuid4(),
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    previous_package = ReportDeliveryPackage(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        review_decision_id=REVIEW_ID,
+        revision=1,
+        content_revision=0,
+        package_version=2,
+    )
+    current_package = ReportDeliveryPackage(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        review_decision_id=REVIEW_ID,
+        revision=2,
+        content_revision=0,
+        package_version=2,
+        schema_version="walksafe.admin-report-delivery-package.v2",
+        package_byte_count=2048,
+        package_sha256="f" * 64,
+    )
+    latest_delivery = SimpleNamespace(
+        status="FAILED",
+        package_id=previous_package.id,
+        package_revision=previous_package.revision,
+    )
+    db = _PackageSession(
+        [
+            Report(id=REPORT_ID, content_revision=0),
+            latest_delivery,
+            review,
+            current_package,
+            previous_package,
+        ]
+    )
+
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        get_admin_report_delivery_package_proof(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            package_revision=2,
+        )
+
+    assert captured.value.code == "delivery_package_revision_conflict"
+    assert captured.value.status_code == 409
+
+
+def test_package_proof_allows_new_content_after_resolved_prior_workflow() -> None:
+    current_review = ReportReviewDecision(
+        id=REVIEW_ID,
+        report_id=REPORT_ID,
+        revision=5,
+        content_revision=1,
+        decision="APPROVED",
+        duplicate_of_report_id=None,
+        evidence_grant_id=uuid.uuid4(),
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    previous_package = ReportDeliveryPackage(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        review_decision_id=uuid.uuid4(),
+        revision=1,
+        content_revision=0,
+        package_version=2,
+    )
+    current_package = ReportDeliveryPackage(
+        id=uuid.uuid4(),
+        report_id=REPORT_ID,
+        review_decision_id=REVIEW_ID,
+        revision=2,
+        content_revision=1,
+        package_version=2,
+        schema_version="walksafe.admin-report-delivery-package.v2",
+        package_byte_count=2048,
+        package_sha256="f" * 64,
+    )
+    latest_delivery = SimpleNamespace(
+        status="RESOLVED",
+        package_id=previous_package.id,
+        package_revision=previous_package.revision,
+    )
+    db = _PackageSession(
+        [
+            Report(id=REPORT_ID, content_revision=1),
+            latest_delivery,
+            SimpleNamespace(
+                report_id=REPORT_ID,
+                revision=1,
+                expected_revision=0,
+                idempotency_key=uuid.uuid4(),
+                content_sha256="e" * 64,
+                user_description=None,
+                category_hint=None,
+                created_at=OCCURRED_AT,
+            ),
+            current_review,
+            current_package,
+            previous_package,
+        ]
+    )
+
+    proof = get_admin_report_delivery_package_proof(
+        db,  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        package_revision=2,
+    )
+
+    assert proof.content_revision == 1
+    assert proof.review_revision == 5
 
 
 def test_audit_projection_is_allowlisted_and_cursor_is_filter_bound() -> None:

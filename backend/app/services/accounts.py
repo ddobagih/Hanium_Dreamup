@@ -26,6 +26,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from backend.app.account_schemas import (
     AccountAuthenticateRequestV1,
@@ -1091,6 +1092,7 @@ class AccountService:
             enrollment.state_version += 1
             enrollment.otp_hmac = None
             enrollment.updated_at = observed_at
+            flag_modified(enrollment, "updated_at")
             db.commit()
             raise AccountServiceError(
                 "account_enrollment_verification_failed",
@@ -1115,6 +1117,7 @@ class AccountService:
             enrollment.attempt_count += 1
             enrollment.state_version += 1
             enrollment.updated_at = observed_at
+            flag_modified(enrollment, "updated_at")
             if enrollment.attempt_count >= enrollment.max_attempts:
                 enrollment.state = "EXHAUSTED"
                 enrollment.otp_hmac = None
@@ -1136,6 +1139,7 @@ class AccountService:
             enrollment.otp_hmac = None
             enrollment.consumed_at = observed_at
             enrollment.updated_at = observed_at
+            flag_modified(enrollment, "updated_at")
             db.commit()
             raise AccountServiceError(
                 "account_enrollment_conflict",
@@ -1196,6 +1200,7 @@ class AccountService:
         enrollment.otp_hmac = None
         enrollment.consumed_at = observed_at
         enrollment.updated_at = observed_at
+        flag_modified(enrollment, "updated_at")
         db.add(account)
         db.add(receipt)
         try:

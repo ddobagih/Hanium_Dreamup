@@ -246,6 +246,7 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     "/api/reports/mine/{report_id}/content",
     "/api/reports/mine/{report_id}/corrections",
     "/api/reports/mine/{report_id}/requests",
+    "/api/reports/mine/{report_id}/requests/{request_id}",
     "/api/raw-collections/{collection_id}/manifest",
     "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}",
     "/api/raw-collections/{collection_id}",
@@ -273,27 +274,28 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
   assert.deepEqual(Object.keys(contract.paths[expected[13]!]!), ["get"]);
   assert.deepEqual(Object.keys(contract.paths[expected[14]!]!), ["post"]);
   assert.deepEqual(Object.keys(contract.paths[expected[15]!]!), ["post"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[16]!]!), ["put"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[16]!]!), ["get"]);
   assert.deepEqual(Object.keys(contract.paths[expected[17]!]!), ["put"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[18]!]!), ["get"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[19]!]!), ["post"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[20]!]!).sort(), ["get", "put"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[21]!]!), ["post"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[22]!]!), ["get"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[23]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[18]!]!), ["put"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[19]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[20]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[21]!]!).sort(), ["get", "put"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[22]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[23]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[24]!]!), ["post"]);
   assert.equal(contract.info.version, "0.11.0");
-  const rawManifest = contract.paths[expected[16]!]!.put as {
+  const rawManifest = contract.paths[expected[17]!]!.put as {
     "x-max-body-bytes": number;
     parameters: Array<{ $ref: string }>;
   };
-  const rawChunk = contract.paths[expected[17]!]!.put as {
+  const rawChunk = contract.paths[expected[18]!]!.put as {
     "x-max-body-bytes": number;
     parameters: Array<{ $ref: string }>;
   };
-  const rawStatus = contract.paths[expected[18]!]!.get as {
+  const rawStatus = contract.paths[expected[19]!]!.get as {
     parameters: Array<{ $ref: string }>;
   };
-  const rawCommit = contract.paths[expected[19]!]!.post as {
+  const rawCommit = contract.paths[expected[20]!]!.post as {
     "x-max-body-bytes": number;
     parameters: Array<{ $ref: string }>;
   };
@@ -425,13 +427,17 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
   const userContent = detailed.paths["/api/reports/mine/{report_id}/content"]!.get!;
   const userCorrection = detailed.paths["/api/reports/mine/{report_id}/corrections"]!.post!;
   const userRequest = detailed.paths["/api/reports/mine/{report_id}/requests"]!.post!;
+  const userRequestDetail = detailed.paths[
+    "/api/reports/mine/{report_id}/requests/{request_id}"
+  ]!.get!;
   for (const operation of [
     userList,
     userDeletion,
     userDetail,
     userContent,
     userCorrection,
-    userRequest
+    userRequest,
+    userRequestDetail
   ]) {
     assert.deepEqual(operation.security, [{ fieldSession: [] }]);
     assert.match(operation.description ?? "", /current v7/i);
@@ -439,6 +445,10 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     assert.doesNotMatch(
       JSON.stringify(operation.parameters ?? []),
       /x-walksafe-consent|consentControlSecret/i
+    );
+    assert.equal(
+      operation.responses?.["429"]?.$ref,
+      "#/components/responses/ReportRateLimited"
     );
   }
   assert.equal(userList.responses?.["200"]?.$ref, "#/components/responses/UserReportList");
@@ -460,6 +470,10 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     "#/components/responses/ReportContentRevision"
   );
   assert.equal(userRequest.responses?.["201"]?.$ref, "#/components/responses/ReportUserRequest");
+  assert.equal(
+    userRequestDetail.responses?.["200"]?.$ref,
+    "#/components/responses/ReportUserRequest"
+  );
   for (const schemaName of [
     "ReportUserRequest",
     "UserReport",
@@ -510,11 +524,31 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
   const reportRightsResponses = (contract as unknown as {
     components: {
       responses: Record<string, {
-        headers?: Record<string, { $ref?: string }>;
+        description?: string;
+        headers?: Record<string, {
+          $ref?: string;
+          schema?: { type?: string; minimum?: number };
+        }>;
         content?: { "application/json"?: { schema?: { $ref?: string } } };
       }>;
     };
   }).components.responses;
+  assert.equal(
+    reportRightsResponses.ReportUserRequest!.description,
+    "Public report-scoped user request status"
+  );
+  assert.equal(
+    reportRightsResponses.ReportRateLimited!.headers?.["Cache-Control"]?.$ref,
+    "#/components/headers/NoStore"
+  );
+  assert.deepEqual(
+    reportRightsResponses.ReportRateLimited!.headers?.["Retry-After"]?.schema,
+    { type: "integer", minimum: 0 }
+  );
+  assert.equal(
+    reportRightsResponses.ReportRateLimited!.content?.["application/json"]?.schema?.$ref,
+    "#/components/schemas/GatewayError"
+  );
   for (const [name, schemaName] of [
     ["ReportContentCurrent", "ReportContentCurrent"],
     ["ReportContentRevision", "ReportContentRevision"],
@@ -1655,6 +1689,15 @@ test("user report routes bind actor generation and expose only strict minimum JS
     external_copy_count: 0,
     updated_at: createdAt
   };
+  const requestStatus = {
+    request_id: requestId,
+    request_type: "CORRECTION",
+    status: "ACKNOWLEDGED",
+    status_version: 2,
+    public_response: "요청을 확인했습니다.",
+    created_at: createdAt,
+    updated_at: createdAt
+  };
   const baseItem = {
     report_id: reportId,
     created_at: createdAt,
@@ -1728,6 +1771,15 @@ test("user report routes bind actor generation and expose only strict minimum JS
     if (url.includes("/reports/mine/deletions/")) {
       assert.equal(init?.method, "GET");
       return Response.json(deletionStatus);
+    }
+    if (url.endsWith(`/requests/${requestId}`)) {
+      assert.equal(
+        url,
+        `http://127.0.0.1:8000/reports/mine/${reportId}/requests/${requestId}`
+      );
+      assert.equal(init?.method, "GET");
+      assert.equal(init?.body, undefined);
+      return Response.json(requestStatus);
     }
     if (url.endsWith("/requests")) {
       assert.equal(init?.method, "POST");
@@ -1854,6 +1906,106 @@ test("user report routes bind actor generation and expose only strict minimum JS
   assert.equal(created.status, 201);
   assert.equal((await created.json() as { request_id: string }).request_id, requestId);
 
+  const retrievedRequest = await handleGatewayRequest(
+    new Request(
+      `http://127.0.0.1:8081/api/reports/mine/${reportId}/requests/${requestId}`,
+      { headers: { cookie } }
+    ),
+    { fetchImpl }
+  );
+  assert.equal(retrievedRequest.status, 200);
+  assert.equal(retrievedRequest.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await retrievedRequest.json(), requestStatus);
+
+  for (const { request: limitedRequest, retryAfter, expectedRetryAfter } of [
+    {
+      request: new Request(
+        `http://127.0.0.1:8081/api/reports/mine/${reportId}/requests/${requestId}`,
+        { headers: { cookie } }
+      ),
+      retryAfter: "17",
+      expectedRetryAfter: "17"
+    },
+    {
+      request: new Request(
+        `http://127.0.0.1:8081/api/reports/mine/${reportId}/requests/${requestId}`,
+        { headers: { cookie } }
+      ),
+      retryAfter: "17 seconds",
+      expectedRetryAfter: null
+    },
+    {
+      request: new Request(
+        `http://127.0.0.1:8081/api/reports/mine/${reportId}/requests`,
+        {
+          method: "POST",
+          headers: { cookie, "content-type": "application/json" },
+          body: JSON.stringify({
+            client_request_id: requestId,
+            request_type: "CORRECTION",
+            request_text: "표면 손상 범위를 정정해 주세요."
+          })
+        }
+      ),
+      retryAfter: "8",
+      expectedRetryAfter: "8"
+    }
+  ] as const) {
+    const limited = await handleGatewayRequest(limitedRequest, {
+      fetchImpl: async () => Response.json(
+        {
+          detail: {
+            code: "actor_rate_limit_exceeded",
+            message: "Backend-only rate limit detail"
+          },
+          internal_note: "must-not-leak"
+        },
+        { status: 429, headers: { "retry-after": retryAfter } }
+      )
+    });
+    assert.equal(limited.status, 429);
+    assert.equal(limited.headers.get("cache-control"), "no-store");
+    assert.equal(limited.headers.get("retry-after"), expectedRetryAfter);
+    assert.deepEqual(await limited.json(), {
+      detail: { code: "report_rate_limited" }
+    });
+  }
+
+  const crossBoundRequest = await handleGatewayRequest(
+    new Request(
+      `http://127.0.0.1:8081/api/reports/mine/${reportId}/requests/${requestId}`,
+      { headers: { cookie } }
+    ),
+    {
+      fetchImpl: async () => Response.json({
+        ...requestStatus,
+        request_id: correctionId
+      })
+    }
+  );
+  assert.equal(crossBoundRequest.status, 502);
+
+  for (const [invalid, expectedStatus] of [
+    [new Request(
+      `http://127.0.0.1:8081/api/reports/mine/${reportId}/requests/${requestId}?debug=1`,
+      { headers: { cookie } }
+    ), 404],
+    [new Request(
+      `http://127.0.0.1:8081/api/reports/mine/${reportId}/requests/${requestId}`,
+      { method: "POST", headers: { cookie } }
+    ), 405],
+    [new Request(
+      "http://127.0.0.1:8081/api/reports/mine/AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA/requests/BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB",
+      { headers: { cookie } }
+    ), 404]
+  ] as const) {
+    const rejected = await handleGatewayRequest(invalid, {
+      fetchImpl: async () => assert.fail("invalid request lookup must not reach backend")
+    });
+    assert.equal(rejected.status, expectedStatus);
+    assert.equal(rejected.headers.get("cache-control"), "no-store");
+  }
+
   const invalidBody = await handleGatewayRequest(
     new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}/requests`, {
       method: "POST",
@@ -1953,6 +2105,17 @@ test("user report routes bind actor generation and expose only strict minimum JS
       init: { headers: { cookie } },
       payload: { ...deletionStatus, private_actor: ACTOR_ID },
       upstreamStatus: 200
+    },
+    {
+      url: `http://127.0.0.1:8081/api/reports/mine/${reportId}/requests/${requestId}`,
+      init: { headers: { cookie } },
+      payload: {
+        ...requestStatus,
+        request_text: "내부 요청 원문",
+        internal_note: "내부 메모",
+        intent_sha256: "f".repeat(64)
+      },
+      upstreamStatus: 200
     }
   ]) {
     const leaked = await handleGatewayRequest(
@@ -1983,6 +2146,20 @@ test("user report routes bind actor generation and expose only strict minimum JS
   );
   assert.equal(leakedDetail.status, 502);
   assert.doesNotMatch(await leakedDetail.text(), /latitude|internal_reason|private/);
+
+  const crossBoundDetail = await handleGatewayRequest(
+    new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}`, {
+      headers: { cookie }
+    }),
+    {
+      fetchImpl: async () => Response.json({
+        schema_version: "walksafe.user-report-detail.v1",
+        ...baseItem,
+        report_id: correctionId
+      })
+    }
+  );
+  assert.equal(crossBoundDetail.status, 502);
 
   const fenced = await handleGatewayRequest(
     new Request(`http://127.0.0.1:8081/api/reports/mine/${reportId}`, {

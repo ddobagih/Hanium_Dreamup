@@ -28,6 +28,7 @@ from backend.app.field_test_security import (  # noqa: E402
     _POSTGRES_ACTOR_RATE_LIMITER,
     _RequestBodyIncomplete,
     _request_body_error_response,
+    _strict_json_object,
     create_actor_assertion,
     required_field_test_access,
     requires_account_generation,
@@ -40,12 +41,33 @@ from backend.app.request_limits import (  # noqa: E402
     PrivacyNoStoreMiddleware,
 )
 from backend.app.services.actor_rate_limit import ActorRateLimitStoreUnavailable  # noqa: E402
+from backend.app.services.admin_security import AdminSecurityError  # noqa: E402
 from model.two_model_runtime import DEFAULT_RUNTIME_CONFIG  # noqa: E402
 from asgi_client import ASGITestClient  # noqa: E402
 
 
 FIELD_TOKEN = "field-token-for-tests-1234567890"
 ADMIN_TOKEN = "admin-token-for-tests-1234567890"
+
+
+@pytest.mark.parametrize(
+    "raw_body",
+    [
+        b'\xef\xbb\xbf{"reason":"review evidence"}',
+        '{"reason":"review evidence"}'.encode("utf-16"),
+        b'{"reason":"first","reason":"second"}',
+        b'{"reason":"review\\u0000evidence"}',
+        b'{"reason":"review\\ud800evidence"}',
+        b'{"expected_content_revision":9223372036854775808}',
+        b'{"expected_content_revision":1.0}',
+    ],
+)
+def test_admin_report_mutation_json_rejects_noncanonical_database_input(
+    raw_body: bytes,
+) -> None:
+    with pytest.raises(AdminSecurityError) as rejected:
+        _strict_json_object(raw_body)
+    assert rejected.value.status_code == 422
 
 
 @pytest.fixture
@@ -74,6 +96,22 @@ def test_route_access_matrix_separates_field_and_admin_operations() -> None:
     )
     assert requires_actor_identity(deletion_status_path, "GET")
     assert requires_account_generation(deletion_status_path, "GET")
+    request_status_path = (
+        "/reports/mine/00000000-0000-0000-0000-000000000001/requests/"
+        "00000000-0000-0000-0000-000000000002"
+    )
+    assert (
+        required_field_test_access(request_status_path, "GET")
+        is FieldTestAccess.FIELD
+    )
+    assert requires_actor_identity(request_status_path, "GET")
+    assert requires_account_generation(request_status_path, "GET")
+    assert (
+        required_field_test_access(
+            "/reports/mine/{report_id}/requests/{request_id}", "GET"
+        )
+        is FieldTestAccess.FIELD
+    )
     assert (
         required_field_test_access(
             "/reports/mine/deletions/{request_id}",
@@ -475,9 +513,10 @@ def test_sensitive_admin_reads_require_a_gateway_bound_actor(
                     actor_id,
                     FieldTestAccess.ADMIN,
                     secret,
-                ),
-                "x-walksafe-read-purpose": "admin_report_image",
-            },
+                    ),
+                    "x-walksafe-read-purpose": "admin_report_image",
+                    "x-walksafe-original-access-grant": "invalid",
+                },
         )
         assert bound.status_code == 503
         assert bound.json()["detail"]["code"] == "admin_security_required"

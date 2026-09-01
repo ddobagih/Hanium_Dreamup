@@ -10,6 +10,7 @@ import uuid
 
 import pytest
 from fastapi import FastAPI, HTTPException
+from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.datastructures import QueryParams
 
@@ -27,13 +28,19 @@ from backend.app.models import (
     ReportReviewDecision,
 )
 from backend.app.openapi_contract import install_walksafe_openapi_contract
-from backend.app.schemas import AdminReportDetailV1
+from backend.app.schemas import AdminReportDetailV2
 from backend.app.services.admin_device_proof import (
     VerifiedAdminDeviceProof,
     canonical_admin_query_sha256,
     is_admin_device_proof_workflow_request,
 )
-from backend.app.services.admin_report_projection import project_admin_report_detail
+from backend.app.services.admin_report_projection import (
+    AdminReportDeliveryRow,
+    AdminReportDetailRow,
+    admin_report_delivery_columns,
+    admin_report_detail_columns,
+    project_admin_report_detail,
+)
 from backend.app.services.admin_security import (
     AdminSecurityError,
     AdminSessionIdentity,
@@ -44,15 +51,18 @@ REPORT_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
 SESSION_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
 CORRELATION_ID = uuid.UUID("33333333-3333-4333-8333-333333333333")
 REVIEW_ID = uuid.UUID("44444444-4444-4444-8444-444444444444")
+PACKAGE_ID = uuid.UUID("88888888-8888-4888-8888-888888888888")
+EXPORT_AUDIT_ID = uuid.UUID("99999999-9999-4999-8999-999999999999")
 DETAIL_PATH = f"/admin/reports/{REPORT_ID}"
 OBSERVED_AT = datetime(2026, 8, 29, 1, 3, tzinfo=UTC)
 
 
 def _report() -> Report:
-    return Report(
+    report = Report(
         id=REPORT_ID,
         status="reviewed",
         status_version=1,
+        content_revision=3,
         class_id=0,
         class_name="damaged_tactile_block",
         confidence=0.75,
@@ -74,6 +84,8 @@ def _report() -> Report:
         created_at=datetime(2026, 8, 29, 1, 1, tzinfo=UTC),
         updated_at=datetime(2026, 8, 29, 1, 2, tzinfo=UTC),
     )
+    report.latest_delivery_revision = 0
+    return report
 
 
 def _review() -> ReportReviewDecision:
@@ -81,6 +93,7 @@ def _review() -> ReportReviewDecision:
         id=REVIEW_ID,
         report_id=REPORT_ID,
         revision=2,
+        content_revision=3,
         decision="APPROVED",
         reason="private reviewer narrative",
         duplicate_of_report_id=None,
@@ -97,10 +110,11 @@ def _review() -> ReportReviewDecision:
 
 
 def _delivery() -> ReportInstitutionDeliveryEvent:
-    return ReportInstitutionDeliveryEvent(
+    delivery = ReportInstitutionDeliveryEvent(
         id=uuid.UUID("55555555-5555-4555-8555-555555555555"),
         report_id=REPORT_ID,
         review_decision_id=REVIEW_ID,
+        package_id=PACKAGE_ID,
         revision=3,
         package_revision=1,
         institution="private institution detail",
@@ -119,6 +133,15 @@ def _delivery() -> ReportInstitutionDeliveryEvent:
         correlation_id=CORRELATION_ID,
         recorded_at=datetime(2026, 8, 29, 1, 4, tzinfo=UTC),
     )
+    delivery.package_content_revision = 3
+    delivery.package_schema_version = "walksafe.admin-report-delivery-package.v2"
+    delivery.package_version = 2
+    delivery.export_audit_id = EXPORT_AUDIT_ID
+    delivery.package_sha256 = "c" * 64
+    delivery.csv_sha256 = "d" * 64
+    delivery.manifest_sha256 = "e" * 64
+    delivery.package_byte_count = 4096
+    return delivery
 
 
 def _identity() -> AdminSessionIdentity:
@@ -167,11 +190,13 @@ def test_detail_projection_is_strict_minimum_and_uses_capability_links() -> None
     detail = project_admin_report_detail(_report(), _review(), _delivery())
     body = detail.model_dump(mode="json")
 
-    assert set(AdminReportDetailV1.model_fields) == {
+    assert set(AdminReportDetailV2.model_fields) == {
         "schema_version",
         "id",
         "status",
         "status_version",
+        "content_revision",
+        "latest_delivery_revision",
         "allowed_next_statuses",
         "class_name",
         "confidence",
@@ -183,6 +208,8 @@ def test_detail_projection_is_strict_minimum_and_uses_capability_links() -> None
         "current_delivery",
         "capabilities",
     }
+    assert body["content_revision"] == 3
+    assert body["latest_delivery_revision"] == 3
     assert body["current_review"] == {
         "revision": 2,
         "decision": "APPROVED",
@@ -195,7 +222,16 @@ def test_detail_projection_is_strict_minimum_and_uses_capability_links() -> None
     }
     assert body["current_delivery"] == {
         "revision": 3,
+        "package_id": str(PACKAGE_ID),
         "package_revision": 1,
+        "package_content_revision": 3,
+        "package_schema_version": "walksafe.admin-report-delivery-package.v2",
+        "package_version": 2,
+        "export_audit_id": str(EXPORT_AUDIT_ID),
+        "package_sha256": "c" * 64,
+        "csv_sha256": "d" * 64,
+        "manifest_sha256": "e" * 64,
+        "package_byte_count": 4096,
         "status": "ACKNOWLEDGED",
         "external_receipt_present": True,
         "evidence_present": True,
@@ -221,21 +257,106 @@ def test_detail_projection_is_strict_minimum_and_uses_capability_links() -> None
     assert "private" not in serialized
 
 
-def test_detail_fixture_has_the_exact_contract() -> None:
-    fixture_path = Path(__file__).parents[2] / "contracts/fixtures/admin-report-detail-v1.json"
-    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
-    parsed = AdminReportDetailV1.model_validate(fixture)
+def test_detail_query_selects_every_required_projection_field() -> None:
+    assert tuple(column.key for column in admin_report_detail_columns()) == tuple(
+        AdminReportDetailRow.__dataclass_fields__
+    )
+    assert tuple(column.key for column in admin_report_delivery_columns()) == tuple(
+        AdminReportDeliveryRow.__dataclass_fields__
+    )
 
+
+def test_detail_fixture_has_the_exact_contract() -> None:
+    fixture_path = Path(__file__).parents[2] / "contracts/fixtures/admin-report-detail-v2.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    parsed = AdminReportDetailV2.model_validate(fixture)
+
+    assert set(fixture) == {
+        "schema_version",
+        "id",
+        "status",
+        "status_version",
+        "content_revision",
+        "latest_delivery_revision",
+        "allowed_next_statuses",
+        "class_name",
+        "confidence",
+        "location_quality",
+        "captured_at",
+        "created_at",
+        "updated_at",
+        "current_review",
+        "current_delivery",
+        "capabilities",
+    }
     assert parsed.id == REPORT_ID
-    assert parsed.schema_version == "walksafe.admin-report-detail.v1"
+    assert parsed.schema_version == "walksafe.admin-report-detail.v2"
+    assert parsed.content_revision == 0
+    assert parsed.latest_delivery_revision == 3
     assert "latitude" not in fixture
     assert "metadata" not in fixture
+    assert set(fixture["current_review"]) == {
+        "revision",
+        "decision",
+        "user_visible_reason",
+        "duplicate_of_report_id",
+        "location_reviewed",
+        "photo_reviewed",
+        "privacy_reviewed",
+        "decided_at",
+    }
+    assert set(fixture["capabilities"]) == {
+        "review_decisions_path",
+        "deliveries_path",
+        "original_access_grants_path",
+        "status_path",
+        "delivery_packages_path",
+    }
+
+
+@pytest.mark.parametrize(
+    "missing_key",
+    [
+        "status_version",
+        "allowed_next_statuses",
+    ],
+)
+def test_detail_v2_rejects_missing_required_top_level_keys(missing_key: str) -> None:
+    fixture_path = Path(__file__).parents[2] / "contracts/fixtures/admin-report-detail-v2.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    fixture.pop(missing_key)
+
+    with pytest.raises(ValidationError):
+        AdminReportDetailV2.model_validate(fixture)
+
+
+@pytest.mark.parametrize(
+    ("container_key", "missing_key"),
+    [
+        ("current_review", "user_visible_reason"),
+        ("capabilities", "status_path"),
+        ("capabilities", "delivery_packages_path"),
+    ],
+)
+def test_detail_v2_rejects_missing_required_nested_keys(
+    container_key: str,
+    missing_key: str,
+) -> None:
+    fixture_path = Path(__file__).parents[2] / "contracts/fixtures/admin-report-detail-v2.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    fixture[container_key].pop(missing_key)
+
+    with pytest.raises(ValidationError):
+        AdminReportDetailV2.model_validate(fixture)
 
 
 def test_detail_route_has_admin_proof_and_openapi_contract() -> None:
+    proof_path = f"/admin/reports/{REPORT_ID}/delivery-packages/7/proof"
+
     assert required_field_test_access(DETAIL_PATH, "GET") is FieldTestAccess.ADMIN
     assert is_admin_device_proof_workflow_request("GET", DETAIL_PATH) is True
     assert is_admin_device_proof_workflow_request("POST", DETAIL_PATH) is False
+    assert is_admin_device_proof_workflow_request("GET", proof_path) is True
     assert is_admin_device_proof_workflow_request(
         "GET", "/admin/reports/11111111-1111-4111-8111-11111111111A"
     ) is True
@@ -247,6 +368,9 @@ def test_detail_route_has_admin_proof_and_openapi_contract() -> None:
         SimpleNamespace(admin_security_enabled=True, admin_device_proof_enabled=True),
     )
     operation = app.openapi()["paths"]["/admin/reports/{report_id}"]["get"]
+    proof_operation = app.openapi()["paths"][
+        "/admin/reports/{report_id}/delivery-packages/{package_revision}/proof"
+    ]["get"]
     assert set(operation["security"][0]) == {
         "WalkSafeAdminBearer",
         "WalkSafeAdminAppKind",
@@ -259,6 +383,9 @@ def test_detail_route_has_admin_proof_and_openapi_contract() -> None:
         "WalkSafeReadPurpose",
     }
     assert operation["x-walksafe-admin-device-proof"]["read_purpose"] == "admin.report.detail"
+    assert proof_operation["x-walksafe-admin-device-proof"]["read_purpose"] == (
+        "admin.report.delivery_package.proof"
+    )
 
 
 def test_verified_session_proof_failure_is_security_audited_without_header_correlation(
@@ -396,7 +523,9 @@ def _call_detail(db: _FakeSession, *, path: str = DETAIL_PATH, query: bytes = b"
 
 
 def test_detail_success_is_audited_before_response() -> None:
-    db = _FakeSession(_report(), _review(), _delivery())
+    report = _report()
+    report.latest_delivery_revision = 3
+    db = _FakeSession(report, _review(), _delivery())
 
     detail = _call_detail(db)
 
@@ -414,9 +543,21 @@ def test_detail_success_is_audited_before_response() -> None:
 
 
 def test_detail_without_review_or_delivery_returns_null_summaries() -> None:
-    detail = _call_detail(_FakeSession(_report()))
+    report = _report()
+    report.latest_delivery_revision = 0
+    detail = _call_detail(_FakeSession(report))
 
     assert detail.current_review is None
+    assert detail.current_delivery is None
+
+
+def test_detail_keeps_latest_delivery_revision_when_current_content_has_no_delivery() -> None:
+    report = _report()
+    report.latest_delivery_revision = 4
+
+    detail = _call_detail(_FakeSession(report, None, None))
+
+    assert detail.latest_delivery_revision == 4
     assert detail.current_delivery is None
 
 

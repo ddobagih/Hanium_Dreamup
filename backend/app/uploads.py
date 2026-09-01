@@ -89,7 +89,6 @@ def _upload_directory_identity(metadata: os.stat_result) -> tuple[int, ...]:
         metadata.st_mode,
         metadata.st_uid,
         metadata.st_gid,
-        metadata.st_nlink,
     )
 
 

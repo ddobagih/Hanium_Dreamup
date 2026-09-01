@@ -56,6 +56,9 @@ _DEVICE_PROOF_WORKFLOW_PATHS = {
     "/admin/reports/{report_id}/delivery-packages": {
         "post": ("admin.report.delivery_package.create", None),
     },
+    "/admin/reports/{report_id}/delivery-packages/{package_revision}/proof": {
+        "get": (None, "admin.report.delivery_package.proof"),
+    },
     "/admin/report-requests": {
         "get": (None, "admin.report_request.list"),
     },
@@ -84,6 +87,9 @@ _DEVICE_PROOF_WORKFLOW_PATHS = {
         "post": ("report.review.decide", None),
         "get": (None, "report.review_decisions"),
     },
+    "/reports/{report_id}/original-access-grants": {
+        "post": ("report.original.grant", None),
+    },
     "/reports/{report_id}/deliveries": {
         "post": ("report.delivery.create", None),
         "get": (None, "report.delivery_events"),
@@ -111,6 +117,10 @@ _HIGH_RISK_DEVICE_PROOF_WORKFLOWS = {
         "patch",
         "/admin/incidents/{incident_id}/status",
     ): "admin.incident.status.update",
+    (
+        "post",
+        "/reports/{report_id}/original-access-grants",
+    ): "report.original.grant",
 }
 _ADMIN_RECONFIRMATION_PARAMETER = {
     "name": ADMIN_RECONFIRM_NONCE_HEADER_NAME,
@@ -228,6 +238,91 @@ def _install_privacy_schema_invariants(components: dict[str, Any]) -> None:
                 },
                 "else": {
                     "properties": {"completion_receipt_sha256": {"type": "null"}}
+                },
+            }
+        ]
+    review = schemas.get("ReportReviewDecisionRequest")
+    if isinstance(review, dict):
+        review["allOf"] = [
+            {
+                "if": {
+                    "properties": {"decision": {"const": "APPROVED"}},
+                    "required": ["decision"],
+                },
+                "then": {
+                    "properties": {
+                        "user_visible_reason": {"type": "null"},
+                        "duplicate_of_report_id": {"type": "null"},
+                        "location_reviewed": {"const": True},
+                        "photo_reviewed": {"const": True},
+                        "privacy_reviewed": {"const": True},
+                        "evidence_grant_id": {
+                            "type": "string",
+                            "format": "uuid",
+                        }
+                    },
+                    "required": ["evidence_grant_id"],
+                },
+                "else": {
+                    "properties": {"evidence_grant_id": {"type": "null"}}
+                },
+            },
+            {
+                "if": {
+                    "properties": {
+                        "decision": {"enum": ["REJECTED", "DUPLICATE"]}
+                    },
+                    "required": ["decision"],
+                },
+                "then": {
+                    "properties": {
+                        "user_visible_reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500,
+                        }
+                    },
+                    "required": ["user_visible_reason"],
+                },
+            },
+            {
+                "if": {
+                    "properties": {"decision": {"const": "DUPLICATE"}},
+                    "required": ["decision"],
+                },
+                "then": {
+                    "properties": {
+                        "duplicate_of_report_id": {
+                            "type": "string",
+                            "format": "uuid",
+                        }
+                    },
+                    "required": ["duplicate_of_report_id"],
+                },
+                "else": {
+                    "properties": {"duplicate_of_report_id": {"type": "null"}}
+                },
+            },
+        ]
+    delivery = schemas.get("ReportInstitutionDeliveryRequest")
+    if isinstance(delivery, dict):
+        delivery["allOf"] = [
+            {
+                "if": {
+                    "properties": {
+                        "status": {"enum": ["ACKNOWLEDGED", "RESOLVED"]}
+                    },
+                    "required": ["status"],
+                },
+                "then": {
+                    "properties": {
+                        "external_receipt_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160,
+                        }
+                    },
+                    "required": ["external_receipt_id"],
                 },
             }
         ]
@@ -519,6 +614,22 @@ def install_walksafe_openapi_contract(app: FastAPI, settings: Any) -> None:
                     }
                     if method == "get" and path.startswith("/uploads/"):
                         requirement["WalkSafeOriginalAccessGrant"] = []
+                        for parameter in operation.get("parameters", []):
+                            if (
+                                parameter.get("in") == "header"
+                                and parameter.get("name")
+                                == "X-WalkSafe-Original-Access-Grant"
+                            ):
+                                parameter.setdefault("schema", {}).update(
+                                    {
+                                        "minLength": 43,
+                                        "maxLength": 43,
+                                        "pattern": (
+                                            "^[A-Za-z0-9_-]{42}"
+                                            "[AEIMQUYcgkosw048]$"
+                                        ),
+                                    }
+                                )
                     actor_required = False
                     operation["x-walksafe-actor-identity-source"] = "admin-session"
                     workflow_contract = _DEVICE_PROOF_WORKFLOW_PATHS.get(

@@ -271,6 +271,42 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute(
+        """
+        DO $guard$
+        BEGIN
+          LOCK TABLE public.reports,
+                     public.report_content_revisions,
+                     public.report_review_decisions,
+                     public.report_delivery_packages
+            IN ACCESS EXCLUSIVE MODE;
+          IF EXISTS (SELECT 1 FROM public.report_content_revisions)
+            OR EXISTS (
+              SELECT 1 FROM public.reports
+               WHERE content_revision IS DISTINCT FROM 0
+            )
+            OR EXISTS (
+              SELECT 1 FROM public.report_review_decisions
+               WHERE content_revision IS DISTINCT FROM 0
+            )
+            OR EXISTS (
+              SELECT 1 FROM public.report_delivery_packages
+               WHERE package_version IS DISTINCT FROM 1
+                  OR schema_version IS DISTINCT FROM
+                     'walksafe.admin-report-delivery-package.v1'
+                  OR content_revision IS DISTINCT FROM 0
+                  OR content_sha256 IS NOT NULL
+                  OR supersedes_package_id IS NOT NULL
+            )
+          THEN
+            RAISE EXCEPTION
+              'cannot downgrade report content corrections while successor data exists'
+              USING ERRCODE = '55000';
+          END IF;
+        END
+        $guard$
+        """
+    )
     op.drop_index(
         "ix_report_delivery_packages_supersedes_package_id",
         table_name="report_delivery_packages",

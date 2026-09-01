@@ -155,6 +155,8 @@ const USER_REPORT_DETAIL_ROUTE =
   /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const USER_REPORT_REQUEST_ROUTE =
   /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/requests$/;
+const USER_REPORT_REQUEST_DETAIL_ROUTE =
+  /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/requests\/(?<requestId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const USER_REPORT_CONTENT_ROUTE =
   /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/content$/;
 const USER_REPORT_CORRECTION_ROUTE =
@@ -1151,6 +1153,7 @@ async function reportTransportStatus(
 type UserReportRoute =
   | Readonly<{ kind: "list" }>
   | Readonly<{ kind: "detail" | "request" | "content" | "correction"; reportId: string }>
+  | Readonly<{ kind: "request-detail"; reportId: string; requestId: string }>
   | Readonly<{ kind: "deletion"; requestId: string }>;
 
 function userReportRoute(pathname: string): UserReportRoute | null {
@@ -1160,6 +1163,14 @@ function userReportRoute(pathname: string): UserReportRoute | null {
   const deletion = USER_REPORT_DELETION_ROUTE.exec(pathname);
   if (deletion?.groups?.requestId) {
     return { kind: "deletion", requestId: deletion.groups.requestId };
+  }
+  const requestDetail = USER_REPORT_REQUEST_DETAIL_ROUTE.exec(pathname);
+  if (requestDetail?.groups?.reportId && requestDetail.groups.requestId) {
+    return {
+      kind: "request-detail",
+      reportId: requestDetail.groups.reportId,
+      requestId: requestDetail.groups.requestId
+    };
   }
   const request = USER_REPORT_REQUEST_ROUTE.exec(pathname);
   if (request?.groups?.reportId) {
@@ -1408,6 +1419,10 @@ function sanitizeUserReportResponse(
   if (route.kind === "deletion") {
     return sanitizeReportDeletionStatus(payload, route.requestId);
   }
+  if (route.kind === "request-detail") {
+    const sanitized = sanitizeRequestSummary(payload);
+    return sanitized?.request_id === route.requestId ? sanitized : null;
+  }
   if (route.kind === "request") return sanitizeRequestSummary(payload);
   if (route.kind === "detail") {
     if (!exactObjectKeys(payload, [
@@ -1417,7 +1432,7 @@ function sanitizeUserReportResponse(
     const item = { ...payload };
     delete item.schema_version;
     const sanitized = sanitizeUserReportItem(item);
-    return sanitized ? {
+    return sanitized && sanitized.report_id === route.reportId ? {
       schema_version: "walksafe.user-report-detail.v1",
       ...sanitized
     } : null;
@@ -1601,6 +1616,9 @@ async function userReportProxy(
       case "request":
         backendPath = `/reports/mine/${route.reportId}/requests`;
         break;
+      case "request-detail":
+        backendPath = `/reports/mine/${route.reportId}/requests/${route.requestId}`;
+        break;
       case "content":
         backendPath = `/reports/mine/${route.reportId}/content`;
         break;
@@ -1633,6 +1651,18 @@ async function userReportProxy(
       cancelUpstream(upstream);
       return userReportNotFound();
     }
+    if (upstream.status === 429) {
+      const headers: Record<string, string> = { "cache-control": "no-store" };
+      const retryAfter = upstream.headers.get("retry-after");
+      if (retryAfter && /^\d+$/.test(retryAfter)) {
+        headers["retry-after"] = retryAfter;
+      }
+      cancelUpstream(upstream);
+      return Response.json(
+        { detail: { code: "report_rate_limited" } },
+        { status: 429, headers }
+      );
+    }
     if ((route.kind === "request" || route.kind === "correction") && upstream.status === 409) {
       cancelUpstream(upstream);
       return Response.json(
@@ -1648,13 +1678,9 @@ async function userReportProxy(
     }
     if (
       (route.kind === "request" || route.kind === "correction") &&
-      [413, 415, 422, 429].includes(upstream.status)
+      [413, 415, 422].includes(upstream.status)
     ) {
       const headers: Record<string, string> = { "cache-control": "no-store" };
-      const retryAfter = upstream.headers.get("retry-after");
-      if (upstream.status === 429 && retryAfter && /^\d+$/.test(retryAfter)) {
-        headers["retry-after"] = retryAfter;
-      }
       cancelUpstream(upstream);
       return Response.json(
         {

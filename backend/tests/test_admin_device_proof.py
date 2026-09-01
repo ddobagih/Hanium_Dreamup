@@ -11,6 +11,8 @@ from types import SimpleNamespace
 from typing import Any
 import uuid
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import FastAPI
@@ -66,6 +68,13 @@ SESSION_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
 CHALLENGE_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
 CORRELATION_ID = uuid.UUID("33333333-3333-4333-8333-333333333333")
 REPORT_ID = "44444444-4444-4444-8444-444444444444"
+
+
+def _repository_alembic_head() -> str:
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    head = ScriptDirectory.from_config(config).get_current_head()
+    assert head is not None
+    return head
 
 
 def _private_key() -> ec.EllipticCurvePrivateKey:
@@ -1088,7 +1097,7 @@ def test_postgres_expired_recovery_proof_reaches_real_cleanup_route(
             assert "test" in database_name.lower()
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608290011"
+            ).scalar_one() == _repository_alembic_head()
 
         with owner_sessions() as db:
             provision_admin_security(
@@ -1727,14 +1736,14 @@ def test_workflow_post_requires_standard_session_proof_and_replays_exact_chunks(
         path=path,
         messages=messages,
         headers=headers,
-        query=b"z=&a=1&a=0",
+        query=b"",
     )
 
     assert sent[0]["status"] == 204
     assert verifier[0]["expected_action"] == action
     assert verifier[0]["expected_read_purpose"] is None
     assert verifier[0]["raw_body"] == body
-    assert verifier[0]["raw_query_string"] == b"z=&a=1&a=0"
+    assert verifier[0]["raw_query_string"] == b""
     assert downstream[0]["authorization"]["high_risk_action"] is None
     assert downstream[0]["authorization"]["reconfirmation_nonce"] == ""
     assert downstream[1]["raw_body"] == body
@@ -1743,6 +1752,77 @@ def test_workflow_post_requires_standard_session_proof_and_replays_exact_chunks(
         downstream[1]["state"]["admin_device_proof"],
         VerifiedAdminDeviceProof,
     )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        f"/reports/{REPORT_ID}/original-access-grants",
+        f"/reports/{REPORT_ID}/review-decisions",
+        f"/reports/{REPORT_ID}/deliveries",
+        f"/admin/reports/{REPORT_ID}/delivery-packages",
+    ],
+)
+def test_admin_report_mutations_reject_query_before_consuming_proof(path: str) -> None:
+    verifier, _downstream, sent = _run_middleware(
+        method="POST",
+        path=path,
+        messages=[{"type": "http.request", "body": b"{}", "more_body": False}],
+        headers=_headers(),
+        query=b"ignored=true",
+    )
+
+    assert verifier == []
+    assert sent[0]["status"] == 422
+    assert json.loads(sent[1]["body"])["detail"]["code"] == (
+        "admin_device_proof_binding_invalid"
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/reports/ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF/original-access-grants",
+        "/reports/ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF/review-decisions",
+        "/reports/ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF/deliveries",
+        "/admin/reports/ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF/delivery-packages",
+    ],
+)
+def test_admin_report_mutations_reject_noncanonical_uuid_path(path: str) -> None:
+    verifier, _downstream, sent = _run_middleware(
+        method="POST",
+        path=path,
+        messages=[{"type": "http.request", "body": b"{}", "more_body": False}],
+        headers=_headers(),
+    )
+
+    assert verifier == []
+    assert sent[0]["status"] == 422
+    assert json.loads(sent[1]["body"])["detail"]["code"] == (
+        "admin_device_proof_binding_invalid"
+    )
+
+
+@pytest.mark.parametrize("size", [65_536, 65_537])
+def test_admin_report_mutation_body_limit_matches_database_claim(size: int) -> None:
+    body = b'{"reason":"ok"}' + b" " * (size - len(b'{"reason":"ok"}'))
+    verifier, downstream, sent = _run_middleware(
+        method="POST",
+        path=f"/reports/{REPORT_ID}/review-decisions",
+        messages=[{"type": "http.request", "body": body, "more_body": False}],
+        headers=_headers() + [(b"content-length", str(size).encode())],
+    )
+
+    if size == 65_536:
+        assert sent[0]["status"] == 204
+        assert len(verifier) == 1
+        assert downstream[-1]["raw_body"] == body
+    else:
+        assert verifier == []
+        assert sent[0]["status"] == 413
+        assert json.loads(sent[1]["body"])["detail"]["code"] == (
+            "request_body_too_large"
+        )
 
 
 def test_signed_custody_request_reaches_middleware_route_and_service() -> None:
@@ -2358,6 +2438,9 @@ def test_wave5_admin_report_actions_are_registered_high_risk_operations() -> Non
     package = classify_admin_operation(
         "POST", f"/admin/reports/{REPORT_ID}/delivery-packages"
     )
+    original = classify_admin_operation(
+        "POST", f"/reports/{REPORT_ID}/original-access-grants"
+    )
 
     assert status is not None
     assert (status.action, status.risk) == ("admin.report.status.update", "HIGH")
@@ -2366,11 +2449,19 @@ def test_wave5_admin_report_actions_are_registered_high_risk_operations() -> Non
         "admin.report.delivery_package.create",
         "HIGH",
     )
+    assert original is not None
+    assert (original.action, original.risk) == ("report.original.grant", "HIGH")
     assert is_admin_device_proof_workflow_request(
         "PATCH", f"/admin/reports/{REPORT_ID}/status"
     )
     assert is_admin_device_proof_workflow_request(
         "POST", f"/admin/reports/{REPORT_ID}/delivery-packages"
+    )
+    assert is_admin_device_proof_workflow_request(
+        "POST", f"/reports/{REPORT_ID}/original-access-grants"
+    )
+    assert not is_admin_device_proof_workflow_request(
+        "GET", f"/reports/{REPORT_ID}/original-access-grants"
     )
     assert is_admin_device_proof_workflow_request("GET", "/admin/reports/audits")
     assert not is_admin_device_proof_workflow_request(

@@ -61,6 +61,7 @@ from backend.app.services.report_user_requests import (
     create_report_user_request,
     decode_cursor,
     encode_cursor,
+    get_owned_report_user_request,
     get_owned_user_report,
     latest_request_summaries,
     project_admin_request_detail,
@@ -538,6 +539,60 @@ def create_router(settings: Settings) -> APIRouter:
                 headers=_NO_STORE,
             ) from exc
         response.status_code = 201 if created else 200
+        return ReportUserRequestSummaryV1(
+            request_id=item.id,
+            request_type=item.request_type,
+            status=item.status,
+            status_version=item.status_version,
+            public_response=item.public_response,
+            created_at=item.created_at,
+            updated_at=item.updated_at,
+        )
+
+    @router.get(
+        "/reports/mine/{report_id}/requests/{request_id}",
+        response_model=ReportUserRequestSummaryV1,
+    )
+    def get_my_report_request(
+        report_id: str,
+        request_id: str,
+        request: Request,
+        response: Response,
+        x_walksafe_actor_id: str = Header(alias="x-walksafe-actor-id"),
+        x_walksafe_account_generation: str = Header(
+            alias="x-walksafe-account-generation"
+        ),
+        db: Session = Depends(get_db),
+    ) -> ReportUserRequestSummaryV1:
+        response.headers.update(_NO_STORE)
+        if request.query_params:
+            _not_found()
+        parsed_report_id = _canonical_uuid(report_id)
+        parsed_request_id = _canonical_uuid(request_id)
+        _actor, generation, subject = _field_binding(
+            request,
+            settings,
+            actor_id=x_walksafe_actor_id,
+            account_generation=x_walksafe_account_generation,
+        )
+        try:
+            item = get_owned_report_user_request(
+                db,
+                report_id=parsed_report_id,
+                request_id=parsed_request_id,
+                privacy_subject=subject,
+                account_generation=generation,
+            )
+        except ReportUserRequestError:
+            db.rollback()
+            _not_found()
+        except SQLAlchemyError as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "report_user_view_unavailable"},
+                headers=_NO_STORE,
+            ) from exc
         return ReportUserRequestSummaryV1(
             request_id=item.id,
             request_type=item.request_type,

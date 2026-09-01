@@ -16,7 +16,7 @@ import json
 import re
 from secrets import compare_digest
 from time import time
-from typing import Any
+from typing import Any, NoReturn
 
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.responses import JSONResponse
@@ -106,6 +106,7 @@ REPORT_TRANSPORT_STATUS_TEMPLATE = "/reports/v2/{report_id}/status"
 USER_REPORT_LIST_TEMPLATE = "/reports/mine"
 USER_REPORT_DETAIL_TEMPLATE = "/reports/mine/{report_id}"
 USER_REPORT_REQUEST_TEMPLATE = "/reports/mine/{report_id}/requests"
+USER_REPORT_REQUEST_DETAIL_TEMPLATE = "/reports/mine/{report_id}/requests/{request_id}"
 USER_REPORT_CONTENT_TEMPLATE = "/reports/mine/{report_id}/content"
 USER_REPORT_CORRECTION_TEMPLATE = "/reports/mine/{report_id}/corrections"
 USER_REPORT_DELETION_STATUS_TEMPLATE = "/reports/mine/deletions/{request_id}"
@@ -116,6 +117,9 @@ USER_REPORT_DETAIL_PATH = re.compile(
 USER_REPORT_REQUEST_PATH = re.compile(
     r"^/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
     r"[0-9a-f]{4}-[0-9a-f]{12}/requests$"
+)
+USER_REPORT_REQUEST_DETAIL_PATH = re.compile(
+    r"^/reports/mine/[^/]+/requests/[^/]+$"
 )
 USER_REPORT_CONTENT_PATH = re.compile(
     r"^/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
@@ -137,11 +141,16 @@ def _user_report_route(path: str, method: str) -> bool:
         (path == USER_REPORT_LIST_TEMPLATE and normalized == "GET")
         or (path == USER_REPORT_DETAIL_TEMPLATE and normalized == "GET")
         or (path == USER_REPORT_REQUEST_TEMPLATE and normalized == "POST")
+        or (path == USER_REPORT_REQUEST_DETAIL_TEMPLATE and normalized == "GET")
         or (path == USER_REPORT_CONTENT_TEMPLATE and normalized == "GET")
         or (path == USER_REPORT_CORRECTION_TEMPLATE and normalized == "POST")
         or (path == USER_REPORT_DELETION_STATUS_TEMPLATE and normalized == "GET")
         or (USER_REPORT_DETAIL_PATH.fullmatch(path) is not None and normalized == "GET")
         or (USER_REPORT_REQUEST_PATH.fullmatch(path) is not None and normalized == "POST")
+        or (
+            USER_REPORT_REQUEST_DETAIL_PATH.fullmatch(path) is not None
+            and normalized == "GET"
+        )
         or (USER_REPORT_CONTENT_PATH.fullmatch(path) is not None and normalized == "GET")
         or (USER_REPORT_CORRECTION_PATH.fullmatch(path) is not None and normalized == "POST")
         or (
@@ -179,6 +188,15 @@ ADMIN_DEVICE_PROOF_PUBLIC_AUTH_ROUTES = {
     ("POST", "/admin/security/sessions"): "LOGIN",
     ("POST", "/admin/security/recovery/complete"): "RECOVERY_COMPLETE",
 }
+_ADMIN_REPORT_MUTATION_BODY_ACTIONS = frozenset(
+    {
+        "report.original.grant",
+        "report.review.decide",
+        "admin.report.delivery_package.create",
+        "report.delivery.create",
+    }
+)
+ADMIN_REPORT_MUTATION_MAX_BODY_BYTES = 65_536
 ACCOUNT_GATEWAY_ROUTES = frozenset(
     {
         ("POST", "/account-enrollments/email-otp"),
@@ -630,10 +648,22 @@ def _strict_json_object(raw_body: bytes) -> dict[str, Any]:
             value[key] = item
         return value
 
+    def parse_bounded_integer(value: str) -> int:
+        parsed = int(value)
+        if not -(2**63) <= parsed <= 2**63 - 1:
+            raise ValueError("JSON integer exceeds the database range")
+        return parsed
+
+    def reject_non_integer_number(_value: str) -> NoReturn:
+        raise ValueError("non-integer JSON numbers are not accepted")
+
     try:
         parsed = json.loads(
             raw_body.decode("utf-8"),
             object_pairs_hook=reject_duplicate_keys,
+            parse_int=parse_bounded_integer,
+            parse_float=reject_non_integer_number,
+            parse_constant=reject_non_integer_number,
         )
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         raise AdminSecurityError(
@@ -647,6 +677,27 @@ def _strict_json_object(raw_body: bytes) -> dict[str, Any]:
             "The administrator device proof request body is invalid.",
             status_code=422,
         )
+
+    def reject_database_incompatible_text(value: Any) -> None:
+        if isinstance(value, str):
+            if "\x00" in value or any(
+                0xD800 <= ord(character) <= 0xDFFF for character in value
+            ):
+                raise AdminSecurityError(
+                    "admin_device_proof_binding_invalid",
+                    "The administrator device proof request body is invalid.",
+                    status_code=422,
+                )
+            return
+        if isinstance(value, dict):
+            for key, item in value.items():
+                reject_database_incompatible_text(key)
+                reject_database_incompatible_text(item)
+        elif isinstance(value, list):
+            for item in value:
+                reject_database_incompatible_text(item)
+
+    reject_database_incompatible_text(parsed)
     return parsed
 
 
@@ -1382,14 +1433,33 @@ class FieldTestSecurityMiddleware:
                     challenge_id, signature, correlation_id = _device_proof_headers(
                         scope
                     )
-                    max_bytes = max_request_body_bytes(self.settings)
+                    normalized_method = method.upper()
+                    operation = classify_admin_operation(normalized_method, path)
+                    is_admin_report_mutation = (
+                        operation is not None
+                        and operation.action in _ADMIN_REPORT_MUTATION_BODY_ACTIONS
+                    )
+                    max_bytes = (
+                        min(
+                            max_request_body_bytes(self.settings),
+                            ADMIN_REPORT_MUTATION_MAX_BODY_BYTES,
+                        )
+                        if is_admin_report_mutation
+                        else max_request_body_bytes(self.settings)
+                    )
                     raw_body, receive = await _capture_request_body(
                         scope,
                         receive,
                         max_bytes=max_bytes,
                     )
-                    normalized_method = method.upper()
-                    operation = classify_admin_operation(normalized_method, path)
+                    if is_admin_report_mutation:
+                        if path != path.lower() or scope.get("query_string", b""):
+                            raise AdminSecurityError(
+                                "admin_device_proof_binding_invalid",
+                                "The administrator device proof request target is invalid.",
+                                status_code=422,
+                            )
+                        _strict_json_object(raw_body)
                     proof = await asyncio.to_thread(
                         self.admin_device_proof_verifier,
                         self.settings,

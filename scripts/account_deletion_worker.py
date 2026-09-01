@@ -803,6 +803,22 @@ def _validate_raw_journal_inventory(
         storage_name = item.get("storage_name")
         envelope_sha256 = item.get("envelope_sha256")
         envelope_size = item.get("envelope_size")
+        quarantine_expires_at = item.get("quarantine_expires_at")
+        if (
+            "quarantine_expires_at" not in item
+            or (item.get("state") == "QUARANTINED")
+            != (quarantine_expires_at is not None)
+        ):
+            raise AccountDeletionWorkerError(
+                "worker raw journal inventory is invalid"
+            )
+        if quarantine_expires_at is not None:
+            try:
+                _parse_time(quarantine_expires_at)
+            except (AccountDeletionWorkerError, ValueError) as exc:
+                raise AccountDeletionWorkerError(
+                    "worker raw journal inventory is invalid"
+                ) from exc
         if storage_name is None:
             if envelope_sha256 is not None or envelope_size is not None:
                 raise AccountDeletionWorkerError(
@@ -1485,6 +1501,11 @@ def _raw_inventory(
                 if collection.retention_expires_at
                 else None
             ),
+            "quarantine_expires_at": (
+                _iso(collection.quarantine_expires_at)
+                if collection.quarantine_expires_at
+                else None
+            ),
             "receipt_sha256": receipt.receipt_sha256 if receipt is not None else None,
             "storage_name": metadata.storage_name if metadata is not None else None,
             "envelope_sha256": (
@@ -1962,6 +1983,7 @@ def _final_manifest(journal: Mapping[str, object]) -> dict[str, object]:
                 "retention_class": str(item["retention_class"]),
                 "committed_at": item["committed_at"],
                 "retention_expires_at": item["retention_expires_at"],
+                "quarantine_expires_at": item["quarantine_expires_at"],
                 "receipt_sha256": item["receipt_sha256"],
                 "storage_name": item["storage_name"],
                 "envelope_sha256": item["envelope_sha256"],

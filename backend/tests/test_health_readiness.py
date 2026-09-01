@@ -144,10 +144,11 @@ def test_rate_limit_group_constraint_catalog_drift_is_rejected(
 
 
 @pytest.mark.parametrize(
-    ("rows", "expected"),
+    ("rows", "boundary_ready", "expected"),
     [
         (
             [_rate_group_constraint_row()],
+            True,
             {
                 "ready": True,
                 "current_revision": health_api.EXPECTED_ALEMBIC_HEAD,
@@ -155,18 +156,29 @@ def test_rate_limit_group_constraint_catalog_drift_is_rejected(
         ),
         (
             [],
+            True,
             {
                 "ready": False,
                 "reason": "actor_rate_limit_group_constraint_invalid",
                 "current_revision": health_api.EXPECTED_ALEMBIC_HEAD,
             },
         ),
+        (
+            [_rate_group_constraint_row()],
+            False,
+            {
+                "ready": False,
+                "reason": "admin_report_integrity_boundary_invalid",
+                "current_revision": health_api.EXPECTED_ALEMBIC_HEAD,
+            },
+        ),
     ],
-    ids=["exact", "missing"],
+    ids=["exact", "rate-group-missing", "admin-boundary-drift"],
 )
 def test_database_readiness_wires_the_rate_limit_catalog_result(
     monkeypatch: pytest.MonkeyPatch,
     rows: list[dict[str, object]],
+    boundary_ready: bool,
     expected: dict[str, object],
 ) -> None:
     statements: list[str] = []
@@ -177,6 +189,9 @@ def test_database_readiness_wires_the_rate_limit_catalog_result(
             self.scalar = scalar
 
         def scalar_one_or_none(self) -> object:
+            return self.scalar
+
+        def scalar_one(self) -> object:
             return self.scalar
 
         def mappings(self) -> FakeResult:
@@ -191,6 +206,8 @@ def test_database_readiness_wires_the_rate_limit_catalog_result(
             statements.append(rendered)
             if "SELECT version_num FROM alembic_version" in rendered:
                 return FakeResult(scalar=health_api.EXPECTED_ALEMBIC_HEAD)
+            if "walksafe_admin_report_integrity_boundary" in rendered:
+                return FakeResult(scalar=boundary_ready)
             return FakeResult()
 
     class FakeTransaction:

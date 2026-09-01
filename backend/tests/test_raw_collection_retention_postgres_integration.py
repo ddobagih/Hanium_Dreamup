@@ -55,7 +55,12 @@ def test_exact_expiry_deletes_parent_cascade_and_bound_file(
         before_stat = encrypted_path.stat()
         with SessionFactory() as db:
             expires_at = db.scalar(
-                select(RawCollection.retention_expires_at).where(
+                select(
+                    func.coalesce(
+                        RawCollection.retention_expires_at,
+                        RawCollection.quarantine_expires_at,
+                    )
+                ).where(
                     RawCollection.collection_id == collection_id
                 )
             )
@@ -134,7 +139,12 @@ def test_precommit_crash_reconcile_restores_exact_file_and_parent(
     try:
         with SessionFactory() as db:
             expires_at = db.scalar(
-                select(RawCollection.retention_expires_at).where(
+                select(
+                    func.coalesce(
+                        RawCollection.retention_expires_at,
+                        RawCollection.quarantine_expires_at,
+                    )
+                ).where(
                     RawCollection.collection_id == collection_id
                 )
             )
@@ -183,7 +193,12 @@ def test_postcommit_crash_reconcile_finishes_cleanup_and_receipt(
     try:
         with SessionFactory() as db:
             expires_at = db.scalar(
-                select(RawCollection.retention_expires_at).where(
+                select(
+                    func.coalesce(
+                        RawCollection.retention_expires_at,
+                        RawCollection.quarantine_expires_at,
+                    )
+                ).where(
                     RawCollection.collection_id == collection_id
                 )
             )

@@ -25,7 +25,7 @@ _UNSAFE_DOWNGRADE_SQL = """
 DO $$
 BEGIN
   IF EXISTS (
-    SELECT 1 FROM public.raw_collections WHERE state = 'COMMITTED'
+    SELECT 1 FROM public.raw_collections WHERE receipt_sha256 IS NOT NULL
   ) THEN
     RAISE EXCEPTION
       'cannot downgrade B1c while committed raw collection receipts exist'

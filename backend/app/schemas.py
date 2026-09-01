@@ -616,11 +616,33 @@ class AdminReportReviewSummaryV1(BaseModel):
     decided_at: AwareDatetime
 
 
+class AdminReportReviewSummaryV2(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    revision: int = Field(ge=1)
+    decision: ReportReviewDecisionValue
+    user_visible_reason: str | None = Field(min_length=1, max_length=500)
+    duplicate_of_report_id: uuid.UUID | None
+    location_reviewed: bool
+    photo_reviewed: bool
+    privacy_reviewed: bool
+    decided_at: AwareDatetime
+
+
 class AdminReportDeliverySummaryV1(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     revision: int = Field(ge=1)
-    package_revision: int | None = Field(default=None, ge=1)
+    package_id: uuid.UUID
+    package_revision: int = Field(ge=1)
+    package_content_revision: int = Field(ge=0)
+    package_schema_version: str = Field(min_length=1, max_length=64)
+    package_version: int = Field(ge=1)
+    export_audit_id: uuid.UUID
+    package_sha256: Sha256LowerHex
+    csv_sha256: Sha256LowerHex
+    manifest_sha256: Sha256LowerHex
+    package_byte_count: int = Field(gt=0)
     status: ReportInstitutionDeliveryStatus
     external_receipt_present: bool
     evidence_present: bool
@@ -638,23 +660,35 @@ class AdminReportCapabilitiesV1(BaseModel):
     delivery_packages_path: str | None = Field(default=None, min_length=1, max_length=512)
 
 
-class AdminReportDetailV1(BaseModel):
+class AdminReportCapabilitiesV2(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["walksafe.admin-report-detail.v1"]
+    review_decisions_path: str = Field(min_length=1, max_length=512)
+    deliveries_path: str = Field(min_length=1, max_length=512)
+    original_access_grants_path: str = Field(min_length=1, max_length=512)
+    status_path: str = Field(min_length=1, max_length=512)
+    delivery_packages_path: str = Field(min_length=1, max_length=512)
+
+
+class AdminReportDetailV2(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-report-detail.v2"]
     id: uuid.UUID
     status: ReportStatus
-    status_version: int = Field(default=1, ge=1)
-    allowed_next_statuses: List[ReportStatus] = Field(default_factory=list, max_length=2)
+    status_version: int = Field(ge=1)
+    content_revision: int = Field(ge=0)
+    latest_delivery_revision: int = Field(ge=0)
+    allowed_next_statuses: List[ReportStatus] = Field(max_length=2)
     class_name: ClassName
     confidence: float = Field(ge=0, le=1, allow_inf_nan=False)
     location_quality: LocationQuality
     captured_at: AwareDatetime
     created_at: AwareDatetime
     updated_at: AwareDatetime
-    current_review: AdminReportReviewSummaryV1 | None
+    current_review: AdminReportReviewSummaryV2 | None
     current_delivery: AdminReportDeliverySummaryV1 | None
-    capabilities: AdminReportCapabilitiesV1
+    capabilities: AdminReportCapabilitiesV2
 
 
 class AdminReportStatusUpdateV1(BaseModel):
@@ -675,6 +709,25 @@ class AdminReportStatusV1(BaseModel):
     status_version: int = Field(ge=1)
     allowed_next_statuses: List[ReportStatus] = Field(max_length=2)
     updated_at: AwareDatetime
+
+
+class AdminReportPackageCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_content_revision: int = Field(ge=0, strict=True)
+    expected_review_revision: int = Field(ge=1, strict=True)
+
+
+class AdminReportDeliveryPackageProofV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.admin-report-delivery-package-proof.v1"]
+    package_revision: int = Field(ge=1)
+    content_revision: int = Field(ge=0)
+    review_revision: int = Field(ge=1)
+    package_schema_version: Literal["walksafe.admin-report-delivery-package.v2"]
+    package_byte_count: int = Field(gt=0)
+    package_sha256: Sha256LowerHex
 
 
 class AdminIncidentSummaryV1(BaseModel):
@@ -824,6 +877,7 @@ class ReportOriginalAccessGrantRequest(BaseModel):
 
     purpose: ReportOriginalAccessPurpose
     reason: str = Field(min_length=8, max_length=500)
+    expected_content_revision: int = Field(ge=0, strict=True)
 
     @field_validator("reason")
     @classmethod
@@ -834,13 +888,37 @@ class ReportOriginalAccessGrantRequest(BaseModel):
         return normalized
 
 
+class ReportOriginalAccessExactLocation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lat: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    lon: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    accuracy: float | None = Field(ge=0, allow_inf_nan=False)
+
+
+class ReportOriginalAccessImage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    resource_path: str = Field(min_length=1, max_length=255)
+    content_type: Literal["image/jpeg", "image/png", "image/webp"]
+    sha256: Sha256LowerHex
+    byte_count: int = Field(gt=0)
+    access_token: str = Field(
+        min_length=43,
+        max_length=43,
+        pattern=r"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+    )
+
+
 class ReportOriginalAccessGrantResponse(BaseModel):
-    schema_version: Literal["walksafe.report-original-access-grant.v1"]
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.report-original-access-grant.v2"]
     grant_id: uuid.UUID
-    report_id: uuid.UUID
-    purpose: ReportOriginalAccessPurpose
-    access_token: str
+    content_revision: int = Field(ge=0)
     expires_at: AwareDatetime
+    exact_location: ReportOriginalAccessExactLocation
+    image: ReportOriginalAccessImage
 
 
 class ReportReviewDecisionRequest(BaseModel):
@@ -854,6 +932,24 @@ class ReportReviewDecisionRequest(BaseModel):
     photo_reviewed: bool = Field(strict=True)
     privacy_reviewed: bool = Field(strict=True)
     content_revision: int = Field(default=0, ge=0, strict=True)
+    evidence_grant_id: uuid.UUID | None = None
+
+    @field_validator(
+        "duplicate_of_report_id", "evidence_grant_id", mode="before"
+    )
+    @classmethod
+    def require_canonical_review_uuid(cls, value: object) -> object:
+        if value is None or isinstance(value, uuid.UUID):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("review UUID must be canonical")
+        try:
+            parsed = uuid.UUID(value)
+        except ValueError as exc:
+            raise ValueError("review UUID must be canonical") from exc
+        if str(parsed) != value:
+            raise ValueError("review UUID must be canonical")
+        return parsed
 
     @model_validator(mode="after")
     def validate_decision_evidence(self) -> "ReportReviewDecisionRequest":
@@ -868,11 +964,15 @@ class ReportReviewDecisionRequest(BaseModel):
                 and self.privacy_reviewed
             ):
                 raise ValueError("APPROVED decisions require every review check")
+            if self.evidence_grant_id is None:
+                raise ValueError("APPROVED decisions require evidence_grant_id")
         elif self.decision == "DUPLICATE":
             if self.duplicate_of_report_id is None:
                 raise ValueError("DUPLICATE decisions require duplicate_of_report_id")
         elif self.duplicate_of_report_id is not None:
             raise ValueError("REJECTED decisions cannot reference a duplicate report")
+        if self.decision != "APPROVED" and self.evidence_grant_id is not None:
+            raise ValueError("Only APPROVED decisions can reference evidence_grant_id")
         if self.decision in {"REJECTED", "DUPLICATE"} and self.user_visible_reason is None:
             raise ValueError("REJECTED and DUPLICATE decisions require a user-visible reason")
         return self
