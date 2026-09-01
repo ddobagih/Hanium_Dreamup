@@ -43,6 +43,7 @@ def test_only_known_predecessors_may_use_legacy_compatibility(
     assert ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS == {
         "202608300005",
         "202608300006",
+        "202609010001",
     }
 
 
@@ -61,7 +62,7 @@ def test_known_successor_still_queries_the_head005_boundary() -> None:
     assert (
         admin_report_integrity_boundary_state(
             BoundaryExecutor(),
-            revision="202608300006",
+            revision="202609010001",
         )
         is True
     )

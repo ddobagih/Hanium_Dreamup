@@ -8562,6 +8562,129 @@
         "title": "UserReportListPageV1",
         "type": "object"
       },
+      "UserReportRequestHistoryItemV1": {
+        "additionalProperties": false,
+        "properties": {
+          "deletion_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportDeletionStatusV2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report_id": {
+            "format": "uuid",
+            "title": "Report Id",
+            "type": "string"
+          },
+          "request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportUserRequestSummaryV1"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "revision": {
+            "maximum": 9007199254740991.0,
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "ACTIVE_REQUEST",
+              "DELETION_TOMBSTONE"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "source",
+          "report_id",
+          "request_id",
+          "request",
+          "deletion_status"
+        ],
+        "title": "UserReportRequestHistoryItemV1",
+        "type": "object"
+      },
+      "UserReportRequestHistoryPageV1": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UserReportRequestHistoryItemV1"
+            },
+            "maxItems": 25,
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "report_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Id"
+          },
+          "schema_version": {
+            "const": "walksafe.user-report-request-history-page.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "snapshot_revision": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Snapshot Revision",
+            "type": "integer"
+          },
+          "total_count": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Total Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "report_id",
+          "snapshot_revision",
+          "total_count",
+          "items"
+        ],
+        "title": "UserReportRequestHistoryPageV1",
+        "type": "object"
+      },
       "UserReportSummaryV1": {
         "additionalProperties": false,
         "properties": {
@@ -16138,6 +16261,114 @@
           }
         ],
         "summary": "Get My Report Deletion",
+        "x-walksafe-actor-identity-required": true,
+        "x-walksafe-required-role": "field"
+      }
+    },
+    "/reports/mine/requests/history": {
+      "get": {
+        "operationId": "list_my_report_request_history_reports_mine_requests_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "report_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 36,
+                  "minLength": 36,
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Report Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-walksafe-actor-id",
+            "required": true,
+            "schema": {
+              "title": "X-Walksafe-Actor-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-walksafe-account-generation",
+            "required": true,
+            "schema": {
+              "title": "X-Walksafe-Account-Generation",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserReportRequestHistoryPageV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAccountGeneration": [],
+            "WalkSafeActorAssertion": [],
+            "WalkSafeActorId": [],
+            "WalkSafeFieldToken": []
+          }
+        ],
+        "summary": "List My Report Request History",
         "x-walksafe-actor-identity-required": true,
         "x-walksafe-required-role": "field"
       }

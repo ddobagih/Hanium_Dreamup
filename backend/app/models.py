@@ -1311,6 +1311,14 @@ class ReportUserRequest(Base):
             name="ck_report_user_requests_status_version",
         ),
         CheckConstraint(
+            "discovery_revision BETWEEN 1 AND 9007199254740991",
+            name="ck_report_user_requests_discovery_revision",
+        ),
+        UniqueConstraint(
+            "discovery_revision",
+            name="uq_report_user_requests_discovery_revision",
+        ),
+        CheckConstraint(
             "public_response IS NULL OR length(public_response) BETWEEN 1 AND 500",
             name="ck_report_user_requests_public_response",
         ),
@@ -1342,6 +1350,13 @@ class ReportUserRequest(Base):
     intent_sha256 = Column(String(64), nullable=False)
     status = Column(String(16), nullable=False, default="RECEIVED")
     status_version = Column(BigInteger, nullable=False, default=1)
+    discovery_revision = Column(
+        BigInteger,
+        nullable=False,
+        server_default=text(
+            "nextval('public.report_user_request_discovery_revision_seq'::regclass)"
+        ),
+    )
     public_response = Column(String(500), nullable=True)
     internal_note = Column(String(500), nullable=True)
     created_at = Column(
@@ -1497,6 +1512,14 @@ class ReportDeletionTombstone(Base):
             "request_status_version >= 1 AND external_copy_count >= 0",
             name="ck_report_deletion_tombstones_counts",
         ),
+        CheckConstraint(
+            "discovery_revision BETWEEN 1 AND 9007199254740991",
+            name="ck_report_deletion_tombstones_discovery_revision",
+        ),
+        UniqueConstraint(
+            "discovery_revision",
+            name="uq_report_deletion_tombstones_discovery_revision",
+        ),
         Index(
             "ix_report_deletion_tombstones_subject_deleted_at",
             "privacy_subject_hmac",
@@ -1511,6 +1534,13 @@ class ReportDeletionTombstone(Base):
     privacy_subject_hmac = Column(String(64), nullable=False)
     account_generation = Column(BigInteger, nullable=False)
     request_status_version = Column(BigInteger, nullable=False)
+    discovery_revision = Column(
+        BigInteger,
+        nullable=False,
+        server_default=text(
+            "nextval('public.report_user_request_discovery_revision_seq'::regclass)"
+        ),
+    )
     external_copy_count = Column(BigInteger, nullable=False, default=0)
     deleted_at = Column(
         DateTime(timezone=True),

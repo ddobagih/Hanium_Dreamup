@@ -506,6 +506,7 @@ def test_user_can_retrieve_each_request_and_observe_admin_status_immediately() -
         now=CREATED_AT,
     )
     assert first_created is second_created is True
+    assert "pg_advisory_xact_lock_shared" in str(db.statements[0])
     client = _owned_request_client(db)
     headers = {
         "x-walksafe-actor-id": "field@example.com",
@@ -871,6 +872,7 @@ def test_admin_list_projection_does_not_select_request_or_internal_text() -> Non
 def test_field_and_admin_security_contracts_are_route_exact() -> None:
     field_routes = (
         ("GET", "/reports/mine"),
+        ("GET", "/reports/mine/requests/history"),
         ("GET", f"/reports/mine/{REPORT_ID}"),
         ("POST", f"/reports/mine/{REPORT_ID}/requests"),
         ("GET", f"/reports/mine/{REPORT_ID}/requests/{REQUEST_ID}"),

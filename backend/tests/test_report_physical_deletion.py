@@ -33,6 +33,7 @@ def test_deletion_tombstone_has_no_report_content_location_or_photo_columns() ->
         "privacy_subject_hmac",
         "account_generation",
         "request_status_version",
+        "discovery_revision",
         "external_copy_count",
         "deleted_at",
     }

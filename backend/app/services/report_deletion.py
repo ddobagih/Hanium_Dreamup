@@ -186,6 +186,7 @@ def get_owned_report_deletion_status(
         select(
             ReportUserRequest.id.label("request_id"),
             ReportUserRequest.report_id,
+            ReportUserRequest.status.label("request_status"),
             ReportUserRequest.status_version.label("request_status_version"),
             ReportUserRequest.updated_at,
         )
@@ -199,9 +200,7 @@ def get_owned_report_deletion_status(
     ).one_or_none()
     if row is None:
         raise _not_found()
-    request_status = db.scalar(
-        select(ReportUserRequest.status).where(ReportUserRequest.id == request_id)
-    )
+    request_status = row.request_status
     if request_status == "RESOLVED":
         raise ReportDeletionError(
             "report_deletion_effect_missing",
@@ -403,6 +402,7 @@ def apply_report_deletion(
         select(
             ReportUserRequest.id.label("request_id"),
             ReportUserRequest.status_version.label("request_status_version"),
+            ReportUserRequest.discovery_revision,
             Report.id.label("report_id"),
             Report.privacy_subject_hmac,
             Report.account_generation,
@@ -461,6 +461,7 @@ def apply_report_deletion(
         privacy_subject_hmac=row.privacy_subject_hmac,
         account_generation=row.account_generation,
         request_status_version=row.request_status_version,
+        discovery_revision=row.discovery_revision,
         external_copy_count=len(external_rows),
         deleted_at=deleted_at,
     )

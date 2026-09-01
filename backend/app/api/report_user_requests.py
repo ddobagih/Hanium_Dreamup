@@ -35,6 +35,7 @@ from backend.app.schemas import (
     ReportUserStatus,
     UserReportDetailV1,
     UserReportListPageV1,
+    UserReportRequestHistoryPageV1,
 )
 from backend.app.services.report_content_corrections import (
     ReportContentCorrectionError,
@@ -84,6 +85,12 @@ from backend.app.services.report_user_requests import (
     user_report_filter_digest,
     user_report_statement,
 )
+from backend.app.services.report_user_request_history import (
+    USER_REQUEST_HISTORY_DEFAULT_LIMIT,
+    USER_REQUEST_HISTORY_MAX_LIMIT,
+    UserReportRequestHistoryError,
+    list_owned_report_request_history,
+)
 
 
 _ACTOR_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
@@ -99,6 +106,7 @@ _ADMIN_EXTERNAL_COPY_LIST_QUERY_FIELDS = frozenset(
     {"limit", "cursor", "request_id"}
 )
 _USER_LIST_QUERY_FIELDS = frozenset({"limit", "cursor", "user_status"})
+_USER_REQUEST_HISTORY_QUERY_FIELDS = frozenset({"limit", "cursor", "report_id"})
 
 
 def _not_found() -> None:
@@ -492,6 +500,87 @@ def create_router(settings: Settings) -> APIRouter:
             items=items,
             next_cursor=next_cursor,
         )
+
+    @router.get(
+        "/reports/mine/requests/history",
+        response_model=UserReportRequestHistoryPageV1,
+    )
+    def list_my_report_request_history(
+        request: Request,
+        response: Response,
+        limit: int = Query(
+            default=USER_REQUEST_HISTORY_DEFAULT_LIMIT,
+            ge=1,
+            le=USER_REQUEST_HISTORY_MAX_LIMIT,
+        ),
+        cursor: str | None = Query(
+            default=None,
+            min_length=1,
+            max_length=1024,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+        report_id: str | None = Query(
+            default=None,
+            min_length=36,
+            max_length=36,
+            pattern=(
+                r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+                r"[0-9a-f]{4}-[0-9a-f]{12}$"
+            ),
+        ),
+        x_walksafe_actor_id: str = Header(alias="x-walksafe-actor-id"),
+        x_walksafe_account_generation: str = Header(
+            alias="x-walksafe-account-generation"
+        ),
+        db: Session = Depends(get_db),
+    ) -> UserReportRequestHistoryPageV1:
+        response.headers.update(_NO_STORE)
+        _actor, generation, subject = _field_binding(
+            request,
+            settings,
+            actor_id=x_walksafe_actor_id,
+            account_generation=x_walksafe_account_generation,
+        )
+        if not _query_shape(request, _USER_REQUEST_HISTORY_QUERY_FIELDS):
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "report_request_history_query_invalid"},
+                headers=_NO_STORE,
+            )
+        parsed_report_id = None
+        if report_id is not None:
+            try:
+                parsed_report_id = uuid.UUID(report_id)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"code": "report_request_history_query_invalid"},
+                    headers=_NO_STORE,
+                ) from exc
+            if str(parsed_report_id) != report_id:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"code": "report_request_history_query_invalid"},
+                    headers=_NO_STORE,
+                )
+        try:
+            return list_owned_report_request_history(
+                db,
+                privacy_subject=subject,
+                account_generation=generation,
+                report_id=parsed_report_id,
+                limit=limit,
+                cursor=cursor,
+            )
+        except ReportUserRequestHistoryError as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"code": exc.code, "message": exc.message},
+                headers=_NO_STORE,
+            ) from exc
+        except ReportUserRequestError as exc:
+            _raise_user_error(db, exc)
 
     @router.get(
         "/reports/mine/deletions/{request_id}",

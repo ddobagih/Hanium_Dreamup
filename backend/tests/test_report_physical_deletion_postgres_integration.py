@@ -30,6 +30,9 @@ from backend.app.services.report_user_requests import (
     create_report_user_request,
     update_admin_request_status,
 )
+from backend.app.services.report_user_request_history import (
+    list_owned_report_request_history,
+)
 from scripts.delete_reports import _assert_manual_role
 
 
@@ -183,6 +186,14 @@ def test_acknowledged_request_and_physical_effect_are_separate_and_idempotent(
         assert created is True
 
         with SessionFactory() as db:
+            request_discovery_revision = db.scalar(
+                select(ReportUserRequest.discovery_revision).where(
+                    ReportUserRequest.id == request_state.id
+                )
+            )
+        assert request_discovery_revision is not None
+
+        with SessionFactory() as db:
             acknowledged = update_admin_request_status(
                 db,
                 request_id=request_state.id,
@@ -311,7 +322,55 @@ def test_acknowledged_request_and_physical_effect_are_separate_and_idempotent(
                 )
             )
             assert tombstone is not None
+            assert tombstone.discovery_revision == request_discovery_revision
             assert tombstone.external_copy_count == 0
+
+        with engine.connect() as connection:
+            connection.execute(
+                text("SET SESSION AUTHORIZATION walksafe_backend_runtime")
+            )
+            connection.commit()
+            try:
+                RuntimeSession = sessionmaker(
+                    bind=connection,
+                    expire_on_commit=False,
+                )
+                with RuntimeSession() as db:
+                    filtered_history_page = list_owned_report_request_history(
+                        db,
+                        privacy_subject=subject,
+                        account_generation=3,
+                        report_id=report_id,
+                        limit=10,
+                        cursor=None,
+                    )
+                    global_history_page = list_owned_report_request_history(
+                        db,
+                        privacy_subject=subject,
+                        account_generation=3,
+                        report_id=None,
+                        limit=10,
+                        cursor=None,
+                    )
+                    db.rollback()
+            finally:
+                connection.rollback()
+                connection.execute(text("RESET SESSION AUTHORIZATION"))
+                connection.commit()
+        assert filtered_history_page.total_count == 1
+        filtered_item = filtered_history_page.items[0]
+        assert filtered_item.source == "DELETION_TOMBSTONE"
+        assert filtered_item.revision == request_discovery_revision
+        assert filtered_item.request is None
+        assert filtered_item.deletion_status is not None
+        assert filtered_item.deletion_status.state == "DELETED"
+        global_item = next(
+            item
+            for item in global_history_page.items
+            if item.request_id == request_state.id
+        )
+        assert global_item.source == "DELETION_TOMBSTONE"
+        assert global_item.revision == request_discovery_revision
 
         with SessionFactory() as db:
             replay = apply_report_deletion(

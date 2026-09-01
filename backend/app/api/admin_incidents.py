@@ -636,6 +636,9 @@ def get_admin_incident_history(
         ) from exc
 
     try:
+        # Keep the mutable projection and append-only high-water mark in one
+        # statement snapshot. Separate reads can straddle a committed status
+        # update under PostgreSQL READ COMMITTED and falsely report corruption.
         snapshot_row = db.execute(
             select(
                 CriticalIncident,

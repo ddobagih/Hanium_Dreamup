@@ -541,6 +541,79 @@ class ReportDeletionStatusV2(BaseModel):
         return self
 
 
+class UserReportRequestHistoryItemV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    revision: int = Field(ge=1, le=9_007_199_254_740_991)
+    source: Literal["ACTIVE_REQUEST", "DELETION_TOMBSTONE"]
+    report_id: uuid.UUID
+    request_id: uuid.UUID
+    request: ReportUserRequestSummaryV1 | None
+    deletion_status: ReportDeletionStatusV2 | None
+
+    @model_validator(mode="after")
+    def validate_source_projection(self) -> "UserReportRequestHistoryItemV1":
+        if self.source == "ACTIVE_REQUEST":
+            if self.request is None or self.request.request_id != self.request_id:
+                raise ValueError("active request history requires its request projection")
+            if (self.request.request_type == "DELETE") != (
+                self.deletion_status is not None
+            ):
+                raise ValueError("only deletion requests require deletion status")
+            if (
+                self.deletion_status is not None
+                and self.request.status_version
+                != self.deletion_status.request_status_version
+            ):
+                raise ValueError("deletion request projections must share one version")
+            if (
+                self.deletion_status is not None
+                and self.deletion_status.state == "DELETED"
+            ):
+                raise ValueError("completed deletion must use its tombstone source")
+        elif self.request is not None:
+            raise ValueError("deletion tombstones cannot synthesize request status")
+        if self.deletion_status is not None and (
+            self.deletion_status.request_id != self.request_id
+            or self.deletion_status.report_id != self.report_id
+            or (
+                self.source == "DELETION_TOMBSTONE"
+                and self.deletion_status.state != "DELETED"
+            )
+        ):
+            raise ValueError("deletion status does not match request history")
+        if self.source == "DELETION_TOMBSTONE" and self.deletion_status is None:
+            raise ValueError("deletion tombstones require durable deletion status")
+        return self
+
+
+class UserReportRequestHistoryPageV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.user-report-request-history-page.v1"]
+    report_id: uuid.UUID | None
+    snapshot_revision: int = Field(ge=0, le=9_007_199_254_740_991)
+    total_count: int = Field(ge=0, le=9_007_199_254_740_991)
+    items: List[UserReportRequestHistoryItemV1] = Field(max_length=25)
+    next_cursor: str | None = Field(default=None, min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def validate_snapshot_page(self) -> "UserReportRequestHistoryPageV1":
+        revisions = [item.revision for item in self.items]
+        if revisions and (
+            revisions != sorted(set(revisions), reverse=True)
+            or revisions[0] > self.snapshot_revision
+            or (
+                self.report_id is not None
+                and any(item.report_id != self.report_id for item in self.items)
+            )
+        ):
+            raise ValueError("request history page is not strictly newest-first")
+        if (self.total_count == 0) != (self.snapshot_revision == 0):
+            raise ValueError("request history empty snapshot is inconsistent")
+        return self
+
+
 class UserReportSummaryV1(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -104,6 +104,7 @@ REPORT_TRANSPORT_STATUS_PATH = re.compile(
 )
 REPORT_TRANSPORT_STATUS_TEMPLATE = "/reports/v2/{report_id}/status"
 USER_REPORT_LIST_TEMPLATE = "/reports/mine"
+USER_REPORT_REQUEST_HISTORY_TEMPLATE = "/reports/mine/requests/history"
 USER_REPORT_DETAIL_TEMPLATE = "/reports/mine/{report_id}"
 USER_REPORT_REQUEST_TEMPLATE = "/reports/mine/{report_id}/requests"
 USER_REPORT_REQUEST_DETAIL_TEMPLATE = "/reports/mine/{report_id}/requests/{request_id}"
@@ -139,6 +140,10 @@ def _user_report_route(path: str, method: str) -> bool:
     normalized = method.upper()
     return (
         (path == USER_REPORT_LIST_TEMPLATE and normalized == "GET")
+        or (
+            path == USER_REPORT_REQUEST_HISTORY_TEMPLATE
+            and normalized == "GET"
+        )
         or (path == USER_REPORT_DETAIL_TEMPLATE and normalized == "GET")
         or (path == USER_REPORT_REQUEST_TEMPLATE and normalized == "POST")
         or (path == USER_REPORT_REQUEST_DETAIL_TEMPLATE and normalized == "GET")

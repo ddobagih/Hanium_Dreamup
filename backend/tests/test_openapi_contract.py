@@ -62,6 +62,34 @@ def test_report_history_validation_errors_are_no_store() -> None:
     )
 
 
+def test_user_request_history_validation_errors_are_no_store() -> None:
+    request = Request(
+        {
+            "type": "http",
+            "http_version": "1.1",
+            "method": "GET",
+            "scheme": "https",
+            "path": "/reports/mine/requests/history",
+            "raw_path": b"/reports/mine/requests/history",
+            "query_string": b"limit=0",
+            "headers": [],
+            "client": ("127.0.0.1", 12345),
+            "server": ("testserver", 443),
+        }
+    )
+
+    response = asyncio.run(
+        walksafe_request_validation_error(request, RequestValidationError([]))
+    )
+
+    assert response.status_code == 422
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    assert json.loads(response.body)["detail"]["code"] == (
+        "report_user_request_validation_failed"
+    )
+
+
 def test_openapi_expresses_runtime_role_and_actor_security() -> None:
     schema = app.openapi()
     schemes = schema["components"]["securitySchemes"]
@@ -105,6 +133,11 @@ def test_openapi_expresses_runtime_role_and_actor_security() -> None:
 
     for path, method, response_schema in (
         ("/reports/mine", "get", "UserReportListPageV1"),
+        (
+            "/reports/mine/requests/history",
+            "get",
+            "UserReportRequestHistoryPageV1",
+        ),
         ("/reports/mine/{report_id}", "get", "UserReportDetailV1"),
         (
             "/reports/mine/{report_id}/requests",

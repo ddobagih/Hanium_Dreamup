@@ -43,6 +43,7 @@ from backend.app.schemas import (
 from backend.app.services.admin_history_pagination import (
     INCIDENT_HISTORY_RESPONSE_BUDGET_BYTES,
     decode_admin_history_cursor,
+    encode_admin_history_cursor,
 )
 from backend.app.services import admin_incident_workflow
 from backend.app.services.admin_device_proof import (
@@ -243,6 +244,26 @@ class _IncidentHistoryRowsResult:
         return self.rows
 
 
+class _IncidentHistoryReadCommittedResult:
+    def __init__(
+        self,
+        incident: CriticalIncident,
+        count: int,
+        maximum: int,
+    ) -> None:
+        self.incident = incident
+        self.count = count
+        self.maximum = maximum
+
+    def one_or_none(self) -> tuple[CriticalIncident, int, int]:
+        return self.incident, self.count, self.maximum
+
+    def one(self) -> tuple[int, int]:
+        """Shape used by the former split aggregate query."""
+
+        return self.count, self.maximum
+
+
 class _IncidentHistorySession:
     def __init__(
         self,
@@ -278,6 +299,45 @@ class _IncidentHistorySession:
 
     def rollback(self) -> None:
         self.rollback_count += 1
+
+
+class _IncidentHistoryReadCommittedSession(_IncidentHistorySession):
+    """Expose the stale-parent/new-aggregate result of a split read."""
+
+    def __init__(
+        self,
+        *,
+        stale_incident: CriticalIncident,
+        incident: CriticalIncident,
+        count: int,
+        maximum: int,
+        scalar_results: list[CriticalIncidentEvent | None],
+        rows: list[CriticalIncidentEvent],
+    ) -> None:
+        super().__init__(
+            incident=incident,
+            count=count,
+            maximum=maximum,
+            scalar_results=scalar_results,
+            rows=rows,
+        )
+        self.stale_incident = stale_incident
+        self.get_count = 0
+        self.execute_count = 0
+
+    def get(self, _model: type[object], _key: object) -> CriticalIncident:
+        self.get_count += 1
+        return self.stale_incident
+
+    def execute(self, _statement: object) -> _IncidentHistoryReadCommittedResult:
+        self.execute_count += 1
+        assert self.incident is not None
+        assert self.maximum is not None
+        return _IncidentHistoryReadCommittedResult(
+            self.incident,
+            self.count,
+            self.maximum,
+        )
 
 
 def _incident_history_request(
@@ -589,6 +649,139 @@ def test_incident_history_pages_keep_first_snapshot_and_exclude_new_appends(
     assert second_page.next_cursor is None
     assert [audit["result_count"] for audit in audits] == [2, 1]
     assert all(audit["outcome"] == "SUCCEEDED" for audit in audits)
+
+
+def test_incident_history_read_committed_append_uses_one_statement_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        admin_incidents,
+        "_persist_audit",
+        lambda *_args, **_kwargs: None,
+    )
+    events = _event_history(4)
+    stale_incident = _incident(
+        status=events[2].next_state,
+        status_version=3,
+        updated_at=events[2].recorded_at,
+    )
+    current_incident = _incident(
+        status=events[3].next_state,
+        status_version=4,
+        updated_at=events[3].recorded_at,
+    )
+    db = _IncidentHistoryReadCommittedSession(
+        stale_incident=stale_incident,
+        incident=current_incident,
+        count=4,
+        maximum=4,
+        scalar_results=[events[3]],
+        rows=events[:2],
+    )
+
+    page = admin_incidents.get_admin_incident_history(
+        request=_incident_history_request(),  # type: ignore[arg-type]
+        response=Response(),
+        incident_id=str(INCIDENT_ID),
+        limit=2,
+        cursor=None,
+        db=db,  # type: ignore[arg-type]
+    )
+
+    assert db.get_count == 0
+    assert db.execute_count == 1
+    assert page.snapshot_revision == page.total_count == 4
+    assert page.incident.status_version == 4
+    assert [item.revision for item in page.items] == [1, 2]
+
+
+def test_incident_history_past_cursor_survives_read_committed_append(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        admin_incidents,
+        "_persist_audit",
+        lambda *_args, **_kwargs: None,
+    )
+    cursor = encode_admin_history_cursor(
+        stream="incident_events",
+        resource_id=INCIDENT_ID,
+        snapshot_revision=3,
+        after_revision=2,
+    )
+    events = _event_history(5)
+    stale_incident = _incident(
+        status=events[3].next_state,
+        status_version=4,
+        updated_at=events[3].recorded_at,
+    )
+    current_incident = _incident(
+        status=events[4].next_state,
+        status_version=5,
+        updated_at=events[4].recorded_at,
+    )
+    db = _IncidentHistoryReadCommittedSession(
+        stale_incident=stale_incident,
+        incident=current_incident,
+        count=5,
+        maximum=5,
+        scalar_results=[events[2], events[1]],
+        rows=[events[2]],
+    )
+
+    page = admin_incidents.get_admin_incident_history(
+        request=_incident_history_request(
+            query=f"limit=2&cursor={cursor}"
+        ),  # type: ignore[arg-type]
+        response=Response(),
+        incident_id=str(INCIDENT_ID),
+        limit=2,
+        cursor=cursor,
+        db=db,  # type: ignore[arg-type]
+    )
+
+    assert db.get_count == 0
+    assert db.execute_count == 1
+    assert page.snapshot_revision == page.total_count == 3
+    assert page.incident.status_version == 3
+    assert page.incident.status == "RESOLVED"
+    assert [item.revision for item in page.items] == [3]
+    assert page.next_cursor is None
+
+
+def test_incident_history_same_statement_detects_projection_event_divergence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        admin_incidents,
+        "_persist_audit",
+        lambda *_args, **_kwargs: None,
+    )
+    events = _event_history(4)
+    incident = _incident(
+        status=events[3].next_state,
+        status_version=4,
+        updated_at=events[3].recorded_at,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        admin_incidents.get_admin_incident_history(
+            request=_incident_history_request(),  # type: ignore[arg-type]
+            response=Response(),
+            incident_id=str(INCIDENT_ID),
+            limit=2,
+            cursor=None,
+            db=_IncidentHistorySession(
+                incident=incident,
+                count=3,
+                maximum=3,
+                scalar_results=[],
+                rows=[],
+            ),  # type: ignore[arg-type]
+        )
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail["code"] == "admin_incident_history_integrity_invalid"
 
 
 def test_incident_history_enforces_utf8_budget_and_contiguous_prefix(
@@ -1179,8 +1372,11 @@ def test_migration_015_is_append_only_event_bound_and_least_privilege(
     integrity_successor = importlib.import_module(
         "backend.alembic.versions.202608300005_admin_report_integrity_boundary"
     )
-    head = importlib.import_module(
+    external_copy_successor = importlib.import_module(
         "backend.alembic.versions.202608300006_report_external_copy_deletion_events"
+    )
+    head = importlib.import_module(
+        "backend.alembic.versions.202609010001_report_user_request_discovery"
     )
     assert migration.revision == "202608290015"
     assert migration.down_revision == "202608290014"
@@ -1190,7 +1386,8 @@ def test_migration_015_is_append_only_event_bound_and_least_privilege(
     assert restore_successor.down_revision == evidence_successor.revision
     assert acl_successor.down_revision == restore_successor.revision
     assert integrity_successor.down_revision == acl_successor.revision
-    assert head.down_revision == integrity_successor.revision
+    assert external_copy_successor.down_revision == integrity_successor.revision
+    assert head.down_revision == external_copy_successor.revision
     assert health_api.EXPECTED_ALEMBIC_HEAD == head.revision
     alembic_config = Config(
         str(Path(__file__).resolve().parents[1] / "alembic.ini")
