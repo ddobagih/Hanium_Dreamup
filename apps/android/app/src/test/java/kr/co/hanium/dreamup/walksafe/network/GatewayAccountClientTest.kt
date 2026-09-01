@@ -193,6 +193,149 @@ class GatewayAccountClientTest {
     }
 
     @Test
+    fun passwordLoginAndRestoredSessionAcceptOfficialOptionalCapacityStatusField() {
+        val deviceId = "android-device-account-01"
+        val transport = AccountTransport(
+            postResponse = GatewayHttpResponse(
+                200,
+                """{"session_scope":"general"}""",
+                mapOf(
+                    "Set-Cookie" to
+                        "walksafe_field_session=${v7CookieValue(ACTOR_ID, deviceId)}; Path=/; HttpOnly; SameSite=Strict; Secure",
+                ),
+            ),
+            getResponse = GatewayHttpResponse(200, accountStatusWithCapacity()),
+        )
+        val client = GatewayFieldSessionClient(transport)
+
+        val session = client.loginWithPassword(
+            gatewayBaseUrl = "https://gateway.example",
+            email = "person@example.com",
+            password = "correct horse battery",
+            rememberMe = false,
+            deviceId = deviceId,
+            nowEpochMs = 1_000L,
+        )
+
+        assertTrue(session.isUsableFor(ACTOR_ID, 2_000L))
+        val snapshot = requireNotNull(session.backendDevicePersistenceSnapshotOrNull(2_000L))
+        val restored = requireNotNull(
+            GatewayFieldSession.restoreBackendAccountDevice(
+                snapshot = snapshot,
+                expectedGatewayBaseUrl = "https://gateway.example",
+                expectedActorId = ACTOR_ID,
+                expectedDeviceId = deviceId,
+                nowEpochMs = 2_000L,
+            ),
+        )
+        val revalidated = client.revalidateBackendAccountDeviceSession(restored, 2_000L)
+        assertTrue(revalidated.isUsableFor(ACTOR_ID, 3_000L))
+    }
+
+    @Test
+    fun passwordLoginStatusStillRejectsUnknownFieldAlongsideCapacity() {
+        val deviceId = "android-device-account-01"
+        val status = JSONObject(accountStatusWithCapacity())
+            .put("unexpected", true)
+            .toString()
+        val transport = AccountTransport(
+            postResponse = GatewayHttpResponse(
+                200,
+                """{"session_scope":"general"}""",
+                mapOf(
+                    "Set-Cookie" to
+                        "walksafe_field_session=${v7CookieValue(ACTOR_ID, deviceId)}; Path=/; HttpOnly; SameSite=Strict; Secure",
+                ),
+            ),
+            getResponse = GatewayHttpResponse(200, status),
+        )
+
+        val error = assertThrows(GatewaySessionHttpException::class.java) {
+            GatewayFieldSessionClient(transport).loginWithPassword(
+                gatewayBaseUrl = "https://gateway.example",
+                email = "person@example.com",
+                password = "correct horse battery",
+                rememberMe = false,
+                deviceId = deviceId,
+                nowEpochMs = 1_000L,
+            )
+        }
+
+        assertEquals("gateway_actor_binding_failed", error.reason)
+    }
+
+    @Test
+    fun passwordLoginAndRestoredSessionRejectMalformedOptionalCapacity() {
+        val deviceId = "android-device-account-01"
+        val postResponse = GatewayHttpResponse(
+            200,
+            """{"session_scope":"general"}""",
+            mapOf(
+                "Set-Cookie" to
+                    "walksafe_field_session=${v7CookieValue(ACTOR_ID, deviceId)}; Path=/; HttpOnly; SameSite=Strict; Secure",
+            ),
+        )
+        val malformedCapacityValues = listOf(
+            JSONObject.NULL,
+            "invalid",
+            JSONObject().put("version", 1),
+        )
+        malformedCapacityValues.forEach { malformedCapacity ->
+            val status = JSONObject(accountStatusWithCapacity())
+                .put("capacity", malformedCapacity)
+                .toString()
+            val error = assertThrows(GatewaySessionHttpException::class.java) {
+                GatewayFieldSessionClient(
+                    AccountTransport(postResponse, GatewayHttpResponse(200, status)),
+                ).loginWithPassword(
+                    gatewayBaseUrl = "https://gateway.example",
+                    email = "person@example.com",
+                    password = "correct horse battery",
+                    rememberMe = false,
+                    deviceId = deviceId,
+                    nowEpochMs = 1_000L,
+                )
+            }
+            assertEquals("gateway_actor_binding_failed", error.reason)
+        }
+
+        val transport = AccountTransport(
+            postResponse = postResponse,
+            getResponse = GatewayHttpResponse(200, accountStatusWithCapacity()),
+        )
+        val client = GatewayFieldSessionClient(transport)
+        val session = client.loginWithPassword(
+            gatewayBaseUrl = "https://gateway.example",
+            email = "person@example.com",
+            password = "correct horse battery",
+            rememberMe = false,
+            deviceId = deviceId,
+            nowEpochMs = 1_000L,
+        )
+        val snapshot = requireNotNull(session.backendDevicePersistenceSnapshotOrNull(2_000L))
+        val restored = requireNotNull(
+            GatewayFieldSession.restoreBackendAccountDevice(
+                snapshot = snapshot,
+                expectedGatewayBaseUrl = "https://gateway.example",
+                expectedActorId = ACTOR_ID,
+                expectedDeviceId = deviceId,
+                nowEpochMs = 2_000L,
+            ),
+        )
+        transport.getResponse = GatewayHttpResponse(
+            200,
+            JSONObject(accountStatusWithCapacity())
+                .put("capacity", JSONObject().put("version", 1))
+                .toString(),
+        )
+
+        val restoreError = assertThrows(GatewaySessionHttpException::class.java) {
+            client.revalidateBackendAccountDeviceSession(restored, 2_000L)
+        }
+        assertEquals("gateway_backend_device_restore_rejected", restoreError.reason)
+    }
+
+    @Test
     fun passwordLoginRejectsLegacyOrMismatchedDeviceCookieBeforeStatus() {
         val legacy = AccountTransport(
             postResponse = GatewayHttpResponse(
@@ -275,7 +418,7 @@ class GatewayAccountClientTest {
 
     private class AccountTransport(
         private val postResponse: GatewayHttpResponse,
-        private val getResponse: GatewayHttpResponse = GatewayHttpResponse(500, "{}"),
+        var getResponse: GatewayHttpResponse = GatewayHttpResponse(500, "{}"),
     ) : GatewaySessionTransport {
         var url: String = ""
         var body: String = ""
@@ -303,6 +446,22 @@ class GatewayAccountClientTest {
         while (iterator.hasNext()) result += iterator.next()
         return result
     }
+
+    private fun accountStatusWithCapacity(): String = JSONObject()
+        .put("required", true)
+        .put("authenticated", true)
+        .put("actor_id", ACTOR_ID)
+        .put("session_scope", "general")
+        .put(
+            "capacity",
+            JSONObject()
+                .put("version", 1)
+                .put("observed_at", "2026-08-29T10:00:00Z")
+                .put("expires_at", "2026-08-29T10:10:00Z")
+                .put("level", "NORMAL")
+                .put("reason", "STORAGE_UTILIZATION"),
+        )
+        .toString()
 
     private fun v7CookieValue(actorId: String, deviceId: String): String = listOf(
         "v7",
