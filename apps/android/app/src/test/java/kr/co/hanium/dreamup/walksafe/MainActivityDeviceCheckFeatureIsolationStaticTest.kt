@@ -258,8 +258,8 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
             ).containsMatchIn(firstRunUi),
         )
         assertTrue(
-            refresh.indexOf("updatePhoneMountingUi()") <
-                refresh.indexOf("updateFirstRunOnboardingUi()"),
+            refresh.indexOf("updateFirstRunOnboardingUi()") <
+                refresh.lastIndexOf("updatePhoneMountingUi()"),
         )
         val noCamera = mountingUi
             .substringAfter("if (!cameraAnalysisFeaturesEnabled()) {")

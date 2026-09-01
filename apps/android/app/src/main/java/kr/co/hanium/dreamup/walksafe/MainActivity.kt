@@ -19622,7 +19622,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             currentPriorityUserSupportEnvironment(decision),
         )
         updateOfficialEnvironmentUi()
-        updatePhoneMountingUi()
         val officialEnvironmentReady =
             officialEnvironmentReadiness(walkSessionLifecycle.snapshot().epoch).first ==
                 WalkSessionReadinessStatus.READY
@@ -19814,6 +19813,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
         updatePriorityUserOnboardingUi(decision)
         updateFirstRunOnboardingUi()
+        updatePhoneMountingUi()
         updateFieldSessionLogButton()
         applyActionButtonState()
         maybeAdvanceWalkSessionAfterCapabilityCheck()
