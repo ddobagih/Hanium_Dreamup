@@ -121,13 +121,83 @@ class HandsFreeVoiceIntegrationStaticTest {
         val controller = File(
             "src/main/java/kr/co/hanium/dreamup/walksafe/voice/HandsFreeVoiceController.kt",
         ).readText()
+        val service = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/voice/WalkVoiceForegroundService.kt",
+        ).readText()
 
         assertTrue(controller.contains("if (closed || !starting) return"))
-        assertEquals(2, Regex("runCatching\\(onTerminalError\\)").findAll(controller).count())
-        assertTrue(mainActivity.contains("onTerminalError = ::handleHandsFreeVoiceTerminalError"))
-        val terminalHandler = functionBlock("private fun handleHandsFreeVoiceTerminalError")
+        assertTrue(controller.contains("sealed interface HandsFreeVoiceTerminalFailure"))
+        assertTrue(controller.contains("enum class HandsFreeVoiceInternalFailure"))
+        assertTrue(controller.contains("HandsFreeVoiceTerminalFailure.Transcriber(error)"))
+        assertTrue(controller.contains("HandsFreeVoiceInternalFailure.COMMAND_DISPATCH_FAILED"))
+        assertTrue(controller.contains("HandsFreeVoiceInternalFailure.OUTPUT_TIMEOUT"))
+        assertTrue(controller.contains("HandsFreeVoiceTerminalFailure.Internal(reason)"))
+        assertTrue(mainActivity.contains("onTerminalFailure = ::handleHandsFreeVoiceTerminalFailure"))
+        val terminalHandler = functionBlock("private fun handleHandsFreeVoiceTerminalFailure")
         assertTrue(terminalHandler.contains("handsFreeVoiceServiceRequested = false"))
         assertTrue(terminalHandler.contains("stopService("))
+        val transcriber = terminalHandler.substringAfter(
+            "is HandsFreeVoiceTerminalFailure.Transcriber ->",
+        ).substringBefore("is HandsFreeVoiceTerminalFailure.Internal ->")
+        val internal = terminalHandler.substringAfter(
+            "is HandsFreeVoiceTerminalFailure.Internal ->",
+        )
+        assertTrue(transcriber.contains("onDeviceSpeechRecognitionCapabilityOverride = false"))
+        assertFalse(transcriber.contains("oneShotSpeechRecognitionLimited"))
+        assertTrue(internal.contains("scheduleHandsFreeVoiceRestart()"))
+        assertFalse(terminalHandler.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+
+        val controllerStart = functionBlockFrom(controller, "override fun start")
+        val controllerStop = functionBlockFrom(controller, "override fun stop")
+        val ready = functionBlockFrom(controller, "private fun handleReady")
+        val transcript = functionBlockFrom(controller, "private fun handleTranscript")
+        val ended = functionBlock("private fun handleHandsFreeVoiceSessionEnded")
+        val serviceStart = functionBlockFrom(service, "private fun startVoiceSession")
+
+        assertTrue(service.contains("fun start(): Boolean"))
+        assertTrue(controller.contains("override fun start(): Boolean"))
+        assertTrue(controllerStart.contains("return false"))
+        assertTrue(controllerStart.contains("return true"))
+        assertTrue(serviceStart.contains("walkVoiceSessionController"))
+        assertTrue(serviceStart.contains("?: run"))
+        assertTrue(serviceStart.contains("if (!controller.start())"))
+        assertTrue(serviceStart.contains("stopVoiceSession(stopController = false)"))
+        assertTrue(serviceStart.contains("stopSelf()"))
+
+        assertTrue(mainActivity.contains("onSessionEnded = ::handleHandsFreeVoiceSessionEnded"))
+        assertTrue(ready.contains("endSessionWithoutRestart("))
+        assertTrue(transcript.contains("endSessionWithoutRestart("))
+        assertTrue(ended.contains("handsFreeVoiceServiceRequested = false"))
+        assertTrue(ended.contains("stopService("))
+        assertFalse(ended.contains("scheduleHandsFreeVoiceRestart()"))
+        assertFalse(ended.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+
+        assertTrue(controllerStop.contains("if (!preserveStopStatus)"))
+        assertTrue(functionBlockFrom(controller, "private fun handleError")
+            .contains("preserveStopStatus = true"))
+        assertTrue(functionBlockFrom(controller, "private fun failClosed")
+            .contains("preserveStopStatus = true"))
+    }
+
+    @Test
+    fun wakePhraseImmediatelySignalsCommandListeningWithHapticAndLiveStatus() {
+        val controller = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/voice/HandsFreeVoiceController.kt",
+        ).readText()
+        val openWindow = functionBlockFrom(controller, "private fun openCommandWindow")
+        val callback = functionBlock("private fun handleHandsFreeVoiceCommandListeningStarted")
+
+        assertTrue(
+            ReportStaticSourceInspector.appearsInOrder(
+                openWindow,
+                "stateMachine.onWakeWordDetected",
+                "runCatching(onCommandListeningStarted)",
+                "scheduleCommandTimeout",
+            ),
+        )
+        assertTrue(callback.contains("playVoiceListeningStartVibration()"))
+        assertTrue(callback.contains("updateGatewayVoiceStatus("))
+        assertTrue(mainActivity.contains("ACCESSIBILITY_LIVE_REGION_POLITE"))
     }
 
     @Test

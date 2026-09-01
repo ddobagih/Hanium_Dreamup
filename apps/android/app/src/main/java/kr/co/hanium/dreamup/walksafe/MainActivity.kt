@@ -199,6 +199,7 @@ import kr.co.hanium.dreamup.walksafe.feedback.utteranceTerminalTimeoutMs
 import kr.co.hanium.dreamup.walksafe.voice.BundledVoskModelInstaller
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceController
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceEligibility
+import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceTerminalFailure
 import kr.co.hanium.dreamup.walksafe.voice.WalkSafeApplication
 import kr.co.hanium.dreamup.walksafe.voice.WalkVoiceForegroundService
 import kr.co.hanium.dreamup.walksafe.voice.VoskWakePhraseProbe
@@ -522,6 +523,9 @@ private fun CameraFrameQualityReason.isTransientPreflightQualityFailure(): Boole
     -> true
     else -> false
 }
+
+internal fun shouldPermanentlyLimitOneShotSpeechRecognition(error: Int): Boolean =
+    error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED
 
 internal fun userReportAuthorityExpiryDelayMs(
     accessExpiresAtEpochMs: Long,
@@ -1408,6 +1412,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var runtimeMetricLastFrameTimestampNanos = 0L
     private var runtimeMetricInitialNavigationStartPending = false
     private var onDeviceSpeechRecognitionCapabilityOverride: Boolean? = null
+    private var oneShotSpeechRecognitionLimited = false
     private var offlineKoreanTextToSpeechCapabilityOverride: Boolean? = null
     private var voiceDataInstallRecheckPending = false
     private var voiceDataInstallRecheckInFlight = false
@@ -10847,7 +10852,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun handleVoicePermissionResult() {
         if (permissionRecoveryGate.blocksAutomaticResourceStart) return
         if (hasRecordAudioPermission()) {
-            toggleGatewayVoiceCapture()
+            startVoiceCommandRecognition()
         } else {
             updateNavigationStatus("voice=record_audio_permission_missing")
             speakInteraction("음성 명령을 사용하려면 마이크 권한이 필요합니다.")
@@ -13106,22 +13111,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             setOnClickListener { requestExplicitReport(ExplicitReportRequestSource.ON_SCREEN) }
         }
         voiceReportButton = Button(this).apply {
-            text = "서버 음성 명령"
-            contentDescription = "서버 음성 명령 녹음 시작"
+            text = "기기 내 음성 명령"
+            contentDescription = "기기 내 음성 명령 듣기 시작"
             minimumHeight = accessibilityTargetSizePx()
             isSingleLine = false
             setOnClickListener { ensureVoicePermissionThenListen() }
         }
         gatewayVoiceStatusText = TextView(this).apply {
-            text = "서버 음성 명령 대기"
+            text = "기기 내 음성 명령 대기"
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         walkSafetyVoiceButton = Button(this).apply {
             id = View.generateViewId()
-            text = "서버 음성 명령"
-            contentDescription = "서버 음성 명령 녹음 시작"
+            text = "기기 내 음성 명령"
+            contentDescription = "기기 내 음성 명령 듣기 시작"
             minimumHeight = accessibilityTargetSizePx()
             minimumWidth = accessibilityTargetSizePx()
             isSingleLine = false
@@ -13129,7 +13134,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         walkSafetyVoiceStatusText = TextView(this).apply {
             id = View.generateViewId()
-            text = "서버 음성 명령 대기"
+            text = "기기 내 음성 명령 대기"
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -22502,10 +22507,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun voiceResumeConfirmationAvailable(): Boolean {
         val decision = startupCapabilityDecision ?: return false
-        return postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.HANDS_FREE_VOICE) &&
+        if (oneShotSpeechRecognitionLimited || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return false
+        }
+        val oneShotRecognitionAvailable = runCatching {
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
+        }.getOrDefault(false)
+        return oneShotRecognitionAvailable &&
             postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE) &&
             decision.allowsRequirement(WalkSafeStartupRequirement.MICROPHONE) &&
-            decision.allowsRequirement(WalkSafeStartupRequirement.ON_DEVICE_STT) &&
             decision.allowsRequirement(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS)
     }
 
@@ -26693,7 +26703,9 @@ generation != cameraFallbackGeneration
                 )
             },
             onStatus = ::updateNavigationStatus,
-            onTerminalError = ::handleHandsFreeVoiceTerminalError,
+            onCommandListeningStarted = ::handleHandsFreeVoiceCommandListeningStarted,
+            onTerminalFailure = ::handleHandsFreeVoiceTerminalFailure,
+            onSessionEnded = ::handleHandsFreeVoiceSessionEnded,
         )
         handsFreeVoiceController = controller
         (application as? WalkSafeApplication)?.attachWalkVoiceSessionController(controller)
@@ -26721,13 +26733,58 @@ generation != cameraFallbackGeneration
             )
     }
 
-    private fun handleHandsFreeVoiceTerminalError() {
+    private fun handleHandsFreeVoiceCommandListeningStarted() {
+        runCatching { ensureFeedbackActuator().playVoiceListeningStartVibration() }
+        updateGatewayVoiceStatus("호출어를 인식했습니다. 음성 명령을 듣고 있습니다.")
+        updateNavigationStatus("voice_hands_free=listening_command")
+    }
+
+    private fun handleHandsFreeVoiceSessionEnded() {
         handsFreeVoiceRestartRunnable?.let { pending ->
             if (::statusText.isInitialized) statusText.removeCallbacks(pending)
         }
         handsFreeVoiceRestartRunnable = null
         handsFreeVoiceServiceRequested = false
         runCatching { stopService(Intent(this, WalkVoiceForegroundService::class.java)) }
+    }
+
+    private fun handleHandsFreeVoiceTerminalFailure(
+        failure: HandsFreeVoiceTerminalFailure,
+    ) {
+        handsFreeVoiceRestartRunnable?.let { pending ->
+            if (::statusText.isInitialized) statusText.removeCallbacks(pending)
+        }
+        handsFreeVoiceRestartRunnable = null
+        handsFreeVoiceServiceRequested = false
+        runCatching { stopService(Intent(this, WalkVoiceForegroundService::class.java)) }
+        when (failure) {
+            is HandsFreeVoiceTerminalFailure.Transcriber -> {
+                val wasConfirmed = isStartupCapabilityConfirmed()
+                onDeviceSpeechRecognitionCapabilityOverride = false
+                refreshStartupCapabilityUi()
+                if (wasConfirmed) {
+                    confirmedStartupCapabilityDecision = startupCapabilityDecision?.takeIf {
+                        it.mayConfirmAndStart
+                    }
+                    refreshStartupCapabilityUi()
+                }
+                updateStatus(
+                    "호출어 음성 기능 제한",
+                    "기기 내 Vosk 음성 처리 오류로 호출어 기능만 제한했습니다. " +
+                        "화면 음성 명령과 보행의 다른 기능은 계속 사용할 수 있습니다.",
+                )
+                updateNavigationStatus(
+                    "voice_hands_free=transcriber_limited error=${failure.error.name.lowercase()}",
+                )
+            }
+            is HandsFreeVoiceTerminalFailure.Internal -> {
+                updateNavigationStatus(
+                    "voice_hands_free=internal_restart " +
+                        "reason=${failure.reason.name.lowercase()}",
+                )
+                scheduleHandsFreeVoiceRestart()
+            }
+        }
     }
 
     private fun maybeStartHandsFreeVoiceService() {
@@ -26985,29 +27042,47 @@ generation != cameraFallbackGeneration
         }
     }
 
+    private fun handleOneShotSpeechRecognitionFailure(
+        detail: String,
+        permanentlyLimit: Boolean,
+    ) {
+        if (permanentlyLimit) oneShotSpeechRecognitionLimited = true
+        voiceRecognitionGeneration += 1
+        voiceRecognitionActive = false
+        voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
+        clearVoiceEndConfirmation()
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+        updateGatewayVoiceStatus(
+            if (permanentlyLimit) {
+                "기기 내 화면 음성 명령을 사용할 수 없습니다."
+            } else {
+                "기기 내 화면 음성 듣기가 종료됐습니다. 다시 시도할 수 있습니다."
+            },
+        )
+        updateVoiceCommandButton(active = false)
+        scheduleHandsFreeVoiceRestart()
+        if (permanentlyLimit) {
+            updateStatus(
+                "화면 음성 명령 기능 제한",
+                "$detail 기기 내 호출어와 보행의 다른 기능은 계속 사용할 수 있습니다.",
+            )
+        } else {
+            updateStatus(
+                "화면 음성 명령 종료",
+                "$detail 다시 시도할 수 있으며 호출어와 보행의 다른 기능은 계속 사용할 수 있습니다.",
+            )
+        }
+    }
+
     private fun handleRuntimeSpeechCapabilityFailure(
         requirement: WalkSafeStartupRequirement,
         detail: String,
     ) {
+        if (requirement != WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS) return
         val wasConfirmed = isStartupCapabilityConfirmed()
-        val featureLabel = when (requirement) {
-            WalkSafeStartupRequirement.ON_DEVICE_STT -> "음성 명령"
-            WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS -> "음성 안내"
-            else -> return
-        }
-        when (requirement) {
-            WalkSafeStartupRequirement.ON_DEVICE_STT -> {
-                if (onDeviceSpeechRecognitionCapabilityOverride == false) return
-                onDeviceSpeechRecognitionCapabilityOverride = false
-                stopHandsFreeVoiceService()
-                cancelVoiceCommandRecognition()
-            }
-            WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS -> {
-                if (offlineKoreanTextToSpeechCapabilityOverride == false) return
-                offlineKoreanTextToSpeechCapabilityOverride = false
-            }
-            else -> return
-        }
+        if (offlineKoreanTextToSpeechCapabilityOverride == false) return
+        offlineKoreanTextToSpeechCapabilityOverride = false
         refreshStartupCapabilityUi()
         if (wasConfirmed) {
             confirmedStartupCapabilityDecision = startupCapabilityDecision?.takeIf {
@@ -27016,7 +27091,7 @@ generation != cameraFallbackGeneration
             refreshStartupCapabilityUi()
         }
         updateStatus(
-            "$featureLabel 기능 제한",
+            "음성 안내 기능 제한",
             "$detail 화면과 사용 가능한 다른 기능은 계속 사용할 수 있습니다.",
         )
         if (isScreenReaderActive()) startupCapabilityText.announceForAccessibility(detail)
@@ -27709,25 +27784,11 @@ generation != cameraFallbackGeneration
     }
 
     private fun ensureVoicePermissionThenListen() {
-        if (gatewayVoiceRecorder?.isRecording == true) {
-            stopGatewayVoiceCapture()
-            return
-        }
-        if (!requireFirstRunOnboardingComplete("voice_command")) return
-        if (
-            !::firstRunOnboardingSnapshot.isInitialized ||
-            firstRunOnboardingSnapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ||
-            currentGatewaySpeechSessionOrNull() == null
-        ) {
-            updateGatewayVoiceStatus("이메일 로그인과 기기 점검을 완료해야 사용할 수 있습니다.")
-            speakInteraction("이메일 로그인과 기기 점검을 완료한 뒤 서버 음성 명령을 사용할 수 있습니다.")
-            return
-        }
         val snapshot = walkSessionLifecycle.snapshot()
-        if (
-            !snapshot.isForeground ||
-            snapshot.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
-        ) return
+        if (!snapshot.isForeground || snapshot.state != WalkSessionState.ACTIVE) {
+            updateGatewayVoiceStatus("화면 음성 명령은 보행 안내 중에만 사용할 수 있습니다.")
+            return
+        }
         if (!hasRecordAudioPermission()) {
             requestPermissionsWithLease(
                 arrayOf(Manifest.permission.RECORD_AUDIO),
@@ -27735,7 +27796,7 @@ generation != cameraFallbackGeneration
             )
             return
         }
-        toggleGatewayVoiceCapture()
+        startVoiceCommandRecognition()
     }
 
     /** Explicit foreground button capture only; this is not a 길라잡이 wake-word listener. */
@@ -28038,19 +28099,16 @@ generation != cameraFallbackGeneration
         purpose: VoiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND,
         expectedGatewayWalkOperationId: String? = null,
     ): Boolean {
-        if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.HANDS_FREE_VOICE)) {
-            updateNavigationStatus("voice_command=device_feature_limited")
+        if (!hasRecordAudioPermission()) {
+            updateNavigationStatus("voice_command=microphone_permission_missing")
             return false
         }
         if (
             startupCapabilityDecision?.allowsRequirement(
                 WalkSafeStartupRequirement.MICROPHONE,
-            ) == false ||
-            startupCapabilityDecision?.allowsRequirement(
-                WalkSafeStartupRequirement.ON_DEVICE_STT,
             ) == false
         ) {
-            updateNavigationStatus("voice_command=runtime_feature_limited")
+            updateNavigationStatus("voice_command=microphone_limited")
             return false
         }
         val sessionSnapshot = walkSessionLifecycle.snapshot()
@@ -28068,15 +28126,9 @@ generation != cameraFallbackGeneration
         val mayListen = when (purpose) {
             VoiceRecognitionPurpose.COMMAND -> {
                 sessionSnapshot.isForeground &&
-                    sessionSnapshot.state in setOf(
-                        WalkSessionState.ACTIVE,
-                        WalkSessionState.PAUSED,
-                    ) &&
+                    sessionSnapshot.state == WalkSessionState.ACTIVE &&
                     sessionSnapshot.epoch == expectedWalkEpoch &&
-                    (
-                        sessionSnapshot.state == WalkSessionState.PAUSED ||
-                            requireStartupCapabilityConfirmation()
-                    )
+                    requireStartupCapabilityConfirmation()
             }
             VoiceRecognitionPurpose.WALK_SESSION_RESUME -> {
                 sessionSnapshot.state == WalkSessionState.PAUSED &&
@@ -28112,47 +28164,47 @@ generation != cameraFallbackGeneration
             updateNavigationStatus("voice=blocked_by_risk_speech")
             return false
         }
-        stopHandsFreeVoiceService()
+        fun unavailable(detail: String, permanentlyLimit: Boolean): Boolean {
+            updateNavigationStatus("voice=recognizer_unavailable")
+            handleOneShotSpeechRecognitionFailure(detail, permanentlyLimit)
+            return false
+        }
+        if (oneShotSpeechRecognitionLimited) {
+            return unavailable(
+                "휴대폰 내부 one-shot 음성 인식이 제한되어 있습니다.",
+                permanentlyLimit = true,
+            )
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            updateNavigationStatus("voice=recognizer_unavailable")
-            if (purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER) {
-                handleGatewayWalkTakeoverRecognition(emptyList())
-                return false
-            }
-            handleRuntimeSpeechCapabilityFailure(
-                WalkSafeStartupRequirement.ON_DEVICE_STT,
-                "휴대폰 내부 음성 인식을 사용할 수 없어 음성 명령 기능을 제한합니다.",
+            return unavailable(
+                "휴대폰 내부 one-shot 음성 인식을 지원하지 않습니다.",
+                permanentlyLimit = true,
             )
-            return false
         }
-        val onDeviceRecognitionAvailable =
-            runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(this) }.getOrDefault(false)
+        val onDeviceRecognitionAvailable = try {
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
+        } catch (_: RuntimeException) {
+            return unavailable(
+                "휴대폰 내부 one-shot 음성 인식 상태를 확인하지 못했습니다.",
+                permanentlyLimit = false,
+            )
+        }
         if (!onDeviceRecognitionAvailable) {
-            updateNavigationStatus("voice=recognizer_unavailable")
-            if (purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER) {
-                handleGatewayWalkTakeoverRecognition(emptyList())
-                return false
-            }
-            handleRuntimeSpeechCapabilityFailure(
-                WalkSafeStartupRequirement.ON_DEVICE_STT,
-                "휴대폰 내부 음성 인식을 사용할 수 없어 음성 명령 기능을 제한합니다.",
+            return unavailable(
+                "휴대폰 내부 one-shot 음성 인식을 사용할 수 없습니다.",
+                permanentlyLimit = true,
             )
-            return false
         }
+        stopHandsFreeVoiceService()
         val generation = ++voiceRecognitionGeneration
         val recognizer = speechRecognizer ?: runCatching {
             SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
         }.getOrElse {
             updateNavigationStatus("voice=on_device_recognizer_creation_failed")
-            if (purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER) {
-                handleGatewayWalkTakeoverRecognition(emptyList())
-                return false
-            }
-            handleRuntimeSpeechCapabilityFailure(
-                WalkSafeStartupRequirement.ON_DEVICE_STT,
-                "휴대폰 내부 음성 인식을 시작할 수 없어 음성 명령 기능을 제한합니다.",
+            return unavailable(
+                "휴대폰 내부 one-shot 음성 인식기를 만들 수 없습니다.",
+                permanentlyLimit = false,
             )
-            return false
         }.also {
             speechRecognizer = it
         }
@@ -28188,18 +28240,10 @@ generation != cameraFallbackGeneration
             recognizer.startListening(intent)
             true
         }.getOrElse {
-            voiceRecognitionActive = false
-            voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
-            updateVoiceCommandButton(active = false)
-            if (purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER) {
-                handleGatewayWalkTakeoverRecognition(emptyList())
-                return false
-            }
-            handleRuntimeSpeechCapabilityFailure(
-                WalkSafeStartupRequirement.ON_DEVICE_STT,
-                "휴대폰 내부 음성 인식을 시작할 수 없어 음성 명령 기능을 제한합니다.",
+            unavailable(
+                "휴대폰 내부 one-shot 음성 인식을 시작할 수 없습니다.",
+                permanentlyLimit = false,
             )
-            false
         }
     }
 
@@ -28297,14 +28341,17 @@ generation != cameraFallbackGeneration
                 }
                 speechRecognizer?.destroy()
                 speechRecognizer = null
-                if (purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER) {
-                    handleGatewayWalkTakeoverRecognition(emptyList())
-                    return
-                }
-                handleRuntimeSpeechCapabilityFailure(
-                    WalkSafeStartupRequirement.ON_DEVICE_STT,
-                    "휴대폰 내부 음성 인식에 오류가 발생해 음성 명령 기능을 제한합니다.",
+                handleOneShotSpeechRecognitionFailure(
+                    "휴대폰 내부 one-shot 음성 인식에 오류가 발생했습니다.",
+                    permanentlyLimit = shouldPermanentlyLimitOneShotSpeechRecognition(error),
                 )
+                when (purpose) {
+                    VoiceRecognitionPurpose.WALK_SESSION_RESUME ->
+                        handleWalkSessionResumeRecognizerNotStarted()
+                    VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER ->
+                        handleGatewayWalkTakeoverRecognition(emptyList())
+                    VoiceRecognitionPurpose.COMMAND -> Unit
+                }
             }
 
             override fun onResults(results: Bundle?) {
@@ -28321,6 +28368,7 @@ generation != cameraFallbackGeneration
                 voiceRecognitionActive = false
                 voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
                 updateVoiceCommandButton(active = false)
+                updateGatewayVoiceStatus("기기 내 음성 명령을 처리했습니다.")
                 val phrases = results
                     ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     .orEmpty()
@@ -28358,10 +28406,7 @@ generation != cameraFallbackGeneration
                 walkSessionLifecycle.snapshot().let { snapshot ->
                     snapshot.epoch == expectedWalkEpoch &&
                         snapshot.isForeground &&
-                        snapshot.state in setOf(
-                            WalkSessionState.ACTIVE,
-                            WalkSessionState.PAUSED,
-                        )
+                        snapshot.state == WalkSessionState.ACTIVE
                 }
             VoiceRecognitionPurpose.WALK_SESSION_RESUME -> {
                 val snapshot = walkSessionLifecycle.snapshot()
@@ -28886,21 +28931,23 @@ generation != cameraFallbackGeneration
             !active &&
                 !gatewayProcessing &&
                 snapshot.isForeground &&
-                snapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
-                currentGatewaySpeechSessionOrNull() != null
+                snapshot.state == WalkSessionState.ACTIVE &&
+                !oneShotSpeechRecognitionLimited
         }
         listOf(voiceReportButton, walkSafetyVoiceButton).forEach { button ->
             button.text = when {
                 gatewayRecording -> "녹음 중지"
                 gatewayProcessing -> "음성 처리 중"
                 active -> "음성 듣는 중"
-                else -> "서버 음성 명령"
+                oneShotSpeechRecognitionLimited -> "기기 내 음성 명령 제한"
+                else -> "기기 내 음성 명령"
             }
             button.contentDescription = when {
                 gatewayRecording -> "서버 음성 명령 녹음 중지"
                 gatewayProcessing -> "서버 음성 명령 처리 중"
                 active -> "음성 명령을 듣는 중"
-                else -> "서버 음성 명령 녹음 시작"
+                oneShotSpeechRecognitionLimited -> "기기 내 음성 명령을 사용할 수 없음"
+                else -> "기기 내 음성 명령 듣기 시작"
             }
             button.isEnabled = enabled
         }
@@ -28912,6 +28959,7 @@ generation != cameraFallbackGeneration
             button.text = label
             button.contentDescription = label
         }
+        updateGatewayVoiceStatus(label)
         updateNavigationStatus("voice=${label.toStatusToken(maxLength = 32)}")
     }
 
