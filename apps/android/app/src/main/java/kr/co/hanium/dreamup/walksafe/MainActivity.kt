@@ -1010,9 +1010,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val movementGeneration: Long,
     )
 
-    private enum class ExplicitReportRequestSource {
-        ON_SCREEN,
-        VOICE,
+    private enum class ExplicitReportRequestSource(
+        val reportTrigger: String,
+    ) {
+        ON_SCREEN(AndroidReportCandidatePolicy.TRIGGER_ON_SCREEN),
+        VOICE(AndroidReportCandidatePolicy.TRIGGER_VOICE),
     }
 
     private val privacyStartupInspectionLock = Any()
@@ -27622,6 +27624,7 @@ generation != cameraFallbackGeneration
             return
         }
         val status = prepareExplicitReportCandidateIfCurrent(
+            source = source,
             nowMs = System.currentTimeMillis(),
             confirmationContext = context,
             requestedAtElapsedRealtimeMs = nowElapsedRealtimeMs,
@@ -27753,6 +27756,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun prepareExplicitReportCandidateIfCurrent(
+        source: ExplicitReportRequestSource,
         nowMs: Long,
         confirmationContext: ExplicitReportConfirmationContext,
         requestedAtElapsedRealtimeMs: Long,
@@ -27773,7 +27777,7 @@ generation != cameraFallbackGeneration
                     reportImage = latestExplicitReportImage,
                     nowMs = nowMs,
                     capturedAtMs = latestExplicitReportCapturedAtMs.takeIf { it > 0L } ?: nowMs,
-                    trigger = "voice",
+                    trigger = source.reportTrigger,
                     explicitRequest = true,
                     explicitConfirmationContext = confirmationContext,
                     explicitConfirmationRequestedAtElapsedRealtimeMs =

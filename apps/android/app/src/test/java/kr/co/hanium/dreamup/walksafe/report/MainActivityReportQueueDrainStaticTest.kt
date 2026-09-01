@@ -102,6 +102,7 @@ class MainActivityReportQueueDrainStaticTest {
     fun explicitConfirmationQueuesOnlyTheFirstActionFrozenSnapshot() {
         val request = functionBlock("private fun requestExplicitReport(")
         val process = functionBlock("private fun processReportCandidate(")
+        val preparation = functionBlock("private fun prepareExplicitReportCandidateIfCurrent(")
         val submit = functionBlock("private fun submitFrozenExplicitReportAfterConfirmation(")
         val disclosure = functionBlock("private fun beginExplicitReportConfirmationDisclosure(")
         val timeout = functionBlock("private fun scheduleExplicitReportConfirmationTimeout(")
@@ -115,6 +116,16 @@ class MainActivityReportQueueDrainStaticTest {
         assertTrue(disclosure.contains("renderExplicitReportConfirmationDisclosure(armed = false)"))
         assertTrue(source.contains("requestExplicitReport(ExplicitReportRequestSource.ON_SCREEN)"))
         assertTrue(source.contains("requestExplicitReport(ExplicitReportRequestSource.VOICE)"))
+        assertTrue(
+            source.contains(
+                "ON_SCREEN(AndroidReportCandidatePolicy.TRIGGER_ON_SCREEN)",
+            ),
+        )
+        assertTrue(source.contains("VOICE(AndroidReportCandidatePolicy.TRIGGER_VOICE)"))
+        assertTrue(request.contains("source = source"))
+        assertTrue(preparation.contains("source: ExplicitReportRequestSource"))
+        assertTrue(preparation.contains("trigger = source.reportTrigger"))
+        assertFalse(preparation.contains("trigger = \"voice\""))
         assertTrue(disclosure.contains("deliverExplicitReportDisclosureAfterDraw(delivered)"))
         val visualDelivery = functionBlock("private fun deliverExplicitReportDisclosureAfterDraw(")
         assertTrue(visualDelivery.contains("OnDrawListener"))

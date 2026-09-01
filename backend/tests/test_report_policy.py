@@ -74,6 +74,17 @@ def test_report_v2_maps_android_source() -> None:
     assert metadata.reporter_user_id == "user-123"
 
 
+def test_report_v2_preserves_on_screen_explicit_trigger() -> None:
+    metadata = report_metadata(trigger="on_screen", auto_reported=False)
+
+    ensure_report_v2_allowed(metadata)
+
+    assert metadata.trigger == "on_screen"
+    assert metadata.auto_reported is False
+    with pytest.raises(ValidationError, match="auto_reported must be true"):
+        report_metadata(trigger="on_screen", auto_reported=True)
+
+
 def test_durable_export_audit_redacts_exact_filter_coordinates() -> None:
     filters = {
         "lat": 37.56651234,

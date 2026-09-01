@@ -47,7 +47,7 @@ ModelStatus = Literal["unavailable", "ready"]
 DetectV2ModelKey = Literal["custom_tactile", "coco_general", "unified_walksafe"]
 DetectV2DistanceSource = Literal["sensor_depth", "manual_fixture", "model_estimate", "unknown"]
 DetectV2ApproachState = Literal["approaching", "stable", "receding", "unknown"]
-ReportV2Trigger = Literal["auto", "voice"]
+ReportV2Trigger = Literal["auto", "on_screen", "voice"]
 ReportCoordinateGateStatus = Literal["pass", "pending", "failed", "gps_missing"]
 ReportReviewFlag = Annotated[str, StringConstraints(min_length=1, max_length=64, pattern=r"^[a-z0-9_:-]+$")]
 ReportOriginalAccessPurpose = Literal["report_review", "security_incident", "data_subject_request"]
@@ -1506,7 +1506,7 @@ class ReportV2Metadata(DetectV2Detection):
     def trigger_matches_auto_reported(self) -> "ReportV2Metadata":
         expected_auto_reported = self.trigger == "auto"
         if self.auto_reported != expected_auto_reported:
-            raise ValueError("auto_reported must be true for auto trigger and false for voice trigger")
+            raise ValueError("auto_reported must be true for auto trigger and false for explicit triggers")
         return self
 
 
