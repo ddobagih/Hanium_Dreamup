@@ -141,6 +141,7 @@ public final class AdminDeviceProof {
                     || "admin.report.delivery_package.proof".equals(readPurpose)
                     || "admin.report_request.list".equals(readPurpose)
                     || "admin.report_request.detail".equals(readPurpose)
+                    || "admin.report_deletion.external_copy.list".equals(readPurpose)
                     || "admin.incident.list".equals(readPurpose)
                     || "admin.incident.detail".equals(readPurpose)
                     || "admin.audit.list".equals(readPurpose))) {
@@ -157,6 +158,7 @@ public final class AdminDeviceProof {
                     || "report.delivery.create".equals(action)
                     || "report.original.grant".equals(action)
                     || "admin.report.delivery_package.create".equals(action)
+                    || "report.external_copy_deletion.record".equals(action)
                     || "recovery.custody.attest".equals(action)
                     || "device.report_lost".equals(action));
             if (readPurpose != null || !(statusUpdate || postAction)) {

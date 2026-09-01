@@ -870,6 +870,28 @@ public final class AdminSecurityController implements AutoCloseable {
         );
     }
 
+    public synchronized AdminExternalCopyDeletionModels.Page listAdminExternalCopyDeletions(
+        AdminExternalCopyDeletionModels.Filter filter,
+        String cursor,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireReportRepository().listExternalCopyDeletions(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            filter,
+            cursor
+        );
+    }
+
+    public synchronized AdminExternalCopyDeletionModels.Item recordAdminExternalCopyDeletion(
+        AdminExternalCopyDeletionModels.EventCommand command,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireReportRepository().recordExternalCopyDeletion(
+            requireOperationalSession(operationalWorkflowsEnabled),
+            command
+        );
+    }
+
     public synchronized AdminHighRiskActionGate.Decision consumeHighRiskAuthorization(
         AdminHighRiskActionGate.Operation action,
         long nowEpochMs,

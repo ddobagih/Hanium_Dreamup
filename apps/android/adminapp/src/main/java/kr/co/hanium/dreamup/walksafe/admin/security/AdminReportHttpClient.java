@@ -19,6 +19,7 @@ import java.util.Set;
 public final class AdminReportHttpClient implements AdminReportRepository {
     static final String LIST_PATH = "/admin/reports";
     static final String REQUEST_LIST_PATH = "/admin/report-requests";
+    static final String EXTERNAL_COPY_LIST_PATH = "/admin/report-deletions/external-copies";
     static final String CHALLENGE_PATH = "/admin/security/device-proof/challenges";
     static final String LIST_PURPOSE = "admin.report.list";
     static final String DETAIL_PURPOSE = "admin.report.detail";
@@ -26,8 +27,12 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     static final String AUDIT_PURPOSE = "admin.audit.list";
     static final String REQUEST_LIST_PURPOSE = "admin.report_request.list";
     static final String REQUEST_DETAIL_PURPOSE = "admin.report_request.detail";
+    static final String EXTERNAL_COPY_LIST_PURPOSE =
+        "admin.report_deletion.external_copy.list";
     static final String STATUS_ACTION = "admin.report.status.update";
     static final String REQUEST_STATUS_ACTION = "admin.report_request.status.update";
+    static final String EXTERNAL_COPY_RECORD_ACTION =
+        "report.external_copy_deletion.record";
     static final String PACKAGE_ACTION = "admin.report.delivery_package.create";
     static final String CORRELATION_ID_HEADER = "X-WalkSafe-Correlation-Id";
     static final String READ_PURPOSE_HEADER = "X-WalkSafe-Read-Purpose";
@@ -393,6 +398,72 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         }
         requireStatus(response, 200);
         return AdminReportRequestModels.parseStatus(jsonBody(response), safeId, safeType);
+    }
+
+    @Override
+    public AdminExternalCopyDeletionModels.Page listExternalCopyDeletions(
+        AdminOperationsApi.SessionContext session,
+        AdminExternalCopyDeletionModels.Filter filter,
+        String cursor
+    ) throws IOException, GeneralSecurityException {
+        if (filter == null) throw new IllegalArgumentException("external-copy filter is required");
+        List<AdminCanonicalEncoding.QueryParameter> parameters = new ArrayList<>();
+        parameters.add(new AdminCanonicalEncoding.QueryParameter(
+            "limit",
+            Integer.toString(AdminExternalCopyDeletionModels.PAGE_SIZE)
+        ));
+        add(parameters, "request_id", filter.requestId());
+        if (cursor != null) {
+            if (!cursor.matches("[A-Za-z0-9_-]{1,1024}")) {
+                throw new IllegalArgumentException("external-copy cursor is invalid");
+            }
+            add(parameters, "cursor", cursor);
+        }
+        String query = AdminCanonicalEncoding.canonicalQuery(parameters);
+        Response response = executeProtectedRead(
+            requireSession(session),
+            EXTERNAL_COPY_LIST_PATH,
+            query,
+            EXTERNAL_COPY_LIST_PURPOSE
+        );
+        requireStatus(response, 200);
+        return AdminExternalCopyDeletionModels.parsePage(jsonBody(response));
+    }
+
+    @Override
+    public AdminExternalCopyDeletionModels.Item recordExternalCopyDeletion(
+        AdminOperationsApi.SessionContext session,
+        AdminExternalCopyDeletionModels.EventCommand command
+    ) throws IOException, GeneralSecurityException {
+        if (command == null) throw new IllegalArgumentException("external-copy command is required");
+        String path = "/admin/report-deletions/" + command.requestId()
+            + "/external-copies/" + command.copyId() + "/events";
+        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(command.bodyFields());
+        Response response = executeProtected(
+            requireSession(session),
+            "POST",
+            path,
+            "",
+            EXTERNAL_COPY_RECORD_ACTION,
+            null,
+            body,
+            AdminJava8Collections.map(),
+            "application/json"
+        );
+        if (response.statusCode == 404) throw new ExternalCopyNotFoundException();
+        if (response.statusCode == 409) {
+            throw new ExternalCopyConflictException(
+                AdminExternalCopyDeletionModels.parseConflict(
+                    jsonBody(response),
+                    command.requestId(),
+                    command.copyId()
+                )
+            );
+        }
+        if (response.statusCode != 200 && response.statusCode != 201) {
+            requireStatus(response, 201);
+        }
+        return AdminExternalCopyDeletionModels.parseEvent(jsonBody(response), command);
     }
 
     private Response executeProtectedRead(

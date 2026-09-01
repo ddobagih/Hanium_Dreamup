@@ -46,6 +46,8 @@ import kr.co.hanium.dreamup.walksafe.admin.security.AdminAuditController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminAuditModels;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeliveryPackage;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeliveryPackageSaver;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminExternalCopyDeletionController;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminExternalCopyDeletionModels;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminInstitutionDelivery;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentHttpClient;
@@ -82,6 +84,10 @@ public final class AdminBoundaryActivity extends Activity {
     private static final String REQUEST_FILTER_TYPE_STATE = "admin_request_filter_type";
     private static final String REQUEST_FILTER_STATUS_STATE = "admin_request_filter_status";
     private static final String REQUEST_SELECTED_ID_STATE = "admin_request_selected_id";
+    private static final String EXTERNAL_COPY_FILTER_REQUEST_STATE =
+        "admin_external_copy_filter_request";
+    private static final String EXTERNAL_COPY_SELECTED_ID_STATE =
+        "admin_external_copy_selected_id";
     private static final String AUDIT_EVENT_TYPE_STATE = "admin_audit_event_type";
     private static final String AUDIT_ACTOR_STATE = "admin_audit_actor";
     private static final String INCIDENT_FILTER_STATUS_STATE = "admin_incident_filter_status";
@@ -114,6 +120,7 @@ public final class AdminBoundaryActivity extends Activity {
     private AdminSecurityController controller;
     private AdminReportController reportController;
     private AdminReportRequestController reportRequestController;
+    private AdminExternalCopyDeletionController externalCopyDeletionController;
     private AdminReportWorkflowController reportWorkflowController;
     private AdminAuditController auditController;
     private AdminIncidentController incidentController;
@@ -149,6 +156,7 @@ public final class AdminBoundaryActivity extends Activity {
     private LinearLayout reportOperationsFormGroup;
     private AdminReportPanel reportPanel;
     private AdminReportRequestPanel reportRequestPanel;
+    private AdminExternalCopyDeletionPanel externalCopyDeletionPanel;
     private AdminAuditPanel auditPanel;
     private AdminIncidentPanel incidentPanel;
     private EditText reportIdInput;
@@ -355,6 +363,31 @@ public final class AdminBoundaryActivity extends Activity {
                         }
                     }
                 );
+                externalCopyDeletionController = new AdminExternalCopyDeletionController(
+                    new AdminExternalCopyDeletionController.Loader() {
+                        @Override
+                        public AdminExternalCopyDeletionModels.Page load(
+                            AdminExternalCopyDeletionModels.Filter filter,
+                            String cursor
+                        ) throws Exception {
+                            return controller.listAdminExternalCopyDeletions(
+                                filter,
+                                cursor,
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                            );
+                        }
+
+                        @Override
+                        public AdminExternalCopyDeletionModels.Item record(
+                            AdminExternalCopyDeletionModels.EventCommand command
+                        ) throws Exception {
+                            return controller.recordAdminExternalCopyDeletion(
+                                command,
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                            );
+                        }
+                    }
+                );
                 reportWorkflowController = new AdminReportWorkflowController(
                     new AdminReportWorkflowController.Loader() {
                         @Override
@@ -459,6 +492,16 @@ public final class AdminBoundaryActivity extends Activity {
             outState.putString(REQUEST_FILTER_STATUS_STATE, draft.status());
             outState.putString(REQUEST_SELECTED_ID_STATE, reportRequestPanel.selectedRequestId());
         }
+        if (externalCopyDeletionPanel != null) {
+            outState.putString(
+                EXTERNAL_COPY_FILTER_REQUEST_STATE,
+                externalCopyDeletionPanel.filterDraft().requestId()
+            );
+            outState.putString(
+                EXTERNAL_COPY_SELECTED_ID_STATE,
+                externalCopyDeletionPanel.selectedCopyId()
+            );
+        }
         if (auditPanel != null) {
             outState.putString(AUDIT_EVENT_TYPE_STATE, auditPanel.eventType());
             outState.putString(AUDIT_ACTOR_STATE, auditPanel.actorId());
@@ -478,6 +521,7 @@ public final class AdminBoundaryActivity extends Activity {
         clear(originalEvidenceTotpInput);
         if (reportController != null) reportController.invalidate();
         if (reportRequestController != null) reportRequestController.invalidate();
+        if (externalCopyDeletionController != null) externalCopyDeletionController.invalidate();
         if (auditController != null) auditController.invalidate();
         if (incidentController != null) incidentController.invalidate();
         if (!awaitingSafResult && reportWorkflowController != null) {
@@ -485,6 +529,7 @@ public final class AdminBoundaryActivity extends Activity {
         }
         if (reportPanel != null) reportPanel.clearHighRiskInputs();
         if (reportRequestPanel != null) reportRequestPanel.clearSensitiveInputs();
+        if (externalCopyDeletionPanel != null) externalCopyDeletionPanel.clearTransientInputs();
         if (incidentPanel != null) incidentPanel.clearSensitiveInputs();
         clearSensitiveInputs();
         super.onStop();
@@ -494,6 +539,7 @@ public final class AdminBoundaryActivity extends Activity {
     protected void onDestroy() {
         clearOriginalEvidence("원본 증거를 메모리에서 지웠습니다.");
         if (reportRequestController != null) reportRequestController.invalidate();
+        if (externalCopyDeletionController != null) externalCopyDeletionController.invalidate();
         if (incidentController != null) incidentController.invalidate();
         if (pendingDeliveryPackage != null) pendingDeliveryPackage.destroy();
         pendingDeliveryPackage = null;
@@ -897,6 +943,49 @@ public final class AdminBoundaryActivity extends Activity {
             }
         );
         requiredParallelOperationsGroup.addView(reportRequestPanel, matchWrap());
+
+        externalCopyDeletionPanel = new AdminExternalCopyDeletionPanel(
+            this,
+            new AdminExternalCopyDeletionPanel.Listener() {
+                @Override
+                public void onLoad(AdminExternalCopyDeletionPanel.FilterDraft filter) {
+                    loadFirstExternalCopyDeletionPage(filter);
+                }
+
+                @Override
+                public void onLoadMore() {
+                    loadNextExternalCopyDeletionPage();
+                }
+
+                @Override
+                public void onRetryRead() {
+                    retryExternalCopyDeletionRead();
+                }
+
+                @Override
+                public void onRetryRecord() {
+                    retryExternalCopyDeletionRecord();
+                }
+
+                @Override
+                public void onRecord(
+                    AdminExternalCopyDeletionModels.Item item,
+                    String nextState,
+                    String observedAt,
+                    String institutionReference,
+                    String evidenceSha256
+                ) {
+                    recordExternalCopyDeletionFact(
+                        item,
+                        nextState,
+                        observedAt,
+                        institutionReference,
+                        evidenceSha256
+                    );
+                }
+            }
+        );
+        requiredParallelOperationsGroup.addView(externalCopyDeletionPanel, matchWrap());
 
         incidentPanel = new AdminIncidentPanel(this, new AdminIncidentPanel.Listener() {
             @Override
@@ -1834,6 +1923,9 @@ public final class AdminBoundaryActivity extends Activity {
         if (reportRequestPanel != null && reportRequestController != null) {
             reportRequestPanel.render(reportRequestController.snapshot());
         }
+        if (externalCopyDeletionPanel != null && externalCopyDeletionController != null) {
+            externalCopyDeletionPanel.render(externalCopyDeletionController.snapshot());
+        }
         if (auditPanel != null && auditController != null) {
             auditPanel.render(auditController.snapshot());
         }
@@ -2063,6 +2155,84 @@ public final class AdminBoundaryActivity extends Activity {
         }
     }
 
+    private void loadFirstExternalCopyDeletionPage(
+        AdminExternalCopyDeletionPanel.FilterDraft draft
+    ) {
+        if (externalCopyDeletionController == null) return;
+        try {
+            executeExternalCopyDeletionRequest(externalCopyDeletionController.beginFirst(
+                new AdminExternalCopyDeletionModels.Filter(draft.requestId())
+            ));
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            resultText.setText("삭제 요청 UUID 필터를 다시 확인해 주세요.");
+        }
+    }
+
+    private void loadNextExternalCopyDeletionPage() {
+        if (externalCopyDeletionController == null) return;
+        try {
+            executeExternalCopyDeletionRequest(externalCopyDeletionController.beginNext());
+        } catch (IllegalStateException error) {
+            resultText.setText("불러올 다음 외부기관 보관본 페이지가 없습니다.");
+        }
+    }
+
+    private void retryExternalCopyDeletionRead() {
+        if (externalCopyDeletionController == null) return;
+        try {
+            executeExternalCopyDeletionRequest(externalCopyDeletionController.beginRetry());
+        } catch (IllegalStateException error) {
+            resultText.setText("다시 시도할 외부기관 보관본 조회가 없습니다.");
+        }
+    }
+
+    private void retryExternalCopyDeletionRecord() {
+        if (externalCopyDeletionController == null) return;
+        try {
+            executeExternalCopyDeletionRequest(
+                externalCopyDeletionController.beginRecordRetry()
+            );
+        } catch (IllegalStateException error) {
+            resultText.setText("같은 사실·멱등키로 다시 확인할 기록이 없습니다.");
+        }
+    }
+
+    private void recordExternalCopyDeletionFact(
+        AdminExternalCopyDeletionModels.Item item,
+        String nextState,
+        String observedAt,
+        String institutionReference,
+        String evidenceSha256
+    ) {
+        if (externalCopyDeletionController == null) return;
+        try {
+            executeExternalCopyDeletionRequest(externalCopyDeletionController.beginRecord(
+                item,
+                nextState,
+                observedAt,
+                institutionReference,
+                evidenceSha256
+            ));
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            resultText.setText(
+                "앱 밖 사실 확인 시각·기관 참조값·증거 SHA-256과 현재 상태를 확인해 주세요. 회신 원문이나 연락처는 입력하지 마세요."
+            );
+        }
+    }
+
+    private void executeExternalCopyDeletionRequest(
+        AdminExternalCopyDeletionController.Request request
+    ) {
+        externalCopyDeletionPanel.render(externalCopyDeletionController.snapshot());
+        networkExecutor.execute(() -> {
+            boolean applied = externalCopyDeletionController.execute(request);
+            runOnUiThread(() -> {
+                if (isDestroyed() || !applied) return;
+                externalCopyDeletionPanel.render(externalCopyDeletionController.snapshot());
+            });
+        });
+    }
+
     private void reconcileOperationsAccessBinding(boolean accessActive, String currentSessionId) {
         if (!operationsAccessBindingInitialized
             || boundOperationsAccessActive != accessActive
@@ -2107,12 +2277,18 @@ public final class AdminBoundaryActivity extends Activity {
         resetOperationsInputsForDifferentReport();
         if (reportPanel != null) reportPanel.clearSessionBoundDrafts();
         if (reportRequestPanel != null) reportRequestPanel.clearSessionBoundDrafts();
+        if (externalCopyDeletionPanel != null) {
+            externalCopyDeletionPanel.clearSessionBoundDrafts();
+        }
         if (incidentPanel != null) {
             incidentPanel.clearSensitiveInputs();
             incidentPanel.clearSubmittedEvidence();
         }
         if (reportController != null) reportController.clearSessionState();
         if (reportRequestController != null) reportRequestController.clearSessionState();
+        if (externalCopyDeletionController != null) {
+            externalCopyDeletionController.clearSessionState();
+        }
         if (reportWorkflowController != null) reportWorkflowController.clearSessionState();
         if (auditController != null) auditController.clearSessionState();
         if (incidentController != null) incidentController.clearSessionState();
@@ -2279,6 +2455,14 @@ public final class AdminBoundaryActivity extends Activity {
                     savedInstanceState.getString(REQUEST_FILTER_STATUS_STATE, "")
                 ),
                 savedInstanceState.getString(REQUEST_SELECTED_ID_STATE)
+            );
+        }
+        if (externalCopyDeletionPanel != null) {
+            externalCopyDeletionPanel.restore(
+                new AdminExternalCopyDeletionPanel.FilterDraft(
+                    savedInstanceState.getString(EXTERNAL_COPY_FILTER_REQUEST_STATE, "")
+                ),
+                savedInstanceState.getString(EXTERNAL_COPY_SELECTED_ID_STATE)
             );
         }
         if (auditPanel != null) {

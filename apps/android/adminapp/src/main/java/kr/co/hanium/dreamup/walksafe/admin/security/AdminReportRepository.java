@@ -42,6 +42,24 @@ public interface AdminReportRepository {
         public AdminReportRequestModels.StatusConflict latest() { return latest; }
     }
 
+    final class ExternalCopyNotFoundException extends IOException {
+        public ExternalCopyNotFoundException() {
+            super("external-copy deletion record was not found");
+        }
+    }
+
+    final class ExternalCopyConflictException extends IOException {
+        private final AdminExternalCopyDeletionModels.Conflict latest;
+
+        public ExternalCopyConflictException(AdminExternalCopyDeletionModels.Conflict latest) {
+            super("external-copy deletion revision conflicted");
+            if (latest == null) throw new IllegalArgumentException("latest external-copy state is required");
+            this.latest = latest;
+        }
+
+        public AdminExternalCopyDeletionModels.Conflict latest() { return latest; }
+    }
+
     AdminReportModels.Page list(
         AdminOperationsApi.SessionContext session,
         AdminReportModels.Filters filters,
@@ -99,5 +117,16 @@ public interface AdminReportRepository {
         String publicResponse,
         String internalNote,
         Map<String, String> reconfirmationHeaders
+    ) throws IOException, GeneralSecurityException;
+
+    AdminExternalCopyDeletionModels.Page listExternalCopyDeletions(
+        AdminOperationsApi.SessionContext session,
+        AdminExternalCopyDeletionModels.Filter filter,
+        String cursor
+    ) throws IOException, GeneralSecurityException;
+
+    AdminExternalCopyDeletionModels.Item recordExternalCopyDeletion(
+        AdminOperationsApi.SessionContext session,
+        AdminExternalCopyDeletionModels.EventCommand command
     ) throws IOException, GeneralSecurityException;
 }

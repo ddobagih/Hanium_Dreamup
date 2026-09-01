@@ -390,6 +390,87 @@ public final class AdminReportHttpClientTest {
         ));
     }
 
+    @Test
+    public void externalCopyListAndManualRecordUseExactStandardDeviceProof() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        AdminReportHttpClient client = client(transport);
+        AdminExternalCopyDeletionModels.EventCommand command = externalCopyCommand();
+
+        AdminExternalCopyDeletionModels.Page page = client.listExternalCopyDeletions(
+            SESSION,
+            new AdminExternalCopyDeletionModels.Filter(REQUEST_ID),
+            "cursor_A"
+        );
+        AdminExternalCopyDeletionModels.Item recorded =
+            client.recordExternalCopyDeletion(SESSION, command);
+
+        assertEquals(1, page.items().size());
+        assertEquals("REQUEST_SENT", recorded.state());
+        Map<String, Object> listIntent = AdminStrictJson.parseObject(
+            transport.requests.get(0).bodyText()
+        );
+        Request list = transport.requests.get(1);
+        assertEquals(AdminReportHttpClient.EXTERNAL_COPY_LIST_PURPOSE, listIntent.get("read_purpose"));
+        assertTrue(list.url.contains("limit=25"));
+        assertTrue(list.url.contains("request_id=" + REQUEST_ID));
+        assertTrue(list.url.contains("cursor=cursor_A"));
+        assertEquals(
+            AdminReportHttpClient.EXTERNAL_COPY_LIST_PURPOSE,
+            list.headers.get(AdminReportHttpClient.READ_PURPOSE_HEADER)
+        );
+
+        Map<String, Object> recordIntent = AdminStrictJson.parseObject(
+            transport.requests.get(2).bodyText()
+        );
+        Request post = transport.requests.get(3);
+        assertEquals(AdminReportHttpClient.EXTERNAL_COPY_RECORD_ACTION, recordIntent.get("action"));
+        assertEquals("POST", post.method);
+        assertFalse(post.headers.containsKey(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER));
+        assertEquals(
+            Set.of(
+                "state", "expected_revision", "idempotency_key", "observed_at",
+                "institution_reference", "evidence_sha256"
+            ),
+            AdminStrictJson.parseObject(post.bodyText()).keySet()
+        );
+        assertFalse(post.bodyText().contains("reply_body"));
+        assertFalse(post.bodyText().contains("recipient"));
+    }
+
+    @Test
+    public void externalCopyReplayAndConflictRequireExactBoundProjection() throws Exception {
+        FakeTransport replay = new FakeTransport();
+        replay.externalCopyStatus = 200;
+        assertEquals(
+            "REQUEST_SENT",
+            client(replay).recordExternalCopyDeletion(SESSION, externalCopyCommand()).state()
+        );
+
+        FakeTransport conflict = new FakeTransport();
+        conflict.externalCopyStatus = 409;
+        assertThrows(AdminReportRepository.ExternalCopyConflictException.class, () ->
+            client(conflict).recordExternalCopyDeletion(SESSION, externalCopyCommand())
+        );
+
+        FakeTransport mismatched = new FakeTransport();
+        mismatched.externalCopyStatus = 409;
+        mismatched.externalCopyConflictBody = externalCopyConflict().replace(
+            EXTERNAL_COPY_ID,
+            "99999999-9999-4999-8999-999999999999"
+        );
+        assertThrows(IOException.class, () ->
+            client(mismatched).recordExternalCopyDeletion(SESSION, externalCopyCommand())
+        );
+
+        FakeTransport oversized = new FakeTransport();
+        oversized.externalCopyListBody = "x".repeat(128 * 1024 + 1);
+        assertThrows(IOException.class, () -> client(oversized).listExternalCopyDeletions(
+            SESSION,
+            new AdminExternalCopyDeletionModels.Filter(null),
+            null
+        ));
+    }
+
     private static AdminReportHttpClient client(FakeTransport transport) {
         return new AdminReportHttpClient(
             "http://127.0.0.1:8000",
@@ -410,6 +491,10 @@ public final class AdminReportHttpClientTest {
         int requestStatusCode = 200;
         String requestStatusBody = requestStatus();
         String requestConflictBody = requestConflict();
+        int externalCopyStatus = 201;
+        String externalCopyEventBody = externalCopyEvent();
+        String externalCopyConflictBody = externalCopyConflict();
+        String externalCopyListBody = externalCopyList();
         String packageContentRevisionHeader = "3";
         String packageReviewRevisionHeader = "2";
         int packageByteCountDelta;
@@ -449,6 +534,15 @@ public final class AdminReportHttpClientTest {
                         AdminDeviceProofTest.ISSUED_AT,
                         null
                     )
+                );
+            }
+            if (url.contains("/admin/report-deletions/external-copies?")) {
+                return new AdminReportHttpClient.Response(200, externalCopyListBody);
+            }
+            if (url.contains("/admin/report-deletions/")) {
+                return new AdminReportHttpClient.Response(
+                    externalCopyStatus,
+                    externalCopyStatus == 409 ? externalCopyConflictBody : externalCopyEventBody
                 );
             }
             if (url.startsWith("http://127.0.0.1:8000/admin/report-requests/")) {
@@ -652,8 +746,56 @@ public final class AdminReportHttpClientTest {
             + "\"updated_at\":\"2026-08-29T02:00:00Z\"}";
     }
 
+    private static AdminExternalCopyDeletionModels.EventCommand externalCopyCommand() {
+        return new AdminExternalCopyDeletionModels.EventCommand(
+            REQUEST_ID,
+            EXTERNAL_COPY_ID,
+            "REQUEST_SENT",
+            0,
+            "77777777-7777-4777-8777-777777777777",
+            "2026-09-01T01:00:00Z",
+            null,
+            null
+        );
+    }
+
+    private static String externalCopyList() {
+        return "{\"schema_version\":\"walksafe.admin-report-deletion-external-copy-list.v1\","
+            + "\"items\":[" + externalCopyItem("NOT_REQUESTED", 0, "[\"REQUEST_SENT\"]")
+            + "],\"next_cursor\":null}";
+    }
+
+    private static String externalCopyEvent() {
+        return "{\"schema_version\":\"walksafe.admin-report-deletion-external-copy-event.v1\","
+            + externalCopyItem(
+                "REQUEST_SENT",
+                1,
+                "[\"REPLY_ACKNOWLEDGED\",\"REPLY_DELETION_CONFIRMED\",\"REPLY_DECLINED\"]"
+            ).substring(1);
+    }
+
+    private static String externalCopyConflict() {
+        return "{\"detail\":{\"code\":\"report_external_copy_revision_conflict\","
+            + "\"message\":\"conflict\",\"latest\":"
+            + externalCopyItem(
+                "REQUEST_SENT",
+                1,
+                "[\"REPLY_ACKNOWLEDGED\",\"REPLY_DELETION_CONFIRMED\",\"REPLY_DECLINED\"]"
+            ) + "}}";
+    }
+
+    private static String externalCopyItem(String state, int revision, String allowed) {
+        return "{\"request_id\":\"" + REQUEST_ID + "\",\"copy_id\":\"" + EXTERNAL_COPY_ID + "\","
+            + "\"institution\":\"서울시\",\"delivery_status_at_local_deletion\":\"RESOLVED\","
+            + "\"state\":\"" + state + "\",\"revision\":" + revision + ","
+            + "\"allowed_next_states\":" + allowed + ","
+            + "\"status_observed_at\":" + (revision == 0 ? "null" : "\"2026-09-01T01:00:00Z\"") + ","
+            + "\"status_recorded_at\":" + (revision == 0 ? "null" : "\"2026-09-01T01:00:01Z\"") + "}";
+    }
+
     private static final String REPORT_ID = "11111111-1111-4111-8111-111111111111";
     private static final String REQUEST_ID = "88888888-8888-4888-8888-888888888888";
+    private static final String EXTERNAL_COPY_ID = "22222222-2222-4222-8222-222222222222";
     private static final String TOKEN = "opaque-access-token-for-tests-123456";
     private static final AdminOperationsApi.SessionContext SESSION = new AdminOperationsApi.SessionContext(
         TOKEN,
