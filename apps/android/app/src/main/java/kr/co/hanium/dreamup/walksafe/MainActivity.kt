@@ -675,6 +675,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var routeDeviationNewRouteButton: Button
     private lateinit var routeDeviationRecheckButton: Button
     private lateinit var routeDeviationEndButton: Button
+    private lateinit var arrivalConfirmButton: Button
+    private lateinit var arrivalRejectButton: Button
     private lateinit var debugBboxOverlay: DebugBboxOverlayView
     private lateinit var loginUserIdInput: EditText
     private lateinit var loginSaveButton: Button
@@ -1170,6 +1172,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var latestTmapOnRoute = false
     private var directionGuidancePauseReason: String? = null
     private var lastAnnouncedRouteDecisionToken: RouteNavigatorDecisionToken? = null
+    private var renderedArrivalDecisionToken: RouteNavigatorDecisionToken? = null
     private var routeDeviationHapticDecision: RouteNavigatorUserDecision? = null
     private var routeSnapshotPurgeFailed = false
     private var routeSnapshotExpiryRunnable: Runnable? = null
@@ -13232,6 +13235,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             contentDescription = text
             setOnClickListener { endNavigationAfterDeviation() }
         }
+        arrivalConfirmButton = Button(this).apply {
+            text = "도착 확인"
+            contentDescription = text
+            setOnClickListener { confirmArrivalFromButton(renderedArrivalDecisionToken) }
+        }
+        arrivalRejectButton = Button(this).apply {
+            text = "도착 아님"
+            contentDescription = text
+            setOnClickListener { rejectArrivalFromButton(renderedArrivalDecisionToken) }
+        }
         offRouteNoticeText = TextView(this).apply {
             textSize = 18f
             typeface = wsTypeface(Typeface.BOLD)
@@ -13260,6 +13273,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(routeDeviationNewRouteButton)
             addView(routeDeviationRecheckButton)
             addView(routeDeviationEndButton)
+            addView(arrivalConfirmButton)
+            addView(arrivalRejectButton)
         }
         destinationResetButton = Button(this).apply {
             text = "경로 초기화"
@@ -16458,7 +16473,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             clearGatewaySession(logoutRemote = true)
         }
         reporterUserId = actorId
-        permissionSessionPolicy.rememberActor(actorId)
+        if (!permissionSessionPolicy.isAuthenticatedFor(actorId)) {
+            permissionSessionPolicy.rememberActor(actorId)
+        }
         restorePriorityUserOnboardingFromPrefs()
         val verifiedAgeBand = when (firstRunOnboardingSnapshot.ageBand) {
             FirstRunAgeBand.AGE_14_TO_17 -> PriorityUserAgeBand.AGE_14_TO_17
@@ -28608,7 +28625,15 @@ generation != cameraFallbackGeneration
             speakInteraction(message)
             return
         }
-        if (!onDestinationSelected(selected)) return
+        if (!onDestinationSelected(selected)) {
+            if (currentDestination == selected.point && freshTrustedLocationOrNull() == null) {
+                speakInteraction(
+                    "${selected.name} 목적지를 유지했습니다. GPS 위치를 확인한 뒤 " +
+                        "같은 후보 번호를 다시 말하거나 경로 시작을 선택해 주세요.",
+                )
+            }
+            return
+        }
         pendingVoiceDestinationQuery = null
         pendingVoiceDestinationPageIndex = null
         destinationSearchVoiceState = null
@@ -28701,12 +28726,47 @@ generation != cameraFallbackGeneration
         speakInteraction(requireNotNull(decision.instruction))
     }
 
+    private fun confirmArrivalFromButton(expectedToken: RouteNavigatorDecisionToken?) {
+        val decision = if (expectedToken != null) {
+            routeNavigator.confirmArrival(expectedToken)
+        } else {
+            null
+        }
+        if (decision?.arrived != true) {
+            updateRouteDeviationActions(routeNavigator.pendingUserDecision())
+            updateNavigationStatus("navigation=arrival_confirmation_stale")
+            speakInteraction("도착 확인 상태가 변경되었습니다. 현재 경로 상태를 다시 확인해 주세요.")
+            return
+        }
+        resetRouteState()
+        updateNavigationStatus("navigation=arrival_confirmed_by_user")
+        speakInteraction(requireNotNull(decision.instruction))
+    }
+
     private fun rejectArrivalFromVoice() {
         val decision = routeNavigator.rejectArrival()
         if (decision.reason != "arrival_rejected_route_retained") {
             speakInteraction("지금은 거절할 도착 후보가 없습니다.")
             return
         }
+        updateRouteDeviationActions(decision.pendingUserDecision)
+        updateNavigationStatus("navigation=arrival_rejected_route_retained")
+        speakInteraction(requireNotNull(decision.instruction))
+    }
+
+    private fun rejectArrivalFromButton(expectedToken: RouteNavigatorDecisionToken?) {
+        val decision = if (expectedToken != null) {
+            routeNavigator.rejectArrival(expectedToken)
+        } else {
+            null
+        }
+        if (decision?.reason != "arrival_rejected_route_retained") {
+            updateRouteDeviationActions(routeNavigator.pendingUserDecision())
+            updateNavigationStatus("navigation=arrival_confirmation_stale")
+            speakInteraction("도착 확인 상태가 변경되었습니다. 현재 경로 상태를 다시 확인해 주세요.")
+            return
+        }
+        updateRouteDeviationActions(decision.pendingUserDecision)
         updateNavigationStatus("navigation=arrival_rejected_route_retained")
         speakInteraction(requireNotNull(decision.instruction))
     }
@@ -29245,14 +29305,14 @@ generation != cameraFallbackGeneration
             updateNavigationStatus("navigation=gps_permission_missing")
             return
         }
-        val destination = parseDestinationInput()
+        val destination = currentDestination ?: parseDestinationInput()
         if (destination == null) {
             updateNavigationStatus("navigation=destination_missing")
             return
         }
         if (destinationSearchInFlight || navigationRequests.hasActiveDestinationSearch()) cancelDestinationSearch()
         currentDestination = destination
-        isRouteActive = true
+        isRouteActive = false
         latestTmapOnRoute = false
         updateRouteButtonText()
         requestRoute(destination, reason = "user_destination")
@@ -29743,7 +29803,7 @@ generation != cameraFallbackGeneration
             destinationLngInput.setText(result.point.longitude.toString())
         }
         currentDestination = result.point
-        isRouteActive = true
+        isRouteActive = false
         latestTmapOnRoute = false
         updateRouteButtonText()
         updateNavigationStatus("navigation=destination_selected ${result.name} ${formatDestinationDistance(result.distanceM)}")
@@ -29886,19 +29946,20 @@ generation != cameraFallbackGeneration
         val origin = freshTrustedLocationOrNull()
         if (origin == null) {
             latestTmapOnRoute = false
-            if (!preserveExistingRoute && !isRouteLocationPermissionReady()) {
+            if (!preserveExistingRoute) {
                 isRouteActive = false
-                currentDestination = null
-            } else if (!preserveExistingRoute) {
-                navigationPermissionsRequestedForRoute = true
-                startNavigationServicesIfNeeded()
+                currentDestination = destination
+                if (isRouteLocationPermissionReady()) {
+                    navigationPermissionsRequestedForRoute = true
+                    startNavigationServicesIfNeeded()
+                }
             }
             updateRouteButtonText()
             updateNavigationStatus(
                 if (preserveExistingRoute) {
                     "navigation=reroute_blocked trusted_gps_missing existing_route_retained"
-                } else if (isRouteActive) {
-                    "navigation=route_waiting trusted_gps_missing"
+                } else if (isRouteLocationPermissionReady()) {
+                    "navigation=route_waiting trusted_gps_missing explicit_start_required"
                 } else {
                     "navigation=route_blocked gps_permission_missing"
                 },
@@ -29909,6 +29970,8 @@ generation != cameraFallbackGeneration
             updateNavigationStatus("navigation=route_blocked request_in_flight")
             return
         }
+        isRouteActive = true
+        currentDestination = destination
         val requestId = ++routeRequestGeneration
         updateNavigationStatus("navigation=route_requesting reason=$reason priority=STAIR_AVOID")
         updateRouteButtonText()
@@ -30272,31 +30335,38 @@ generation != cameraFallbackGeneration
         if (!::routeDeviationActions.isInitialized) return
         val suspected = decision == RouteNavigatorUserDecision.LOCATION_RECHECK
         val confirmed = decision == RouteNavigatorUserDecision.REROUTE
-        routeDeviationActions.visibility = if (suspected || confirmed) View.VISIBLE else View.GONE
+        val arrival = decision == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION
+        val decisionVisible = suspected || confirmed || arrival
+        renderedArrivalDecisionToken = if (arrival) routeNavigator.pendingDecisionToken() else null
+        routeDeviationActions.visibility = if (decisionVisible) View.VISIBLE else View.GONE
         if (::routeDeviationSection.isInitialized) {
             routeDeviationSection.visibility =
-                if (suspected || confirmed) View.VISIBLE else View.GONE
+                if (decisionVisible) View.VISIBLE else View.GONE
         }
         routeDeviationActions.contentDescription = when {
             confirmed -> "경로 이탈 확정. 새 경로 요청, 위치 다시 확인, 길안내 종료 중 선택"
             suspected -> "경로 이탈 의심. 위치 다시 확인 선택"
+            arrival -> "도착 후보입니다. 도착 확인 또는 도착 아님 중 선택"
             else -> null
         }
         if (::offRouteNoticeText.isInitialized) {
             offRouteNoticeText.text = when {
                 confirmed -> "경로를 벗어났습니다"
                 suspected -> "경로를 벗어난 것으로 보입니다"
+                arrival -> "목적지에 도착하셨나요?"
                 else -> ""
             }
         }
         routeDeviationNewRouteButton.visibility = if (confirmed) View.VISIBLE else View.GONE
         routeDeviationRecheckButton.visibility = if (suspected || confirmed) View.VISIBLE else View.GONE
         routeDeviationEndButton.visibility = if (confirmed) View.VISIBLE else View.GONE
+        arrivalConfirmButton.visibility = if (arrival) View.VISIBLE else View.GONE
+        arrivalRejectButton.visibility = if (arrival) View.VISIBLE else View.GONE
         if (::routeButton.isInitialized) {
-            routeButton.visibility = if (suspected || confirmed) View.GONE else View.VISIBLE
+            routeButton.visibility = if (decisionVisible) View.GONE else View.VISIBLE
         }
         if (::destinationResetButton.isInitialized) {
-            destinationResetButton.visibility = if (suspected || confirmed) View.GONE else View.VISIBLE
+            destinationResetButton.visibility = if (decisionVisible) View.GONE else View.VISIBLE
         }
     }
 
@@ -30304,12 +30374,13 @@ generation != cameraFallbackGeneration
         routeNavigator.pendingUserDecision() in setOf(
             RouteNavigatorUserDecision.LOCATION_RECHECK,
             RouteNavigatorUserDecision.REROUTE,
+            RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION,
         )
 
     private fun blockRouteMutationWhileDeviationChoicePending(): Boolean {
         if (!routeDeviationChoicePending()) return false
         updateNavigationStatus("navigation=route_deviation_choice_required")
-        speakInteraction("현재 경로 상태에서 표시된 이탈 선택지를 먼저 골라 주세요.")
+        speakInteraction("현재 경로 상태에서 표시된 확인 선택지를 먼저 골라 주세요.")
         return true
     }
 

@@ -56,7 +56,6 @@ data class WalkSessionReadinessPlan(
 
             WalkSessionAction.RESUME_WALK -> {
                 addWalkRuntimeRequirements()
-                add(WalkSessionReadinessRequirement.VOICE_INPUT)
                 add(WalkSessionReadinessRequirement.VOICE_OUTPUT)
             }
 

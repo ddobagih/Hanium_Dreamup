@@ -330,6 +330,14 @@ class RouteNavigator(
     }
 
     @Synchronized
+    fun confirmArrival(expectedToken: RouteNavigatorDecisionToken): RouteNavigatorUpdate {
+        if (pendingDecisionToken() != expectedToken) {
+            return staleArrivalDecisionUpdate()
+        }
+        return confirmArrival()
+    }
+
+    @Synchronized
     fun rejectArrival(): RouteNavigatorUpdate {
         if (route == null || pendingDecision != RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
             return RouteNavigatorUpdate(null, false, false, false, "arrival_confirmation_missing")
@@ -343,6 +351,14 @@ class RouteNavigator(
             shouldReroute = false,
             reason = "arrival_rejected_route_retained",
         )
+    }
+
+    @Synchronized
+    fun rejectArrival(expectedToken: RouteNavigatorDecisionToken): RouteNavigatorUpdate {
+        if (pendingDecisionToken() != expectedToken) {
+            return staleArrivalDecisionUpdate()
+        }
+        return rejectArrival()
     }
 
     @Synchronized
@@ -537,6 +553,15 @@ class RouteNavigator(
         pendingDecision = decision
         decisionRevision += 1L
     }
+
+    private fun staleArrivalDecisionUpdate(): RouteNavigatorUpdate = RouteNavigatorUpdate(
+        instruction = null,
+        arrived = false,
+        offRoute = confirmedDeviationLatched,
+        shouldReroute = false,
+        reason = "arrival_confirmation_stale",
+        pendingUserDecision = pendingDecision,
+    )
 
     private fun advanceAnnouncedPassedGuides(
         route: WalkingRoute,

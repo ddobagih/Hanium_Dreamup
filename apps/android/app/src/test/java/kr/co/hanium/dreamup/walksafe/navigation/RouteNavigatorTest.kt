@@ -499,6 +499,26 @@ class RouteNavigatorTest {
     }
 
     @Test
+    fun staleArrivalDecisionTokenCannotConfirmOrRejectAReplacementRoute() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(arrivalConfirmSamples = 1))
+        val nearEnd = TrustedLocation(37.0009, 127.0, 5f, 1_000L)
+        navigator.setRoute(route())
+        navigator.update(nearEnd, nowMs = 1_000L, requestInFlight = false)
+        val staleToken = requireNotNull(navigator.pendingDecisionToken())
+
+        navigator.setRoute(route())
+        navigator.update(nearEnd, nowMs = 2_000L, requestInFlight = false)
+
+        assertEquals("arrival_confirmation_stale", navigator.confirmArrival(staleToken).reason)
+        assertEquals("arrival_confirmation_stale", navigator.rejectArrival(staleToken).reason)
+        assertTrue(navigator.hasRoute())
+        assertEquals(
+            RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION,
+            navigator.pendingUserDecision(),
+        )
+    }
+
+    @Test
     fun confirmedDeviationCannotBeClearedByOneOnRouteGpsFix() {
         val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
         navigator.setRoute(route())

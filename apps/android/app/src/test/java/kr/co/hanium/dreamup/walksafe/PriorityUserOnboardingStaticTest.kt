@@ -260,6 +260,8 @@ class PriorityUserOnboardingStaticTest {
         assertInOrder(
             bindActor,
             "reporterUserId = actorId",
+            "if (!permissionSessionPolicy.isAuthenticatedFor(actorId))",
+            "permissionSessionPolicy.rememberActor(actorId)",
             "restorePriorityUserOnboardingFromPrefs()",
         )
         assertTrue(bindActor.contains("firstRunOnboardingSnapshot.verifiedActorBinding?.value"))

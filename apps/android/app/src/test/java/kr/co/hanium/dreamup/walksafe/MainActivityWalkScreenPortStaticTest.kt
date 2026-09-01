@@ -98,7 +98,7 @@ class MainActivityWalkScreenPortStaticTest {
                 0 until voiceSelection.indexOf("destinationSearchVoiceState?.onCommand("),
         )
         assertTrue(
-            voiceSelection.indexOf("if (!onDestinationSelected(selected)) return") in
+            voiceSelection.indexOf("if (!onDestinationSelected(selected)) {") in
                 0 until voiceSelection.indexOf("destinationSearchVoiceState = null"),
         )
         assertTrue(

@@ -39,6 +39,44 @@ class MainActivityNavigationCompositionTest {
     }
 
     @Test
+    fun destinationWithoutTrustedGpsStaysSelectedButInactiveUntilExplicitRetry() {
+        val selection = functionBlock("private fun onDestinationSelected(")
+        val request = functionBlock("private fun requestRoute(")
+        val routeButton = functionBlock("private fun onRouteButtonClicked(")
+
+        assertTrue(selection.contains("currentDestination = result.point"))
+        assertFalse(selection.contains("isRouteActive = true"))
+        assertTrue(routeButton.contains("currentDestination ?: parseDestinationInput()"))
+
+        val missingGps = request.substringAfter("val origin = freshTrustedLocationOrNull()")
+            .substringBefore("if (navigationRequests.hasActiveRoute()")
+        assertTrue(missingGps.contains("currentDestination = destination"))
+        assertTrue(missingGps.contains("isRouteActive = false"))
+        assertFalse(missingGps.contains("walkingRouteClient.fetchRouteCall("))
+        assertTrue(
+            request.indexOf("isRouteActive = true") >
+                request.indexOf("routeRequestInFlight.compareAndSet(false, true)"),
+        )
+    }
+
+    @Test
+    fun arrivalDecisionRendersTokenBoundAccessibleConfirmAndRejectActions() {
+        val controls = source.substringAfter("routeDeviationNewRouteButton = Button(this).apply")
+            .substringBefore("destinationResetButton = Button(this).apply")
+        val update = functionBlock("private fun updateRouteDeviationActions(")
+        val confirm = functionBlock("private fun confirmArrivalFromButton(")
+        val reject = functionBlock("private fun rejectArrivalFromButton(")
+
+        assertTrue(controls.contains("text = \"도착 확인\""))
+        assertTrue(controls.contains("text = \"도착 아님\""))
+        assertTrue(controls.contains("setOnClickListener"))
+        assertTrue(update.contains("RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION"))
+        assertTrue(update.contains("routeNavigator.pendingDecisionToken()"))
+        assertTrue(confirm.contains("routeNavigator.confirmArrival(expectedToken)"))
+        assertTrue(reject.contains("routeNavigator.rejectArrival(expectedToken)"))
+    }
+
+    @Test
     fun routeGuidanceUsesStrideOnlyAsAuxiliaryProgressEvidence() {
         val guidance = functionBlock("private fun updateRouteGuidance(")
 
@@ -56,9 +94,9 @@ class MainActivityNavigationCompositionTest {
         assertTrue(hearMore.contains("DestinationSearchVoiceCommand.HearMore"))
         assertTrue(hearMore.contains("performDestinationSearch(reset = false)"))
         assertTrue(selection.contains("DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex)"))
-        assertTrue(selection.contains("if (!onDestinationSelected(selected)) return"))
+        assertTrue(selection.contains("if (!onDestinationSelected(selected)) {"))
         assertTrue(
-            selection.indexOf("if (!onDestinationSelected(selected)) return") <
+            selection.indexOf("if (!onDestinationSelected(selected)) {") <
                 selection.indexOf("TMAP 경로를 확인합니다"),
         )
     }

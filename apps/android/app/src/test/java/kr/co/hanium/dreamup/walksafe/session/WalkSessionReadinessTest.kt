@@ -135,7 +135,7 @@ class WalkSessionReadinessTest {
         assertTrue(
             plan.requires(WalkSessionReadinessRequirement.OFFICIAL_ENVIRONMENT),
         )
-        assertTrue(
+        assertFalse(
             plan.requires(WalkSessionReadinessRequirement.VOICE_INPUT),
         )
     }
