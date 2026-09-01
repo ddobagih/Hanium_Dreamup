@@ -105,7 +105,7 @@ class MainActivityFirstRunRegistrationStaticTest {
     }
 
     @Test
-    fun startupProbesOnlyStartBehindTheDeviceCheckGate() {
+    fun startupProbeUsesTheDeviceCheckGateAndResourceMonitoringAlsoStartsForActiveWalks() {
         val create = functionBlock("override fun onCreate(savedInstanceState: Bundle?)")
         assertInOrder(
             create,
@@ -119,10 +119,20 @@ class MainActivityFirstRunRegistrationStaticTest {
         assertInOrder(
             start,
             "if (!firstRunDeviceCheckAllowsPreflight()) return",
+            "ensureWalkSessionResourceMonitoring()",
+            "startupCapabilityProbe.start()",
+        )
+        val resourceMonitoring =
+            functionBlock("private fun ensureWalkSessionResourceMonitoring()")
+        assertInOrder(
+            resourceMonitoring,
             "walkSessionResourceProbe.start {",
             "observeWalkRuntimeResourceSafety()",
             "refreshStartupCapabilityUi()",
-            "startupCapabilityProbe.start()",
+        )
+        assertTrue(
+            functionBlock("private fun activateWalkSessionRuntime()")
+                .contains("ensureWalkSessionResourceMonitoring()"),
         )
         val gate = functionBlock("private fun firstRunDeviceCheckAllowsPreflight()")
         assertTrue(gate.contains("PostLoginDeviceCheckState.RUNNING"))

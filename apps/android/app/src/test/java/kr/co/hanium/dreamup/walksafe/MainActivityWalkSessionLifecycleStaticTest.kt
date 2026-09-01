@@ -327,13 +327,53 @@ class MainActivityWalkSessionLifecycleStaticTest {
     @Test
     fun systemResourceChangesReevaluateAndStopAnActiveWalk() {
         val create = functionBlock("override fun onCreate(savedInstanceState: Bundle?)")
+        val restoreDeviceCheck =
+            functionBlock("private fun bindPostLoginDeviceCheckSession(")
         val firstRunProbes =
             functionBlock("private fun maybeStartFirstRunDeviceCheckProbes()")
+        val ensureResourceMonitoring =
+            functionBlock("private fun ensureWalkSessionResourceMonitoring()")
+        val resetResourceProbe =
+            functionBlock("private fun resetWalkSessionResourceProbe()")
+        val activate = functionBlock("private fun activateWalkSessionRuntime()")
+        val initialActivation =
+            functionBlock("private fun completeGatewayWalkActivation(")
+        val spokenResume =
+            functionBlock("private fun handleWalkSessionResumeRecognition(")
+        val buttonResume =
+            functionBlock("private fun confirmWalkSessionResumeFromButton()")
         val readiness = functionBlock("private fun applyRuntimeReadinessIfActive(")
         val destroy = functionBlock("override fun onDestroy()")
 
         assertTrue(create.contains("maybeStartFirstRunDeviceCheckProbes()"))
-        assertTrue(firstRunProbes.contains("walkSessionResourceProbe.start"))
+        assertTrue(restoreDeviceCheck.contains("state = result.state"))
+        assertTrue(restoreDeviceCheck.contains("postLoginDeviceCheckSnapshot = restoredSnapshot"))
+        assertFalse(restoreDeviceCheck.contains("ensureWalkSessionResourceMonitoring()"))
+        assertTrue(firstRunProbes.contains("ensureWalkSessionResourceMonitoring()"))
+        assertTrue(ensureResourceMonitoring.contains("walkSessionResourceProbeStarted) return"))
+        assertTrue(ensureResourceMonitoring.contains("walkSessionResourceProbe.start"))
+        assertTrue(ensureResourceMonitoring.contains("observeWalkRuntimeResourceSafety()"))
+        assertTrue(ensureResourceMonitoring.contains("refreshStartupCapabilityUi()"))
+        assertTrue(ensureResourceMonitoring.contains(".getOrDefault(false)"))
+        assertTrue(
+            ensureResourceMonitoring.indexOf("walkSessionResourceProbeStarted = true") <
+                ensureResourceMonitoring.indexOf("walkSessionResourceProbe.start"),
+        )
+        assertTrue(activate.contains("ensureWalkSessionResourceMonitoring()"))
+        assertTrue(
+            activate.indexOf("ensureWalkSessionResourceMonitoring()") <
+                activate.indexOf("observeWalkRuntimeResourceSafety(runtimeEpoch)"),
+        )
+        assertTrue(
+            activate.indexOf("observeWalkRuntimeResourceSafety(runtimeEpoch)") <
+                activate.indexOf("activateOfficialEnvironmentRuntime()"),
+        )
+        assertTrue(initialActivation.contains("activateWalkSessionRuntime()"))
+        assertTrue(spokenResume.contains("activateWalkSessionRuntime()"))
+        assertTrue(buttonResume.contains("activateWalkSessionRuntime()"))
+        assertTrue(resetResourceProbe.contains("walkSessionResourceProbe.close()"))
+        assertTrue(resetResourceProbe.contains("AndroidWalkSessionResourceProbe(this)"))
+        assertTrue(resetResourceProbe.contains("walkSessionResourceProbeStarted = false"))
         assertTrue(readiness.contains("WalkSessionEvent.RuntimeReadinessChanged(readiness)"))
         assertTrue(readiness.contains("WalkSessionState.SAFE_STOP"))
         assertTrue(readiness.contains("cancelWalkSessionOutputs(\"runtime_readiness_changed\")"))

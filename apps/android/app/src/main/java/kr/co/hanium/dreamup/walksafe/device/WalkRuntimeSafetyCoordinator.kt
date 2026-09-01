@@ -96,7 +96,6 @@ class WalkRuntimeSafetyCoordinator(
         get() = thresholdProfile != null
 
     fun beginEpoch(epoch: WalkRuntimeEpoch): WalkRuntimeSafetyDecision = synchronized(lock) {
-        if (thresholdProfile == null) return@synchronized notConfigured()
         if (activeEpoch != epoch) {
             activeEpoch = epoch
             if (latchedEpoch != epoch) {
@@ -107,6 +106,8 @@ class WalkRuntimeSafetyCoordinator(
         }
         if (latchedEpoch == epoch) {
             latchedDecision(epoch, emptySet())
+        } else if (thresholdProfile == null) {
+            notConfigured(epoch)
         } else {
             WalkRuntimeSafetyDecision(
                 disposition = WalkRuntimeSafetyDisposition.ALLOW_SAFETY_OUTPUT,
@@ -118,7 +119,6 @@ class WalkRuntimeSafetyCoordinator(
     fun observe(observation: WalkRuntimeSafetyObservation): WalkRuntimeSafetyDecision {
         val evaluation = synchronized(lock) {
             val profile = thresholdProfile
-                ?: return@synchronized Evaluation(notConfigured(observation.deferredFailures))
             val epochForStop = activeEpoch ?: observation.epoch
             val currentEpochObservation = activeEpoch == observation.epoch
             val newCauses = buildCauses(
@@ -149,11 +149,15 @@ class WalkRuntimeSafetyCoordinator(
                 Evaluation(latchedDecision(epochForStop, newCauses, observation.deferredFailures))
             } else if (newCauses.isEmpty()) {
                 Evaluation(
-                    WalkRuntimeSafetyDecision(
-                        disposition = WalkRuntimeSafetyDisposition.ALLOW_SAFETY_OUTPUT,
-                        epoch = epochForStop,
-                        deferredFailures = observation.deferredFailures,
-                    ),
+                    if (profile == null) {
+                        notConfigured(epochForStop, observation.deferredFailures)
+                    } else {
+                        WalkRuntimeSafetyDecision(
+                            disposition = WalkRuntimeSafetyDisposition.ALLOW_SAFETY_OUTPUT,
+                            epoch = epochForStop,
+                            deferredFailures = observation.deferredFailures,
+                        )
+                    },
                 )
             } else {
                 latchedEpoch = epochForStop
@@ -176,7 +180,7 @@ class WalkRuntimeSafetyCoordinator(
 
     private fun buildCauses(
         observation: WalkRuntimeSafetyObservation,
-        profile: ApprovedWalkRuntimeSafetyThresholdProfile,
+        profile: ApprovedWalkRuntimeSafetyThresholdProfile?,
         previousObservedAtElapsedRealtimeMs: Long?,
     ): Set<WalkRuntimeSafetyStopCause> = buildSet {
         if (observation.cameraTrusted == false) add(WalkRuntimeSafetyStopCause.CAMERA_TRUST_LOST)
@@ -202,12 +206,14 @@ class WalkRuntimeSafetyCoordinator(
             add(WalkRuntimeSafetyStopCause.INVALID_TIME)
         } else {
             if (
+                profile != null &&
                 capturedAtMs != null &&
                 observedAtMs - capturedAtMs > profile.maximumFrameAgeMs
             ) {
                 add(WalkRuntimeSafetyStopCause.FRAME_AGE_EXCEEDED)
             }
             if (
+                profile != null &&
                 inferenceLatencyMs != null &&
                 inferenceLatencyMs > profile.maximumInferenceLatencyMs
             ) {
@@ -231,10 +237,11 @@ class WalkRuntimeSafetyCoordinator(
     }
 
     private fun notConfigured(
+        epoch: WalkRuntimeEpoch,
         deferredFailures: Set<WalkRuntimeDeferredFailure> = emptySet(),
     ) = WalkRuntimeSafetyDecision(
         disposition = WalkRuntimeSafetyDisposition.NOT_CONFIGURED,
-        epoch = null,
+        epoch = epoch,
         deferredFailures = deferredFailures,
     )
 

@@ -65,4 +65,21 @@ class WalkSessionDeviceResourceSnapshotTest {
         assertTrue(probeSource.contains("appContext.unregisterReceiver(registered)"))
         assertFalse(probeSource.contains("getStorageLowBytes"))
     }
+
+    @Test
+    fun listenerRegistrationFailureIsReportedAndLeavesTheProbeRetryable() {
+        val start = probeSource.substringAfter("fun start")
+            .substringBefore("fun snapshot")
+
+        assertTrue(start.contains("): Boolean"))
+        assertTrue(start.contains("val receiverRegistered ="))
+        assertTrue(start.contains("if (!receiverRegistered) return false"))
+        assertTrue(start.contains("val thermalListenerRegistered ="))
+        assertTrue(start.contains("if (!thermalListenerRegistered)"))
+        assertTrue(start.contains("appContext.unregisterReceiver(resourceReceiver)"))
+        assertTrue(
+            start.indexOf("receiver = null") < start.lastIndexOf("return false"),
+        )
+        assertTrue(start.lastIndexOf("return true") > start.lastIndexOf("return false"))
+    }
 }

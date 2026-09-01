@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.rawcollection
 
+import java.security.MessageDigest
+import java.util.Locale
 import java.util.UUID
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckSnapshot
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckState
@@ -122,6 +124,27 @@ class RawCollectionRuntimeCoordinatorTest {
         )
         assertEquals(1, fixture.client.calls)
         assertEquals(2, fixture.client.lastPlaintexts.size)
+        assertEquals(
+            listOf(0, 1),
+            fixture.client.lastChunkMetadata.map(RawChunkMetadata::ordinal),
+        )
+        assertEquals(
+            listOf(RawChunkType.DETECTION, RawChunkType.PERFORMANCE),
+            fixture.client.lastChunkMetadata.map(RawChunkMetadata::type),
+        )
+        assertEquals(2, fixture.client.lastPayloadSnapshots.size)
+        assertFalse(
+            fixture.client.lastPayloadSnapshots[0]
+                .contentEquals(fixture.client.lastPayloadSnapshots[1]),
+        )
+        assertFalse(
+            fixture.client.lastChunkMetadata[0].sha256 ==
+                fixture.client.lastChunkMetadata[1].sha256,
+        )
+        assertEquals(
+            fixture.client.lastChunkMetadata.map(RawChunkMetadata::sha256),
+            fixture.client.lastPayloadSnapshots.map(::sha256Hex),
+        )
         assertTrue(
             fixture.client.lastPlaintexts.all { plaintext ->
                 plaintext.all { it == 0.toByte() }
@@ -295,8 +318,50 @@ class RawCollectionRuntimeCoordinatorTest {
     @Test
     fun pausedSealDiscardsALegacySingleChunkPartialCollection() {
         val fixture = fixture()
+        seedLegacySingleChunkPartial(fixture)
+
+        assertEquals(
+            RawSegmentSealResult.STORAGE_FAILURE,
+            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.PAUSED)),
+        )
+        assertNull(fixture.storage.activeCollectionId)
+        assertEquals(0, fixture.storage.collectionCount)
+    }
+
+    @Test
+    fun captureDiscardsLegacySingleChunkPartialBeforeWritingTheExactBatch() {
+        val fixture = fixture()
+        seedLegacySingleChunkPartial(fixture, LEGACY_COLLECTION_ID)
+        assertEquals(
+            listOf(RawChunkType.DETECTION),
+            fixture.store.activePartialManifest(OWNER, WALK_ID)?.chunks?.map(RawChunkMetadata::type),
+        )
+
+        assertEquals(
+            RawMetadataCaptureResult.CAPTURED,
+            fixture.coordinator.captureMetadataBatch(
+                fixture.context(WalkSessionState.ACTIVE),
+                detectionSample(),
+                performanceSample(),
+            ),
+        )
+
+        assertNull(fixture.storage.readManifest(LEGACY_COLLECTION_ID))
+        assertEquals(COLLECTION_ID, fixture.storage.activeCollectionId)
+        val replacement = requireNotNull(fixture.store.activePartialManifest(OWNER, WALK_ID))
+        assertEquals(listOf(0, 1), replacement.chunks.map(RawChunkMetadata::ordinal))
+        assertEquals(
+            listOf(RawChunkType.DETECTION, RawChunkType.PERFORMANCE),
+            replacement.chunks.map(RawChunkMetadata::type),
+        )
+    }
+
+    private fun seedLegacySingleChunkPartial(
+        fixture: RuntimeFixture,
+        collectionId: String = COLLECTION_ID,
+    ) {
         val legacyPartial = RawCollectionManifest(
-            collectionId = COLLECTION_ID,
+            collectionId = collectionId,
             owner = OWNER,
             walkSessionId = WALK_ID,
             consentReceiptSha256 = CONSENT_SHA,
@@ -314,22 +379,20 @@ class RawCollectionRuntimeCoordinatorTest {
                 ),
             ),
         )
-        val envelope = requireNotNull(
-            fixture.aead.seal(
-                encodeRawManifest(legacyPartial),
-                byteArrayOf(),
-                AeadLimits(1_024 * 1_024, 1_024 * 1_024 + 16, 2 * 1_024 * 1_024),
-            ) as? AeadSealResult.Sealed,
-        ).envelope
-        assertTrue(fixture.storage.writeManifestAtomically(COLLECTION_ID, envelope))
-        assertTrue(fixture.storage.writeActiveCollectionIdAtomically(COLLECTION_ID))
-
-        assertEquals(
-            RawSegmentSealResult.STORAGE_FAILURE,
-            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.PAUSED)),
-        )
-        assertNull(fixture.storage.activeCollectionId)
-        assertEquals(0, fixture.storage.collectionCount)
+        val plaintext = encodeRawManifest(legacyPartial)
+        val envelope = try {
+            requireNotNull(
+                fixture.aead.seal(
+                    plaintext,
+                    byteArrayOf(),
+                    AeadLimits(1_024 * 1_024, 1_024 * 1_024 + 16, 2 * 1_024 * 1_024),
+                ) as? AeadSealResult.Sealed,
+            ).envelope
+        } finally {
+            plaintext.fill(0)
+        }
+        assertTrue(fixture.storage.writeManifestAtomically(collectionId, envelope))
+        assertTrue(fixture.storage.writeActiveCollectionIdAtomically(collectionId))
     }
 
     private fun fixture(storeNowEpochMs: Long = NOW_EPOCH_MS): RuntimeFixture {
@@ -418,6 +481,7 @@ class RawCollectionRuntimeCoordinatorTest {
 
     private companion object {
         const val COLLECTION_ID = "123e4567-e89b-42d3-a456-426614174000"
+        const val LEGACY_COLLECTION_ID = "123e4567-e89b-42d3-a456-426614174004"
         const val WALK_ID = "123e4567-e89b-42d3-a456-426614174001"
         const val ACTOR_ID = "123e4567-e89b-42d3-a456-426614174002"
         const val DEVICE_ID = "device-installation-00000001"
@@ -522,6 +586,8 @@ private fun endedWalkSnapshot(epoch: WalkRuntimeEpoch): WalkSessionSnapshot = Wa
 private class RuntimeFakeClient : RawCollectionNetworkClient {
     var calls = 0
     var lastPlaintexts: List<ByteArray> = emptyList()
+    var lastPayloadSnapshots: List<ByteArray> = emptyList()
+    var lastChunkMetadata: List<RawChunkMetadata> = emptyList()
 
     override fun uploadCall(
         session: GatewayFieldSession,
@@ -534,12 +600,18 @@ private class RuntimeFakeClient : RawCollectionNetworkClient {
     ): CancellableNetworkCall<RawCollectionReceipt> {
         calls += 1
         lastPlaintexts = chunks.map(RawPlaintextChunk::plaintext)
+        lastPayloadSnapshots = chunks.map { it.plaintext.copyOf() }
+        lastChunkMetadata = chunks.map(RawPlaintextChunk::metadata)
         return CancellableNetworkCall.blocking {
             check(isCurrent())
             exactRuntimeReceipt(backendManifest)
         }
     }
 }
+
+private fun sha256Hex(value: ByteArray): String = MessageDigest.getInstance("SHA-256")
+    .digest(value)
+    .joinToString("") { byte -> "%02x".format(Locale.ROOT, byte.toInt() and 0xff) }
 
 private fun exactRuntimeReceipt(manifest: BackendRawManifest): RawCollectionReceipt {
     val unsigned = RawCollectionReceipt(

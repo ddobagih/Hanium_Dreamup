@@ -93,11 +93,16 @@ class HandsFreeVoiceIntegrationStaticTest {
         assertTrue(start.contains("hasHandsFreeNotificationPermission()"))
         assertTrue(start.contains("voice_hands_free=notification_permission_required"))
         val observedPermissions = functionBlock("private fun applyObservedPermissionStateChange")
-        assertTrue(
-            observedPermissions.contains(
-                "if (!hasHandsFreeNotificationPermission() || !hasRecordAudioPermission())",
-            ),
-        )
+        val notificationBranch = observedPermissions
+            .substringAfter("if (!hasHandsFreeNotificationPermission()) {")
+            .substringBefore("if (!hasRecordAudioPermission()) {")
+        val microphoneBranch = observedPermissions
+            .substringAfter("if (!hasRecordAudioPermission()) {")
+            .substringBefore("if (!hasActivityRecognitionPermission()) {")
+        assertTrue(notificationBranch.contains("stopHandsFreeVoiceService()"))
+        assertFalse(notificationBranch.contains("cancelVoiceCommandRecognition()"))
+        assertTrue(microphoneBranch.contains("stopHandsFreeVoiceService()"))
+        assertTrue(microphoneBranch.contains("cancelVoiceCommandRecognition()"))
     }
 
     @Test

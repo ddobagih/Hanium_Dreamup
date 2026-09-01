@@ -3,7 +3,7 @@ package kr.co.hanium.dreamup.walksafe.device
 import android.content.SharedPreferences
 import java.security.MessageDigest
 
-const val POST_LOGIN_DEVICE_CHECK_RESULT_POLICY_VERSION = "3"
+const val POST_LOGIN_DEVICE_CHECK_RESULT_POLICY_VERSION = "4"
 const val POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION = "20260901-r001"
 
 data class PostLoginDeviceCheckResultBinding(
@@ -28,8 +28,8 @@ data class PostLoginDeviceCheckResultBinding(
     val missingRequiredPermissions: Set<String>,
     val locationServiceEnabled: Boolean,
     val voiceDisclosureAccepted: Boolean,
-    val offlineKoreanTextToSpeechAvailable: Boolean,
-    val onDeviceSpeechRecognitionAvailable: Boolean,
+    val offlineKoreanTextToSpeechAvailable: Boolean?,
+    val onDeviceSpeechRecognitionAvailable: Boolean?,
 )
 
 data class PersistedPostLoginDeviceCheckResult(
@@ -165,7 +165,6 @@ class AndroidDeviceCheckResultStore(
             requiredStrings.any(String::isBlank) ||
             osSdkInt <= 0 ||
             appVersionCode <= 0L ||
-            missingRequiredPermissions.any(String::isBlank) ||
             !isValidOptionalPair(environmentProfileId, environmentProfileRevision) ||
             !isValidOptionalPair(approvedDeviceProfileId, approvedDeviceProfileVersion)
         ) return null
@@ -188,11 +187,6 @@ class AndroidDeviceCheckResultStore(
             approvedDeviceProfileRegistrySha256,
             approvedDeviceProfileId.orEmpty(),
             approvedDeviceProfileVersion.orEmpty(),
-            missingRequiredPermissions.sorted().joinToString(","),
-            locationServiceEnabled.toString(),
-            voiceDisclosureAccepted.toString(),
-            offlineKoreanTextToSpeechAvailable.toString(),
-            onDeviceSpeechRecognitionAvailable.toString(),
         )
         val canonical = buildString {
             values.forEach { value ->
@@ -210,7 +204,7 @@ class AndroidDeviceCheckResultStore(
 
     private companion object {
         const val POLICY_VERSION_KEY = "device_check_result_policy_v1"
-        const val BINDING_SHA256_KEY = "device_check_result_binding_sha256_v3"
+        const val BINDING_SHA256_KEY = "device_check_result_binding_sha256_v4"
         const val TIER_KEY = "device_check_result_tier_v1"
         const val DISABLED_FEATURES_KEY = "device_check_result_disabled_features_v1"
         const val CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY =

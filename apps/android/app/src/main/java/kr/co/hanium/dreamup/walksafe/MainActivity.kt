@@ -13934,9 +13934,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val installationId = gatewaySessionStore.getOrCreateInstallDeviceId() ?: return null
         val startup = startupCapabilityProbe.snapshot()
         val offlineKoreanTextToSpeechAvailable =
-            startup.offlineKoreanTextToSpeechAvailable ?: return null
+            startup.offlineKoreanTextToSpeechAvailable
         val onDeviceSpeechRecognitionAvailable =
-            startup.onDeviceSpeechRecognitionAvailable ?: return null
+            startup.onDeviceSpeechRecognitionAvailable
         val environmentProfile = activeEnvironmentProfiles
         val deviceProfile = startupCapabilityProbe.deviceProfileMatch()
         return PostLoginDeviceCheckResultBinding(
@@ -14017,10 +14017,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             } else {
                 null
             }
-            onDeviceSpeechRecognitionCapabilityOverride =
-                PostLoginDeviceCheckFeature.HANDS_FREE_VOICE !in restored.disabledFeatures
-            offlineKoreanTextToSpeechCapabilityOverride =
-                PostLoginDeviceCheckFeature.VOICE_GUIDANCE !in restored.disabledFeatures
+            onDeviceSpeechRecognitionCapabilityOverride = if (
+                PostLoginDeviceCheckFeature.HANDS_FREE_VOICE in restored.disabledFeatures
+            ) {
+                false
+            } else {
+                null
+            }
+            offlineKoreanTextToSpeechCapabilityOverride = if (
+                PostLoginDeviceCheckFeature.VOICE_GUIDANCE in restored.disabledFeatures
+            ) {
+                false
+            } else {
+                null
+            }
         } else if (sessionBindingChanged) {
             postLoginCameraDependentChecksDeferred = false
             metricDistanceCapabilityOverride = null
@@ -14234,17 +14244,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun maybeStartFirstRunDeviceCheckProbes() {
         if (!firstRunDeviceCheckAllowsPreflight()) return
-        if (
-            ::walkSessionResourceProbe.isInitialized &&
-            !walkSessionResourceProbeStarted
-        ) {
-            walkSessionResourceProbeStarted = true
-            walkSessionResourceProbe.start {
-                observeWalkRuntimeResourceSafety()
-                maybeContinuePostLoginDeviceCheck()
-                refreshStartupCapabilityUi()
-            }
-        }
+        ensureWalkSessionResourceMonitoring()
         if (
             ::startupCapabilityProbe.isInitialized &&
             !startupCapabilityProbeStarted
@@ -14252,6 +14252,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             startupCapabilityProbeStarted = true
             startupCapabilityProbe.start()
         }
+    }
+
+    private fun ensureWalkSessionResourceMonitoring() {
+        if (!::walkSessionResourceProbe.isInitialized || walkSessionResourceProbeStarted) return
+        walkSessionResourceProbeStarted = true
+        walkSessionResourceProbeStarted =
+            runCatching {
+                walkSessionResourceProbe.start {
+                    observeWalkRuntimeResourceSafety()
+                    maybeContinuePostLoginDeviceCheck()
+                    refreshStartupCapabilityUi()
+                }
+            }.getOrDefault(false)
+    }
+
+    private fun resetWalkSessionResourceProbe() {
+        if (::walkSessionResourceProbe.isInitialized) walkSessionResourceProbe.close()
+        walkSessionResourceProbe = AndroidWalkSessionResourceProbe(this)
+        walkSessionResourceProbeStarted = false
     }
 
     private fun startPostLoginDeviceCheckRuntime(
@@ -14266,9 +14285,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             refreshStartupCapabilityUi()
         }
         startupCapabilityProbeStarted = false
-        if (::walkSessionResourceProbe.isInitialized) walkSessionResourceProbe.close()
-        walkSessionResourceProbe = AndroidWalkSessionResourceProbe(this)
-        walkSessionResourceProbeStarted = false
+        resetWalkSessionResourceProbe()
         postLoginMetricPreflightStarted = false
         lateinit var timeout: Runnable
         timeout = Runnable {
@@ -14636,8 +14653,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         storedDeviceCheckBindingValidationPending = false
         if (::walkSessionResourceProbe.isInitialized && walkSessionResourceProbeStarted) {
-            walkSessionResourceProbe.close()
-            walkSessionResourceProbeStarted = false
+            resetWalkSessionResourceProbe()
         }
         postLoginDeviceCheckPermissionRequestCode?.let { requestCode ->
             permissionRequestLeases.remove(requestCode)
@@ -15137,7 +15153,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         PostLoginDeviceCheckFeature.OBSTACLE_DETECTION -> "장애물 인식"
                         PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE -> "미터 거리 안내"
                         PostLoginDeviceCheckFeature.LOCATION_GUIDANCE -> "위치·경로 안내"
-                        PostLoginDeviceCheckFeature.HANDS_FREE_VOICE -> "호출어·음성 명령"
+                        PostLoginDeviceCheckFeature.HANDS_FREE_VOICE -> if (
+                            feature in postLoginDeviceCheckSnapshot.disabledFeatures ||
+                            !hasRecordAudioPermission() ||
+                            (
+                                ::startupCapabilityProbe.isInitialized &&
+                                    startupCapabilityProbe.snapshot()
+                                        .onDeviceSpeechRecognitionAvailable == false
+                            )
+                        ) {
+                            "호출어·음성 명령"
+                        } else {
+                            "호출어 대기"
+                        }
                         PostLoginDeviceCheckFeature.VOICE_GUIDANCE -> "음성 안내"
                         PostLoginDeviceCheckFeature.HAPTIC_FEEDBACK -> "진동 알림"
                     },
@@ -15177,6 +15205,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (!hasLocationPermission() || !isLocationServiceEnabledForDeviceCheck()) {
             add(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)
+        }
+        if (
+            ::startupCapabilityProbe.isInitialized &&
+            startupCapabilityProbe.snapshot().onDeviceSpeechRecognitionAvailable == false
+        ) {
+            add(PostLoginDeviceCheckFeature.HANDS_FREE_VOICE)
+        }
+        if (
+            ::startupCapabilityProbe.isInitialized &&
+            startupCapabilityProbe.snapshot().offlineKoreanTextToSpeechAvailable == false
+        ) {
+            add(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)
         }
         if (
             !hasRecordAudioPermission() ||
@@ -15724,7 +15764,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun observeWalkRuntimeResourceSafety(
         expectedEpoch: WalkRuntimeEpoch? = null,
     ): Boolean {
-        if (!walkRuntimeSafetyCoordinator.configured) return true
         if (!::walkSessionLifecycle.isInitialized || !::walkSessionResourceProbe.isInitialized) {
             return true
         }
@@ -22324,6 +22363,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val runtimeEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull()
             ?: return handleGatewayWalkAuthorityLost("walk_epoch_missing_before_runtime")
         if (!walkRuntimeSafetyCoordinator.beginEpoch(runtimeEpoch).safetyOutputsAllowed) return
+        ensureWalkSessionResourceMonitoring()
         if (!observeWalkRuntimeResourceSafety(runtimeEpoch)) return
         scheduleGatewayWalkRenewal()
         persistWalkSessionInterruptionMarker()
@@ -22540,7 +22580,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun voiceResumeConfirmationAvailable(): Boolean {
         val decision = startupCapabilityDecision ?: return false
-        if (oneShotSpeechRecognitionLimited || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        if (
+            !hasRecordAudioPermission() ||
+            oneShotSpeechRecognitionLimited ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+        ) {
             return false
         }
         val oneShotRecognitionAvailable = runCatching {
@@ -24095,7 +24139,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 updateNavigationStatus("navigation=stopped location_unavailable reason=$reason")
             }
         }
-        if (!hasHandsFreeNotificationPermission() || !hasRecordAudioPermission()) {
+        if (!hasHandsFreeNotificationPermission()) {
+            stopHandsFreeVoiceService()
+        }
+        if (!hasRecordAudioPermission()) {
             stopHandsFreeVoiceService()
             cancelVoiceCommandRecognition()
         }
@@ -25059,7 +25106,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         observedAtElapsedRealtimeMs: Long,
         inferenceLatencyMs: Long,
     ): Boolean {
-        if (!walkRuntimeSafetyCoordinator.configured) return true
         return walkRuntimeSafetyCoordinator.observe(
             WalkRuntimeSafetyObservation(
                 epoch = epoch,
@@ -27828,8 +27874,11 @@ generation != cameraFallbackGeneration
 
     private fun ensureVoicePermissionThenListen() {
         val snapshot = walkSessionLifecycle.snapshot()
-        if (!snapshot.isForeground || snapshot.state != WalkSessionState.ACTIVE) {
-            updateGatewayVoiceStatus("화면 음성 명령은 보행 안내 중에만 사용할 수 있습니다.")
+        if (
+            !snapshot.isForeground ||
+            snapshot.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
+        ) {
+            updateGatewayVoiceStatus("화면 음성 명령은 보행 안내 또는 일시정지 중에만 사용할 수 있습니다.")
             return
         }
         if (!hasRecordAudioPermission()) {
@@ -28169,9 +28218,12 @@ generation != cameraFallbackGeneration
         val mayListen = when (purpose) {
             VoiceRecognitionPurpose.COMMAND -> {
                 sessionSnapshot.isForeground &&
-                    sessionSnapshot.state == WalkSessionState.ACTIVE &&
                     sessionSnapshot.epoch == expectedWalkEpoch &&
-                    requireStartupCapabilityConfirmation()
+                    when (sessionSnapshot.state) {
+                        WalkSessionState.ACTIVE -> requireStartupCapabilityConfirmation()
+                        WalkSessionState.PAUSED -> voiceResumeConfirmationAvailable()
+                        else -> false
+                    }
             }
             VoiceRecognitionPurpose.WALK_SESSION_RESUME -> {
                 sessionSnapshot.state == WalkSessionState.PAUSED &&
@@ -28449,7 +28501,8 @@ generation != cameraFallbackGeneration
                 walkSessionLifecycle.snapshot().let { snapshot ->
                     snapshot.epoch == expectedWalkEpoch &&
                         snapshot.isForeground &&
-                        snapshot.state == WalkSessionState.ACTIVE
+                        snapshot.state in
+                        setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
                 }
             VoiceRecognitionPurpose.WALK_SESSION_RESUME -> {
                 val snapshot = walkSessionLifecycle.snapshot()
@@ -28968,28 +29021,36 @@ generation != cameraFallbackGeneration
         val snapshot = walkSessionLifecycle.snapshot()
         val gatewayRecording = gatewayVoiceRecorder?.isRecording == true
         val gatewayProcessing = activeGatewaySpeechInteraction != null && !gatewayRecording
+        val voiceCommandAvailable = when (snapshot.state) {
+            WalkSessionState.ACTIVE -> !oneShotSpeechRecognitionLimited
+            WalkSessionState.PAUSED -> voiceResumeConfirmationAvailable()
+            else -> false
+        }
         val enabled = if (gatewayRecording) {
             snapshot.isForeground && isActivityForeground
         } else {
             !active &&
                 !gatewayProcessing &&
                 snapshot.isForeground &&
-                snapshot.state == WalkSessionState.ACTIVE &&
-                !oneShotSpeechRecognitionLimited
+                voiceCommandAvailable
         }
+        val voiceCommandUnavailable = !gatewayRecording && !gatewayProcessing &&
+            !active &&
+            snapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
+            !voiceCommandAvailable
         listOf(voiceReportButton, walkSafetyVoiceButton).forEach { button ->
             button.text = when {
                 gatewayRecording -> "녹음 중지"
                 gatewayProcessing -> "음성 처리 중"
                 active -> "음성 듣는 중"
-                oneShotSpeechRecognitionLimited -> "기기 내 음성 명령 제한"
+                voiceCommandUnavailable -> "기기 내 음성 명령 제한"
                 else -> "기기 내 음성 명령"
             }
             button.contentDescription = when {
                 gatewayRecording -> "서버 음성 명령 녹음 중지"
                 gatewayProcessing -> "서버 음성 명령 처리 중"
                 active -> "음성 명령을 듣는 중"
-                oneShotSpeechRecognitionLimited -> "기기 내 음성 명령을 사용할 수 없음"
+                voiceCommandUnavailable -> "기기 내 음성 명령을 사용할 수 없음"
                 else -> "기기 내 음성 명령 듣기 시작"
             }
             button.isEnabled = enabled
@@ -31166,7 +31227,9 @@ generation != cameraFallbackGeneration
                         add(WalkSafeStartupRequirement.METRIC_DISTANCE)
                     PostLoginDeviceCheckFeature.LOCATION_GUIDANCE ->
                         add(WalkSafeStartupRequirement.GPS)
-                    PostLoginDeviceCheckFeature.HANDS_FREE_VOICE -> {
+                    PostLoginDeviceCheckFeature.HANDS_FREE_VOICE -> if (
+                        feature in postLoginDeviceCheckSnapshot.disabledFeatures
+                    ) {
                         add(WalkSafeStartupRequirement.MICROPHONE)
                         add(WalkSafeStartupRequirement.ON_DEVICE_STT)
                     }
