@@ -73,7 +73,7 @@ def external_copy_database() -> tuple[object, sessionmaker]:
     with engine.begin() as connection:
         assert connection.execute(
             text("SELECT version_num FROM alembic_version")
-        ).scalar_one() == "202609010002"
+        ).scalar_one() == "202609010003"
         for table_name in (
             "report_deletion_tombstones",
             "report_deletion_external_copy_states",
@@ -390,7 +390,7 @@ def test_manual_event_flow_cas_idempotency_and_user_minimum_projection(
     assert tuple(privileges) == (True, True, False, False, False, False)
     assert _database_readiness(_database_url()) == {
         "ready": True,
-        "current_revision": "202609010002",
+        "current_revision": "202609010003",
     }
 
     with SessionFactory() as db:
@@ -421,7 +421,7 @@ def test_manual_event_flow_cas_idempotency_and_user_minimum_projection(
         # PostgreSQL rolls back the whole multi-revision downgrade transaction.
         assert connection.execute(
             text("SELECT version_num FROM alembic_version")
-        ).scalar_one() == "202609010002"
+        ).scalar_one() == "202609010003"
         assert connection.execute(
             text("SELECT count(*) FROM report_deletion_external_copy_events")
         ).scalar_one() == 3

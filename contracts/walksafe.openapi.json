@@ -7804,6 +7804,12 @@
             "title": "Decision",
             "type": "string"
           },
+          "decision_id": {
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Decision Id",
+            "type": "string"
+          },
           "duplicate_of_report_id": {
             "anyOf": [
               {
@@ -7861,6 +7867,7 @@
           }
         },
         "required": [
+          "decision_id",
           "decision",
           "reason",
           "duplicate_of_report_id",
@@ -17787,7 +17794,10 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Created review decision or exact idempotent replay of the original decision."
+          },
+          "409": {
+            "description": "Review workflow conflict, including review_decision_idempotency_conflict when decision_id is reused for a different payload, report, or administrator."
           },
           "422": {
             "content": {

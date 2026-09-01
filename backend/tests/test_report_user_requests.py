@@ -643,6 +643,7 @@ def test_user_request_lookup_rejects_query_and_noncanonical_uuid(path: str) -> N
 
 def test_review_reason_requires_public_internal_separation() -> None:
     common = {
+        "decision_id": uuid.UUID("55555555-5555-4555-8555-555555555555"),
         "reason": "관리자 내부 검토 사유",
         "duplicate_of_report_id": None,
         "location_reviewed": True,

@@ -1168,6 +1168,14 @@ class ReportOriginalAccessGrantResponse(BaseModel):
 class ReportReviewDecisionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    decision_id: uuid.UUID = Field(
+        json_schema_extra={
+            "pattern": (
+                r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+                r"[0-9a-f]{4}-[0-9a-f]{12}$"
+            )
+        }
+    )
     decision: ReportReviewDecisionValue
     reason: ReportReviewReason
     user_visible_reason: ReportUserVisibleReason | None = None
@@ -1184,7 +1192,10 @@ class ReportReviewDecisionRequest(BaseModel):
         return _reject_disallowed_admin_text_controls(value)
 
     @field_validator(
-        "duplicate_of_report_id", "evidence_grant_id", mode="before"
+        "decision_id",
+        "duplicate_of_report_id",
+        "evidence_grant_id",
+        mode="before",
     )
     @classmethod
     def require_canonical_review_uuid(cls, value: object) -> object:

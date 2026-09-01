@@ -468,6 +468,7 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history(
             )
 
     approved_request = ReportReviewDecisionRequest(
+        decision_id=uuid.uuid4(),
         decision="APPROVED",
         reason="위치·사진·개인정보 검수를 완료함",
         duplicate_of_report_id=None,
@@ -560,6 +561,7 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history(
     assert acknowledged.review_decision_id == approved.id
 
     rejected_request = ReportReviewDecisionRequest(
+        decision_id=uuid.uuid4(),
         decision="REJECTED",
         reason="추가 확인 결과 기관 전달 승인을 철회함",
         user_visible_reason="검토 결과 이 신고를 처리할 수 없습니다",

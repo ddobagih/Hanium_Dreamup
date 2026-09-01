@@ -1378,8 +1378,11 @@ def test_migration_015_is_append_only_event_bound_and_least_privilege(
     discovery_successor = importlib.import_module(
         "backend.alembic.versions.202609010001_report_user_request_discovery"
     )
-    head = importlib.import_module(
+    raw_digest_successor = importlib.import_module(
         "backend.alembic.versions.202609010002_raw_collection_digest_rejection"
+    )
+    head = importlib.import_module(
+        "backend.alembic.versions.202609010003_admin_report_decision_idempotency"
     )
     assert migration.revision == "202608290015"
     assert migration.down_revision == "202608290014"
@@ -1391,7 +1394,8 @@ def test_migration_015_is_append_only_event_bound_and_least_privilege(
     assert integrity_successor.down_revision == acl_successor.revision
     assert external_copy_successor.down_revision == integrity_successor.revision
     assert discovery_successor.down_revision == external_copy_successor.revision
-    assert head.down_revision == discovery_successor.revision
+    assert raw_digest_successor.down_revision == discovery_successor.revision
+    assert head.down_revision == raw_digest_successor.revision
     assert health_api.EXPECTED_ALEMBIC_HEAD == head.revision
     alembic_config = Config(
         str(Path(__file__).resolve().parents[1] / "alembic.ini")

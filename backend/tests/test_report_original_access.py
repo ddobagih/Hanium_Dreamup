@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import hashlib
 import importlib
@@ -19,7 +20,7 @@ from alembic.operations import Operations
 from geoalchemy2 import WKTElement
 import pytest
 from pydantic import ValidationError
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 import backend.app.services.report_original_access as report_original_access
@@ -137,6 +138,7 @@ def test_high_risk_evidence_requests_preserve_existing_whitespace_normalization(
     assert grant.reason == "Review original evidence."
     review = ReportReviewDecisionRequest.model_validate(
         {
+            "decision_id": str(uuid.uuid4()),
             "decision": "REJECTED",
             "reason": f"{whitespace}Review rejected.{whitespace}",
             "user_visible_reason": "기관 전달 대상이 아닙니다.",
@@ -171,6 +173,7 @@ def test_review_request_rejects_noncanonical_uuid_text() -> None:
     with pytest.raises(ValidationError):
         ReportReviewDecisionRequest.model_validate(
             {
+                "decision_id": str(uuid.uuid4()),
                 "decision": "DUPLICATE",
                 "reason": "Duplicate report was reviewed.",
                 "user_visible_reason": "중복 신고입니다.",
@@ -206,7 +209,9 @@ def test_database_text_normalizers_match_python_and_pydantic_whitespace() -> Non
         0x3000,
     ]
     strip_codepoints = [
-        codepoint for codepoint in split_codepoints if codepoint not in range(0x1C, 0x20)
+        codepoint
+        for codepoint in split_codepoints
+        if codepoint not in {0x0B, 0x0C} and codepoint not in range(0x1C, 0x20)
     ]
     with SessionLocal() as db:
         for codepoint in split_codepoints:
@@ -226,6 +231,7 @@ def test_database_text_normalizers_match_python_and_pydantic_whitespace() -> Non
             whitespace = chr(codepoint)
             raw = f"{whitespace}Review rejected.{whitespace}"
             payload = ReportReviewDecisionRequest(
+                decision_id=uuid.uuid4(),
                 decision="REJECTED",
                 reason=raw,
                 user_visible_reason="기관 전달 대상이 아닙니다.",
@@ -1035,6 +1041,7 @@ def test_runtime_functions_issue_access_and_bind_one_approval(tmp_path: Path) ->
         reconfirmation=True,
     )
     rejected_payload = ReportReviewDecisionRequest(
+        decision_id=uuid.uuid4(),
         decision="REJECTED",
         reason="A later typed review rejected institution delivery.",
         user_visible_reason="기관 전달 대상이 아닙니다.",
@@ -1046,6 +1053,7 @@ def test_runtime_functions_issue_access_and_bind_one_approval(tmp_path: Path) ->
         evidence_grant_id=None,
     )
     duplicate_payload = ReportReviewDecisionRequest(
+        decision_id=uuid.uuid4(),
         decision="DUPLICATE",
         reason="A later typed review linked the duplicate report.",
         user_visible_reason="중복 신고로 확인됐습니다.",
@@ -1090,6 +1098,7 @@ def test_runtime_functions_issue_access_and_bind_one_approval(tmp_path: Path) ->
                     credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
                 )
             approval_payload = ReportReviewDecisionRequest(
+                decision_id=uuid.uuid4(),
                 decision="APPROVED",
                 reason="Original image and exact location were reviewed.",
                 user_visible_reason=None,
@@ -1579,8 +1588,295 @@ def test_concurrent_one_time_grant_has_exactly_one_success(tmp_path: Path) -> No
 
 
 @pytest.mark.skipif(not TEST_DATABASE_CONFIGURED, reason="WALKSAFE_TEST_DATABASE_URL is not configured")
-def test_consumed_evidence_grant_binds_to_exactly_one_concurrent_approval(
+def test_fresh_proof_sequential_review_replay_returns_one_postgres_row(
     tmp_path: Path,
+) -> None:
+    report_id = _store_encrypted_report(tmp_path)
+    identities = [
+        _identity("approval-sequential-replay-original"),
+        _identity("approval-sequential-replay-new-session"),
+    ]
+    grant = _issue(report_id, identities[0])
+    with SessionLocal() as db:
+        access_report_original(
+            db,
+            upload_root=tmp_path,
+            filename=f"{report_id}.jpg",
+            raw_access_token=grant.access_token,
+            identity=identities[0],
+            key_manager=report_image_key_manager,
+            runtime_totp_secret=TEST_TOTP_SECRET,
+            credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
+        )
+    _prepare_identity(identities[1], observed_at=datetime.now(timezone.utc))
+    decision_id = uuid.uuid4()
+    payload = ReportReviewDecisionRequest(
+        decision_id=decision_id,
+        decision="APPROVED",
+        reason="Original image and exact location were reviewed.",
+        user_visible_reason=None,
+        duplicate_of_report_id=None,
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+        content_revision=0,
+        evidence_grant_id=grant.grant_id,
+    )
+    canonical_body = payload.model_dump_json()
+    request_bodies = [
+        canonical_body.replace(
+            '"reason":"Original image and exact location were reviewed."',
+            '"reason":"  Original image and exact location were reviewed.  "',
+        ).encode("utf-8"),
+        canonical_body.replace(
+            '"reason":"Original image and exact location were reviewed."',
+            '"reason":"\u00a0Original image and exact location were reviewed.\u00a0"',
+        ).encode("utf-8"),
+    ]
+    assert identities[0].session_id != identities[1].session_id
+    assert identities[0].device_id != identities[1].device_id
+    assert request_bodies[0] != request_bodies[1]
+    assert [
+        ReportReviewDecisionRequest.model_validate_json(body)
+        for body in request_bodies
+    ] == [payload, payload]
+    proof_bindings = [
+        _record_consumed_action_proof(
+            identity=identities[index],
+            report_id=report_id,
+            action="report.review.decide",
+            request_body=request_bodies[index],
+        )
+        for index in range(2)
+    ]
+    engine = SessionLocal.kw["bind"]
+    results: list[
+        tuple[uuid.UUID, int, uuid.UUID, str, uuid.UUID, datetime, datetime]
+    ] = []
+
+    for index, (proof_challenge_id, correlation_id, _) in enumerate(proof_bindings):
+        with engine.connect() as connection:
+            connection.execute(
+                text("SET SESSION AUTHORIZATION walksafe_backend_runtime")
+            )
+            connection.commit()
+            try:
+                with SessionLocal(bind=connection) as db:
+                    decision = append_report_review_decision(
+                        db,
+                        report_id=report_id,
+                        payload=payload,
+                        identity=identities[index],
+                        correlation_id=correlation_id,
+                        proof_challenge_id=proof_challenge_id,
+                        proof_request_body=request_bodies[index],
+                        runtime_totp_secret=TEST_TOTP_SECRET,
+                        credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
+                    )
+                    results.append(
+                        (
+                            decision.id,
+                            decision.revision,
+                            decision.session_id,
+                            decision.device_id,
+                            decision.correlation_id,
+                            decision.decided_at,
+                            decision.created_at,
+                        )
+                    )
+            finally:
+                if connection.in_transaction():
+                    connection.rollback()
+                connection.execute(text("RESET SESSION AUTHORIZATION"))
+                connection.commit()
+
+    with SessionLocal() as db:
+        row_count = db.execute(
+            select(func.count(ReportReviewDecision.id)).where(
+                ReportReviewDecision.id == decision_id
+            )
+        ).scalar_one()
+        claim_count = db.execute(
+            text(
+                "SELECT count(*) FROM public.admin_report_mutation_claims "
+                "WHERE resource_type = 'review_decision' "
+                "AND resource_id = :decision_id"
+            ),
+            {"decision_id": decision_id},
+        ).scalar_one()
+        canonical_claim = db.execute(
+            text(
+                "SELECT challenge_id, session_id, device_id "
+                "FROM public.admin_report_mutation_claims "
+                "WHERE resource_type = 'review_decision' "
+                "AND resource_id = :decision_id"
+            ),
+            {"decision_id": decision_id},
+        ).one()
+        consumed_proof_count = db.execute(
+            select(func.count(AdminDeviceProofChallenge.id)).where(
+                AdminDeviceProofChallenge.id.in_(
+                    [binding[0] for binding in proof_bindings]
+                ),
+                AdminDeviceProofChallenge.consumed_at.is_not(None),
+            )
+        ).scalar_one()
+
+    assert results[0] == results[1]
+    assert results[0][0] == decision_id
+    assert results[0][1] == 1
+    assert results[0][2] == identities[0].session_id
+    assert results[0][3] == identities[0].device_id
+    assert results[0][4] == proof_bindings[0][1]
+    assert row_count == 1
+    assert claim_count == 1
+    assert tuple(canonical_claim) == (
+        proof_bindings[0][0],
+        identities[0].session_id,
+        identities[0].device_id,
+    )
+    assert consumed_proof_count == 2
+
+
+@pytest.mark.skipif(not TEST_DATABASE_CONFIGURED, reason="WALKSAFE_TEST_DATABASE_URL is not configured")
+@pytest.mark.parametrize("conflict_kind", ["report", "admin"])
+def test_postgres_review_decision_id_reuse_by_other_report_or_admin_conflicts(
+    tmp_path: Path,
+    conflict_kind: str,
+) -> None:
+    report_id = _store_encrypted_report(tmp_path)
+    conflicting_report_id = (
+        _store_encrypted_report(tmp_path) if conflict_kind == "report" else report_id
+    )
+    identity = _identity(f"decision-id-{conflict_kind}-original")
+    _prepare_identity(identity, observed_at=datetime.now(timezone.utc))
+    conflicting_identity = (
+        replace(identity, admin_id="different-admin@example.com")
+        if conflict_kind == "admin"
+        else identity
+    )
+    decision_id = uuid.uuid4()
+    payload = ReportReviewDecisionRequest(
+        decision_id=decision_id,
+        decision="REJECTED",
+        reason="The report was rejected after administrator review.",
+        user_visible_reason="기관 전달 대상이 아닙니다.",
+        duplicate_of_report_id=None,
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+        content_revision=0,
+        evidence_grant_id=None,
+    )
+    request_body = payload.model_dump_json().encode("utf-8")
+    requests = [
+        (
+            report_id,
+            identity,
+            _record_consumed_action_proof(
+                identity=identity,
+                report_id=report_id,
+                action="report.review.decide",
+                request_body=request_body,
+            ),
+        ),
+        (
+            conflicting_report_id,
+            conflicting_identity,
+            _record_consumed_action_proof(
+                identity=conflicting_identity,
+                report_id=conflicting_report_id,
+                action="report.review.decide",
+                request_body=request_body,
+            ),
+        ),
+    ]
+    engine = SessionLocal.kw["bind"]
+
+    def decide(index: int) -> ReportReviewDecision:
+        request_report_id, request_identity, proof_binding = requests[index]
+        proof_challenge_id, correlation_id, _ = proof_binding
+        with engine.connect() as connection:
+            connection.execute(
+                text("SET SESSION AUTHORIZATION walksafe_backend_runtime")
+            )
+            connection.commit()
+            try:
+                with SessionLocal(bind=connection) as db:
+                    return append_report_review_decision(
+                        db,
+                        report_id=request_report_id,
+                        payload=payload,
+                        identity=request_identity,
+                        correlation_id=correlation_id,
+                        proof_challenge_id=proof_challenge_id,
+                        proof_request_body=request_body,
+                        runtime_totp_secret=TEST_TOTP_SECRET,
+                        credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
+                    )
+            finally:
+                if connection.in_transaction():
+                    connection.rollback()
+                connection.execute(text("RESET SESSION AUTHORIZATION"))
+                connection.commit()
+
+    created = decide(0)
+    original_snapshot = (
+        created.id,
+        created.report_id,
+        created.revision,
+        created.admin_id,
+        created.session_id,
+        created.device_id,
+        created.correlation_id,
+        created.decided_at,
+        created.created_at,
+    )
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        decide(1)
+
+    with SessionLocal() as db:
+        stored = db.get(ReportReviewDecision, decision_id)
+        claim_count = db.execute(
+            text(
+                "SELECT count(*) FROM public.admin_report_mutation_claims "
+                "WHERE resource_type = 'review_decision' "
+                "AND resource_id = :decision_id"
+            ),
+            {"decision_id": decision_id},
+        ).scalar_one()
+        consumed_proof_count = db.execute(
+            select(func.count(AdminDeviceProofChallenge.id)).where(
+                AdminDeviceProofChallenge.id.in_(
+                    [request[2][0] for request in requests]
+                ),
+                AdminDeviceProofChallenge.consumed_at.is_not(None),
+            )
+        ).scalar_one()
+
+    assert captured.value.code == "review_decision_idempotency_conflict"
+    assert captured.value.status_code == 409
+    assert stored is not None
+    assert (
+        stored.id,
+        stored.report_id,
+        stored.revision,
+        stored.admin_id,
+        stored.session_id,
+        stored.device_id,
+        stored.correlation_id,
+        stored.decided_at,
+        stored.created_at,
+    ) == original_snapshot
+    assert claim_count == 1
+    assert consumed_proof_count == 2
+
+
+@pytest.mark.skipif(not TEST_DATABASE_CONFIGURED, reason="WALKSAFE_TEST_DATABASE_URL is not configured")
+@pytest.mark.parametrize("divergent_reuse", [False, True])
+def test_concurrent_review_decision_id_reuse_is_replayed_or_conflicts(
+    tmp_path: Path,
+    divergent_reuse: bool,
 ) -> None:
     report_id = _store_encrypted_report(tmp_path)
     identity = _identity("approval-race")
@@ -1596,7 +1892,9 @@ def test_consumed_evidence_grant_binds_to_exactly_one_concurrent_approval(
             runtime_totp_secret=TEST_TOTP_SECRET,
             credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
         )
+    decision_id = uuid.uuid4()
     payload = ReportReviewDecisionRequest(
+        decision_id=decision_id,
         decision="APPROVED",
         reason="Original image and exact location were reviewed.",
         user_visible_reason=None,
@@ -1607,19 +1905,27 @@ def test_consumed_evidence_grant_binds_to_exactly_one_concurrent_approval(
         content_revision=0,
         evidence_grant_id=grant.grant_id,
     )
-    request_body = payload.model_dump_json().encode("utf-8")
+    payloads = [payload, payload]
+    if divergent_reuse:
+        payloads[1] = payload.model_copy(
+            update={"reason": "The same decision ID was reused differently."}
+        )
+    request_bodies = [
+        candidate.model_dump_json().encode("utf-8") for candidate in payloads
+    ]
     proof_bindings = [
         _record_consumed_action_proof(
             identity=identity,
             report_id=report_id,
             action="report.review.decide",
-            request_body=request_body,
+            request_body=request_bodies[index],
         )
-        for _ in range(2)
+        for index in range(2)
     ]
     engine = SessionLocal.kw["bind"]
+    barrier = threading.Barrier(2)
 
-    def approve_once(index: int) -> str:
+    def approve_once(index: int) -> tuple[str, uuid.UUID | None, int | None]:
         proof_challenge_id, correlation_id, _ = proof_bindings[index]
         with engine.connect() as connection:
             connection.execute(
@@ -1627,22 +1933,23 @@ def test_consumed_evidence_grant_binds_to_exactly_one_concurrent_approval(
             )
             connection.commit()
             try:
+                barrier.wait(timeout=5)
                 with SessionLocal(bind=connection) as db:
                     try:
-                        append_report_review_decision(
+                        decision = append_report_review_decision(
                             db,
                             report_id=report_id,
-                            payload=payload,
+                            payload=payloads[index],
                             identity=identity,
                             correlation_id=correlation_id,
                             proof_challenge_id=proof_challenge_id,
-                            proof_request_body=request_body,
+                            proof_request_body=request_bodies[index],
                             runtime_totp_secret=TEST_TOTP_SECRET,
                             credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
                         )
-                        return "success"
+                        return "success", decision.id, decision.revision
                     except AdminReportWorkflowError as exc:
-                        return exc.code
+                        return exc.code, None, None
             finally:
                 if connection.in_transaction():
                     connection.rollback()
@@ -1652,8 +1959,16 @@ def test_consumed_evidence_grant_binds_to_exactly_one_concurrent_approval(
     with ThreadPoolExecutor(max_workers=2) as executor:
         outcomes = list(executor.map(approve_once, range(2)))
 
-    assert outcomes.count("success") == 1
-    assert outcomes.count("review_evidence_grant_invalid") == 1
+    success_results = [result[1:] for result in outcomes if result[0] == "success"]
+    if divergent_reuse:
+        assert len(success_results) == 1
+        assert [result[0] for result in outcomes].count(
+            "review_decision_idempotency_conflict"
+        ) == 1
+    else:
+        assert len(success_results) == 2
+        assert len(set(success_results)) == 1
+        assert success_results[0][0] == decision_id
     with SessionLocal() as db:
         decisions = list(
             db.scalars(
@@ -1664,7 +1979,17 @@ def test_consumed_evidence_grant_binds_to_exactly_one_concurrent_approval(
             )
         )
         stored_grant = db.get(ReportOriginalAccessGrant, grant.grant_id)
+        claim_count = db.execute(
+            text(
+                "SELECT count(*) FROM public.admin_report_mutation_claims "
+                "WHERE resource_type = 'review_decision' "
+                "AND resource_id = :decision_id"
+            ),
+            {"decision_id": decision_id},
+        ).scalar_one()
     assert len(decisions) == 1
+    assert decisions[0].id == decision_id
+    assert claim_count == 1
     assert stored_grant is not None
     assert stored_grant.review_decision_id == decisions[0].id
     assert stored_grant.review_bound_at is not None
@@ -1678,6 +2003,7 @@ def test_runtime_original_access_and_review_share_one_lock_order(
     identity = _identity("access-review-lock-order")
     grant = _issue(report_id, identity)
     payload = ReportReviewDecisionRequest(
+        decision_id=uuid.uuid4(),
         decision="REJECTED",
         reason="Concurrent review lock ordering was verified.",
         user_visible_reason="기관 전달 대상이 아닙니다.",

@@ -45,13 +45,31 @@ def test_only_known_predecessors_may_use_legacy_compatibility(
         "202608300006",
         "202609010001",
         "202609010002",
+        "202609010003",
     }
 
 
-def test_known_successor_still_queries_the_head005_boundary() -> None:
+@pytest.mark.parametrize(
+    ("revision", "expected_definition_sha256"),
+    [
+        (
+            "202609010002",
+            "80a983dd5bb8fd3b65d102573e58167e7c26de39a7b5b8ff440b545a08c10035",
+        ),
+        (
+            "202609010003",
+            "2b68a3968fa183f5c2682246c8048c9220ffa802ca55b97f782905bc08d26249",
+        ),
+    ],
+)
+def test_known_successor_queries_its_exact_integrity_boundary(
+    revision: str,
+    expected_definition_sha256: str,
+) -> None:
     class BoundaryExecutor:
         def execute(self, statement):
             assert "walksafe_admin_report_integrity_boundary" in str(statement)
+            assert expected_definition_sha256 in str(statement)
 
             class Result:
                 @staticmethod
@@ -63,7 +81,7 @@ def test_known_successor_still_queries_the_head005_boundary() -> None:
     assert (
         admin_report_integrity_boundary_state(
             BoundaryExecutor(),
-            revision="202609010001",
+            revision=revision,
         )
         is True
     )

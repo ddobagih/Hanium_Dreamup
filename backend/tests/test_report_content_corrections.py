@@ -354,6 +354,7 @@ def _identity() -> AdminSessionIdentity:
 
 def _review_payload(content_revision: int) -> ReportReviewDecisionRequest:
     return ReportReviewDecisionRequest(
+        decision_id=uuid.uuid4(),
         decision="APPROVED",
         reason="정정 내용을 재검수했습니다",
         user_visible_reason=None,

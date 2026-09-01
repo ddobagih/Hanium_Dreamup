@@ -13,6 +13,7 @@ ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS = frozenset(
         "202608300006",
         "202609010001",
         "202609010002",
+        "202609010003",
     }
 )
 
@@ -319,13 +320,13 @@ _BOUNDARY_SQL = text(
          '21f28f5e68d48e0ab9566d3f837c978ce3e147fee0c7d35131af7fc22f691c2d',
          'TABLE(result_status text, decision_id uuid, decision_revision bigint)', false),
         ('walksafe_append_report_review_decision_v3',
-         '80a983dd5bb8fd3b65d102573e58167e7c26de39a7b5b8ff440b545a08c10035',
+         '2b68a3968fa183f5c2682246c8048c9220ffa802ca55b97f782905bc08d26249',
          'TABLE(result_status text, decision_id uuid, decision_revision bigint)', false),
         ('walksafe_assert_admin_totp_capability',
          'c6a95b20292cd519a5a346edbbbf9753b0158bbceb1264d9dc70d72d1d6e5b87',
          'boolean', false),
         ('walksafe_claim_admin_report_mutation',
-         '59ae7764df9427c0876c793ae41cdab1944ba31bcc93ce0d659a5b5aa25888d6',
+         '71951738802e93f6ec8d6aaca97b4f1fbfe88e7c408793b77e84275b62cd8d7d',
          'uuid', false),
         ('walksafe_complete_report_original_evidence_access',
          '8a8f9e3e642e03407e001c6c398d2fa66bff7725699f4515f5b92ab89bc28c06',
@@ -1252,6 +1253,16 @@ _BOUNDARY_SQL = text(
     """
 )
 
+_PRE_DECISION_IDEMPOTENCY_BOUNDARY_SQL = text(
+    _BOUNDARY_SQL.text.replace(
+        "2b68a3968fa183f5c2682246c8048c9220ffa802ca55b97f782905bc08d26249",
+        "80a983dd5bb8fd3b65d102573e58167e7c26de39a7b5b8ff440b545a08c10035",
+    ).replace(
+        "71951738802e93f6ec8d6aaca97b4f1fbfe88e7c408793b77e84275b62cd8d7d",
+        "59ae7764df9427c0876c793ae41cdab1944ba31bcc93ce0d659a5b5aa25888d6",
+    )
+)
+
 
 def admin_report_integrity_boundary_state(
     executor,
@@ -1269,7 +1280,12 @@ def admin_report_integrity_boundary_state(
         return None
     if current_revision not in ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS:
         return False
-    return bool(executor.execute(_BOUNDARY_SQL).scalar_one())
+    boundary_sql = (
+        _BOUNDARY_SQL
+        if current_revision == "202609010003"
+        else _PRE_DECISION_IDEMPOTENCY_BOUNDARY_SQL
+    )
+    return bool(executor.execute(boundary_sql).scalar_one())
 
 
 __all__ = [

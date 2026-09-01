@@ -50,6 +50,105 @@ def _runtime_report_insert_sql(report_id: uuid.UUID) -> tuple[object, dict[str, 
     )
 
 
+def test_review_decision_idempotency_migration_preserves_existing_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configured_url = make_url(os.environ["WALKSAFE_TEST_DATABASE_URL"].strip())
+    database_name = f"walksafe_review_idempotency_test_{uuid.uuid4().hex}"
+    disposable_url = configured_url.set(database=database_name)
+    migration_url = disposable_url.render_as_string(hide_password=False)
+    admin_engine = create_engine(configured_url, pool_pre_ping=True)
+    disposable_engine = create_engine(disposable_url, pool_pre_ping=True)
+    quoted_database = admin_engine.dialect.identifier_preparer.quote(database_name)
+    created_database = False
+    report_id = uuid.uuid4()
+    decision_id = uuid.uuid4()
+    session_id = uuid.uuid4()
+    correlation_id = uuid.uuid4()
+
+    try:
+        with admin_engine.connect().execution_options(
+            isolation_level="AUTOCOMMIT"
+        ) as connection:
+            connection.exec_driver_sql(f"CREATE DATABASE {quoted_database}")
+            created_database = True
+
+        config = _set_migration_url(monkeypatch, migration_url)
+        command.upgrade(config, "202609010002")
+        report_statement, report_parameters = _runtime_report_insert_sql(report_id)
+        with disposable_engine.begin() as connection:
+            connection.execute(report_statement, report_parameters)
+            connection.execute(
+                text(
+                    "INSERT INTO public.report_review_decisions ("
+                    "id, report_id, revision, content_revision, decision, "
+                    "reason, user_visible_reason, duplicate_of_report_id, "
+                    "evidence_grant_id, location_reviewed, photo_reviewed, "
+                    "privacy_reviewed, admin_id, session_id, device_id, "
+                    "correlation_id, decided_at) VALUES ("
+                    ":decision_id, :report_id, 1, 0, 'REJECTED', "
+                    "'legacy decision', '신고를 처리할 수 없습니다', NULL, "
+                    "NULL, true, true, true, 'legacy-admin@example.com', "
+                    ":session_id, 'legacy-device', :correlation_id, "
+                    "'2026-09-01T00:00:00Z'::timestamptz)"
+                ),
+                {
+                    "decision_id": decision_id,
+                    "report_id": report_id,
+                    "session_id": session_id,
+                    "correlation_id": correlation_id,
+                },
+            )
+
+        def stored_decision() -> tuple[object, ...]:
+            with disposable_engine.connect() as connection:
+                return tuple(
+                    connection.execute(
+                        text(
+                            "SELECT * FROM public.report_review_decisions "
+                            "WHERE id = :decision_id"
+                        ),
+                        {"decision_id": decision_id},
+                    ).one()
+                )
+
+        predecessor_row = stored_decision()
+        command.upgrade(config, "202609010003")
+        assert stored_decision() == predecessor_row
+        with disposable_engine.connect() as connection:
+            assert admin_report_integrity_boundary_state(connection) is True
+
+        command.downgrade(config, "202609010002")
+        assert stored_decision() == predecessor_row
+        with disposable_engine.connect() as connection:
+            assert admin_report_integrity_boundary_state(connection) is True
+
+        command.upgrade(config, "202609010003")
+        assert stored_decision() == predecessor_row
+        with disposable_engine.connect() as connection:
+            assert connection.execute(
+                text("SELECT version_num FROM public.alembic_version")
+            ).scalar_one() == "202609010003"
+            assert admin_report_integrity_boundary_state(connection) is True
+    finally:
+        disposable_engine.dispose()
+        if created_database:
+            with admin_engine.connect().execution_options(
+                isolation_level="AUTOCOMMIT"
+            ) as connection:
+                connection.execute(
+                    text(
+                        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                        "WHERE datname = :database_name AND pid <> pg_backend_pid()"
+                    ),
+                    {"database_name": database_name},
+                ).all()
+                connection.exec_driver_sql(
+                    f"DROP DATABASE IF EXISTS {quoted_database}"
+                )
+        admin_engine.dispose()
+
+
 def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -261,7 +360,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
             "ready": False,
             "reason": "migration_not_at_head",
             "current_revision": "202608300005",
-            "expected_revision": "202609010002",
+            "expected_revision": "202609010003",
         }
 
         with disposable_engine.begin() as connection:
@@ -278,7 +377,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
                 "ready": False,
                 "reason": "migration_not_at_head",
                 "current_revision": "202608300005",
-                "expected_revision": "202609010002",
+                "expected_revision": "202609010003",
             }
         finally:
             with disposable_engine.begin() as connection:
@@ -336,7 +435,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
                 "ready": False,
                 "reason": "migration_not_at_head",
                 "current_revision": "202608300005",
-                "expected_revision": "202609010002",
+                "expected_revision": "202609010003",
             }
         finally:
             with disposable_engine.begin() as connection:
