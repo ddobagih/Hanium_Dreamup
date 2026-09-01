@@ -13494,7 +13494,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun firstRunWaitingTextOrNull(snapshot: FirstRunOnboardingSnapshot): String? {
-        if (snapshot.flow != FirstRunOnboardingFlow.LEGACY_PHONE_V3) return null
+        if (snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4) {
+            return if (accountRequestFence.isInFlight()) {
+                "인증번호 요청, 계정 생성 또는 로그인을 처리하고 있습니다. 잠시 기다려 주세요."
+            } else {
+                null
+            }
+        }
         return when (snapshot.stage) {
             FirstRunOnboardingStage.VERIFIED_SMS ->
                 "운영 공급자의 SMS 검증 증거를 기다리고 있습니다. " +

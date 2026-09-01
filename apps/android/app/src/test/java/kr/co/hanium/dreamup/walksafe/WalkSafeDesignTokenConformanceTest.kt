@@ -201,9 +201,10 @@ class WalkSafeDesignTokenConformanceTest {
     }
 
     @Test
-    fun waitingCardKeepsTheTeammateAnimationWithoutChangingTheEmailLoginFlow() {
+    fun waitingCardKeepsTheTeammateAnimationAndOnlyShowsForActiveEmailRequests() {
         val build = functionBlock("private fun buildContentView()")
         val waiting = functionBlock("private fun firstRunWaitingTextOrNull(")
+        val emailWaiting = waiting.substringBefore("return when (snapshot.stage)")
         val dots = functionBlock("private fun updateFirstRunWaitingDots(")
         val update = functionBlock("private fun updateFirstRunOnboardingUi(")
         val onResume = functionBlock("override fun onResume()")
@@ -219,7 +220,15 @@ class WalkSafeDesignTokenConformanceTest {
         assertTrue(waiting.contains("FirstRunOnboardingStage.GUARDIAN_APPROVAL"))
         assertTrue(waiting.contains("FirstRunOnboardingStage.ACCOUNT_ACTIVATION"))
         assertTrue(waiting.contains("FirstRunOnboardingStage.VERIFIED_LOGIN"))
-        assertTrue(waiting.contains("snapshot.flow != FirstRunOnboardingFlow.LEGACY_PHONE_V3"))
+        assertTrue(emailWaiting.contains("snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4"))
+        assertTrue(emailWaiting.contains("return if (accountRequestFence.isInFlight())"))
+        assertTrue(
+            emailWaiting.contains(
+                "인증번호 요청, 계정 생성 또는 로그인을 처리하고 있습니다. 잠시 기다려 주세요.",
+            ),
+        )
+        assertTrue(emailWaiting.contains("else {\n                null\n            }"))
+        assertFalse(emailWaiting.contains("snapshot.stage"))
         assertFalse(waiting.contains("FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION"))
         assertFalse(waiting.contains("Button("))
         assertFalse(waiting.contains("재전송"))
