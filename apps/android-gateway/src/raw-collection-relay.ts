@@ -349,7 +349,18 @@ async function readExactBody(
   try {
     while (true) {
       if (signal.aborted) throw signal.reason;
-      const chunk = await reader.read();
+      let rejectOnAbort: (reason?: unknown) => void = () => undefined;
+      const aborted = new Promise<never>((_resolve, reject) => {
+        rejectOnAbort = reject;
+      });
+      const onAbort = () => rejectOnAbort(signal.reason);
+      signal.addEventListener("abort", onAbort, { once: true });
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await Promise.race([reader.read(), aborted]);
+      } finally {
+        signal.removeEventListener("abort", onAbort);
+      }
       if (chunk.done) break;
       if (offset + chunk.value.byteLength > expectedBytes) {
         await reader.cancel("raw body exceeded Content-Length");
@@ -362,11 +373,13 @@ async function readExactBody(
       offset += chunk.value.byteLength;
     }
   } catch {
+    const requestAborted = request.signal.aborted;
+    const timeoutAborted = timeout.aborted;
     void reader.cancel("raw body read cancelled").catch(() => undefined);
-    if (request.signal.aborted) {
+    if (requestAborted) {
       return { error: jsonError(499, "gateway_client_closed", "The client request was cancelled.") };
     }
-    if (timeout.aborted) {
+    if (timeoutAborted) {
       return { error: jsonError(408, "raw_body_read_timeout", "The raw body read timed out.") };
     }
     return { error: jsonError(400, "raw_body_read_failed", "The raw body could not be read.") };
