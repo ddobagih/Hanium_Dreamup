@@ -715,6 +715,7 @@ class UserReportControllerTest {
 
         callbacks.reject = true
         worker.runNext()
+        assertEquals(1, client.listCancelCalls)
         assertEquals(UserReportUiPhase.ERROR, controller.snapshot().phase)
         assertEquals(UserReportFailure.TEMPORARY, controller.snapshot().failure)
         assertTrue(controller.snapshot().retryAvailable)
@@ -957,6 +958,7 @@ class UserReportControllerTest {
         val correctionIntents = mutableListOf<UserReportCorrectionIntent>()
         val deletionStatusRequestIds = mutableListOf<String>()
         var listCancelFailure: Throwable? = null
+        var listCancelCalls: Int = 0
 
         override fun listReportsCall(
             session: GatewayFieldSession,
@@ -968,7 +970,10 @@ class UserReportControllerTest {
             val result = listResults.removeFirst()
             return CancellableNetworkCall(
                 executeBlock = { result.getOrThrow() },
-                cancelBlock = { listCancelFailure?.let { throw it } },
+                cancelBlock = {
+                    listCancelCalls += 1
+                    listCancelFailure?.let { throw it }
+                },
             )
         }
 
