@@ -21,6 +21,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 
+import { revokeFieldSessionsForSecurityEvent } from "./auth.js";
 import {
   backendUrl,
   deletionBackendHeaders,
@@ -897,7 +898,13 @@ export function isAccountGenerationFencedV2(actorId: string, generation: number)
 
 export type AcceptDeletionResultV2 =
   | { kind: "accepted"; requestId: string; actorId: string; accountGeneration: number }
-  | { kind: "replay"; requestId: string; status: AccountDeletionStatusV2 | null }
+  | {
+      kind: "replay";
+      requestId: string;
+      actorId: string;
+      accountGeneration: number;
+      status: AccountDeletionStatusV2 | null;
+    }
   | { kind: "not_found" }
   | { kind: "conflict" }
   | { kind: "inactive" };
@@ -931,6 +938,8 @@ export function acceptOrReplayAccountDeletionV2(
         value: {
           kind: "replay",
           requestId: existing.request_id,
+          actorId: existing.actor_id,
+          accountGeneration: existing.account_generation,
           status: existing.backend_status
         } as const,
         changed: false
@@ -1371,6 +1380,20 @@ async function forwardOperation(
     return record?.backend_status
       ? { kind: "ok", status: record.backend_status, upstreamStatus: 200 }
       : { kind: "not_found" };
+  }
+  if (operation.kind === "REQUEST") {
+    try {
+      await revokeFieldSessionsForSecurityEvent(
+        record.actor_id,
+        "security_incident",
+        nowEpochMs
+      );
+    } catch {
+      return { kind: "pending", retryAfterSeconds: 5 };
+    }
+    if (forwardingOperations.has(inFlightKey)) {
+      return { kind: "pending", retryAfterSeconds: 1 };
+    }
   }
   const terminalConflictCode = operationTerminalConflictCode(operation);
   if (terminalConflictCode !== null) {

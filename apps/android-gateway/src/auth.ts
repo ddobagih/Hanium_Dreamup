@@ -52,6 +52,7 @@ const DEVICE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const RESERVED_ACTOR_IDS = new Set(["unknown", "system", "anonymous"]);
 const gatewayLoginLocks = new Map<string, Promise<void>>();
 export const SHORT_SESSION_MAX_PLAINTEXT_BYTES = 16 * 1024;
+export const SHORT_DEVICE_SESSION_LIMIT = 32;
 
 type GatewayAccount = { actorId: string; token: string };
 
@@ -163,6 +164,34 @@ type GatewaySessionIdentity =
   | BackendGatewaySessionIdentity
   | BackendDeviceGatewaySessionIdentity;
 
+type BackendDeviceGatewaySessionLedger = {
+  actorId: string;
+  sessions: BackendDeviceGatewaySessionIdentity[];
+};
+
+type BackendGatewaySessionWatermark = {
+  actorId: string;
+  accountGeneration: number;
+  authEpoch: number;
+};
+
+type GatewaySessionState =
+  | GatewaySessionIdentity
+  | BackendDeviceGatewaySessionLedger
+  | BackendGatewaySessionWatermark;
+
+class GatewaySessionDeviceCapacityError extends Error {
+  constructor() {
+    super("gateway short-session device capacity is unavailable");
+  }
+}
+
+class GatewaySessionRollbackError extends Error {
+  constructor() {
+    super("gateway account session generation or authentication epoch would roll back");
+  }
+}
+
 function validGatewaySessionScope(value: unknown): value is GatewaySessionScope {
   return value === "general" || value === "account_deletion_recovery";
 }
@@ -268,7 +297,28 @@ function durableUnlinkSync(target: string): void {
   }
 }
 
-function readActiveSession(actorId: string): GatewaySessionIdentity | null {
+function isBackendDeviceSessionLedger(
+  state: GatewaySessionState
+): state is BackendDeviceGatewaySessionLedger {
+  return "sessions" in state;
+}
+
+function isBackendSessionWatermark(
+  state: GatewaySessionState
+): state is BackendGatewaySessionWatermark {
+  return "accountGeneration" in state && !("sessionKind" in state);
+}
+
+function isBackendSessionIdentity(
+  state: GatewaySessionState
+): state is BackendGatewaySessionIdentity | BackendDeviceGatewaySessionIdentity {
+  return "sessionKind" in state && (
+    state.sessionKind === "backend_account" ||
+    state.sessionKind === "backend_account_device"
+  );
+}
+
+function readActiveSession(actorId: string): GatewaySessionState | null {
   const filePath = sessionStatePath(actorId);
   let descriptor: number | null = null;
   try {
@@ -292,9 +342,12 @@ function readActiveSession(actorId: string): GatewaySessionIdentity | null {
     if (!validShortSessionStateForMaintenance(decoded, recordId)) return null;
     // Known v3 records may survive a rollout so startup can proceed, but they
     // remain deliberately unauthenticated until a new scope-bound login replaces them.
-    const state = decoded as Partial<GatewaySessionIdentity>;
+    const state = decoded as GatewaySessionState;
+    if (isBackendDeviceSessionLedger(state) || isBackendSessionWatermark(state)) {
+      return state;
+    }
     if (!validGatewaySessionScope(state.sessionScope)) return null;
-    return state as GatewaySessionIdentity;
+    return state;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
@@ -325,6 +378,74 @@ export function validShortSessionStateForMaintenance(
   ].sort().join("\0");
   const backendDeviceKeys = [...backendKeys.split("\0"), "deviceId"]
     .sort().join("\0");
+  const watermarkKeys = ["actorId", "accountGeneration", "authEpoch"]
+    .sort().join("\0");
+  if (keys === watermarkKeys) {
+    if (
+      typeof state.actorId !== "string" ||
+      !ACTOR_ID.test(state.actorId) ||
+      !Number.isSafeInteger(state.accountGeneration) ||
+      Number(state.accountGeneration) < 1 ||
+      !Number.isSafeInteger(state.authEpoch) ||
+      Number(state.authEpoch) < 1
+    ) return false;
+    const digest = createHash("sha256")
+      .update(`field\0${state.actorId}`)
+      .digest("hex");
+    return recordId === `field-${digest}.json`;
+  }
+  const ledgerKeys = ["actorId", "sessions"].sort().join("\0");
+  if (keys === ledgerKeys) {
+    if (
+      typeof state.actorId !== "string" ||
+      !ACTOR_ID.test(state.actorId) ||
+      !Array.isArray(state.sessions) ||
+      state.sessions.length === 0 ||
+      state.sessions.length > SHORT_DEVICE_SESSION_LIMIT
+    ) return false;
+    const devices = new Set<string>();
+    const sessionIds = new Set<string>();
+    let accountGeneration: number | null = null;
+    let authEpoch: number | null = null;
+    for (const session of state.sessions) {
+      if (
+        typeof session !== "object" ||
+        session === null ||
+        Array.isArray(session)
+      ) return false;
+      const entry = session as Record<string, unknown>;
+      if (
+        Object.keys(entry).sort().join("\0") !== backendDeviceKeys ||
+        entry.actorId !== state.actorId ||
+        entry.sessionKind !== "backend_account_device" ||
+        !Number.isSafeInteger(entry.accountGeneration) ||
+        Number(entry.accountGeneration) < 1 ||
+        !Number.isSafeInteger(entry.authEpoch) ||
+        Number(entry.authEpoch) < 1 ||
+        typeof entry.deviceId !== "string" ||
+        !DEVICE_ID.test(entry.deviceId) ||
+        typeof entry.sessionId !== "string" ||
+        !/^[A-Za-z0-9_-]{32,128}$/.test(entry.sessionId) ||
+        entry.sessionScope !== "general" ||
+        !Number.isSafeInteger(entry.expiresAtSeconds) ||
+        Number(entry.expiresAtSeconds) <= 0 ||
+        devices.has(entry.deviceId) ||
+        sessionIds.has(entry.sessionId)
+      ) return false;
+      accountGeneration ??= Number(entry.accountGeneration);
+      authEpoch ??= Number(entry.authEpoch);
+      if (
+        entry.accountGeneration !== accountGeneration ||
+        entry.authEpoch !== authEpoch
+      ) return false;
+      devices.add(entry.deviceId);
+      sessionIds.add(entry.sessionId);
+    }
+    const digest = createHash("sha256")
+      .update(`field\0${state.actorId}`)
+      .digest("hex");
+    return recordId === `field-${digest}.json`;
+  }
   const legacyV3State = keys === legacyKeys;
   const backendAccountState = keys === backendKeys;
   const backendDeviceState = keys === backendDeviceKeys;
@@ -350,7 +471,9 @@ export function validShortSessionStateForMaintenance(
     Number(state.authEpoch) < 1
   )) return false;
   if (backendDeviceState && (
-    typeof state.deviceId !== "string" || !DEVICE_ID.test(state.deviceId)
+    typeof state.deviceId !== "string" ||
+    !DEVICE_ID.test(state.deviceId) ||
+    state.sessionScope !== "general"
   )) return false;
   const digest = createHash("sha256")
     .update(`field\0${state.actorId}`)
@@ -358,39 +481,127 @@ export function validShortSessionStateForMaintenance(
   return recordId === `field-${digest}.json`;
 }
 
+function writeSessionState(target: string, state: GatewaySessionState): void {
+  const temporary = `${target}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
+  let descriptor: number | null = null;
+  let directoryDescriptor: number | null = null;
+  try {
+    const encoded = encryptGatewayStateJson(
+      { kind: "short-session", recordId: path.basename(target) },
+      state,
+      SHORT_SESSION_MAX_PLAINTEXT_BYTES
+    );
+    descriptor = openSync(
+      temporary,
+      fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW,
+      0o600
+    );
+    writeFileSync(descriptor, encoded, "utf8");
+    fsyncSync(descriptor);
+    closeSync(descriptor);
+    descriptor = null;
+    chmodSync(temporary, 0o600);
+    renameSync(temporary, target);
+    directoryDescriptor = openSync(
+      path.dirname(target),
+      fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
+    );
+    fsyncSync(directoryDescriptor);
+  } finally {
+    if (descriptor !== null) closeSync(descriptor);
+    if (directoryDescriptor !== null) closeSync(directoryDescriptor);
+    rmSync(temporary, { force: true });
+  }
+}
+
+function currentBackendDeviceSessions(
+  state: GatewaySessionState | null,
+  identity: BackendDeviceGatewaySessionIdentity,
+  nowSeconds: number
+): BackendDeviceGatewaySessionIdentity[] {
+  const sessions = state && isBackendDeviceSessionLedger(state)
+    ? state.sessions
+    : state && isBackendSessionIdentity(state) &&
+      state.sessionKind === "backend_account_device"
+      ? [state]
+      : [];
+  return sessions.filter((session) =>
+    session.actorId === identity.actorId &&
+    session.accountGeneration === identity.accountGeneration &&
+    session.authEpoch === identity.authEpoch &&
+    session.expiresAtSeconds > nowSeconds &&
+    session.expiresAtSeconds <= nowSeconds + SESSION_MAX_AGE_SECONDS
+  );
+}
+
+function backendSessionWatermark(
+  state: GatewaySessionState | null
+): { accountGeneration: number; authEpoch: number } | null {
+  if (state && isBackendSessionWatermark(state)) {
+    return {
+      accountGeneration: state.accountGeneration,
+      authEpoch: state.authEpoch
+    };
+  }
+  const session = state && isBackendDeviceSessionLedger(state)
+    ? state.sessions[0] ?? null
+    : state && isBackendSessionIdentity(state)
+      ? state
+      : null;
+  return session
+    ? {
+        accountGeneration: session.accountGeneration,
+        authEpoch: session.authEpoch
+      }
+    : null;
+}
+
+function backendSessionWatermarkState(
+  state: BackendGatewaySessionIdentity | BackendDeviceGatewaySessionIdentity
+): BackendGatewaySessionWatermark {
+  return {
+    actorId: state.actorId,
+    accountGeneration: state.accountGeneration,
+    authEpoch: state.authEpoch
+  };
+}
+
 function writeActiveSession(identity: GatewaySessionIdentity): void {
   const target = sessionStatePath(identity.actorId);
   withExclusiveFileLock(`${target}.lock`, () => {
-    const temporary = `${target}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
-    let descriptor: number | null = null;
-    let directoryDescriptor: number | null = null;
-    try {
-      const encoded = encryptGatewayStateJson(
-        { kind: "short-session", recordId: path.basename(target) },
-        identity,
-        SHORT_SESSION_MAX_PLAINTEXT_BYTES
-      );
-      descriptor = openSync(
-        temporary,
-        fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW,
-        0o600
-      );
-      writeFileSync(descriptor, encoded, "utf8");
-      fsyncSync(descriptor);
-      closeSync(descriptor);
-      descriptor = null;
-      chmodSync(temporary, 0o600);
-      renameSync(temporary, target);
-      directoryDescriptor = openSync(
-        path.dirname(target),
-        fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
-      );
-      fsyncSync(directoryDescriptor);
-    } finally {
-      if (descriptor !== null) closeSync(descriptor);
-      if (directoryDescriptor !== null) closeSync(directoryDescriptor);
-      rmSync(temporary, { force: true });
+    const active = "sessionKind" in identity
+      ? readActiveSession(identity.actorId)
+      : null;
+    if ("sessionKind" in identity) {
+      const watermark = backendSessionWatermark(active);
+      if (watermark && (
+        identity.accountGeneration < watermark.accountGeneration ||
+        (identity.accountGeneration === watermark.accountGeneration &&
+          identity.authEpoch < watermark.authEpoch)
+      )) {
+        throw new GatewaySessionRollbackError();
+      }
     }
+    if (
+      "sessionKind" in identity &&
+      identity.sessionKind === "backend_account_device"
+    ) {
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const sessions = currentBackendDeviceSessions(
+        active,
+        identity,
+        nowSeconds
+      ).filter((session) => session.deviceId !== identity.deviceId);
+      if (sessions.length >= SHORT_DEVICE_SESSION_LIMIT) {
+        throw new GatewaySessionDeviceCapacityError();
+      }
+      writeSessionState(target, {
+        actorId: identity.actorId,
+        sessions: [...sessions, identity]
+      });
+      return;
+    }
+    writeSessionState(target, identity);
   });
 }
 
@@ -398,8 +609,28 @@ function clearActiveSession(identity: GatewaySessionIdentity): void {
   const target = sessionStatePath(identity.actorId);
   withExclusiveFileLock(`${target}.lock`, () => {
     const active = readActiveSession(identity.actorId);
+    if (active && isBackendDeviceSessionLedger(active)) {
+      const sessions = active.sessions.filter(
+        (session) => session.sessionId !== identity.sessionId
+      );
+      if (sessions.length === active.sessions.length) return;
+      if (sessions.length === 0) {
+        writeSessionState(
+          target,
+          backendSessionWatermarkState(active.sessions[0]!)
+        );
+      } else {
+        writeSessionState(target, { actorId: active.actorId, sessions });
+      }
+      return;
+    }
+    if (active && isBackendSessionWatermark(active)) return;
     if (active?.sessionId === identity.sessionId) {
-      durableUnlinkSync(target);
+      if (isBackendSessionIdentity(active)) {
+        writeSessionState(target, backendSessionWatermarkState(active));
+      } else {
+        durableUnlinkSync(target);
+      }
     }
   });
 }
@@ -427,13 +658,15 @@ function validLegacySessionIdentity(candidate: string): LegacyGatewaySessionIden
   if (!account) return null;
   const expiresAtSeconds = Number(expiresText);
   const nowSeconds = Math.floor(Date.now() / 1000);
-  if (!Number.isInteger(expiresAtSeconds) || expiresAtSeconds < nowSeconds) return null;
+  if (!Number.isInteger(expiresAtSeconds) || expiresAtSeconds <= nowSeconds) return null;
   if (expiresAtSeconds > nowSeconds + SESSION_MAX_AGE_SECONDS) return null;
   const expected = sessionValue(account, expiresAtSeconds, sessionId, sessionScope);
   if (!expected || !constantTimeEqual(candidate, expected)) return null;
   const active = readActiveSession(actorId);
   if (
     !active ||
+    isBackendDeviceSessionLedger(active) ||
+    isBackendSessionWatermark(active) ||
     "sessionKind" in active ||
     active.actorId !== actorId ||
     active.sessionId !== sessionId ||
@@ -490,7 +723,7 @@ function validBackendSessionIdentity(
     accountGeneration === null ||
     authEpoch === null ||
     expiresAtSeconds === null ||
-    expiresAtSeconds < nowSeconds ||
+    expiresAtSeconds <= nowSeconds ||
     expiresAtSeconds > nowSeconds + SESSION_MAX_AGE_SECONDS
   ) return null;
   const binding = { actorId, accountGeneration, authEpoch };
@@ -504,7 +737,9 @@ function validBackendSessionIdentity(
   const active = readActiveSession(actorId);
   if (
     !active ||
-    !("sessionKind" in active) ||
+    isBackendDeviceSessionLedger(active) ||
+    isBackendSessionWatermark(active) ||
+    !isBackendSessionIdentity(active) ||
     active.sessionKind !== "backend_account" ||
     active.actorId !== actorId ||
     active.accountGeneration !== accountGeneration ||
@@ -525,7 +760,8 @@ function validBackendSessionIdentity(
 }
 
 function validBackendDeviceSessionIdentity(
-  candidate: string
+  candidate: string,
+  nowSeconds = Math.floor(Date.now() / 1000)
 ): BackendDeviceGatewaySessionIdentity | null {
   const [
     version,
@@ -544,7 +780,7 @@ function validBackendDeviceSessionIdentity(
     version !== "v7" ||
     !encodedActor ||
     !encodedDevice ||
-    !validGatewaySessionScope(sessionScope) ||
+    sessionScope !== "general" ||
     !sessionId ||
     !signature ||
     !/^[A-Za-z0-9_-]{32,128}$/.test(sessionId)
@@ -565,12 +801,11 @@ function validBackendDeviceSessionIdentity(
   const accountGeneration = positiveCanonicalInteger(generationText ?? "");
   const authEpoch = positiveCanonicalInteger(authEpochText ?? "");
   const expiresAtSeconds = positiveCanonicalInteger(expiresText ?? "");
-  const nowSeconds = Math.floor(Date.now() / 1000);
   if (
     accountGeneration === null ||
     authEpoch === null ||
     expiresAtSeconds === null ||
-    expiresAtSeconds < nowSeconds ||
+    expiresAtSeconds <= nowSeconds ||
     expiresAtSeconds > nowSeconds + SESSION_MAX_AGE_SECONDS
   ) return null;
   const binding = { actorId, accountGeneration, authEpoch, deviceId };
@@ -581,18 +816,27 @@ function validBackendDeviceSessionIdentity(
     sessionScope
   );
   if (!expected || !constantTimeEqual(candidate, expected)) return null;
-  const active = readActiveSession(actorId);
+  const state = readActiveSession(actorId);
+  const active = state && isBackendDeviceSessionLedger(state)
+    ? state.sessions.find((session) => session.sessionId === sessionId)
+    : state && !isBackendSessionWatermark(state)
+      ? state
+      : null;
   if (
     !active ||
+    isBackendDeviceSessionLedger(active) ||
     !("sessionKind" in active) ||
-    active.sessionKind !== "backend_account_device" ||
-    active.actorId !== actorId ||
-    active.accountGeneration !== accountGeneration ||
-    active.authEpoch !== authEpoch ||
-    active.deviceId !== deviceId ||
-    active.sessionId !== sessionId ||
-    active.expiresAtSeconds !== expiresAtSeconds ||
-    active.sessionScope !== sessionScope
+    active.sessionKind !== "backend_account_device"
+  ) return null;
+  const backendDeviceActive = active as BackendDeviceGatewaySessionIdentity;
+  if (
+    backendDeviceActive.actorId !== actorId ||
+    backendDeviceActive.accountGeneration !== accountGeneration ||
+    backendDeviceActive.authEpoch !== authEpoch ||
+    backendDeviceActive.deviceId !== deviceId ||
+    backendDeviceActive.sessionId !== sessionId ||
+    backendDeviceActive.expiresAtSeconds !== expiresAtSeconds ||
+    backendDeviceActive.sessionScope !== sessionScope
   ) return null;
   return {
     actorId,
@@ -1198,6 +1442,23 @@ export function establishBackendGatewaySession(
           sessionKind: "backend_account"
         });
   } catch (error) {
+    if (error instanceof GatewaySessionRollbackError) {
+      return Response.json(
+        {
+          detail: {
+            code: "account_authentication_stale",
+            message: "Authentication state changed while login was in progress. Retry login."
+          }
+        },
+        { status: 409, headers: { "cache-control": "no-store" } }
+      );
+    }
+    if (error instanceof GatewaySessionDeviceCapacityError) {
+      return Response.json(
+        { code: "field_session_device_capacity_unavailable" },
+        { status: 503, headers: { "cache-control": "no-store" } }
+      );
+    }
     return error instanceof ExclusiveFileLockBusyError
       ? gatewayLoginBusyResponse()
       : gatewayUnavailableResponse();
@@ -1213,6 +1474,144 @@ export function establishBackendGatewaySession(
       )
     }
   });
+}
+
+function gatewaySessionStorageFailureResponse(error: unknown): Response {
+  if (error instanceof ExclusiveFileLockBusyError) {
+    return Response.json(
+      {
+        code: "field_session_storage_busy",
+        message: "다른 현장 세션 갱신이 완료될 때까지 다시 시도해야 합니다.",
+        retryable: true
+      },
+      {
+        status: 503,
+        headers: { "cache-control": "no-store", "retry-after": "1" }
+      }
+    );
+  }
+  return Response.json(
+    {
+      code: "field_session_storage_unavailable",
+      message: "현장 세션 상태를 안전하게 저장할 수 없습니다."
+    },
+    {
+      status: 503,
+      headers: { "cache-control": "no-store", "retry-after": "1" }
+    }
+  );
+}
+
+export function listBackendDeviceGatewaySessionDevices(
+  request: Request,
+  nowEpochMs = Date.now()
+): Response | null {
+  const candidate = requestCookies(request).get(FIELD_COOKIE) ?? "";
+  if (!candidate.startsWith("v7.")) return null;
+  const nowSeconds = Math.floor(nowEpochMs / 1000);
+  const identity = validBackendDeviceSessionIdentity(candidate, nowSeconds);
+  if (!identity) return gatewayUnauthorizedResponse();
+  const target = sessionStatePath(identity.actorId);
+  try {
+    return withExclusiveFileLock(`${target}.lock`, () => {
+      const current = validBackendDeviceSessionIdentity(candidate, nowSeconds);
+      if (!current) return gatewayUnauthorizedResponse();
+      const state = readActiveSession(current.actorId);
+      const sessions = state && isBackendDeviceSessionLedger(state)
+        ? state.sessions
+        : state && isBackendSessionIdentity(state) &&
+          state.sessionKind === "backend_account_device"
+          ? [state]
+          : [];
+      const devices = sessions
+        .filter((session) =>
+          session.accountGeneration === current.accountGeneration &&
+          session.authEpoch === current.authEpoch &&
+          session.expiresAtSeconds > nowSeconds &&
+          session.expiresAtSeconds <= nowSeconds + SESSION_MAX_AGE_SECONDS
+        )
+        .sort((left, right) => left.deviceId.localeCompare(right.deviceId))
+        .map((session) => {
+          const createdAtEpochMs =
+            (session.expiresAtSeconds - SESSION_MAX_AGE_SECONDS) * 1000;
+          const expiresAtEpochMs = session.expiresAtSeconds * 1000;
+          return {
+            device_id: session.deviceId,
+            family_id: session.sessionId,
+            current: session.sessionId === current.sessionId,
+            rotation: 0,
+            created_at_epoch_ms: createdAtEpochMs,
+            last_rotated_at_epoch_ms: createdAtEpochMs,
+            idle_expires_at_epoch_ms: expiresAtEpochMs,
+            absolute_expires_at_epoch_ms: expiresAtEpochMs
+          };
+        });
+      return Response.json(
+        { actor_id: current.actorId, devices },
+        { headers: { "cache-control": "no-store" } }
+      );
+    });
+  } catch (error) {
+    return gatewaySessionStorageFailureResponse(error);
+  }
+}
+
+export function revokeBackendDeviceGatewaySession(
+  request: Request,
+  deviceId: string,
+  nowEpochMs = Date.now()
+): Response | null {
+  const candidate = requestCookies(request).get(FIELD_COOKIE) ?? "";
+  if (!candidate.startsWith("v7.")) return null;
+  if (!DEVICE_ID.test(deviceId)) {
+    return Response.json(
+      { code: "field_session_query_invalid" },
+      { status: 400, headers: { "cache-control": "no-store" } }
+    );
+  }
+  const nowSeconds = Math.floor(nowEpochMs / 1000);
+  const identity = validBackendDeviceSessionIdentity(candidate, nowSeconds);
+  if (!identity) return gatewayUnauthorizedResponse();
+  const target = sessionStatePath(identity.actorId);
+  try {
+    const response = withExclusiveFileLock(`${target}.lock`, () => {
+      const current = validBackendDeviceSessionIdentity(candidate, nowSeconds);
+      if (!current) return gatewayUnauthorizedResponse();
+      const state = readActiveSession(current.actorId);
+      if (state && isBackendDeviceSessionLedger(state)) {
+        const sessions = state.sessions.filter(
+          (session) => session.deviceId !== deviceId
+        );
+        if (sessions.length !== state.sessions.length) {
+          if (sessions.length === 0) {
+            writeSessionState(
+              target,
+              backendSessionWatermarkState(state.sessions[0]!)
+            );
+          } else {
+            writeSessionState(target, { actorId: state.actorId, sessions });
+          }
+        }
+      } else if (
+        state &&
+        isBackendSessionIdentity(state) &&
+        state.sessionKind === "backend_account_device" &&
+        state.deviceId === deviceId
+      ) {
+        writeSessionState(target, backendSessionWatermarkState(state));
+      }
+      return new Response(null, {
+        status: 204,
+        headers: { "cache-control": "no-store" }
+      });
+    });
+    if (response.status === 204 && deviceId === identity.deviceId) {
+      response.headers.set("set-cookie", cookieHeader("", request, 0));
+    }
+    return response;
+  } catch (error) {
+    return gatewaySessionStorageFailureResponse(error);
+  }
 }
 
 export function clearGatewaySession(request: Request): Response {

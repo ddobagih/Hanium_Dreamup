@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -13,6 +14,10 @@ import {
   FIELD_TEST_TOKEN_HEADER,
   type GatewayFetch
 } from "../src/backend.js";
+import { withExclusiveFileLockAsync } from "../src/exclusive-file-lock.js";
+import {
+  gatewaySessionStatus
+} from "../src/auth.js";
 import {
   acceptOrReplayAccountDeletionV2,
   ACCOUNT_DELETION_INVENTORY_V2,
@@ -30,7 +35,7 @@ import {
 import { handleGatewayRequest } from "../src/routes.js";
 import { configureTestStateEncryption } from "./state-encryption-fixture.js";
 
-const ACTOR = "deletion-v2-actor";
+const ACTOR = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3030";
 const ACTOR_TOKEN = "deletion-v2-actor-token-12345678901234567890";
 const INTERNAL_TOKEN = "deletion-v2-internal-token-12345678901234567890";
 const CAPABILITY = Buffer.alloc(32, 0x5a).toString("base64url");
@@ -77,7 +82,32 @@ after(async () => {
   await rm(stateDirectory, { recursive: true, force: true });
 });
 
-async function login(): Promise<string> {
+async function holdExclusiveLock(lockPath: string): Promise<() => Promise<void>> {
+  let release!: () => void;
+  let signalAcquired!: () => void;
+  let signalFailure!: (error: unknown) => void;
+  const acquired = new Promise<void>((resolve, reject) => {
+    signalAcquired = resolve;
+    signalFailure = reject;
+  });
+  const holding = withExclusiveFileLockAsync(lockPath, async () => {
+    signalAcquired();
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+  });
+  void holding.catch(signalFailure);
+  await acquired;
+  return async () => {
+    release();
+    await holding;
+  };
+}
+
+async function loginBackendDevice(
+  deviceId: string,
+  actorId = ACTOR
+): Promise<string> {
   clientIp += 1;
   const response = await handleGatewayRequest(
     new Request("http://127.0.0.1:8081/api/field-session", {
@@ -86,11 +116,24 @@ async function login(): Promise<string> {
         "content-type": "application/json",
         "cf-connecting-ip": `198.51.100.${clientIp}`
       },
-      body: JSON.stringify({ actor_id: ACTOR, token: ACTOR_TOKEN })
-    })
+      body: JSON.stringify({
+        grant_type: "password",
+        email: "deletion-v2-actor@example.org",
+        password: "deletion-v2-password-must-not-leak",
+        remember_me: false,
+        device_id: deviceId
+      })
+    }),
+    {
+      fetchImpl: async () => Response.json({
+        schema_version: "walksafe.account-authentication.v1",
+        actor_id: actorId,
+        account_generation: 1,
+        auth_epoch: 1
+      })
+    }
   );
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { session_scope: "general" });
   return (response.headers.get("set-cookie") ?? "").split(";", 1)[0]!;
 }
 
@@ -240,9 +283,212 @@ test("device evidence uses the cross-language whole-second canonical hash vector
   }
 });
 
-test("v2 request, status, and evidence use one capability without forwarding it", async () => {
+test("v2 deletion outbox retries v7 session revocation after a storage lock clears", async () => {
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3031";
+  const requestId = "deletion_v2_lock_retry_0001";
+  const capability = Buffer.alloc(32, 0x31).toString("base64url");
+  const cookie = await loginBackendDevice("deletion-lock-device", actorId);
+  const recordId = `field-${createHash("sha256")
+    .update(`field\0${actorId}`)
+    .digest("hex")}.json`;
+  const statePath = path.join(stateDirectory, "sessions", recordId);
+  const body = JSON.stringify({
+    schema_version: "walksafe.account-deletion-request.v2",
+    request_id: requestId,
+    client_revision: 1,
+    confirmation: "DELETE_MY_ACCOUNT"
+  });
+  const backendStatus = { ...statusFixture(), request_id: requestId };
+  let backendCalls = 0;
+  const fetchImpl: GatewayFetch = async () => {
+    backendCalls += 1;
+    return Response.json(backendStatus, { status: 202 });
+  };
+  const deletionRequest = (): Request => new Request(
+    "http://127.0.0.1:8081/privacy/account-deletions",
+    {
+      method: "POST",
+      headers: {
+        cookie,
+        "content-type": "application/json",
+        [DELETION_ACCESS_SECRET_HEADER]: capability
+      },
+      body
+    }
+  );
+
+  const before = await readFile(statePath, "utf8");
+  const releaseLock = await holdExclusiveLock(`${statePath}.lock`);
+  try {
+    const pending = await handleGatewayRequest(deletionRequest(), { fetchImpl });
+    assert.equal(pending.status, 503);
+    assert.equal(pending.headers.get("retry-after"), "5");
+    assert.deepEqual(await pending.json(), {
+      code: "account_deletion_backend_pending"
+    });
+    assert.equal(backendCalls, 0);
+    assert.equal(await readFile(statePath, "utf8"), before);
+    const fencedSpeech = await handleGatewayRequest(new Request(
+      "http://127.0.0.1:8081/api/speech/tts",
+      {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/json",
+          "cf-connecting-ip": "198.51.100.250"
+        },
+        body: JSON.stringify({ text: "fenced account must not reach voice" })
+      }
+    ), { fetchImpl });
+    assert.equal(fencedSpeech.status, 409);
+    assert.deepEqual(await fencedSpeech.json(), {
+      detail: {
+        code: "account_generation_inactive",
+        message: "The account generation is no longer active."
+      }
+    });
+    assert.equal(backendCalls, 0);
+    const pendingStatus = await handleGatewayRequest(new Request(
+      `http://127.0.0.1:8081/privacy/account-deletions/${requestId}/status`,
+      { headers: { [DELETION_ACCESS_SECRET_HEADER]: capability } }
+    ), { fetchImpl });
+    assert.equal(pendingStatus.status, 503);
+    assert.deepEqual(await pendingStatus.json(), {
+      code: "account_deletion_backend_pending"
+    });
+    assert.equal(backendCalls, 0);
+    assert.equal(await readFile(statePath, "utf8"), before);
+    assert.deepEqual(
+      await drainAccountDeletionOutboxV2(
+        fetchImpl,
+        Date.now() + 24 * 60 * 60 * 1_000
+      ),
+      { attempted: 1, succeeded: 0 }
+    );
+    assert.equal(backendCalls, 0);
+  } finally {
+    await releaseLock();
+  }
+
+  assert.deepEqual(
+    await drainAccountDeletionOutboxV2(
+      fetchImpl,
+      Date.now() + 24 * 60 * 60 * 1_000
+    ),
+    { attempted: 1, succeeded: 1 }
+  );
+  assert.equal(backendCalls, 1);
+  await assert.rejects(
+    readFile(statePath, "utf8"),
+    (error: NodeJS.ErrnoException) => error.code === "ENOENT"
+  );
+  assert.equal(
+    (await gatewaySessionStatus(new Request(
+      "https://gateway.invalid/api/field-session",
+      { headers: { cookie } }
+    )).json() as { authenticated: boolean }).authenticated,
+    false
+  );
+});
+
+test("v2 deletion fence replaces an in-flight speech response", async () => {
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3032";
+  const requestId = "deletion_v2_speech_race_0001";
+  const capability = Buffer.alloc(32, 0x32).toString("base64url");
+  const cookie = await loginBackendDevice("deletion-speech-device", actorId);
+  Object.assign(process.env, {
+    WALKSAFE_VOICE_ENABLED: "true",
+    WALKSAFE_VOICE_API_BASE_URL: "http://127.0.0.1:9001",
+    WALKSAFE_VOICE_SERVICE_TOKEN: "deletion-race-voice-token-1234567890"
+  });
+  let signalSpeechStarted!: () => void;
+  let releaseSpeech!: (response: Response) => void;
+  const speechStarted = new Promise<void>((resolve) => {
+    signalSpeechStarted = resolve;
+  });
+  const heldSpeech = new Promise<Response>((resolve) => {
+    releaseSpeech = resolve;
+  });
+  try {
+    const speech = handleGatewayRequest(new Request(
+      "http://127.0.0.1:8081/api/speech/tts",
+      {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/json",
+          "cf-connecting-ip": "198.51.100.251"
+        },
+        body: JSON.stringify({
+          schema_version: "walksafe.speech-tts-request.v1",
+          text: "삭제된 세션의 응답은 반환되면 안 됩니다.",
+          request_id: "018f2b63-8fb8-7cc2-98a1-4a4fd27c3002"
+        })
+      }
+    ), {
+      fetchImpl: async () => {
+        signalSpeechStarted();
+        return heldSpeech;
+      }
+    });
+    await speechStarted;
+
+    const deletion = await handleGatewayRequest(new Request(
+      "http://127.0.0.1:8081/privacy/account-deletions",
+      {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/json",
+          [DELETION_ACCESS_SECRET_HEADER]: capability
+        },
+        body: JSON.stringify({
+          schema_version: "walksafe.account-deletion-request.v2",
+          request_id: requestId,
+          client_revision: 1,
+          confirmation: "DELETE_MY_ACCOUNT"
+        })
+      }
+    ), {
+      fetchImpl: async () => Response.json(
+        { ...statusFixture(), request_id: requestId },
+        { status: 202 }
+      )
+    });
+    assert.equal(deletion.status, 202);
+
+    releaseSpeech(new Response("invalid wav", {
+      headers: { "content-type": "audio/wav" }
+    }));
+    const fenced = await speech;
+    assert.equal(fenced.status, 409);
+    assert.deepEqual(await fenced.json(), {
+      detail: {
+        code: "account_generation_inactive",
+        message: "The account generation is no longer active."
+      }
+    });
+  } finally {
+    releaseSpeech(new Response("cancelled", { status: 503 }));
+    delete process.env.WALKSAFE_VOICE_ENABLED;
+    delete process.env.WALKSAFE_VOICE_API_BASE_URL;
+    delete process.env.WALKSAFE_VOICE_SERVICE_TOKEN;
+  }
+});
+
+test("v2 deletion revokes every v7 device session and uses one unforwarded capability", async () => {
   assert.equal(CAPABILITY.length, 43);
-  const cookie = await login();
+  const cookie = await loginBackendDevice("deletion-device-a");
+  const secondDeviceCookie = await loginBackendDevice("deletion-device-b");
+  for (const activeCookie of [cookie, secondDeviceCookie]) {
+    assert.equal(
+      (await gatewaySessionStatus(new Request(
+        "https://gateway.invalid/api/field-session",
+        { headers: { cookie: activeCookie } }
+      )).json() as { authenticated: boolean }).authenticated,
+      true
+    );
+  }
   let backendCalls = 0;
   let evidenceCalls = 0;
   let statusCalls = 0;
@@ -310,6 +556,22 @@ test("v2 request, status, and evidence use one capability without forwarding it"
   assert.equal(accepted.status, 202);
   assert.deepEqual(await accepted.json(), statusFixture());
   assert.equal(backendCalls, 1);
+  for (const revokedCookie of [cookie, secondDeviceCookie]) {
+    assert.equal(
+      (await gatewaySessionStatus(new Request(
+        "https://gateway.invalid/api/field-session",
+        { headers: { cookie: revokedCookie } }
+      )).json() as { authenticated: boolean }).authenticated,
+      false
+    );
+  }
+  const recordId = `field-${createHash("sha256")
+    .update(`field\0${ACTOR}`)
+    .digest("hex")}.json`;
+  await assert.rejects(
+    readFile(path.join(stateDirectory, "sessions", recordId), "utf8"),
+    (error: NodeJS.ErrnoException) => error.code === "ENOENT"
+  );
   assert.equal(
     (await readFile(privacyDeletionV2LedgerPathForTests(), "utf8")).includes(CAPABILITY),
     false

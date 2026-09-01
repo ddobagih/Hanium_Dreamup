@@ -17,8 +17,9 @@ import {
   isGatewayAccessConfigured,
   isGatewayActorConfigured,
   isGatewaySessionAuthorized,
+  listBackendDeviceGatewaySessionDevices,
   recordGatewayLoginAttempt,
-  revokeFieldSessionsForSecurityEvent,
+  revokeBackendDeviceGatewaySession,
   verifyGatewayCredential,
   withGatewayLoginLock
 } from "./auth.js";
@@ -654,7 +655,8 @@ async function fieldSession(
       return actorId
         ? withFieldActorOperation(
             actorId,
-            () => listFieldLongSessionDevices(request),
+            () => listBackendDeviceGatewaySessionDevices(request)
+              ?? listFieldLongSessionDevices(request),
             gatewaySessionAccountGeneration(request)
           )
         : gatewayUnauthorizedResponse();
@@ -680,7 +682,10 @@ async function fieldSession(
       return actorId
         ? withFieldActorOperation(
             actorId,
-            () => revokeFieldLongSessionDevice(request, queryEntries[0]![1]),
+            () => revokeBackendDeviceGatewaySession(
+              request,
+              queryEntries[0]![1]
+            ) ?? revokeFieldLongSessionDevice(request, queryEntries[0]![1]),
             gatewaySessionAccountGeneration(request)
           )
         : gatewayUnauthorizedResponse();
@@ -2174,19 +2179,11 @@ async function accountDeletionRequestV2(
     if (accepted.kind === "conflict" || accepted.kind === "inactive") {
       return deletionConflict();
     }
-    if (accepted.kind === "accepted") {
+    if (accepted.kind === "accepted" || accepted.kind === "replay") {
       abortPrivacyOperationsForAccountDeletion(
         accepted.actorId,
         accepted.accountGeneration
       );
-      try {
-        await revokeFieldSessionsForSecurityEvent(
-          accepted.actorId,
-          "security_incident"
-        );
-      } catch {
-        return deletionPending(5);
-      }
     }
     const forwarded = await forwardAccountDeletionRequestV2(
       accepted.requestId,
@@ -2514,11 +2511,31 @@ async function dispatchGatewayRequest(
         ?? gatewayFieldLongSessionBinding
     );
   }
-  else if (pathname === "/api/speech/stt") {
-    response = await relaySpeechStt(request, correlationId, dependencies.fetchImpl);
-  }
-  else if (pathname === "/api/speech/tts") {
-    response = await relaySpeechTts(request, correlationId, dependencies.fetchImpl);
+  else if (pathname === "/api/speech/stt" || pathname === "/api/speech/tts") {
+    const relay = () => pathname === "/api/speech/stt"
+      ? relaySpeechStt(request, correlationId, dependencies.fetchImpl)
+      : relaySpeechTts(request, correlationId, dependencies.fetchImpl);
+    const actorId = gatewaySessionActor(request);
+    const accountGeneration = gatewaySessionAccountGeneration(request);
+    const deletionFence = (): Response | null => {
+      if (!actorId || accountGeneration === null) return null;
+      try {
+        return isAccountGenerationFencedV2(actorId, accountGeneration)
+          ? privacyOperationInactive()
+          : null;
+      } catch {
+        return privacyLedgerUnavailable();
+      }
+    };
+    const beforeRelay = deletionFence();
+    if (beforeRelay) {
+      response = beforeRelay;
+    } else {
+      const relayed = await relay();
+      const afterRelay = deletionFence();
+      if (afterRelay) cancelUpstream(relayed);
+      response = afterRelay ?? relayed;
+    }
   }
   else if (pathname === "/api/navigation/walking") {
     response = await walkingRoute(request, dependencies.fetchImpl);

@@ -16,8 +16,18 @@ import {
   FIELD_TEST_TOKEN_HEADER,
   type GatewayFetch
 } from "../src/backend.js";
+import { withExclusiveFileLockAsync } from "../src/exclusive-file-lock.js";
 import { handleGatewayRequest } from "../src/routes.js";
-import { SHORT_SESSION_MAX_PLAINTEXT_BYTES } from "../src/auth.js";
+import {
+  clearGatewaySession,
+  establishBackendGatewaySession,
+  gatewaySessionStatus,
+  revokeBackendDeviceGatewaySession,
+  revokeFieldSessionsForSecurityEvent,
+  SHORT_DEVICE_SESSION_LIMIT,
+  SHORT_SESSION_MAX_PLAINTEXT_BYTES,
+  validShortSessionStateForMaintenance
+} from "../src/auth.js";
 import {
   ACCOUNT_DELETION_REQUEST_SCHEMA,
   acceptAccountDeletionRequest
@@ -60,6 +70,28 @@ after(async () => {
 function nextClientIp(): string {
   ipSuffix += 1;
   return `203.0.113.${ipSuffix}`;
+}
+
+async function holdExclusiveLock(lockPath: string): Promise<() => Promise<void>> {
+  let release!: () => void;
+  let signalAcquired!: () => void;
+  let signalFailure!: (error: unknown) => void;
+  const acquired = new Promise<void>((resolve, reject) => {
+    signalAcquired = resolve;
+    signalFailure = reject;
+  });
+  const holding = withExclusiveFileLockAsync(lockPath, async () => {
+    signalAcquired();
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+  });
+  void holding.catch(signalFailure);
+  await acquired;
+  return async () => {
+    release();
+    await holding;
+  };
 }
 
 function enrollmentBody(extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -601,17 +633,20 @@ test("device-bound password login creates v7 and supports field-walk without pro
     originalState,
     SHORT_SESSION_MAX_PLAINTEXT_BYTES
   );
-  for (const mutation of [
-    { actorId: "018f2b63-8fb8-4cc2-98a1-4a4fd27c3011" },
-    { accountGeneration: 12 },
-    { authEpoch: 6 },
-    { deviceId: "android-device-b" },
-    { sessionId: "A".repeat(43) },
-    { extra: true }
+  assert.equal(state.actorId, actorId);
+  assert.ok(Array.isArray(state.sessions));
+  const activeSession = (state.sessions as Array<Record<string, unknown>>)[0]!;
+  for (const mismatchedState of [
+    { ...state, actorId: "018f2b63-8fb8-4cc2-98a1-4a4fd27c3011" },
+    { ...state, sessions: [{ ...activeSession, accountGeneration: 12 }] },
+    { ...state, sessions: [{ ...activeSession, authEpoch: 6 }] },
+    { ...state, sessions: [{ ...activeSession, deviceId: "android-device-b" }] },
+    { ...state, sessions: [{ ...activeSession, sessionId: "A".repeat(43) }] },
+    { ...state, extra: true }
   ]) {
     await writeFile(statePath, encryptTestStateFile(
       stateContext,
-      { ...state, ...mutation },
+      mismatchedState,
       SHORT_SESSION_MAX_PLAINTEXT_BYTES
     ));
     const stateMismatch = await handleGatewayRequest(new Request(
@@ -677,11 +712,11 @@ test("device-bound password login creates v7 and supports field-walk without pro
     { fetchImpl }
   );
   assert.equal(otherDevice.status, 200);
-  const staleDevice = await handleGatewayRequest(new Request(
+  const retainedDevice = await handleGatewayRequest(new Request(
     "https://gateway.invalid/api/field-walk",
     { headers: { cookie } }
   ));
-  assert.equal(staleDevice.status, 401);
+  assert.equal(retainedDevice.status, 200);
   const otherDeviceCookie = (otherDevice.headers.get("set-cookie") ?? "")
     .split(";", 1)[0]!;
   assert.equal(acceptAccountDeletionRequest(
@@ -715,6 +750,475 @@ test("device-bound password login creates v7 and supports field-walk without pro
     }
   );
   assert.equal(otherGeneration.status, 409);
+});
+
+test("v7 device sessions coexist, replace only the same device, and selectively revoke", async () => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3020";
+  const credentials = {
+    grant_type: "password",
+    email: "multi-device-user@example.org",
+    password: "multi-device-password-must-not-leak",
+    remember_me: false
+  };
+  const fetchImpl: GatewayFetch = async () => Response.json({
+    schema_version: "walksafe.account-authentication.v1",
+    actor_id: actorId,
+    account_generation: 21,
+    auth_epoch: 9
+  });
+  const login = async (deviceId: string): Promise<string> => {
+    const response = await handleGatewayRequest(
+      postJson("/api/field-session", {
+        ...credentials,
+        device_id: deviceId
+      }, { "cf-connecting-ip": nextClientIp() }),
+      { fetchImpl }
+    );
+    assert.equal(response.status, 200);
+    return (response.headers.get("set-cookie") ?? "").split(";", 1)[0]!;
+  };
+  const authenticated = (cookie: string): Promise<boolean> =>
+    gatewaySessionStatus(new Request(
+      "https://gateway.invalid/api/field-session",
+      { headers: { cookie } }
+    )).json().then((body) => (body as { authenticated: boolean }).authenticated);
+
+  const firstDeviceA = await login("short-device-a");
+  const deviceB = await login("short-device-b");
+  assert.equal(await authenticated(firstDeviceA), true);
+  assert.equal(await authenticated(deviceB), true);
+
+  const currentDeviceA = await login("short-device-a");
+  assert.equal(await authenticated(firstDeviceA), false);
+  assert.equal(await authenticated(currentDeviceA), true);
+  assert.equal(await authenticated(deviceB), true);
+
+  const listed = await handleGatewayRequest(new Request(
+    "https://gateway.invalid/api/field-session?devices=true",
+    { headers: { cookie: currentDeviceA } }
+  ));
+  assert.equal(listed.status, 200);
+  const listBody = await listed.json() as {
+    actor_id: string;
+    devices: Array<{
+      device_id: string;
+      family_id: string;
+      current: boolean;
+      rotation: number;
+      created_at_epoch_ms: number;
+      last_rotated_at_epoch_ms: number;
+      idle_expires_at_epoch_ms: number;
+      absolute_expires_at_epoch_ms: number;
+    }>;
+  };
+  assert.equal(listBody.actor_id, actorId);
+  assert.deepEqual(
+    listBody.devices.map((device) => device.device_id),
+    ["short-device-a", "short-device-b"]
+  );
+  const listedCurrent = listBody.devices.find(
+    (device) => device.device_id === "short-device-a"
+  )!;
+  assert.equal(listedCurrent.current, true);
+  assert.equal(listedCurrent.rotation, 0);
+  assert.equal(
+    listedCurrent.absolute_expires_at_epoch_ms - listedCurrent.created_at_epoch_ms,
+    12 * 60 * 60 * 1000
+  );
+  assert.equal(
+    listedCurrent.idle_expires_at_epoch_ms,
+    listedCurrent.absolute_expires_at_epoch_ms
+  );
+  assert.equal(
+    listedCurrent.last_rotated_at_epoch_ms,
+    listedCurrent.created_at_epoch_ms
+  );
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const revoked = await handleGatewayRequest(new Request(
+      "https://gateway.invalid/api/field-session?device_id=short-device-b",
+      { method: "DELETE", headers: { cookie: currentDeviceA } }
+    ));
+    assert.equal(revoked.status, 204);
+    assert.equal(revoked.headers.get("set-cookie"), null);
+  }
+  assert.equal(await authenticated(currentDeviceA), true);
+  assert.equal(await authenticated(deviceB), false);
+
+  const selfRevoked = await handleGatewayRequest(new Request(
+    "https://gateway.invalid/api/field-session?device_id=short-device-a",
+    { method: "DELETE", headers: { cookie: currentDeviceA } }
+  ));
+  assert.equal(selfRevoked.status, 204);
+  assert.match(selfRevoked.headers.get("set-cookie") ?? "", /Max-Age=0/);
+  assert.equal(await authenticated(currentDeviceA), false);
+});
+
+test("v7 rejects generation or authentication epoch rollback without changing active devices", async () => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3023";
+  const request = new Request("https://gateway.invalid/api/field-session");
+  const issue = (
+    deviceId: string,
+    accountGeneration: number,
+    authEpoch: number
+  ): Response => establishBackendGatewaySession(
+    request,
+    { actorId, accountGeneration, authEpoch, deviceId },
+    false
+  );
+  const cookie = (response: Response): string =>
+    (response.headers.get("set-cookie") ?? "").split(";", 1)[0]!;
+  const authenticated = (value: string): Promise<boolean> =>
+    gatewaySessionStatus(new Request(request.url, {
+      headers: { cookie: value }
+    })).json().then((body) => (body as { authenticated: boolean }).authenticated);
+  const recordId = `field-${createHash("sha256")
+    .update(`field\0${actorId}`)
+    .digest("hex")}.json`;
+  const statePath = path.join(stateDirectory, "sessions", recordId);
+
+  const deviceA = issue("rollback-device-a", 51, 7);
+  const deviceB = issue("rollback-device-b", 51, 7);
+  assert.equal(deviceA.status, 200);
+  assert.equal(deviceB.status, 200);
+  const deviceACookie = cookie(deviceA);
+  const deviceBCookie = cookie(deviceB);
+  const beforeRollback = await readFile(statePath, "utf8");
+
+  for (const stale of [
+    issue("stale-generation-device", 50, 99),
+    issue("stale-epoch-device", 51, 6)
+  ]) {
+    assert.equal(stale.status, 409);
+    assert.deepEqual(await stale.json(), {
+      detail: {
+        code: "account_authentication_stale",
+        message: "Authentication state changed while login was in progress. Retry login."
+      }
+    });
+    assert.equal(await readFile(statePath, "utf8"), beforeRollback);
+  }
+  assert.equal(await authenticated(deviceACookie), true);
+  assert.equal(await authenticated(deviceBCookie), true);
+
+  const advanced = issue("advanced-epoch-device", 51, 8);
+  assert.equal(advanced.status, 200);
+  assert.equal(await authenticated(deviceACookie), false);
+  assert.equal(await authenticated(deviceBCookie), false);
+  assert.equal(await authenticated(cookie(advanced)), true);
+});
+
+test("v7 logout and last-device revoke retain a non-authenticating rollback watermark", async () => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3025";
+  const request = new Request("https://gateway.invalid/api/field-session");
+  const issue = (deviceId: string, authEpoch: number): Response =>
+    establishBackendGatewaySession(
+      request,
+      { actorId, accountGeneration: 71, authEpoch, deviceId },
+      false
+    );
+  const cookie = (response: Response): string =>
+    (response.headers.get("set-cookie") ?? "").split(";", 1)[0]!;
+  const recordId = `field-${createHash("sha256")
+    .update(`field\0${actorId}`)
+    .digest("hex")}.json`;
+  const statePath = path.join(stateDirectory, "sessions", recordId);
+  const stateContext = { kind: "short-session" as const, recordId };
+  const assertWatermark = async (authEpoch: number): Promise<void> => {
+    const state = decryptTestStateFile<Record<string, unknown>>(
+      stateContext,
+      await readFile(statePath, "utf8"),
+      SHORT_SESSION_MAX_PLAINTEXT_BYTES
+    );
+    assert.deepEqual(state, {
+      actorId,
+      accountGeneration: 71,
+      authEpoch
+    });
+    assert.equal(validShortSessionStateForMaintenance(state, recordId), true);
+  };
+  const assertStale = async (response: Response): Promise<void> => {
+    assert.equal(response.status, 409);
+    assert.equal(
+      (await response.json() as { detail: { code: string } }).detail.code,
+      "account_authentication_stale"
+    );
+  };
+
+  const loggedIn = issue("watermark-logout-device", 10);
+  assert.equal(loggedIn.status, 200);
+  const logout = clearGatewaySession(new Request(request.url, {
+    method: "DELETE",
+    headers: { cookie: cookie(loggedIn) }
+  }));
+  assert.equal(logout.status, 204);
+  await assertWatermark(10);
+  await assertStale(issue("delayed-after-logout", 9));
+
+  const current = issue("watermark-revoke-device", 10);
+  assert.equal(current.status, 200);
+  const selfRevoked = revokeBackendDeviceGatewaySession(
+    new Request(request.url, { headers: { cookie: cookie(current) } }),
+    "watermark-revoke-device"
+  );
+  assert.equal(selfRevoked?.status, 204);
+  await assertWatermark(10);
+  await assertStale(issue("delayed-after-revoke", 9));
+
+  const advanced = issue("watermark-advanced-device", 11);
+  assert.equal(advanced.status, 200);
+});
+
+test("v7 device list and selective revoke preserve the long-session storage-busy contract", async () => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3024";
+  const response = await handleGatewayRequest(
+    postJson("/api/field-session", {
+      grant_type: "password",
+      email: "busy-device-user@example.org",
+      password: "busy-device-password-must-not-leak",
+      remember_me: false,
+      device_id: "busy-device"
+    }, { "cf-connecting-ip": nextClientIp() }),
+    {
+      fetchImpl: async () => Response.json({
+        schema_version: "walksafe.account-authentication.v1",
+        actor_id: actorId,
+        account_generation: 61,
+        auth_epoch: 3
+      })
+    }
+  );
+  assert.equal(response.status, 200);
+  const sessionCookie = (response.headers.get("set-cookie") ?? "")
+    .split(";", 1)[0]!;
+  const recordId = `field-${createHash("sha256")
+    .update(`field\0${actorId}`)
+    .digest("hex")}.json`;
+  const statePath = path.join(stateDirectory, "sessions", recordId);
+  const before = await readFile(statePath, "utf8");
+  const releaseLock = await holdExclusiveLock(`${statePath}.lock`);
+  try {
+    for (const request of [
+      new Request("https://gateway.invalid/api/field-session?devices=true", {
+        headers: { cookie: sessionCookie }
+      }),
+      new Request("https://gateway.invalid/api/field-session?device_id=busy-device", {
+        method: "DELETE",
+        headers: { cookie: sessionCookie }
+      })
+    ]) {
+      const blocked = await handleGatewayRequest(request);
+      assert.equal(blocked.status, 503);
+      assert.equal(blocked.headers.get("cache-control"), "no-store");
+      assert.equal(blocked.headers.get("retry-after"), "1");
+      assert.deepEqual(await blocked.json(), {
+        code: "field_session_storage_busy",
+        message: "다른 현장 세션 갱신이 완료될 때까지 다시 시도해야 합니다.",
+        retryable: true
+      });
+      assert.equal(await readFile(statePath, "utf8"), before);
+    }
+  } finally {
+    await releaseLock();
+  }
+  assert.equal(
+    (await gatewaySessionStatus(new Request(
+      "https://gateway.invalid/api/field-session",
+      { headers: { cookie: sessionCookie } }
+    )).json() as { authenticated: boolean }).authenticated,
+    true
+  );
+});
+
+test("v7 safely migrates a singleton and generation or security fences clear every device", async () => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3021";
+  const request = new Request("https://gateway.invalid/api/field-session");
+  const issue = (deviceId: string, accountGeneration = 31, authEpoch = 4): Response =>
+    establishBackendGatewaySession(
+      request,
+      { actorId, accountGeneration, authEpoch, deviceId },
+      false
+    );
+  const cookie = (response: Response): string =>
+    (response.headers.get("set-cookie") ?? "").split(";", 1)[0]!;
+  const authenticated = (value: string): Promise<boolean> =>
+    gatewaySessionStatus(new Request(
+      "https://gateway.invalid/api/field-session",
+      { headers: { cookie: value } }
+    )).json().then((body) => (body as { authenticated: boolean }).authenticated);
+  const recordId = `field-${createHash("sha256")
+    .update(`field\0${actorId}`)
+    .digest("hex")}.json`;
+  const statePath = path.join(stateDirectory, "sessions", recordId);
+  const stateContext = { kind: "short-session" as const, recordId };
+
+  const deviceAResponse = issue("migration-device-a");
+  assert.equal(deviceAResponse.status, 200);
+  const deviceA = cookie(deviceAResponse);
+  const ledger = decryptTestStateFile<{
+    actorId: string;
+    sessions: Array<Record<string, unknown>>;
+  }>(
+    stateContext,
+    await readFile(statePath, "utf8"),
+    SHORT_SESSION_MAX_PLAINTEXT_BYTES
+  );
+  assert.equal(ledger.sessions.length, 1);
+  const legacySingleton = ledger.sessions[0]!;
+  assert.equal(validShortSessionStateForMaintenance(legacySingleton, recordId), true);
+  await writeFile(statePath, encryptTestStateFile(
+    stateContext,
+    legacySingleton,
+    SHORT_SESSION_MAX_PLAINTEXT_BYTES
+  ));
+  assert.equal(await authenticated(deviceA), true);
+
+  const deviceBResponse = issue("migration-device-b");
+  assert.equal(deviceBResponse.status, 200);
+  const deviceB = cookie(deviceBResponse);
+  const migrated = decryptTestStateFile<{
+    actorId: string;
+    sessions: Array<Record<string, unknown>>;
+  }>(
+    stateContext,
+    await readFile(statePath, "utf8"),
+    SHORT_SESSION_MAX_PLAINTEXT_BYTES
+  );
+  assert.equal(validShortSessionStateForMaintenance(migrated, recordId), true);
+  assert.deepEqual(
+    migrated.sessions.map((session) => session.deviceId),
+    ["migration-device-a", "migration-device-b"]
+  );
+  assert.equal(await authenticated(deviceA), true);
+  assert.equal(await authenticated(deviceB), true);
+
+  const nextGenerationResponse = issue("generation-device", 32, 5);
+  assert.equal(nextGenerationResponse.status, 200);
+  const nextGeneration = cookie(nextGenerationResponse);
+  assert.equal(await authenticated(deviceA), false);
+  assert.equal(await authenticated(deviceB), false);
+  assert.equal(await authenticated(nextGeneration), true);
+  const fenced = decryptTestStateFile<{
+    sessions: Array<Record<string, unknown>>;
+  }>(
+    stateContext,
+    await readFile(statePath, "utf8"),
+    SHORT_SESSION_MAX_PLAINTEXT_BYTES
+  );
+  assert.deepEqual(
+    fenced.sessions.map((session) => session.deviceId),
+    ["generation-device"]
+  );
+
+  await revokeFieldSessionsForSecurityEvent(actorId, "security_incident");
+  assert.equal(await authenticated(nextGeneration), false);
+});
+
+test("v7 device capacity replaces the same device and reclaims exact-expiry sessions", async () => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3022";
+  const request = new Request("https://gateway.invalid/api/field-session");
+  const originalNow = Date.now;
+  const startedAtEpochMs = 2_000_000_000_000;
+  Date.now = () => startedAtEpochMs;
+  try {
+    const cookies: string[] = [];
+    for (let index = 0; index < SHORT_DEVICE_SESSION_LIMIT; index += 1) {
+      const response = establishBackendGatewaySession(
+        request,
+        {
+          actorId,
+          accountGeneration: 41,
+          authEpoch: 8,
+          deviceId: `capacity-device-${index}`
+        },
+        false
+      );
+      assert.equal(response.status, 200);
+      cookies.push((response.headers.get("set-cookie") ?? "").split(";", 1)[0]!);
+    }
+    const overflow = establishBackendGatewaySession(
+      request,
+      {
+        actorId,
+        accountGeneration: 41,
+        authEpoch: 8,
+        deviceId: "capacity-overflow"
+      },
+      false
+    );
+    assert.equal(overflow.status, 503);
+    assert.deepEqual(await overflow.json(), {
+      code: "field_session_device_capacity_unavailable"
+    });
+
+    const sameDevice = establishBackendGatewaySession(
+      request,
+      {
+        actorId,
+        accountGeneration: 41,
+        authEpoch: 8,
+        deviceId: "capacity-device-0"
+      },
+      false
+    );
+    assert.equal(sameDevice.status, 200);
+    const replacementCookie = (sameDevice.headers.get("set-cookie") ?? "")
+      .split(";", 1)[0]!;
+    assert.equal(
+      (await gatewaySessionStatus(new Request(request.url, {
+        headers: { cookie: cookies[0]! }
+      })).json() as { authenticated: boolean }).authenticated,
+      false
+    );
+    assert.equal(
+      (await gatewaySessionStatus(new Request(request.url, {
+        headers: { cookie: replacementCookie }
+      })).json() as { authenticated: boolean }).authenticated,
+      true
+    );
+
+    Date.now = () => startedAtEpochMs + 12 * 60 * 60 * 1000;
+    assert.equal(
+      (await gatewaySessionStatus(new Request(request.url, {
+        headers: { cookie: replacementCookie }
+      })).json() as { authenticated: boolean }).authenticated,
+      false
+    );
+    const reclaimed = establishBackendGatewaySession(
+      request,
+      {
+        actorId,
+        accountGeneration: 41,
+        authEpoch: 8,
+        deviceId: "capacity-after-expiry"
+      },
+      false
+    );
+    assert.equal(reclaimed.status, 200);
+    const recordId = `field-${createHash("sha256")
+      .update(`field\0${actorId}`)
+      .digest("hex")}.json`;
+    const state = decryptTestStateFile<{
+      actorId: string;
+      sessions: Array<Record<string, unknown>>;
+    }>(
+      { kind: "short-session", recordId },
+      await readFile(path.join(stateDirectory, "sessions", recordId), "utf8"),
+      SHORT_SESSION_MAX_PLAINTEXT_BYTES
+    );
+    assert.deepEqual(
+      state.sessions.map((session) => session.deviceId),
+      ["capacity-after-expiry"]
+    );
+  } finally {
+    Date.now = originalNow;
+  }
 });
 
 test("password failures are generic and legacy v5 login remains compatible", async () => {
