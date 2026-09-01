@@ -75,7 +75,7 @@ internal class ReportQueueDrainPolicy {
     ): Boolean {
         val current = currentLease
         val valid = current == lease &&
-            context.walkState != WalkSessionState.ACTIVE &&
+            context.walkState == WalkSessionState.PAUSED &&
             context.appForeground &&
             context.stationary &&
             context.networkAllowed &&
@@ -102,7 +102,7 @@ internal class ReportQueueDrainPolicy {
 
     private fun eligible(report: QueuedReport, context: ReportQueueDrainContext): Boolean =
         context.movementGeneration >= 0L &&
-            context.walkState != WalkSessionState.ACTIVE &&
+            context.walkState == WalkSessionState.PAUSED &&
             context.appForeground &&
             context.stationary &&
             context.networkAllowed &&

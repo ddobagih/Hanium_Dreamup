@@ -254,14 +254,46 @@ class UserReportModelsTest {
             )
             assertEquals(state, parsed?.state)
             assertEquals(0L, parsed?.externalCopyCount)
+            assertEquals(emptyList<UserReportDeletionExternalCopyStatus>(), parsed?.externalCopies)
         }
+        val externalCopies = UserReportExternalCopyDeletionState.entries.mapIndexed { index, state ->
+            val recordedAt = if (state == UserReportExternalCopyDeletionState.NOT_REQUESTED) {
+                "null"
+            } else {
+                "\"$TIMESTAMP\""
+            }
+            """{"institution":"기관 ${index + 1}","state":"${state.wireValue}","status_recorded_at":$recordedAt}"""
+        }.joinToString(",")
+        val deleted = validatedUserReportDeletionStatusOrNull(
+            deletionBody(
+                state = "DELETED",
+                externalCopyCount = UserReportExternalCopyDeletionState.entries.size,
+                externalCopies = externalCopies,
+            ),
+        )
+        assertEquals(
+            UserReportExternalCopyDeletionState.entries,
+            deleted?.externalCopies?.map(UserReportDeletionExternalCopyStatus::state),
+        )
+        assertNull(deleted?.externalCopies?.first()?.statusRecordedAt)
+        assertEquals(TIMESTAMP, deleted?.externalCopies?.get(1)?.statusRecordedAt)
+
         val valid = deletionBody(state = "PENDING")
+        val oneExternalCopy =
+            """{"institution":"서울시청","state":"REQUEST_SENT","status_recorded_at":"$TIMESTAMP"}"""
         listOf(
             valid.dropLast(1) + ",\"reason\":\"private\"}",
+            valid.replace("walksafe.report-deletion-status.v2", "walksafe.report-deletion-status.v1"),
             valid.replace("\"PENDING\"", "\"UNKNOWN\""),
             valid.replace("\"request_status_version\":1", "\"request_status_version\":0"),
             valid.replace("\"external_copy_count\":0", "\"external_copy_count\":-1"),
             valid.replace("\"external_copy_count\":0", "\"external_copy_count\":0.0"),
+            deletionBody("DELETED", 0, oneExternalCopy),
+            deletionBody("PENDING", 1, oneExternalCopy),
+            deletionBody("DELETED", 1, oneExternalCopy.dropLast(1) + ",\"internal_note\":\"private\"}"),
+            deletionBody("DELETED", 1, oneExternalCopy.replace("REQUEST_SENT", "UNKNOWN")),
+            deletionBody("DELETED", 1, oneExternalCopy.replace(TIMESTAMP, "not-a-time")),
+            deletionBody("DELETED", 1, oneExternalCopy.replace("서울시청", " 서울시청 ")),
             valid.replace(REQUEST_ID, REQUEST_ID.uppercase()),
         ).forEach { assertNull(validatedUserReportDeletionStatusOrNull(it)) }
     }
@@ -296,8 +328,12 @@ class UserReportModelsTest {
     ): String =
         """{"schema_version":"walksafe.report-content-revision.v1","report_id":"${reportId(1)}","revision":$revision,"expected_revision":$expectedRevision,"idempotency_key":"$IDEMPOTENCY_KEY","content_sha256":"$SHA256","user_description":$userDescription,"category_hint":$categoryHint,"corrected_at":"$TIMESTAMP"}"""
 
-    private fun deletionBody(state: String): String =
-        """{"schema_version":"walksafe.report-deletion-status.v1","request_id":"$REQUEST_ID","report_id":"${reportId(1)}","state":"$state","request_status_version":1,"external_copy_count":0,"updated_at":"$TIMESTAMP"}"""
+    private fun deletionBody(
+        state: String,
+        externalCopyCount: Int = 0,
+        externalCopies: String = "",
+    ): String =
+        """{"schema_version":"walksafe.report-deletion-status.v2","request_id":"$REQUEST_ID","report_id":"${reportId(1)}","state":"$state","request_status_version":1,"external_copy_count":$externalCopyCount,"external_copies":[$externalCopies],"updated_at":"$TIMESTAMP"}"""
 
     private fun reportId(index: Int): String =
         "aaaaaaaa-aaaa-4aaa-8aaa-${index.toString().padStart(12, '0')}"

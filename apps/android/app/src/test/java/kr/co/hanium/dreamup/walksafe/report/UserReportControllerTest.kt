@@ -386,7 +386,83 @@ class UserReportControllerTest {
         worker.runNext()
 
         assertEquals(UserReportDeletionState.DELETED, controller.snapshot().selectedDeletionStatus?.state)
+        assertEquals(
+            UserReportExternalCopyDeletionState.REQUEST_SENT,
+            controller.snapshot().selectedDeletionStatus?.externalCopies?.single()?.state,
+        )
         assertEquals(listOf(REQUEST_ID), client.deletionStatusRequestIds)
+    }
+
+    @Test
+    fun deletionStatusKeepsConcealed404AndRateLimitRetryableWithoutLosingTracking() {
+        listOf(
+            404 to UserReportFailure.NOT_FOUND_OR_SIGNED_OUT,
+            429 to UserReportFailure.TEMPORARY,
+        ).forEach { (statusCode, expectedFailure) ->
+            val worker = QueuedExecutor()
+            val tracker = FakeDeletionTracker()
+            val session = backendSession()
+            val stableAuthority = authority(session)
+            val reference = UserReportRequestReference(
+                reportId = REPORT_ID,
+                requestId = REQUEST_ID,
+                requestType = UserReportRequestType.DELETE,
+            )
+            assertTrue(tracker.trackRequest(session, reference))
+            val client = FakeClient().apply {
+                deletionStatusResults += Result.failure(UserReportHttpException(statusCode))
+            }
+            val controller = UserReportController(
+                client = client,
+                workerExecutor = worker,
+                callbackExecutor = DIRECT_EXECUTOR,
+                authorityProvider = { stableAuthority },
+                observer = {},
+                deletionTracker = tracker,
+            )
+            controller.onAuthorityChanged()
+
+            assertTrue(controller.refreshDeletionStatus(REQUEST_ID))
+            worker.runNext()
+
+            assertEquals(expectedFailure, controller.snapshot().failure)
+            assertTrue(controller.snapshot().retryAvailable)
+            assertEquals(listOf(REQUEST_ID), controller.snapshot().trackedDeletionRequestIds)
+            assertEquals(listOf(reference), controller.snapshot().trackedRequestReferences)
+        }
+    }
+
+    @Test
+    fun deletionStatusRejectsReportIdThatConflictsWithTrackedRequestReference() {
+        val worker = QueuedExecutor()
+        val tracker = FakeDeletionTracker()
+        val session = backendSession()
+        val stableAuthority = authority(session)
+        val reference = UserReportRequestReference(
+            reportId = REPORT_ID,
+            requestId = REQUEST_ID,
+            requestType = UserReportRequestType.DELETE,
+        )
+        assertTrue(tracker.trackRequest(session, reference))
+        val client = FakeClient().apply {
+            deletionStatusResults += Result.success(deletionStatus(reportId = SECOND_REPORT_ID))
+        }
+        val controller = UserReportController(
+            client = client,
+            workerExecutor = worker,
+            callbackExecutor = DIRECT_EXECUTOR,
+            authorityProvider = { stableAuthority },
+            observer = {},
+            deletionTracker = tracker,
+        )
+        controller.onAuthorityChanged()
+
+        assertTrue(controller.refreshDeletionStatus(REQUEST_ID))
+        worker.runNext()
+
+        assertEquals(UserReportFailure.MALFORMED_RESPONSE, controller.snapshot().failure)
+        assertNull(controller.snapshot().selectedDeletionStatus)
+        assertTrue(controller.snapshot().retryAvailable)
     }
 
     @Test
@@ -914,12 +990,19 @@ class UserReportControllerTest {
         correctedAt = TIMESTAMP,
     )
 
-    private fun deletionStatus() = UserReportDeletionStatus(
+    private fun deletionStatus(reportId: String = REPORT_ID) = UserReportDeletionStatus(
         requestId = REQUEST_ID,
-        reportId = REPORT_ID,
+        reportId = reportId,
         state = UserReportDeletionState.DELETED,
         requestStatusVersion = 3,
-        externalCopyCount = 0,
+        externalCopyCount = 1,
+        externalCopies = listOf(
+            UserReportDeletionExternalCopyStatus(
+                institution = "서울시청",
+                state = UserReportExternalCopyDeletionState.REQUEST_SENT,
+                statusRecordedAt = TIMESTAMP,
+            ),
+        ),
         updatedAt = TIMESTAMP,
     )
 

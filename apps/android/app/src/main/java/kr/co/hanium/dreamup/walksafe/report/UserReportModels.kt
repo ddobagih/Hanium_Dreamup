@@ -13,7 +13,7 @@ internal const val USER_REPORT_CONTENT_CURRENT_SCHEMA_VERSION =
 internal const val USER_REPORT_CONTENT_REVISION_SCHEMA_VERSION =
     "walksafe.report-content-revision.v1"
 internal const val USER_REPORT_DELETION_STATUS_SCHEMA_VERSION =
-    "walksafe.report-deletion-status.v1"
+    "walksafe.report-deletion-status.v2"
 
 internal enum class UserReportStatus(val wireValue: String, val labelKo: String) {
     RECEIVED("RECEIVED", "접수됨"),
@@ -194,14 +194,49 @@ internal enum class UserReportDeletionState(val wireValue: String, val labelKo: 
     }
 }
 
+internal enum class UserReportExternalCopyDeletionState(
+    val wireValue: String,
+    val labelKo: String,
+) {
+    NOT_REQUESTED("NOT_REQUESTED", "기관 보관본 삭제 요청 전"),
+    REQUEST_SENT("REQUEST_SENT", "기관에 삭제 요청 전달됨 · 삭제 완료 아님"),
+    REPLY_ACKNOWLEDGED(
+        "REPLY_ACKNOWLEDGED",
+        "기관이 삭제 요청 접수를 회신함 · 삭제 완료 아님",
+    ),
+    REPLY_DELETION_CONFIRMED(
+        "REPLY_DELETION_CONFIRMED",
+        "기관이 삭제 완료를 회신함 · 기관 회신 사실",
+    ),
+    REPLY_DECLINED("REPLY_DECLINED", "기관이 삭제 요청 거절을 회신함"),
+    ;
+
+    companion object {
+        fun fromWireOrNull(value: String): UserReportExternalCopyDeletionState? =
+            entries.singleOrNull { it.wireValue == value }
+    }
+}
+
+internal data class UserReportDeletionExternalCopyStatus(
+    val institution: String,
+    val state: UserReportExternalCopyDeletionState,
+    val statusRecordedAt: String?,
+)
+
 internal data class UserReportDeletionStatus(
     val requestId: String,
     val reportId: String,
     val state: UserReportDeletionState,
     val requestStatusVersion: Long,
     val externalCopyCount: Long,
+    val externalCopies: List<UserReportDeletionExternalCopyStatus>,
     val updatedAt: String,
-)
+) {
+    init {
+        require(externalCopyCount == externalCopies.size.toLong())
+        require(state == UserReportDeletionState.DELETED || externalCopies.isEmpty())
+    }
+}
 
 internal fun validatedUserReportListOrNull(body: String): UserReportListPage? =
     runCatching {
@@ -350,6 +385,7 @@ internal fun validatedUserReportDeletionStatusOrNull(body: String): UserReportDe
                 "state",
                 "request_status_version",
                 "external_copy_count",
+                "external_copies",
                 "updated_at",
             ),
         )
@@ -360,13 +396,43 @@ internal fun validatedUserReportDeletionStatusOrNull(body: String): UserReportDe
         require(validCanonicalUserReportUuid(requestId))
         require(validCanonicalUserReportUuid(reportId))
         require(validUserReportTimestamp(updatedAt))
+        val externalCopyCount = root.strictNonNegativeLong("external_copy_count")
+        val rawExternalCopies = root.get("external_copies") as? JSONArray
+            ?: error("external_copies must be an array")
+        require(externalCopyCount == rawExternalCopies.length().toLong())
+        val externalCopies = buildList {
+            repeat(rawExternalCopies.length()) { index ->
+                val item = rawExternalCopies.get(index) as? JSONObject
+                    ?: error("external copy must be an object")
+                require(item.exactKeys("institution", "state", "status_recorded_at"))
+                val institution = item.strictString("institution")
+                require(institution == institution.trim())
+                require(institution.codePointCount(0, institution.length) in 1..160)
+                val statusRecordedAt = item.strictNullableString(
+                    "status_recorded_at",
+                    20,
+                    40,
+                )
+                require(statusRecordedAt == null || validUserReportTimestamp(statusRecordedAt))
+                add(
+                    UserReportDeletionExternalCopyStatus(
+                        institution = institution,
+                        state = UserReportExternalCopyDeletionState.fromWireOrNull(
+                            item.strictString("state"),
+                        ) ?: error("unknown external copy deletion state"),
+                        statusRecordedAt = statusRecordedAt,
+                    ),
+                )
+            }
+        }
         UserReportDeletionStatus(
             requestId = requestId,
             reportId = reportId,
             state = UserReportDeletionState.fromWireOrNull(root.strictString("state"))
                 ?: error("unknown deletion state"),
             requestStatusVersion = root.strictPositiveLong("request_status_version"),
-            externalCopyCount = root.strictNonNegativeLong("external_copy_count"),
+            externalCopyCount = externalCopyCount,
+            externalCopies = externalCopies,
             updatedAt = updatedAt,
         )
     }.getOrNull()

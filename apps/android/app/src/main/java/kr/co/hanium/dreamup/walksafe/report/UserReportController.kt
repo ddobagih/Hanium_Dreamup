@@ -227,16 +227,46 @@ internal class UserReportController(
 
     fun refreshDeletionStatus(requestId: String): Boolean {
         if (!validCanonicalUserReportUuid(requestId)) return false
-        if (requestId !in snapshot().trackedDeletionRequestIds) return false
+        val current = snapshot()
+        if (requestId !in current.trackedDeletionRequestIds) return false
+        val expectedReportId = current.trackedRequestReferences.singleOrNull {
+            it.requestId == requestId && it.requestType == UserReportRequestType.DELETE
+        }?.reportId ?: current.selectedDetail
+            ?.takeIf { detail ->
+                detail.latestRequest?.let { request ->
+                    request.requestId == requestId &&
+                        request.requestType == UserReportRequestType.DELETE
+                } == true
+            }
+            ?.reportId
         return start(
             action = Action.DeletionStatus(requestId),
             loadingPhase = UserReportUiPhase.LOADING_DELETION_STATUS,
+            precondition = { locked ->
+                requestId in locked.trackedDeletionRequestIds &&
+                    (
+                        expectedReportId == null ||
+                            locked.trackedRequestReferences.any {
+                                it.reportId == expectedReportId &&
+                                    it.requestId == requestId &&
+                                    it.requestType == UserReportRequestType.DELETE
+                            } ||
+                            locked.selectedDetail?.let { detail ->
+                                detail.reportId == expectedReportId &&
+                                    detail.latestRequest?.let { request ->
+                                        request.requestId == requestId &&
+                                            request.requestType == UserReportRequestType.DELETE
+                                    } == true
+                            } == true
+                    )
+            },
             prepare = { before -> before.copy(selectedDeletionStatus = null) },
             createCall = { authority ->
                 client.reportDeletionStatusCall(authority.session, requestId)
             },
         ) { result, before, _ ->
             require(result.requestId == requestId)
+            require(expectedReportId == null || result.reportId == expectedReportId)
             before.copy(
                 phase = UserReportUiPhase.READY,
                 selectedDeletionStatus = result,

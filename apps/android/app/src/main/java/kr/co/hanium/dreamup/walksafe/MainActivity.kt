@@ -367,6 +367,8 @@ import kr.co.hanium.dreamup.walksafe.report.UserReportAuthority
 import kr.co.hanium.dreamup.walksafe.report.UserReportContentCategory
 import kr.co.hanium.dreamup.walksafe.report.UserReportController
 import kr.co.hanium.dreamup.walksafe.report.UserReportCorrectionPatch
+import kr.co.hanium.dreamup.walksafe.report.UserReportDeletionState
+import kr.co.hanium.dreamup.walksafe.report.UserReportDeletionStatus
 import kr.co.hanium.dreamup.walksafe.report.UserReportDetail
 import kr.co.hanium.dreamup.walksafe.report.UserReportFailure
 import kr.co.hanium.dreamup.walksafe.report.UserReportRequestSummary
@@ -8694,7 +8696,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             UserReportUiPhase.LOADING_REQUEST_STATUS ->
                 "내 신고 상태: 정정·삭제 요청 처리 상태를 불러오는 중입니다."
             UserReportUiPhase.LOADING_DELETION_STATUS ->
-                "내 신고 상태: 물리 삭제 진행 상태를 불러오는 중입니다."
+                "내 신고 상태: 앱 서버 원본과 기관 보관본 삭제 상태를 불러오는 중입니다."
             UserReportUiPhase.SUBMITTING_REQUEST -> "내 신고 상태: 요청을 접수하는 중입니다."
             UserReportUiPhase.SUBMITTING_CORRECTION ->
                 "내 신고 상태: 구조화된 내용 정정을 반영하는 중입니다."
@@ -8736,8 +8738,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 detail = it,
                 state = state,
             )
-        }
-            ?: "신고를 선택하면 상세 상태가 표시됩니다."
+        } ?: state.selectedDeletionStatus?.let { deletion ->
+            "삭제 요청 상태\n${userReportDeletionStatusText(deletion)}"
+        } ?: "신고를 선택하면 상세 상태가 표시됩니다."
         userReportDetailText.text = detailMessage
         userReportDetailText.contentDescription = detailMessage
         val requestAvailable = detail != null && authorityReady && !busy
@@ -8767,9 +8770,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             requestAvailable && selectedReportHasRequest
         val trackedDeletionCount = state.trackedDeletionRequestIds.size
         userReportDeletionStatusButton.text = if (trackedDeletionCount == 0) {
-            "신고 물리 삭제 상태 없음"
+            "신고 물리 삭제·기관 보관본 상태 없음"
         } else {
-            "신고 물리 삭제 상태 확인 ($trackedDeletionCount 건)"
+            "신고 물리 삭제·기관 보관본 상태 확인 ($trackedDeletionCount 건)"
         }
         userReportDeletionStatusButton.contentDescription =
             userReportDeletionStatusButton.text
@@ -8957,14 +8960,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         }
         state.selectedDeletionStatus?.takeIf { it.reportId == detail.reportId }?.let { deletion ->
-            append("\n물리 삭제 상태: ")
-            append(deletion.state.labelKo)
-            append("\n삭제 상태 갱신 시각: ")
-            append(deletion.updatedAt)
-            if (deletion.externalCopyCount > 0L) {
-                append("\n외부 사본 확인 수: ")
-                append(deletion.externalCopyCount)
-            }
+            append("\n")
+            append(userReportDeletionStatusText(deletion))
         }
         selectedRequestStatus?.let { request ->
             append("\n")
@@ -8996,6 +8993,38 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             append("\n요청 상태 갱신 시각: ")
             append(request.updatedAt)
+        }
+
+    private fun userReportDeletionStatusText(deletion: UserReportDeletionStatus): String =
+        buildString {
+            append("앱 서버 원본 삭제 상태: ")
+            append(deletion.state.labelKo)
+            append("\n앱 서버 원본 상태 갱신 시각: ")
+            append(deletion.updatedAt)
+            append("\n기관 보관본 수: ")
+            append(deletion.externalCopyCount)
+            if (deletion.externalCopies.isEmpty()) {
+                append(
+                    if (deletion.state == UserReportDeletionState.DELETED) {
+                        "\n기관 보관본 상태: 확인된 기관 보관본 없음"
+                    } else {
+                        "\n기관 보관본 상태: 앱 서버 원본 삭제 완료 전에는 제공되지 않음"
+                    },
+                )
+            } else {
+                deletion.externalCopies.forEachIndexed { index, copy ->
+                    append("\n기관 보관본 ")
+                    append(index + 1)
+                    append(" · ")
+                    append(copy.institution)
+                    append(": ")
+                    append(copy.state.labelKo)
+                    copy.statusRecordedAt?.let { recordedAt ->
+                        append("\n기관 상태 기록 시각: ")
+                        append(recordedAt)
+                    }
+                }
+            }
         }
 
     private fun nextUserReportCorrectionCategoryPatch(
@@ -9105,7 +9134,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 return
             }
         if (!userReportController.refreshDeletionStatus(requestId)) {
-            setUserReportStatusMessage("내 신고 상태: 물리 삭제 상태를 다시 확인할 수 없습니다.")
+            setUserReportStatusMessage(
+                "내 신고 상태: 앱 서버 원본과 기관 보관본 삭제 상태를 다시 확인할 수 없습니다.",
+            )
         }
     }
 
@@ -12687,7 +12718,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             onClick = ::refreshLatestUserReportRequestStatus,
         )
         userReportDeletionStatusButton = accessiblePriorityUserButton(
-            label = "신고 물리 삭제 상태 확인",
+            label = "신고 물리 삭제·기관 보관본 상태 확인",
             onClick = ::refreshLatestUserReportDeletionStatus,
         )
         userReportControls = LinearLayout(this).apply {
@@ -20159,10 +20190,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     ): ReportQueueDrainTrigger? {
         if (
             before.state != WalkSessionState.ACTIVE ||
-            (
-                event != WalkSessionEvent.RecheckRequested &&
-                    event != WalkSessionEvent.EndRequested
-            ) ||
+            event != WalkSessionEvent.RecheckRequested ||
             !isActivityForeground ||
             !::networkStateProbe.isInitialized ||
             !reportPrivacyConsentSession.isGranted()
@@ -20246,7 +20274,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (
                 active != null &&
                 (
-                    transition.current.state == WalkSessionState.ACTIVE ||
+                    transition.current.state != WalkSessionState.PAUSED ||
                         transition.current.epoch.walkSessionId != active.walkSessionId
                 )
             ) {
@@ -20271,11 +20299,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (
             trigger == null ||
             transition.previous.state != WalkSessionState.ACTIVE ||
-            (
-                event != WalkSessionEvent.RecheckRequested &&
-                    event != WalkSessionEvent.EndRequested
-            ) ||
-            transition.current.state == WalkSessionState.ACTIVE ||
+            event != WalkSessionEvent.RecheckRequested ||
+            transition.current.state != WalkSessionState.PAUSED ||
+            transition.current.recoveryStage != WalkSessionRecoveryStage.RECHECK_REQUIRED ||
             transition.current.epoch.walkSessionId != trigger.walkSessionId
         ) {
             return
@@ -20291,7 +20317,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 reportQueueDrainTrigger != null ||
                 reportQueueDrainMovementGeneration != trigger.movementGeneration ||
                 reportQueueDrainNetworkGeneration != trigger.networkGeneration ||
-                reportQueueDrainWalkState == WalkSessionState.ACTIVE ||
+                reportQueueDrainWalkState != WalkSessionState.PAUSED ||
                 reportQueueDrainWalkSessionId != trigger.walkSessionId
             ) {
                 false
@@ -20573,7 +20599,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     )
 
     private fun ReportQueueDrainContext.allRequiredBaseGatesAllowed(): Boolean =
-        walkState != WalkSessionState.ACTIVE &&
+        walkState == WalkSessionState.PAUSED &&
             appForeground &&
             stationary &&
             networkAllowed &&

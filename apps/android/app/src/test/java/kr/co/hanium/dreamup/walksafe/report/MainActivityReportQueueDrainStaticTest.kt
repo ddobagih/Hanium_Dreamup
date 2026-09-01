@@ -12,7 +12,7 @@ class MainActivityReportQueueDrainStaticTest {
     ).readText()
 
     @Test
-    fun onlyActiveToRecheckOrEndTransitionCanStartDrain() {
+    fun onlyActiveToExplicitRecheckPauseCanStartDrain() {
         val transition = functionBlock("private fun transitionWalkSession(")
 
         assertTrue(transition.contains("captureReportQueueDrainTriggerBeforeTransition(before, event)"))
@@ -29,9 +29,18 @@ class MainActivityReportQueueDrainStaticTest {
 
         val capture = functionBlock("private fun captureReportQueueDrainTriggerBeforeTransition(")
         val builder = functionBlock("private fun buildReportQueueDrainTrigger(")
+        val start = functionBlock("private fun startReportQueueDrainAfterTransition(")
         assertTrue(capture.contains("before.state != WalkSessionState.ACTIVE"))
         assertTrue(capture.contains("event != WalkSessionEvent.RecheckRequested"))
-        assertTrue(capture.contains("event != WalkSessionEvent.EndRequested"))
+        assertFalse(capture.contains("WalkSessionEvent.EndRequested"))
+        assertTrue(start.contains("event != WalkSessionEvent.RecheckRequested"))
+        assertFalse(start.contains("WalkSessionEvent.EndRequested"))
+        assertTrue(start.contains("transition.current.state != WalkSessionState.PAUSED"))
+        assertTrue(
+            start.contains(
+                "transition.current.recoveryStage != WalkSessionRecoveryStage.RECHECK_REQUIRED",
+            ),
+        )
         assertTrue(capture.contains("activityOriginalUploadAdmission.stationarySnapshot("))
         assertTrue(builder.contains("GatewaySessionScope.GENERAL"))
         assertTrue(builder.contains("currentIntegratedConsentBinding()"))
@@ -148,8 +157,12 @@ class MainActivityReportQueueDrainStaticTest {
         assertTrue(sample.contains("observedAtMs >= trigger.stationarySnapshot.observedAtMs"))
         assertTrue(sample.contains("reportQueueDrainCoordinator.cancelActive()"))
         assertTrue(sample.contains("stopStepTrackingNow()"))
-        assertTrue(transition.contains("transition.current.state == WalkSessionState.ACTIVE"))
+        assertTrue(transition.contains("transition.current.state != WalkSessionState.PAUSED"))
         assertTrue(transition.contains("transition.current.epoch.walkSessionId != active.walkSessionId"))
+        assertTrue(
+            functionBlock("private fun ReportQueueDrainContext.allRequiredBaseGatesAllowed(")
+                .contains("walkState == WalkSessionState.PAUSED"),
+        )
     }
 
     @Test

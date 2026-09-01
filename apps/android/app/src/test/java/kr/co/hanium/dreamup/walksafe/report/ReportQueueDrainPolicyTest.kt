@@ -8,15 +8,21 @@ import org.junit.Test
 
 class ReportQueueDrainPolicyTest {
     @Test
-    fun activeWalkAllowsZeroStatusAndPostRequests() {
-        val decision = ReportQueueDrainPolicy().acquire(
-            report(),
-            context(walkState = WalkSessionState.ACTIVE),
-        )
+    fun onlyPausedWalkAllowsStatusAndPostRequests() {
+        WalkSessionState.entries
+            .filterNot { it == WalkSessionState.PAUSED }
+            .forEach { state ->
+                val decision = ReportQueueDrainPolicy().acquire(
+                    report(),
+                    context(walkState = state),
+                )
 
-        assertFalse(decision.allowed)
-        assertEquals(0, decision.allowedStatusRequests)
-        assertEquals(0, decision.allowedPostRequests)
+                assertFalse("$state must not drain reports", decision.allowed)
+                assertEquals(0, decision.allowedStatusRequests)
+                assertEquals(0, decision.allowedPostRequests)
+            }
+
+        assertTrue(ReportQueueDrainPolicy().acquire(report(), context()).allowed)
     }
 
     @Test
@@ -126,6 +132,16 @@ class ReportQueueDrainPolicyTest {
             val policy = ReportQueueDrainPolicy()
             val lease = requireNotNull(policy.acquire(report(), context()).lease)
             assertFalse(policy.isCurrent(lease, changed))
+        }
+        listOf(
+            WalkSessionState.READY,
+            WalkSessionState.ACTIVE,
+            WalkSessionState.SAFE_STOP,
+            WalkSessionState.ENDED,
+        ).forEach { state ->
+            val policy = ReportQueueDrainPolicy()
+            val lease = requireNotNull(policy.acquire(report(), context()).lease)
+            assertFalse(policy.isCurrent(lease, context(walkState = state)))
         }
     }
 

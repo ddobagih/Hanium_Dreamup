@@ -10,6 +10,7 @@ import kr.co.hanium.dreamup.walksafe.report.UserReportContentCategory
 import kr.co.hanium.dreamup.walksafe.report.UserReportCorrectionIntent
 import kr.co.hanium.dreamup.walksafe.report.UserReportCorrectionPatch
 import kr.co.hanium.dreamup.walksafe.report.UserReportDeletionState
+import kr.co.hanium.dreamup.walksafe.report.UserReportExternalCopyDeletionState
 import kr.co.hanium.dreamup.walksafe.report.UserReportRequestIntent
 import kr.co.hanium.dreamup.walksafe.report.UserReportRequestType
 import kr.co.hanium.dreamup.walksafe.report.UserReportStatus
@@ -183,6 +184,16 @@ class AndroidUserReportClientNetworkTest {
             assertEquals(2L, categoryRevision.revision)
             assertNull(clearRevision.categoryHint)
             assertEquals(UserReportDeletionState.DELETED, deletion.state)
+            assertEquals(3L, deletion.externalCopyCount)
+            assertEquals(
+                listOf(
+                    UserReportExternalCopyDeletionState.REQUEST_SENT,
+                    UserReportExternalCopyDeletionState.REPLY_ACKNOWLEDGED,
+                    UserReportExternalCopyDeletionState.REPLY_DELETION_CONFIRMED,
+                ),
+                deletion.externalCopies.map { it.state },
+            )
+            assertEquals("서울시청", deletion.externalCopies.first().institution)
             assertEquals(
                 "GET /api/reports/mine/$REPORT_ID/content HTTP/1.1",
                 server.requests[0].startLine,
@@ -259,6 +270,10 @@ class AndroidUserReportClientNetworkTest {
                 CONTENT_RESPONSE.replace(REPORT_ID, OTHER_REPORT_ID),
                 CORRECTION_CATEGORY_RESPONSE.replace(CORRECTION_ID, SECOND_CORRECTION_ID),
                 DELETION_RESPONSE.replace(REQUEST_ID, OTHER_REQUEST_ID),
+                DELETION_RESPONSE.replace(
+                    "walksafe.report-deletion-status.v2",
+                    "walksafe.report-deletion-status.v1",
+                ),
                 REQUEST_RESPONSE.replace(REQUEST_ID, OTHER_REQUEST_ID),
                 REQUEST_RESPONSE.dropLast(1) + ",\"internal_note\":\"비공개\"}",
             ),
@@ -281,6 +296,9 @@ class AndroidUserReportClientNetworkTest {
                         ),
                     ),
                 ).execute()
+            }
+            assertThrows(UserReportProtocolException::class.java) {
+                client.reportDeletionStatusCall(session, REQUEST_ID).execute()
             }
             assertThrows(UserReportProtocolException::class.java) {
                 client.reportDeletionStatusCall(session, REQUEST_ID).execute()
@@ -424,6 +442,6 @@ class AndroidUserReportClientNetworkTest {
         const val CORRECTION_CLEAR_RESPONSE =
             """{"schema_version":"walksafe.report-content-revision.v1","report_id":"$REPORT_ID","revision":3,"expected_revision":2,"idempotency_key":"$SECOND_CORRECTION_ID","content_sha256":"$SHA256","user_description":"café 파손","category_hint":null,"corrected_at":"$TIMESTAMP"}"""
         const val DELETION_RESPONSE =
-            """{"schema_version":"walksafe.report-deletion-status.v1","request_id":"$REQUEST_ID","report_id":"$REPORT_ID","state":"DELETED","request_status_version":3,"external_copy_count":0,"updated_at":"$TIMESTAMP"}"""
+            """{"schema_version":"walksafe.report-deletion-status.v2","request_id":"$REQUEST_ID","report_id":"$REPORT_ID","state":"DELETED","request_status_version":3,"external_copy_count":3,"external_copies":[{"institution":"서울시청","state":"REQUEST_SENT","status_recorded_at":"$TIMESTAMP"},{"institution":"보행지원기관","state":"REPLY_ACKNOWLEDGED","status_recorded_at":"$TIMESTAMP"},{"institution":"시설관리기관","state":"REPLY_DELETION_CONFIRMED","status_recorded_at":"$TIMESTAMP"}],"updated_at":"$TIMESTAMP"}"""
     }
 }
