@@ -1,3 +1,5 @@
+import { MIMEType } from "node:util";
+
 import {
   clearGatewaySession,
   establishBackendGatewaySession,
@@ -151,6 +153,7 @@ const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
 const REPORT_TRANSPORT_STATUS_ROUTE =
   /^\/api\/reports\/v2\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/status$/;
 const USER_REPORT_LIST_ROUTE = "/api/reports/mine";
+const USER_REPORT_REQUEST_HISTORY_ROUTE = "/api/reports/mine/requests/history";
 const USER_REPORT_DETAIL_ROUTE =
   /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const USER_REPORT_REQUEST_ROUTE =
@@ -165,6 +168,7 @@ const USER_REPORT_DELETION_ROUTE =
   /^\/api\/reports\/mine\/deletions\/(?<requestId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const USER_REPORT_BODY_LIMIT_BYTES = 4 * 1024;
 const USER_REPORT_RESPONSE_LIMIT_BYTES = 128 * 1024;
+const USER_REPORT_REQUEST_HISTORY_RESPONSE_LIMIT_BYTES = 48 * 1024;
 const USER_REPORT_CURSOR = /^[A-Za-z0-9_-]{1,1024}$/;
 const USER_REPORT_STATUSES = new Set([
   "RECEIVED", "INSTITUTION_SUBMITTED", "REJECTED", "RESOLVED"
@@ -1159,6 +1163,7 @@ async function reportTransportStatus(
 
 type UserReportRoute =
   | Readonly<{ kind: "list" }>
+  | Readonly<{ kind: "request-history" }>
   | Readonly<{ kind: "detail" | "request" | "content" | "correction"; reportId: string }>
   | Readonly<{ kind: "request-detail"; reportId: string; requestId: string }>
   | Readonly<{ kind: "deletion"; requestId: string }>;
@@ -1166,6 +1171,9 @@ type UserReportRoute =
 function userReportRoute(pathname: string): UserReportRoute | null {
   if (pathname === USER_REPORT_LIST_ROUTE) {
     return { kind: "list" };
+  }
+  if (pathname === USER_REPORT_REQUEST_HISTORY_ROUTE) {
+    return { kind: "request-history" };
   }
   const deletion = USER_REPORT_DELETION_ROUTE.exec(pathname);
   if (deletion?.groups?.requestId) {
@@ -1433,11 +1441,149 @@ function sanitizeReportDeletionStatus(
   };
 }
 
+function safeHistoryInteger(value: unknown, minimum: number): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= minimum;
+}
+
+function sanitizeUserReportRequestHistoryItem(
+  value: unknown,
+  expectedReportId: string | null
+): Record<string, unknown> | null {
+  const item = objectPayload(value);
+  if (!item || !exactObjectKeys(item, [
+    "revision", "source", "report_id", "request_id", "request", "deletion_status"
+  ]) ||
+    !safeHistoryInteger(item.revision, 1) ||
+    (item.source !== "ACTIVE_REQUEST" && item.source !== "DELETION_TOMBSTONE") ||
+    typeof item.report_id !== "string" || !CANONICAL_REPORT_UUID.test(item.report_id) ||
+    (expectedReportId !== null && item.report_id !== expectedReportId) ||
+    typeof item.request_id !== "string" || !CANONICAL_REPORT_UUID.test(item.request_id)
+  ) return null;
+
+  const requestPayload = item.request === null ? null : objectPayload(item.request);
+  if (item.request !== null && requestPayload === null) return null;
+  const request = requestPayload === null ? null : sanitizeRequestSummary(requestPayload);
+  if (requestPayload !== null && (
+    request === null ||
+    request.request_id !== item.request_id ||
+    !validAwareDateTime(requestPayload.created_at) ||
+    !validAwareDateTime(requestPayload.updated_at)
+  )) return null;
+
+  const deletionPayload = item.deletion_status === null
+    ? null : objectPayload(item.deletion_status);
+  if (item.deletion_status !== null && deletionPayload === null) return null;
+  const deletion = deletionPayload === null
+    ? null : sanitizeReportDeletionStatus(deletionPayload, item.request_id);
+  if (deletionPayload !== null && (
+    deletion === null || deletion.report_id !== item.report_id
+  )) return null;
+
+  if (item.source === "ACTIVE_REQUEST") {
+    if (request === null) return null;
+    if (request.request_type === "CORRECTION" && deletion !== null) return null;
+    if (request.request_type === "DELETE" && (
+      deletion === null ||
+      deletion.state === "DELETED" ||
+      deletion.request_status_version !== request.status_version
+    )) return null;
+  } else if (
+    request !== null || deletion === null || deletion.state !== "DELETED"
+  ) {
+    return null;
+  }
+
+  return {
+    revision: item.revision,
+    source: item.source,
+    report_id: item.report_id,
+    request_id: item.request_id,
+    request,
+    deletion_status: deletion
+  };
+}
+
+function sanitizeUserReportRequestHistory(
+  value: unknown,
+  expectedReportId: string | null,
+  requestCursor: string | null,
+  expectedLimit: number
+): Record<string, unknown> | null {
+  const requestHadCursor = requestCursor !== null;
+  const payload = objectPayload(value);
+  if (!payload || !exactObjectKeys(payload, [
+    "schema_version", "report_id", "snapshot_revision", "total_count", "items", "next_cursor"
+  ]) ||
+    payload.schema_version !== "walksafe.user-report-request-history-page.v1" ||
+    !(
+      payload.report_id === null ||
+      (typeof payload.report_id === "string" && CANONICAL_REPORT_UUID.test(payload.report_id))
+    ) ||
+    payload.report_id !== expectedReportId ||
+    !safeHistoryInteger(payload.snapshot_revision, 0) ||
+    !safeHistoryInteger(payload.total_count, 0) ||
+    !Array.isArray(payload.items) || payload.items.length > expectedLimit ||
+    !(
+      payload.next_cursor === null ||
+      (typeof payload.next_cursor === "string" && USER_REPORT_CURSOR.test(payload.next_cursor))
+    )
+  ) return null;
+
+  const items: Record<string, unknown>[] = [];
+  const requestIds = new Set<string>();
+  let previousRevision: number | null = null;
+  for (const candidate of payload.items) {
+    const item = sanitizeUserReportRequestHistoryItem(candidate, expectedReportId);
+    if (!item) return null;
+    const revision = item.revision as number;
+    const requestId = item.request_id as string;
+    if (
+      revision > payload.snapshot_revision ||
+      (previousRevision !== null && revision >= previousRevision) ||
+      requestIds.has(requestId)
+    ) return null;
+    previousRevision = revision;
+    requestIds.add(requestId);
+    items.push(item);
+  }
+  if (
+    payload.total_count < items.length ||
+    ((payload.total_count === 0) !== (payload.snapshot_revision === 0)) ||
+    (items.length === 0 && (payload.total_count !== 0 || payload.next_cursor !== null)) ||
+    (requestHadCursor && items.length >= payload.total_count) ||
+    (requestHadCursor && items.length > 0 &&
+      (items[0]!.revision as number) >= payload.snapshot_revision) ||
+    (requestHadCursor && payload.next_cursor !== null &&
+      payload.total_count < items.length + 2) ||
+    (requestCursor !== null && payload.next_cursor === requestCursor) ||
+    (!requestHadCursor && items.length > 0 && items[0]!.revision !== payload.snapshot_revision) ||
+    (!requestHadCursor && (
+      (payload.total_count === items.length) !== (payload.next_cursor === null)
+    ))
+  ) return null;
+  return {
+    schema_version: payload.schema_version,
+    report_id: payload.report_id,
+    snapshot_revision: payload.snapshot_revision,
+    total_count: payload.total_count,
+    items,
+    next_cursor: payload.next_cursor
+  };
+}
+
 function sanitizeUserReportResponse(
   value: unknown,
   route: UserReportRoute,
-  correctionRequest: UserReportCorrectionRequest | null
+  correctionRequest: UserReportCorrectionRequest | null,
+  expectedHistoryReportId: string | null,
+  historyRequestCursor: string | null,
+  expectedHistoryLimit: number
 ): Record<string, unknown> | null {
+  if (route.kind === "request-history") {
+    return sanitizeUserReportRequestHistory(
+      value, expectedHistoryReportId, historyRequestCursor, expectedHistoryLimit
+    );
+  }
   const payload = objectPayload(value);
   if (!payload) return null;
   if (route.kind === "content") {
@@ -1483,17 +1629,32 @@ function sanitizeUserReportResponse(
   };
 }
 
+function validJsonMediaType(value: string | null): boolean {
+  if (value === null) return false;
+  try {
+    return new MIMEType(value).essence === "application/json";
+  } catch {
+    return false;
+  }
+}
+
 async function boundedUserReportPayload(
   response: Response,
   route: UserReportRoute,
-  correctionRequest: UserReportCorrectionRequest | null
+  correctionRequest: UserReportCorrectionRequest | null,
+  expectedHistoryReportId: string | null,
+  historyRequestCursor: string | null,
+  expectedHistoryLimit: number
 ): Promise<Record<string, unknown> | null> {
-  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const responseLimitBytes = route.kind === "request-history"
+    ? USER_REPORT_REQUEST_HISTORY_RESPONSE_LIMIT_BYTES
+    : USER_REPORT_RESPONSE_LIMIT_BYTES;
+  const contentType = response.headers.get("content-type");
   const contentLength = response.headers.get("content-length");
   if (
-    !contentType.startsWith("application/json") || response.body === null ||
+    !validJsonMediaType(contentType) || response.body === null ||
     (contentLength !== null && (
-      !/^\d+$/.test(contentLength) || Number(contentLength) > USER_REPORT_RESPONSE_LIMIT_BYTES
+      !/^\d+$/.test(contentLength) || Number(contentLength) > responseLimitBytes
     ))
   ) {
     cancelUpstream(response);
@@ -1506,11 +1667,18 @@ async function boundedUserReportPayload(
     duplex: "half"
   } as RequestInit & { duplex: "half" });
   const bounded = await readBoundedJsonBody(
-    boundedRequest, USER_REPORT_RESPONSE_LIMIT_BYTES, 5_000
+    boundedRequest, responseLimitBytes, 5_000
   );
   return bounded.error
     ? null
-    : sanitizeUserReportResponse(bounded.value, route, correctionRequest);
+    : sanitizeUserReportResponse(
+      bounded.value,
+      route,
+      correctionRequest,
+      expectedHistoryReportId,
+      historyRequestCursor,
+      expectedHistoryLimit
+    );
 }
 
 function validUserReportQuery(url: URL): boolean {
@@ -1521,6 +1689,20 @@ function validUserReportQuery(url: URL): boolean {
     if (key === "limit" && (!/^[1-9][0-9]{0,2}$/.test(value) || Number(value) > 100)) return false;
     if (key === "cursor" && !USER_REPORT_CURSOR.test(value)) return false;
     if (key === "user_status" && !USER_REPORT_STATUSES.has(value)) return false;
+  }
+  return true;
+}
+
+function validUserReportRequestHistoryQuery(url: URL): boolean {
+  const seen = new Set<string>();
+  for (const [key, value] of url.searchParams) {
+    if (seen.has(key) || !["limit", "cursor", "report_id"].includes(key)) return false;
+    seen.add(key);
+    if (key === "limit" && (!/^[1-9][0-9]?$/.test(value) || Number(value) > 25)) {
+      return false;
+    }
+    if (key === "cursor" && !USER_REPORT_CURSOR.test(value)) return false;
+    if (key === "report_id" && !CANONICAL_REPORT_UUID.test(value)) return false;
   }
   return true;
 }
@@ -1595,6 +1777,16 @@ async function userReportProxy(
     ? userReportNotFound() : denied;
   const binding = authorizedProxyDeviceBinding(request);
   if (!binding) return userReportNotFound();
+  const requestUrl = new URL(request.url);
+  const expectedHistoryReportId = route.kind === "request-history"
+    ? requestUrl.searchParams.get("report_id")
+    : null;
+  const historyRequestCursor = route.kind === "request-history"
+    ? requestUrl.searchParams.get("cursor")
+    : null;
+  const expectedHistoryLimit = route.kind === "request-history"
+    ? Number(requestUrl.searchParams.get("limit") ?? "10")
+    : 0;
   const operation = startPrivacyOperation(
     binding.actorId,
     binding.accountGeneration
@@ -1640,6 +1832,9 @@ async function userReportProxy(
       case "list":
         backendPath = "/reports/mine";
         break;
+      case "request-history":
+        backendPath = "/reports/mine/requests/history";
+        break;
       case "detail":
         backendPath = `/reports/mine/${route.reportId}`;
         break;
@@ -1668,7 +1863,7 @@ async function userReportProxy(
     };
     const upstreamUrl = backendUrl(
       backendPath,
-      route.kind === "list" ? request : undefined
+      route.kind === "list" || route.kind === "request-history" ? request : undefined
     );
     const upstream = fetchImpl
       ? await fetchBackend(request, upstreamUrl, init, 15_000, fetchImpl)
@@ -1680,6 +1875,13 @@ async function userReportProxy(
     if ([401, 403, 404].includes(upstream.status)) {
       cancelUpstream(upstream);
       return userReportNotFound();
+    }
+    if (route.kind === "request-history" && upstream.status === 422) {
+      cancelUpstream(upstream);
+      return Response.json(
+        { detail: { code: "report_request_history_query_invalid" } },
+        { status: 422, headers: { "cache-control": "no-store" } }
+      );
     }
     if (upstream.status === 429) {
       const headers: Record<string, string> = { "cache-control": "no-store" };
@@ -1730,7 +1932,14 @@ async function userReportProxy(
       cancelUpstream(upstream);
       return userReportUnavailable();
     }
-    const payload = await boundedUserReportPayload(upstream, route, correctionRequest);
+    const payload = await boundedUserReportPayload(
+      upstream,
+      route,
+      correctionRequest,
+      expectedHistoryReportId,
+      historyRequestCursor,
+      expectedHistoryLimit
+    );
     const stillCurrent = privacyOperationIsCurrent(operation.lease);
     if (!stillCurrent) return userReportNotFound();
     if (!payload) return userReportUnavailable();
@@ -1976,7 +2185,14 @@ async function dispatchGatewayRequest(
     if (gatewaySessionScope(request) === "account_deletion_recovery") {
       return userReportNotFound();
     }
-    if (userReport.kind === "list") {
+    if (userReport.kind === "request-history") {
+      if (!validUserReportRequestHistoryQuery(requestUrl) || requestHasEntityBody(request)) {
+        return Response.json(
+          { detail: { code: "report_request_history_query_invalid" } },
+          { status: 422, headers: { "cache-control": "no-store" } }
+        );
+      }
+    } else if (userReport.kind === "list") {
       if (!validUserReportQuery(requestUrl) || requestHasEntityBody(request)) {
         return Response.json(
           { detail: { code: "report_query_invalid" } },

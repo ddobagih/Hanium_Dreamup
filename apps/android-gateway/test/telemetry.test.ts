@@ -139,6 +139,13 @@ function allowedRouteCases(secret: string, deletionId: string): RouteCase[] {
       request: () => new Request("http://127.0.0.1:8081/api/reports/mine", { headers })
     },
     {
+      template: "/api/reports/mine/requests/history",
+      request: () => new Request(
+        "http://127.0.0.1:8081/api/reports/mine/requests/history?limit=10&cursor=opaque",
+        { headers }
+      )
+    },
+    {
       template: "/api/reports/mine/deletions/{request_id}",
       request: () => new Request(
         "http://127.0.0.1:8081/api/reports/mine/deletions/22222222-2222-4222-8222-222222222222",

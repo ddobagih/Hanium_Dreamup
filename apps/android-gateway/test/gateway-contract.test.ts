@@ -241,6 +241,7 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     "/api/reports/v2",
     "/api/reports/v2/{report_id}/status",
     "/api/reports/mine",
+    "/api/reports/mine/requests/history",
     "/api/reports/mine/deletions/{request_id}",
     "/api/reports/mine/{report_id}",
     "/api/reports/mine/{report_id}/content",
@@ -272,30 +273,31 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
   assert.deepEqual(Object.keys(contract.paths[expected[11]!]!), ["get"]);
   assert.deepEqual(Object.keys(contract.paths[expected[12]!]!), ["get"]);
   assert.deepEqual(Object.keys(contract.paths[expected[13]!]!), ["get"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[14]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[14]!]!), ["get"]);
   assert.deepEqual(Object.keys(contract.paths[expected[15]!]!), ["post"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[16]!]!), ["get"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[17]!]!), ["put"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[16]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[17]!]!), ["get"]);
   assert.deepEqual(Object.keys(contract.paths[expected[18]!]!), ["put"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[19]!]!), ["get"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[20]!]!), ["post"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[21]!]!).sort(), ["get", "put"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[22]!]!), ["post"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[23]!]!), ["get"]);
-  assert.deepEqual(Object.keys(contract.paths[expected[24]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[19]!]!), ["put"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[20]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[21]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[22]!]!).sort(), ["get", "put"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[23]!]!), ["post"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[24]!]!), ["get"]);
+  assert.deepEqual(Object.keys(contract.paths[expected[25]!]!), ["post"]);
   assert.equal(contract.info.version, "0.11.0");
-  const rawManifest = contract.paths[expected[17]!]!.put as {
+  const rawManifest = contract.paths[expected[18]!]!.put as {
     "x-max-body-bytes": number;
     parameters: Array<{ $ref: string }>;
   };
-  const rawChunk = contract.paths[expected[18]!]!.put as {
+  const rawChunk = contract.paths[expected[19]!]!.put as {
     "x-max-body-bytes": number;
     parameters: Array<{ $ref: string }>;
   };
-  const rawStatus = contract.paths[expected[19]!]!.get as {
+  const rawStatus = contract.paths[expected[20]!]!.get as {
     parameters: Array<{ $ref: string }>;
   };
-  const rawCommit = contract.paths[expected[20]!]!.post as {
+  const rawCommit = contract.paths[expected[21]!]!.post as {
     "x-max-body-bytes": number;
     parameters: Array<{ $ref: string }>;
   };
@@ -422,6 +424,7 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     false
   );
   const userList = detailed.paths["/api/reports/mine"]!.get!;
+  const userRequestHistory = detailed.paths["/api/reports/mine/requests/history"]!.get!;
   const userDeletion = detailed.paths["/api/reports/mine/deletions/{request_id}"]!.get!;
   const userDetail = detailed.paths["/api/reports/mine/{report_id}"]!.get!;
   const userContent = detailed.paths["/api/reports/mine/{report_id}/content"]!.get!;
@@ -432,6 +435,7 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
   ]!.get!;
   for (const operation of [
     userList,
+    userRequestHistory,
     userDeletion,
     userDetail,
     userContent,
@@ -452,6 +456,26 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     );
   }
   assert.equal(userList.responses?.["200"]?.$ref, "#/components/responses/UserReportList");
+  assert.equal(
+    userRequestHistory.responses?.["200"]?.$ref,
+    "#/components/responses/UserReportRequestHistory"
+  );
+  assert.equal(
+    userRequestHistory.responses?.["422"]?.$ref,
+    "#/components/responses/GatewayError"
+  );
+  assert.deepEqual(
+    userRequestHistory.parameters?.map(({ name, in: location, required }) => ({
+      name,
+      in: location,
+      required
+    })),
+    [
+      { name: "limit", in: "query", required: false },
+      { name: "cursor", in: "query", required: false },
+      { name: "report_id", in: "query", required: false }
+    ]
+  );
   assert.equal(
     userDeletion.responses?.["200"]?.$ref,
     "#/components/responses/ReportDeletionStatus"
@@ -484,7 +508,9 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     "ReportContentCorrectionRequest",
     "ReportContentRevision",
     "ReportDeletionExternalCopyStatus",
-    "ReportDeletionStatus"
+    "ReportDeletionStatus",
+    "UserReportRequestHistoryItem",
+    "UserReportRequestHistoryPage"
   ]) {
     assert.equal(detailed.components.schemas[schemaName]!.additionalProperties, false);
   }
@@ -507,6 +533,22 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     deletionStatusSchema.properties?.external_copies?.items?.$ref,
     "#/components/schemas/ReportDeletionExternalCopyStatus"
   );
+  const historyPageSchema = detailed.components.schemas
+    .UserReportRequestHistoryPage as unknown as {
+      properties?: {
+        schema_version?: { const?: string };
+        items?: { maxItems?: number; items?: { $ref?: string } };
+      };
+    };
+  assert.equal(
+    historyPageSchema.properties?.schema_version?.const,
+    "walksafe.user-report-request-history-page.v1"
+  );
+  assert.equal(historyPageSchema.properties?.items?.maxItems, 25);
+  assert.equal(
+    historyPageSchema.properties?.items?.items?.$ref,
+    "#/components/schemas/UserReportRequestHistoryItem"
+  );
   const externalCopySchema = detailed.components.schemas
     .ReportDeletionExternalCopyStatus as unknown as {
       required?: string[];
@@ -518,6 +560,35 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
   assert.deepEqual(Object.keys(externalCopySchema.properties ?? {}), [
     "institution", "state", "status_recorded_at"
   ]);
+  const historyContract = contract.paths["/api/reports/mine/requests/history"]!
+    .get as {
+      "x-max-response-bytes"?: number;
+      parameters?: Array<{
+        name?: string;
+        schema?: {
+          minimum?: number;
+          maximum?: number;
+          default?: number;
+          maxLength?: number;
+          pattern?: string;
+        };
+      }>;
+    };
+  assert.equal(historyContract["x-max-response-bytes"], 48 * 1024);
+  const historyParameters = new Map(
+    historyContract.parameters?.map(parameter => [parameter.name, parameter.schema])
+  );
+  assert.deepEqual(historyParameters.get("limit"), {
+    type: "integer",
+    minimum: 1,
+    maximum: 25,
+    default: 10
+  });
+  assert.equal(historyParameters.get("cursor")?.maxLength, 1024);
+  assert.equal(
+    historyParameters.get("report_id")?.pattern,
+    "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+  );
   const requestContract = contract.paths["/api/reports/mine/{report_id}/requests"]!
     .post as {
       "x-max-body-bytes"?: number;
@@ -581,6 +652,7 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     "#/components/schemas/GatewayError"
   );
   for (const [name, schemaName] of [
+    ["UserReportRequestHistory", "UserReportRequestHistoryPage"],
     ["ReportContentCurrent", "ReportContentCurrent"],
     ["ReportContentRevision", "ReportContentRevision"],
     ["ReportDeletionStatus", "ReportDeletionStatus"]
@@ -1756,6 +1828,8 @@ test("user report routes bind actor generation and expose only strict minimum JS
     assert.equal(headers.get(ACTOR_ID_HEADER), ACTOR_ID);
     assert.equal(headers.get(ACCOUNT_GENERATION_HEADER), "1");
     assert.match(headers.get(ACTOR_ASSERTION_HEADER) ?? "", /^v2\.\d+\.[A-Za-z0-9_-]+$/);
+    assert.equal(headers.get(FIELD_TEST_TOKEN_HEADER), INTERNAL_TOKEN);
+    assert.equal(headers.get("cookie"), null);
     assert.equal(headers.get("x-walksafe-admin-token"), null);
     for (const header of [
       CONSENT_CONTROL_SECRET_HEADER,
@@ -2233,6 +2307,408 @@ test("user report routes bind actor generation and expose only strict minimum JS
   assert.deepEqual(await v6Rejected.json(), {
     detail: { code: "report_not_found" }
   });
+});
+
+test("report request history restores active and deleted requests through strict actor relay", async () => {
+  const cookie = backendAccountSessionCookie("android-report-request-history-device");
+  const reportId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const deletedReportId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const correctionRequestId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const deletionRequestId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const tombstoneRequestId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const recordedAt = "2026-09-01T01:02:03.456Z";
+  const activeCorrection = {
+    revision: 11,
+    source: "ACTIVE_REQUEST",
+    report_id: reportId,
+    request_id: correctionRequestId,
+    request: {
+      request_id: correctionRequestId,
+      request_type: "CORRECTION",
+      status: "ACKNOWLEDGED",
+      status_version: 2,
+      public_response: "요청을 확인했습니다.",
+      created_at: recordedAt,
+      updated_at: recordedAt
+    },
+    deletion_status: null
+  };
+  const activeDeletion = {
+    revision: 9,
+    source: "ACTIVE_REQUEST",
+    report_id: reportId,
+    request_id: deletionRequestId,
+    request: {
+      request_id: deletionRequestId,
+      request_type: "DELETE",
+      status: "ACKNOWLEDGED",
+      status_version: 3,
+      public_response: null,
+      created_at: recordedAt,
+      updated_at: recordedAt
+    },
+    deletion_status: {
+      schema_version: "walksafe.report-deletion-status.v2",
+      request_id: deletionRequestId,
+      report_id: reportId,
+      state: "PENDING",
+      request_status_version: 3,
+      external_copy_count: 0,
+      external_copies: [],
+      updated_at: recordedAt
+    }
+  };
+  const deletionTombstone = {
+    revision: 7,
+    source: "DELETION_TOMBSTONE",
+    report_id: deletedReportId,
+    request_id: tombstoneRequestId,
+    request: null,
+    deletion_status: {
+      schema_version: "walksafe.report-deletion-status.v2",
+      request_id: tombstoneRequestId,
+      report_id: deletedReportId,
+      state: "DELETED",
+      request_status_version: 4,
+      external_copy_count: 1,
+      external_copies: [{
+        institution: "서울시",
+        state: "REPLY_DELETION_CONFIRMED",
+        status_recorded_at: recordedAt
+      }],
+      updated_at: recordedAt
+    }
+  };
+  const pages = new Map<string, Record<string, unknown>>([
+    ["?limit=2", {
+      schema_version: "walksafe.user-report-request-history-page.v1",
+      report_id: null,
+      snapshot_revision: 11,
+      total_count: 3,
+      items: [activeCorrection, activeDeletion],
+      next_cursor: "cursor_1"
+    }],
+    ["?limit=2&cursor=cursor_1", {
+      schema_version: "walksafe.user-report-request-history-page.v1",
+      report_id: null,
+      snapshot_revision: 11,
+      total_count: 3,
+      items: [deletionTombstone],
+      next_cursor: null
+    }],
+    [`?report_id=${reportId}&limit=2`, {
+      schema_version: "walksafe.user-report-request-history-page.v1",
+      report_id: reportId,
+      snapshot_revision: 11,
+      total_count: 2,
+      items: [activeCorrection, activeDeletion],
+      next_cursor: null
+    }]
+  ]);
+  const calls: string[] = [];
+  const fetchImpl: GatewayFetch = async (input, init) => {
+    const url = new URL(String(input));
+    calls.push(url.toString());
+    assert.equal(url.pathname, "/reports/mine/requests/history");
+    assert.equal(init?.method, "GET");
+    assert.equal(init?.body, undefined);
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get(ACTOR_ID_HEADER), ACTOR_ID);
+    assert.equal(headers.get(ACCOUNT_GENERATION_HEADER), "1");
+    assert.match(headers.get(ACTOR_ASSERTION_HEADER) ?? "", /^v2\.\d+\.[A-Za-z0-9_-]+$/);
+    assert.equal(headers.get("x-walksafe-admin-token"), null);
+    const page = pages.get(url.search);
+    assert.ok(page);
+    return new Response(JSON.stringify(page), {
+      headers: { "content-type": "application/json; charset=utf-8" }
+    });
+  };
+
+  for (const query of pages.keys()) {
+    const response = await handleGatewayRequest(
+      new Request(`http://127.0.0.1:8081/api/reports/mine/requests/history${query}`, {
+        headers: {
+          cookie,
+          [ACTOR_ID_HEADER]: "spoofed-actor",
+          [ACCOUNT_GENERATION_HEADER]: "999",
+          [FIELD_TEST_TOKEN_HEADER]: "spoofed-service-token",
+          "x-walksafe-admin-token": "must-not-forward"
+        }
+      }),
+      { fetchImpl }
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await response.json(), pages.get(query));
+  }
+  assert.deepEqual(calls, [
+    "http://127.0.0.1:8000/reports/mine/requests/history?limit=2",
+    "http://127.0.0.1:8000/reports/mine/requests/history?limit=2&cursor=cursor_1",
+    `http://127.0.0.1:8000/reports/mine/requests/history?report_id=${reportId}&limit=2`
+  ]);
+});
+
+test("report request history rejects invalid query, upstream status, shape, and byte budget", async () => {
+  const cookie = backendAccountSessionCookie("android-report-request-history-strict-device");
+  const reportId = "11111111-1111-4111-8111-111111111111";
+  const requestId = "22222222-2222-4222-8222-222222222222";
+  const secondRequestId = "33333333-3333-4333-8333-333333333333";
+  const recordedAt = "2026-09-01T02:03:04Z";
+  const item = {
+    revision: 5,
+    source: "ACTIVE_REQUEST",
+    report_id: reportId,
+    request_id: requestId,
+    request: {
+      request_id: requestId,
+      request_type: "CORRECTION",
+      status: "RECEIVED",
+      status_version: 1,
+      public_response: null,
+      created_at: recordedAt,
+      updated_at: recordedAt
+    },
+    deletion_status: null
+  };
+  const secondItem = {
+    ...item,
+    revision: 4,
+    request_id: secondRequestId,
+    request: { ...item.request, request_id: secondRequestId }
+  };
+  const valid = {
+    schema_version: "walksafe.user-report-request-history-page.v1",
+    report_id: null,
+    snapshot_revision: 5,
+    total_count: 1,
+    items: [item],
+    next_cursor: null
+  };
+  const tombstone = {
+    revision: 3,
+    source: "DELETION_TOMBSTONE",
+    report_id: reportId,
+    request_id: secondRequestId,
+    request: null,
+    deletion_status: {
+      schema_version: "walksafe.report-deletion-status.v2",
+      request_id: secondRequestId,
+      report_id: reportId,
+      state: "DELETED",
+      request_status_version: 2,
+      external_copy_count: 0,
+      external_copies: [],
+      updated_at: recordedAt
+    }
+  };
+  const invalidPayloads: unknown[] = [
+    { ...valid, private_actor: ACTOR_ID },
+    { ...valid, snapshot_revision: 0 },
+    { ...valid, snapshot_revision: 6 },
+    { ...valid, total_count: 0 },
+    { ...valid, snapshot_revision: Number.MAX_SAFE_INTEGER + 1 },
+    { ...valid, items: [{ ...item, revision: 6 }] },
+    { ...valid, total_count: 2, next_cursor: null },
+    { ...valid, next_cursor: "unexpected_cursor" },
+    { ...valid, total_count: 2, items: [], next_cursor: null },
+    { ...valid, next_cursor: "bad+cursor" },
+    { ...valid, items: [{ ...item, private_actor: ACTOR_ID }] },
+    { ...valid, items: [{ ...item, deletion_status: "not-null" }] },
+    { ...valid, items: [{ ...item, request: { ...item.request, created_at: "2026-09-01" } }] },
+    { ...valid, items: [{ ...item, request: null }] },
+    { ...valid, items: [{ ...tombstone, request: "not-null" }] },
+    { ...valid, items: [{ ...tombstone, deletion_status: null }] },
+    { ...valid, total_count: 2, items: [secondItem, item], next_cursor: null },
+    {
+      ...valid,
+      total_count: 2,
+      items: [
+        item,
+        {
+          ...secondItem,
+          request_id: requestId,
+          request: { ...secondItem.request, request_id: requestId }
+        }
+      ],
+      next_cursor: null
+    }
+  ];
+  for (const payload of invalidPayloads) {
+    const rejected = await handleGatewayRequest(
+      new Request("http://127.0.0.1:8081/api/reports/mine/requests/history", {
+        headers: { cookie }
+      }),
+      { fetchImpl: async () => Response.json(payload) }
+    );
+    assert.equal(rejected.status, 502);
+    assert.equal(rejected.headers.get("cache-control"), "no-store");
+    assert.doesNotMatch(await rejected.text(), /private_actor|field-operator/);
+  }
+
+  const filteredMismatch = await handleGatewayRequest(
+    new Request(
+      `http://127.0.0.1:8081/api/reports/mine/requests/history?report_id=${reportId}`,
+      { headers: { cookie } }
+    ),
+    { fetchImpl: async () => Response.json(valid) }
+  );
+  assert.equal(filteredMismatch.status, 502);
+  const limitOverflow = await handleGatewayRequest(
+    new Request(
+      "http://127.0.0.1:8081/api/reports/mine/requests/history?limit=1",
+      { headers: { cookie } }
+    ),
+    {
+      fetchImpl: async () => Response.json({
+        ...valid,
+        total_count: 2,
+        items: [item, secondItem]
+      })
+    }
+  );
+  assert.equal(limitOverflow.status, 502);
+  const impossibleCursorSnapshot = await handleGatewayRequest(
+    new Request(
+      "http://127.0.0.1:8081/api/reports/mine/requests/history?cursor=opaque_cursor",
+      { headers: { cookie } }
+    ),
+    {
+      fetchImpl: async () => Response.json({
+        schema_version: "walksafe.user-report-request-history-page.v1",
+        report_id: null,
+        snapshot_revision: 0,
+        total_count: 0,
+        items: [],
+        next_cursor: null
+      })
+    }
+  );
+  assert.equal(impossibleCursorSnapshot.status, 502);
+  const impossibleCursorFullSnapshot = await handleGatewayRequest(
+    new Request(
+      "http://127.0.0.1:8081/api/reports/mine/requests/history?cursor=opaque_cursor",
+      { headers: { cookie } }
+    ),
+    { fetchImpl: async () => Response.json(valid) }
+  );
+  assert.equal(impossibleCursorFullSnapshot.status, 502);
+  for (const payload of [
+    {
+      ...valid,
+      total_count: 2
+    },
+    {
+      ...valid,
+      total_count: 2,
+      items: [secondItem],
+      next_cursor: "next_cursor"
+    },
+    {
+      ...valid,
+      total_count: 3,
+      items: [secondItem],
+      next_cursor: "opaque_cursor"
+    }
+  ]) {
+    const rejected = await handleGatewayRequest(
+      new Request(
+        "http://127.0.0.1:8081/api/reports/mine/requests/history?cursor=opaque_cursor",
+        { headers: { cookie } }
+      ),
+      { fetchImpl: async () => Response.json(payload) }
+    );
+    assert.equal(rejected.status, 502);
+  }
+
+  for (const response of [
+    Response.json(valid, { headers: { "content-length": String(48 * 1024 + 1) } }),
+    new Response(`${" ".repeat(48 * 1024)}${JSON.stringify(valid)}`, {
+      headers: { "content-type": "application/json" }
+    }),
+    new Response(JSON.stringify(valid), { headers: { "content-type": "text/plain" } }),
+    new Response(JSON.stringify(valid), { headers: { "content-type": "application/jsonp" } }),
+    new Response("{", { headers: { "content-type": "application/json" } })
+  ]) {
+    const rejected = await handleGatewayRequest(
+      new Request("http://127.0.0.1:8081/api/reports/mine/requests/history", {
+        headers: { cookie }
+      }),
+      { fetchImpl: async () => response }
+    );
+    assert.equal(rejected.status, 502);
+    assert.equal(rejected.headers.get("cache-control"), "no-store");
+  }
+
+  for (const invalidQuery of [
+    "?limit=0",
+    "?limit=26",
+    "?limit=01",
+    "?limit=10&limit=11",
+    "?cursor=",
+    "?cursor=bad%2Bcursor",
+    "?report_id=AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+    "?report_id=11111111-1111-4111-8111-111111111111&report_id=11111111-1111-4111-8111-111111111111",
+    "?debug=1"
+  ]) {
+    const rejected = await handleGatewayRequest(
+      new Request(`http://127.0.0.1:8081/api/reports/mine/requests/history${invalidQuery}`, {
+        headers: { cookie }
+      }),
+      { fetchImpl: async () => assert.fail("invalid query must not reach backend") }
+    );
+    assert.equal(rejected.status, 422);
+    assert.deepEqual(await rejected.json(), {
+      detail: { code: "report_request_history_query_invalid" }
+    });
+  }
+
+  for (const [upstreamStatus, expectedStatus] of [
+    [422, 422],
+    [404, 404],
+    [429, 429],
+    [503, 502]
+  ] as const) {
+    const rejected = await handleGatewayRequest(
+      new Request("http://127.0.0.1:8081/api/reports/mine/requests/history", {
+        headers: { cookie }
+      }),
+      {
+        fetchImpl: async () => Response.json(
+          { detail: { code: "private_backend_code", actor: ACTOR_ID } },
+          {
+            status: upstreamStatus,
+            ...(upstreamStatus === 429 ? { headers: { "retry-after": "17" } } : {})
+          }
+        )
+      }
+    );
+    assert.equal(rejected.status, expectedStatus);
+    assert.equal(rejected.headers.get("cache-control"), "no-store");
+    assert.doesNotMatch(await rejected.text(), /private_backend_code|field-operator/);
+    if (upstreamStatus === 429) assert.equal(rejected.headers.get("retry-after"), "17");
+  }
+
+  const wrongMethod = await handleGatewayRequest(
+    new Request("http://127.0.0.1:8081/api/reports/mine/requests/history", {
+      method: "POST",
+      headers: { cookie }
+    }),
+    { fetchImpl: async () => assert.fail("wrong method must not reach backend") }
+  );
+  assert.equal(wrongMethod.status, 405);
+  const networkFailure = await handleGatewayRequest(
+    new Request("http://127.0.0.1:8081/api/reports/mine/requests/history", {
+      headers: { cookie }
+    }),
+    { fetchImpl: async () => { throw new Error("private network detail"); } }
+  );
+  assert.equal(networkFailure.status, 502);
+  assert.doesNotMatch(await networkFailure.text(), /private network detail/);
+  const unauthenticated = await handleGatewayRequest(
+    new Request("http://127.0.0.1:8081/api/reports/mine/requests/history"),
+    { fetchImpl: async () => assert.fail("unauthenticated request must not reach backend") }
+  );
+  assert.equal(unauthenticated.status, 404);
 });
 
 test("report deletion status accepts only the exact v2 external-copy projection", async () => {

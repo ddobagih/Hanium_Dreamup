@@ -21,6 +21,7 @@ export const GATEWAY_ROUTE_TEMPLATES = Object.freeze([
   "/api/reports/v2",
   "/api/reports/v2/{report_id}/status",
   "/api/reports/mine",
+  "/api/reports/mine/requests/history",
   "/api/reports/mine/deletions/{request_id}",
   "/api/reports/mine/{report_id}",
   "/api/reports/mine/{report_id}/content",
