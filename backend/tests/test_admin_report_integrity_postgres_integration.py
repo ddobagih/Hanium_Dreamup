@@ -257,7 +257,12 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
 
         with disposable_engine.connect() as connection:
             assert admin_report_integrity_boundary_state(connection) is True
-        assert _database_readiness(migration_url)["ready"] is True
+        assert _database_readiness(migration_url) == {
+            "ready": False,
+            "reason": "migration_not_at_head",
+            "current_revision": "202608300005",
+            "expected_revision": "202608300006",
+        }
 
         with disposable_engine.begin() as connection:
             connection.execute(
@@ -271,8 +276,9 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
                 assert admin_report_integrity_boundary_state(connection) is False
             assert _database_readiness(migration_url) == {
                 "ready": False,
-                "reason": "admin_report_integrity_boundary_invalid",
+                "reason": "migration_not_at_head",
                 "current_revision": "202608300005",
+                "expected_revision": "202608300006",
             }
         finally:
             with disposable_engine.begin() as connection:
@@ -328,8 +334,9 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
                 assert admin_report_integrity_boundary_state(connection) is False
             assert _database_readiness(migration_url) == {
                 "ready": False,
-                "reason": "admin_report_integrity_boundary_invalid",
+                "reason": "migration_not_at_head",
                 "current_revision": "202608300005",
+                "expected_revision": "202608300006",
             }
         finally:
             with disposable_engine.begin() as connection:

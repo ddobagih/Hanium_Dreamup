@@ -56,6 +56,19 @@ ReportUserStatus = Literal["RECEIVED", "INSTITUTION_SUBMITTED", "REJECTED", "RES
 ReportUserRequestType = Literal["CORRECTION", "DELETE"]
 ReportUserRequestStatus = Literal["RECEIVED", "ACKNOWLEDGED", "RESOLVED", "REJECTED"]
 ReportDeletionState = Literal["PENDING", "LEGAL_HOLD", "REJECTED", "DELETED"]
+ReportExternalCopyDeletionRecordedState = Literal[
+    "REQUEST_SENT",
+    "REPLY_ACKNOWLEDGED",
+    "REPLY_DELETION_CONFIRMED",
+    "REPLY_DECLINED",
+]
+ReportExternalCopyDeletionState = Literal[
+    "NOT_REQUESTED",
+    "REQUEST_SENT",
+    "REPLY_ACKNOWLEDGED",
+    "REPLY_DELETION_CONFIRMED",
+    "REPLY_DECLINED",
+]
 ReportContentCategoryHint = Literal[
     "SIDEWALK_OBSTRUCTION",
     "ROAD_DAMAGE",
@@ -84,6 +97,14 @@ ReportInstitution = Annotated[str, StringConstraints(strip_whitespace=True, min_
 ReportDeliveryChannel = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
 ReportDeliveryRecipient = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
 ReportExternalReceiptId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
+ReportInstitutionReference = Annotated[
+    str,
+    StringConstraints(
+        min_length=1,
+        max_length=160,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$",
+    ),
+]
 Sha256LowerHex = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 AccountDeletionRequestId = Annotated[
     str,
@@ -491,16 +512,33 @@ class ReportUserRequestSummaryV1(BaseModel):
     updated_at: AwareDatetime
 
 
-class ReportDeletionStatusV1(BaseModel):
+class ReportDeletionExternalCopyStatusV2(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["walksafe.report-deletion-status.v1"]
+    institution: ReportInstitution
+    state: ReportExternalCopyDeletionState
+    status_recorded_at: AwareDatetime | None
+
+
+class ReportDeletionStatusV2(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.report-deletion-status.v2"]
     request_id: uuid.UUID
     report_id: uuid.UUID
     state: ReportDeletionState
     request_status_version: int = Field(ge=1)
     external_copy_count: int = Field(ge=0)
+    external_copies: List[ReportDeletionExternalCopyStatusV2]
     updated_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def require_complete_external_copy_projection(self) -> "ReportDeletionStatusV2":
+        if self.external_copy_count != len(self.external_copies):
+            raise ValueError("external_copy_count must match external_copies")
+        if self.state != "DELETED" and self.external_copies:
+            raise ValueError("external copy snapshots require local deletion")
+        return self
 
 
 class UserReportSummaryV1(BaseModel):
@@ -578,6 +616,97 @@ class AdminReportUserRequestStatusV1(BaseModel):
     allowed_next_statuses: List[ReportUserRequestStatus] = Field(max_length=2)
     public_response: str | None = Field(default=None, min_length=1, max_length=500)
     updated_at: AwareDatetime
+
+
+class AdminReportDeletionExternalCopyEventCreateV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: ReportExternalCopyDeletionRecordedState
+    expected_revision: int = Field(ge=0, strict=True)
+    idempotency_key: uuid.UUID
+    observed_at: AwareDatetime = Field(
+        json_schema_extra={"pattern": _RFC3339_UTC_PATTERN.pattern}
+    )
+    institution_reference: ReportInstitutionReference | None = None
+    evidence_sha256: Sha256LowerHex | None = None
+
+    @field_validator("observed_at", mode="before")
+    @classmethod
+    def require_rfc3339_utc_text(cls, value: object) -> object:
+        if type(value) is not str or _RFC3339_UTC_PATTERN.fullmatch(value) is None:
+            raise ValueError("observed_at must be RFC3339 UTC text")
+        return value
+
+    @field_validator("observed_at")
+    @classmethod
+    def require_utc_observed_at(cls, value: datetime) -> datetime:
+        if value.utcoffset() is None or value.utcoffset().total_seconds() != 0:
+            raise ValueError("observed_at must use UTC offset zero")
+        return value.astimezone(UTC)
+
+    @field_validator("idempotency_key", mode="before")
+    @classmethod
+    def require_canonical_idempotency_key(cls, value: object) -> object:
+        if isinstance(value, uuid.UUID):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("idempotency_key must be a canonical UUID")
+        try:
+            parsed = uuid.UUID(value)
+        except ValueError as exc:
+            raise ValueError("idempotency_key must be a canonical UUID") from exc
+        if str(parsed) != value:
+            raise ValueError("idempotency_key must be a canonical UUID")
+        return parsed
+
+    @model_validator(mode="after")
+    def require_reply_evidence(self) -> "AdminReportDeletionExternalCopyEventCreateV1":
+        if self.state.startswith("REPLY_") and (
+            self.institution_reference is None and self.evidence_sha256 is None
+        ):
+            raise ValueError("institution replies require a reference or evidence digest")
+        if (
+            self.state == "REPLY_DELETION_CONFIRMED"
+            and self.evidence_sha256 is None
+        ):
+            raise ValueError("deletion confirmation replies require evidence_sha256")
+        return self
+
+
+class AdminReportDeletionExternalCopyItemV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: uuid.UUID
+    copy_id: uuid.UUID
+    institution: ReportInstitution
+    delivery_status_at_local_deletion: ReportInstitutionDeliveryStatus
+    state: ReportExternalCopyDeletionState
+    revision: int = Field(ge=0)
+    allowed_next_states: List[ReportExternalCopyDeletionRecordedState] = Field(
+        max_length=3
+    )
+    status_observed_at: AwareDatetime | None
+    status_recorded_at: AwareDatetime | None
+
+
+class AdminReportDeletionExternalCopyListPageV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[
+        "walksafe.admin-report-deletion-external-copy-list.v1"
+    ]
+    items: List[AdminReportDeletionExternalCopyItemV1] = Field(max_length=100)
+    next_cursor: str | None = Field(default=None, min_length=1, max_length=1024)
+
+
+class AdminReportDeletionExternalCopyEventV1(
+    AdminReportDeletionExternalCopyItemV1
+):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[
+        "walksafe.admin-report-deletion-external-copy-event.v1"
+    ]
 
 
 class AdminReportSummaryV1(BaseModel):

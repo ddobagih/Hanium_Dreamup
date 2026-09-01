@@ -11,7 +11,7 @@ from backend.app.models import (
     ReportDeletionLegalHold,
     ReportDeletionTombstone,
 )
-from backend.app.schemas import ReportDeletionStatusV1
+from backend.app.schemas import ReportDeletionStatusV2
 from backend.app.services.report_deletion import (
     _logical_storage_name,
     list_report_deletion_candidates,
@@ -75,13 +75,14 @@ def test_legal_hold_requires_content_free_approval_and_expiry_fields() -> None:
 
 
 def test_deletion_status_contract_is_strict_and_bounded() -> None:
-    payload = ReportDeletionStatusV1(
-        schema_version="walksafe.report-deletion-status.v1",
+    payload = ReportDeletionStatusV2(
+        schema_version="walksafe.report-deletion-status.v2",
         request_id=uuid.uuid4(),
         report_id=uuid.uuid4(),
         state="LEGAL_HOLD",
         request_status_version=2,
         external_copy_count=0,
+        external_copies=[],
         updated_at="2026-08-29T00:00:00Z",
     )
     assert payload.state == "LEGAL_HOLD"
@@ -92,6 +93,7 @@ def test_deletion_status_contract_is_strict_and_bounded() -> None:
         "state",
         "request_status_version",
         "external_copy_count",
+        "external_copies",
         "updated_at",
     }
 

@@ -1,4 +1,4 @@
-"""Runtime verification for the head005 administrator report boundary."""
+"""Runtime verification for the administrator report integrity boundary."""
 
 from __future__ import annotations
 
@@ -7,6 +7,9 @@ from sqlalchemy import text
 
 ADMIN_REPORT_INTEGRITY_HEAD = "202608300005"
 ADMIN_REPORT_INTEGRITY_LEGACY_REVISIONS = frozenset({"202608300004"})
+ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS = frozenset(
+    {ADMIN_REPORT_INTEGRITY_HEAD, "202608300006"}
+)
 
 _BOUNDARY_SQL = text(
     r"""
@@ -1250,7 +1253,7 @@ def admin_report_integrity_boundary_state(
     *,
     revision: str | None = None,
 ) -> bool | None:
-    """Return ``None`` only for a known predecessor; reject unknown successors."""
+    """Return ``None`` only for a known predecessor; reject unknown revisions."""
 
     current_revision = revision
     if current_revision is None:
@@ -1259,7 +1262,7 @@ def admin_report_integrity_boundary_state(
         ).scalar_one_or_none()
     if current_revision in ADMIN_REPORT_INTEGRITY_LEGACY_REVISIONS:
         return None
-    if current_revision != ADMIN_REPORT_INTEGRITY_HEAD:
+    if current_revision not in ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS:
         return False
     return bool(executor.execute(_BOUNDARY_SQL).scalar_one())
 
@@ -1267,5 +1270,6 @@ def admin_report_integrity_boundary_state(
 __all__ = [
     "ADMIN_REPORT_INTEGRITY_HEAD",
     "ADMIN_REPORT_INTEGRITY_LEGACY_REVISIONS",
+    "ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS",
     "admin_report_integrity_boundary_state",
 ]

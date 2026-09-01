@@ -1435,6 +1435,310 @@
         "title": "AdminReportCapabilitiesV2",
         "type": "object"
       },
+      "AdminReportDeletionExternalCopyEventCreateV1": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Sha256"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "institution_reference": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution Reference"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|\\+00:00)$",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "REQUEST_SENT",
+              "REPLY_ACKNOWLEDGED",
+              "REPLY_DELETION_CONFIRMED",
+              "REPLY_DECLINED"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "expected_revision",
+          "idempotency_key",
+          "observed_at"
+        ],
+        "title": "AdminReportDeletionExternalCopyEventCreateV1",
+        "type": "object"
+      },
+      "AdminReportDeletionExternalCopyEventV1": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_next_states": {
+            "items": {
+              "enum": [
+                "REQUEST_SENT",
+                "REPLY_ACKNOWLEDGED",
+                "REPLY_DELETION_CONFIRMED",
+                "REPLY_DECLINED"
+              ],
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Allowed Next States",
+            "type": "array"
+          },
+          "copy_id": {
+            "format": "uuid",
+            "title": "Copy Id",
+            "type": "string"
+          },
+          "delivery_status_at_local_deletion": {
+            "enum": [
+              "SUBMITTED",
+              "ACKNOWLEDGED",
+              "RESOLVED",
+              "FAILED"
+            ],
+            "title": "Delivery Status At Local Deletion",
+            "type": "string"
+          },
+          "institution": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Institution",
+            "type": "string"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "walksafe.admin-report-deletion-external-copy-event.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "NOT_REQUESTED",
+              "REQUEST_SENT",
+              "REPLY_ACKNOWLEDGED",
+              "REPLY_DELETION_CONFIRMED",
+              "REPLY_DECLINED"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "status_observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Observed At"
+          },
+          "status_recorded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Recorded At"
+          }
+        },
+        "required": [
+          "request_id",
+          "copy_id",
+          "institution",
+          "delivery_status_at_local_deletion",
+          "state",
+          "revision",
+          "allowed_next_states",
+          "status_observed_at",
+          "status_recorded_at",
+          "schema_version"
+        ],
+        "title": "AdminReportDeletionExternalCopyEventV1",
+        "type": "object"
+      },
+      "AdminReportDeletionExternalCopyItemV1": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_next_states": {
+            "items": {
+              "enum": [
+                "REQUEST_SENT",
+                "REPLY_ACKNOWLEDGED",
+                "REPLY_DELETION_CONFIRMED",
+                "REPLY_DECLINED"
+              ],
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Allowed Next States",
+            "type": "array"
+          },
+          "copy_id": {
+            "format": "uuid",
+            "title": "Copy Id",
+            "type": "string"
+          },
+          "delivery_status_at_local_deletion": {
+            "enum": [
+              "SUBMITTED",
+              "ACKNOWLEDGED",
+              "RESOLVED",
+              "FAILED"
+            ],
+            "title": "Delivery Status At Local Deletion",
+            "type": "string"
+          },
+          "institution": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Institution",
+            "type": "string"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "NOT_REQUESTED",
+              "REQUEST_SENT",
+              "REPLY_ACKNOWLEDGED",
+              "REPLY_DELETION_CONFIRMED",
+              "REPLY_DECLINED"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "status_observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Observed At"
+          },
+          "status_recorded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Recorded At"
+          }
+        },
+        "required": [
+          "request_id",
+          "copy_id",
+          "institution",
+          "delivery_status_at_local_deletion",
+          "state",
+          "revision",
+          "allowed_next_states",
+          "status_observed_at",
+          "status_recorded_at"
+        ],
+        "title": "AdminReportDeletionExternalCopyItemV1",
+        "type": "object"
+      },
+      "AdminReportDeletionExternalCopyListPageV1": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminReportDeletionExternalCopyItemV1"
+            },
+            "maxItems": 100,
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "schema_version": {
+            "const": "walksafe.admin-report-deletion-external-copy-list.v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "items"
+        ],
+        "title": "AdminReportDeletionExternalCopyListPageV1",
+        "type": "object"
+      },
       "AdminReportDeliveryPackageProofV1": {
         "additionalProperties": false,
         "properties": {
@@ -6397,9 +6701,57 @@
         "title": "ReportContentRevisionV1",
         "type": "object"
       },
-      "ReportDeletionStatusV1": {
+      "ReportDeletionExternalCopyStatusV2": {
         "additionalProperties": false,
         "properties": {
+          "institution": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Institution",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "NOT_REQUESTED",
+              "REQUEST_SENT",
+              "REPLY_ACKNOWLEDGED",
+              "REPLY_DELETION_CONFIRMED",
+              "REPLY_DECLINED"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "status_recorded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Recorded At"
+          }
+        },
+        "required": [
+          "institution",
+          "state",
+          "status_recorded_at"
+        ],
+        "title": "ReportDeletionExternalCopyStatusV2",
+        "type": "object"
+      },
+      "ReportDeletionStatusV2": {
+        "additionalProperties": false,
+        "properties": {
+          "external_copies": {
+            "items": {
+              "$ref": "#/components/schemas/ReportDeletionExternalCopyStatusV2"
+            },
+            "title": "External Copies",
+            "type": "array"
+          },
           "external_copy_count": {
             "minimum": 0.0,
             "title": "External Copy Count",
@@ -6421,7 +6773,7 @@
             "type": "integer"
           },
           "schema_version": {
-            "const": "walksafe.report-deletion-status.v1",
+            "const": "walksafe.report-deletion-status.v2",
             "title": "Schema Version",
             "type": "string"
           },
@@ -6448,9 +6800,10 @@
           "state",
           "request_status_version",
           "external_copy_count",
+          "external_copies",
           "updated_at"
         ],
-        "title": "ReportDeletionStatusV1",
+        "title": "ReportDeletionStatusV2",
         "type": "object"
       },
       "ReportInstitutionDeliveryRequest": {
@@ -9390,6 +9743,196 @@
           "session_id": "authenticated-admin-session"
         },
         "x-walksafe-high-risk-action": "admin.raw_collection.legal_hold",
+        "x-walksafe-required-role": "admin"
+      }
+    },
+    "/admin/report-deletions/external-copies": {
+      "get": {
+        "operationId": "list_admin_report_deletion_external_copies_admin_report_deletions_external_copies_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "request_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReportDeletionExternalCopyListPageV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAdminAppKind": [],
+            "WalkSafeAdminAudience": [],
+            "WalkSafeAdminBearer": [],
+            "WalkSafeAdminDeviceChallengeId": [],
+            "WalkSafeAdminDeviceId": [],
+            "WalkSafeAdminDeviceSignature": [],
+            "WalkSafeAdminRole": [],
+            "WalkSafeCorrelationId": [],
+            "WalkSafeReadPurpose": []
+          }
+        ],
+        "summary": "List Admin Report Deletion External Copies",
+        "x-walksafe-actor-identity-required": false,
+        "x-walksafe-actor-identity-source": "admin-session",
+        "x-walksafe-admin-device-proof": {
+          "action": null,
+          "purpose": "ACTION",
+          "read_purpose": "admin.report_deletion.external_copy.list",
+          "session_id": "authenticated-admin-session"
+        },
+        "x-walksafe-required-role": "admin"
+      }
+    },
+    "/admin/report-deletions/{request_id}/external-copies/{copy_id}/events": {
+      "post": {
+        "operationId": "record_admin_report_deletion_external_copy_event_admin_report_deletions__request_id__external_copies__copy_id__events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "copy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Copy Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminReportDeletionExternalCopyEventCreateV1"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReportDeletionExternalCopyEventV1"
+                }
+              }
+            },
+            "description": "Exact idempotent replay of a recorded fact."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReportDeletionExternalCopyEventV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAdminAppKind": [],
+            "WalkSafeAdminAudience": [],
+            "WalkSafeAdminBearer": [],
+            "WalkSafeAdminDeviceChallengeId": [],
+            "WalkSafeAdminDeviceId": [],
+            "WalkSafeAdminDeviceSignature": [],
+            "WalkSafeAdminRole": [],
+            "WalkSafeCorrelationId": []
+          }
+        ],
+        "summary": "Record Admin Report Deletion External Copy Event",
+        "x-walksafe-actor-identity-required": false,
+        "x-walksafe-actor-identity-source": "admin-session",
+        "x-walksafe-admin-device-proof": {
+          "action": "report.external_copy_deletion.record",
+          "purpose": "ACTION",
+          "read_purpose": null,
+          "session_id": "authenticated-admin-session"
+        },
         "x-walksafe-required-role": "admin"
       }
     },
@@ -15285,7 +15828,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReportDeletionStatusV1"
+                  "$ref": "#/components/schemas/ReportDeletionStatusV2"
                 }
               }
             },

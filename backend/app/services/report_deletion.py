@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import (
     Report,
+    ReportDeletionExternalCopyEvent,
     ReportDeletionExternalCopyState,
     ReportDeletionLegalHold,
     ReportDeletionTombstone,
@@ -44,6 +45,14 @@ class ReportDeletionStatus:
     request_status_version: int
     external_copy_count: int
     updated_at: datetime
+    external_copies: tuple["ReportDeletionExternalCopyStatus", ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ReportDeletionExternalCopyStatus:
+    institution: str
+    state: str
+    status_recorded_at: datetime | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,13 +169,18 @@ def get_owned_report_deletion_status(
         )
     ).scalar_one_or_none()
     if tombstone is not None:
+        external_copies, external_updated_at = _external_copy_deletion_statuses(
+            db,
+            tombstone=tombstone,
+        )
         return ReportDeletionStatus(
             request_id=tombstone.request_id,
             report_id=tombstone.report_id,
             state="DELETED",
             request_status_version=tombstone.request_status_version,
             external_copy_count=tombstone.external_copy_count,
-            updated_at=tombstone.deleted_at,
+            updated_at=max(tombstone.deleted_at, external_updated_at),
+            external_copies=external_copies,
         )
     row = db.execute(
         select(
@@ -214,6 +228,73 @@ def get_owned_report_deletion_status(
         external_copy_count=0,
         updated_at=row.updated_at,
     )
+
+
+def _external_copy_deletion_statuses(
+    db: Session,
+    *,
+    tombstone: ReportDeletionTombstone,
+) -> tuple[tuple[ReportDeletionExternalCopyStatus, ...], datetime]:
+    rows = db.execute(
+        select(
+            ReportDeletionExternalCopyState.id.label("copy_id"),
+            ReportDeletionExternalCopyState.institution,
+            ReportDeletionExternalCopyEvent.state,
+            ReportDeletionExternalCopyEvent.revision,
+            ReportDeletionExternalCopyEvent.recorded_at,
+        )
+        .outerjoin(
+            ReportDeletionExternalCopyEvent,
+            ReportDeletionExternalCopyEvent.external_copy_state_id
+            == ReportDeletionExternalCopyState.id,
+        )
+        .where(
+            ReportDeletionExternalCopyState.deletion_tombstone_id
+            == tombstone.id
+        )
+        .order_by(
+            ReportDeletionExternalCopyState.id,
+            ReportDeletionExternalCopyEvent.revision,
+            ReportDeletionExternalCopyEvent.id,
+        )
+    ).all()
+    latest: dict[
+        uuid.UUID,
+        tuple[str, str, datetime | None],
+    ] = {}
+    for row in rows:
+        latest[row.copy_id] = (
+            row.institution,
+            row.state or "NOT_REQUESTED",
+            row.recorded_at,
+        )
+    if len(latest) != int(tombstone.external_copy_count):
+        raise ReportDeletionError(
+            "report_external_copy_evidence_inconsistent",
+            "The external-copy deletion evidence is incomplete.",
+            status_code=503,
+        )
+    ordered = sorted(
+        latest.items(),
+        key=lambda item: (item[1][0].casefold(), str(item[0])),
+    )
+    external_copies = tuple(
+        ReportDeletionExternalCopyStatus(
+            institution=institution,
+            state=state,
+            status_recorded_at=recorded_at,
+        )
+        for _copy_id, (institution, state, recorded_at) in ordered
+    )
+    updated_at = max(
+        (
+            recorded_at
+            for _copy_id, (_institution, _state, recorded_at) in ordered
+            if recorded_at is not None
+        ),
+        default=tombstone.deleted_at,
+    )
+    return external_copies, updated_at
 
 
 def _logical_storage_name(report_id: uuid.UUID, image_path: str) -> str | None:
@@ -511,6 +592,7 @@ def apply_report_deletion(
 __all__ = [
     "ReportDeletionCandidate",
     "ReportDeletionError",
+    "ReportDeletionExternalCopyStatus",
     "ReportDeletionStatus",
     "ReportDeletionStorageEffect",
     "apply_report_deletion",

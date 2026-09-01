@@ -1558,6 +1558,88 @@ class ReportDeletionExternalCopyState(Base):
     )
 
 
+class ReportDeletionExternalCopyEvent(Base):
+    """Append-only administrator observation about one institution copy."""
+
+    __tablename__ = "report_deletion_external_copy_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "external_copy_state_id",
+            "revision",
+            name="uq_report_deletion_external_copy_events_revision",
+        ),
+        UniqueConstraint(
+            "external_copy_state_id",
+            "idempotency_key",
+            name="uq_report_deletion_external_copy_events_idempotency",
+        ),
+        CheckConstraint(
+            "revision >= 1 AND expected_revision >= 0 "
+            "AND revision = expected_revision + 1",
+            name="ck_report_deletion_external_copy_events_revision",
+        ),
+        CheckConstraint(
+            "state IN ('REQUEST_SENT', 'REPLY_ACKNOWLEDGED', "
+            "'REPLY_DELETION_CONFIRMED', 'REPLY_DECLINED')",
+            name="ck_report_deletion_external_copy_events_state",
+        ),
+        CheckConstraint(
+            "institution_reference IS NULL OR institution_reference ~ "
+            "'^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$'",
+            name="ck_report_deletion_external_copy_events_reference",
+        ),
+        CheckConstraint(
+            "evidence_sha256 IS NULL OR evidence_sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_report_deletion_external_copy_events_evidence",
+        ),
+        CheckConstraint(
+            "state = 'REQUEST_SENT' OR institution_reference IS NOT NULL "
+            "OR evidence_sha256 IS NOT NULL",
+            name="ck_report_deletion_external_copy_events_reply_evidence",
+        ),
+        CheckConstraint(
+            "state <> 'REPLY_DELETION_CONFIRMED' OR evidence_sha256 IS NOT NULL",
+            name="ck_report_deletion_external_copy_events_confirmation_evidence",
+        ),
+        CheckConstraint(
+            "observed_at <= recorded_at",
+            name="ck_report_deletion_external_copy_events_time_order",
+        ),
+        CheckConstraint(
+            "admin_id ~ '^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$'",
+            name="ck_report_deletion_external_copy_events_admin",
+        ),
+        CheckConstraint(
+            "device_id ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'",
+            name="ck_report_deletion_external_copy_events_device",
+        ),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    external_copy_state_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("report_deletion_external_copy_states.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    revision = Column(BigInteger, nullable=False)
+    expected_revision = Column(BigInteger, nullable=False)
+    idempotency_key = Column(UUID(as_uuid=True), nullable=False)
+    state = Column(String(32), nullable=False)
+    institution_reference = Column(String(160), nullable=True)
+    evidence_sha256 = Column(String(64), nullable=True)
+    observed_at = Column(DateTime(timezone=True), nullable=False)
+    admin_id = Column(String(64), nullable=False)
+    session_id = Column(UUID(as_uuid=True), nullable=False)
+    device_id = Column(String(128), nullable=False)
+    correlation_id = Column(UUID(as_uuid=True), nullable=False)
+    recorded_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.clock_timestamp(),
+    )
+
+
 class PrivacyConsentEvent(Base):
     """Append-only purpose-separated consent evidence for one account generation."""
 

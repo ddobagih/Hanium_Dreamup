@@ -68,6 +68,12 @@ _DEVICE_PROOF_WORKFLOW_PATHS = {
     "/admin/report-requests/{request_id}/status": {
         "patch": ("admin.report_request.status.update", None),
     },
+    "/admin/report-deletions/external-copies": {
+        "get": (None, "admin.report_deletion.external_copy.list"),
+    },
+    "/admin/report-deletions/{request_id}/external-copies/{copy_id}/events": {
+        "post": ("report.external_copy_deletion.record", None),
+    },
     "/admin/incidents": {
         "get": (None, "admin.incident.list"),
     },

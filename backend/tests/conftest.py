@@ -214,6 +214,7 @@ def clean_test_storage() -> Iterator[Callable[[], None] | None]:
                 report_tables = [
                     table_name
                     for table_name in (
+                        "report_deletion_external_copy_events",
                         "report_deletion_external_copy_states",
                         "report_deletion_tombstones",
                         "report_deletion_legal_holds",
@@ -232,6 +233,7 @@ def clean_test_storage() -> Iterator[Callable[[], None] | None]:
                 ]
                 guarded_tables = {
                     "report_content_revisions",
+                    "report_deletion_external_copy_events",
                     "report_deletion_external_copy_states",
                     "report_deletion_tombstones",
                 }.intersection(report_tables)

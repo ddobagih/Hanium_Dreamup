@@ -15,6 +15,10 @@ from backend.app.database import get_db
 from backend.app.field_test_security import FieldTestAccess, VerifiedActorAssertion
 from backend.app.models import ReportUserRequest
 from backend.app.schemas import (
+    AdminReportDeletionExternalCopyEventCreateV1,
+    AdminReportDeletionExternalCopyEventV1,
+    AdminReportDeletionExternalCopyItemV1,
+    AdminReportDeletionExternalCopyListPageV1,
     AdminReportUserRequestDetailV1,
     AdminReportUserRequestListPageV1,
     AdminReportUserRequestStatusUpdateV1,
@@ -23,7 +27,8 @@ from backend.app.schemas import (
     ReportContentCorrectionRequestV1,
     ReportContentCurrentV1,
     ReportContentRevisionV1,
-    ReportDeletionStatusV1,
+    ReportDeletionExternalCopyStatusV2,
+    ReportDeletionStatusV2,
     ReportUserRequestStatus,
     ReportUserRequestSummaryV1,
     ReportUserRequestType,
@@ -39,6 +44,14 @@ from backend.app.services.report_content_corrections import (
 from backend.app.services.report_deletion import (
     ReportDeletionError,
     get_owned_report_deletion_status,
+)
+from backend.app.services.report_external_copy_deletions import (
+    ADMIN_EXTERNAL_COPY_LIST_OPERATION,
+    ADMIN_EXTERNAL_COPY_RECORD_OPERATION,
+    AdminExternalCopyDeletionStatus,
+    ReportExternalCopyDeletionError,
+    list_admin_external_copy_deletions,
+    record_admin_external_copy_deletion_event,
 )
 from backend.app.services.admin_device_proof import VerifiedAdminDeviceProof
 from backend.app.services.admin_security import AdminSessionIdentity
@@ -81,6 +94,9 @@ ADMIN_REQUEST_DETAIL_OPERATION = "admin.report_request.detail"
 ADMIN_REQUEST_STATUS_OPERATION = "admin.report_request.status.update"
 _ADMIN_LIST_QUERY_FIELDS = frozenset(
     {"limit", "cursor", "report_id", "request_type", "status"}
+)
+_ADMIN_EXTERNAL_COPY_LIST_QUERY_FIELDS = frozenset(
+    {"limit", "cursor", "request_id"}
 )
 _USER_LIST_QUERY_FIELDS = frozenset({"limit", "cursor", "user_status"})
 
@@ -247,6 +263,44 @@ def _admin_action_context(
     return identity, proof
 
 
+def _admin_record_context(
+    request: Request,
+    *,
+    operation: str,
+) -> tuple[AdminSessionIdentity, VerifiedAdminDeviceProof]:
+    identity = getattr(request.state, "admin_security_identity", None)
+    proof = getattr(request.state, "admin_device_proof", None)
+    if not isinstance(identity, AdminSessionIdentity):
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "admin_session_required"},
+            headers=_NO_STORE,
+        )
+    if not isinstance(proof, VerifiedAdminDeviceProof):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "admin_device_proof_required"},
+            headers=_NO_STORE,
+        )
+    if (
+        proof.admin_id != identity.admin_id
+        or proof.session_id != identity.session_id
+        or proof.device_id != identity.device_id
+        or proof.correlation_id is None
+        or proof.action != operation
+        or proof.read_purpose is not None
+        or proof.purpose != "ACTION"
+        or proof.method != request.method.upper()
+        or proof.path != request.url.path
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "admin_device_proof_invalid"},
+            headers=_NO_STORE,
+        )
+    return identity, proof
+
+
 def _audit(
     db: Session,
     *,
@@ -257,6 +311,7 @@ def _audit(
     outcome: str,
     result_count: int | None,
     error_code: str | None,
+    resource_type: str = "report_request",
 ) -> None:
     try:
         persist_admin_operation_audit(
@@ -267,7 +322,7 @@ def _audit(
             correlation_id=proof.correlation_id,
             operation=operation,
             outcome=outcome,
-            resource_type="report_request",
+            resource_type=resource_type,
             resource_id=resource_id,
             query_sha256=proof.query_sha256,
             result_count=result_count,
@@ -285,15 +340,31 @@ def persist_admin_report_request_validation_audit(
     request: Request,
     db: Session,
 ) -> None:
-    if request.method.upper() == "GET" and request.url.path == "/admin/report-requests":
+    if (
+        request.method.upper() == "GET"
+        and request.url.path == "/admin/report-deletions/external-copies"
+    ):
+        operation = ADMIN_EXTERNAL_COPY_LIST_OPERATION
+        identity, proof = _admin_read_context(request, operation=operation)
+        resource_type = "report_deletion_external_copy"
+    elif request.method.upper() == "POST" and request.url.path.startswith(
+        "/admin/report-deletions/"
+    ):
+        operation = ADMIN_EXTERNAL_COPY_RECORD_OPERATION
+        identity, proof = _admin_record_context(request, operation=operation)
+        resource_type = "report_deletion_external_copy"
+    elif request.method.upper() == "GET" and request.url.path == "/admin/report-requests":
         operation = ADMIN_REQUEST_LIST_OPERATION
         identity, proof = _admin_read_context(request, operation=operation)
+        resource_type = "report_request"
     elif request.method.upper() == "GET":
         operation = ADMIN_REQUEST_DETAIL_OPERATION
         identity, proof = _admin_read_context(request, operation=operation)
+        resource_type = "report_request"
     elif request.method.upper() == "PATCH":
         operation = ADMIN_REQUEST_STATUS_OPERATION
         identity, proof = _admin_action_context(request)
+        resource_type = "report_request"
     else:
         raise HTTPException(
             status_code=404,
@@ -309,6 +380,23 @@ def persist_admin_report_request_validation_audit(
         outcome="DENIED",
         result_count=None,
         error_code="report_request_validation_failed",
+        resource_type=resource_type,
+    )
+
+
+def _admin_external_copy_item(
+    item: AdminExternalCopyDeletionStatus,
+) -> AdminReportDeletionExternalCopyItemV1:
+    return AdminReportDeletionExternalCopyItemV1(
+        request_id=item.request_id,
+        copy_id=item.copy_id,
+        institution=item.institution,
+        delivery_status_at_local_deletion=item.delivery_status_at_local_deletion,
+        state=item.state,
+        revision=item.revision,
+        allowed_next_states=list(item.allowed_next_states),
+        status_observed_at=item.status_observed_at,
+        status_recorded_at=item.status_recorded_at,
     )
 
 
@@ -407,7 +495,7 @@ def create_router(settings: Settings) -> APIRouter:
 
     @router.get(
         "/reports/mine/deletions/{request_id}",
-        response_model=ReportDeletionStatusV1,
+        response_model=ReportDeletionStatusV2,
     )
     def get_my_report_deletion(
         request_id: str,
@@ -418,7 +506,7 @@ def create_router(settings: Settings) -> APIRouter:
             alias="x-walksafe-account-generation"
         ),
         db: Session = Depends(get_db),
-    ) -> ReportDeletionStatusV1:
+    ) -> ReportDeletionStatusV2:
         response.headers.update(_NO_STORE)
         if request.query_params:
             _not_found()
@@ -447,13 +535,21 @@ def create_router(settings: Settings) -> APIRouter:
                 detail={"code": "report_deletion_status_unavailable"},
                 headers=_NO_STORE,
             ) from exc
-        return ReportDeletionStatusV1(
-            schema_version="walksafe.report-deletion-status.v1",
+        return ReportDeletionStatusV2(
+            schema_version="walksafe.report-deletion-status.v2",
             request_id=state.request_id,
             report_id=state.report_id,
             state=state.state,
             request_status_version=state.request_status_version,
             external_copy_count=state.external_copy_count,
+            external_copies=[
+                ReportDeletionExternalCopyStatusV2(
+                    institution=item.institution,
+                    state=item.state,
+                    status_recorded_at=item.status_recorded_at,
+                )
+                for item in state.external_copies
+            ],
             updated_at=state.updated_at,
         )
 
@@ -697,6 +793,221 @@ def create_router(settings: Settings) -> APIRouter:
             user_description=state.user_description,
             category_hint=state.category_hint,
             corrected_at=state.corrected_at,
+        )
+
+    @router.get(
+        "/admin/report-deletions/external-copies",
+        response_model=AdminReportDeletionExternalCopyListPageV1,
+    )
+    def list_admin_report_deletion_external_copies(
+        request: Request,
+        response: Response,
+        limit: int = Query(default=25, ge=1, le=100),
+        cursor: str | None = Query(default=None, min_length=1, max_length=1024),
+        request_id: uuid.UUID | None = Query(default=None),
+        db: Session = Depends(get_db),
+    ) -> AdminReportDeletionExternalCopyListPageV1:
+        response.headers.update(_NO_STORE)
+        identity, proof = _admin_read_context(
+            request,
+            operation=ADMIN_EXTERNAL_COPY_LIST_OPERATION,
+        )
+        if not _query_shape(request, _ADMIN_EXTERNAL_COPY_LIST_QUERY_FIELDS):
+            _audit(
+                db,
+                identity=identity,
+                proof=proof,
+                operation=ADMIN_EXTERNAL_COPY_LIST_OPERATION,
+                resource_id="admin/report-deletions/external-copies",
+                outcome="DENIED",
+                result_count=None,
+                error_code="report_external_copy_query_invalid",
+                resource_type="report_deletion_external_copy",
+            )
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "report_external_copy_query_invalid"},
+                headers=_NO_STORE,
+            )
+        try:
+            page = list_admin_external_copy_deletions(
+                db,
+                limit=limit,
+                cursor=cursor,
+                request_id=request_id,
+            )
+        except ReportUserCursorError as exc:
+            _audit(
+                db,
+                identity=identity,
+                proof=proof,
+                operation=ADMIN_EXTERNAL_COPY_LIST_OPERATION,
+                resource_id="admin/report-deletions/external-copies",
+                outcome="DENIED",
+                result_count=None,
+                error_code="report_external_copy_cursor_invalid",
+                resource_type="report_deletion_external_copy",
+            )
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "report_external_copy_cursor_invalid"},
+                headers=_NO_STORE,
+            ) from exc
+        except ReportExternalCopyDeletionError as exc:
+            db.rollback()
+            _audit(
+                db,
+                identity=identity,
+                proof=proof,
+                operation=ADMIN_EXTERNAL_COPY_LIST_OPERATION,
+                resource_id="admin/report-deletions/external-copies",
+                outcome="ERROR" if exc.status_code >= 500 else "DENIED",
+                result_count=None,
+                error_code=exc.code,
+                resource_type="report_deletion_external_copy",
+            )
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"code": exc.code, "message": exc.message},
+                headers=_NO_STORE,
+            ) from exc
+        except SQLAlchemyError as exc:
+            db.rollback()
+            _audit(
+                db,
+                identity=identity,
+                proof=proof,
+                operation=ADMIN_EXTERNAL_COPY_LIST_OPERATION,
+                resource_id="admin/report-deletions/external-copies",
+                outcome="ERROR",
+                result_count=None,
+                error_code="report_external_copy_list_unavailable",
+                resource_type="report_deletion_external_copy",
+            )
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "report_external_copy_list_unavailable"},
+                headers=_NO_STORE,
+            ) from exc
+        result = AdminReportDeletionExternalCopyListPageV1(
+            schema_version=(
+                "walksafe.admin-report-deletion-external-copy-list.v1"
+            ),
+            items=[_admin_external_copy_item(item) for item in page.items],
+            next_cursor=page.next_cursor,
+        )
+        _audit(
+            db,
+            identity=identity,
+            proof=proof,
+            operation=ADMIN_EXTERNAL_COPY_LIST_OPERATION,
+            resource_id="admin/report-deletions/external-copies",
+            outcome="SUCCEEDED",
+            result_count=len(result.items),
+            error_code=None,
+            resource_type="report_deletion_external_copy",
+        )
+        return result
+
+    @router.post(
+        "/admin/report-deletions/{request_id}/external-copies/{copy_id}/events",
+        response_model=AdminReportDeletionExternalCopyEventV1,
+        status_code=201,
+        responses={
+            200: {
+                "model": AdminReportDeletionExternalCopyEventV1,
+                "description": "Exact idempotent replay of a recorded fact.",
+            }
+        },
+    )
+    def record_admin_report_deletion_external_copy_event(
+        request_id: uuid.UUID,
+        copy_id: uuid.UUID,
+        payload: AdminReportDeletionExternalCopyEventCreateV1,
+        request: Request,
+        response: Response,
+        db: Session = Depends(get_db),
+    ) -> AdminReportDeletionExternalCopyEventV1:
+        response.headers.update(_NO_STORE)
+        identity, proof = _admin_record_context(
+            request,
+            operation=ADMIN_EXTERNAL_COPY_RECORD_OPERATION,
+        )
+        if request.query_params:
+            _audit(
+                db,
+                identity=identity,
+                proof=proof,
+                operation=ADMIN_EXTERNAL_COPY_RECORD_OPERATION,
+                resource_id=str(copy_id),
+                outcome="DENIED",
+                result_count=None,
+                error_code="report_external_copy_query_invalid",
+                resource_type="report_deletion_external_copy",
+            )
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "report_external_copy_query_invalid"},
+                headers=_NO_STORE,
+            )
+        try:
+            item, created = record_admin_external_copy_deletion_event(
+                db,
+                request_id=request_id,
+                copy_id=copy_id,
+                payload=payload,
+                identity=identity,
+                correlation_id=proof.correlation_id,
+                query_sha256=proof.query_sha256,
+            )
+        except ReportExternalCopyDeletionError as exc:
+            _audit(
+                db,
+                identity=identity,
+                proof=proof,
+                operation=ADMIN_EXTERNAL_COPY_RECORD_OPERATION,
+                resource_id=str(copy_id),
+                outcome="ERROR" if exc.status_code >= 500 else "DENIED",
+                result_count=None,
+                error_code=exc.code,
+                resource_type="report_deletion_external_copy",
+            )
+            detail: dict[str, object] = {
+                "code": exc.code,
+                "message": exc.message,
+            }
+            if exc.latest is not None:
+                detail["latest"] = exc.latest
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail=detail,
+                headers=_NO_STORE,
+            ) from exc
+        except SQLAlchemyError as exc:
+            db.rollback()
+            _audit(
+                db,
+                identity=identity,
+                proof=proof,
+                operation=ADMIN_EXTERNAL_COPY_RECORD_OPERATION,
+                resource_id=str(copy_id),
+                outcome="ERROR",
+                result_count=None,
+                error_code="report_external_copy_store_unavailable",
+                resource_type="report_deletion_external_copy",
+            )
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "report_external_copy_store_unavailable"},
+                headers=_NO_STORE,
+            ) from exc
+        response.status_code = 201 if created else 200
+        public_item = _admin_external_copy_item(item)
+        return AdminReportDeletionExternalCopyEventV1(
+            schema_version=(
+                "walksafe.admin-report-deletion-external-copy-event.v1"
+            ),
+            **public_item.model_dump(),
         )
 
     @router.get(

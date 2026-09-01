@@ -98,6 +98,16 @@ _ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN = re.compile(
     r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
     r"[0-9a-fA-F]{12}/status$"
 )
+_ADMIN_REPORT_DELETION_EXTERNAL_COPY_LIST_PATH = (
+    "/admin/report-deletions/external-copies"
+)
+_ADMIN_REPORT_DELETION_EXTERNAL_COPY_EVENT_PATH_PATTERN = re.compile(
+    r"^/admin/report-deletions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
+    r"[0-9a-fA-F]{12}/external-copies/"
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
+    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/events$"
+)
 _ADMIN_INCIDENT_LIST_PATH = "/admin/incidents"
 _ADMIN_INCIDENT_DETAIL_PATH_PATTERN = re.compile(
     r"^/admin/incidents/[^/?#]{1,128}$"
@@ -342,6 +352,13 @@ def is_admin_device_proof_workflow_request(method: str, path: str) -> bool:
         return normalized_method == "GET"
     if _ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method == "PATCH"
+    if path == _ADMIN_REPORT_DELETION_EXTERNAL_COPY_LIST_PATH:
+        return normalized_method == "GET"
+    if (
+        _ADMIN_REPORT_DELETION_EXTERNAL_COPY_EVENT_PATH_PATTERN.fullmatch(path)
+        is not None
+    ):
+        return normalized_method == "POST"
     if path == _ADMIN_INCIDENT_LIST_PATH:
         return normalized_method == "GET"
     if _ADMIN_INCIDENT_DETAIL_PATH_PATTERN.fullmatch(path) is not None:

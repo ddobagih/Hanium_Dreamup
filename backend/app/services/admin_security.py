@@ -75,6 +75,13 @@ ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN = re.compile(
     r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
     r"[0-9a-fA-F]{12}/status$"
 )
+ADMIN_REPORT_DELETION_EXTERNAL_COPY_EVENT_PATH_PATTERN = re.compile(
+    r"^/admin/report-deletions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
+    r"[0-9a-fA-F]{12}/external-copies/"
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
+    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/events$"
+)
 ADMIN_INCIDENT_STATUS_PATH_PATTERN = re.compile(
     r"^/admin/incidents/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
     r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
@@ -357,6 +364,18 @@ def classify_admin_operation(method: str, path: str) -> AdminOperation | None:
     ):
         return AdminOperation(
             "report.delivery.create",
+            normalized_method,
+            normalized_path,
+            "STANDARD",
+        )
+    if (
+        normalized_method == "POST"
+        and ADMIN_REPORT_DELETION_EXTERNAL_COPY_EVENT_PATH_PATTERN.fullmatch(
+            normalized_path
+        )
+    ):
+        return AdminOperation(
+            "report.external_copy_deletion.record",
             normalized_method,
             normalized_path,
             "STANDARD",

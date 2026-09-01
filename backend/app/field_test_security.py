@@ -194,6 +194,7 @@ _ADMIN_REPORT_MUTATION_BODY_ACTIONS = frozenset(
         "report.review.decide",
         "admin.report.delivery_package.create",
         "report.delivery.create",
+        "report.external_copy_deletion.record",
     }
 )
 ADMIN_REPORT_MUTATION_MAX_BODY_BYTES = 65_536
@@ -326,6 +327,8 @@ def _rate_limit_group(path: str, method: str) -> str | None:
         or path.startswith("/admin/reports/")
         or path == "/admin/report-requests"
         or path.startswith("/admin/report-requests/")
+        or path == "/admin/report-deletions/external-copies"
+        or path.startswith("/admin/report-deletions/")
         or path == "/admin/incidents"
         or path.startswith("/admin/incidents/")
         or path.startswith("/uploads/")
@@ -456,6 +459,10 @@ def required_field_test_access(path: str, method: str) -> FieldTestAccess | None
     if path == "/admin/reports" or path.startswith("/admin/reports/"):
         return FieldTestAccess.ADMIN
     if path == "/admin/report-requests" or path.startswith("/admin/report-requests/"):
+        return FieldTestAccess.ADMIN
+    if path == "/admin/report-deletions/external-copies" or path.startswith(
+        "/admin/report-deletions/"
+    ):
         return FieldTestAccess.ADMIN
     if path == "/admin/incidents" or path.startswith("/admin/incidents/"):
         return FieldTestAccess.ADMIN

@@ -320,8 +320,11 @@ async def walksafe_request_validation_error(
                 }
             },
         )
-    if request.url.path == "/admin/report-requests" or request.url.path.startswith(
-        "/admin/report-requests/"
+    if (
+        request.url.path == "/admin/report-requests"
+        or request.url.path.startswith("/admin/report-requests/")
+        or request.url.path == "/admin/report-deletions/external-copies"
+        or request.url.path.startswith("/admin/report-deletions/")
     ):
         def persist_report_request_validation_audit() -> None:
             with SessionLocal() as db:

@@ -4,6 +4,7 @@ import pytest
 
 import backend.app.services.admin_report_delivery_package as delivery_package
 from backend.app.services.admin_report_integrity import (
+    ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS,
     ADMIN_REPORT_INTEGRITY_HEAD,
     ADMIN_REPORT_INTEGRITY_LEGACY_REVISIONS,
     admin_report_integrity_boundary_state,
@@ -18,7 +19,6 @@ import backend.app.services.report_original_access as original_access
         ("202608300004", None),
         ("202608300003", False),
         ("202608299999", False),
-        ("202608300006", False),
         ("future-branch", False),
     ],
 )
@@ -40,6 +40,31 @@ def test_only_known_predecessors_may_use_legacy_compatibility(
 
     assert ADMIN_REPORT_INTEGRITY_HEAD == "202608300005"
     assert ADMIN_REPORT_INTEGRITY_LEGACY_REVISIONS == {"202608300004"}
+    assert ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS == {
+        "202608300005",
+        "202608300006",
+    }
+
+
+def test_known_successor_still_queries_the_head005_boundary() -> None:
+    class BoundaryExecutor:
+        def execute(self, statement):
+            assert "walksafe_admin_report_integrity_boundary" in str(statement)
+
+            class Result:
+                @staticmethod
+                def scalar_one() -> bool:
+                    return True
+
+            return Result()
+
+    assert (
+        admin_report_integrity_boundary_state(
+            BoundaryExecutor(),
+            revision="202608300006",
+        )
+        is True
+    )
 
 
 @pytest.mark.parametrize(
