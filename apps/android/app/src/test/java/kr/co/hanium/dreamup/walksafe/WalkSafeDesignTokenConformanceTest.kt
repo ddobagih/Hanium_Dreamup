@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe
 
 import java.io.File
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -103,8 +104,11 @@ class WalkSafeDesignTokenConformanceTest {
                 assertTrue("empty font: $name", file.length() > 0L)
             }
         val license = File("../licenses/pretendard-OFL-1.1.txt")
+        val packagedLicense = File("src/main/assets/licenses/pretendard-OFL-1.1.txt")
         assertTrue("missing Pretendard license", license.isFile)
         assertTrue(license.readText().contains("SIL OPEN FONT LICENSE Version 1.1"))
+        assertTrue("missing packaged Pretendard license", packagedLicense.isFile)
+        assertArrayEquals(license.readBytes(), packagedLicense.readBytes())
         assertTrue(typeface.contains("style == Typeface.BOLD -> R.font.pretendard_bold"))
         assertTrue(typeface.contains("medium -> R.font.pretendard_medium"))
         assertTrue(typeface.contains("else -> R.font.pretendard_regular"))
