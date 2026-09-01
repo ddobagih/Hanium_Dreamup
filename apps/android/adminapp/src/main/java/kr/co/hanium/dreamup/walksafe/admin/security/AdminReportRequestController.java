@@ -32,6 +32,7 @@ public final class AdminReportRequestController {
 
         AdminReportRequestModels.StatusSnapshot updateStatus(
             String requestId,
+            String requestType,
             String nextStatus,
             int expectedVersion,
             String publicResponse,
@@ -104,6 +105,7 @@ public final class AdminReportRequestController {
         private final AdminReportRequestModels.Filters filters;
         private final String cursor;
         private final String requestId;
+        private final String requestType;
         private final String nextStatus;
         private final int expectedVersion;
         private final String publicResponse;
@@ -118,6 +120,7 @@ public final class AdminReportRequestController {
             AdminReportRequestModels.Filters filters,
             String cursor,
             String requestId,
+            String requestType,
             String nextStatus,
             int expectedVersion,
             String publicResponse,
@@ -130,6 +133,7 @@ public final class AdminReportRequestController {
             this.filters = filters;
             this.cursor = cursor;
             this.requestId = requestId;
+            this.requestType = requestType;
             this.nextStatus = nextStatus;
             this.expectedVersion = expectedVersion;
             this.publicResponse = publicResponse;
@@ -173,7 +177,7 @@ public final class AdminReportRequestController {
         if (filters == null) throw new IllegalArgumentException("report request filters are required");
         requireNoMutationInFlight();
         Request request = request(
-            ++generation, Request.Kind.FIRST_PAGE, filters, null, null,
+            ++generation, Request.Kind.FIRST_PAGE, filters, null, null, null,
             null, 0, null, null, null, null
         );
         retryRequest = request;
@@ -190,7 +194,7 @@ public final class AdminReportRequestController {
         }
         Request request = request(
             ++generation, Request.Kind.NEXT_PAGE, state.filters, state.nextCursor,
-            state.selectedRequestId, null, 0, null, null, null, null
+            state.selectedRequestId, null, null, 0, null, null, null, null
         );
         retryRequest = request;
         state = new State(
@@ -209,7 +213,7 @@ public final class AdminReportRequestController {
         requireNoMutationInFlight();
         String safeId = AdminReportRequestModels.canonicalUuid(requestId, "request_id");
         Request request = request(
-            ++generation, Request.Kind.DETAIL, state.filters, null, safeId,
+            ++generation, Request.Kind.DETAIL, state.filters, null, safeId, null,
             null, 0, null, null, null, null
         );
         retryRequest = request;
@@ -239,6 +243,7 @@ public final class AdminReportRequestController {
             previous.filters,
             previous.cursor,
             previous.requestId,
+            null,
             null,
             0,
             null,
@@ -290,6 +295,7 @@ public final class AdminReportRequestController {
             state.filters,
             null,
             safeId,
+            state.detail.summary().requestType(),
             nextStatus,
             expectedVersion,
             AdminReportRequestModels.optionalResponse(publicResponse, "public_response"),
@@ -384,6 +390,7 @@ public final class AdminReportRequestController {
         try {
             updated = loader.updateStatus(
                 request.requestId,
+                request.requestType,
                 request.nextStatus,
                 request.expectedVersion,
                 request.publicResponse,
@@ -582,6 +589,7 @@ public final class AdminReportRequestController {
         AdminReportRequestModels.Filters filters,
         String cursor,
         String requestId,
+        String requestType,
         String nextStatus,
         int expectedVersion,
         String publicResponse,
@@ -595,6 +603,7 @@ public final class AdminReportRequestController {
             filters,
             cursor,
             requestId,
+            requestType,
             nextStatus,
             expectedVersion,
             publicResponse,
@@ -611,6 +620,7 @@ public final class AdminReportRequestController {
             state.filters,
             null,
             requestId,
+            null,
             null,
             0,
             null,

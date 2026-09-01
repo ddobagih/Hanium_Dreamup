@@ -254,7 +254,8 @@ public final class AdminReportHttpClientTest {
         AdminReportRequestModels.StatusSnapshot updated = client.updateRequestStatus(
             SESSION,
             REQUEST_ID,
-            "RESOLVED",
+            "DELETE",
+            "REJECTED",
             2,
             "요청 처리를 완료했습니다.",
             "내부 확인 완료",
@@ -312,7 +313,8 @@ public final class AdminReportHttpClientTest {
             client(transport).updateRequestStatus(
                 SESSION,
                 REQUEST_ID,
-                "RESOLVED",
+                "DELETE",
+                "REJECTED",
                 2,
                 null,
                 null,
@@ -333,7 +335,51 @@ public final class AdminReportHttpClientTest {
         assertThrows(IOException.class, () -> client(malformed).updateRequestStatus(
             SESSION,
             REQUEST_ID,
-            "RESOLVED",
+            "DELETE",
+            "REJECTED",
+            2,
+            null,
+            null,
+            Map.of(
+                AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER,
+                "AAECAwQFBgcICQoLDA0ODw"
+            )
+        ));
+    }
+
+    @Test
+    public void userRequestSuccessAndConflictBindProjectionToDeleteType() {
+        FakeTransport malformedSuccess = new FakeTransport();
+        malformedSuccess.requestStatusBody = acknowledgedRequestStatus(
+            "[\"RESOLVED\",\"REJECTED\"]"
+        );
+        assertThrows(IOException.class, () -> client(malformedSuccess).updateRequestStatus(
+            SESSION,
+            REQUEST_ID,
+            "DELETE",
+            "REJECTED",
+            2,
+            null,
+            null,
+            Map.of(
+                AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER,
+                "AAECAwQFBgcICQoLDA0ODw"
+            )
+        ));
+
+        FakeTransport malformedConflict = new FakeTransport();
+        malformedConflict.requestStatusCode = 409;
+        malformedConflict.requestConflictBody = "{\"detail\":{"
+            + "\"code\":\"report_request_version_conflict\",\"message\":\"conflict\","
+            + "\"latest\":"
+            + acknowledgedRequestStatus("[\"RESOLVED\",\"REJECTED\"]")
+                .replace("\"schema_version\":\"walksafe.admin-report-request-status.v1\",", "")
+            + "}}";
+        assertThrows(IOException.class, () -> client(malformedConflict).updateRequestStatus(
+            SESSION,
+            REQUEST_ID,
+            "DELETE",
+            "REJECTED",
             2,
             null,
             null,
@@ -362,6 +408,7 @@ public final class AdminReportHttpClientTest {
         String detailBody = wave5Detail();
         int detailStatus = 200;
         int requestStatusCode = 200;
+        String requestStatusBody = requestStatus();
         String requestConflictBody = requestConflict();
         String packageContentRevisionHeader = "3";
         String packageReviewRevisionHeader = "2";
@@ -408,7 +455,7 @@ public final class AdminReportHttpClientTest {
                 if (url.endsWith("/status")) {
                     return new AdminReportHttpClient.Response(
                         requestStatusCode,
-                        requestStatusCode == 409 ? requestConflictBody : requestStatus()
+                        requestStatusCode == 409 ? requestConflictBody : requestStatusBody
                     );
                 }
                 return new AdminReportHttpClient.Response(200, requestDetail());
@@ -572,9 +619,18 @@ public final class AdminReportHttpClientTest {
     private static String requestStatus() {
         return "{\"schema_version\":\"walksafe.admin-report-request-status.v1\","
             + "\"request_id\":\"" + REQUEST_ID + "\","
-            + "\"report_id\":\"" + REPORT_ID + "\",\"status\":\"RESOLVED\","
+            + "\"report_id\":\"" + REPORT_ID + "\",\"status\":\"REJECTED\","
             + "\"status_version\":3,\"allowed_next_statuses\":[],"
             + "\"public_response\":\"요청 처리를 완료했습니다.\","
+            + "\"updated_at\":\"2026-08-29T03:00:00Z\"}";
+    }
+
+    private static String acknowledgedRequestStatus(String allowedNextStatuses) {
+        return "{\"schema_version\":\"walksafe.admin-report-request-status.v1\","
+            + "\"request_id\":\"" + REQUEST_ID + "\","
+            + "\"report_id\":\"" + REPORT_ID + "\",\"status\":\"ACKNOWLEDGED\","
+            + "\"status_version\":3,\"allowed_next_statuses\":" + allowedNextStatuses + ","
+            + "\"public_response\":null,"
             + "\"updated_at\":\"2026-08-29T03:00:00Z\"}";
     }
 

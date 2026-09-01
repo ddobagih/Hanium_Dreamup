@@ -93,6 +93,7 @@ public interface AdminReportRepository {
     AdminReportRequestModels.StatusSnapshot updateRequestStatus(
         AdminOperationsApi.SessionContext session,
         String requestId,
+        String requestType,
         String nextStatus,
         int expectedVersion,
         String publicResponse,

@@ -28,10 +28,23 @@ public final class AdminReportRequestModelsTest {
 
         AdminReportRequestModels.StatusSnapshot status = AdminReportRequestModels.parseStatus(
             statusFixture(),
-            REQUEST_ID
+            REQUEST_ID,
+            "CORRECTION"
         );
         assertEquals("ACKNOWLEDGED", status.status());
         assertEquals(2, status.allowedNextStatuses().size());
+    }
+
+    @Test
+    public void acknowledgedDeleteOnlyAllowsRejection() throws Exception {
+        AdminReportRequestModels.Detail detail = AdminReportRequestModels.parseDetail(
+            detailFixture()
+                .replace("\"request_type\":\"CORRECTION\"", "\"request_type\":\"DELETE\"")
+                .replace("\"status\":\"RECEIVED\"", "\"status\":\"ACKNOWLEDGED\""),
+            REQUEST_ID
+        );
+
+        assertEquals(java.util.List.of("REJECTED"), detail.summary().allowedNextStatuses());
     }
 
     @Test
@@ -54,7 +67,35 @@ public final class AdminReportRequestModelsTest {
                 "[\"RESOLVED\",\"REJECTED\"]",
                 "[\"REJECTED\",\"RESOLVED\"]"
             ),
-            REQUEST_ID
+            REQUEST_ID,
+            "CORRECTION"
+        ));
+    }
+
+    @Test
+    public void statusAndConflictProjectionAreBoundToExpectedRequestType() throws Exception {
+        String deleteStatus = statusFixture().replace(
+            "[\"RESOLVED\",\"REJECTED\"]",
+            "[\"REJECTED\"]"
+        );
+        assertEquals(
+            java.util.List.of("REJECTED"),
+            AdminReportRequestModels.parseStatus(deleteStatus, REQUEST_ID, "DELETE")
+                .allowedNextStatuses()
+        );
+        assertThrows(IOException.class, () -> AdminReportRequestModels.parseStatus(
+            statusFixture(),
+            REQUEST_ID,
+            "DELETE"
+        ));
+        assertThrows(IOException.class, () -> AdminReportRequestModels.parseStatusConflict(
+            "{\"detail\":{\"code\":\"report_request_version_conflict\","
+                + "\"message\":\"conflict\",\"latest\":"
+                + statusFixture()
+                    .replace("\"schema_version\":\"walksafe.admin-report-request-status.v1\",", "")
+                + "}}",
+            REQUEST_ID,
+            "DELETE"
         ));
     }
 

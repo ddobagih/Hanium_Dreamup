@@ -347,6 +347,7 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     public AdminReportRequestModels.StatusSnapshot updateRequestStatus(
         AdminOperationsApi.SessionContext session,
         String requestId,
+        String requestType,
         String nextStatus,
         int expectedVersion,
         String publicResponse,
@@ -354,8 +355,12 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException {
         String safeId = AdminReportRequestModels.canonicalUuid(requestId, "request_id");
+        String safeType = AdminReportRequestModels.requestType(requestType);
         if (!AdminJava8Collections.set("ACKNOWLEDGED", "RESOLVED", "REJECTED").contains(nextStatus)) {
             throw new IllegalArgumentException("next report request status is invalid");
+        }
+        if ("DELETE".equals(safeType) && "RESOLVED".equals(nextStatus)) {
+            throw new IllegalArgumentException("DELETE report requests cannot be resolved");
         }
         if (expectedVersion < 1) throw new IllegalArgumentException("expected_version must be positive");
         Map<String, Object> fields = new LinkedHashMap<>();
@@ -383,11 +388,11 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         );
         if (response.statusCode == 409) {
             throw new ReportRequestConflictException(
-                AdminReportRequestModels.parseStatusConflict(jsonBody(response), safeId)
+                AdminReportRequestModels.parseStatusConflict(jsonBody(response), safeId, safeType)
             );
         }
         requireStatus(response, 200);
-        return AdminReportRequestModels.parseStatus(jsonBody(response), safeId);
+        return AdminReportRequestModels.parseStatus(jsonBody(response), safeId, safeType);
     }
 
     private Response executeProtectedRead(

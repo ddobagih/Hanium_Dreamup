@@ -63,6 +63,7 @@ public final class AdminReportRequestControllerTest {
                 @Override
                 public AdminReportRequestModels.StatusSnapshot updateStatus(
                     String requestId,
+                    String requestType,
                     String nextStatus,
                     int expectedVersion,
                     String publicResponse,
@@ -208,6 +209,26 @@ public final class AdminReportRequestControllerTest {
         assertEquals(2, controller.snapshot().items().get(0).statusVersion());
     }
 
+    @Test
+    public void acknowledgedDeleteRejectsResolvedBeforeNetwork() throws Exception {
+        CountingLoader loader = new CountingLoader();
+        loader.detailRequestType = "DELETE";
+        loader.detailStatus = "ACKNOWLEDGED";
+        loader.detailStatusVersion = 2;
+        AdminReportRequestController controller = selectedController(loader);
+
+        assertThrows(IllegalArgumentException.class, () -> controller.beginStatusUpdate(
+            AdminReportRequestModelsTest.REQUEST_ID,
+            "RESOLVED",
+            2,
+            null,
+            null,
+            "long-test-password".toCharArray(),
+            "123456".toCharArray()
+        ));
+        assertEquals(0, loader.statusUpdates);
+    }
+
     private static AdminReportRequestController selectedController(CountingLoader loader)
         throws Exception {
         AdminReportRequestController controller = new AdminReportRequestController(loader);
@@ -231,6 +252,9 @@ public final class AdminReportRequestControllerTest {
         int statusUpdates;
         boolean conflict;
         boolean failDetailAfterPatch;
+        String detailRequestType = "CORRECTION";
+        String detailStatus = "RECEIVED";
+        int detailStatusVersion = 1;
         char[] lastPassword;
         char[] lastTotp;
 
@@ -253,10 +277,13 @@ public final class AdminReportRequestControllerTest {
                 failDetailAfterPatch = false;
                 throw new java.io.IOException("detail refresh failed");
             }
-            String body = AdminReportRequestModelsTest.detailFixture();
+            String body = AdminReportRequestModelsTest.detailFixture()
+                .replace("\"request_type\":\"CORRECTION\"", "\"request_type\":\"" + detailRequestType + "\"")
+                .replace("\"status\":\"RECEIVED\"", "\"status\":\"" + detailStatus + "\"")
+                .replace("\"status_version\":1", "\"status_version\":" + detailStatusVersion);
             if (statusUpdates > 0) {
-                body = body.replace("\"status\":\"RECEIVED\"", "\"status\":\"ACKNOWLEDGED\"")
-                    .replace("\"status_version\":1", "\"status_version\":2");
+                body = body.replace("\"status\":\"" + detailStatus + "\"", "\"status\":\"ACKNOWLEDGED\"")
+                    .replace("\"status_version\":" + detailStatusVersion, "\"status_version\":2");
             }
             return AdminReportRequestModels.parseDetail(body, requestId);
         }
@@ -264,6 +291,7 @@ public final class AdminReportRequestControllerTest {
         @Override
         public AdminReportRequestModels.StatusSnapshot updateStatus(
             String requestId,
+            String requestType,
             String nextStatus,
             int expectedVersion,
             String publicResponse,
@@ -274,16 +302,22 @@ public final class AdminReportRequestControllerTest {
             statusUpdates += 1;
             lastPassword = password;
             lastTotp = totp;
+            assertEquals(detailRequestType, requestType);
             assertArrayEquals("long-test-password".toCharArray(), password);
             assertArrayEquals("123456".toCharArray(), totp);
             if (conflict) {
                 throw new AdminReportRepository.ReportRequestConflictException(
-                    AdminReportRequestModels.parseStatusConflict(conflictFixture(), requestId)
+                    AdminReportRequestModels.parseStatusConflict(
+                        conflictFixture(),
+                        requestId,
+                        requestType
+                    )
                 );
             }
             return AdminReportRequestModels.parseStatus(
                 AdminReportRequestModelsTest.statusFixture(),
-                requestId
+                requestId,
+                requestType
             );
         }
     }

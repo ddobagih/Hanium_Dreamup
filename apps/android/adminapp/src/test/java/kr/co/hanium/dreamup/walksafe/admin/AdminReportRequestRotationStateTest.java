@@ -34,6 +34,7 @@ public final class AdminReportRequestRotationStateTest {
                 @Override
                 public AdminReportRequestModels.StatusSnapshot updateStatus(
                     String requestId,
+                    String requestType,
                     String nextStatus,
                     int expectedVersion,
                     String publicResponse,

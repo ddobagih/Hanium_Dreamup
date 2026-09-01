@@ -839,6 +839,7 @@ public final class AdminSecurityController implements AutoCloseable {
 
     public synchronized AdminReportRequestModels.StatusSnapshot updateAdminReportRequestStatus(
         String requestId,
+        String requestType,
         String nextStatus,
         int expectedVersion,
         String publicResponse,
@@ -860,6 +861,7 @@ public final class AdminSecurityController implements AutoCloseable {
         return requireReportRepository().updateRequestStatus(
             requireOperationalSession(operationalWorkflowsEnabled),
             requestId,
+            requestType,
             nextStatus,
             expectedVersion,
             publicResponse,

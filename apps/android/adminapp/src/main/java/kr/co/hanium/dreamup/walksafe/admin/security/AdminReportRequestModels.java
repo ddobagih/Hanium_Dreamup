@@ -71,7 +71,9 @@ public final class AdminReportRequestModels {
         public int statusVersion() { return statusVersion; }
         public String createdAt() { return createdAt; }
         public String updatedAt() { return updatedAt; }
-        public List<String> allowedNextStatuses() { return allowedNextStatusesFor(status); }
+        public List<String> allowedNextStatuses() {
+            return allowedNextStatusesFor(requestType, status);
+        }
     }
 
     public static final class Page {
@@ -206,8 +208,13 @@ public final class AdminReportRequestModels {
         );
     }
 
-    public static StatusSnapshot parseStatus(String body, String expectedRequestId) throws IOException {
+    public static StatusSnapshot parseStatus(
+        String body,
+        String expectedRequestId,
+        String expectedRequestType
+    ) throws IOException {
         String safeId = canonicalUuid(expectedRequestId, "request_id");
+        String safeType = requestType(expectedRequestType);
         Map<String, Object> root = AdminStrictJson.parseObject(body);
         exactKeys(root, immutableSet(
             "schema_version", "request_id", "report_id", "status", "status_version",
@@ -216,12 +223,17 @@ public final class AdminReportRequestModels {
         if (!STATUS_SCHEMA.equals(text(root, "schema_version", 64))) {
             throw new IOException("unsupported administrator report request status schema");
         }
-        return status(root, safeId);
+        return status(root, safeId, safeType);
     }
 
-    public static StatusConflict parseStatusConflict(String body, String expectedRequestId)
+    public static StatusConflict parseStatusConflict(
+        String body,
+        String expectedRequestId,
+        String expectedRequestType
+    )
         throws IOException {
         String safeId = canonicalUuid(expectedRequestId, "request_id");
+        String safeType = requestType(expectedRequestType);
         Map<String, Object> root = AdminStrictJson.parseObject(body);
         exactKeys(root, immutableSet("detail"));
         Map<String, Object> detail = requiredObject(root, "detail");
@@ -235,7 +247,7 @@ public final class AdminReportRequestModels {
             "request_id", "report_id", "status", "status_version",
             "allowed_next_statuses", "public_response", "updated_at"
         ));
-        return new StatusConflict(status(latest, safeId));
+        return new StatusConflict(status(latest, safeId, safeType));
     }
 
     public static String canonicalUuid(String value, String label) {
@@ -250,10 +262,21 @@ public final class AdminReportRequestModels {
         return normalized;
     }
 
-    static List<String> allowedNextStatusesFor(String status) {
+    static String requestType(String value) {
+        String normalized = emptyToNull(value);
+        if (normalized == null || !REQUEST_TYPES.contains(normalized)) {
+            throw new IllegalArgumentException("request_type is invalid");
+        }
+        return normalized;
+    }
+
+    static List<String> allowedNextStatusesFor(String requestType, String status) {
+        String safeType = requestType(requestType);
         return switch (status) {
             case "RECEIVED" -> Collections.singletonList("ACKNOWLEDGED");
-            case "ACKNOWLEDGED" -> immutableList(Arrays.asList("RESOLVED", "REJECTED"));
+            case "ACKNOWLEDGED" -> "DELETE".equals(safeType)
+                ? Collections.singletonList("REJECTED")
+                : immutableList(Arrays.asList("RESOLVED", "REJECTED"));
             case "RESOLVED", "REJECTED" -> Collections.emptyList();
             default -> throw new IllegalArgumentException("request status is invalid");
         };
@@ -261,7 +284,8 @@ public final class AdminReportRequestModels {
 
     private static StatusSnapshot status(
         Map<String, Object> value,
-        String expectedRequestId
+        String expectedRequestId,
+        String expectedRequestType
     ) throws IOException {
         String requestId = uuid(value, "request_id");
         if (!expectedRequestId.equals(requestId)) {
@@ -270,7 +294,7 @@ public final class AdminReportRequestModels {
         String reportId = uuid(value, "report_id");
         String status = member(value, "status", STATUSES);
         List<String> allowed = statusList(value, "allowed_next_statuses", status);
-        if (!allowed.equals(allowedNextStatusesFor(status))) {
+        if (!allowed.equals(allowedNextStatusesFor(expectedRequestType, status))) {
             throw new IOException("administrator report request status transition projection is invalid");
         }
         return new StatusSnapshot(

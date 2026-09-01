@@ -332,6 +332,7 @@ public final class AdminBoundaryActivity extends Activity {
                         @Override
                         public AdminReportRequestModels.StatusSnapshot updateStatus(
                             String requestId,
+                            String requestType,
                             String nextStatus,
                             int expectedVersion,
                             String publicResponse,
@@ -341,6 +342,7 @@ public final class AdminBoundaryActivity extends Activity {
                         ) throws Exception {
                             return controller.updateAdminReportRequestStatus(
                                 requestId,
+                                requestType,
                                 nextStatus,
                                 expectedVersion,
                                 publicResponse,
