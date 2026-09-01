@@ -466,7 +466,7 @@ test("tombstone rejects old access and refresh before replay retries revocation"
         client_revision: 1,
         expected_previous_backend_receipt_sha256: null,
         selections: {
-          raw_source_collection: true,
+          raw_source_collection: false,
           automatic_reporting: false,
           mobile_network_transfer: false,
           training_reuse: false

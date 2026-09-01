@@ -180,7 +180,7 @@ async function reportConsentHeaders(cookie: string): Promise<Record<string, stri
         client_revision: 1,
         expected_previous_backend_receipt_sha256: null,
         selections: {
-          raw_source_collection: true,
+          raw_source_collection: false,
           automatic_reporting: true,
           mobile_network_transfer: false,
           training_reuse: false
@@ -637,6 +637,7 @@ test("OpenAPI and router expose service, consent-control, and deletion paths", a
     ]
   );
   assert.doesNotMatch(raw, /x-walksafe-field-test-token|x-walksafe-actor-assertion/i);
+  assert.match(raw, /explicit does not require optional raw-source consent/);
   assert.doesNotMatch(raw, /WALKSAFE_[A-Z]/);
   assert.equal("servers" in (contract as object), false);
 

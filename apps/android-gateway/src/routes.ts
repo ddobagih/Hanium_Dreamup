@@ -895,7 +895,7 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
     }
     const initialRequired: Array<
       "raw_source_collection" | "automatic_reporting" | "mobile_network_transfer"
-    > = ["raw_source_collection"];
+    > = [];
     if (reportPurpose === "automatic") initialRequired.push("automatic_reporting");
     if (networkTransport === "cellular") initialRequired.push("mobile_network_transfer");
     if (!privacyOperationIsCurrent(operation.lease)) return privacyOperationInactive();

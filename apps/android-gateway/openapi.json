@@ -825,7 +825,7 @@
             "name": "x-walksafe-report-purpose",
             "in": "header",
             "required": true,
-            "description": "Authenticated first-party Android declaration. explicit requires raw-source consent; automatic also requires automatic-reporting consent.",
+            "description": "Authenticated first-party Android declaration. explicit does not require optional raw-source consent; automatic requires automatic-reporting consent, and cellular transfer separately requires mobile-network consent. Both require the current Backend consent receipt and actor binding.",
             "schema": {
               "type": "string",
               "enum": [
