@@ -98,6 +98,78 @@ server {
         proxy_pass http://127.0.0.1:8081;
     }
 
+    location ~ "^/api/reports/v2/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/status$" {
+        if ($request_method != GET) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/reports/mine {
+        if ($request_method != GET) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/reports/mine/requests/history {
+        if ($request_method != GET) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/reports/mine/deletions/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" {
+        if ($request_method != GET) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" {
+        if ($request_method != GET) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/content$" {
+        if ($request_method != GET) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/corrections$" {
+        if ($request_method != POST) {
+            return 405;
+        }
+        client_max_body_size 4k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/requests$" {
+        if ($request_method != POST) {
+            return 405;
+        }
+        client_max_body_size 4k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/reports/mine/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/requests/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" {
+        if ($request_method != GET) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
     location = /api/field-walk {
         if ($request_method !~ ^(GET|POST)$) {
             return 405;
