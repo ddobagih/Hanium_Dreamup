@@ -13,10 +13,11 @@ import os
 from pathlib import Path
 import re
 import stat
+import threading
 from typing import Any, Callable
 import uuid
 
-from sqlalchemy import func, select, text
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -124,6 +125,7 @@ class PersistedRawChunkFile:
     storage_name: str
     envelope_sha256: str
     envelope_size: int
+    fingerprint: tuple[int, int, int, int, int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,6 +154,14 @@ class RawChunkCommitMetadata:
 
 
 @dataclass(frozen=True, slots=True)
+class VerifiedRawChunk:
+    content: bytes
+    fingerprint: tuple[int, int, int, int, int]
+    keyring_generation: int
+    keyring_manifest_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
 class PendingRawChunkWrite:
     metadata: RawChunkCommitMetadata
     destination: Path
@@ -170,6 +180,18 @@ class RawStorageReconciliation:
     removed_orphans: int
 
 
+def _raw_file_fingerprint(
+    metadata: os.stat_result,
+) -> tuple[int, int, int, int, int]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
 def _storage_error(code: str, message: str) -> RawCollectionStorageError:
     return RawCollectionStorageError(
         code=code,
@@ -183,6 +205,14 @@ def _not_found() -> RawCollectionStorageError:
         code="raw_collection_not_found",
         message="The raw collection is not visible to this actor.",
         status_code=404,
+    )
+
+
+def _digest_rejected() -> RawCollectionStorageError:
+    return RawCollectionStorageError(
+        code="raw_collection_digest_rejected",
+        message="The raw collection was rejected after object digest verification.",
+        status_code=409,
     )
 
 
@@ -1150,17 +1180,32 @@ def persist_raw_chunk_envelope(
             directory_descriptor,
             expected_metadata=directory_metadata,
         )
-        final_metadata = os.stat(
+        file_metadata = os.fstat(file_descriptor)
+        path_metadata = os.stat(
             storage_name,
             dir_fd=directory_descriptor,
             follow_symlinks=False,
         )
-        if not upload_file_metadata_is_safe(final_metadata, directory_metadata):
+        verified_metadata = os.fstat(file_descriptor)
+        fingerprint = _raw_file_fingerprint(verified_metadata)
+        if (
+            not upload_file_metadata_is_safe(file_metadata, directory_metadata)
+            or not upload_file_metadata_is_safe(path_metadata, directory_metadata)
+            or not upload_file_metadata_is_safe(
+                verified_metadata,
+                directory_metadata,
+            )
+            or not descriptor_acl_is_absent(file_descriptor)
+            or _raw_file_fingerprint(file_metadata) != fingerprint
+            or _raw_file_fingerprint(path_metadata) != fingerprint
+            or verified_metadata.st_size != len(envelope)
+        ):
             raise OSError("raw chunk final file metadata is unsafe")
         return PersistedRawChunkFile(
             storage_name=storage_name,
             envelope_sha256=hashlib.sha256(envelope).hexdigest(),
             envelope_size=len(envelope),
+            fingerprint=fingerprint,
         )
     except RawCollectionStorageError:
         raise
@@ -1187,13 +1232,13 @@ def persist_raw_chunk_envelope(
             os.close(directory_descriptor)
 
 
-def read_raw_chunk_envelope(
+def _read_raw_chunk_envelope_with_fingerprint(
     root: Path,
     storage_name: str,
     *,
     expected_size: int,
     expected_sha256: str,
-) -> bytes:
+) -> tuple[bytes, tuple[int, int, int, int, int]]:
     """Read through pinned descriptors and reject any DB/file divergence."""
 
     if _STORAGE_NAME_PATTERN.fullmatch(storage_name) is None:
@@ -1220,11 +1265,12 @@ def read_raw_chunk_envelope(
             dir_fd=directory_descriptor,
             follow_symlinks=False,
         )
+        file_fingerprint = _raw_file_fingerprint(file_metadata)
         if (
             not upload_file_metadata_is_safe(file_metadata, directory_metadata)
+            or not upload_file_metadata_is_safe(path_metadata, directory_metadata)
             or not descriptor_acl_is_absent(file_descriptor)
-            or (file_metadata.st_dev, file_metadata.st_ino)
-            != (path_metadata.st_dev, path_metadata.st_ino)
+            or file_fingerprint != _raw_file_fingerprint(path_metadata)
             or file_metadata.st_size != expected_size
         ):
             raise OSError("raw chunk file metadata does not match")
@@ -1244,15 +1290,142 @@ def read_raw_chunk_envelope(
             directory_descriptor,
             expected_metadata=directory_metadata,
         )
+        verified_metadata = os.fstat(file_descriptor)
+        verified_path_metadata = os.stat(
+            storage_name,
+            dir_fd=directory_descriptor,
+            follow_symlinks=False,
+        )
+        final_metadata = os.fstat(file_descriptor)
+        final_fingerprint = _raw_file_fingerprint(final_metadata)
         if (
-            not descriptor_acl_is_absent(file_descriptor)
+            not upload_file_metadata_is_safe(
+                verified_metadata,
+                directory_metadata,
+            )
+            or not upload_file_metadata_is_safe(
+                verified_path_metadata,
+                directory_metadata,
+            )
+            or not upload_file_metadata_is_safe(
+                final_metadata,
+                directory_metadata,
+            )
+            or not descriptor_acl_is_absent(file_descriptor)
+            or file_fingerprint != _raw_file_fingerprint(verified_metadata)
+            or file_fingerprint != _raw_file_fingerprint(verified_path_metadata)
+            or file_fingerprint != final_fingerprint
             or not hmac.compare_digest(
                 hashlib.sha256(envelope).hexdigest(),
                 expected_sha256,
             )
         ):
             raise OSError("raw chunk encrypted digest does not match")
-        return envelope
+        return envelope, final_fingerprint
+    except RawCollectionStorageError:
+        raise
+    except (OSError, ValueError) as exc:
+        raise _storage_error(
+            "raw_chunk_persistence_ambiguous",
+            "Raw chunk persistence metadata does not match encrypted storage.",
+        ) from exc
+    finally:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+        if directory_descriptor is not None:
+            os.close(directory_descriptor)
+
+
+def read_raw_chunk_envelope(
+    root: Path,
+    storage_name: str,
+    *,
+    expected_size: int,
+    expected_sha256: str,
+) -> bytes:
+    envelope, _fingerprint = _read_raw_chunk_envelope_with_fingerprint(
+        root,
+        storage_name,
+        expected_size=expected_size,
+        expected_sha256=expected_sha256,
+    )
+    return envelope
+
+
+def probe_raw_chunk_envelope(
+    root: Path,
+    storage_name: str,
+    *,
+    expected_size: int,
+) -> tuple[int, int, int, int, int]:
+    """Check pinned file metadata without turning a status read into a bulk decrypt."""
+
+    if _STORAGE_NAME_PATTERN.fullmatch(storage_name) is None:
+        raise _storage_error(
+            "raw_chunk_persistence_ambiguous",
+            "Raw chunk persistence metadata does not match encrypted storage.",
+        )
+    directory_descriptor: int | None = None
+    file_descriptor: int | None = None
+    try:
+        directory_descriptor = os.open(root, _DIRECTORY_FLAGS)
+        directory_metadata = validate_upload_directory_descriptor(
+            root,
+            directory_descriptor,
+        )
+        file_descriptor = os.open(
+            storage_name,
+            _READ_FLAGS,
+            dir_fd=directory_descriptor,
+        )
+        file_metadata = os.fstat(file_descriptor)
+        path_metadata = os.stat(
+            storage_name,
+            dir_fd=directory_descriptor,
+            follow_symlinks=False,
+        )
+        file_fingerprint = _raw_file_fingerprint(file_metadata)
+        if (
+            not upload_file_metadata_is_safe(file_metadata, directory_metadata)
+            or not upload_file_metadata_is_safe(path_metadata, directory_metadata)
+            or not descriptor_acl_is_absent(file_descriptor)
+            or file_fingerprint != _raw_file_fingerprint(path_metadata)
+            or file_metadata.st_size != expected_size
+        ):
+            raise OSError("raw chunk file metadata does not match")
+        validate_upload_directory_descriptor(
+            root,
+            directory_descriptor,
+            expected_metadata=directory_metadata,
+        )
+        verified_metadata = os.fstat(file_descriptor)
+        verified_path_metadata = os.stat(
+            storage_name,
+            dir_fd=directory_descriptor,
+            follow_symlinks=False,
+        )
+        final_metadata = os.fstat(file_descriptor)
+        final_fingerprint = _raw_file_fingerprint(final_metadata)
+        if (
+            not upload_file_metadata_is_safe(
+                verified_metadata,
+                directory_metadata,
+            )
+            or not upload_file_metadata_is_safe(
+                verified_path_metadata,
+                directory_metadata,
+            )
+            or not upload_file_metadata_is_safe(
+                final_metadata,
+                directory_metadata,
+            )
+            or file_fingerprint != _raw_file_fingerprint(verified_metadata)
+            or file_fingerprint != _raw_file_fingerprint(verified_path_metadata)
+            or file_fingerprint != final_fingerprint
+            or not descriptor_acl_is_absent(file_descriptor)
+        ):
+            raise OSError("raw chunk file metadata changed during probe")
+        return final_fingerprint
     except RawCollectionStorageError:
         raise
     except (OSError, ValueError) as exc:
@@ -1420,14 +1593,17 @@ def validate_raw_storage_database_inventory(
     root: Path,
     *,
     key_manager: ReportImageKeyManager,
+    storage: RawCollectionStorage | None = None,
 ) -> None:
-    """Fail startup unless every persisted raw row and encrypted file agrees."""
+    """Fail on structural/terminal drift and reject nonterminal digest drift."""
 
     lock_raw_storage_reconciliation_transaction(db)
     collections = list(db.scalars(select(RawCollection)).all())
     objects = list(db.scalars(select(RawCollectionObject)).all())
     chunks = list(db.scalars(select(RawCollectionChunk)).all())
-    collections_by_id = {collection.collection_id: collection for collection in collections}
+    collections_by_id = {
+        collection.collection_id: collection for collection in collections
+    }
     objects_by_collection: dict[uuid.UUID, list[RawCollectionObject]] = {}
     chunks_by_object: dict[tuple[uuid.UUID, uuid.UUID], list[RawCollectionChunk]] = {}
     for item in objects:
@@ -1438,7 +1614,14 @@ def validate_raw_storage_database_inventory(
         key = (chunk.collection_id, chunk.object_id)
         chunks_by_object.setdefault(key, []).append(chunk)
 
-    expected: dict[str, tuple[RawCollection, RawCollectionObject, RawCollectionChunk]] = {}
+    expected: dict[
+        str,
+        tuple[RawCollection, RawCollectionObject, RawCollectionChunk],
+    ] = {}
+    inventory_by_collection: dict[
+        uuid.UUID,
+        list[tuple[RawCollectionObject, list[RawCollectionChunk]]],
+    ] = {}
     seen_chunk_keys: set[tuple[uuid.UUID, uuid.UUID]] = set()
     for collection in collections:
         collection_objects = sorted(
@@ -1450,6 +1633,9 @@ def validate_raw_storage_database_inventory(
         observed_chunks = 0
         observed_bytes = 0
         persisted_chunks = 0
+        collection_inventory: list[
+            tuple[RawCollectionObject, list[RawCollectionChunk]]
+        ] = []
         for item in collection_objects:
             key = (collection.collection_id, item.object_id)
             collection_chunks = sorted(
@@ -1462,8 +1648,16 @@ def validate_raw_storage_database_inventory(
                 != tuple(range(item.chunk_count))
                 or sum(chunk.declared_size_bytes for chunk in collection_chunks)
                 != item.size_bytes
+                or (
+                    len(collection_chunks) == 1
+                    and not hmac.compare_digest(
+                        collection_chunks[0].declared_sha256,
+                        item.sha256,
+                    )
+                )
             ):
                 raise RuntimeError("raw storage database inventory is inconsistent")
+            collection_inventory.append((item, collection_chunks))
             seen_chunk_keys.add(key)
             observed_chunks += len(collection_chunks)
             observed_bytes += item.size_bytes
@@ -1495,6 +1689,7 @@ def validate_raw_storage_database_inventory(
             )
         ):
             raise RuntimeError("raw storage database inventory is inconsistent")
+        inventory_by_collection[collection.collection_id] = collection_inventory
     if set(chunks_by_object) != seen_chunk_keys:
         raise RuntimeError("raw storage inventory contains an orphan chunk row")
 
@@ -1531,13 +1726,104 @@ def validate_raw_storage_database_inventory(
     if actual != set(expected):
         raise RuntimeError("raw database and encrypted object inventory differ")
 
-    validator = RawCollectionStorage(
-        raw_object_dir=root,
-        privacy_hmac_secret="inventory-validation-only",
-        key_manager=key_manager,
+    validator = (
+        storage
+        if storage is not None and storage._root == root
+        else RawCollectionStorage(
+            raw_object_dir=root,
+            privacy_hmac_secret="inventory-validation-only",
+            key_manager=key_manager,
+        )
     )
-    for storage_name in sorted(expected):
-        validator._verify_persisted_chunk(*expected[storage_name])
+    verified_files: dict[
+        tuple[RawChunkCommitMetadata, int, str],
+        tuple[int, int, int, int, int],
+    ] = {}
+    pending_rejections: list[tuple[RawCollection, uuid.UUID]] = []
+    for collection in sorted(
+        collections,
+        key=lambda value: str(value.collection_id),
+    ):
+        rejected_at = collection.digest_rejected_at
+        rejected_object_id = collection.digest_rejected_object_id
+        if (rejected_at is None) != (rejected_object_id is None):
+            raise RuntimeError("raw digest rejection marker is incomplete")
+        if rejected_at is not None and collection.state in {
+            "COMMITTED",
+            "QUARANTINED",
+        }:
+            raise RuntimeError("terminal raw collection has a digest rejection")
+        mismatched_objects: list[uuid.UUID] = []
+        complete_objects: set[uuid.UUID] = set()
+        collection_inventory = inventory_by_collection[collection.collection_id]
+        declared_object_ids = {
+            item.object_id for item, _chunks in collection_inventory
+        }
+        if (
+            rejected_object_id is not None
+            and rejected_object_id not in declared_object_ids
+        ):
+            raise RuntimeError("raw digest rejection object is not in its manifest")
+        for item, item_chunks in collection_inventory:
+            complete = all(chunk.storage_name is not None for chunk in item_chunks)
+            digest = hashlib.sha256()
+            for chunk in item_chunks:
+                if chunk.storage_name is None:
+                    continue
+                metadata = validator._persisted_chunk_metadata(
+                    collection,
+                    item,
+                    chunk,
+                )
+                verified = validator._fully_verify_persisted_chunk(
+                    collection,
+                    item,
+                    chunk,
+                )
+                verified_files[
+                    (
+                        metadata,
+                        verified.keyring_generation,
+                        verified.keyring_manifest_sha256,
+                    )
+                ] = verified.fingerprint
+                if complete:
+                    digest.update(verified.content)
+            if complete:
+                complete_objects.add(item.object_id)
+                if not hmac.compare_digest(digest.hexdigest(), item.sha256):
+                    mismatched_objects.append(item.object_id)
+        if collection.state in {"COMMITTED", "QUARANTINED"}:
+            if mismatched_objects:
+                raise RuntimeError("terminal raw object digest does not match")
+            continue
+        if rejected_object_id is not None:
+            if (
+                rejected_object_id in complete_objects
+                and rejected_object_id not in mismatched_objects
+            ):
+                raise RuntimeError("raw digest rejection marker conflicts with storage")
+            continue
+        if mismatched_objects:
+            pending_rejections.append((collection, mismatched_objects[0]))
+
+    for collection, object_id in pending_rejections:
+        collection.digest_rejected_at = datetime.now(UTC)
+        collection.digest_rejected_object_id = object_id
+    try:
+        db.flush()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise RuntimeError("raw digest rejection persistence failed") from exc
+    with validator._verified_chunk_files_lock:
+        previous_verified_files = dict(validator._verified_chunk_files)
+    validator._replace_verified_chunk_files(verified_files)
+    try:
+        db.commit()
+    except SQLAlchemyError as exc:
+        validator._replace_verified_chunk_files(previous_verified_files)
+        db.rollback()
+        raise RuntimeError("raw digest rejection persistence failed") from exc
 
 
 class RawCollectionStorage:
@@ -1555,6 +1841,11 @@ class RawCollectionStorage:
         self._privacy_hmac_secret = privacy_hmac_secret
         self._key_manager = key_manager
         self._capacity_state = capacity_state
+        self._verified_chunk_files: dict[
+            tuple[RawChunkCommitMetadata, int, str],
+            tuple[int, int, int, int, int],
+        ] = {}
+        self._verified_chunk_files_lock = threading.RLock()
 
     def _assert_new_collection_capacity(
         self,
@@ -1584,19 +1875,40 @@ class RawCollectionStorage:
                 "Raw chunk encrypted storage is not configured.",
             )
         try:
-            available_bytes, block_size, available_inodes = (
-                _raw_filesystem_capacity(self._root)
-            )
             outstanding = db.execute(
                 select(
-                    func.coalesce(func.sum(RawCollection.total_bytes), 0),
-                    func.coalesce(func.sum(RawCollection.chunk_count), 0),
-                ).where(
-                    RawCollection.state.in_(("MANIFEST_ACCEPTED", "RECEIVING"))
+                    func.coalesce(
+                        func.sum(RawCollectionChunk.declared_size_bytes),
+                        0,
+                    ),
+                    func.count(RawCollectionChunk.chunk_index),
+                )
+                .select_from(RawCollectionChunk)
+                .join(
+                    RawCollection,
+                    and_(
+                        RawCollection.collection_id
+                        == RawCollectionChunk.collection_id,
+                        RawCollection.manifest_sha256
+                        == RawCollectionChunk.manifest_sha256,
+                        RawCollection.consent_receipt_sha256
+                        == RawCollectionChunk.consent_receipt_sha256,
+                    ),
+                )
+                .where(
+                    RawCollection.state.in_(("MANIFEST_ACCEPTED", "RECEIVING")),
+                    RawCollection.digest_rejected_at.is_(None),
+                    RawCollectionChunk.storage_name.is_(None),
                 )
             ).one()
             outstanding_plaintext_bytes = int(outstanding[0] or 0)
             outstanding_chunks = int(outstanding[1] or 0)
+            # Read the filesystem after the DB reservation snapshot. A chunk
+            # racing from reserved to persisted is then counted once or twice,
+            # never zero times.
+            available_bytes, block_size, available_inodes = (
+                _raw_filesystem_capacity(self._root)
+            )
             outstanding_bytes = _raw_capacity_reservation_bytes(
                 outstanding_plaintext_bytes,
                 outstanding_chunks,
@@ -1938,14 +2250,144 @@ class RawCollectionStorage:
             and collection.account_generation == account_generation
         )
 
+    @staticmethod
+    def _assert_digest_not_rejected(collection: RawCollection) -> None:
+        rejected_at = collection.digest_rejected_at
+        rejected_object_id = collection.digest_rejected_object_id
+        if (rejected_at is None) != (rejected_object_id is None):
+            raise _storage_error(
+                "raw_collection_state_ambiguous",
+                "The raw collection digest rejection marker is incomplete.",
+            )
+        if rejected_at is not None:
+            raise _digest_rejected()
+
+    def _persist_digest_rejection(
+        self,
+        db: Session,
+        collection: RawCollection,
+        object_id: uuid.UUID,
+    ) -> None:
+        rejected_at = collection.digest_rejected_at
+        rejected_object_id = collection.digest_rejected_object_id
+        if (rejected_at is None) != (rejected_object_id is None):
+            raise _storage_error(
+                "raw_collection_state_ambiguous",
+                "The raw collection digest rejection marker is incomplete.",
+            )
+        if rejected_at is not None:
+            if rejected_object_id != object_id:
+                raise _storage_error(
+                    "raw_collection_state_ambiguous",
+                    "The raw collection digest rejection marker conflicts.",
+                )
+            return
+        if (
+            collection.state in {"COMMITTED", "QUARANTINED"}
+            or collection.committed_at is not None
+            or collection.retention_expires_at is not None
+            or collection.quarantine_expires_at is not None
+            or collection.receipt_sha256 is not None
+        ):
+            raise _storage_error(
+                "raw_collection_state_ambiguous",
+                "A terminal raw collection cannot be digest-rejected.",
+            )
+        collection.digest_rejected_at = datetime.now(UTC)
+        collection.digest_rejected_object_id = object_id
+        try:
+            db.commit()
+        except SQLAlchemyError as exc:
+            self._rollback(db)
+            raise _storage_error(
+                "raw_collection_digest_rejection_ambiguous",
+                "Raw collection digest rejection persistence is ambiguous.",
+            ) from exc
+
+    @staticmethod
+    def _validate_manifest_digest_contract(
+        manifest: RawCollectionManifestV1,
+    ) -> None:
+        for item in manifest.objects:
+            if len(item.chunks) != 1:
+                continue
+            chunk = item.chunks[0]
+            if (
+                chunk.size_bytes != item.size_bytes
+                or not hmac.compare_digest(chunk.sha256, item.sha256)
+            ):
+                raise RawCollectionStorageError(
+                    code="raw_manifest_single_chunk_inventory_invalid",
+                    message=(
+                        "A single-chunk object must bind the same size and SHA-256."
+                    ),
+                    status_code=422,
+                )
+
+    def _replay_manifest(
+        self,
+        db: Session,
+        admission: RawCollectionAdmission,
+        manifest: RawCollectionManifestV1,
+        existing: tuple[
+            RawCollection,
+            list[tuple[RawCollectionObject, list[RawCollectionChunk]]],
+        ],
+    ) -> tuple[RawCollectionStatusV1, bool]:
+        collection, inventory = existing
+        if not self._owned(
+            collection,
+            privacy_subject=admission.privacy_subject_hmac,
+            account_generation=admission.account_generation,
+        ):
+            raise _not_found()
+        if not hmac.compare_digest(
+            collection.consent_receipt_sha256,
+            admission.consent_receipt_sha256,
+        ):
+            raise _not_found()
+        if not hmac.compare_digest(
+            collection.manifest_sha256,
+            manifest.manifest_sha256,
+        ):
+            raise RawCollectionStorageError(
+                code="raw_collection_manifest_conflict",
+                message=(
+                    "The collection identifier is already bound to another manifest."
+                ),
+                status_code=409,
+            )
+        self._assert_digest_not_rejected(collection)
+        for item, chunks in inventory:
+            for chunk in chunks:
+                if chunk.storage_name is not None:
+                    metadata = self._verify_persisted_chunk_metadata(
+                        collection,
+                        item,
+                        chunk,
+                    )
+                    self._complete_matching_chunk_journal(metadata)
+        status = self._status(collection, inventory)
+        db.commit()
+        return status, False
+
     def put_manifest(
         self,
         db: Session,
         admission: RawCollectionAdmission,
         manifest: RawCollectionManifestV1,
     ) -> tuple[RawCollectionStatusV1, bool]:
+        self._validate_manifest_digest_contract(manifest)
         collection_id = uuid.UUID(manifest.collection_id)
         lock_raw_storage_write_transaction(db)
+        existing = self._rows_for_collection(
+            db,
+            collection_id,
+            for_update=True,
+        )
+        if existing is not None:
+            return self._replay_manifest(db, admission, manifest, existing)
+
         lock_raw_capacity_reservation_transaction(db)
         db.execute(
             text(
@@ -1960,31 +2402,7 @@ class RawCollectionStorage:
             for_update=True,
         )
         if existing is not None:
-            collection, inventory = existing
-            if not self._owned(
-                collection,
-                privacy_subject=admission.privacy_subject_hmac,
-                account_generation=admission.account_generation,
-            ):
-                raise _not_found()
-            if not hmac.compare_digest(
-                collection.manifest_sha256,
-                manifest.manifest_sha256,
-            ):
-                raise RawCollectionStorageError(
-                    code="raw_collection_manifest_conflict",
-                    message=(
-                        "The collection identifier is already bound to another manifest."
-                    ),
-                    status_code=409,
-                )
-            for item, chunks in inventory:
-                for chunk in chunks:
-                    if chunk.storage_name is not None:
-                        self._verify_persisted_chunk(collection, item, chunk)
-            status = self._status(collection, inventory)
-            db.commit()
-            return status, False
+            return self._replay_manifest(db, admission, manifest, existing)
 
         self._assert_new_collection_capacity(db, manifest)
         collection = RawCollection(
@@ -2077,45 +2495,145 @@ class RawCollectionStorage:
             plaintext_sha256=chunk.declared_sha256,
         )
 
-    def _verify_persisted_chunk(
+    def _persisted_chunk_metadata(
         self,
         collection: RawCollection,
         item: RawCollectionObject,
         chunk: RawCollectionChunk,
-    ) -> bytes:
-        if (
-            self._root is None
-            or chunk.storage_name is None
-            or chunk.envelope_size is None
-            or chunk.envelope_sha256 is None
-            or chunk.key_id is None
-            or chunk.nonce is None
-            or chunk.envelope_version != ENVELOPE_VERSION
-            or chunk.algorithm != "AES-256-GCM"
-            or chunk.aad_version != AAD_VERSION
-            or chunk.persisted_at is None
-        ):
+    ) -> RawChunkCommitMetadata:
+        if self._root is None:
             raise _storage_error(
                 "raw_chunk_persistence_ambiguous",
                 "Raw chunk persistence metadata is incomplete.",
             )
-        expected_name = raw_chunk_storage_name(
-            collection.collection_id,
-            item.object_id,
-            chunk.chunk_index,
-        )
-        if chunk.storage_name != expected_name:
+        try:
+            state = raw_chunk_commit_state(collection, item, chunk)
+        except RuntimeError as exc:
             raise _storage_error(
                 "raw_chunk_persistence_ambiguous",
                 "Raw chunk persistence metadata does not match encrypted storage.",
+            ) from exc
+        if state.metadata is None:
+            raise _storage_error(
+                "raw_chunk_persistence_ambiguous",
+                "Raw chunk persistence metadata is incomplete.",
             )
-        envelope = read_raw_chunk_envelope(
+        return state.metadata
+
+    def _verify_persisted_chunk_metadata(
+        self,
+        collection: RawCollection,
+        item: RawCollectionObject,
+        chunk: RawCollectionChunk,
+    ) -> RawChunkCommitMetadata:
+        metadata = self._persisted_chunk_metadata(collection, item, chunk)
+        assert self._root is not None
+        _key, generation, manifest_sha256 = self._decryption_context(metadata)
+        cache_key = (metadata, generation, manifest_sha256)
+        with self._verified_chunk_files_lock:
+            trusted_fingerprint = self._verified_chunk_files.get(cache_key)
+        if trusted_fingerprint is not None:
+            observed_fingerprint = probe_raw_chunk_envelope(
+                self._root,
+                metadata.storage_name,
+                expected_size=metadata.envelope_size,
+            )
+            if trusted_fingerprint == observed_fingerprint:
+                return metadata
+        self._verify_persisted_chunk(collection, item, chunk)
+        return metadata
+
+    def _keyring_identity(self) -> tuple[int, str]:
+        keyring = self._key_manager.keyring
+        generation = keyring.generation
+        manifest_sha256 = keyring.manifest_sha256
+        if (
+            type(generation) is not int
+            or generation < 1
+            or not isinstance(manifest_sha256, str)
+            or _SHA256_PATTERN.fullmatch(manifest_sha256) is None
+        ):
+            raise _storage_error(
+                "raw_chunk_persistence_ambiguous",
+                "Raw chunk keyring binding is invalid.",
+            )
+        return generation, manifest_sha256
+
+    def _decryption_context(
+        self,
+        metadata: RawChunkCommitMetadata,
+    ) -> tuple[bytes, int, str]:
+        try:
+            master_key = self._key_manager.decryption_key(metadata.key_id)
+            generation, manifest_sha256 = self._keyring_identity()
+        except ReportImageKeyError as exc:
+            raise _storage_error(
+                "raw_chunk_persistence_ambiguous",
+                "Raw chunk persistence metadata does not match encrypted storage.",
+            ) from exc
+        return master_key, generation, manifest_sha256
+
+    def _remember_verified_chunk_file(
+        self,
+        metadata: RawChunkCommitMetadata,
+        fingerprint: tuple[int, int, int, int, int],
+        *,
+        keyring_generation: int,
+        keyring_manifest_sha256: str,
+    ) -> None:
+        cache_key = (metadata, keyring_generation, keyring_manifest_sha256)
+        with self._verified_chunk_files_lock:
+            self._sweep_missing_verified_chunk_files()
+            self._verified_chunk_files[cache_key] = fingerprint
+
+    def _sweep_missing_verified_chunk_files(self) -> None:
+        assert self._root is not None
+        candidates = []
+        iterator = iter(self._verified_chunk_files)
+        for _index in range(2):
+            try:
+                candidates.append(next(iterator))
+            except StopIteration:
+                break
+        for cache_key in candidates:
+            fingerprint = self._verified_chunk_files.pop(cache_key)
+            try:
+                os.stat(
+                    self._root / cache_key[0].storage_name,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                continue
+            except OSError:
+                pass
+            self._verified_chunk_files[cache_key] = fingerprint
+
+    def _replace_verified_chunk_files(
+        self,
+        verified: dict[
+            tuple[RawChunkCommitMetadata, int, str],
+            tuple[int, int, int, int, int],
+        ],
+    ) -> None:
+        with self._verified_chunk_files_lock:
+            self._verified_chunk_files = dict(verified)
+
+    def _fully_verify_persisted_chunk(
+        self,
+        collection: RawCollection,
+        item: RawCollectionObject,
+        chunk: RawCollectionChunk,
+    ) -> VerifiedRawChunk:
+        metadata = self._persisted_chunk_metadata(collection, item, chunk)
+        assert self._root is not None
+        envelope, fingerprint = _read_raw_chunk_envelope_with_fingerprint(
             self._root,
-            chunk.storage_name,
-            expected_size=chunk.envelope_size,
-            expected_sha256=chunk.envelope_sha256,
+            metadata.storage_name,
+            expected_size=metadata.envelope_size,
+            expected_sha256=metadata.envelope_sha256,
         )
         binding = self._binding(collection, item, chunk)
+        master_key, generation, manifest_sha256 = self._decryption_context(metadata)
         try:
             parsed = parse_raw_collection_chunk_envelope(
                 envelope,
@@ -2125,18 +2643,91 @@ class RawCollectionStorage:
                 raise RawCollectionChunkCryptoError(
                     "raw chunk envelope metadata differs"
                 )
-            master_key = self._key_manager.decryption_key(chunk.key_id)
             decrypted = decrypt_raw_collection_chunk(
                 envelope,
                 expected_binding=binding,
                 master_key=master_key,
             )
-        except (RawCollectionChunkCryptoError, ReportImageKeyError) as exc:
+        except RawCollectionChunkCryptoError as exc:
             raise _storage_error(
                 "raw_chunk_persistence_ambiguous",
                 "Raw chunk persistence metadata does not match encrypted storage.",
             ) from exc
-        return decrypted.content
+        return VerifiedRawChunk(
+            content=decrypted.content,
+            fingerprint=fingerprint,
+            keyring_generation=generation,
+            keyring_manifest_sha256=manifest_sha256,
+        )
+
+    def _verify_persisted_chunk(
+        self,
+        collection: RawCollection,
+        item: RawCollectionObject,
+        chunk: RawCollectionChunk,
+    ) -> bytes:
+        metadata = self._persisted_chunk_metadata(collection, item, chunk)
+        verified = self._fully_verify_persisted_chunk(collection, item, chunk)
+        self._remember_verified_chunk_file(
+            metadata,
+            verified.fingerprint,
+            keyring_generation=verified.keyring_generation,
+            keyring_manifest_sha256=verified.keyring_manifest_sha256,
+        )
+        return verified.content
+
+    def _complete_matching_chunk_journal(
+        self,
+        metadata: RawChunkCommitMetadata,
+    ) -> None:
+        assert self._root is not None
+        try:
+            pending = _read_raw_journal(
+                self._root,
+                _journal_name(metadata.storage_name),
+            )
+        except FileNotFoundError:
+            return
+        except RuntimeError as exc:
+            raise _storage_error(
+                "raw_chunk_persistence_ambiguous",
+                "The pending raw chunk journal is invalid.",
+            ) from exc
+        if pending.metadata != metadata:
+            raise _storage_error(
+                "raw_chunk_persistence_ambiguous",
+                "The pending raw chunk journal does not match committed storage.",
+            )
+        try:
+            complete_raw_chunk_write(pending)
+        except OSError as exc:
+            raise _storage_error(
+                "raw_chunk_persistence_ambiguous",
+                "Raw chunk journal cleanup is temporarily ambiguous.",
+            ) from exc
+
+    def _verify_completed_object_with_candidate(
+        self,
+        collection: RawCollection,
+        item: RawCollectionObject,
+        chunks: list[RawCollectionChunk],
+        target: RawCollectionChunk,
+        content: bytes,
+    ) -> bool:
+        if any(
+            candidate is not target and candidate.storage_name is None
+            for candidate in chunks
+        ):
+            return True
+        digest = hashlib.sha256()
+        for candidate in chunks:
+            if candidate is target:
+                digest.update(content)
+            else:
+                digest.update(
+                    self._verify_persisted_chunk(collection, item, candidate)
+                )
+        return hmac.compare_digest(digest.hexdigest(), item.sha256)
 
     def put_chunk(
         self,
@@ -2154,7 +2745,6 @@ class RawCollectionStorage:
         collection_uuid = uuid.UUID(collection_id)
         object_uuid = uuid.UUID(object_id)
         lock_raw_storage_write_transaction(db)
-        lock_raw_capacity_reservation_transaction(db)
         rows = self._rows_for_collection(
             db,
             collection_uuid,
@@ -2171,7 +2761,7 @@ class RawCollectionStorage:
             raise _not_found()
         target = next(
             (
-                (item, chunk)
+                (item, chunks, chunk)
                 for item, chunks in inventory
                 for chunk in chunks
                 if item.object_id == object_uuid and chunk.chunk_index == index
@@ -2192,11 +2782,16 @@ class RawCollectionStorage:
             or target is None
         ):
             raise _not_found()
-        item, chunk = target
+        self._assert_digest_not_rejected(collection)
+        item, item_chunks, chunk = target
         if (
             len(content) != chunk.declared_size_bytes
             or not hmac.compare_digest(
                 content_sha256,
+                chunk.declared_sha256,
+            )
+            or not hmac.compare_digest(
+                hashlib.sha256(content).hexdigest(),
                 chunk.declared_sha256,
             )
         ):
@@ -2206,7 +2801,12 @@ class RawCollectionStorage:
                 status_code=409,
             )
         if chunk.storage_name is not None:
-            self._verify_persisted_chunk(collection, item, chunk)
+            metadata = self._verify_persisted_chunk_metadata(
+                collection,
+                item,
+                chunk,
+            )
+            self._complete_matching_chunk_journal(metadata)
             assert chunk.persisted_at is not None
             state = self._status(collection, inventory).state
             ack = RawCollectionChunkAckV1.model_validate(
@@ -2223,6 +2823,15 @@ class RawCollectionStorage:
             )
             db.commit()
             return ack, False
+        if not self._verify_completed_object_with_candidate(
+            collection,
+            item,
+            item_chunks,
+            chunk,
+            content,
+        ):
+            self._persist_digest_rejection(db, collection, item.object_id)
+            raise _digest_rejected()
         if self._root is None:
             raise _storage_error(
                 "raw_chunk_storage_unavailable",
@@ -2233,6 +2842,9 @@ class RawCollectionStorage:
             slot = self._key_manager.encryption_slot()
             if slot.material is None:
                 raise ReportImageKeyError("active report key material is unavailable")
+            keyring_generation, keyring_manifest_sha256 = (
+                self._keyring_identity()
+            )
             encrypted = encrypt_raw_collection_chunk(
                 content,
                 binding=binding,
@@ -2308,6 +2920,12 @@ class RawCollectionStorage:
                 "raw_chunk_persistence_ambiguous",
                 "Raw chunk file exists but its database commit is ambiguous.",
             ) from exc
+        self._remember_verified_chunk_file(
+            self._persisted_chunk_metadata(collection, item, chunk),
+            persisted.fingerprint,
+            keyring_generation=keyring_generation,
+            keyring_manifest_sha256=keyring_manifest_sha256,
+        )
         try:
             complete_raw_chunk_write(pending)
         except OSError as exc:
@@ -2342,6 +2960,7 @@ class RawCollectionStorage:
         walk_id: str,
         manifest_sha256: str,
     ) -> RawCollectionStatusV1:
+        lock_raw_storage_write_transaction(db)
         privacy_subject = privacy_subject_hmac(
             actor_id,
             account_generation,
@@ -2350,7 +2969,7 @@ class RawCollectionStorage:
         rows = self._rows_for_collection(
             db,
             uuid.UUID(collection_id),
-            for_update=False,
+            for_update=True,
         )
         if rows is None:
             raise _not_found()
@@ -2369,11 +2988,14 @@ class RawCollectionStorage:
             )
         ):
             raise _not_found()
+        self._assert_digest_not_rejected(collection)
         for item, chunks in inventory:
             for chunk in chunks:
                 if chunk.storage_name is not None:
-                    self._verify_persisted_chunk(collection, item, chunk)
-        return self._status(collection, inventory)
+                    self._verify_persisted_chunk_metadata(collection, item, chunk)
+        status = self._status(collection, inventory)
+        db.commit()
+        return status
 
     def commit(
         self,
@@ -2383,6 +3005,7 @@ class RawCollectionStorage:
         *,
         walk_id: str,
     ) -> RawCollectionReceiptV1 | RawCollectionReceiptV2:
+        lock_raw_storage_write_transaction(db)
         rows = self._rows_for_collection(
             db,
             uuid.UUID(payload.collection_id),
@@ -2409,6 +3032,7 @@ class RawCollectionStorage:
             )
         ):
             raise _not_found()
+        self._assert_digest_not_rejected(collection)
         if (
             payload.object_count != collection.object_count
             or payload.chunk_count != collection.chunk_count
@@ -2422,7 +3046,12 @@ class RawCollectionStorage:
         if collection.state in {"COMMITTED", "QUARANTINED"}:
             for item, chunks in inventory:
                 for chunk in chunks:
-                    self._verify_persisted_chunk(collection, item, chunk)
+                    metadata = self._verify_persisted_chunk_metadata(
+                        collection,
+                        item,
+                        chunk,
+                    )
+                    self._complete_matching_chunk_journal(metadata)
             receipt = self._receipt(collection, inventory)
             assert receipt is not None
             try:
@@ -2456,11 +3085,12 @@ class RawCollectionStorage:
                 digest.update(
                     self._verify_persisted_chunk(collection, item, chunk)
                 )
-            if not hmac.compare_digest(digest.hexdigest(), item.sha256):
-                raise _storage_error(
-                    "raw_collection_inventory_ambiguous",
-                    "The raw collection inventory is inconsistent.",
+                self._complete_matching_chunk_journal(
+                    self._persisted_chunk_metadata(collection, item, chunk)
                 )
+            if not hmac.compare_digest(digest.hexdigest(), item.sha256):
+                self._persist_digest_rejection(db, collection, item.object_id)
+                raise _digest_rejected()
         committed_at = datetime.now(UTC).replace(microsecond=0)
         if collection.lifecycle_version == 1:
             retention_expires_at = committed_at + timedelta(days=180)
@@ -2521,6 +3151,7 @@ __all__ = [
     "lock_raw_storage_write_transaction",
     "pending_raw_journal_directory",
     "persist_raw_chunk_envelope",
+    "probe_raw_chunk_envelope",
     "prepare_raw_object_directory",
     "probe_raw_object_directory",
     "raw_chunk_commit_state",

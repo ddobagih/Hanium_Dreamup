@@ -25,6 +25,7 @@ from backend.app.services.raw_collection_crypto import (
 )
 from backend.app.services.raw_collection_ingest import RawCollectionStorageError
 from backend.app.services.raw_collection_storage import (
+    RawCollectionStorage,
     RawChunkCommitState,
     complete_raw_chunk_write,
     lock_raw_storage_reconciliation_transaction,
@@ -49,6 +50,8 @@ PERSISTED_AT = datetime(2026, 8, 29, 1, 2, 3, 456789, tzinfo=UTC)
 
 
 class _StaticKeyManager:
+    keyring = SimpleNamespace(generation=1, manifest_sha256="e" * 64)
+
     def decryption_key(self, key_id: str) -> bytes:
         if key_id != KEY_ID:
             raise AssertionError("unexpected raw key id")
@@ -115,6 +118,12 @@ def _database_rows(pending):
         consent_receipt_sha256=metadata.consent_receipt_sha256,
         manifest_sha256=metadata.manifest_sha256,
         state="READY_TO_COMMIT",
+        committed_at=None,
+        retention_expires_at=None,
+        quarantine_expires_at=None,
+        receipt_sha256=None,
+        digest_rejected_at=None,
+        digest_rejected_object_id=None,
         object_count=1,
         chunk_count=1,
         total_bytes=metadata.plaintext_size,
@@ -159,6 +168,8 @@ class _InventorySession:
             RawCollectionChunk: [chunk] if chunk is not None else [],
         }
         self.lock_statements: list[str] = []
+        self.commits = 0
+        self.rollbacks = 0
 
     def execute(self, statement, _parameters):
         self.lock_statements.append(str(statement))
@@ -166,6 +177,15 @@ class _InventorySession:
     def scalars(self, statement):
         entity = statement.column_descriptions[0]["entity"]
         return SimpleNamespace(all=lambda: self._rows[entity])
+
+    def flush(self) -> None:
+        return None
+
+    def commit(self) -> None:
+        self.commits += 1
+
+    def rollback(self) -> None:
+        self.rollbacks += 1
 
 
 def test_process_death_after_raw_final_publish_removes_orphan(tmp_path: Path) -> None:
@@ -444,6 +464,96 @@ def test_raw_inventory_accepts_exact_mapping_and_rejects_orphans(
         )
 
 
+def test_verified_chunk_cache_binds_full_commit_metadata(tmp_path: Path) -> None:
+    root = tmp_path / "raw-objects"
+    pending, encrypted = _stage(root)
+    _persist(root, pending, encrypted)
+    complete_raw_chunk_write(pending)
+    collection, item, chunk = _database_rows(pending)
+    storage = RawCollectionStorage(
+        raw_object_dir=root,
+        privacy_hmac_secret="inventory-test-only",
+        key_manager=_StaticKeyManager(),  # type: ignore[arg-type]
+    )
+
+    assert storage._verify_persisted_chunk(collection, item, chunk) == (
+        b"raw crash reconciliation fixture"
+    )
+    chunk.nonce = b"x" * 12
+
+    with pytest.raises(RawCollectionStorageError):
+        storage._verify_persisted_chunk_metadata(collection, item, chunk)
+
+
+def test_full_verification_seeds_without_a_second_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "raw-objects"
+    pending, encrypted = _stage(root)
+    _persist(root, pending, encrypted)
+    complete_raw_chunk_write(pending)
+    collection, item, chunk = _database_rows(pending)
+    storage = RawCollectionStorage(
+        raw_object_dir=root,
+        privacy_hmac_secret="inventory-test-only",
+        key_manager=_StaticKeyManager(),  # type: ignore[arg-type]
+    )
+    monkeypatch.setattr(
+        raw_storage,
+        "probe_raw_chunk_envelope",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("full verification performed a second probe")
+        ),
+    )
+
+    assert storage._verify_persisted_chunk(collection, item, chunk) == (
+        b"raw crash reconciliation fixture"
+    )
+
+
+def test_raw_inventory_atomically_replaces_and_warms_chunk_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "raw-objects"
+    pending, encrypted = _stage(root)
+    _persist(root, pending, encrypted)
+    complete_raw_chunk_write(pending)
+    collection, item, chunk = _database_rows(pending)
+    key_manager = _StaticKeyManager()
+    storage = RawCollectionStorage(
+        raw_object_dir=root,
+        privacy_hmac_secret="inventory-test-only",
+        key_manager=key_manager,  # type: ignore[arg-type]
+    )
+    stale_metadata = replace(pending.metadata, nonce=b"z" * 12)
+    storage._verified_chunk_files[(stale_metadata, 1, "e" * 64)] = (0, 0, 0, 0, 0)
+
+    validate_raw_storage_database_inventory(
+        _InventorySession(collection, item, chunk),
+        root,
+        key_manager=key_manager,  # type: ignore[arg-type]
+        storage=storage,
+    )
+
+    assert len(storage._verified_chunk_files) == 1
+    [(cache_key, _fingerprint)] = storage._verified_chunk_files.items()
+    assert cache_key == (pending.metadata, 1, "e" * 64)
+    monkeypatch.setattr(
+        storage,
+        "_verify_persisted_chunk",
+        lambda *_args: (_ for _ in ()).throw(
+            AssertionError("warm runtime cache bulk-decrypted content")
+        ),
+    )
+    assert storage._verify_persisted_chunk_metadata(
+        collection,
+        item,
+        chunk,
+    ) == pending.metadata
+
+
 def test_raw_chunk_commit_state_accepts_persisted_partial_multi_inventory(
     tmp_path: Path,
 ) -> None:
@@ -471,6 +581,41 @@ def test_raw_inventory_rejects_database_only_persisted_chunk(tmp_path: Path) -> 
     collection, item, chunk = _database_rows(pending)
 
     with pytest.raises(RuntimeError, match="inventory differ"):
+        validate_raw_storage_database_inventory(
+            _InventorySession(collection, item, chunk),
+            root,
+            key_manager=_StaticKeyManager(),  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize("persisted", (False, True))
+def test_raw_inventory_rejects_single_chunk_object_digest_disagreement(
+    tmp_path: Path,
+    persisted: bool,
+) -> None:
+    root = tmp_path / "raw-objects"
+    pending, encrypted = _stage(root)
+    if persisted:
+        _persist(root, pending, encrypted)
+    complete_raw_chunk_write(pending)
+    collection, item, chunk = _database_rows(pending)
+    item.sha256 = "0" * 64
+    if not persisted:
+        collection.state = "MANIFEST_ACCEPTED"
+        for field in (
+            "storage_name",
+            "envelope_version",
+            "algorithm",
+            "aad_version",
+            "key_id",
+            "nonce",
+            "envelope_sha256",
+            "envelope_size",
+            "persisted_at",
+        ):
+            setattr(chunk, field, None)
+
+    with pytest.raises(RuntimeError, match="database inventory is inconsistent"):
         validate_raw_storage_database_inventory(
             _InventorySession(collection, item, chunk),
             root,
@@ -584,8 +729,9 @@ def test_backend_raw_reconciliation_holds_shared_maintenance_lock(
         assert state == RawChunkCommitState(False, None)
         calls.append("reconcile")
 
-    def validate(_db, _root, *, key_manager) -> None:
+    def validate(_db, _root, *, key_manager, storage) -> None:
         assert key_manager is main_app.report_image_key_manager
+        assert storage is main_app.raw_collection_storage
         calls.append("validate")
 
     monkeypatch.setattr(main_app.settings, "raw_object_dir", root)

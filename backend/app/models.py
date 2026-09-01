@@ -1807,6 +1807,20 @@ class RawCollection(Base):
             name="ck_raw_collections_receipt_sha256",
         ),
         CheckConstraint(
+            "(digest_rejected_at IS NULL AND "
+            "digest_rejected_object_id IS NULL) OR "
+            "(digest_rejected_at IS NOT NULL AND "
+            "digest_rejected_object_id IS NOT NULL)",
+            name="ck_raw_collections_digest_rejection_all_or_none",
+        ),
+        CheckConstraint(
+            "digest_rejected_at IS NULL OR "
+            "(state NOT IN ('COMMITTED', 'QUARANTINED') AND "
+            "committed_at IS NULL AND retention_expires_at IS NULL AND "
+            "quarantine_expires_at IS NULL AND receipt_sha256 IS NULL)",
+            name="ck_raw_collections_digest_rejection_no_receipt",
+        ),
+        CheckConstraint(
             "(lifecycle_version = 1 AND state = 'COMMITTED' AND "
             "committed_at IS NOT NULL AND retention_expires_at IS NOT NULL AND "
             "quarantine_expires_at IS NULL AND receipt_sha256 IS NOT NULL) OR "
@@ -1885,6 +1899,8 @@ class RawCollection(Base):
     retention_expires_at = Column(DateTime(timezone=True), nullable=True, index=True)
     quarantine_expires_at = Column(DateTime(timezone=True), nullable=True, index=True)
     receipt_sha256 = Column(String(64), nullable=True)
+    digest_rejected_at = Column(DateTime(timezone=True), nullable=True)
+    digest_rejected_object_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

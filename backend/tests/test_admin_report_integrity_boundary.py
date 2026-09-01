@@ -44,6 +44,7 @@ def test_only_known_predecessors_may_use_legacy_compatibility(
         "202608300005",
         "202608300006",
         "202609010001",
+        "202609010002",
     }
 
 

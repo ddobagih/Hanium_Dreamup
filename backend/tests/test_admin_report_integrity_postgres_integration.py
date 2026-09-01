@@ -261,7 +261,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
             "ready": False,
             "reason": "migration_not_at_head",
             "current_revision": "202608300005",
-            "expected_revision": "202609010001",
+            "expected_revision": "202609010002",
         }
 
         with disposable_engine.begin() as connection:
@@ -278,7 +278,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
                 "ready": False,
                 "reason": "migration_not_at_head",
                 "current_revision": "202608300005",
-                "expected_revision": "202609010001",
+                "expected_revision": "202609010002",
             }
         finally:
             with disposable_engine.begin() as connection:
@@ -336,7 +336,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
                 "ready": False,
                 "reason": "migration_not_at_head",
                 "current_revision": "202608300005",
-                "expected_revision": "202609010001",
+                "expected_revision": "202609010002",
             }
         finally:
             with disposable_engine.begin() as connection:

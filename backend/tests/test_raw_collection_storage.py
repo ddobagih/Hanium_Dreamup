@@ -145,6 +145,45 @@ def test_no_replace_chunk_publish_is_durable_and_replay_preserves_inode(
     assert list(root.glob(".*.tmp")) == []
 
 
+def test_raw_chunk_publish_rejects_mutation_after_final_path_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "raw-objects"
+    prepare_raw_object_directory(_settings(root))
+    storage_name = raw_chunk_storage_name(COLLECTION_ID, OBJECT_ID, 0)
+    envelope = b"WSRC-envelope-synthetic-ciphertext"
+    destination = root / storage_name
+    real_stat = os.stat
+    mutated = False
+    published_inode: int | None = None
+
+    def mutate_after_path_stat(path, *args, **kwargs):
+        nonlocal mutated, published_inode
+        metadata = real_stat(path, *args, **kwargs)
+        if (
+            path == storage_name
+            and kwargs.get("dir_fd") is not None
+            and not mutated
+        ):
+            mutated = True
+            published_inode = metadata.st_ino
+            destination.write_bytes(b"X" * len(envelope))
+            os.utime(
+                destination,
+                ns=(metadata.st_atime_ns, metadata.st_mtime_ns + 1_000_000_000),
+            )
+        return metadata
+
+    monkeypatch.setattr(os, "stat", mutate_after_path_stat)
+
+    with pytest.raises(RawCollectionStorageError, match="ambiguous"):
+        persist_raw_chunk_envelope(root, storage_name, envelope)
+
+    assert mutated is True
+    assert real_stat(destination, follow_symlinks=False).st_ino == published_inode
+
+
 def test_committed_raw_file_drift_is_fail_closed(tmp_path: Path) -> None:
     root = tmp_path / "raw-objects"
     prepare_raw_object_directory(_settings(root))
@@ -160,6 +199,88 @@ def test_committed_raw_file_drift_is_fail_closed(tmp_path: Path) -> None:
             expected_size=persisted.envelope_size,
             expected_sha256=persisted.envelope_sha256,
         )
+
+
+def test_raw_chunk_probe_rejects_in_probe_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "raw-objects"
+    prepare_raw_object_directory(_settings(root))
+    storage_name = raw_chunk_storage_name(COLLECTION_ID, OBJECT_ID, 0)
+    envelope = b"WSRC-envelope-synthetic-ciphertext"
+    persisted = persist_raw_chunk_envelope(root, storage_name, envelope)
+    destination = root / storage_name
+    real_fstat = os.fstat
+    mutated = False
+
+    def mutate_after_first_file_stat(descriptor: int):
+        nonlocal mutated
+        metadata = real_fstat(descriptor)
+        if stat.S_ISREG(metadata.st_mode) and not mutated:
+            mutated = True
+            destination.write_bytes(b"X" * len(envelope))
+        return metadata
+
+    monkeypatch.setattr(os, "fstat", mutate_after_first_file_stat)
+
+    with pytest.raises(RawCollectionStorageError, match="does not match"):
+        raw_storage.probe_raw_chunk_envelope(
+            root,
+            storage_name,
+            expected_size=persisted.envelope_size,
+        )
+
+
+@pytest.mark.parametrize("operation", ("read", "probe"))
+def test_raw_chunk_verification_rejects_mutation_after_final_path_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+) -> None:
+    root = tmp_path / "raw-objects"
+    prepare_raw_object_directory(_settings(root))
+    storage_name = raw_chunk_storage_name(COLLECTION_ID, OBJECT_ID, 0)
+    envelope = b"WSRC-envelope-synthetic-ciphertext"
+    persisted = persist_raw_chunk_envelope(root, storage_name, envelope)
+    destination = root / storage_name
+    real_stat = os.stat
+    target_stats = 0
+
+    def mutate_after_final_path_stat(path, *args, **kwargs):
+        nonlocal target_stats
+        metadata = real_stat(path, *args, **kwargs)
+        if path == storage_name and kwargs.get("dir_fd") is not None:
+            target_stats += 1
+            if target_stats == 2:
+                destination.write_bytes(b"X" * len(envelope))
+                os.utime(
+                    destination,
+                    ns=(
+                        metadata.st_atime_ns,
+                        metadata.st_mtime_ns + 1_000_000_000,
+                    ),
+                )
+        return metadata
+
+    monkeypatch.setattr(os, "stat", mutate_after_final_path_stat)
+
+    with pytest.raises(RawCollectionStorageError, match="does not match"):
+        if operation == "read":
+            read_raw_chunk_envelope(
+                root,
+                storage_name,
+                expected_size=persisted.envelope_size,
+                expected_sha256=persisted.envelope_sha256,
+            )
+        else:
+            raw_storage.probe_raw_chunk_envelope(
+                root,
+                storage_name,
+                expected_size=persisted.envelope_size,
+            )
+
+    assert target_stats == 2
 
 
 def test_fractional_persisted_receipt_time_is_fail_closed() -> None:
