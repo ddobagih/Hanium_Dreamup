@@ -1,6 +1,6 @@
 {
-  "canonical_findings_sha256": "952aacfe552fe11260a937040d8a7d36d6dd1bca53d2809b81f9cf8cae1b3618",
-  "finding_count": 23,
+  "canonical_findings_sha256": "7876667d010fd848bf4e9cd0fd5885844455a9bc99e81dc2929fd47ab7dc5807",
+  "finding_count": 29,
   "gitleaks_version": "8.30.1",
   "schema_version": "walksafe.gitleaks-reviewed-findings.v1",
   "scope": "full current checkout; exact canonical JSON finding objects; no line-fingerprint baseline"
