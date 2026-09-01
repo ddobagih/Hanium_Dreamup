@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -83,8 +84,9 @@ public final class AdminReportHttpClientTest {
         AdminReportModels.StatusSnapshot status = client.updateStatus(
             SESSION, REPORT_ID, "resolved", 2, reconfirmation
         );
+        AdminDeliveryPackage.Eligibility eligibility = packageEligibility();
         AdminDeliveryPackage packageValue = client.createDeliveryPackage(
-            SESSION, REPORT_ID, reconfirmation
+            SESSION, eligibility, reconfirmation
         );
         AdminAuditModels.Page audits = client.audits(
             SESSION, new AdminAuditModels.Filters("STATUS", "admin-001"), null
@@ -93,6 +95,9 @@ public final class AdminReportHttpClientTest {
         assertEquals("resolved", status.status());
         assertEquals(3, status.statusVersion());
         assertEquals(1, packageValue.revision());
+        assertEquals(3, packageValue.contentRevision());
+        assertEquals(2, packageValue.reviewRevision());
+        assertTrue(packageValue.expectedByteCount() > 0);
         assertEquals(1, audits.items().size());
         Map<String, Object> statusIntent = AdminStrictJson.parseObject(transport.requests.get(0).bodyText());
         Request statusRequest = transport.requests.get(1);
@@ -105,11 +110,129 @@ public final class AdminReportHttpClientTest {
         );
         Map<String, Object> packageIntent = AdminStrictJson.parseObject(transport.requests.get(2).bodyText());
         assertEquals("admin.report.delivery_package.create", packageIntent.get("action"));
-        assertEquals("POST", transport.requests.get(3).method);
+        Request packageRequest = transport.requests.get(3);
+        assertEquals("POST", packageRequest.method);
+        Map<String, Object> packageBody = AdminStrictJson.parseObject(packageRequest.bodyText());
+        assertEquals(
+            Set.of("expected_content_revision", "expected_review_revision"),
+            packageBody.keySet()
+        );
+        assertEquals(3L, packageBody.get("expected_content_revision"));
+        assertEquals(2L, packageBody.get("expected_review_revision"));
         Map<String, Object> auditIntent = AdminStrictJson.parseObject(transport.requests.get(4).bodyText());
         assertEquals("admin.audit.list", auditIntent.get("read_purpose"));
         assertTrue(transport.requests.get(5).url.contains("actor_id=admin-001"));
         packageValue.destroy();
+    }
+
+    @Test
+    public void packageRequiresExactStartDetailAndNewResponseHeaders() {
+        Map<String, String> reconfirmation = Map.of(
+            AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER,
+            "AAECAwQFBgcICQoLDA0ODw"
+        );
+        AdminDeliveryPackage.Eligibility eligibility = packageEligibility();
+        FakeTransport mismatch = new FakeTransport();
+        mismatch.packageContentRevisionHeader = "4";
+        assertThrows(IOException.class, () -> client(mismatch).createDeliveryPackage(
+            SESSION, eligibility, reconfirmation
+        ));
+
+        FakeTransport missing = new FakeTransport();
+        missing.packageContentRevisionHeader = null;
+        assertThrows(IOException.class, () -> client(missing).createDeliveryPackage(
+            SESSION, eligibility, reconfirmation
+        ));
+
+        FakeTransport reviewMismatch = new FakeTransport();
+        reviewMismatch.packageReviewRevisionHeader = "3";
+        assertThrows(IOException.class, () -> client(reviewMismatch).createDeliveryPackage(
+            SESSION, eligibility, reconfirmation
+        ));
+
+        FakeTransport missingReview = new FakeTransport();
+        missingReview.packageReviewRevisionHeader = null;
+        assertThrows(IOException.class, () -> client(missingReview).createDeliveryPackage(
+            SESSION, eligibility, reconfirmation
+        ));
+
+        FakeTransport byteCountMismatch = new FakeTransport();
+        byteCountMismatch.packageByteCountDelta = 1;
+        assertThrows(IOException.class, () -> client(byteCountMismatch).createDeliveryPackage(
+            SESSION, eligibility, reconfirmation
+        ));
+
+        FakeTransport missingByteCount = new FakeTransport();
+        missingByteCount.omitPackageByteCountHeader = true;
+        assertThrows(IOException.class, () -> client(missingByteCount).createDeliveryPackage(
+            SESSION, eligibility, reconfirmation
+        ));
+    }
+
+    @Test
+    public void packageProofUsesExactRevisionPathReadPurposeAndStrictResponse() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        AdminDeliveryPackage.Proof proof = client(transport).deliveryPackageProof(
+            SESSION,
+            REPORT_ID,
+            7
+        );
+
+        assertEquals(2, transport.requests.size());
+        Map<String, Object> intent = AdminStrictJson.parseObject(
+            transport.requests.get(0).bodyText()
+        );
+        assertEquals("GET", intent.get("method"));
+        assertEquals(
+            "/admin/reports/" + REPORT_ID + "/delivery-packages/7/proof",
+            intent.get("path")
+        );
+        assertEquals("admin.report.delivery_package.proof", intent.get("read_purpose"));
+        assertEquals(null, intent.get("action"));
+
+        Request request = transport.requests.get(1);
+        assertEquals("GET", request.method);
+        assertEquals(
+            "http://127.0.0.1:8000/admin/reports/" + REPORT_ID
+                + "/delivery-packages/7/proof",
+            request.url
+        );
+        assertEquals(
+            "admin.report.delivery_package.proof",
+            request.headers.get(AdminReportHttpClient.READ_PURPOSE_HEADER)
+        );
+        assertEquals(REPORT_ID, proof.reportId());
+        assertEquals(7, proof.packageRevision());
+        assertEquals(3, proof.contentRevision());
+        assertEquals(2, proof.reviewRevision());
+        assertEquals(4_096, proof.byteCount());
+
+        FakeTransport unknown = new FakeTransport();
+        unknown.proofBody = proofBody().replace(
+            "\"package_sha256\":",
+            "\"private_metadata\":{},\"package_sha256\":"
+        );
+        assertThrows(IOException.class, () -> client(unknown).deliveryPackageProof(
+            SESSION, REPORT_ID, 7
+        ));
+
+        FakeTransport schemaMismatch = new FakeTransport();
+        schemaMismatch.proofBody = proofBody().replace(
+            "walksafe.admin-report-delivery-package-proof.v1",
+            "walksafe.admin-report-delivery-package-proof.v0"
+        );
+        assertThrows(IOException.class, () -> client(schemaMismatch).deliveryPackageProof(
+            SESSION, REPORT_ID, 7
+        ));
+
+        FakeTransport revisionMismatch = new FakeTransport();
+        revisionMismatch.proofBody = proofBody().replace(
+            "\"package_revision\":7",
+            "\"package_revision\":8"
+        );
+        assertThrows(IOException.class, () -> client(revisionMismatch).deliveryPackageProof(
+            SESSION, REPORT_ID, 7
+        ));
     }
 
     @Test
@@ -240,6 +363,11 @@ public final class AdminReportHttpClientTest {
         int detailStatus = 200;
         int requestStatusCode = 200;
         String requestConflictBody = requestConflict();
+        String packageContentRevisionHeader = "3";
+        String packageReviewRevisionHeader = "2";
+        int packageByteCountDelta;
+        boolean omitPackageByteCountHeader;
+        String proofBody = AdminReportHttpClientTest.proofBody();
 
         @Override
         public AdminReportHttpClient.Response execute(
@@ -296,6 +424,9 @@ public final class AdminReportHttpClientTest {
                         + "\"updated_at\":\"2026-08-29T02:00:00Z\"}"
                 );
             }
+            if (url.contains("/delivery-packages/") && url.endsWith("/proof")) {
+                return new AdminReportHttpClient.Response(200, proofBody);
+            }
             if (url.endsWith("/delivery-packages")) return packageResponse();
             if (url.contains("/admin/reports/audits?")) {
                 return new AdminReportHttpClient.Response(200,
@@ -312,10 +443,9 @@ public final class AdminReportHttpClientTest {
             return new AdminReportHttpClient.Response(detailStatus, detailBody);
         }
 
-        private static AdminReportHttpClient.Response packageResponse() throws IOException {
+        private AdminReportHttpClient.Response packageResponse() throws IOException {
             byte[] csv = "report_id,status\n1,new\n".getBytes(StandardCharsets.UTF_8);
-            byte[] manifest = "{\"schema_version\":\"walksafe.admin-report-delivery-package.v1\"}"
-                .getBytes(StandardCharsets.UTF_8);
+            byte[] manifest = packageManifest(csv);
             byte[] zip;
             try (ByteArrayOutputStream output = new ByteArrayOutputStream();
                  ZipOutputStream archive = new ZipOutputStream(output)) {
@@ -328,15 +458,42 @@ public final class AdminReportHttpClientTest {
                 archive.finish();
                 zip = output.toByteArray();
             }
-            return new AdminReportHttpClient.Response(201, zip, Map.of(
-                "Content-Type", "application/zip",
-                "X-WalkSafe-Package-Id", "22222222-2222-4222-8222-222222222222",
-                "X-WalkSafe-Package-Revision", "1",
-                "X-WalkSafe-Export-Audit-Id", "33333333-3333-4333-8333-333333333333",
-                "X-WalkSafe-Package-SHA256", AdminDeliveryPackage.digest(zip),
-                "X-WalkSafe-CSV-SHA256", AdminDeliveryPackage.digest(csv),
-                "X-WalkSafe-Manifest-SHA256", AdminDeliveryPackage.digest(manifest)
-            ));
+            Map<String, String> headers = new LinkedHashMap<>();
+            headers.put("Content-Type", "application/zip");
+            headers.put("X-WalkSafe-Package-Id", "22222222-2222-4222-8222-222222222222");
+            headers.put("X-WalkSafe-Package-Revision", "1");
+            if (packageContentRevisionHeader != null) {
+                headers.put("X-WalkSafe-Content-Revision", packageContentRevisionHeader);
+            }
+            if (packageReviewRevisionHeader != null) {
+                headers.put("X-WalkSafe-Review-Revision", packageReviewRevisionHeader);
+            }
+            if (!omitPackageByteCountHeader) {
+                headers.put(
+                    "X-WalkSafe-Package-Byte-Count",
+                    Integer.toString(zip.length + packageByteCountDelta)
+                );
+            }
+            headers.put("X-WalkSafe-Export-Audit-Id", "33333333-3333-4333-8333-333333333333");
+            headers.put("X-WalkSafe-Package-SHA256", AdminDeliveryPackage.digest(zip));
+            headers.put("X-WalkSafe-CSV-SHA256", AdminDeliveryPackage.digest(csv));
+            headers.put("X-WalkSafe-Manifest-SHA256", AdminDeliveryPackage.digest(manifest));
+            return new AdminReportHttpClient.Response(201, zip, headers);
+        }
+
+        private static byte[] packageManifest(byte[] csv) {
+            return ("{\"category_hint\":null,\"content_revision\":3,"
+                + "\"content_sha256\":\"" + "a".repeat(64) + "\","
+                + "\"csv_bytes\":" + csv.length + ",\"csv_name\":\"report.csv\","
+                + "\"csv_sha256\":\"" + AdminDeliveryPackage.digest(csv) + "\","
+                + "\"export_audit_id\":\"33333333-3333-4333-8333-333333333333\","
+                + "\"package_revision\":1,\"package_version\":2,"
+                + "\"report_id\":\"" + REPORT_ID + "\","
+                + "\"review_decision_id\":\"44444444-4444-4444-8444-444444444444\","
+                + "\"review_revision\":2,\"row_count\":1,"
+                + "\"schema_version\":\"walksafe.admin-report-delivery-package.v2\","
+                + "\"supersedes_package_id\":null,\"user_description\":null}")
+                .getBytes(StandardCharsets.UTF_8);
         }
     }
 
@@ -375,6 +532,29 @@ public final class AdminReportHttpClientTest {
     private static String wave5Detail() {
         try { return AdminReportModelsTest.wave5DetailFixture(); }
         catch (Exception error) { throw new AssertionError(error); }
+    }
+
+    private static AdminDeliveryPackage.Eligibility packageEligibility() {
+        try {
+            String detail = wave5Detail()
+                .replace("\"content_revision\": 0", "\"content_revision\": 3")
+                .replace(
+                    "\"package_content_revision\": 0",
+                    "\"package_content_revision\": 3"
+                );
+            return AdminDeliveryPackage.Eligibility.fromDetail(
+                AdminReportModels.parseDetail(detail, REPORT_ID)
+            );
+        } catch (Exception error) {
+            throw new AssertionError(error);
+        }
+    }
+
+    private static String proofBody() {
+        return "{\"schema_version\":\"walksafe.admin-report-delivery-package-proof.v1\","
+            + "\"package_revision\":7,\"content_revision\":3,\"review_revision\":2,"
+            + "\"package_schema_version\":\"walksafe.admin-report-delivery-package.v2\","
+            + "\"package_byte_count\":4096,\"package_sha256\":\"" + "f".repeat(64) + "\"}";
     }
 
     private static String requestList() {

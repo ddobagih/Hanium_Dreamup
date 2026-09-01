@@ -16,6 +16,7 @@ import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportController;
@@ -427,7 +428,7 @@ public final class AdminReportPanel extends LinearLayout {
     private static String deliveryText(AdminReportModels.DeliverySummary delivery) {
         if (delivery == null) return "\n현재 수동전달 기록: 아직 기록 없음";
         return "\n현재 수동전달 기록: " + delivery.status() + " · revision " + delivery.revision()
-            + "\n제출본 revision: " + (delivery.packageRevision() == null ? "결속 없음" : delivery.packageRevision())
+            + "\n제출본 revision: " + delivery.packageRevision()
             + "\n외부 접수번호 " + present(delivery.externalReceiptPresent())
             + " · 증빙 " + present(delivery.evidencePresent())
             + "\n관찰시각: " + delivery.observedAt()
@@ -454,16 +455,25 @@ public final class AdminReportPanel extends LinearLayout {
 
     private void confirmHighRiskAction() {
         if (displayedDetail == null || (!pendingPackage && pendingStatus == null)) return;
-        char[] password = highRiskPassword.getText().toString().toCharArray();
-        char[] totp = highRiskTotp.getText().toString().toCharArray();
+        char[] password = editableChars(highRiskPassword);
+        char[] totp = editableChars(highRiskTotp);
         clearHighRiskInputs();
-        if (pendingPackage) {
-            listener.onCreateDeliveryPackage(displayedDetail, password, totp);
-        } else {
-            listener.onUpdateStatus(displayedDetail, pendingStatus, password, totp);
+        try {
+            if (pendingPackage) {
+                listener.onCreateDeliveryPackage(displayedDetail, password, totp);
+            } else {
+                listener.onUpdateStatus(displayedDetail, pendingStatus, password, totp);
+            }
+        } finally {
+            Arrays.fill(password, '\0');
+            Arrays.fill(totp, '\0');
         }
-        java.util.Arrays.fill(password, '\0');
-        java.util.Arrays.fill(totp, '\0');
+    }
+
+    private static char[] editableChars(EditText input) {
+        char[] value = new char[input.length()];
+        input.getText().getChars(0, value.length, value, 0);
+        return value;
     }
 
     private EditText sensitiveInput(String hint, int inputType) {

@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Exact seven-field, append-only administrator review decision request. */
+/** Exact nine-field, append-only administrator review decision request. */
 public final class AdminReportDecision {
     public enum Decision {
         APPROVED,
@@ -20,7 +20,9 @@ public final class AdminReportDecision {
         "duplicate_of_report_id",
         "location_reviewed",
         "photo_reviewed",
-        "privacy_reviewed"
+        "privacy_reviewed",
+        "content_revision",
+        "evidence_grant_id"
     );
 
     private final Decision decision;
@@ -30,6 +32,8 @@ public final class AdminReportDecision {
     private final boolean locationReviewed;
     private final boolean photoReviewed;
     private final boolean privacyReviewed;
+    private final int contentRevision;
+    private final String evidenceGrantId;
 
     public AdminReportDecision(
         Decision decision,
@@ -38,7 +42,9 @@ public final class AdminReportDecision {
         String duplicateOfReportId,
         boolean locationReviewed,
         boolean photoReviewed,
-        boolean privacyReviewed
+        boolean privacyReviewed,
+        int contentRevision,
+        String evidenceGrantId
     ) {
         if (decision == null) throw new IllegalArgumentException("decision is required");
         this.decision = decision;
@@ -64,12 +70,21 @@ public final class AdminReportDecision {
         this.locationReviewed = locationReviewed;
         this.photoReviewed = photoReviewed;
         this.privacyReviewed = privacyReviewed;
+        if (contentRevision < 0) throw new IllegalArgumentException("content_revision is invalid");
+        this.contentRevision = contentRevision;
+        this.evidenceGrantId = evidenceGrantId == null
+            ? null
+            : canonicalUuid(evidenceGrantId, "evidence_grant_id");
+        if ((decision == Decision.APPROVED) != (this.evidenceGrantId != null)) {
+            throw new IllegalArgumentException("evidence_grant_id is required only for APPROVED");
+        }
     }
 
     public Decision decision() { return decision; }
     public String reason() { return reason; }
     public String userVisibleReason() { return userVisibleReason; }
     public String duplicateOfReportId() { return duplicateOfReportId; }
+    public String evidenceGrantId() { return evidenceGrantId; }
 
     public byte[] requestBody(String reportId) {
         String canonicalReportId = canonicalUuid(reportId, "report_id");
@@ -84,7 +99,9 @@ public final class AdminReportDecision {
         fields.put("location_reviewed", locationReviewed);
         fields.put("photo_reviewed", photoReviewed);
         fields.put("privacy_reviewed", privacyReviewed);
-        if (!fields.keySet().equals(EXACT_KEYS)) throw new IllegalStateException("invalid exact7 review shape");
+        fields.put("content_revision", contentRevision);
+        fields.put("evidence_grant_id", evidenceGrantId);
+        if (!fields.keySet().equals(EXACT_KEYS)) throw new IllegalStateException("invalid exact9 review shape");
         return AdminCanonicalEncoding.canonicalJsonBytes(fields);
     }
 

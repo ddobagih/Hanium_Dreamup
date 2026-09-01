@@ -216,4 +216,43 @@ public final class AdminHighRiskActionGateTest {
             () -> AdminHighRiskActionGate.incidentStatus("not-a-canonical-uuid")
         );
     }
+
+    @Test
+    public void originalEvidenceUsesOnlyTheCanonicalReportBoundGrantTriple() {
+        String reportId = "11111111-1111-4111-8111-111111111111";
+        AdminHighRiskActionGate.Operation operation =
+            AdminHighRiskActionGate.originalEvidence(reportId);
+
+        assertEquals("report.original.grant", operation.reauthenticationAction());
+        assertEquals("POST", operation.method());
+        assertEquals("/reports/" + reportId + "/original-access-grants", operation.path());
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> AdminHighRiskActionGate.originalEvidence("not-a-canonical-uuid")
+        );
+
+        var binding = new AdminHighRiskActionGate.Binding(
+            operation,
+            "AAECAwQFBgcICQoLDA0ODw",
+            20_000L
+        );
+        assertTrue(AdminHighRiskActionGate.evaluate(
+            operation,
+            AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED,
+            binding,
+            10_000L,
+            true
+        ).isAllowed());
+        assertFalse(AdminHighRiskActionGate.evaluate(
+            AdminHighRiskActionGate.originalEvidence(
+                "22222222-2222-4222-8222-222222222222"
+            ),
+            AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED,
+            binding,
+            10_000L,
+            true
+        ).isAllowed());
+    }
 }

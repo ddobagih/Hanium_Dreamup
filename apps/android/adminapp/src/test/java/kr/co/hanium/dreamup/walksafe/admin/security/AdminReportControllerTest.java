@@ -75,8 +75,9 @@ public final class AdminReportControllerTest {
 
     private static String detail(String id) {
         String prefix = "/reports/" + id;
-        return "{\"schema_version\":\"walksafe.admin-report-detail.v1\",\"id\":\"" + id + "\","
+        return "{\"schema_version\":\"walksafe.admin-report-detail.v2\",\"id\":\"" + id + "\","
             + "\"status\":\"new\",\"status_version\":1,\"allowed_next_statuses\":[\"reviewed\",\"resolved\"],"
+            + "\"content_revision\":0,\"latest_delivery_revision\":0,"
             + "\"class_name\":\"pothole\",\"confidence\":0.5,"
             + "\"location_quality\":\"low\",\"captured_at\":\"2026-08-29T00:00:00Z\","
             + "\"created_at\":\"2026-08-29T00:00:01Z\",\"updated_at\":\"2026-08-29T00:00:02Z\","

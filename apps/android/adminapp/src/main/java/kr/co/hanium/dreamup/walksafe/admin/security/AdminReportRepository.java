@@ -63,8 +63,14 @@ public interface AdminReportRepository {
 
     AdminDeliveryPackage createDeliveryPackage(
         AdminOperationsApi.SessionContext session,
-        String reportId,
+        AdminDeliveryPackage.Eligibility eligibility,
         Map<String, String> reconfirmationHeaders
+    ) throws IOException, GeneralSecurityException;
+
+    AdminDeliveryPackage.Proof deliveryPackageProof(
+        AdminOperationsApi.SessionContext session,
+        String reportId,
+        int packageRevision
     ) throws IOException, GeneralSecurityException;
 
     AdminAuditModels.Page audits(

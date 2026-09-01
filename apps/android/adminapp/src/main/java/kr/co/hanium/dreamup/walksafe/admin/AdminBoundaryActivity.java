@@ -2,11 +2,16 @@ package kr.co.hanium.dreamup.walksafe.admin;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.DocumentsContract;
+import android.text.Editable;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -15,8 +20,10 @@ import android.view.WindowManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Button;
 import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -27,10 +34,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeviceKeyStore;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminAuditController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminAuditModels;
@@ -43,6 +53,7 @@ import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentModels;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentRepository;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOperationsApi;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOperationsHttpClient;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminOriginalEvidence;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportHttpClient;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportModels;
@@ -75,6 +86,7 @@ public final class AdminBoundaryActivity extends Activity {
     private static final String AUDIT_ACTOR_STATE = "admin_audit_actor";
     private static final String INCIDENT_FILTER_STATUS_STATE = "admin_incident_filter_status";
     private static final String INCIDENT_SELECTED_ID_STATE = "admin_incident_selected_id";
+    private static final int OPEN_DELIVERY_PACKAGE_DOCUMENT = 7_300;
     private static final int CREATE_DELIVERY_PACKAGE_DOCUMENT = 7_301;
     private static final int LAST_DELIVERY_PACKAGE_DOCUMENT_REQUEST = 65_534;
     private static final String[] REVIEW_DECISION_LABELS = {
@@ -147,6 +159,14 @@ public final class AdminBoundaryActivity extends Activity {
     private CheckBox locationReviewedInput;
     private CheckBox photoReviewedInput;
     private CheckBox privacyReviewedInput;
+    private EditText originalEvidenceReasonInput;
+    private EditText originalEvidencePasswordInput;
+    private EditText originalEvidenceTotpInput;
+    private Button originalEvidenceLoadButton;
+    private TextView originalEvidenceStatusText;
+    private TextView originalEvidenceLocationText;
+    private ImageView originalEvidenceImage;
+    private CheckBox originalEvidenceConfirmedInput;
     private EditText institutionInput;
     private EditText deliveryChannelInput;
     private EditText deliveryRecipientInput;
@@ -159,18 +179,35 @@ public final class AdminBoundaryActivity extends Activity {
     private EditText packageRevisionInput;
     private EditText idempotencyKeyInput;
     private CheckBox manualDeliveryCompletedInput;
+    private Button reconnectDeliveryPackageButton;
     private Button revokeCurrentButton;
     private LinearLayout contentRoot;
     private boolean operationInFlight;
     private boolean recordingDelivery;
     private AdminDeliveryPackage pendingDeliveryPackage;
     private AdminDeliveryPackageSaver.Saved verifiedDeliveryPackage;
+    private AdminOriginalEvidence originalEvidence;
+    private Bitmap originalEvidenceBitmap;
+    private final Handler originalEvidenceExpiryHandler = new Handler(Looper.getMainLooper());
+    private Runnable originalEvidenceExpiryTask;
+    private Future<?> originalEvidenceLoadTask;
+    private final AtomicReference<PendingOriginalEvidenceCredentials>
+        pendingOriginalEvidenceCredentials = new AtomicReference<>();
+    private volatile long originalEvidenceGeneration;
     private String connectedOperationsReportId;
+    private int connectedOperationsContentRevision = -1;
+    private int connectedOperationsReviewRevision = -1;
+    private String connectedOperationsReviewDecision;
+    private int connectedOperationsLatestDeliveryRevision = -1;
+    private int connectedOperationsDeliveryRevision = -1;
+    private Integer connectedOperationsPackageRevision;
+    private String connectedOperationsDeliveryStatus;
     private volatile String boundOperationsSessionId;
     private boolean operationsAccessBindingInitialized;
     private volatile boolean boundOperationsAccessActive;
     private volatile long operationsSessionGeneration;
     private volatile long safSaveGeneration;
+    private volatile long safReconnectGeneration;
     private long pendingSafSaveGeneration = -1L;
     private long pendingSafWorkflowGeneration = -1L;
     private long pendingSafSessionGeneration = -1L;
@@ -178,6 +215,29 @@ public final class AdminBoundaryActivity extends Activity {
     private int nextSafRequestCode = CREATE_DELIVERY_PACKAGE_DOCUMENT;
     private int pendingSafRequestCode = -1;
     private boolean awaitingSafResult;
+    private boolean awaitingSafReconnectResult;
+    private long pendingSafReconnectGeneration = -1L;
+    private long pendingSafReconnectSessionGeneration = -1L;
+    private String pendingSafReconnectSessionId;
+    private AdminDeliveryPackage.Eligibility pendingSafReconnectEligibility;
+
+    private static final class PendingOriginalEvidenceCredentials {
+        private final char[] password;
+        private final char[] totp;
+
+        private PendingOriginalEvidenceCredentials(char[] password, char[] totp) {
+            this.password = password;
+            this.totp = totp;
+        }
+
+        private char[] password() { return password; }
+        private char[] totp() { return totp; }
+
+        private synchronized void clear() {
+            Arrays.fill(password, '\0');
+            Arrays.fill(totp, '\0');
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -316,12 +376,12 @@ public final class AdminBoundaryActivity extends Activity {
 
                         @Override
                         public AdminDeliveryPackage createPackage(
-                            String reportId,
-                            String password,
-                            String totp
+                            AdminDeliveryPackage.Eligibility eligibility,
+                            char[] password,
+                            char[] totp
                         ) throws Exception {
                             return controller.createAdminDeliveryPackage(
-                                reportId,
+                                eligibility,
                                 password,
                                 totp,
                                 System.currentTimeMillis(),
@@ -410,6 +470,10 @@ public final class AdminBoundaryActivity extends Activity {
 
     @Override
     protected void onStop() {
+        clearOriginalEvidence("화면을 벗어나 원본 증거를 메모리에서 지웠습니다.");
+        clear(originalEvidenceReasonInput);
+        clear(originalEvidencePasswordInput);
+        clear(originalEvidenceTotpInput);
         if (reportController != null) reportController.invalidate();
         if (reportRequestController != null) reportRequestController.invalidate();
         if (auditController != null) auditController.invalidate();
@@ -426,11 +490,13 @@ public final class AdminBoundaryActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        clearOriginalEvidence("원본 증거를 메모리에서 지웠습니다.");
         if (reportRequestController != null) reportRequestController.invalidate();
         if (incidentController != null) incidentController.invalidate();
         if (pendingDeliveryPackage != null) pendingDeliveryPackage.destroy();
         pendingDeliveryPackage = null;
         verifiedDeliveryPackage = null;
+        clearPendingSafReconnectBinding();
         if (controller != null) networkExecutor.execute(controller::close);
         networkExecutor.shutdown();
         super.onDestroy();
@@ -439,6 +505,12 @@ public final class AdminBoundaryActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == OPEN_DELIVERY_PACKAGE_DOCUMENT) {
+            handleExistingDeliveryPackageResult(
+                resultCode == RESULT_OK && data != null ? data.getData() : null
+            );
+            return;
+        }
         if (!isSafSaveRequestCode(requestCode)) return;
         Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
         if (requestCode != pendingSafRequestCode) {
@@ -474,11 +546,22 @@ public final class AdminBoundaryActivity extends Activity {
                 if (!serverSessionValid || !isCurrentSafSaveBinding(
                     saveGeneration, workflowGeneration, sessionGeneration, sessionId
                 )) {
-                    rejectSafSaveBeforeWrite(packageValue, uri);
+                    rejectSafSave(packageValue, uri, workflowGeneration,
+                        "현재 관리자 세션을 서버에서 재확인하지 못해 제출본을 저장하지 않았습니다.");
+                    return;
+                }
+                AdminReportModels.Detail beforeWrite = controller.getAdminReportDetail(
+                    packageValue.reportId(),
+                    BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                );
+                if (!packageValue.matchesFreshEligibility(beforeWrite)) {
+                    rejectSafSave(packageValue, uri, workflowGeneration,
+                        "신고 내용·검토·전달 버전이 바뀌어 새 제출본을 저장하지 않았습니다.");
                     return;
                 }
             } catch (Exception error) {
-                rejectSafSaveBeforeWrite(packageValue, uri);
+                rejectSafSave(packageValue, uri, workflowGeneration,
+                    "저장 직전 신고 상태를 다시 확인하지 못해 새 제출본을 저장하지 않았습니다.");
                 return;
             }
             try {
@@ -486,19 +569,33 @@ public final class AdminBoundaryActivity extends Activity {
                     packageValue,
                     safDestination(uri)
                 );
+                AdminReportModels.Detail afterWrite = controller.getAdminReportDetail(
+                    saved.reportId(),
+                    BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                );
+                if (!packageValue.matchesFreshEligibility(afterWrite)
+                    || !saved.matchesFreshDetail(afterWrite)) {
+                    throw new IOException("report package eligibility changed during SAF save");
+                }
                 runOnUiThread(() -> {
-                    if (isDestroyed()) return;
+                    if (isDestroyed()) {
+                        deleteSafDocument(uri);
+                        return;
+                    }
                     if (!isCurrentSafSaveBinding(
                         saveGeneration, workflowGeneration, sessionGeneration, sessionId
                     ) || !reportWorkflowController.markSaved(workflowGeneration, saved.revision())) {
                         deleteSafDocument(uri);
                         return;
                     }
-                    verifiedDeliveryPackage = saved;
-                    packageRevisionInput.setText(Integer.toString(saved.revision()));
+                    reportController.replaceDetail(afterWrite);
+                    reportPanel.render(reportController.snapshot());
+                    connectReportToOperations(afterWrite);
+                    replaceVerifiedDeliveryPackage(saved);
                     reportPanel.renderWorkflow(reportWorkflowController.snapshot());
                 });
             } catch (Exception error) {
+                deleteSafDocument(uri);
                 runOnUiThread(() -> {
                     if (isDestroyed()) return;
                     if (isCurrentSafSaveBinding(
@@ -511,16 +608,20 @@ public final class AdminBoundaryActivity extends Activity {
         });
     }
 
-    private void rejectSafSaveBeforeWrite(AdminDeliveryPackage packageValue, Uri uri) {
+    private void rejectSafSave(
+        AdminDeliveryPackage packageValue,
+        Uri uri,
+        long workflowGeneration,
+        String message
+    ) {
         packageValue.destroy();
         deleteSafDocument(uri);
         runOnUiThread(() -> {
             if (isDestroyed()) return;
-            resetSessionBoundReportState();
-            render();
-            resultText.setText(
-                "현재 관리자 세션을 서버에서 재확인하지 못해 제출본을 저장하지 않았습니다."
-            );
+            if (reportWorkflowController.markSaveFailed(workflowGeneration, false)) {
+                reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+            }
+            resultText.setText(message + " 기존 제출본 연결과 입력은 유지했습니다.");
         });
     }
 
@@ -893,6 +994,76 @@ public final class AdminBoundaryActivity extends Activity {
         reportOperationsFormGroup.addView(locationReviewedInput, matchWrap());
         reportOperationsFormGroup.addView(photoReviewedInput, matchWrap());
         reportOperationsFormGroup.addView(privacyReviewedInput, matchWrap());
+
+        TextView originalEvidenceHeading = text("승인용 원본 증거 확인", 18);
+        originalEvidenceHeading.setPadding(0, dp(20), 0, dp(4));
+        markAccessibilityHeading(originalEvidenceHeading);
+        reportOperationsFormGroup.addView(originalEvidenceHeading, matchWrap());
+        reportOperationsFormGroup.addView(text(
+            "APPROVED 결정에만 사용합니다. 비밀번호·6자리 추가 인증 후 정확한 위치와 원본 사진을 한 번 불러옵니다. 화면을 벗어나거나 시간이 만료되면 즉시 지우며 저장·복사·공유하지 않습니다.",
+            15
+        ), matchWrap());
+        originalEvidenceReasonInput = input(
+            "원본 열람 사유 (8자 이상, 내부 감사 기록)",
+            InputType.TYPE_CLASS_TEXT,
+            false
+        );
+        originalEvidencePasswordInput = input(
+            "원본 열람 재인증 비밀번호",
+            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD,
+            true
+        );
+        originalEvidenceTotpInput = input(
+            "원본 열람 6자리 추가 인증",
+            InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD,
+            true
+        );
+        originalEvidencePasswordInput.setFilterTouchesWhenObscured(true);
+        originalEvidenceTotpInput.setFilterTouchesWhenObscured(true);
+        reportOperationsFormGroup.addView(originalEvidenceReasonInput, matchWrap());
+        reportOperationsFormGroup.addView(originalEvidencePasswordInput, matchWrap());
+        reportOperationsFormGroup.addView(originalEvidenceTotpInput, matchWrap());
+        originalEvidenceLoadButton = button("정확한 위치·원본 사진 일회 열람");
+        originalEvidenceLoadButton.setContentDescription(
+            "승인 검토용 정확한 위치와 원본 사진을 재인증 후 한 번 불러오기"
+        );
+        originalEvidenceLoadButton.setOnClickListener(view -> loadOriginalEvidence());
+        reportOperationsFormGroup.addView(originalEvidenceLoadButton, matchWrap());
+        originalEvidenceStatusText = text("원본 증거를 아직 불러오지 않았습니다.", 15);
+        originalEvidenceStatusText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE);
+        reportOperationsFormGroup.addView(originalEvidenceStatusText, matchWrap());
+        originalEvidenceLocationText = text("정확한 위치: 열람 전", 16);
+        originalEvidenceLocationText.setTextIsSelectable(false);
+        reportOperationsFormGroup.addView(originalEvidenceLocationText, matchWrap());
+        originalEvidenceImage = new ImageView(this);
+        originalEvidenceImage.setAdjustViewBounds(true);
+        originalEvidenceImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        originalEvidenceImage.setContentDescription("승인 검토용 신고 원본 사진");
+        originalEvidenceImage.setSaveEnabled(false);
+        originalEvidenceImage.setId(View.NO_ID);
+        originalEvidenceImage.setVisibility(View.GONE);
+        reportOperationsFormGroup.addView(
+            originalEvidenceImage,
+            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(240))
+        );
+        originalEvidenceConfirmedInput = checkBox(
+            "현재 표시된 정확한 위치와 원본 사진을 직접 확인했습니다."
+        );
+        originalEvidenceConfirmedInput.setEnabled(false);
+        reportOperationsFormGroup.addView(originalEvidenceConfirmedInput, matchWrap());
+        reviewDecisionInput.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position < 0 || position >= REVIEW_DECISIONS.length
+                    || REVIEW_DECISIONS[position] != AdminReportDecision.Decision.APPROVED) {
+                    clearOriginalEvidence("승인 외 결정에는 원본 열람 grant를 보관하지 않습니다.");
+                }
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) {
+                clearOriginalEvidence("결정을 다시 선택해야 원본 증거를 열람할 수 있습니다.");
+            }
+        });
         Button reviewButton = button("검토 결정 기록");
         reviewButton.setOnClickListener(view -> recordReviewDecision());
         reportOperationsFormGroup.addView(reviewButton, matchWrap());
@@ -908,6 +1079,19 @@ public final class AdminBoundaryActivity extends Activity {
             "승인된 신고의 제출본을 저장하고 앱 밖에서 기관에 직접 제출하세요. 이 영역은 앱 밖에서 시도한 제출의 성공·접수·처리·실패 결과만 기록합니다.",
             15
         ), matchWrap());
+        reportOperationsFormGroup.addView(text(
+            "앱 재시작이나 재로그인 뒤 접수·처리 결과를 이어서 기록하려면, 이전에 저장한 같은 ZIP을 직접 다시 선택해 현재 신고와 해시를 확인해야 합니다. 앱은 ZIP을 내부에 복사하거나 기관으로 전송하지 않습니다.",
+            15
+        ), matchWrap());
+        reconnectDeliveryPackageButton = button("기존 제출본 ZIP 다시 확인");
+        reconnectDeliveryPackageButton.setContentDescription(
+            "기존 제출본 ZIP을 직접 선택하여 현재 신고, 전달 버전, 콘텐츠 버전과 해시 다시 확인"
+        );
+        reconnectDeliveryPackageButton.setOnClickListener(
+            view -> launchExistingDeliveryPackagePicker()
+        );
+        reconnectDeliveryPackageButton.setVisibility(View.GONE);
+        reportOperationsFormGroup.addView(reconnectDeliveryPackageButton, matchWrap());
         institutionInput = input("기관", InputType.TYPE_CLASS_TEXT, false);
         deliveryChannelInput = input("수동 전달 채널 (예: 전화, 공문)", InputType.TYPE_CLASS_TEXT, false);
         deliveryRecipientInput = input("수신 부서 또는 담당자", InputType.TYPE_CLASS_TEXT, false);
@@ -990,15 +1174,50 @@ public final class AdminBoundaryActivity extends Activity {
     private void recordReviewDecision() {
         try {
             String reportId = requireConnectedOperationsReportId();
+            AdminReportDecision.Decision selectedDecision =
+                REVIEW_DECISIONS[reviewDecisionInput.getSelectedItemPosition()];
+            String evidenceGrantId = null;
+            if (selectedDecision == AdminReportDecision.Decision.APPROVED) {
+                if (originalEvidenceConfirmedInput == null
+                    || !originalEvidenceConfirmedInput.isChecked()) {
+                    if (originalEvidenceConfirmedInput != null) {
+                        originalEvidenceConfirmedInput.requestFocus();
+                    }
+                    resultText.setText("승인 전 현재 표시된 정확한 위치와 원본 사진을 직접 확인해 주세요.");
+                    return;
+                }
+                String sessionId = boundOperationsSessionId;
+                if (originalEvidence == null
+                    || sessionId == null
+                    || !originalEvidence.matches(
+                        reportId,
+                        connectedOperationsContentRevision,
+                        sessionId,
+                        deviceId,
+                        System.currentTimeMillis()
+                    )) {
+                    clearOriginalEvidence("원본 증거가 만료되었거나 현재 신고·세션과 다릅니다.");
+                    resultText.setText("승인용 원본 증거를 현재 신고에서 다시 열람해 주세요.");
+                    return;
+                }
+                evidenceGrantId = originalEvidence.grantId();
+            } else {
+                clearOriginalEvidence("승인 외 결정에는 원본 열람 grant를 사용하지 않습니다.");
+            }
             AdminReportDecision decision = new AdminReportDecision(
-                REVIEW_DECISIONS[reviewDecisionInput.getSelectedItemPosition()],
+                selectedDecision,
                 normalized(reviewReasonInput),
                 nullableNormalized(reviewUserVisibleReasonInput),
                 nullableNormalized(duplicateReportIdInput),
                 locationReviewedInput.isChecked(),
                 photoReviewedInput.isChecked(),
-                privacyReviewedInput.isChecked()
+                privacyReviewedInput.isChecked(),
+                connectedOperationsContentRevision,
+                evidenceGrantId
             );
+            if (selectedDecision == AdminReportDecision.Decision.APPROVED) {
+                clearOriginalEvidence("확인한 원본 증거를 승인 요청에 한 번 결속했습니다.");
+            }
             runOperationalOperation("검토 결정을 기록하고 있습니다.", () ->
                 controller.recordReviewDecision(
                     reportId,
@@ -1011,6 +1230,259 @@ public final class AdminBoundaryActivity extends Activity {
         } catch (IllegalArgumentException error) {
             resultText.setText("검토 결정 입력값을 다시 확인해 주세요.");
         }
+    }
+
+    private void loadOriginalEvidence() {
+        if (controller == null || operationInFlight) return;
+        char[] password = null;
+        char[] totp = null;
+        try {
+            String reportId = requireConnectedOperationsReportId();
+            if (REVIEW_DECISIONS[reviewDecisionInput.getSelectedItemPosition()]
+                != AdminReportDecision.Decision.APPROVED) {
+                clearOriginalEvidence("승인 결정을 선택한 경우에만 원본 증거를 열람할 수 있습니다.");
+                resultText.setText("원본 증거는 APPROVED 결정 검토에만 사용할 수 있습니다.");
+                return;
+            }
+            String reason = normalized(originalEvidenceReasonInput);
+            if (reason.length() < 8 || reason.length() > 500) {
+                originalEvidenceReasonInput.requestFocus();
+                resultText.setText("원본 열람 사유를 8자 이상 500자 이하로 입력해 주세요.");
+                return;
+            }
+            password = takeMutableInput(originalEvidencePasswordInput);
+            totp = takeMutableInput(originalEvidenceTotpInput);
+            String sessionId = boundOperationsSessionId;
+            if (!boundOperationsAccessActive || sessionId == null) {
+                throw new IllegalStateException("관리자 세션을 다시 확인해 주세요.");
+            }
+            int contentRevision = connectedOperationsContentRevision;
+            long sessionGeneration = operationsSessionGeneration;
+            clearOriginalEvidence("재인증 후 원본 증거를 불러오고 있습니다.");
+            long requestGeneration = originalEvidenceGeneration;
+            operationInFlight = true;
+            setInteractiveEnabled(contentRoot, false);
+            resultText.setText("승인용 원본 증거를 안전하게 불러오고 있습니다.");
+            PendingOriginalEvidenceCredentials requestCredentials =
+                new PendingOriginalEvidenceCredentials(password, totp);
+            password = null;
+            totp = null;
+            pendingOriginalEvidenceCredentials.set(requestCredentials);
+            originalEvidenceLoadTask = networkExecutor.submit(() -> {
+                try {
+                    AdminOriginalEvidence loaded = controller.loadAdminOriginalEvidence(
+                        reportId,
+                        contentRevision,
+                        reason,
+                        requestCredentials.password(),
+                        requestCredentials.totp(),
+                        System.currentTimeMillis(),
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    );
+                    runOnUiThread(() -> {
+                        if (requestGeneration == originalEvidenceGeneration) {
+                            originalEvidenceLoadTask = null;
+                        }
+                        applyLoadedOriginalEvidence(
+                            loaded,
+                            reportId,
+                            contentRevision,
+                            sessionId,
+                            sessionGeneration,
+                            requestGeneration
+                        );
+                    });
+                } catch (Exception error) {
+                    runOnUiThread(() -> {
+                        if (requestGeneration == originalEvidenceGeneration) {
+                            originalEvidenceLoadTask = null;
+                        }
+                        if (isDestroyed() || requestGeneration != originalEvidenceGeneration) return;
+                        operationInFlight = false;
+                        setInteractiveEnabled(contentRoot, true);
+                        clearOriginalEvidence("원본 증거를 불러오지 못했습니다. 서버 상태와 재인증 정보를 확인해 주세요.");
+                        resultText.setText("원본 증거를 불러오지 못했습니다. 자동 재시도하지 않습니다.");
+                    });
+                } finally {
+                    requestCredentials.clear();
+                    pendingOriginalEvidenceCredentials.compareAndSet(requestCredentials, null);
+                }
+            });
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totp != null) Arrays.fill(totp, '\0');
+            resultText.setText(error.getMessage() == null
+                ? "원본 열람 입력과 재인증 정보를 확인해 주세요."
+                : error.getMessage());
+        }
+    }
+
+    private void applyLoadedOriginalEvidence(
+        AdminOriginalEvidence loaded,
+        String reportId,
+        int contentRevision,
+        String sessionId,
+        long sessionGeneration,
+        long requestGeneration
+    ) {
+        if (loaded == null) return;
+        boolean currentRequest = requestGeneration == originalEvidenceGeneration;
+        if (isDestroyed()
+            || !currentRequest
+            || sessionGeneration != operationsSessionGeneration
+            || !boundOperationsAccessActive
+            || !sessionId.equals(boundOperationsSessionId)
+            || !reportId.equals(connectedOperationsReportId)
+            || contentRevision != connectedOperationsContentRevision
+            || !loaded.matches(
+                reportId,
+                contentRevision,
+                sessionId,
+                deviceId,
+                System.currentTimeMillis()
+            )) {
+            loaded.close();
+            if (!isDestroyed() && currentRequest) {
+                operationInFlight = false;
+                setInteractiveEnabled(contentRoot, true);
+                resultText.setText("신고·콘텐츠 버전 또는 관리자 세션이 바뀌어 원본 증거를 표시하지 않았습니다.");
+            }
+            return;
+        }
+        byte[] displayBytes = null;
+        Bitmap decoded = null;
+        try {
+            displayBytes = loaded.copyImageBytes(System.currentTimeMillis());
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(displayBytes, 0, displayBytes.length, bounds);
+            if (bounds.outWidth < 1 || bounds.outHeight < 1
+                || bounds.outWidth > 8192 || bounds.outHeight > 8192
+                || (long) bounds.outWidth * bounds.outHeight > 20_000_000L) {
+                throw new IllegalStateException("원본 이미지 크기가 안전한 표시 범위를 벗어났습니다.");
+            }
+            int sampleSize = 1;
+            while (bounds.outWidth / sampleSize > 1600 || bounds.outHeight / sampleSize > 1600) {
+                sampleSize *= 2;
+            }
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            options.inMutable = true;
+            options.inSampleSize = sampleSize;
+            decoded = BitmapFactory.decodeByteArray(displayBytes, 0, displayBytes.length, options);
+            if (decoded == null) throw new IllegalStateException("원본 이미지를 표시할 수 없습니다.");
+            loaded.discardEncodedImageAfterDisplay();
+        } catch (RuntimeException error) {
+            if (decoded != null) destroyBitmap(decoded);
+            loaded.close();
+            operationInFlight = false;
+            setInteractiveEnabled(contentRoot, true);
+            clearOriginalEvidence("검증된 원본 이미지를 안전하게 표시하지 못했습니다.");
+            resultText.setText("원본 이미지를 표시하지 않았습니다. 다른 작업을 진행하지 마세요.");
+            return;
+        } finally {
+            if (displayBytes != null) Arrays.fill(displayBytes, (byte) 0);
+        }
+
+        originalEvidence = loaded;
+        originalEvidenceBitmap = decoded;
+        originalEvidenceImage.setImageBitmap(decoded);
+        originalEvidenceImage.setVisibility(View.VISIBLE);
+        originalEvidenceLocationText.setText(String.format(
+            Locale.ROOT,
+            "정확한 위치: 위도 %.7f, 경도 %.7f%s",
+            loaded.latitude(),
+            loaded.longitude(),
+            loaded.accuracyMeters() == null
+                ? ""
+                : String.format(Locale.ROOT, ", 정확도 %.1fm", loaded.accuracyMeters())
+        ));
+        originalEvidenceStatusText.setText(
+            "현재 신고·콘텐츠 버전·세션에 결속된 원본입니다. 확인 후 만료 전에 승인 결정을 기록하세요."
+        );
+        originalEvidenceConfirmedInput.setChecked(false);
+        scheduleOriginalEvidenceExpiry(loaded);
+        operationInFlight = false;
+        setInteractiveEnabled(contentRoot, true);
+        originalEvidenceConfirmedInput.requestFocus();
+        resultText.setText("정확한 위치와 원본 사진을 표시했습니다. 직접 확인한 뒤 확인란을 선택하세요.");
+    }
+
+    private void scheduleOriginalEvidenceExpiry(AdminOriginalEvidence evidence) {
+        if (originalEvidenceExpiryTask != null) {
+            originalEvidenceExpiryHandler.removeCallbacks(originalEvidenceExpiryTask);
+        }
+        originalEvidenceExpiryTask = () -> {
+            if (originalEvidence == evidence) {
+                clearOriginalEvidence("원본 증거 열람 시간이 만료되어 메모리에서 지웠습니다.");
+                resultText.setText("원본 증거가 만료되었습니다. 승인하려면 다시 열람해 주세요.");
+            }
+        };
+        long delay = Math.max(1L, evidence.expiresAtEpochMs() - System.currentTimeMillis());
+        originalEvidenceExpiryHandler.postDelayed(originalEvidenceExpiryTask, delay);
+    }
+
+    private void clearOriginalEvidence(String message) {
+        originalEvidenceGeneration += 1L;
+        if (originalEvidenceLoadTask != null) {
+            originalEvidenceLoadTask.cancel(true);
+            originalEvidenceLoadTask = null;
+            operationInFlight = false;
+            if (contentRoot != null) setInteractiveEnabled(contentRoot, true);
+        }
+        PendingOriginalEvidenceCredentials pendingCredentials =
+            pendingOriginalEvidenceCredentials.getAndSet(null);
+        if (pendingCredentials != null) pendingCredentials.clear();
+        if (originalEvidenceExpiryTask != null) {
+            originalEvidenceExpiryHandler.removeCallbacks(originalEvidenceExpiryTask);
+            originalEvidenceExpiryTask = null;
+        }
+        if (originalEvidenceImage != null) {
+            originalEvidenceImage.setImageDrawable(null);
+            originalEvidenceImage.setVisibility(View.GONE);
+        }
+        if (originalEvidenceBitmap != null) destroyBitmap(originalEvidenceBitmap);
+        originalEvidenceBitmap = null;
+        if (originalEvidence != null) originalEvidence.close();
+        originalEvidence = null;
+        if (originalEvidenceConfirmedInput != null) {
+            originalEvidenceConfirmedInput.setChecked(false);
+            originalEvidenceConfirmedInput.setEnabled(false);
+        }
+        if (originalEvidenceLocationText != null) {
+            originalEvidenceLocationText.setText("정확한 위치: 열람 전");
+        }
+        if (originalEvidenceStatusText != null) originalEvidenceStatusText.setText(message);
+    }
+
+    private void renderOriginalEvidenceConfirmationState() {
+        if (originalEvidenceConfirmedInput == null) return;
+        String sessionId = boundOperationsSessionId;
+        if (originalEvidence == null || sessionId == null) {
+            originalEvidenceConfirmedInput.setChecked(false);
+            originalEvidenceConfirmedInput.setEnabled(false);
+            return;
+        }
+        if (!originalEvidence.matches(
+            connectedOperationsReportId,
+            connectedOperationsContentRevision,
+            sessionId,
+            deviceId,
+            System.currentTimeMillis()
+        )) {
+            clearOriginalEvidence("원본 증거가 만료되었거나 현재 신고·세션과 다릅니다.");
+            return;
+        }
+        originalEvidenceConfirmedInput.setEnabled(!operationInFlight);
+    }
+
+    private static void destroyBitmap(Bitmap bitmap) {
+        try {
+            if (bitmap.isMutable() && !bitmap.isRecycled()) bitmap.eraseColor(Color.TRANSPARENT);
+        } catch (RuntimeException ignored) {
+            // Best-effort pixel clearing is followed by recycle and reference removal.
+        }
+        if (!bitmap.isRecycled()) bitmap.recycle();
     }
 
     private void readReviewDecisions() {
@@ -1042,9 +1514,23 @@ public final class AdminBoundaryActivity extends Activity {
                 throw new IllegalArgumentException("invalid package revision");
             }
             long parsedPackageRevision = Long.parseLong(packageRevision);
+            long parsedDeliveryRevision = Long.parseLong(revision);
             if (verifiedDeliveryPackage == null
-                || !verifiedDeliveryPackage.matchesDelivery(reportId, parsedPackageRevision)) {
-                throw new IllegalArgumentException("delivery package does not match report and revision");
+                || !verifiedDeliveryPackage.matchesDelivery(
+                    reportId,
+                    parsedPackageRevision,
+                    connectedOperationsContentRevision
+                )
+                || !verifiedDeliveryPackage.matchesFreshDetail(
+                    reportController.snapshot().detail()
+                )) {
+                throw new IllegalArgumentException(
+                    "delivery package does not match report, package revision, and content revision"
+                );
+            }
+            if (parsedDeliveryRevision != connectedOperationsLatestDeliveryRevision
+                || "RESOLVED".equals(connectedOperationsDeliveryStatus)) {
+                throw new IllegalArgumentException("current delivery binding is stale");
             }
             AdminInstitutionDelivery delivery = new AdminInstitutionDelivery(
                 normalized(institutionInput),
@@ -1056,7 +1542,7 @@ public final class AdminBoundaryActivity extends Activity {
                 nullableNormalized(evidenceSha256Input),
                 normalized(observedAtInput),
                 parsedPackageRevision,
-                Long.parseLong(revision),
+                parsedDeliveryRevision,
                 normalized(idempotencyKeyInput)
             );
             recordingDelivery = true;
@@ -1298,6 +1784,7 @@ public final class AdminBoundaryActivity extends Activity {
             hideInteractiveGroups();
             operationsGroup.setVisibility(View.GONE);
             operationalLockText.setText("인증·복구·감사 기능을 승인하기 전에는 어떤 관리자 업무도 수행할 수 없습니다.");
+            renderOriginalEvidenceConfirmationState();
             return;
         }
 
@@ -1366,6 +1853,7 @@ public final class AdminBoundaryActivity extends Activity {
                 "내부 운영 기능이 열렸습니다. 기관 전달은 수동 기록만 가능하며 앱은 외부 전송을 수행하지 않습니다."
             );
         }
+        renderOriginalEvidenceConfirmationState();
     }
 
     private void renderDevices(
@@ -1456,6 +1944,7 @@ public final class AdminBoundaryActivity extends Activity {
     private void loadReportDetail(String reportId) {
         if (reportController == null) return;
         try {
+            clearOriginalEvidence("신고 상세를 다시 조회하여 기존 원본 증거를 지웠습니다.");
             executeReportRequest(reportController.beginDetail(reportId));
         } catch (IllegalArgumentException error) {
             resultText.setText("상세를 확인할 신고 UUID가 올바르지 않습니다.");
@@ -1477,7 +1966,12 @@ public final class AdminBoundaryActivity extends Activity {
             boolean applied = reportController.execute(request);
             runOnUiThread(() -> {
                 if (isDestroyed() || !applied) return;
-                reportPanel.render(reportController.snapshot());
+                AdminReportController.State state = reportController.snapshot();
+                reportPanel.render(state);
+                if (state.detail() != null
+                    && state.detail().summary().id().equals(connectedOperationsReportId)) {
+                    connectReportToOperations(state.detail());
+                }
             });
         });
     }
@@ -1581,8 +2075,18 @@ public final class AdminBoundaryActivity extends Activity {
     private void resetSessionBoundReportState() {
         operationsSessionGeneration += 1L;
         safSaveGeneration += 1L;
+        safReconnectGeneration += 1L;
         clearPendingSafBinding();
+        clearPendingSafReconnectBinding();
+        clearOriginalEvidence("관리자 세션이 바뀌어 원본 증거를 지웠습니다.");
         connectedOperationsReportId = null;
+        connectedOperationsContentRevision = -1;
+        connectedOperationsReviewRevision = -1;
+        connectedOperationsReviewDecision = null;
+        connectedOperationsLatestDeliveryRevision = -1;
+        connectedOperationsDeliveryRevision = -1;
+        connectedOperationsPackageRevision = null;
+        connectedOperationsDeliveryStatus = null;
         if (reportOperationsFormGroup != null) {
             reportOperationsFormGroup.setVisibility(View.GONE);
         }
@@ -1590,10 +2094,14 @@ public final class AdminBoundaryActivity extends Activity {
         pendingDeliveryPackage = null;
         verifiedDeliveryPackage = null;
         awaitingSafResult = false;
+        awaitingSafReconnectResult = false;
         recordingDelivery = false;
         clear(reportIdInput);
         if (expectedRevisionInput != null) expectedRevisionInput.setText("0");
         clear(packageRevisionInput);
+        if (reconnectDeliveryPackageButton != null) {
+            reconnectDeliveryPackageButton.setVisibility(View.GONE);
+        }
         resetOperationsInputsForDifferentReport();
         if (reportPanel != null) reportPanel.clearSessionBoundDrafts();
         if (reportRequestPanel != null) reportRequestPanel.clearSessionBoundDrafts();
@@ -1611,7 +2119,8 @@ public final class AdminBoundaryActivity extends Activity {
     private String requireConnectedOperationsReportId() {
         String reportId = normalized(reportIdInput);
         if (connectedOperationsReportId == null
-            || !connectedOperationsReportId.equals(reportId)) {
+            || !connectedOperationsReportId.equals(reportId)
+            || connectedOperationsContentRevision < 0) {
             throw new IllegalStateException(
                 "연결된 신고가 유효하지 않습니다. 신고 상세에서 작업을 다시 연결해 주세요."
             );
@@ -1621,25 +2130,74 @@ public final class AdminBoundaryActivity extends Activity {
 
     private void connectReportToOperations(AdminReportModels.Detail detail) {
         String reportId = detail.summary().id();
-        boolean reportChanged = !reportId.equals(connectedOperationsReportId);
-        if (reportChanged) {
+        boolean reportChanged = connectedOperationsReportId != null
+            && !reportId.equals(connectedOperationsReportId);
+        boolean contentRevisionChanged = connectedOperationsContentRevision >= 0
+            && connectedOperationsContentRevision != detail.contentRevision();
+        int reviewRevision = detail.review() == null ? -1 : detail.review().revision();
+        String reviewDecision = detail.review() == null ? null : detail.review().decision();
+        boolean reviewChanged = connectedOperationsContentRevision >= 0
+            && (connectedOperationsReviewRevision != reviewRevision
+                || !java.util.Objects.equals(connectedOperationsReviewDecision, reviewDecision));
+        int deliveryRevision = detail.delivery() == null ? -1 : detail.delivery().revision();
+        Integer packageRevision = detail.delivery() == null
+            ? null : detail.delivery().packageRevision();
+        String deliveryStatus = detail.delivery() == null ? null : detail.delivery().status();
+        boolean deliveryTupleChanged = !reportChanged && !contentRevisionChanged && !reviewChanged
+            && connectedOperationsContentRevision >= 0
+            && (connectedOperationsDeliveryRevision != deliveryRevision
+                || !java.util.Objects.equals(connectedOperationsPackageRevision, packageRevision)
+                || !java.util.Objects.equals(connectedOperationsDeliveryStatus, deliveryStatus)
+                || connectedOperationsLatestDeliveryRevision
+                    != detail.latestDeliveryRevision());
+        if (reportChanged || contentRevisionChanged || reviewChanged) {
+            invalidatePendingDeliveryPackageWork();
+            verifiedDeliveryPackage = null;
+            clearOriginalEvidence(
+                reportChanged
+                    ? "다른 신고를 선택해 이전 원본 증거를 지웠습니다."
+                    : contentRevisionChanged
+                        ? "신고 콘텐츠 버전이 바뀌어 이전 원본 증거를 지웠습니다."
+                        : "검토 결정이 바뀌어 이전 원본 증거를 지웠습니다."
+            );
             resetOperationsInputsForDifferentReport();
+        } else if (deliveryTupleChanged) {
+            invalidatePendingDeliveryPackageWork();
+            resetPackageBoundDeliveryDraft();
         }
         connectedOperationsReportId = reportId;
+        connectedOperationsContentRevision = detail.contentRevision();
+        connectedOperationsReviewRevision = reviewRevision;
+        connectedOperationsReviewDecision = reviewDecision;
+        connectedOperationsLatestDeliveryRevision = detail.latestDeliveryRevision();
+        connectedOperationsDeliveryRevision = deliveryRevision;
+        connectedOperationsPackageRevision = packageRevision;
+        connectedOperationsDeliveryStatus = deliveryStatus;
         reportIdInput.setText(reportId);
-        int currentDeliveryRevision = detail.delivery() == null ? 0 : detail.delivery().revision();
-        expectedRevisionInput.setText(Integer.toString(currentDeliveryRevision));
+        expectedRevisionInput.setText(Integer.toString(detail.latestDeliveryRevision()));
         packageRevisionInput.setText(
             verifiedDeliveryPackage != null
-                && verifiedDeliveryPackage.matchesDelivery(reportId, verifiedDeliveryPackage.revision())
+                && verifiedDeliveryPackage.matchesFreshDetail(detail)
                 ? Integer.toString(verifiedDeliveryPackage.revision())
                 : ""
+        );
+        reconnectDeliveryPackageButton.setVisibility(
+            canReconnectDeliveryPackage(detail) ? View.VISIBLE : View.GONE
         );
         resultText.setText(
             "선택한 신고를 아래 폼에 연결했습니다. 기관 전달은 앱 밖에서 수행한 사실만 기록하세요."
         );
         reportOperationsFormGroup.setVisibility(View.VISIBLE);
         reviewDecisionInput.requestFocus();
+    }
+
+    private static boolean canReconnectDeliveryPackage(AdminReportModels.Detail detail) {
+        try {
+            AdminDeliveryPackage.Eligibility.fromDetail(detail);
+            return true;
+        } catch (IllegalArgumentException error) {
+            return false;
+        }
     }
 
     private void resetOperationsInputsForDifferentReport() {
@@ -1650,6 +2208,10 @@ public final class AdminBoundaryActivity extends Activity {
         if (locationReviewedInput != null) locationReviewedInput.setChecked(false);
         if (photoReviewedInput != null) photoReviewedInput.setChecked(false);
         if (privacyReviewedInput != null) privacyReviewedInput.setChecked(false);
+        clear(originalEvidenceReasonInput);
+        clear(originalEvidencePasswordInput);
+        clear(originalEvidenceTotpInput);
+        clearOriginalEvidence("승인용 원본 증거를 아직 불러오지 않았습니다.");
 
         clear(institutionInput);
         clear(deliveryChannelInput);
@@ -1661,6 +2223,32 @@ public final class AdminBoundaryActivity extends Activity {
         if (observedAtInput != null) observedAtInput.setText(Instant.now().toString());
         if (manualDeliveryCompletedInput != null) manualDeliveryCompletedInput.setChecked(false);
         if (idempotencyKeyInput != null) idempotencyKeyInput.setText(UUID.randomUUID().toString());
+    }
+
+    private void resetPackageBoundDeliveryDraft() {
+        clear(externalReceiptInput);
+        clear(evidenceSha256Input);
+        if (observedAtInput != null) observedAtInput.setText(Instant.now().toString());
+        if (manualDeliveryCompletedInput != null) manualDeliveryCompletedInput.setChecked(false);
+        if (idempotencyKeyInput != null) idempotencyKeyInput.setText(UUID.randomUUID().toString());
+    }
+
+    private void replaceVerifiedDeliveryPackage(AdminDeliveryPackageSaver.Saved saved) {
+        verifiedDeliveryPackage = saved;
+        packageRevisionInput.setText(Integer.toString(saved.revision()));
+        resetPackageBoundDeliveryDraft();
+    }
+
+    private void invalidatePendingDeliveryPackageWork() {
+        safSaveGeneration += 1L;
+        safReconnectGeneration += 1L;
+        if (pendingDeliveryPackage != null) pendingDeliveryPackage.destroy();
+        pendingDeliveryPackage = null;
+        awaitingSafResult = false;
+        awaitingSafReconnectResult = false;
+        clearPendingSafBinding();
+        clearPendingSafReconnectBinding();
+        if (reportWorkflowController != null) reportWorkflowController.invalidate();
     }
 
     private void refreshConnectedReportDetail() {
@@ -1731,12 +2319,10 @@ public final class AdminBoundaryActivity extends Activity {
     ) {
         try {
             AdminReportWorkflowController.Request request = reportWorkflowController.beginPackage(
-                detail.summary().id(),
+                detail,
                 password,
                 totp
             );
-            verifiedDeliveryPackage = null;
-            packageRevisionInput.setText("");
             executeReportWorkflow(request);
         } catch (IllegalArgumentException | IllegalStateException error) {
             resultText.setText("제출본 생성 재인증 입력을 확인해 주세요.");
@@ -1806,6 +2392,154 @@ public final class AdminBoundaryActivity extends Activity {
         }
     }
 
+    private void launchExistingDeliveryPackagePicker() {
+        try {
+            String reportId = requireConnectedOperationsReportId();
+            AdminReportModels.Detail detail = reportController.snapshot().detail();
+            if (detail == null || !reportId.equals(detail.summary().id())
+                || detail.contentRevision() != connectedOperationsContentRevision
+                || detail.latestDeliveryRevision()
+                    != connectedOperationsLatestDeliveryRevision) {
+                throw new IllegalStateException("현재 신고 상세를 다시 확인해 주세요.");
+            }
+            AdminDeliveryPackage.Eligibility eligibility =
+                AdminDeliveryPackage.Eligibility.fromDetail(detail);
+            if (awaitingSafReconnectResult) {
+                throw new IllegalStateException("기존 제출본 선택 화면이 이미 열려 있습니다.");
+            }
+            pendingSafReconnectGeneration = ++safReconnectGeneration;
+            pendingSafReconnectSessionGeneration = operationsSessionGeneration;
+            pendingSafReconnectSessionId = boundOperationsSessionId;
+            pendingSafReconnectEligibility = eligibility;
+            awaitingSafReconnectResult = true;
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/zip")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(intent, OPEN_DELIVERY_PACKAGE_DOCUMENT);
+            resultText.setText(
+                "이전에 저장한 v2 제출본 ZIP을 직접 선택하세요. 파일은 수정·삭제·공유하지 않고 서버 증명과 대조합니다."
+            );
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            resultText.setText(
+                "현재 콘텐츠의 승인과 전달 상태를 먼저 새로 조회해 주세요. 완료된 전달은 다시 연결할 수 없습니다."
+            );
+        } catch (RuntimeException error) {
+            awaitingSafReconnectResult = false;
+            clearPendingSafReconnectBinding();
+            resultText.setText("ZIP 파일 선택 화면을 열지 못했습니다.");
+        }
+    }
+
+    private void handleExistingDeliveryPackageResult(Uri uri) {
+        awaitingSafReconnectResult = false;
+        long reconnectGeneration = pendingSafReconnectGeneration;
+        long sessionGeneration = pendingSafReconnectSessionGeneration;
+        String sessionId = pendingSafReconnectSessionId;
+        AdminDeliveryPackage.Eligibility eligibility = pendingSafReconnectEligibility;
+        clearPendingSafReconnectBinding();
+        if (uri == null) {
+            resultText.setText("기존 제출본 선택을 취소했습니다. 원본 파일은 변경하지 않았습니다.");
+            return;
+        }
+        if (!isCurrentSafReconnectBinding(
+            reconnectGeneration, sessionGeneration, sessionId, eligibility
+        )) {
+            resultText.setText("로그인 또는 신고 상태가 바뀌어 선택한 파일을 사용하지 않았습니다.");
+            return;
+        }
+        networkExecutor.execute(() -> {
+            try {
+                if (!controller.refreshAndValidateSafSaveSession(sessionId)) {
+                    throw new IOException("administrator session is no longer current");
+                }
+                InputStream locatorInput = getContentResolver().openInputStream(uri);
+                if (locatorInput == null) throw new IOException("SAF locator input unavailable");
+                AdminDeliveryPackage.Reference reference =
+                    AdminDeliveryPackageSaver.inspectUntrusted(locatorInput);
+                if (!eligibility.reportId().equals(reference.reportId())) {
+                    throw new IOException("selected package belongs to another report");
+                }
+                AdminReportModels.Detail beforeRead = controller.getAdminReportDetail(
+                    eligibility.reportId(),
+                    BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                );
+                if (!eligibility.matchesExact(beforeRead)) {
+                    throw new IOException("report eligibility changed before package verification");
+                }
+                AdminDeliveryPackage.Proof proof = controller.getAdminDeliveryPackageProof(
+                    reference.reportId(),
+                    reference.packageRevision(),
+                    BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                );
+                if (!proof.matchesReference(reference) || !proof.matchesFreshDetail(beforeRead)) {
+                    throw new IOException("package proof does not match the fresh report detail");
+                }
+                InputStream input = getContentResolver().openInputStream(uri);
+                if (input == null) throw new IOException("SAF input unavailable");
+                AdminDeliveryPackageSaver.Saved saved =
+                    AdminDeliveryPackageSaver.verifyExisting(proof, input);
+                AdminReportModels.Detail afterRead = controller.getAdminReportDetail(
+                    eligibility.reportId(),
+                    BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                );
+                if (!eligibility.matchesExact(afterRead)
+                    || !proof.matchesFreshDetail(afterRead)
+                    || !saved.matchesProof(proof)
+                    || !saved.matchesFreshDetail(afterRead)) {
+                    throw new IOException("report state changed during package verification");
+                }
+                runOnUiThread(() -> {
+                    if (isDestroyed() || !isCurrentSafReconnectBinding(
+                        reconnectGeneration, sessionGeneration, sessionId, eligibility
+                    )) return;
+                    reportController.replaceDetail(afterRead);
+                    reportPanel.render(reportController.snapshot());
+                    connectReportToOperations(afterRead);
+                    replaceVerifiedDeliveryPackage(saved);
+                    resultText.setText(
+                        "선택한 ZIP의 서버 증명, 전체 해시, v2 매니페스트를 확인해 현재 신고에 연결했습니다. 기관 제출은 자동으로 수행하지 않습니다."
+                    );
+                    packageRevisionInput.requestFocus();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    if (isDestroyed() || !isCurrentSafReconnectBinding(
+                        reconnectGeneration, sessionGeneration, sessionId, eligibility
+                    )) return;
+                    resultText.setText(
+                        "선택한 ZIP을 현재 신고에 연결하지 않았습니다. 기존 제출본 연결과 입력, 선택한 원본 파일은 그대로 유지했습니다."
+                    );
+                });
+            }
+        });
+    }
+
+    private boolean isCurrentSafReconnectBinding(
+        long reconnectGeneration,
+        long sessionGeneration,
+        String sessionId,
+        AdminDeliveryPackage.Eligibility eligibility
+    ) {
+        if (eligibility == null
+            || reconnectGeneration < 0L
+            || reconnectGeneration != safReconnectGeneration
+            || sessionGeneration != operationsSessionGeneration
+            || !boundOperationsAccessActive
+            || !java.util.Objects.equals(sessionId, boundOperationsSessionId)
+            || !java.util.Objects.equals(eligibility.reportId(), connectedOperationsReportId)
+            || eligibility.contentRevision() != connectedOperationsContentRevision
+            || eligibility.reviewRevision() != connectedOperationsReviewRevision
+            || eligibility.latestDeliveryRevision()
+                != connectedOperationsLatestDeliveryRevision
+            || controller == null) {
+            return false;
+        }
+        AdminSecurityController.Snapshot snapshot = controller.snapshot();
+        return snapshot.isAccessSessionActive()
+            && java.util.Objects.equals(sessionId, snapshot.currentSessionId());
+    }
+
     private boolean isCurrentSafSaveBinding(
         long saveGeneration,
         long workflowGeneration,
@@ -1834,6 +2568,13 @@ public final class AdminBoundaryActivity extends Activity {
         pendingSafSessionGeneration = -1L;
         pendingSafSessionId = null;
         pendingSafRequestCode = -1;
+    }
+
+    private void clearPendingSafReconnectBinding() {
+        pendingSafReconnectGeneration = -1L;
+        pendingSafReconnectSessionGeneration = -1L;
+        pendingSafReconnectSessionId = null;
+        pendingSafReconnectEligibility = null;
     }
 
     private int allocateSafRequestCode() {
@@ -2047,8 +2788,22 @@ public final class AdminBoundaryActivity extends Activity {
         if (input != null) input.getText().clear();
     }
 
-    private static void setInteractiveEnabled(View view, boolean enabled) {
-        if (view instanceof Button || view instanceof EditText || view instanceof Spinner || view instanceof CheckBox) {
+    private static char[] takeMutableInput(EditText input) {
+        Editable value = input.getText();
+        char[] copy = new char[value.length()];
+        value.getChars(0, value.length(), copy, 0);
+        value.clear();
+        return copy;
+    }
+
+    private void setInteractiveEnabled(View view, boolean enabled) {
+        if (view == originalEvidenceConfirmedInput) {
+            if (!enabled) {
+                originalEvidenceConfirmedInput.setEnabled(false);
+            } else {
+                renderOriginalEvidenceConfirmationState();
+            }
+        } else if (view instanceof Button || view instanceof EditText || view instanceof Spinner || view instanceof CheckBox) {
             view.setEnabled(enabled);
         }
         if (view instanceof ViewGroup group) {

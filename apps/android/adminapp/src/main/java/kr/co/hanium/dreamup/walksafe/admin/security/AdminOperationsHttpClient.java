@@ -10,6 +10,7 @@ import java.security.GeneralSecurityException;
 import java.time.DateTimeException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,9 +24,12 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     static final String READ_PURPOSE_HEADER = "X-WalkSafe-Read-Purpose";
     static final String REVIEW_ACTION = "report.review.decide";
     static final String DELIVERY_ACTION = "report.delivery.create";
+    static final String ORIGINAL_GRANT_ACTION = "report.original.grant";
+    static final String ORIGINAL_ACCESS_GRANT_HEADER = "X-WalkSafe-Original-Access-Grant";
     static final String REVIEW_READ_PURPOSE = "report.review_decisions";
     static final String DELIVERY_READ_PURPOSE = "report.delivery_events";
     private static final int MAX_HISTORY_ITEMS = 256;
+    private static final int MAX_CONSECUTIVE_ZERO_READS = 3;
 
     private enum HistoryType {
         NONE,
@@ -39,6 +43,15 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
 
     interface Transport {
         Response execute(String method, String url, Map<String, String> headers, byte[] body) throws IOException;
+
+        default BinaryResponse executeBinary(
+            String method,
+            String url,
+            Map<String, String> headers,
+            int expectedByteCount
+        ) throws IOException {
+            throw new IOException("binary administrator transport is unavailable");
+        }
     }
 
     static final class Response {
@@ -48,6 +61,33 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         Response(int statusCode, String body) {
             this.statusCode = statusCode;
             this.body = body == null ? "" : body;
+        }
+    }
+
+    static final class BinaryResponse implements AutoCloseable {
+        final int statusCode;
+        final String contentType;
+        final long declaredLength;
+        private byte[] body;
+
+        BinaryResponse(int statusCode, String contentType, long declaredLength, byte[] ownedBody) {
+            this.statusCode = statusCode;
+            this.contentType = contentType;
+            this.declaredLength = declaredLength;
+            this.body = ownedBody == null ? new byte[0] : ownedBody;
+        }
+
+        synchronized byte[] takeBody() throws IOException {
+            if (body == null) throw new IOException("binary administrator response was already consumed");
+            byte[] taken = body;
+            body = null;
+            return taken;
+        }
+
+        @Override
+        public synchronized void close() {
+            if (body != null) Arrays.fill(body, (byte) 0);
+            body = null;
         }
     }
 
@@ -163,6 +203,112 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         );
     }
 
+    @Override
+    public AdminOriginalEvidence loadOriginalEvidence(
+        SessionContext session,
+        String reportId,
+        int expectedContentRevision,
+        String reason,
+        Map<String, String> reconfirmationHeaders
+    ) throws IOException, GeneralSecurityException {
+        requireOriginalEvidenceRequestActive();
+        SessionContext safeSession = requireSession(session);
+        String safeReportId = AdminReportDecision.canonicalUuid(reportId, "report_id");
+        if (expectedContentRevision < 0) {
+            throw new IllegalArgumentException("expected content revision is invalid");
+        }
+        String normalizedReason = normalizedGrantReason(reason);
+        Map<String, String> safeReconfirmation = requireReconfirmation(reconfirmationHeaders);
+        String grantPath = "/reports/" + safeReportId + "/original-access-grants";
+        Map<String, Object> grantFields = new LinkedHashMap<>();
+        grantFields.put("purpose", AdminOriginalEvidence.PURPOSE);
+        grantFields.put("reason", normalizedReason);
+        grantFields.put("expected_content_revision", expectedContentRevision);
+        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(grantFields);
+        String correlationId = UUID.randomUUID().toString();
+        String emptyQuery = AdminCanonicalEncoding.canonicalQuery(AdminJava8Collections.list());
+        AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
+            ORIGINAL_GRANT_ACTION,
+            safeSession.adminId(),
+            AdminCanonicalEncoding.sha256Hex(body),
+            correlationId,
+            safeSession.deviceId(),
+            deviceKeyMarker,
+            deviceKeyVersion,
+            "POST",
+            grantPath,
+            AdminDeviceProof.Purpose.ACTION,
+            AdminCanonicalEncoding.sha256Hex(emptyQuery.getBytes(StandardCharsets.UTF_8)),
+            null,
+            safeSession.sessionId()
+        );
+        Response challengeResponse = transport.execute(
+            "POST",
+            origin + CHALLENGE_PATH,
+            jsonHeaders(protectedHeaders(safeSession, correlationId, null)),
+            intent.challengeRequestBytes()
+        );
+        requireOriginalEvidenceRequestActive();
+        requireExactStatus(challengeResponse.statusCode, 200, "device challenge request");
+        AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
+            challengeResponse.body,
+            intent,
+            clock.nowEpochMs(),
+            signer
+        );
+        Map<String, String> grantHeaders = new LinkedHashMap<>(
+            protectedHeaders(safeSession, correlationId, null)
+        );
+        grantHeaders.putAll(proof.proofHeaders());
+        grantHeaders.putAll(safeReconfirmation);
+        Response grantResponse = transport.execute(
+            "POST",
+            origin + grantPath,
+            jsonHeaders(grantHeaders),
+            body
+        );
+        requireOriginalEvidenceRequestActive();
+        requireExactStatus(grantResponse.statusCode, 201, "original evidence grant request");
+
+        try (AdminOriginalEvidence.IssuedGrant grant = parseOriginalGrant(
+            grantResponse.body,
+            safeReportId,
+            safeSession.sessionId(),
+            safeSession.deviceId(),
+            expectedContentRevision,
+            clock.nowEpochMs()
+        )) {
+            char[] accessToken = grant.consumeAccessToken(clock.nowEpochMs());
+            try {
+                requireOriginalEvidenceRequestActive();
+                Map<String, String> imageHeaders = new LinkedHashMap<>(
+                    protectedHeaders(safeSession, UUID.randomUUID().toString(), null)
+                );
+                imageHeaders.put("Accept", grant.contentType());
+                imageHeaders.put("Cache-Control", "no-store");
+                imageHeaders.put("Pragma", "no-cache");
+                imageHeaders.put(ORIGINAL_ACCESS_GRANT_HEADER, new String(accessToken));
+                try (BinaryResponse imageResponse = transport.executeBinary(
+                    "GET",
+                    origin + grant.resourcePath(),
+                    AdminJava8Collections.copyMap(imageHeaders),
+                    grant.byteCount()
+                )) {
+                    return AdminOriginalEvidence.verifyAndTake(
+                        grant,
+                        imageResponse.statusCode,
+                        imageResponse.contentType,
+                        imageResponse.declaredLength,
+                        imageResponse.takeBody(),
+                        clock.nowEpochMs()
+                    );
+                }
+            } finally {
+                Arrays.fill(accessToken, '\0');
+            }
+        }
+    }
+
     private Result executeProtected(
         SessionContext session,
         String method,
@@ -239,6 +385,204 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         };
     }
 
+    private static AdminOriginalEvidence.IssuedGrant parseOriginalGrant(
+        String body,
+        String expectedReportId,
+        String sessionId,
+        String deviceId,
+        int expectedContentRevision,
+        long nowEpochMs
+    ) throws IOException {
+        Map<String, Object> root = AdminStrictJson.parseObject(body);
+        requireExactKeys(root, AdminJava8Collections.set(
+            "schema_version", "grant_id", "content_revision", "expires_at",
+            "exact_location", "image"
+        ));
+        if (!AdminOriginalEvidence.SCHEMA_VERSION.equals(requiredText(root, "schema_version", 64))) {
+            throw new IOException("original evidence grant schema is unsupported");
+        }
+        String grantId = requiredUuid(root, "grant_id");
+        int contentRevision = requiredInt(root, "content_revision", 0);
+        if (contentRevision != expectedContentRevision) {
+            throw new IOException("original evidence grant content revision is mismatched");
+        }
+        String expiresAt = requiredText(root, "expires_at", 64);
+        Map<String, Object> exactLocation = requiredObject(root, "exact_location");
+        requireExactKeys(exactLocation, AdminJava8Collections.set("lat", "lon", "accuracy"));
+        double latitude = requiredFiniteNumber(exactLocation, "lat", -90d, 90d);
+        double longitude = requiredFiniteNumber(exactLocation, "lon", -180d, 180d);
+        Double accuracy = nullableFiniteNumber(exactLocation, "accuracy", 0d, Double.MAX_VALUE);
+        Map<String, Object> image = requiredObject(root, "image");
+        requireExactKeys(image, AdminJava8Collections.set(
+            "resource_path", "content_type", "sha256", "byte_count", "access_token"
+        ));
+        return new AdminOriginalEvidence.IssuedGrant(
+            expectedReportId,
+            sessionId,
+            deviceId,
+            grantId,
+            contentRevision,
+            expiresAt,
+            latitude,
+            longitude,
+            accuracy,
+            requiredText(image, "resource_path", 255),
+            requiredText(image, "content_type", 32),
+            requiredText(image, "sha256", 64),
+            requiredInt(image, "byte_count", 1),
+            requiredText(image, "access_token", 43),
+            nowEpochMs
+        );
+    }
+
+    private static Map<String, String> requireReconfirmation(Map<String, String> headers) {
+        if (headers == null
+            || headers.size() != 1
+            || !headers.containsKey(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER)) {
+            throw new IllegalArgumentException("exact reconfirmation header is required");
+        }
+        String nonce = headers.get(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER);
+        if (!AdminHighRiskActionGate.isCanonicalNonce(nonce)) {
+            throw new IllegalArgumentException("reconfirmation nonce is invalid");
+        }
+        return AdminJava8Collections.map(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER, nonce);
+    }
+
+    private static void requireOriginalEvidenceRequestActive() throws IOException {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new IOException("original evidence request was cancelled");
+        }
+    }
+
+    static byte[] readOriginalEvidenceBody(InputStream input, int expectedByteCount) throws IOException {
+        if (input == null
+            || expectedByteCount < 1
+            || expectedByteCount > AdminOriginalEvidence.MAX_IMAGE_BYTES) {
+            throw new IOException("original evidence response length is invalid");
+        }
+        byte[] content = new byte[expectedByteCount];
+        byte[] buffer = new byte[Math.min(4_096, expectedByteCount)];
+        boolean succeeded = false;
+        try (input) {
+            int offset = 0;
+            int zeroReads = 0;
+            while (offset < content.length) {
+                requireOriginalEvidenceRequestActive();
+                int read = input.read(buffer, 0, Math.min(buffer.length, content.length - offset));
+                requireOriginalEvidenceRequestActive();
+                if (read < 0) throw new IOException("original evidence response ended early");
+                if (read == 0) {
+                    if (++zeroReads > MAX_CONSECUTIVE_ZERO_READS) {
+                        throw new IOException("original evidence response made no progress");
+                    }
+                    continue;
+                }
+                zeroReads = 0;
+                System.arraycopy(buffer, 0, content, offset, read);
+                offset += read;
+            }
+            requireOriginalEvidenceRequestActive();
+            int trailing = input.read();
+            requireOriginalEvidenceRequestActive();
+            if (trailing != -1) {
+                throw new IOException("original evidence response is longer than declared");
+            }
+            succeeded = true;
+            return content;
+        } finally {
+            Arrays.fill(buffer, (byte) 0);
+            if (!succeeded) Arrays.fill(content, (byte) 0);
+        }
+    }
+
+    static String readBoundedResponse(InputStream input) throws IOException {
+        byte[] buffer = new byte[4_096];
+        try (input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            int zeroReads = 0;
+            try {
+                while (true) {
+                    requireResponseReadActive();
+                    int read = input.read(buffer);
+                    requireResponseReadActive();
+                    if (read < 0) break;
+                    if (read == 0) {
+                        if (++zeroReads > MAX_CONSECUTIVE_ZERO_READS) {
+                            throw new IOException("administrator API response made no progress");
+                        }
+                        continue;
+                    }
+                    zeroReads = 0;
+                    if (output.size() + read > 64 * 1_024) {
+                        throw new IOException("administrator API response is too large");
+                    }
+                    output.write(buffer, 0, read);
+                }
+                return AdminStrictJson.decodeUtf8(output.toByteArray());
+            } finally {
+                Arrays.fill(buffer, (byte) 0);
+            }
+        }
+    }
+
+    private static void requireResponseReadActive() throws IOException {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new IOException("administrator API response read was cancelled");
+        }
+    }
+
+    private static String normalizedGrantReason(String value) {
+        if (value == null) throw new IllegalArgumentException("original evidence reason is required");
+        String normalized = value.trim().replaceAll("\\s+", " ");
+        if (normalized.length() < 8 || normalized.length() > 500
+            || normalized.chars().anyMatch(character -> character < 0x20 || character == 0x7f)) {
+            throw new IllegalArgumentException("original evidence reason is invalid");
+        }
+        return normalized;
+    }
+
+    private static Map<String, Object> requiredObject(Map<String, Object> value, String key)
+        throws IOException {
+        Object raw = value.get(key);
+        if (!(raw instanceof Map<?, ?> object)) {
+            throw new IOException("original evidence object is invalid: " + key);
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : object.entrySet()) {
+            if (!(entry.getKey() instanceof String text)) {
+                throw new IOException("original evidence object key is invalid: " + key);
+            }
+            result.put(text, entry.getValue());
+        }
+        return AdminJava8Collections.copyMap(result);
+    }
+
+    private static double requiredFiniteNumber(
+        Map<String, Object> value,
+        String key,
+        double minimum,
+        double maximum
+    ) throws IOException {
+        Object raw = value.get(key);
+        if (!(raw instanceof Number number)) {
+            throw new IOException("original evidence number is invalid: " + key);
+        }
+        double parsed = number.doubleValue();
+        if (!Double.isFinite(parsed) || parsed < minimum || parsed > maximum) {
+            throw new IOException("original evidence number is invalid: " + key);
+        }
+        return parsed;
+    }
+
+    private static Double nullableFiniteNumber(
+        Map<String, Object> value,
+        String key,
+        double minimum,
+        double maximum
+    ) throws IOException {
+        if (value.get(key) == null) return null;
+        return requiredFiniteNumber(value, key, minimum, maximum);
+    }
+
     private static SessionContext requireSession(SessionContext session) throws IOException {
         if (session == null) throw new IOException("administrator session is unavailable");
         requireOpaqueToken(session.accessToken());
@@ -304,7 +648,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         for (int index = 0; index < array.size(); index++) {
             Map<String, Object> item = array.get(index);
             requireExactKeys(item, AdminJava8Collections.set(
-                "id", "report_id", "revision", "decision", "reason", "user_visible_reason",
+                "id", "report_id", "revision", "content_revision", "decision", "reason", "user_visible_reason",
                 "duplicate_of_report_id",
                 "location_reviewed", "photo_reviewed", "privacy_reviewed", "admin_id",
                 "session_id", "device_id", "correlation_id", "decided_at", "created_at"
@@ -314,6 +658,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             if (!expectedReportId.equals(reportId)) throw new IOException("review history report binding is invalid");
             int revision = requiredInt(item, "revision", 1);
             if (revision != index + 1) throw new IOException("review history revisions are not append-only");
+            requiredInt(item, "content_revision", 0);
             AdminReportDecision.Decision decision = reviewDecision(requiredText(item, "decision", 16));
             String reason = requiredText(item, "reason", 500);
             String userVisibleReason = nullableText(item, "user_visible_reason", 500);
@@ -567,6 +912,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             connection.setConnectTimeout(8_000);
             connection.setReadTimeout(12_000);
             connection.setInstanceFollowRedirects(false);
+            connection.setUseCaches(false);
             connection.setDoInput(true);
             connection.setDoOutput(body != null);
             headers.forEach(connection::setRequestProperty);
@@ -580,25 +926,52 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 InputStream stream = status >= 200 && status <= 299
                     ? connection.getInputStream()
                     : connection.getErrorStream();
-                return new Response(status, stream == null ? "" : readBounded(stream));
+                return new Response(status, stream == null ? "" : readBoundedResponse(stream));
             } finally {
                 connection.disconnect();
             }
         }
 
-        private static String readBounded(InputStream input) throws IOException {
-            try (input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-                byte[] buffer = new byte[4_096];
-                while (true) {
-                    int read = input.read(buffer);
-                    if (read < 0) break;
-                    if (output.size() + read > 64 * 1_024) {
-                        throw new IOException("administrator API response is too large");
-                    }
-                    output.write(buffer, 0, read);
+        @Override
+        public BinaryResponse executeBinary(
+            String method,
+            String url,
+            Map<String, String> headers,
+            int expectedByteCount
+        ) throws IOException {
+            requireOriginalEvidenceRequestActive();
+            if (!"GET".equals(method)
+                || expectedByteCount < 1
+                || expectedByteCount > AdminOriginalEvidence.MAX_IMAGE_BYTES) {
+                throw new IOException("original evidence request is invalid");
+            }
+            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(8_000);
+            connection.setReadTimeout(12_000);
+            connection.setInstanceFollowRedirects(false);
+            connection.setUseCaches(false);
+            connection.setDoInput(true);
+            connection.setDoOutput(false);
+            headers.forEach(connection::setRequestProperty);
+            byte[] content = null;
+            try {
+                int status = connection.getResponseCode();
+                requireOriginalEvidenceRequestActive();
+                String contentType = connection.getHeaderField("Content-Type");
+                long declaredLength = connection.getContentLengthLong();
+                if (status != 200 || declaredLength != expectedByteCount) {
+                    return new BinaryResponse(status, contentType, declaredLength, new byte[0]);
                 }
-                return AdminStrictJson.decodeUtf8(output.toByteArray());
+                content = readOriginalEvidenceBody(connection.getInputStream(), expectedByteCount);
+                BinaryResponse response = new BinaryResponse(status, contentType, declaredLength, content);
+                content = null;
+                return response;
+            } finally {
+                if (content != null) Arrays.fill(content, (byte) 0);
+                connection.disconnect();
             }
         }
+
     }
 }

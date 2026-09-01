@@ -35,7 +35,7 @@ public final class AdminReportAccessibilityStaticTest {
     }
 
     @Test
-    public void rotationStateIsAllowlistedAndExternalDispatchRemainsAbsent() {
+    public void rotationStateIsAllowlistedAndManualDeliveryRecoveryIsExplicitlyAnnounced() {
         assertTrue(activity.contains("REPORT_FILTER_ID_STATE"));
         assertTrue(activity.contains("REPORT_SELECTED_ID_STATE"));
         assertFalse(activity.contains("putString(\"token"));
@@ -43,10 +43,37 @@ public final class AdminReportAccessibilityStaticTest {
         assertFalse(panel.contains("mailto:"));
         assertFalse(panel.contains("sms:"));
         assertTrue(activity.contains("Intent.ACTION_CREATE_DOCUMENT"));
+        assertTrue(activity.contains("Intent.ACTION_OPEN_DOCUMENT"));
+        assertTrue(activity.contains("기존 제출본 ZIP 다시 확인"));
+        assertTrue(activity.contains(
+            "현재 신고, 전달 버전, 콘텐츠 버전과 해시 다시 확인"
+        ));
+        assertTrue(activity.contains(
+            "앱 재시작이나 재로그인 뒤 접수·처리 결과를 이어서 기록하려면"
+        ));
+        assertTrue(activity.contains(
+            "앱은 ZIP을 내부에 복사하거나 기관으로 전송하지 않습니다."
+        ));
+        assertTrue(activity.contains(
+            "이전에 저장한 v2 제출본 ZIP을 직접 선택하세요. 파일은 수정·삭제·공유하지 않고 서버 증명과 대조합니다."
+        ));
+        assertTrue(activity.contains(
+            "선택한 ZIP의 서버 증명, 전체 해시, v2 매니페스트를 확인해 현재 신고에 연결했습니다. 기관 제출은 자동으로 수행하지 않습니다."
+        ));
+        assertTrue(activity.contains(
+            "기존 제출본 연결과 입력, 선택한 원본 파일은 그대로 유지했습니다."
+        ));
         assertTrue(activity.contains("openOutputStream(uri, \"wt\")"));
         assertTrue(activity.contains("DocumentsContract.deleteDocument"));
         assertFalse(activity.contains("FileOutputStream"));
-        assertTrue(activity.contains("verifiedDeliveryPackage.matchesDelivery(reportId, parsedPackageRevision)"));
+        assertTrue(activity.contains(
+            "parsedDeliveryRevision != connectedOperationsLatestDeliveryRevision"
+        ));
+        assertTrue(activity.contains("input(\"예상 최신 revision\""));
+        assertTrue(activity.contains(
+            "makeReadOnly(expectedRevisionInput, \"앱이 관리하는 현재 전달 기록 버전\")"
+        ));
+        assertFalse(activity.contains("Intent.ACTION_SEND"));
         assertTrue(reportClient.contains("connection.setUseCaches(false)"));
         assertTrue(panel.contains("highRiskConfirm.setEnabled(!loading)"));
         assertTrue(panel.contains("for (Button button : mutationButtons) button.setEnabled(!loading)"));

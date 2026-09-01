@@ -14,7 +14,11 @@ public final class AdminReportWorkflowController {
             char[] password,
             char[] totp
         ) throws Exception;
-        AdminDeliveryPackage createPackage(String reportId, String password, String totp) throws Exception;
+        AdminDeliveryPackage createPackage(
+            AdminDeliveryPackage.Eligibility eligibility,
+            char[] password,
+            char[] totp
+        ) throws Exception;
         AdminReportModels.Detail refreshDetail(String reportId) throws Exception;
     }
 
@@ -49,6 +53,7 @@ public final class AdminReportWorkflowController {
         private final String reportId;
         private final String nextStatus;
         private final int expectedVersion;
+        private final AdminDeliveryPackage.Eligibility packageEligibility;
         private final char[] password;
         private final char[] totp;
         private boolean claimed;
@@ -59,6 +64,7 @@ public final class AdminReportWorkflowController {
             String reportId,
             String nextStatus,
             int expectedVersion,
+            AdminDeliveryPackage.Eligibility packageEligibility,
             char[] password,
             char[] totp
         ) {
@@ -67,6 +73,7 @@ public final class AdminReportWorkflowController {
             this.reportId = reportId;
             this.nextStatus = nextStatus;
             this.expectedVersion = expectedVersion;
+            this.packageEligibility = packageEligibility;
             this.password = password.clone();
             this.totp = totp.clone();
         }
@@ -78,9 +85,6 @@ public final class AdminReportWorkflowController {
 
         private synchronized char[] passwordCopy() { return password.clone(); }
         private synchronized char[] totpCopy() { return totp.clone(); }
-        private synchronized String passwordString() { return new String(password); }
-        private synchronized String totpString() { return new String(totp); }
-
         private synchronized boolean claim() {
             if (claimed) return false;
             claimed = true;
@@ -117,20 +121,26 @@ public final class AdminReportWorkflowController {
         clearPackage();
         String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
         Request request = new Request(
-            ++generation, Request.Kind.STATUS, safeId, nextStatus, expectedVersion, password, totp
+            ++generation, Request.Kind.STATUS, safeId, nextStatus, expectedVersion, null, password, totp
         );
         replaceActiveRequest(request);
         state = new State(Phase.LOADING, safeId, "상태 변경을 재인증하고 있습니다.", null);
         return request;
     }
 
-    public synchronized Request beginPackage(String reportId, char[] password, char[] totp) {
+    public synchronized Request beginPackage(
+        AdminReportModels.Detail detail,
+        char[] password,
+        char[] totp
+    ) {
         requireNoMutationInFlight();
         requireCredentials(password, totp);
         clearPackage();
-        String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
+        AdminDeliveryPackage.Eligibility eligibility =
+            AdminDeliveryPackage.Eligibility.fromDetail(detail);
+        String safeId = eligibility.reportId();
         Request request = new Request(
-            ++generation, Request.Kind.PACKAGE, safeId, null, 0, password, totp
+            ++generation, Request.Kind.PACKAGE, safeId, null, 0, eligibility, password, totp
         );
         replaceActiveRequest(request);
         state = new State(Phase.LOADING, safeId, "제출본 생성을 재인증하고 있습니다.", null);
@@ -142,12 +152,19 @@ public final class AdminReportWorkflowController {
         try {
             if (!isCurrent(request)) return false;
             if (request.kind == Request.Kind.PACKAGE) {
-                AdminDeliveryPackage created = loader.createPackage(
-                    request.reportId,
-                    request.passwordString(),
-                    request.totpString()
-                );
-                return applyPackage(request, created);
+                char[] password = request.passwordCopy();
+                char[] totp = request.totpCopy();
+                try {
+                    AdminDeliveryPackage created = loader.createPackage(
+                        request.packageEligibility,
+                        password,
+                        totp
+                    );
+                    return applyPackage(request, created);
+                } finally {
+                    Arrays.fill(password, '\0');
+                    Arrays.fill(totp, '\0');
+                }
             }
             char[] password = request.passwordCopy();
             char[] totp = request.totpCopy();

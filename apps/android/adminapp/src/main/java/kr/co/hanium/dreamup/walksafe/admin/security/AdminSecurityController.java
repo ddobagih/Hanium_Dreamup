@@ -595,6 +595,38 @@ public final class AdminSecurityController implements AutoCloseable {
         );
     }
 
+    public synchronized AdminOriginalEvidence loadAdminOriginalEvidence(
+        String reportId,
+        int expectedContentRevision,
+        String reason,
+        char[] password,
+        char[] totpCode,
+        long nowEpochMs,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        AdminHighRiskActionGate.Operation operation =
+            AdminHighRiskActionGate.originalEvidence(reportId);
+        try {
+            reauthenticate(password, totpCode, operation, nowEpochMs);
+            AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
+                operation,
+                nowEpochMs,
+                operationalWorkflowsEnabled
+            );
+            if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
+            return requireOperationsApi().loadOriginalEvidence(
+                requireOperationalSession(operationalWorkflowsEnabled),
+                reportId,
+                expectedContentRevision,
+                reason,
+                decision.requestHeaders()
+            );
+        } finally {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totpCode != null) Arrays.fill(totpCode, '\0');
+        }
+    }
+
     public synchronized AdminOperationsApi.Result readReviewDecisions(
         String reportId,
         boolean operationalWorkflowsEnabled
@@ -676,24 +708,46 @@ public final class AdminSecurityController implements AutoCloseable {
     }
 
     public synchronized AdminDeliveryPackage createAdminDeliveryPackage(
-        String reportId,
-        String password,
-        String totpCode,
+        AdminDeliveryPackage.Eligibility eligibility,
+        char[] password,
+        char[] totpCode,
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        AdminHighRiskActionGate.Operation operation = AdminHighRiskActionGate.deliveryPackage(reportId);
-        reauthenticate(password, totpCode, operation, nowEpochMs);
-        AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
-            operation,
-            nowEpochMs,
-            operationalWorkflowsEnabled
-        );
-        if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
-        return requireReportRepository().createDeliveryPackage(
+        try {
+            if (eligibility == null) {
+                throw new IllegalArgumentException("package eligibility is required");
+            }
+            String reportId = eligibility.reportId();
+            AdminHighRiskActionGate.Operation operation =
+                AdminHighRiskActionGate.deliveryPackage(reportId);
+            reauthenticate(password, totpCode, operation, nowEpochMs);
+            AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
+                operation,
+                nowEpochMs,
+                operationalWorkflowsEnabled
+            );
+            if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
+            return requireReportRepository().createDeliveryPackage(
+                requireOperationalSession(operationalWorkflowsEnabled),
+                eligibility,
+                decision.requestHeaders()
+            );
+        } finally {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totpCode != null) Arrays.fill(totpCode, '\0');
+        }
+    }
+
+    public synchronized AdminDeliveryPackage.Proof getAdminDeliveryPackageProof(
+        String reportId,
+        int packageRevision,
+        boolean operationalWorkflowsEnabled
+    ) throws IOException, GeneralSecurityException {
+        return requireReportRepository().deliveryPackageProof(
             requireOperationalSession(operationalWorkflowsEnabled),
             reportId,
-            decision.requestHeaders()
+            packageRevision
         );
     }
 

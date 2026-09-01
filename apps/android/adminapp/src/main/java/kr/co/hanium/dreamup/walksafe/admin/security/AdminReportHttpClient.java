@@ -8,6 +8,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,7 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     static final String CHALLENGE_PATH = "/admin/security/device-proof/challenges";
     static final String LIST_PURPOSE = "admin.report.list";
     static final String DETAIL_PURPOSE = "admin.report.detail";
+    static final String PACKAGE_PROOF_PURPOSE = "admin.report.delivery_package.proof";
     static final String AUDIT_PURPOSE = "admin.audit.list";
     static final String REQUEST_LIST_PURPOSE = "admin.report_request.list";
     static final String REQUEST_DETAIL_PURPOSE = "admin.report_request.detail";
@@ -202,10 +204,15 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     @Override
     public AdminDeliveryPackage createDeliveryPackage(
         AdminOperationsApi.SessionContext session,
-        String reportId,
+        AdminDeliveryPackage.Eligibility eligibility,
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException {
-        String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
+        if (eligibility == null) throw new IllegalArgumentException("package eligibility is required");
+        String safeId = AdminReportModels.canonicalUuid(eligibility.reportId(), "report_id");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("expected_content_revision", eligibility.contentRevision());
+        fields.put("expected_review_revision", eligibility.reviewRevision());
+        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
         Response response = executeProtected(
             requireSession(session),
             "POST",
@@ -213,7 +220,7 @@ public final class AdminReportHttpClient implements AdminReportRepository {
             "",
             PACKAGE_ACTION,
             null,
-            EMPTY_BODY,
+            body,
             requireReconfirmation(reconfirmationHeaders),
             "application/zip"
         );
@@ -222,16 +229,41 @@ public final class AdminReportHttpClient implements AdminReportRepository {
             throw new IOException("delivery package content type is invalid");
         }
         int revision = positiveIntHeader(response, "x-walksafe-package-revision");
+        int contentRevision = nonNegativeIntHeader(response, "x-walksafe-content-revision");
+        int reviewRevision = positiveIntHeader(response, "x-walksafe-review-revision");
+        int byteCount = positiveIntHeader(response, "x-walksafe-package-byte-count");
         return new AdminDeliveryPackage(
             safeId,
             header(response, "x-walksafe-package-id"),
             revision,
+            contentRevision,
+            reviewRevision,
             header(response, "x-walksafe-export-audit-id"),
             header(response, "x-walksafe-package-sha256"),
             header(response, "x-walksafe-csv-sha256"),
             header(response, "x-walksafe-manifest-sha256"),
+            byteCount,
+            eligibility,
             response.bytes
         );
+    }
+
+    @Override
+    public AdminDeliveryPackage.Proof deliveryPackageProof(
+        AdminOperationsApi.SessionContext session,
+        String reportId,
+        int packageRevision
+    ) throws IOException, GeneralSecurityException {
+        String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
+        if (packageRevision < 1) throw new IllegalArgumentException("package revision must be positive");
+        Response response = executeProtectedRead(
+            requireSession(session),
+            LIST_PATH + "/" + safeId + "/delivery-packages/" + packageRevision + "/proof",
+            "",
+            PACKAGE_PROOF_PURPOSE
+        );
+        requireStatus(response, 200);
+        return AdminDeliveryPackage.parseProof(jsonBody(response), safeId, packageRevision);
     }
 
     @Override
@@ -532,6 +564,20 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         }
     }
 
+    private static int nonNegativeIntHeader(Response response, String name) throws IOException {
+        String value = header(response, name);
+        if (!value.matches("0|[1-9][0-9]{0,9}")) {
+            throw new IOException("delivery package content revision is invalid");
+        }
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed < 0) throw new IOException("delivery package content revision is invalid");
+            return parsed;
+        } catch (NumberFormatException error) {
+            throw new IOException("delivery package content revision is invalid", error);
+        }
+    }
+
     private static final class UrlConnectionTransport implements Transport {
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body)
@@ -571,15 +617,30 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         private static byte[] readBounded(InputStream input) throws IOException {
             try (input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
                 byte[] buffer = new byte[4_096];
-                while (true) {
-                    int read = input.read(buffer);
-                    if (read < 0) break;
-                    if (output.size() + read > MAX_PACKAGE_RESPONSE_BYTES) {
-                        throw new IOException("administrator report response is too large");
+                int zeroReads = 0;
+                try {
+                    while (true) {
+                        if (Thread.currentThread().isInterrupted()) {
+                            throw new IOException("administrator report response read was cancelled");
+                        }
+                        int read = input.read(buffer);
+                        if (read < 0) break;
+                        if (read == 0) {
+                            if (++zeroReads > 3) {
+                                throw new IOException("administrator report response made no progress");
+                            }
+                            continue;
+                        }
+                        zeroReads = 0;
+                        if (output.size() + read > MAX_PACKAGE_RESPONSE_BYTES) {
+                            throw new IOException("administrator report response is too large");
+                        }
+                        output.write(buffer, 0, read);
                     }
-                    output.write(buffer, 0, read);
+                    return output.toByteArray();
+                } finally {
+                    Arrays.fill(buffer, (byte) 0);
                 }
-                return output.toByteArray();
             }
         }
     }

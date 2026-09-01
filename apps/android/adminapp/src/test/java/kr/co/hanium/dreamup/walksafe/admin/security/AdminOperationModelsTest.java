@@ -11,7 +11,7 @@ import org.junit.Test;
 
 public final class AdminOperationModelsTest {
     @Test
-    public void reviewBodyIsExactSevenWithPhysicalNullAndAllReviewsRequired() throws Exception {
+    public void reviewBodyIsExactNineWithContentRevisionAndEvidenceGrant() throws Exception {
         AdminReportDecision approved = new AdminReportDecision(
             AdminReportDecision.Decision.APPROVED,
             "현장 정보와 사진을 확인함",
@@ -19,25 +19,32 @@ public final class AdminOperationModelsTest {
             null,
             true,
             true,
-            true
+            true,
+            3,
+            EVIDENCE_GRANT_ID
         );
         JSONObject body = new JSONObject(new String(approved.requestBody(REPORT_ID), StandardCharsets.UTF_8));
 
         assertEquals(Set.of(
             "decision", "reason", "user_visible_reason", "duplicate_of_report_id",
-            "location_reviewed", "photo_reviewed", "privacy_reviewed"
+            "location_reviewed", "photo_reviewed", "privacy_reviewed", "content_revision",
+            "evidence_grant_id"
         ), keys(body));
         assertTrue(body.has("user_visible_reason"));
         assertTrue(body.isNull("user_visible_reason"));
         assertTrue(body.has("duplicate_of_report_id"));
         assertTrue(body.isNull("duplicate_of_report_id"));
         assertEquals("APPROVED", body.getString("decision"));
+        assertEquals(3, body.getInt("content_revision"));
+        assertEquals(EVIDENCE_GRANT_ID, body.getString("evidence_grant_id"));
 
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.APPROVED, "reason", null, null, true, false, true
+            AdminReportDecision.Decision.APPROVED, "reason", null, null, true, false, true, 0,
+            EVIDENCE_GRANT_ID
         ));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.APPROVED, "reason", null, OTHER_REPORT_ID, true, true, true
+            AdminReportDecision.Decision.APPROVED, "reason", null, OTHER_REPORT_ID, true, true, true, 0,
+            EVIDENCE_GRANT_ID
         ));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
             AdminReportDecision.Decision.APPROVED,
@@ -46,7 +53,19 @@ public final class AdminOperationModelsTest {
             null,
             true,
             true,
-            true
+            true,
+            0,
+            EVIDENCE_GRANT_ID
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
+            AdminReportDecision.Decision.REJECTED, "reason", "공개 사유", null, true, true, true, -1, null
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
+            AdminReportDecision.Decision.APPROVED, "reason", null, null, true, true, true, 0, null
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
+            AdminReportDecision.Decision.REJECTED, "reason", "공개 사유", null, true, true, true, 0,
+            EVIDENCE_GRANT_ID
         ));
     }
 
@@ -59,7 +78,9 @@ public final class AdminOperationModelsTest {
             null,
             true,
             false,
-            true
+            true,
+            0,
+            null
         );
         JSONObject rejectedBody = new JSONObject(new String(
             rejected.requestBody(REPORT_ID), StandardCharsets.UTF_8
@@ -73,7 +94,9 @@ public final class AdminOperationModelsTest {
             OTHER_REPORT_ID,
             false,
             true,
-            false
+            false,
+            0,
+            null
         );
         JSONObject duplicateBody = new JSONObject(new String(
             duplicate.requestBody(REPORT_ID), StandardCharsets.UTF_8
@@ -90,14 +113,16 @@ public final class AdminOperationModelsTest {
             OTHER_REPORT_ID,
             true,
             true,
-            true
+            true,
+            0,
+            null
         );
         assertThrows(IllegalArgumentException.class, () -> duplicate.requestBody(OTHER_REPORT_ID));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.DUPLICATE, "reason", "공개 사유", null, true, true, true
+            AdminReportDecision.Decision.DUPLICATE, "reason", "공개 사유", null, true, true, true, 0, null
         ));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.REJECTED, "reason", " ", null, true, true, true
+            AdminReportDecision.Decision.REJECTED, "reason", " ", null, true, true, true, 0, null
         ));
     }
 
@@ -165,5 +190,6 @@ public final class AdminOperationModelsTest {
 
     private static final String REPORT_ID = "11111111-1111-4111-8111-111111111111";
     private static final String OTHER_REPORT_ID = "22222222-2222-4222-8222-222222222222";
+    private static final String EVIDENCE_GRANT_ID = "44444444-4444-4444-8444-444444444444";
     private static final String IDEMPOTENCY_KEY = "33333333-3333-4333-8333-333333333333";
 }

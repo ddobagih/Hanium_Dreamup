@@ -3,11 +3,14 @@ package kr.co.hanium.dreamup.walksafe.admin.security;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -85,6 +88,8 @@ public final class AdminOperationsHttpClientTest {
         );
         JSONObject body = new JSONObject(operation.bodyText());
         assertEquals(EXACT_REVIEW_KEYS, keys(body));
+        assertEquals(3, body.getInt("content_revision"));
+        assertEquals(EVIDENCE_GRANT_ID, body.getString("evidence_grant_id"));
         assertTrue(body.has("user_visible_reason"));
         assertTrue(body.isNull("user_visible_reason"));
         assertTrue(body.isNull("duplicate_of_report_id"));
@@ -152,6 +157,14 @@ public final class AdminOperationsHttpClientTest {
         assertThrows(IOException.class, () -> client(missingPublicReason, new CapturingSigner())
             .readReviewDecisions(SESSION, REPORT_ID));
 
+        FakeTransport missingContentRevision = new FakeTransport();
+        missingContentRevision.reviewHistoryOverride = FakeTransport.reviewHistoryJson().replace(
+            "\"content_revision\":0,",
+            ""
+        );
+        assertThrows(IOException.class, () -> client(missingContentRevision, new CapturingSigner())
+            .readReviewDecisions(SESSION, REPORT_ID));
+
         FakeTransport invalidApprovedPublicReason = new FakeTransport();
         invalidApprovedPublicReason.reviewHistoryOverride = FakeTransport.reviewHistoryJson().replace(
             "\"user_visible_reason\":null",
@@ -169,6 +182,200 @@ public final class AdminOperationsHttpClientTest {
         );
         assertThrows(IOException.class, () -> client(wrongRevision, new CapturingSigner())
             .readDeliveries(SESSION, REPORT_ID));
+    }
+
+    @Test
+    public void originalEvidenceUsesExactV2GrantReconfirmationAndOneBinaryRead() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        AdminOperationsHttpClient client = client(transport, new CapturingSigner());
+
+        AdminOriginalEvidence evidence = client.loadOriginalEvidence(
+            SESSION,
+            REPORT_ID,
+            3,
+            "승인 검토를 위한 원본 증거 확인",
+            Map.of(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER, RECONFIRMATION_NONCE)
+        );
+
+        assertEquals(2, transport.requests.size());
+        assertEquals(1, transport.binaryRequests.size());
+        assertOperationPair(
+            transport.requests.get(0),
+            transport.requests.get(1),
+            "POST",
+            "/reports/" + REPORT_ID + "/original-access-grants",
+            AdminOperationsHttpClient.ORIGINAL_GRANT_ACTION,
+            null
+        );
+        Request grantRequest = transport.requests.get(1);
+        JSONObject grantBody = new JSONObject(grantRequest.bodyText());
+        JSONObject grantChallenge = new JSONObject(transport.requests.get(0).bodyText());
+        assertEquals(
+            AdminCanonicalEncoding.sha256Hex(grantRequest.body),
+            grantChallenge.getString("body_sha256")
+        );
+        assertEquals(Set.of("purpose", "reason", "expected_content_revision"), keys(grantBody));
+        assertEquals("report_review", grantBody.getString("purpose"));
+        assertEquals(3, grantBody.getInt("expected_content_revision"));
+        assertEquals(
+            RECONFIRMATION_NONCE,
+            grantRequest.headers.get(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER)
+        );
+        Request imageRequest = transport.binaryRequests.get(0);
+        assertEquals("GET", imageRequest.method);
+        assertEquals(ORIGIN + "/uploads/" + REPORT_ID + ".png", imageRequest.url);
+        assertEquals(
+            ORIGINAL_ACCESS_TOKEN,
+            imageRequest.headers.get(AdminOperationsHttpClient.ORIGINAL_ACCESS_GRANT_HEADER)
+        );
+        assertEquals("no-store", imageRequest.headers.get("Cache-Control"));
+        assertEquals("no-cache", imageRequest.headers.get("Pragma"));
+        assertFalse(imageRequest.headers.containsKey(AdminDeviceProof.CHALLENGE_ID_HEADER));
+        assertFalse(imageRequest.headers.containsKey(AdminDeviceProof.SIGNATURE_HEADER));
+        assertFalse(imageRequest.headers.containsKey(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER));
+        assertFalse(imageRequest.headers.containsKey(AdminOperationsHttpClient.READ_PURPOSE_HEADER));
+        assertTrue(evidence.matches(REPORT_ID, 3, SESSION.sessionId(), DEVICE_ID, NOW));
+        evidence.close();
+    }
+
+    @Test
+    public void originalEvidenceFailsClosedBeforeOrAfterGrantOnAnyBindingMismatch() {
+        FakeTransport missingReconfirmation = new FakeTransport();
+        assertThrows(IllegalArgumentException.class, () -> client(
+            missingReconfirmation, new CapturingSigner()
+        ).loadOriginalEvidence(SESSION, REPORT_ID, 3, "long enough reason", Map.of()));
+        assertTrue(missingReconfirmation.requests.isEmpty());
+
+        FakeTransport staleRevision = new FakeTransport();
+        staleRevision.grantOverride = staleRevision.grantJson().replace(
+            "\"content_revision\":3",
+            "\"content_revision\":4"
+        );
+        assertThrows(IOException.class, () -> loadOriginal(client(staleRevision, new CapturingSigner())));
+        assertTrue(staleRevision.binaryRequests.isEmpty());
+
+        FakeTransport extraField = new FakeTransport();
+        extraField.grantOverride = extraField.grantJson().replace(
+            "\"grant_id\"",
+            "\"unexpected\":true,\"grant_id\""
+        );
+        assertThrows(IOException.class, () -> loadOriginal(client(extraField, new CapturingSigner())));
+        assertTrue(extraField.binaryRequests.isEmpty());
+
+        FakeTransport wrongMime = new FakeTransport();
+        wrongMime.binaryContentType = "image/jpeg";
+        assertThrows(IOException.class, () -> loadOriginal(client(wrongMime, new CapturingSigner())));
+
+        FakeTransport wrongLength = new FakeTransport();
+        wrongLength.binaryDeclaredLength = PNG.length + 1L;
+        assertThrows(IOException.class, () -> loadOriginal(client(wrongLength, new CapturingSigner())));
+
+        FakeTransport wrongSha = new FakeTransport();
+        wrongSha.grantOverride = wrongSha.grantJson().replace(
+            AdminCanonicalEncoding.sha256Hex(PNG),
+            "0".repeat(64)
+        );
+        assertThrows(IOException.class, () -> loadOriginal(client(wrongSha, new CapturingSigner())));
+    }
+
+    @Test
+    public void cancelledOriginalEvidenceFailsBeforeAnyNetworkUse() {
+        FakeTransport transport = new FakeTransport();
+        Thread.currentThread().interrupt();
+        try {
+            IOException error = assertThrows(
+                IOException.class,
+                () -> loadOriginal(client(transport, new CapturingSigner()))
+            );
+            assertEquals("original evidence request was cancelled", error.getMessage());
+            assertTrue(Thread.currentThread().isInterrupted());
+            assertTrue(transport.requests.isEmpty());
+            assertTrue(transport.binaryRequests.isEmpty());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    public void responseReadersAllowThreeConsecutiveZeroReadsAndRejectTheFourth() throws Exception {
+        ZeroThenDataInputStream allowedJson = new ZeroThenDataInputStream(3, "{}".getBytes(StandardCharsets.UTF_8));
+        assertEquals("{}", AdminOperationsHttpClient.readBoundedResponse(allowedJson));
+        assertTrue(allowedJson.closed);
+        assertBufferZeroed(allowedJson.lastBuffer);
+
+        ZeroThenDataInputStream rejectedJson = new ZeroThenDataInputStream(4, "{}".getBytes(StandardCharsets.UTF_8));
+        IOException jsonError = assertThrows(
+            IOException.class,
+            () -> AdminOperationsHttpClient.readBoundedResponse(rejectedJson)
+        );
+        assertEquals("administrator API response made no progress", jsonError.getMessage());
+        assertTrue(rejectedJson.closed);
+        assertBufferZeroed(rejectedJson.lastBuffer);
+
+        ZeroThenDataInputStream allowedImage = new ZeroThenDataInputStream(3, PNG);
+        byte[] image = AdminOperationsHttpClient.readOriginalEvidenceBody(allowedImage, PNG.length);
+        try {
+            assertArrayEquals(PNG, image);
+        } finally {
+            java.util.Arrays.fill(image, (byte) 0);
+        }
+        assertTrue(allowedImage.closed);
+        assertBufferZeroed(allowedImage.lastBuffer);
+
+        ZeroThenDataInputStream rejectedImage = new ZeroThenDataInputStream(4, PNG);
+        IOException imageError = assertThrows(
+            IOException.class,
+            () -> AdminOperationsHttpClient.readOriginalEvidenceBody(rejectedImage, PNG.length)
+        );
+        assertEquals("original evidence response made no progress", imageError.getMessage());
+        assertTrue(rejectedImage.closed);
+        assertBufferZeroed(rejectedImage.lastBuffer);
+    }
+
+    @Test
+    public void responseReadersFailClosedWhenInterruptedDuringRead() {
+        InterruptingInputStream json = new InterruptingInputStream("{}".getBytes(StandardCharsets.UTF_8));
+        try {
+            IOException error = assertThrows(
+                IOException.class,
+                () -> AdminOperationsHttpClient.readBoundedResponse(json)
+            );
+            assertEquals("administrator API response read was cancelled", error.getMessage());
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+        assertTrue(json.closed);
+        assertBufferZeroed(json.lastBuffer);
+
+        InterruptingInputStream image = new InterruptingInputStream(PNG);
+        try {
+            IOException error = assertThrows(
+                IOException.class,
+                () -> AdminOperationsHttpClient.readOriginalEvidenceBody(image, PNG.length)
+            );
+            assertEquals("original evidence request was cancelled", error.getMessage());
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+        assertTrue(image.closed);
+        assertBufferZeroed(image.lastBuffer);
+    }
+
+    private static void assertBufferZeroed(byte[] buffer) {
+        assertTrue(buffer != null);
+        for (byte value : buffer) assertEquals(0, value);
+    }
+
+    private static AdminOriginalEvidence loadOriginal(AdminOperationsHttpClient client) throws Exception {
+        return client.loadOriginalEvidence(
+            SESSION,
+            REPORT_ID,
+            3,
+            "long enough reason",
+            Map.of(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER, RECONFIRMATION_NONCE)
+        );
     }
 
     private static void assertOperationPair(
@@ -229,7 +436,9 @@ public final class AdminOperationsHttpClientTest {
             null,
             true,
             true,
-            true
+            true,
+            3,
+            EVIDENCE_GRANT_ID
         );
     }
 
@@ -265,14 +474,73 @@ public final class AdminOperationsHttpClientTest {
         }
     }
 
+    private static class ZeroThenDataInputStream extends InputStream {
+        private int zeroReadsRemaining;
+        private final byte[] data;
+        private int offset;
+        byte[] lastBuffer;
+        boolean closed;
+
+        ZeroThenDataInputStream(int zeroReads, byte[] data) {
+            this.zeroReadsRemaining = zeroReads;
+            this.data = data.clone();
+        }
+
+        @Override
+        public int read(byte[] buffer, int start, int length) {
+            lastBuffer = buffer;
+            if (zeroReadsRemaining-- > 0) return 0;
+            if (offset >= data.length) return -1;
+            int count = Math.min(length, data.length - offset);
+            System.arraycopy(data, offset, buffer, start, count);
+            offset += count;
+            return count;
+        }
+
+        @Override
+        public int read() {
+            if (offset >= data.length) return -1;
+            return data[offset++] & 0xff;
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+    }
+
+    private static final class InterruptingInputStream extends ZeroThenDataInputStream {
+        private boolean interrupted;
+
+        InterruptingInputStream(byte[] data) {
+            super(0, data);
+        }
+
+        @Override
+        public int read(byte[] buffer, int start, int length) {
+            int read = super.read(buffer, start, length);
+            if (!interrupted) {
+                interrupted = true;
+                Thread.currentThread().interrupt();
+            }
+            return read;
+        }
+    }
+
     private static final class FakeTransport implements AdminOperationsHttpClient.Transport {
         final List<Request> requests = new ArrayList<>();
+        final List<Request> binaryRequests = new ArrayList<>();
         boolean addUnexpectedChallengeField;
         int challengeStatus = 200;
         int businessStatus = 201;
         int readStatus = 200;
         String reviewHistoryOverride;
         String deliveryHistoryOverride;
+        String grantOverride;
+        int binaryStatus = 200;
+        String binaryContentType = "image/png";
+        long binaryDeclaredLength = PNG.length;
+        byte[] binaryBody = PNG.clone();
 
         @Override
         public AdminOperationsHttpClient.Response execute(
@@ -322,6 +590,12 @@ public final class AdminOperationsHttpClientTest {
             if (businessStatus < 200 || businessStatus > 299) {
                 return new AdminOperationsHttpClient.Response(businessStatus, "private server detail");
             }
+            if (url.endsWith("/original-access-grants")) {
+                return new AdminOperationsHttpClient.Response(
+                    businessStatus,
+                    grantOverride == null ? grantJson() : grantOverride
+                );
+            }
             if ("GET".equals(method) && url.endsWith("/review-decisions")) {
                 return new AdminOperationsHttpClient.Response(
                     readStatus,
@@ -337,12 +611,50 @@ public final class AdminOperationsHttpClientTest {
             return new AdminOperationsHttpClient.Response(businessStatus, "{}");
         }
 
+        @Override
+        public AdminOperationsHttpClient.BinaryResponse executeBinary(
+            String method,
+            String url,
+            Map<String, String> headers,
+            int expectedByteCount
+        ) {
+            binaryRequests.add(new Request(method, url, headers, null));
+            return new AdminOperationsHttpClient.BinaryResponse(
+                binaryStatus,
+                binaryContentType,
+                binaryDeclaredLength,
+                binaryBody.clone()
+            );
+        }
+
+        private String grantJson() {
+            Map<String, Object> exactLocation = new LinkedHashMap<>();
+            exactLocation.put("lat", 37.5665);
+            exactLocation.put("lon", 126.978);
+            exactLocation.put("accuracy", 4.5);
+            Map<String, Object> image = new LinkedHashMap<>();
+            image.put("resource_path", "/uploads/" + REPORT_ID + ".png");
+            image.put("content_type", "image/png");
+            image.put("sha256", AdminCanonicalEncoding.sha256Hex(PNG));
+            image.put("byte_count", PNG.length);
+            image.put("access_token", ORIGINAL_ACCESS_TOKEN);
+            Map<String, Object> root = new LinkedHashMap<>();
+            root.put("schema_version", AdminOriginalEvidence.SCHEMA_VERSION);
+            root.put("grant_id", EVIDENCE_GRANT_ID);
+            root.put("content_revision", 3);
+            root.put("expires_at", Instant.ofEpochMilli(NOW + 120_000L).toString());
+            root.put("exact_location", exactLocation);
+            root.put("image", image);
+            return new JSONObject(root).toString();
+        }
+
         private static String reviewHistoryJson() {
             return """
                 [{
                   "id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                   "report_id":"44444444-4444-4444-8444-444444444444",
                   "revision":1,
+                  "content_revision":0,
                   "decision":"APPROVED",
                   "reason":"reviewed",
                   "user_visible_reason":null,
@@ -418,13 +730,21 @@ public final class AdminOperationsHttpClientTest {
     );
     private static final Set<String> EXACT_REVIEW_KEYS = Set.of(
         "decision", "reason", "user_visible_reason", "duplicate_of_report_id",
-        "location_reviewed", "photo_reviewed", "privacy_reviewed"
+        "location_reviewed", "photo_reviewed", "privacy_reviewed", "content_revision",
+        "evidence_grant_id"
     );
     private static final String ORIGIN = "http://127.0.0.1:8000";
     private static final String REPORT_ID = "44444444-4444-4444-8444-444444444444";
+    private static final String EVIDENCE_GRANT_ID = "88888888-8888-4888-8888-888888888888";
     private static final String DEVICE_ID = AdminDeviceProofTest.DEVICE_ID;
     private static final String MARKER = AdminDeviceProofTest.MARKER;
     private static final String ACCESS_TOKEN = "opaque-access-token-for-tests-123456";
+    private static final String RECONFIRMATION_NONCE = "AAAAAAAAAAAAAAAAAAAAAA";
+    private static final String ORIGINAL_ACCESS_TOKEN = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    private static final long NOW = AdminDeviceProofTest.ISSUED_AT + 1L;
+    private static final byte[] PNG = {
+        (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+    };
     private static final String EMPTY_SHA = AdminDeviceProofTest.EMPTY_SHA;
     private static final AdminOperationsApi.SessionContext SESSION = new AdminOperationsApi.SessionContext(
         ACCESS_TOKEN,

@@ -6,8 +6,10 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 
 public final class AdminSecurityControllerTest {
@@ -54,7 +56,8 @@ public final class AdminSecurityControllerTest {
         assertThrows(IllegalStateException.class, () -> controller.recordReviewDecision(
             "11111111-1111-4111-8111-111111111111",
             new AdminReportDecision(
-                AdminReportDecision.Decision.APPROVED, "reviewed", null, null, true, true, true
+                AdminReportDecision.Decision.APPROVED, "reviewed", null, null, true, true, true, 0,
+                EVIDENCE_GRANT_ID
             ),
             true
         ));
@@ -382,7 +385,8 @@ public final class AdminSecurityControllerTest {
         AdminSecurityController controller = new AdminSecurityController(api, operations);
         controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
         AdminReportDecision review = new AdminReportDecision(
-            AdminReportDecision.Decision.APPROVED, "reviewed", null, null, true, true, true
+            AdminReportDecision.Decision.APPROVED, "reviewed", null, null, true, true, true, 0,
+            EVIDENCE_GRANT_ID
         );
 
         assertThrows(IllegalStateException.class, () -> controller.recordReviewDecision(
@@ -404,6 +408,60 @@ public final class AdminSecurityControllerTest {
         assertThrows(IllegalStateException.class, () -> controller.recordReviewDecision(
             "11111111-1111-4111-8111-111111111111", review, true
         ));
+    }
+
+    @Test
+    public void originalEvidenceUsesExactStepUpOnceAndAlwaysWipesMutableCredentials() throws Exception {
+        FakeApi api = new FakeApi();
+        FakeOperations operations = new FakeOperations();
+        AdminSecurityController controller = new AdminSecurityController(api, operations);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        char[] password = PASSWORD.toCharArray();
+        char[] totp = "123456".toCharArray();
+
+        AdminOriginalEvidence evidence = controller.loadAdminOriginalEvidence(
+            REPORT_ID,
+            0,
+            "승인 검토 원본 확인",
+            password,
+            totp,
+            10_000L,
+            true
+        );
+
+        assertEquals(1, api.reauthenticateCount);
+        assertEquals("report.original.grant", api.reconfirmationAction);
+        assertEquals("POST", api.reconfirmationMethod);
+        assertEquals("/reports/" + REPORT_ID + "/original-access-grants", api.reconfirmationPath);
+        assertEquals(1, operations.originalEvidenceCalls);
+        assertEquals(1, operations.reconfirmationHeaders.size());
+        assertEquals(
+            api.reconfirmationNonce,
+            operations.reconfirmationHeaders.get(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER)
+        );
+        assertAllCleared(password);
+        assertAllCleared(totp);
+        assertTrue(evidence.matches(REPORT_ID, 0, CURRENT_SESSION_ID, DEVICE_ID, 10_001L));
+        evidence.close();
+
+        operations.failOriginalEvidence = true;
+        char[] failedPassword = PASSWORD.toCharArray();
+        char[] failedTotp = "123456".toCharArray();
+        assertThrows(IOException.class, () -> controller.loadAdminOriginalEvidence(
+            REPORT_ID,
+            0,
+            "승인 검토 원본 확인",
+            failedPassword,
+            failedTotp,
+            10_000L,
+            true
+        ));
+        assertAllCleared(failedPassword);
+        assertAllCleared(failedTotp);
+    }
+
+    private static void assertAllCleared(char[] value) {
+        for (char item : value) assertEquals('\0', item);
     }
 
     @Test
@@ -602,6 +660,24 @@ public final class AdminSecurityControllerTest {
         }
 
         @Override
+        public ReauthenticationResult reauthenticate(
+            String accessToken,
+            char[] password,
+            char[] totpCode,
+            String action,
+            String method,
+            String path,
+            String nonce
+        ) {
+            reauthenticateCount += 1;
+            reconfirmationNonce = nonce;
+            reconfirmationAction = action;
+            reconfirmationMethod = method;
+            reconfirmationPath = path;
+            return new ReauthenticationResult(20_000L, action, method, echoPath == null ? path : echoPath);
+        }
+
+        @Override
         public RecoveryStartResult startRecovery(
             String adminId,
             String recoveryCode,
@@ -666,6 +742,9 @@ public final class AdminSecurityControllerTest {
 
     private static final class FakeOperations implements AdminOperationsApi {
         int reviewCalls;
+        int originalEvidenceCalls;
+        boolean failOriginalEvidence;
+        Map<String, String> reconfirmationHeaders;
         SessionContext session;
 
         @Override
@@ -689,11 +768,55 @@ public final class AdminSecurityControllerTest {
         public Result readDeliveries(SessionContext session, String reportId) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public AdminOriginalEvidence loadOriginalEvidence(
+            SessionContext session,
+            String reportId,
+            int expectedContentRevision,
+            String reason,
+            Map<String, String> reconfirmationHeaders
+        ) throws IOException {
+            originalEvidenceCalls += 1;
+            this.session = session;
+            this.reconfirmationHeaders = reconfirmationHeaders;
+            if (failOriginalEvidence) throw new IOException("original evidence unavailable");
+            byte[] image = {
+                (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+            };
+            AdminOriginalEvidence.IssuedGrant grant = new AdminOriginalEvidence.IssuedGrant(
+                reportId,
+                session.sessionId(),
+                session.deviceId(),
+                EVIDENCE_GRANT_ID,
+                expectedContentRevision,
+                Instant.ofEpochMilli(19_000L).toString(),
+                37.5,
+                127.0,
+                4.5,
+                "/uploads/" + reportId + ".png",
+                "image/png",
+                AdminCanonicalEncoding.sha256Hex(image),
+                image.length,
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                10_000L
+            );
+            return AdminOriginalEvidence.verifyAndTake(
+                grant,
+                200,
+                "image/png",
+                image.length,
+                image,
+                10_000L
+            );
+        }
     }
 
     private static final String DEVICE_ID = "admin-device-12345678-1234-1234-1234-123456789abc";
+    private static final String REPORT_ID = "11111111-1111-4111-8111-111111111111";
     private static final String CURRENT_SESSION_ID = "11111111-1111-4111-8111-111111111111";
     private static final String OTHER_SESSION_ID = "22222222-2222-4222-8222-222222222222";
+    private static final String EVIDENCE_GRANT_ID = "44444444-4444-4444-8444-444444444444";
     private static final String OTHER_DEVICE_ID = "admin-device-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     private static final String KEY_ONLY_DEVICE_ID = "admin-device-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
     private static final String PASSWORD = "correct horse battery staple";

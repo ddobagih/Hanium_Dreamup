@@ -138,6 +138,7 @@ public final class AdminDeviceProof {
                     || "report.delivery_events".equals(readPurpose)
                     || "admin.report.list".equals(readPurpose)
                     || "admin.report.detail".equals(readPurpose)
+                    || "admin.report.delivery_package.proof".equals(readPurpose)
                     || "admin.report_request.list".equals(readPurpose)
                     || "admin.report_request.detail".equals(readPurpose)
                     || "admin.incident.list".equals(readPurpose)
@@ -154,6 +155,7 @@ public final class AdminDeviceProof {
             boolean postAction = "POST".equals(method)
                 && ("report.review.decide".equals(action)
                     || "report.delivery.create".equals(action)
+                    || "report.original.grant".equals(action)
                     || "admin.report.delivery_package.create".equals(action)
                     || "recovery.custody.attest".equals(action)
                     || "device.report_lost".equals(action));

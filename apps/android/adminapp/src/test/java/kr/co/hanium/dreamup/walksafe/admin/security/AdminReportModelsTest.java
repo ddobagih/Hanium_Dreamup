@@ -24,10 +24,40 @@ public final class AdminReportModelsTest {
             wave5DetailFixture(),
             reportId
         );
+        assertEquals(0, detail.contentRevision());
+        assertEquals(3, detail.latestDeliveryRevision());
         assertEquals("APPROVED", detail.review().decision());
         assertNull(detail.review().userVisibleReason());
-        assertEquals("ACKNOWLEDGED", detail.delivery().status());
-        assertEquals(3, detail.delivery().revision());
+        assertEquals("ACKNOWLEDGED", detail.currentContentDelivery().status());
+        assertEquals(3, detail.currentContentDelivery().revision());
+        assertEquals(1, detail.currentContentDelivery().packageRevision());
+        assertEquals(0, detail.currentContentDelivery().packageContentRevision());
+        assertEquals(
+            "88888888-8888-4888-8888-888888888888",
+            detail.currentContentDelivery().packageId()
+        );
+        assertEquals(4096, detail.currentContentDelivery().packageByteCount());
+    }
+
+    @Test
+    public void v2KeepsLatestGlobalDeliveryRevisionWhenCurrentContentHasNoDelivery()
+        throws Exception {
+        String detailJson = wave5DetailFixture()
+            .replace("\"latest_delivery_revision\": 3", "\"latest_delivery_revision\": 4");
+        int deliveryStart = detailJson.indexOf("  \"current_delivery\": {");
+        int capabilitiesStart = detailJson.indexOf("  \"capabilities\":", deliveryStart);
+        String withoutCurrentDelivery = detailJson.substring(0, deliveryStart)
+            + "  \"current_delivery\": null,\n"
+            + detailJson.substring(capabilitiesStart);
+
+        AdminReportModels.Detail detail = AdminReportModels.parseDetail(
+            withoutCurrentDelivery,
+            "11111111-1111-4111-8111-111111111111"
+        );
+
+        assertEquals(4, detail.latestDeliveryRevision());
+        assertNull(detail.currentContentDelivery());
+        assertNull(detail.delivery());
     }
 
     @Test
@@ -40,6 +70,28 @@ public final class AdminReportModelsTest {
             list.replace("\"next_cursor\": null", "\"next_cursor\":null,\"next_cursor\":null")
         ));
         String detail = wave5DetailFixture();
+        assertThrows(IOException.class, () -> AdminReportModels.parseDetail(
+            detail.replace(
+                "walksafe.admin-report-detail.v2",
+                "walksafe.admin-report-detail.v1"
+            ),
+            "11111111-1111-4111-8111-111111111111"
+        ));
+        assertThrows(IOException.class, () -> AdminReportModels.parseDetail(
+            detail.replace("  \"content_revision\": 0,\n", ""),
+            "11111111-1111-4111-8111-111111111111"
+        ));
+        assertThrows(IOException.class, () -> AdminReportModels.parseDetail(
+            detail.replace("  \"latest_delivery_revision\": 3,\n", ""),
+            "11111111-1111-4111-8111-111111111111"
+        ));
+        assertThrows(IOException.class, () -> AdminReportModels.parseDetail(
+            detail.replace(
+                "\"latest_delivery_revision\": 3",
+                "\"latest_delivery_revision\": 2"
+            ),
+            "11111111-1111-4111-8111-111111111111"
+        ));
         assertThrows(IOException.class, () -> AdminReportModels.parseDetail(
             detail.replace("    \"user_visible_reason\": null,\n", ""),
             "11111111-1111-4111-8111-111111111111"
@@ -89,24 +141,6 @@ public final class AdminReportModelsTest {
     }
 
     static String wave5DetailFixture() throws Exception {
-        return fixture("admin-report-detail-v1.json")
-            .replace(
-                "\"status\": \"reviewed\",",
-                "\"status\": \"reviewed\",\n  \"status_version\": 2,\n  \"allowed_next_statuses\": [\"new\", \"resolved\"],"
-            )
-            .replace(
-                "\"decision\": \"APPROVED\",",
-                "\"decision\": \"APPROVED\",\n    \"user_visible_reason\": null,"
-            )
-            .replace(
-                "\"revision\": 3,\n    \"status\"",
-                "\"revision\": 3,\n    \"package_revision\": 1,\n    \"status\""
-            )
-            .replace(
-                "\"original_access_grants_path\": \"/reports/11111111-1111-4111-8111-111111111111/original-access-grants\"",
-                "\"original_access_grants_path\": \"/reports/11111111-1111-4111-8111-111111111111/original-access-grants\",\n"
-                    + "    \"status_path\": \"/admin/reports/11111111-1111-4111-8111-111111111111/status\",\n"
-                    + "    \"delivery_packages_path\": \"/admin/reports/11111111-1111-4111-8111-111111111111/delivery-packages\""
-            );
+        return fixture("admin-report-detail-v2.json");
     }
 }

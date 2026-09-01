@@ -126,6 +126,15 @@ public final class AdminHighRiskActionGate {
         );
     }
 
+    public static Operation originalEvidence(String reportId) {
+        String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
+        return operation(
+            "report.original.grant",
+            "POST",
+            "/reports/" + safeId + "/original-access-grants"
+        );
+    }
+
     public static Operation reportRequestStatus(String requestId) {
         String safeId = AdminReportRequestModels.canonicalUuid(requestId, "request_id");
         return operation(

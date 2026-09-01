@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.admin.security;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.List;
+import java.util.Map;
 
 /** Backend-only administrator review and manual-delivery recording boundary. */
 public interface AdminOperationsApi {
@@ -165,4 +166,12 @@ public interface AdminOperationsApi {
 
     Result readDeliveries(SessionContext session, String reportId)
         throws IOException, GeneralSecurityException;
+
+    AdminOriginalEvidence loadOriginalEvidence(
+        SessionContext session,
+        String reportId,
+        int expectedContentRevision,
+        String reason,
+        Map<String, String> reconfirmationHeaders
+    ) throws IOException, GeneralSecurityException;
 }

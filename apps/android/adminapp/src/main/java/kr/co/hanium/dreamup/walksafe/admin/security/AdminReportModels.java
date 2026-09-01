@@ -13,7 +13,7 @@ import java.util.UUID;
 /** Strict, non-sensitive projections returned by the administrator report APIs. */
 public final class AdminReportModels {
     public static final String LIST_SCHEMA = "walksafe.admin-report-list.v1";
-    public static final String DETAIL_SCHEMA = "walksafe.admin-report-detail.v1";
+    public static final String DETAIL_SCHEMA = "walksafe.admin-report-detail.v2";
     public static final String STATUS_SCHEMA = "walksafe.admin-report-status.v1";
     public static final int PAGE_SIZE = 25;
     private static final Set<String> STATUSES = AdminJava8Collections.set("new", "reviewed", "resolved");
@@ -156,7 +156,16 @@ public final class AdminReportModels {
 
     public static final class DeliverySummary {
         private final int revision;
-        private final Integer packageRevision;
+        private final String packageId;
+        private final int packageRevision;
+        private final int packageContentRevision;
+        private final String packageSchemaVersion;
+        private final int packageVersion;
+        private final String exportAuditId;
+        private final String packageSha256;
+        private final String csvSha256;
+        private final String manifestSha256;
+        private final int packageByteCount;
         private final String status;
         private final boolean externalReceiptPresent;
         private final boolean evidencePresent;
@@ -165,11 +174,24 @@ public final class AdminReportModels {
 
         private DeliverySummary(Map<String, Object> value) throws IOException {
             exactKeys(value, AdminJava8Collections.set(
-                "revision", "package_revision", "status", "external_receipt_present", "evidence_present",
-                "observed_at", "recorded_at"
+                "revision", "package_id", "package_revision", "package_content_revision",
+                "package_schema_version", "package_version", "export_audit_id", "package_sha256",
+                "csv_sha256", "manifest_sha256", "package_byte_count", "status",
+                "external_receipt_present", "evidence_present", "observed_at", "recorded_at"
             ));
             revision = integer(value, "revision", 1, Integer.MAX_VALUE);
-            packageRevision = nullableInteger(value, "package_revision", 1, Integer.MAX_VALUE);
+            packageId = uuid(value, "package_id");
+            packageRevision = integer(value, "package_revision", 1, Integer.MAX_VALUE);
+            packageContentRevision = integer(
+                value, "package_content_revision", 0, Integer.MAX_VALUE
+            );
+            packageSchemaVersion = text(value, "package_schema_version", 64);
+            packageVersion = integer(value, "package_version", 1, Integer.MAX_VALUE);
+            exportAuditId = uuid(value, "export_audit_id");
+            packageSha256 = sha(value, "package_sha256");
+            csvSha256 = sha(value, "csv_sha256");
+            manifestSha256 = sha(value, "manifest_sha256");
+            packageByteCount = integer(value, "package_byte_count", 1, 8 * 1024 * 1024);
             status = member(value, "status", AdminJava8Collections.set("SUBMITTED", "ACKNOWLEDGED", "RESOLVED", "FAILED"));
             externalReceiptPresent = bool(value, "external_receipt_present");
             evidencePresent = bool(value, "evidence_present");
@@ -178,7 +200,16 @@ public final class AdminReportModels {
         }
 
         public int revision() { return revision; }
-        public Integer packageRevision() { return packageRevision; }
+        public String packageId() { return packageId; }
+        public int packageRevision() { return packageRevision; }
+        public int packageContentRevision() { return packageContentRevision; }
+        public String packageSchemaVersion() { return packageSchemaVersion; }
+        public int packageVersion() { return packageVersion; }
+        public String exportAuditId() { return exportAuditId; }
+        public String packageSha256() { return packageSha256; }
+        public String csvSha256() { return csvSha256; }
+        public String manifestSha256() { return manifestSha256; }
+        public int packageByteCount() { return packageByteCount; }
         public String status() { return status; }
         public boolean externalReceiptPresent() { return externalReceiptPresent; }
         public boolean evidencePresent() { return evidencePresent; }
@@ -188,8 +219,10 @@ public final class AdminReportModels {
 
     public static final class Detail {
         private final Summary summary;
+        private final int contentRevision;
+        private final int latestDeliveryRevision;
         private final ReviewSummary review;
-        private final DeliverySummary delivery;
+        private final DeliverySummary currentContentDelivery;
         private final List<String> allowedNextStatuses;
         private final String reviewPath;
         private final String deliveriesPath;
@@ -199,8 +232,10 @@ public final class AdminReportModels {
 
         private Detail(
             Summary summary,
+            int contentRevision,
+            int latestDeliveryRevision,
             ReviewSummary review,
-            DeliverySummary delivery,
+            DeliverySummary currentContentDelivery,
             List<String> allowedNextStatuses,
             String reviewPath,
             String deliveriesPath,
@@ -209,8 +244,10 @@ public final class AdminReportModels {
             String deliveryPackagesPath
         ) {
             this.summary = summary;
+            this.contentRevision = contentRevision;
+            this.latestDeliveryRevision = latestDeliveryRevision;
             this.review = review;
-            this.delivery = delivery;
+            this.currentContentDelivery = currentContentDelivery;
             this.allowedNextStatuses = AdminJava8Collections.copyList(allowedNextStatuses);
             this.reviewPath = reviewPath;
             this.deliveriesPath = deliveriesPath;
@@ -220,8 +257,11 @@ public final class AdminReportModels {
         }
 
         public Summary summary() { return summary; }
+        public int contentRevision() { return contentRevision; }
+        public int latestDeliveryRevision() { return latestDeliveryRevision; }
         public ReviewSummary review() { return review; }
-        public DeliverySummary delivery() { return delivery; }
+        public DeliverySummary currentContentDelivery() { return currentContentDelivery; }
+        public DeliverySummary delivery() { return currentContentDelivery; }
         public List<String> allowedNextStatuses() { return allowedNextStatuses; }
         public String reviewPath() { return reviewPath; }
         public String deliveriesPath() { return deliveriesPath; }
@@ -257,6 +297,7 @@ public final class AdminReportModels {
         Map<String, Object> root = AdminStrictJson.parseObject(body);
         exactKeys(root, AdminJava8Collections.set(
             "schema_version", "id", "status", "status_version", "allowed_next_statuses",
+            "content_revision", "latest_delivery_revision",
             "class_name", "confidence", "location_quality",
             "captured_at", "created_at", "updated_at", "current_review", "current_delivery",
             "capabilities"
@@ -272,11 +313,20 @@ public final class AdminReportModels {
         summaryFields.put("duplicate_count", 0L);
         Summary summary = new Summary(summaryFields);
         if (!safeId.equals(summary.id())) throw new IOException("administrator report detail id is mismatched");
+        int contentRevision = integer(root, "content_revision", 0, Integer.MAX_VALUE);
+        int latestDeliveryRevision = integer(
+            root, "latest_delivery_revision", 0, Integer.MAX_VALUE
+        );
         List<String> allowedNextStatuses = statusList(root, "allowed_next_statuses", summary.status());
         ReviewSummary review = nullableObject(root, "current_review") == null
             ? null : new ReviewSummary(nullableObject(root, "current_review"));
         DeliverySummary delivery = nullableObject(root, "current_delivery") == null
             ? null : new DeliverySummary(nullableObject(root, "current_delivery"));
+        if (delivery != null
+            && (delivery.revision() > latestDeliveryRevision
+                || delivery.packageContentRevision() != contentRevision)) {
+            throw new IOException("administrator current-content delivery binding is invalid");
+        }
         Map<String, Object> capabilities = requiredObject(root, "capabilities");
         exactKeys(capabilities, AdminJava8Collections.set(
             "review_decisions_path", "deliveries_path", "original_access_grants_path",
@@ -299,6 +349,8 @@ public final class AdminReportModels {
         );
         return new Detail(
             summary,
+            contentRevision,
+            latestDeliveryRevision,
             review,
             delivery,
             allowedNextStatuses,
@@ -472,6 +524,14 @@ public final class AdminReportModels {
         } catch (IllegalArgumentException error) {
             throw new IOException("administrator report UUID is invalid: " + key, error);
         }
+    }
+
+    private static String sha(Map<String, Object> value, String key) throws IOException {
+        String parsed = text(value, key, 64);
+        if (!parsed.matches("[0-9a-f]{64}")) {
+            throw new IOException("administrator report SHA-256 is invalid: " + key);
+        }
+        return parsed;
     }
 
     private static String member(Map<String, Object> value, String key, Set<String> allowed) throws IOException {
