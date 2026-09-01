@@ -222,7 +222,6 @@ class UserReportControllerTest {
         val client = FakeClient().apply {
             listResults += Result.success(page(REPORT_ID, null))
             listResults += Result.success(page(REPORT_ID, null))
-            listCancelFailure = IllegalStateException("cancel failed")
         }
         val stableAuthority = authority(session())
         val controller = controller(client, worker) { stableAuthority }
@@ -701,6 +700,7 @@ class UserReportControllerTest {
         val client = FakeClient().apply {
             listResults += Result.success(page(REPORT_ID, null))
             listResults += Result.success(page(REPORT_ID, null))
+            listCancelFailure = IllegalStateException("cancel failed")
         }
         val stableAuthority = authority(session())
         val controller = UserReportController(
