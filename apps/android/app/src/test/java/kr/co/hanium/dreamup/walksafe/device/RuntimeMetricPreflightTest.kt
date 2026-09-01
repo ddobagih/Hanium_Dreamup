@@ -58,6 +58,34 @@ class RuntimeMetricPreflightTest {
     }
 
     @Test
+    fun observeAndExpireUseTheSameFailClosedDeadlineBoundary() {
+        val deadlineMs = START_MS + RuntimeMetricPreflightPolicy.MAX_DURATION_MS
+
+        listOf(-1L, 0L, 1L).forEach { offsetMs ->
+            val nowMs = deadlineMs + offsetMs
+            val observed = supportedSession().observe(
+                frame(index = 0, passing = false).copy(
+                    observedAtElapsedRealtimeMs = nowMs,
+                ),
+            )
+            val expired = supportedSession().expire(nowMs)
+
+            if (offsetMs < 0L) {
+                assertEquals(RuntimeMetricPreflightStatus.IN_PROGRESS, observed.status)
+                assertEquals(RuntimeMetricPreflightStatus.IN_PROGRESS, expired.status)
+                assertNull(observed.completedAtElapsedRealtimeMs)
+                assertNull(expired.completedAtElapsedRealtimeMs)
+            } else {
+                listOf(observed, expired).forEach { result ->
+                    assertEquals(RuntimeMetricPreflightStatus.UNKNOWN, result.status)
+                    assertEquals(RuntimeMetricPreflightReason.TIMEOUT, result.reason)
+                    assertEquals(nowMs, result.completedAtElapsedRealtimeMs)
+                }
+            }
+        }
+    }
+
+    @Test
     fun exactDeadlineOutcomeDoesNotDependOnObserveOrExpireCallOrder() {
         val observeThenExpire = supportedSession().also { session ->
             repeat(9) { index -> session.observe(frame(index = index, passing = true)) }
@@ -219,11 +247,18 @@ class RuntimeMetricPreflightTest {
     fun mismatchedGenerationCannotContributeEvidence() {
         val session = supportedSession(generation = 9L)
 
-        val result = session.observe(frame(index = 0, passing = true).copy(generation = 8L))
+        val mismatchedObservedAtMs = START_MS + 321L
+        val result = session.observe(
+            frame(index = 0, passing = true).copy(
+                generation = 8L,
+                observedAtElapsedRealtimeMs = mismatchedObservedAtMs,
+            ),
+        )
 
         assertEquals(RuntimeMetricPreflightStatus.UNKNOWN, result.status)
         assertEquals(RuntimeMetricPreflightReason.GENERATION_MISMATCH, result.reason)
         assertEquals(0, result.distinctFrameCount)
+        assertNull(result.completedAtElapsedRealtimeMs)
     }
 
     @Test
@@ -270,24 +305,26 @@ class RuntimeMetricPreflightTest {
         session: RuntimeMetricPreflightSession,
         terminalResult: RuntimeMetricPreflightResult,
     ) {
+        val afterDeadlineMs =
+            START_MS + RuntimeMetricPreflightPolicy.MAX_DURATION_MS + 1L
         val lateResults = listOf(
             session.observe(
                 frame(
                     index = 10,
                     passing = true,
                     generation = session.generation + 1L,
-                ),
+                ).copy(observedAtElapsedRealtimeMs = afterDeadlineMs),
             ),
             session.observe(
                 frame(
                     index = 10,
                     passing = true,
                     generation = session.generation,
-                ),
+                ).copy(observedAtElapsedRealtimeMs = afterDeadlineMs),
             ),
-            session.failTransiently(START_MS + 8_000L),
-            session.cancelForLifecycle(START_MS + 9_000L),
-            session.expire(START_MS + RuntimeMetricPreflightPolicy.MAX_DURATION_MS),
+            session.failTransiently(afterDeadlineMs),
+            session.cancelForLifecycle(afterDeadlineMs),
+            session.expire(afterDeadlineMs),
         )
 
         lateResults.forEach { result -> assertEquals(terminalResult, result) }

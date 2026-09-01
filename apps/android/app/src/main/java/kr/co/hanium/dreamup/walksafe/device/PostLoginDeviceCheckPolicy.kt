@@ -183,9 +183,8 @@ object PostLoginDeviceCheckPolicy {
         observation: PostLoginDeviceCheckObservation,
     ): PostLoginDeviceCheckSnapshot {
         if (!isCurrent(snapshot, binding)) return snapshot
-        if (snapshot.isTerminal()) return snapshot
-        if (!foreground) return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
         if (snapshot.state != PostLoginDeviceCheckState.RUNNING) return snapshot
+        if (!foreground) return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
 
         observation.blockingFailure?.let { return fail(snapshot, it) }
         if (hasPendingAutomaticProbe(observation)) return snapshot
@@ -212,9 +211,8 @@ object PostLoginDeviceCheckPolicy {
         foreground: Boolean,
     ): PostLoginDeviceCheckSnapshot {
         if (!isCurrent(snapshot, binding)) return snapshot
-        if (snapshot.isTerminal()) return snapshot
-        if (!foreground) return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
         if (snapshot.state != PostLoginDeviceCheckState.RUNNING) return snapshot
+        if (!foreground) return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
         return fail(snapshot, PostLoginDeviceCheckFailure.CHECK_TIMEOUT)
     }
 
@@ -273,11 +271,6 @@ object PostLoginDeviceCheckPolicy {
         observation.koreanTextToSpeech,
     ).any { it == PostLoginDeviceCheckSignal.PENDING } ||
         observation.metricDepth == PostLoginMetricDepthState.PENDING
-
-    private fun PostLoginDeviceCheckSnapshot.isTerminal(): Boolean =
-        state == PostLoginDeviceCheckState.FULL ||
-            state == PostLoginDeviceCheckState.LIMITED ||
-            state == PostLoginDeviceCheckState.FAIL
 
     private fun fail(
         snapshot: PostLoginDeviceCheckSnapshot,

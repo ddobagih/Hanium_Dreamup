@@ -347,6 +347,92 @@ class PostLoginDeviceCheckPolicyTest {
     }
 
     @Test
+    fun staleBackgroundCallbacksCannotFailTheCurrentAttempt() {
+        val bound = boundSnapshot()
+        val requesting = PostLoginDeviceCheckPolicy.beginFromUserAction(
+            bound,
+            ACTOR,
+            SESSION_GENERATION,
+            foreground = true,
+        )
+        val binding = requireNotNull(requesting.bindingOrNull)
+        val staleBinding = binding.copy(attemptGeneration = binding.attemptGeneration + 1L)
+        val running = PostLoginDeviceCheckPolicy.beginRunning(
+            requesting,
+            binding,
+            foreground = true,
+        )
+
+        assertEquals(
+            requesting,
+            PostLoginDeviceCheckPolicy.beginRunning(
+                requesting,
+                staleBinding,
+                foreground = false,
+            ),
+        )
+        assertEquals(
+            running,
+            PostLoginDeviceCheckPolicy.evaluate(
+                running,
+                staleBinding,
+                foreground = false,
+                observation = readyObservation(),
+            ),
+        )
+        assertEquals(
+            running,
+            PostLoginDeviceCheckPolicy.timeout(
+                running,
+                staleBinding,
+                foreground = false,
+            ),
+        )
+    }
+
+    @Test
+    fun backgroundCallbacksCannotFailSnapshotsOutsideTheirExpectedState() {
+        val requesting = PostLoginDeviceCheckPolicy.beginFromUserAction(
+            boundSnapshot(),
+            ACTOR,
+            SESSION_GENERATION,
+            foreground = true,
+        )
+        val binding = requireNotNull(requesting.bindingOrNull)
+        val running = PostLoginDeviceCheckPolicy.beginRunning(
+            requesting,
+            binding,
+            foreground = true,
+        )
+
+        assertEquals(
+            running,
+            PostLoginDeviceCheckPolicy.beginRunning(
+                running,
+                binding,
+                foreground = false,
+            ),
+        )
+        assertEquals(
+            requesting,
+            PostLoginDeviceCheckPolicy.evaluate(
+                requesting,
+                binding,
+                foreground = false,
+                observation = readyObservation(),
+            ),
+        )
+        assertEquals(
+            requesting,
+            PostLoginDeviceCheckPolicy.timeout(
+                requesting,
+                binding,
+                foreground = false,
+            ),
+        )
+    }
+
+    @Test
     fun staleAttemptAndSessionCallbacksCannotChangeCurrentAttempt() {
         val (firstRunning, firstBinding) = runningAttempt()
         val firstFailed = PostLoginDeviceCheckPolicy.timeout(

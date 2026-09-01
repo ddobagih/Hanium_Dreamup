@@ -191,13 +191,11 @@ class RuntimeMetricPreflightSession(
     @Synchronized
     fun observe(frame: RuntimeMetricFrameEvidence): RuntimeMetricPreflightResult {
         if (status != RuntimeMetricPreflightStatus.IN_PROGRESS) return result()
-        if (frame.observedAtElapsedRealtimeMs - startedAtElapsedRealtimeMs >=
-            profile.maximumDurationMs
-        ) {
+        if (hasReachedDeadline(frame.observedAtElapsedRealtimeMs)) {
             return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, frame.observedAtElapsedRealtimeMs)
         }
         if (frame.generation != generation) {
-            return finishUnknown(RuntimeMetricPreflightReason.GENERATION_MISMATCH, frame.observedAtElapsedRealtimeMs)
+            return finishUnknown(RuntimeMetricPreflightReason.GENERATION_MISMATCH, null)
         }
         if (!frame.isWellFormed()) {
             return finishUnknown(RuntimeMetricPreflightReason.INVALID_FRAME_EVIDENCE, frame.observedAtElapsedRealtimeMs)
@@ -224,11 +222,11 @@ class RuntimeMetricPreflightSession(
     @Synchronized
     fun expire(nowElapsedRealtimeMs: Long): RuntimeMetricPreflightResult {
         if (status != RuntimeMetricPreflightStatus.IN_PROGRESS) return result()
+        if (hasReachedDeadline(nowElapsedRealtimeMs)) {
+            return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, nowElapsedRealtimeMs)
+        }
         if (!isValidClock(nowElapsedRealtimeMs)) {
             return finishUnknown(RuntimeMetricPreflightReason.INVALID_FRAME_EVIDENCE, nowElapsedRealtimeMs)
-        }
-        if (nowElapsedRealtimeMs - startedAtElapsedRealtimeMs >= profile.maximumDurationMs) {
-            return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, nowElapsedRealtimeMs)
         }
         return result()
     }
@@ -271,14 +269,18 @@ class RuntimeMetricPreflightSession(
             (lastObservedAtElapsedRealtimeMs == null ||
                 nowElapsedRealtimeMs >= checkNotNull(lastObservedAtElapsedRealtimeMs))
 
+    private fun hasReachedDeadline(nowElapsedRealtimeMs: Long): Boolean =
+        nowElapsedRealtimeMs >= startedAtElapsedRealtimeMs &&
+            nowElapsedRealtimeMs - startedAtElapsedRealtimeMs >= profile.maximumDurationMs
+
     private fun finishUnknown(
         terminalReason: RuntimeMetricPreflightReason,
-        nowElapsedRealtimeMs: Long,
+        nowElapsedRealtimeMs: Long?,
     ): RuntimeMetricPreflightResult {
         if (status != RuntimeMetricPreflightStatus.IN_PROGRESS) return result()
         status = RuntimeMetricPreflightStatus.UNKNOWN
         reason = terminalReason
-        completedAtElapsedRealtimeMs = nowElapsedRealtimeMs.takeIf { it >= startedAtElapsedRealtimeMs }
+        completedAtElapsedRealtimeMs = nowElapsedRealtimeMs?.takeIf { it >= startedAtElapsedRealtimeMs }
         return result()
     }
 }
