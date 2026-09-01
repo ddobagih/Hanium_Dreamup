@@ -30,12 +30,12 @@ internal interface RawCollectionNetworkClient {
         networkBinding: IntegratedConsentNetworkBinding,
         localManifest: RawCollectionManifest,
         backendManifest: BackendRawManifest,
-        chunk: RawPlaintextChunk,
+        chunks: List<RawPlaintextChunk>,
         isCurrent: () -> Boolean,
     ): CancellableNetworkCall<RawCollectionReceipt>
 }
 
-/** Strict Gateway client for the currently implemented one-object/one-chunk raw shape. */
+/** Strict Gateway client for the bounded raw collection shape. */
 internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
     override fun uploadCall(
         session: GatewayFieldSession,
@@ -43,19 +43,18 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
         networkBinding: IntegratedConsentNetworkBinding,
         localManifest: RawCollectionManifest,
         backendManifest: BackendRawManifest,
-        chunk: RawPlaintextChunk,
+        chunks: List<RawPlaintextChunk>,
         isCurrent: () -> Boolean,
     ): CancellableNetworkCall<RawCollectionReceipt> {
-        val binding = requireNotNull(backendManifest.chunkBindings.singleOrNull())
-        requireValidUploadBinding(
+        requireValidUploadBindings(
             session,
             consent,
             networkBinding,
             localManifest,
             backendManifest,
-            binding,
-            chunk,
+            chunks,
         )
+        val chunksByOrdinal = chunks.associateBy { it.metadata.ordinal }
         val commit = requireNotNull(backendManifest.commitPayload())
         require(backendManifest.jsonUtf8.size in 1..RAW_MANIFEST_REQUEST_MAX_BYTES)
         require(commit.jsonUtf8.size in 1..RAW_COMMIT_REQUEST_MAX_BYTES)
@@ -93,9 +92,17 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
                 cancellation,
                 ::currentOrCancel,
             )
-            status.receipt?.let { return@cancellableHttpCall it }
+            status.receipt?.let { receipt ->
+                if (receipt.schemaVersion != BACKEND_RECEIPT_SCHEMA) {
+                    throw RawCollectionProtocolException()
+                }
+                return@cancellableHttpCall receipt
+            }
 
-            if (status.chunkMissing) {
+            val missingBindings = status.missingBindings
+                .sortedBy(BackendRawChunkBinding::localOrdinal)
+            missingBindings.forEachIndexed { index, binding ->
+                val chunk = requireNotNull(chunksByOrdinal[binding.localOrdinal])
                 requestJson(
                     session = session,
                     consent = consent,
@@ -111,10 +118,17 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
                     cancellation = cancellation,
                     isCurrent = ::currentOrCancel,
                 ).let { body ->
-                    if (!validChunkAck(body, backendManifest, binding)) {
+                    val expectedState = if (index == missingBindings.lastIndex) {
+                        RAW_STATE_READY_TO_COMMIT
+                    } else {
+                        RAW_STATE_RECEIVING
+                    }
+                    if (!validChunkAck(body, backendManifest, binding, expectedState)) {
                         throw RawCollectionProtocolException()
                     }
                 }
+            }
+            if (missingBindings.isNotEmpty()) {
                 status = requestStatus(
                     session,
                     networkBinding,
@@ -123,7 +137,12 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
                     cancellation,
                     ::currentOrCancel,
                 )
-                status.receipt?.let { return@cancellableHttpCall it }
+                status.receipt?.let { receipt ->
+                    if (receipt.schemaVersion != BACKEND_RECEIPT_SCHEMA) {
+                        throw RawCollectionProtocolException()
+                    }
+                    return@cancellableHttpCall receipt
+                }
             }
             if (!status.readyToCommit) throw RawCollectionProtocolException()
 
@@ -270,14 +289,13 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
         }
     }
 
-    private fun requireValidUploadBinding(
+    private fun requireValidUploadBindings(
         session: GatewayFieldSession,
         consent: IntegratedConsentConfirmation,
         networkBinding: IntegratedConsentNetworkBinding,
         localManifest: RawCollectionManifest,
         backendManifest: BackendRawManifest,
-        binding: BackendRawChunkBinding,
-        chunk: RawPlaintextChunk,
+        chunks: List<RawPlaintextChunk>,
     ) {
         val owner = localManifest.owner
         require(session.sessionScope == GatewaySessionScope.GENERAL)
@@ -301,28 +319,52 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
         require(rebuilt.jsonUtf8.contentEquals(backendManifest.jsonUtf8))
         require(backendManifest.objects.size == RAW_BACKEND_OBJECT_COUNT)
         require(backendManifest.chunkCount == RAW_MAX_CHUNKS)
-        require(binding.localOrdinal == 0 && binding.chunkIndex == 0)
-        require(chunk.metadata == localManifest.chunks.single())
-        require(chunk.metadata.ordinal == binding.localOrdinal)
-        require(chunk.metadata.sizeBytes == binding.sizeBytes)
-        require(chunk.metadata.sha256 == binding.sha256)
-        require(chunk.plaintext.size == binding.sizeBytes)
+        require(backendManifest.chunkBindings.size == backendManifest.chunkCount)
+        require(chunks.map(RawPlaintextChunk::metadata) == localManifest.chunks)
+        require(chunks.map { it.metadata.ordinal }.distinct().size == chunks.size)
         require(
-            MessageDigest.getInstance("SHA-256")
-                .digest(chunk.plaintext)
-                .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) } ==
-                binding.sha256,
+            backendManifest.chunkBindings.map { it.localOrdinal }.distinct().size ==
+                backendManifest.chunkBindings.size,
         )
+        require(
+            backendManifest.chunkBindings.map { it.objectId to it.chunkIndex }.distinct().size ==
+                backendManifest.chunkBindings.size,
+        )
+        val chunksByOrdinal = chunks.associateBy { it.metadata.ordinal }
+        val objectsById = backendManifest.objects.associateBy(RawReceiptObject::objectId)
+        require(objectsById.size == backendManifest.objects.size)
+        require(backendManifest.chunkBindings.all { it.objectId in objectsById })
+        backendManifest.objects.forEach { item ->
+            val objectBindings = backendManifest.chunkBindings
+                .filter { it.objectId == item.objectId }
+                .sortedBy(BackendRawChunkBinding::chunkIndex)
+            require(objectBindings.map { it.chunkIndex } == (0 until item.chunkCount).toList())
+            require(objectBindings.sumOf { it.sizeBytes.toLong() } == item.sizeBytes)
+            if (item.chunkCount == 1) require(objectBindings.single().sha256 == item.sha256)
+        }
+        backendManifest.chunkBindings.forEach { binding ->
+            val chunk = requireNotNull(chunksByOrdinal[binding.localOrdinal])
+            require(chunk.metadata.ordinal == binding.localOrdinal)
+            require(chunk.metadata.sizeBytes == binding.sizeBytes)
+            require(chunk.metadata.sha256 == binding.sha256)
+            require(chunk.plaintext.size == binding.sizeBytes)
+            require(
+                MessageDigest.getInstance("SHA-256")
+                    .digest(chunk.plaintext)
+                    .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) } ==
+                    binding.sha256,
+            )
+        }
     }
 }
 
 private data class ParsedRawStatus(
     val state: String,
-    val chunkMissing: Boolean,
+    val missingBindings: Set<BackendRawChunkBinding>,
     val receipt: RawCollectionReceipt?,
 ) {
     val readyToCommit: Boolean
-        get() = state == RAW_STATE_READY_TO_COMMIT && !chunkMissing && receipt == null
+        get() = state == RAW_STATE_READY_TO_COMMIT && missingBindings.isEmpty() && receipt == null
 }
 
 private fun parseStatus(body: String, manifest: BackendRawManifest): ParsedRawStatus? = runCatching {
@@ -334,63 +376,93 @@ private fun parseStatus(body: String, manifest: BackendRawManifest): ParsedRawSt
     require(root.getString("purpose") == BACKEND_RAW_PURPOSE)
     val state = root.getString("state")
     require(state in RAW_STATUS_STATES)
-    require(root.strictInt("object_count") == RAW_BACKEND_OBJECT_COUNT)
-    require(root.strictInt("chunk_count") == RAW_MAX_CHUNKS)
+    require(root.strictInt("object_count") == manifest.objects.size)
+    require(root.strictInt("chunk_count") == manifest.chunkCount)
     require(root.strictLong("total_bytes") == manifest.totalBytes)
     val receivedChunks = root.strictInt("received_chunk_count")
     val receivedBytes = root.strictLong("received_bytes")
     val statusObjects = root.getJSONArray("objects")
-    require(statusObjects.length() == RAW_BACKEND_OBJECT_COUNT)
-    val statusObject = statusObjects.getJSONObject(0)
-    require(statusObject.exactKeys() == RAW_STATUS_OBJECT_FIELDS)
-    val expectedObject = manifest.objects.single()
-    require(statusObject.getString("object_id") == expectedObject.objectId)
-    require(statusObject.getString("kind") == expectedObject.kind)
-    require(statusObject.getString("sha256") == expectedObject.sha256)
-    require(statusObject.strictInt("chunk_count") == RAW_MAX_CHUNKS)
-    require(statusObject.strictLong("size_bytes") == expectedObject.sizeBytes)
-    require(statusObject.strictInt("received_chunk_count") == receivedChunks)
-    require(statusObject.strictLong("received_bytes") == receivedBytes)
-    require(receivedChunks in 0..RAW_MAX_CHUNKS)
-    require(receivedBytes in 0L..manifest.totalBytes)
-    val missingRanges = statusObject.getJSONArray("missing_ranges")
-    val chunkMissing = when (missingRanges.length()) {
-        0 -> false
-        1 -> missingRanges.getJSONObject(0).let { range ->
-            require(range.exactKeys() == RAW_MISSING_RANGE_FIELDS)
-            require(range.strictInt("start") == 0)
-            require(range.strictInt("end") == 0)
-            true
-        }
-        else -> error("invalid missing ranges")
+    require(statusObjects.length() == manifest.objects.size)
+    val expectedObjects = manifest.objects.associateBy(RawReceiptObject::objectId)
+    val statusObjectIds = (0 until statusObjects.length()).map { index ->
+        statusObjects.getJSONObject(index).getString("object_id")
     }
-    require(chunkMissing == (receivedChunks == 0))
-    require((receivedBytes == 0L) == chunkMissing)
-    if (!chunkMissing) require(receivedBytes == manifest.totalBytes)
+    require(statusObjectIds == manifest.objects.map(RawReceiptObject::objectId))
+    require(statusObjectIds.distinct().size == statusObjectIds.size)
+    val missingBindings = mutableSetOf<BackendRawChunkBinding>()
+    var summedReceivedChunks = 0
+    var summedReceivedBytes = 0L
+    repeat(statusObjects.length()) { index ->
+        val statusObject = statusObjects.getJSONObject(index)
+        require(statusObject.exactKeys() == RAW_STATUS_OBJECT_FIELDS)
+        val expectedObject = requireNotNull(expectedObjects[statusObjectIds[index]])
+        val objectBindings = manifest.chunkBindings
+            .filter { it.objectId == expectedObject.objectId }
+            .sortedBy(BackendRawChunkBinding::chunkIndex)
+        require(objectBindings.map { it.chunkIndex } == (0 until expectedObject.chunkCount).toList())
+        require(statusObject.getString("kind") == expectedObject.kind)
+        require(statusObject.getString("sha256") == expectedObject.sha256)
+        require(statusObject.strictInt("chunk_count") == expectedObject.chunkCount)
+        require(statusObject.strictLong("size_bytes") == expectedObject.sizeBytes)
+        val objectReceivedChunks = statusObject.strictInt("received_chunk_count")
+        val objectReceivedBytes = statusObject.strictLong("received_bytes")
+        require(objectReceivedChunks in 0..expectedObject.chunkCount)
+        require(objectReceivedBytes in 0L..expectedObject.sizeBytes)
+        val missingIndices = mutableSetOf<Int>()
+        val missingRanges = statusObject.getJSONArray("missing_ranges")
+        var previousEnd = -2
+        repeat(missingRanges.length()) { rangeIndex ->
+            val range = missingRanges.getJSONObject(rangeIndex)
+            require(range.exactKeys() == RAW_MISSING_RANGE_FIELDS)
+            val start = range.strictInt("start")
+            val end = range.strictInt("end")
+            require(start in 0 until expectedObject.chunkCount)
+            require(end in start until expectedObject.chunkCount)
+            require(start > previousEnd + 1)
+            (start..end).forEach { missingIndices += it }
+            previousEnd = end
+        }
+        require(missingIndices.size == expectedObject.chunkCount - objectReceivedChunks)
+        val objectMissingBindings = objectBindings.filter { it.chunkIndex in missingIndices }
+        val expectedReceivedBytes = expectedObject.sizeBytes -
+            objectMissingBindings.sumOf { it.sizeBytes.toLong() }
+        require(objectReceivedBytes == expectedReceivedBytes)
+        missingBindings += objectMissingBindings
+        summedReceivedChunks += objectReceivedChunks
+        summedReceivedBytes += objectReceivedBytes
+    }
+    require(receivedChunks == summedReceivedChunks)
+    require(receivedBytes == summedReceivedBytes)
+    require(receivedChunks == manifest.chunkCount - missingBindings.size)
+    require(receivedBytes == manifest.totalBytes - missingBindings.sumOf { it.sizeBytes.toLong() })
     val receipt = if (root.isNull("receipt")) {
         null
     } else {
         parseReceipt(root.getJSONObject("receipt").toString(), manifest)
             ?: error("invalid receipt")
     }
+    val complete = missingBindings.isEmpty()
     when (state) {
-        RAW_STATE_MANIFEST_ACCEPTED -> require(chunkMissing && receipt == null)
-        RAW_STATE_READY_TO_COMMIT -> require(!chunkMissing && receipt == null)
-        RAW_STATE_COMMITTED -> require(
-            !chunkMissing && receipt?.schemaVersion == LEGACY_BACKEND_RECEIPT_SCHEMA,
+        RAW_STATE_MANIFEST_ACCEPTED -> require(receivedChunks == 0 && receipt == null)
+        RAW_STATE_RECEIVING -> require(
+            receivedChunks in 1 until manifest.chunkCount && receipt == null,
         )
-        RAW_STATE_RECEIVING -> error("one-chunk collection cannot be partially receiving")
+        RAW_STATE_READY_TO_COMMIT -> require(complete && receipt == null)
+        RAW_STATE_COMMITTED -> require(
+            complete && receipt?.schemaVersion == LEGACY_BACKEND_RECEIPT_SCHEMA,
+        )
         RAW_STATE_QUARANTINED -> require(
-            !chunkMissing && receipt?.schemaVersion == BACKEND_RECEIPT_SCHEMA,
+            complete && receipt?.schemaVersion == BACKEND_RECEIPT_SCHEMA,
         )
     }
-    ParsedRawStatus(state, chunkMissing, receipt)
+    ParsedRawStatus(state, missingBindings, receipt)
 }.getOrNull()
 
 private fun validChunkAck(
     body: String,
     manifest: BackendRawManifest,
     binding: BackendRawChunkBinding,
+    expectedState: String,
 ): Boolean = runCatching {
     val root = JSONObject(body)
     require(root.exactKeys() == RAW_CHUNK_ACK_FIELDS)
@@ -400,7 +472,8 @@ private fun validChunkAck(
     require(root.strictInt("index") == binding.chunkIndex)
     require(root.strictInt("size_bytes") == binding.sizeBytes)
     require(root.getString("sha256") == binding.sha256)
-    require(root.getString("state") == RAW_STATE_READY_TO_COMMIT)
+    require(expectedState in setOf(RAW_STATE_RECEIVING, RAW_STATE_READY_TO_COMMIT))
+    require(root.getString("state") == expectedState)
     require(canonicalUtcSecond(root.getString("stored_at")))
     true
 }.getOrDefault(false)
@@ -419,7 +492,7 @@ private fun parseReceipt(
         },
     )
     val objectValues = root.getJSONArray("objects")
-    require(objectValues.length() == RAW_BACKEND_OBJECT_COUNT)
+    require(objectValues.length() == manifest.objects.size)
     val objects = (0 until objectValues.length()).map { index ->
         val item = objectValues.getJSONObject(index)
         require(item.exactKeys() == RAW_RECEIPT_OBJECT_FIELDS)

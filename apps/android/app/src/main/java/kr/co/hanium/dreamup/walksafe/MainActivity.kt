@@ -391,6 +391,7 @@ import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionRuntimeContext
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionRuntimeCoordinator
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionUploadOutcome
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawDetectionMetadataSample
+import kr.co.hanium.dreamup.walksafe.rawcollection.RawPerformanceMetadataSample
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
 import kr.co.hanium.dreamup.walksafe.security.AndroidSensitivePreferenceStore
 import kr.co.hanium.dreamup.walksafe.security.SensitivePreferenceSpec
@@ -951,12 +952,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
     private lateinit var rawCollectionRuntimeCoordinator: RawCollectionRuntimeCoordinator
     private var rawDetectionWindowWalkId: String? = null
-    private var rawDetectionWindowStartedAtEpochMs = 0L
     private var rawDetectionWindowStartedAtElapsedMs = 0L
     private var rawDetectionProcessedFrameCount = 0
+    private var rawDetectionDroppedFrameCount = 0
     private var rawDetectionCount = 0
     private var rawDetectionInferenceTotalMs = 0L
     private var rawDetectionModelRevision: String? = null
+    private val rawDetectionDueButInFlightDropCount = AtomicInteger(0)
     @Volatile
     private var rawCollectionUploadWalkId: String? = null
     private val reportQueueDrainLock = Any()
@@ -20425,14 +20427,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
-    private fun clearRawDetectionWindow() {
+    private fun clearRawDetectionWindow(clearPendingDropCount: Boolean = true) {
         rawDetectionWindowWalkId = null
-        rawDetectionWindowStartedAtEpochMs = 0L
         rawDetectionWindowStartedAtElapsedMs = 0L
         rawDetectionProcessedFrameCount = 0
+        rawDetectionDroppedFrameCount = 0
         rawDetectionCount = 0
         rawDetectionInferenceTotalMs = 0L
         rawDetectionModelRevision = null
+        if (clearPendingDropCount) {
+            rawDetectionDueButInFlightDropCount.set(0)
+        }
     }
 
     private fun recordRawCollectionDetectionMetadata(
@@ -20444,6 +20449,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val observedAtEpochMs = System.currentTimeMillis()
         val observedAtElapsedMs = SystemClock.elapsedRealtime()
         val detectorWasAvailable = detectorAvailable
+        val dueButInFlightDropCount = rawDetectionDueButInFlightDropCount.getAndSet(0)
         executeRawCollectionTask {
             val context = currentRawCollectionRuntimeContextOrNull()
             if (
@@ -20455,12 +20461,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 return@executeRawCollectionTask
             }
             if (rawDetectionWindowWalkId != expectedWalkEpoch.walkSessionId) {
-                clearRawDetectionWindow()
+                clearRawDetectionWindow(clearPendingDropCount = false)
                 rawDetectionWindowWalkId = expectedWalkEpoch.walkSessionId
-                rawDetectionWindowStartedAtEpochMs = observedAtEpochMs
                 rawDetectionWindowStartedAtElapsedMs = observedAtElapsedMs
             }
             rawDetectionProcessedFrameCount += 1
+            rawDetectionDroppedFrameCount += dueButInFlightDropCount
             rawDetectionCount += detectionCount.coerceAtLeast(0)
             rawDetectionInferenceTotalMs += inferenceMs.coerceAtLeast(0L)
             rawDetectionModelRevision = modelRevision?.takeIf {
@@ -20468,27 +20474,46 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             val elapsedWindowMs =
                 observedAtElapsedMs - rawDetectionWindowStartedAtElapsedMs
-            val epochWindowMs = observedAtEpochMs - rawDetectionWindowStartedAtEpochMs
-            if (
-                elapsedWindowMs < RAW_COLLECTION_CAPTURE_INTERVAL_MS ||
-                epochWindowMs < RAW_COLLECTION_CAPTURE_INTERVAL_MS
-            ) return@executeRawCollectionTask
+            if (elapsedWindowMs < RAW_COLLECTION_CAPTURE_INTERVAL_MS) {
+                return@executeRawCollectionTask
+            }
+            val capturedWindowStartedAtEpochMs =
+                (observedAtEpochMs - elapsedWindowMs).coerceAtLeast(0L)
             val processedFrames = rawDetectionProcessedFrameCount
-            val sample = RawDetectionMetadataSample(
-                windowStartedAtEpochMs = rawDetectionWindowStartedAtEpochMs,
+            val averageProcessingFrameMs = if (processedFrames == 0) {
+                0L
+            } else {
+                rawDetectionInferenceTotalMs / processedFrames
+            }
+            val detectionSample = RawDetectionMetadataSample(
+                windowStartedAtEpochMs = capturedWindowStartedAtEpochMs,
                 capturedAtEpochMs = observedAtEpochMs,
                 processedFrameCount = processedFrames,
                 detectionCount = rawDetectionCount,
-                averageInferenceMs = if (processedFrames == 0) {
-                    0L
-                } else {
-                    rawDetectionInferenceTotalMs / processedFrames
-                },
+                averageInferenceMs = averageProcessingFrameMs,
                 detectorAvailable = detectorWasAvailable,
                 modelRevision = rawDetectionModelRevision,
             )
-            clearRawDetectionWindow()
-            rawCollectionRuntimeCoordinator.captureMetadata(context, sample)
+            val performanceSample = RawPerformanceMetadataSample(
+                windowStartedAtEpochMs = capturedWindowStartedAtEpochMs,
+                capturedAtEpochMs = observedAtEpochMs,
+                processedFrameCount = processedFrames,
+                droppedFrameCount = rawDetectionDroppedFrameCount,
+                averageFrameDurationMs = averageProcessingFrameMs,
+                thermalThrottled = if (::walkSessionResourceProbe.isInitialized) {
+                    runCatching {
+                        walkSessionResourceProbe.snapshot().thermalThrottled
+                    }.getOrNull()
+                } else {
+                    null
+                },
+            )
+            clearRawDetectionWindow(clearPendingDropCount = false)
+            rawCollectionRuntimeCoordinator.captureMetadataBatch(
+                context,
+                detectionSample,
+                performanceSample,
+            )
         }
     }
 
@@ -24927,7 +24952,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 recordRawCollectionDetectionMetadata(
                     expectedWalkEpoch = expectedWalkEpoch,
                     detectionCount = result.detections.size,
-                    inferenceMs = result.timing.totalMs ?: 0L,
+                    inferenceMs = result.timing.totalMs
+                        ?: (
+                            SystemClock.elapsedRealtime() -
+                                detectorStartedAtElapsedRealtimeMs
+                            ).coerceAtLeast(0L),
                     modelRevision = result.timing.modelKey ?: detectorLoadedModelKey,
                 )
             }
@@ -25232,7 +25261,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (!isCurrentFrameGeneration(frameGeneration, expectedWalkEpoch)) return
             if (!detectorAvailable) return
             if (elapsedRealtimeMs - lastDetectionRunMs < DETECTION_INTERVAL_MS) return
-            if (!detectionInFlight.compareAndSet(false, true)) return
+            if (!detectionInFlight.compareAndSet(false, true)) {
+                rawDetectionDueButInFlightDropCount.incrementAndGet()
+                return
+            }
             lastDetectionRunMs = elapsedRealtimeMs
             frameCaptureRequested.getAndSet(false)
         }

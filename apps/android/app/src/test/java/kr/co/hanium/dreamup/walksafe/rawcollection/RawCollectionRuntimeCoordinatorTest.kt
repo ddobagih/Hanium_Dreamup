@@ -47,23 +47,29 @@ class RawCollectionRuntimeCoordinatorTest {
 
         assertEquals(
             RawMetadataCaptureResult.GATE_BLOCKED,
-            fixture.coordinator.captureMetadata(
+            fixture.coordinator.captureMetadataBatch(
                 fixture.context(WalkSessionState.ACTIVE).copy(
                     deviceCheck = fixture.deviceCheck.copy(state = PostLoginDeviceCheckState.FAIL),
                 ),
                 sample,
+                performanceSample(),
             ),
         )
         assertEquals(
             RawMetadataCaptureResult.RATE_LIMITED,
-            fixture.coordinator.captureMetadata(
+            fixture.coordinator.captureMetadataBatch(
                 fixture.context(WalkSessionState.ACTIVE),
                 sample.copy(windowStartedAtEpochMs = NOW_EPOCH_MS - 1_000L),
+                performanceSample().copy(windowStartedAtEpochMs = NOW_EPOCH_MS - 1_000L),
             ),
         )
         assertEquals(
             RawMetadataCaptureResult.CAPTURED,
-            fixture.coordinator.captureMetadata(fixture.context(WalkSessionState.ACTIVE), sample),
+            fixture.coordinator.captureMetadataBatch(
+                fixture.context(WalkSessionState.ACTIVE),
+                sample,
+                performanceSample(),
+            ),
         )
         assertEquals(
             RawSegmentSealResult.GATE_BLOCKED,
@@ -83,9 +89,10 @@ class RawCollectionRuntimeCoordinatorTest {
         val fixture = fixture()
         assertEquals(
             RawMetadataCaptureResult.CAPTURED,
-            fixture.coordinator.captureMetadata(
+            fixture.coordinator.captureMetadataBatch(
                 fixture.context(WalkSessionState.ACTIVE),
-                performanceSample(),
+                detectionSample(),
+                performanceSample(thermalThrottled = null),
             ),
         )
         assertEquals(
@@ -114,7 +121,12 @@ class RawCollectionRuntimeCoordinatorTest {
             requireNotNull(call).execute(),
         )
         assertEquals(1, fixture.client.calls)
-        assertTrue(requireNotNull(fixture.client.lastPlaintext).all { it == 0.toByte() })
+        assertEquals(2, fixture.client.lastPlaintexts.size)
+        assertTrue(
+            fixture.client.lastPlaintexts.all { plaintext ->
+                plaintext.all { it == 0.toByte() }
+            },
+        )
         assertEquals(0, fixture.coordinator.readyCount(fixture.context(WalkSessionState.PAUSED)))
     }
 
@@ -123,9 +135,10 @@ class RawCollectionRuntimeCoordinatorTest {
         val fixture = fixture()
         assertEquals(
             RawMetadataCaptureResult.CAPTURED,
-            fixture.coordinator.captureMetadata(
+            fixture.coordinator.captureMetadataBatch(
                 fixture.context(WalkSessionState.ACTIVE),
                 detectionSample(),
+                performanceSample(),
             ),
         )
         assertTrue(fixture.coordinator.onWalkEnded(fixture.context(WalkSessionState.ENDED)))
@@ -135,9 +148,10 @@ class RawCollectionRuntimeCoordinatorTest {
         val uploadFixture = fixture()
         assertEquals(
             RawMetadataCaptureResult.CAPTURED,
-            uploadFixture.coordinator.captureMetadata(
+            uploadFixture.coordinator.captureMetadataBatch(
                 uploadFixture.context(WalkSessionState.ACTIVE),
                 detectionSample(),
+                performanceSample(),
             ),
         )
         assertEquals(
@@ -160,10 +174,168 @@ class RawCollectionRuntimeCoordinatorTest {
         assertEquals(1, uploadFixture.coordinator.readyCount(uploadFixture.context(WalkSessionState.PAUSED)))
     }
 
-    private fun fixture(): RuntimeFixture {
+    @Test
+    fun failedSecondBatchWriteDiscardsPartialBeforeTheNextCapture() {
+        val fixture = fixture()
+        fixture.storage.failChunkOrdinal = 1
+
+        assertEquals(
+            RawMetadataCaptureResult.STORAGE_FAILURE,
+            fixture.coordinator.captureMetadataBatch(
+                fixture.context(WalkSessionState.ACTIVE),
+                detectionSample(),
+                performanceSample(),
+            ),
+        )
+        assertNull(fixture.storage.activeCollectionId)
+        assertEquals(0, fixture.storage.collectionCount)
+
+        fixture.storage.failChunkOrdinal = null
+        assertEquals(
+            RawMetadataCaptureResult.CAPTURED,
+            fixture.coordinator.captureMetadataBatch(
+                fixture.context(WalkSessionState.ACTIVE),
+                detectionSample(),
+                performanceSample(),
+            ),
+        )
+    }
+
+    @Test
+    fun mismatchedBatchWindowIsRejectedBeforeOpeningACollection() {
+        val fixture = fixture()
+
+        assertEquals(
+            RawMetadataCaptureResult.STORAGE_FAILURE,
+            fixture.coordinator.captureMetadataBatch(
+                fixture.context(WalkSessionState.ACTIVE),
+                detectionSample(),
+                performanceSample().copy(capturedAtEpochMs = NOW_EPOCH_MS - 1L),
+            ),
+        )
+        assertNull(fixture.storage.activeCollectionId)
+        assertEquals(0, fixture.storage.collectionCount)
+    }
+
+    @Test
+    fun executorDelayAfterObservationDoesNotRejectTheCapturedBatch() {
+        val fixture = fixture(storeNowEpochMs = NOW_EPOCH_MS + 1_000L)
+
+        assertEquals(
+            RawMetadataCaptureResult.CAPTURED,
+            fixture.coordinator.captureMetadataBatch(
+                fixture.context(WalkSessionState.ACTIVE),
+                detectionSample(),
+                performanceSample(),
+            ),
+        )
+        assertEquals(
+            RawSegmentSealResult.SEALED,
+            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.PAUSED)),
+        )
+        val ready = requireNotNull(fixture.store.readyManifests(OWNER).singleOrNull())
+        assertEquals(
+            30_000L,
+            requireNotNull(ready.capturedEndedAtEpochMs) - ready.capturedStartedAtEpochMs,
+        )
+    }
+
+    @Test
+    fun staleConsentEmptyPartialIsDiscardedBeforeCapturingTheCurrentBatch() {
+        val fixture = fixture()
+        assertTrue(
+            fixture.store.open(
+                collectionId = COLLECTION_ID,
+                owner = OWNER,
+                walkSessionId = WALK_ID,
+                consentReceiptSha256 = "d".repeat(64),
+                capturedStartedAtEpochMs = NOW_EPOCH_MS - 30_000L,
+                rawConsentGranted = true,
+                walkState = RawWalkState.ACTIVE,
+            ),
+        )
+
+        assertEquals(
+            RawMetadataCaptureResult.CAPTURED,
+            fixture.coordinator.captureMetadataBatch(
+                fixture.context(WalkSessionState.ACTIVE),
+                detectionSample(),
+                performanceSample(),
+            ),
+        )
+        assertEquals(
+            CONSENT_SHA,
+            fixture.store.activePartialManifest(OWNER, WALK_ID)?.consentReceiptSha256,
+        )
+    }
+
+    @Test
+    fun pausedSealDiscardsAnIncompletePartialCollection() {
+        val fixture = fixture()
+        assertTrue(
+            fixture.store.open(
+                collectionId = COLLECTION_ID,
+                owner = OWNER,
+                walkSessionId = WALK_ID,
+                consentReceiptSha256 = CONSENT_SHA,
+                capturedStartedAtEpochMs = NOW_EPOCH_MS - 30_000L,
+                rawConsentGranted = true,
+                walkState = RawWalkState.ACTIVE,
+            ),
+        )
+
+        assertEquals(
+            RawSegmentSealResult.STORAGE_FAILURE,
+            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.PAUSED)),
+        )
+        assertNull(fixture.storage.activeCollectionId)
+        assertEquals(0, fixture.storage.collectionCount)
+    }
+
+    @Test
+    fun pausedSealDiscardsALegacySingleChunkPartialCollection() {
+        val fixture = fixture()
+        val legacyPartial = RawCollectionManifest(
+            collectionId = COLLECTION_ID,
+            owner = OWNER,
+            walkSessionId = WALK_ID,
+            consentReceiptSha256 = CONSENT_SHA,
+            capturedStartedAtEpochMs = NOW_EPOCH_MS - 30_000L,
+            capturedEndedAtEpochMs = null,
+            expiresAtEpochMs = NOW_EPOCH_MS - 30_000L + RAW_COLLECTION_TTL_MS,
+            state = RawManifestState.PARTIAL,
+            chunks = listOf(
+                RawChunkMetadata(
+                    ordinal = 0,
+                    type = RawChunkType.DETECTION,
+                    capturedAtEpochMs = NOW_EPOCH_MS,
+                    sizeBytes = 1,
+                    sha256 = "a".repeat(64),
+                ),
+            ),
+        )
+        val envelope = requireNotNull(
+            fixture.aead.seal(
+                encodeRawManifest(legacyPartial),
+                byteArrayOf(),
+                AeadLimits(1_024 * 1_024, 1_024 * 1_024 + 16, 2 * 1_024 * 1_024),
+            ) as? AeadSealResult.Sealed,
+        ).envelope
+        assertTrue(fixture.storage.writeManifestAtomically(COLLECTION_ID, envelope))
+        assertTrue(fixture.storage.writeActiveCollectionIdAtomically(COLLECTION_ID))
+
+        assertEquals(
+            RawSegmentSealResult.STORAGE_FAILURE,
+            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.PAUSED)),
+        )
+        assertNull(fixture.storage.activeCollectionId)
+        assertEquals(0, fixture.storage.collectionCount)
+    }
+
+    private fun fixture(storeNowEpochMs: Long = NOW_EPOCH_MS): RuntimeFixture {
         val storage = RuntimeFakeStorage()
         val aead = RuntimeFakeAead()
-        val store = RawCollectionStore(storage, aead, { NOW_EPOCH_MS }, testOnly = Unit)
+        val store = RawCollectionStore(storage, aead, { storeNowEpochMs }, testOnly = Unit)
         val client = RuntimeFakeClient()
         val coordinator = RawCollectionRuntimeCoordinator(
             store = store,
@@ -175,7 +347,16 @@ class RawCollectionRuntimeCoordinatorTest {
         )
         val consentSession = IntegratedConsentSession()
         assertTrue(consentSession.accept(confirmation()))
-        return RuntimeFixture(coordinator, client, consentSession, v7Session(), deviceCheck())
+        return RuntimeFixture(
+            coordinator,
+            client,
+            store,
+            aead,
+            storage,
+            consentSession,
+            v7Session(),
+            deviceCheck(),
+        )
     }
 
     private fun detectionSample() = RawDetectionMetadataSample(
@@ -188,13 +369,15 @@ class RawCollectionRuntimeCoordinatorTest {
         modelRevision = "model-v1",
     )
 
-    private fun performanceSample() = RawPerformanceMetadataSample(
+    private fun performanceSample(
+        thermalThrottled: Boolean? = false,
+    ) = RawPerformanceMetadataSample(
         windowStartedAtEpochMs = NOW_EPOCH_MS - 30_000L,
         capturedAtEpochMs = NOW_EPOCH_MS,
         processedFrameCount = 30,
         droppedFrameCount = 2,
         averageFrameDurationMs = 40L,
-        thermalThrottled = false,
+        thermalThrottled = thermalThrottled,
     )
 
     private fun v7Session(): GatewayFieldSession = GatewayFieldSession.backendAccountDeviceSession(
@@ -242,12 +425,16 @@ class RawCollectionRuntimeCoordinatorTest {
         const val NOW_EPOCH_MS = 1_800_000_000_000L
         const val NOW_ELAPSED_MS = 50_000L
         val CONSENT_SHA = "c".repeat(64)
+        val OWNER = RawCollectionOwner(ACTOR_ID, 1L, DEVICE_ID)
     }
 }
 
 private class RuntimeFixture(
     val coordinator: RawCollectionRuntimeCoordinator,
     val client: RuntimeFakeClient,
+    val store: RawCollectionStore,
+    val aead: RuntimeFakeAead,
+    val storage: RuntimeFakeStorage,
     private val consentSession: IntegratedConsentSession,
     private val session: GatewayFieldSession,
     val deviceCheck: PostLoginDeviceCheckSnapshot,
@@ -334,7 +521,7 @@ private fun endedWalkSnapshot(epoch: WalkRuntimeEpoch): WalkSessionSnapshot = Wa
 
 private class RuntimeFakeClient : RawCollectionNetworkClient {
     var calls = 0
-    var lastPlaintext: ByteArray? = null
+    var lastPlaintexts: List<ByteArray> = emptyList()
 
     override fun uploadCall(
         session: GatewayFieldSession,
@@ -342,11 +529,11 @@ private class RuntimeFakeClient : RawCollectionNetworkClient {
         networkBinding: IntegratedConsentNetworkBinding,
         localManifest: RawCollectionManifest,
         backendManifest: BackendRawManifest,
-        chunk: RawPlaintextChunk,
+        chunks: List<RawPlaintextChunk>,
         isCurrent: () -> Boolean,
     ): CancellableNetworkCall<RawCollectionReceipt> {
         calls += 1
-        lastPlaintext = chunk.plaintext
+        lastPlaintexts = chunks.map(RawPlaintextChunk::plaintext)
         return CancellableNetworkCall.blocking {
             check(isCurrent())
             exactRuntimeReceipt(backendManifest)
@@ -378,6 +565,11 @@ private class RuntimeFakeStorage : RawCollectionStorage {
     private val manifests = mutableMapOf<String, String>()
     private val chunks = mutableMapOf<Pair<String, Int>, String>()
     private val fences = mutableMapOf<String, String>()
+    var failChunkOrdinal: Int? = null
+    val activeCollectionId: String?
+        get() = activeId
+    val collectionCount: Int
+        get() = manifests.size
 
     override fun readActiveCollectionId(): String? = activeId
     override fun writeActiveCollectionIdAtomically(collectionId: String): Boolean {
@@ -395,6 +587,7 @@ private class RuntimeFakeStorage : RawCollectionStorage {
     }
     override fun readChunk(collectionId: String, ordinal: Int): String? = chunks[collectionId to ordinal]
     override fun writeChunkAtomically(collectionId: String, ordinal: Int, envelope: String): Boolean {
+        if (ordinal == failChunkOrdinal) return false
         chunks[collectionId to ordinal] = envelope
         return true
     }

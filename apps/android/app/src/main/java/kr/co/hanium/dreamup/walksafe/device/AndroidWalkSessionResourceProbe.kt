@@ -14,6 +14,7 @@ data class WalkSessionDeviceResourceSnapshot(
     val batteryNotLow: Boolean?,
     val privateStorageAboveSystemLow: Boolean?,
     val thermalBelowCritical: Boolean?,
+    val thermalThrottled: Boolean? = null,
 ) {
     val readinessStatus: WalkSessionReadinessStatus
         get() = when {
@@ -93,12 +94,17 @@ class AndroidWalkSessionResourceProbe(
         } else {
             null
         }
-        val thermalBelowCritical = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             appContext.getSystemService(PowerManager::class.java)
                 ?.currentThermalStatus
-                ?.let { it < PowerManager.THERMAL_STATUS_CRITICAL }
         } else {
             null
+        }
+        val thermalBelowCritical = thermalStatus?.let {
+            it < PowerManager.THERMAL_STATUS_CRITICAL
+        }
+        val thermalThrottled = thermalStatus?.let {
+            it >= PowerManager.THERMAL_STATUS_SEVERE
         }
         val files = appContext.filesDir
         val privateStorageAboveSystemLow = runCatching {
@@ -112,6 +118,7 @@ class AndroidWalkSessionResourceProbe(
             batteryNotLow = batteryNotLow,
             privateStorageAboveSystemLow = privateStorageAboveSystemLow,
             thermalBelowCritical = thermalBelowCritical,
+            thermalThrottled = thermalThrottled,
         )
     }
 

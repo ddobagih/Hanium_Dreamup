@@ -15,55 +15,109 @@ import org.junit.Test
 
 class RawCollectionStoreTest {
     @Test
-    fun ownerBoundActiveWalkAcceptsOnlyOneDetectionOrPerformanceMetadataChunk() {
+    fun ownerBoundActiveWalkAcceptsOnlyExactDetectionPerformanceBatch() {
         val fixture = fixture()
         assertTrue(fixture.open())
 
-        assertNull(fixture.append(type = RawChunkType.VIDEO))
-        assertNull(fixture.append(type = RawChunkType.AUDIO))
-        assertNull(fixture.append(type = RawChunkType.EXACT_LOCATION))
-        assertNull(fixture.append(type = RawChunkType.ROUTE))
-        assertNull(fixture.append(type = RawChunkType.SENSOR))
-        assertNull(fixture.append(type = RawChunkType.REPORT))
+        listOf(
+            RawChunkType.VIDEO,
+            RawChunkType.AUDIO,
+            RawChunkType.EXACT_LOCATION,
+            RawChunkType.ROUTE,
+            RawChunkType.SENSOR,
+            RawChunkType.REPORT,
+        ).forEach { sensitiveType ->
+            assertNull(
+                fixture.appendBatch(
+                    types = listOf(RawChunkType.DETECTION, sensitiveType),
+                ),
+            )
+        }
         assertEquals(
             setOf(RawChunkType.DETECTION, RawChunkType.PERFORMANCE),
             RAW_RUNTIME_CHUNK_TYPES,
         )
-        val first = fixture.append(type = RawChunkType.DETECTION)
+        val batch = fixture.appendBatch()
 
-        assertEquals(0, first?.ordinal)
-        assertEquals(RawChunkType.DETECTION, first?.type)
-        assertNull(fixture.append(type = RawChunkType.PERFORMANCE))
+        assertEquals(listOf(0, 1), batch?.map(RawChunkMetadata::ordinal))
+        assertEquals(RAW_RUNTIME_CHUNK_TYPE_ORDER, batch?.map(RawChunkMetadata::type))
+        assertNull(fixture.appendBatch())
         assertNull(
-            fixture.store.append(
+            fixture.store.appendBatch(
                 owner = OWNER.copy(deviceId = OTHER_DEVICE_ID),
                 walkSessionId = WALK_ID,
                 rawConsentGranted = true,
                 walkState = RawWalkState.ACTIVE,
-                type = RawChunkType.DETECTION,
-                capturedAtEpochMs = fixture.now,
-                plaintext = "wrong-owner".toByteArray(),
+                items = fixture.items(),
             ),
         )
         assertNull(
-            fixture.store.append(
+            fixture.store.appendBatch(
                 owner = OWNER,
                 walkSessionId = WALK_ID,
                 rawConsentGranted = true,
                 walkState = RawWalkState.ENDED,
-                type = RawChunkType.DETECTION,
-                capturedAtEpochMs = fixture.now,
-                plaintext = "after-end".toByteArray(),
+                items = fixture.items(),
             ),
         )
         assertEquals(COLLECTION_1, fixture.storage.activeCollectionId)
     }
 
     @Test
-    fun pauseSealProducesExactlyOneBackendObjectAndExplicitOrdinalMapping() {
+    fun duplicateThirdAndOversizedBatchItemsAreRejectedWithoutWritingChunks() {
+        listOf(
+            listOf(RawChunkType.DETECTION, RawChunkType.DETECTION),
+            listOf(RawChunkType.DETECTION, RawChunkType.PERFORMANCE, RawChunkType.DETECTION),
+        ).forEach { types ->
+            val fixture = fixture()
+            assertTrue(fixture.open())
+            assertNull(fixture.appendBatch(types = types))
+            assertTrue(fixture.storage.chunks.isEmpty())
+        }
+
+        val oversized = fixture()
+        assertTrue(oversized.open())
+        assertNull(
+            oversized.store.appendBatch(
+                owner = OWNER,
+                walkSessionId = WALK_ID,
+                rawConsentGranted = true,
+                walkState = RawWalkState.ACTIVE,
+                items = listOf(
+                    RawPlaintextBatchItem(
+                        RawChunkType.DETECTION,
+                        oversized.now,
+                        ByteArray(RAW_MAX_CHUNK_BYTES + 1),
+                    ),
+                    RawPlaintextBatchItem(
+                        RawChunkType.PERFORMANCE,
+                        oversized.now,
+                        byteArrayOf(1),
+                    ),
+                ),
+            ),
+        )
+        assertTrue(oversized.storage.chunks.isEmpty())
+    }
+
+    @Test
+    fun secondChunkWriteFailureDiscardsTheWholePartialBatch() {
         val fixture = fixture()
         assertTrue(fixture.open())
-        assertNotNull(fixture.append(type = RawChunkType.PERFORMANCE))
+        fixture.storage.failChunkOrdinal = 1
+
+        assertNull(fixture.appendBatch())
+
+        assertNull(fixture.storage.activeCollectionId)
+        assertTrue(fixture.storage.manifests.isEmpty())
+        assertTrue(fixture.storage.chunks.isEmpty())
+    }
+
+    @Test
+    fun pauseSealProducesTwoBackendObjectsAndExplicitOrdinalMappings() {
+        val fixture = fixture()
+        assertTrue(fixture.open())
+        assertNotNull(fixture.appendBatch())
         fixture.now += 1L
 
         val sealed = fixture.store.sealActiveSegment(OWNER, WALK_ID)
@@ -73,29 +127,44 @@ class RawCollectionStoreTest {
         assertTrue(fixture.store.readyManifests(OTHER_OWNER).isEmpty())
 
         val backend = requireNotNull(fixture.store.backendUploadManifest(COLLECTION_1, OWNER))
-        assertEquals(1, backend.objects.size)
-        assertEquals(1, backend.chunkCount)
-        assertEquals(1, backend.chunkBindings.size)
-        assertEquals(0, backend.chunkBindings.single().localOrdinal)
-        assertEquals(0, backend.chunkBindings.single().chunkIndex)
-        val json = org.json.JSONObject(String(backend.jsonUtf8, Charsets.UTF_8))
-        assertEquals(1, json.getInt("object_count"))
-        assertEquals(1, json.getInt("chunk_count"))
-        assertEquals(1, json.getJSONArray("objects").length())
-        assertEquals(1, json.getJSONArray("objects").getJSONObject(0).getJSONArray("chunks").length())
-
-        val restored = requireNotNull(
-            fixture.store.readUploadChunk(COLLECTION_1, OWNER, backend.chunkBindings.single().localOrdinal),
+        assertEquals(2, backend.objects.size)
+        assertEquals(2, backend.chunkCount)
+        assertEquals(2, backend.chunkBindings.size)
+        assertEquals(listOf(0, 1), backend.chunkBindings.map { it.localOrdinal })
+        assertEquals(listOf(0, 0), backend.chunkBindings.map { it.chunkIndex })
+        assertEquals(
+            listOf("DETECTION", "PERFORMANCE"),
+            backend.chunkBindings.sortedBy(BackendRawChunkBinding::localOrdinal).map { binding ->
+                backend.objects.single { it.objectId == binding.objectId }.kind
+            },
         )
-        assertArrayEquals(PAYLOAD.toByteArray(), restored.plaintext)
-        restored.plaintext.fill(0)
+        val json = org.json.JSONObject(String(backend.jsonUtf8, Charsets.UTF_8))
+        assertEquals(2, json.getInt("object_count"))
+        assertEquals(2, json.getInt("chunk_count"))
+        assertEquals(2, json.getJSONArray("objects").length())
+        assertTrue(
+            (0 until 2).all { index ->
+                json.getJSONArray("objects")
+                    .getJSONObject(index)
+                    .getJSONArray("chunks")
+                    .length() == 1
+            },
+        )
+
+        backend.chunkBindings.forEach { binding ->
+            val restored = requireNotNull(
+                fixture.store.readUploadChunk(COLLECTION_1, OWNER, binding.localOrdinal),
+            )
+            assertArrayEquals(PAYLOAD.toByteArray(), restored.plaintext)
+            restored.plaintext.fill(0)
+        }
     }
 
     @Test
     fun endedWalkNeverSealsAndResidualPartialRequiresExplicitDiscard() {
         val fixture = fixture()
         assertTrue(fixture.open())
-        assertNotNull(fixture.append())
+        assertNotNull(fixture.appendBatch())
 
         assertTrue(fixture.store.onSessionEnded(OWNER, WALK_ID))
         assertNull(fixture.storage.activeCollectionId)
@@ -110,7 +179,7 @@ class RawCollectionStoreTest {
     fun completeCollectionDeletesOnlyAfterExactBackendReceiptForSameOwner() {
         val fixture = fixture()
         assertTrue(fixture.open())
-        assertNotNull(fixture.append())
+        assertNotNull(fixture.appendBatch())
         fixture.now += 1L
         assertNotNull(fixture.store.sealActiveSegment(OWNER, WALK_ID))
         val manifest = requireNotNull(fixture.store.backendUploadManifest(COLLECTION_1, OWNER))
@@ -129,10 +198,10 @@ class RawCollectionStoreTest {
     }
 
     @Test
-    fun legacyCommittedReceiptRemainsReadableForExactLocalCleanup() {
+    fun legacyReceiptNeverDeletesACollectionThatRequiresAnExactV2Receipt() {
         val fixture = fixture()
         assertTrue(fixture.open())
-        assertNotNull(fixture.append())
+        assertNotNull(fixture.appendBatch())
         fixture.now += 1L
         assertNotNull(fixture.store.sealActiveSegment(OWNER, WALK_ID))
         val manifest = requireNotNull(fixture.store.backendUploadManifest(COLLECTION_1, OWNER))
@@ -147,14 +216,43 @@ class RawCollectionStoreTest {
         )
 
         assertTrue(validBackendReceipt(legacy, manifest))
-        assertTrue(fixture.store.deleteAfterReceipt(OWNER, legacy))
+        assertFalse(fixture.store.deleteAfterReceipt(OWNER, legacy))
+        assertNotNull(fixture.store.uploadReadyManifest(COLLECTION_1, OWNER))
+    }
+
+    @Test
+    fun legacySingleObjectV2ManifestRemainsDecodableButNeverUploadReady() {
+        val legacy = RawCollectionManifest(
+            collectionId = COLLECTION_1,
+            owner = OWNER,
+            walkSessionId = WALK_ID,
+            consentReceiptSha256 = CONSENT_SHA,
+            capturedStartedAtEpochMs = STARTED_AT,
+            capturedEndedAtEpochMs = STARTED_AT + 1L,
+            expiresAtEpochMs = STARTED_AT + RAW_COLLECTION_TTL_MS,
+            state = RawManifestState.COMPLETE,
+            chunks = listOf(
+                RawChunkMetadata(
+                    ordinal = 0,
+                    type = RawChunkType.DETECTION,
+                    capturedAtEpochMs = STARTED_AT,
+                    sizeBytes = PAYLOAD.length,
+                    sha256 = "a".repeat(64),
+                ),
+            ),
+        )
+
+        val decoded = requireNotNull(decodeRawManifest(encodeRawManifest(legacy)))
+
+        assertFalse(decoded.uploadReady)
+        assertNull(decoded.toBackendManifest())
     }
 
     @Test
     fun consentAndAccountFencesBlockReadsAndNewEnrollmentNeedsVerifiedPurge() {
         val consentFixture = fixture()
         assertTrue(consentFixture.open())
-        assertNotNull(consentFixture.append())
+        assertNotNull(consentFixture.appendBatch())
         consentFixture.now += 1L
         assertNotNull(consentFixture.store.sealActiveSegment(OWNER, WALK_ID))
         assertTrue(consentFixture.store.onConsentRevoked(CONSENT_SHA))
@@ -162,7 +260,7 @@ class RawCollectionStoreTest {
 
         val fixture = fixture()
         assertTrue(fixture.open())
-        assertNotNull(fixture.append())
+        assertNotNull(fixture.appendBatch())
         assertTrue(fixture.store.onAccountDeleted())
         assertTrue(fixture.aead.destroyed)
         assertTrue(fixture.storage.manifests.isEmpty())
@@ -254,14 +352,24 @@ private class Fixture(
         walkState = RawWalkState.ACTIVE,
     )
 
-    fun append(type: RawChunkType = RawChunkType.DETECTION): RawChunkMetadata? = store.append(
+    fun items(
+        types: List<RawChunkType> = RAW_RUNTIME_CHUNK_TYPE_ORDER,
+    ): List<RawPlaintextBatchItem> = types.map { type ->
+        RawPlaintextBatchItem(
+            type = type,
+            capturedAtEpochMs = now,
+            plaintext = "aggregate-metadata".toByteArray(),
+        )
+    }
+
+    fun appendBatch(
+        types: List<RawChunkType> = RAW_RUNTIME_CHUNK_TYPE_ORDER,
+    ): List<RawChunkMetadata>? = store.appendBatch(
         owner = DEFAULT_OWNER,
         walkSessionId = DEFAULT_WALK_ID,
         rawConsentGranted = true,
         walkState = RawWalkState.ACTIVE,
-        type = type,
-        capturedAtEpochMs = now,
-        plaintext = "aggregate-metadata".toByteArray(),
+        items = items(types),
     )
 
     private companion object {
@@ -280,6 +388,7 @@ private class FakeRawCollectionStorage : RawCollectionStorage {
     val chunks = mutableMapOf<Pair<String, Int>, String>()
     val fences = mutableMapOf<String, String>()
     var purgeVerified = true
+    var failChunkOrdinal: Int? = null
 
     override fun readActiveCollectionId(): String? = activeCollectionId
     override fun writeActiveCollectionIdAtomically(collectionId: String): Boolean {
@@ -298,6 +407,7 @@ private class FakeRawCollectionStorage : RawCollectionStorage {
     override fun readChunk(collectionId: String, ordinal: Int): String? =
         chunks[collectionId to ordinal]
     override fun writeChunkAtomically(collectionId: String, ordinal: Int, envelope: String): Boolean {
+        if (ordinal == failChunkOrdinal) return false
         chunks[collectionId to ordinal] = envelope
         return true
     }

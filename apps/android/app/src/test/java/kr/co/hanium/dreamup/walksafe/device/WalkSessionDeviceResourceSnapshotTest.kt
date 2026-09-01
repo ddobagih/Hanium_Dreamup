@@ -18,10 +18,12 @@ class WalkSessionDeviceResourceSnapshotTest {
             batteryNotLow = true,
             privateStorageAboveSystemLow = true,
             thermalBelowCritical = true,
+            thermalThrottled = true,
         )
 
         assertEquals(WalkSessionReadinessStatus.READY, snapshot.readinessStatus)
         assertEquals("", snapshot.reason)
+        assertEquals(true, snapshot.thermalThrottled)
     }
 
     @Test
@@ -54,7 +56,10 @@ class WalkSessionDeviceResourceSnapshotTest {
         assertTrue(probeSource.contains("battery?.hasExtra("))
         assertTrue(probeSource.contains("Intent.ACTION_DEVICE_STORAGE_LOW"))
         assertTrue(probeSource.contains("Intent.ACTION_DEVICE_STORAGE_OK"))
+        assertTrue(probeSource.contains("currentThermalStatus"))
         assertTrue(probeSource.contains("PowerManager.THERMAL_STATUS_CRITICAL"))
+        assertTrue(probeSource.contains("PowerManager.THERMAL_STATUS_SEVERE"))
+        assertTrue(probeSource.contains("thermalThrottled = thermalThrottled"))
         assertTrue(probeSource.contains("addThermalStatusListener("))
         assertTrue(probeSource.contains("removeThermalStatusListener("))
         assertTrue(probeSource.contains("appContext.unregisterReceiver(registered)"))

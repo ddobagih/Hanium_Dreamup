@@ -17,12 +17,39 @@ class MainActivityRawCollectionRuntimeStaticTest {
         val publishBoundary = source.substringAfter(
             "val published = this@MainActivity.publishDetectionSnapshot(",
         ).substringBefore("if (shouldCaptureFrame)")
+        val scheduling = source.substringAfter(
+            "private fun scheduleDetectionIfDue(",
+        ).substringBefore("private fun encodeDebugFrameJpeg(")
 
         assertTrue(source.contains("File(noBackupRoot, \"raw_collections\")"))
         assertTrue(source.contains("Thread(runnable, \"walksafe-raw-collection\")"))
         assertTrue(capture.contains("RAW_COLLECTION_CAPTURE_INTERVAL_MS"))
+        assertTrue(capture.contains("observedAtEpochMs - elapsedWindowMs"))
+        assertFalse(capture.contains("epochWindowMs"))
         assertTrue(capture.contains("RawDetectionMetadataSample("))
+        assertTrue(capture.contains("RawPerformanceMetadataSample("))
+        assertTrue(capture.contains("rawDetectionDueButInFlightDropCount.getAndSet(0)"))
+        assertTrue(capture.contains("droppedFrameCount = rawDetectionDroppedFrameCount"))
+        assertTrue(capture.contains("averageFrameDurationMs = averageProcessingFrameMs"))
+        assertTrue(capture.contains("thermalThrottled ="))
+        assertTrue(capture.contains("captureMetadataBatch("))
+        listOf(
+            "RawChunkType.VIDEO",
+            "RawChunkType.AUDIO",
+            "RawChunkType.EXACT_LOCATION",
+            "RawChunkType.SENSOR",
+            "RawChunkType.ROUTE",
+            "RawChunkType.REPORT",
+            "reportImageJpeg",
+            "captureJpeg",
+            "latestTrustedLocation",
+            "routeNavigator",
+            "earthOrientationTracker",
+        ).forEach { forbiddenReference ->
+            assertFalse(capture.contains(forbiddenReference))
+        }
         assertFalse(capture.contains("frameStateLock"))
+        assertTrue(scheduling.contains("rawDetectionDueButInFlightDropCount.incrementAndGet()"))
         assertTrue(publishBoundary.contains("recordRawCollectionDetectionMetadata("))
         assertTrue(
             publishBoundary.indexOf("recordRawCollectionDetectionMetadata(") <

@@ -64,7 +64,7 @@ data class RawPerformanceMetadataSample(
     val processedFrameCount: Int,
     val droppedFrameCount: Int,
     val averageFrameDurationMs: Long,
-    val thermalThrottled: Boolean,
+    val thermalThrottled: Boolean?,
 ) : RawRuntimeMetadataSample {
     init {
         require(windowStartedAtEpochMs >= 0L)
@@ -100,7 +100,7 @@ enum class RawCollectionUploadOutcome {
 /**
  * Small integration surface for active-walk capture and explicit pause/recheck upload.
  *
- * The initial runtime shape is intentionally fixed at one object with one chunk. Upload never
+ * The runtime shape is fixed at one DETECTION object and one PERFORMANCE object. Upload never
  * starts while the local walk is ACTIVE or ENDED, and the Gateway walk lease must remain active.
  */
 class RawCollectionRuntimeCoordinator private constructor(
@@ -162,30 +162,52 @@ class RawCollectionRuntimeCoordinator private constructor(
     }
 
     @Synchronized
-    fun captureMetadata(
+    fun captureMetadataBatch(
         context: RawCollectionRuntimeContext,
-        sample: RawRuntimeMetadataSample,
+        detectionSample: RawDetectionMetadataSample,
+        performanceSample: RawPerformanceMetadataSample,
     ): RawMetadataCaptureResult {
         val admission = admissionOrNull(context, requiredState = WalkSessionState.ACTIVE)
             ?: return RawMetadataCaptureResult.GATE_BLOCKED
         if (
-            sample.capturedAtEpochMs - sample.windowStartedAtEpochMs <
+            detectionSample.windowStartedAtEpochMs != performanceSample.windowStartedAtEpochMs ||
+            detectionSample.capturedAtEpochMs != performanceSample.capturedAtEpochMs
+        ) return RawMetadataCaptureResult.STORAGE_FAILURE
+        if (
+            detectionSample.capturedAtEpochMs - detectionSample.windowStartedAtEpochMs <
             minimumCaptureIntervalMs
         ) return RawMetadataCaptureResult.RATE_LIMITED
         val walkSessionId = context.walk.epoch.walkSessionId
+
+        var active = store.activePartialManifest(admission.owner, walkSessionId)
+        if (
+            active != null &&
+            active.consentReceiptSha256 != admission.confirmation.backendConsentReceiptSha256
+        ) {
+            if (!store.discardActivePartial(admission.owner, walkSessionId)) {
+                return RawMetadataCaptureResult.STORAGE_FAILURE
+            }
+            active = null
+        }
+        if (active?.chunks?.isCompleteRuntimeBatch() == true) {
+            return RawMetadataCaptureResult.SEGMENT_ALREADY_FULL
+        }
+        if (active?.chunks?.isNotEmpty() == true) {
+            if (!store.discardActivePartial(admission.owner, walkSessionId)) {
+                return RawMetadataCaptureResult.STORAGE_FAILURE
+            }
+            active = null
+        }
+
         val previousCapture = store.latestCapturedAtEpochMs(admission.owner, walkSessionId)
         if (
             previousCapture != null &&
             (
-                sample.capturedAtEpochMs < previousCapture ||
-                    sample.capturedAtEpochMs - previousCapture < minimumCaptureIntervalMs
+                detectionSample.capturedAtEpochMs < previousCapture ||
+                    detectionSample.capturedAtEpochMs - previousCapture < minimumCaptureIntervalMs
                 )
         ) return RawMetadataCaptureResult.RATE_LIMITED
 
-        val active = store.activePartialManifest(admission.owner, walkSessionId)
-        if (active?.chunks?.isNotEmpty() == true) {
-            return RawMetadataCaptureResult.SEGMENT_ALREADY_FULL
-        }
         val openedHere = active == null
         if (
             openedHere &&
@@ -194,27 +216,41 @@ class RawCollectionRuntimeCoordinator private constructor(
                 owner = admission.owner,
                 walkSessionId = walkSessionId,
                 consentReceiptSha256 = admission.confirmation.backendConsentReceiptSha256,
+                capturedStartedAtEpochMs = detectionSample.windowStartedAtEpochMs,
                 rawConsentGranted = true,
                 walkState = RawWalkState.ACTIVE,
             )
         ) return RawMetadataCaptureResult.STORAGE_FAILURE
 
-        val payload = encodeRuntimeMetadata(sample)
+        val detectionPayload = encodeRuntimeMetadata(detectionSample)
+        val performancePayload = encodeRuntimeMetadata(performanceSample)
         val metadata = try {
-            store.append(
+            store.appendBatch(
                 owner = admission.owner,
                 walkSessionId = walkSessionId,
                 rawConsentGranted = true,
                 walkState = RawWalkState.ACTIVE,
-                type = sample.rawChunkType(),
-                capturedAtEpochMs = sample.capturedAtEpochMs,
-                plaintext = payload,
+                items = listOf(
+                    RawPlaintextBatchItem(
+                        type = RawChunkType.DETECTION,
+                        capturedAtEpochMs = detectionSample.capturedAtEpochMs,
+                        plaintext = detectionPayload,
+                    ),
+                    RawPlaintextBatchItem(
+                        type = RawChunkType.PERFORMANCE,
+                        capturedAtEpochMs = performanceSample.capturedAtEpochMs,
+                        plaintext = performancePayload,
+                    ),
+                ),
             )
         } finally {
-            payload.fill(0)
+            detectionPayload.fill(0)
+            performancePayload.fill(0)
         }
         if (metadata != null) return RawMetadataCaptureResult.CAPTURED
-        if (openedHere) store.discardActivePartial(admission.owner, walkSessionId)
+        if (openedHere || store.activePartialManifest(admission.owner, walkSessionId) != null) {
+            store.discardActivePartial(admission.owner, walkSessionId)
+        }
         return RawMetadataCaptureResult.STORAGE_FAILURE
     }
 
@@ -229,13 +265,16 @@ class RawCollectionRuntimeCoordinator private constructor(
             ?: return RawSegmentSealResult.NOTHING_TO_SEAL
         if (
             active.consentReceiptSha256 != admission.confirmation.backendConsentReceiptSha256 ||
-            active.chunks.size != RAW_MAX_CHUNKS
-        ) return RawSegmentSealResult.STORAGE_FAILURE
-        return if (store.sealActiveSegment(admission.owner, walkSessionId) != null) {
-            RawSegmentSealResult.SEALED
-        } else {
-            RawSegmentSealResult.STORAGE_FAILURE
+            !active.chunks.isCompleteRuntimeBatch()
+        ) {
+            store.discardActivePartial(admission.owner, walkSessionId)
+            return RawSegmentSealResult.STORAGE_FAILURE
         }
+        if (store.sealActiveSegment(admission.owner, walkSessionId) != null) {
+            return RawSegmentSealResult.SEALED
+        }
+        store.discardActivePartial(admission.owner, walkSessionId)
+        return RawSegmentSealResult.STORAGE_FAILURE
     }
 
     @Synchronized
@@ -262,7 +301,13 @@ class RawCollectionRuntimeCoordinator private constructor(
                 admission.confirmation.backendConsentReceiptSha256
         } ?: return null
         val backendManifest = localManifest.toBackendManifest() ?: return null
-        val uploadBinding = backendManifest.chunkBindings.singleOrNull() ?: return null
+        val uploadBindings = backendManifest.chunkBindings.sortedBy {
+            it.localOrdinal
+        }.takeIf { bindings ->
+            bindings.size == RAW_MAX_CHUNKS &&
+                bindings.map(BackendRawChunkBinding::localOrdinal) ==
+                (0 until RAW_MAX_CHUNKS).toList()
+        } ?: return null
         val networkBinding = requireNotNull(initialContext.networkBinding)
         val lease = UploadLease(
             owner = admission.owner,
@@ -280,24 +325,33 @@ class RawCollectionRuntimeCoordinator private constructor(
         lateinit var outer: CancellableNetworkCall<RawCollectionUploadOutcome>
         outer = CancellableNetworkCall(
             executeBlock = execute@{
-                var plaintext: ByteArray? = null
+                val plaintextChunks = mutableListOf<RawPlaintextChunk>()
                 try {
                     if (!isLeaseCurrent(lease, contextProvider())) {
                         return@execute RawCollectionUploadOutcome.CANCELLED
                     }
-                    val chunk = store.readUploadChunk(
-                        collectionId = localManifest.collectionId,
-                        owner = lease.owner,
-                        ordinal = uploadBinding.localOrdinal,
-                    ) ?: return@execute RawCollectionUploadOutcome.LOCAL_READ_FAILED
-                    plaintext = chunk.plaintext
+                    uploadBindings.forEach { binding ->
+                        val chunk = store.readUploadChunk(
+                            collectionId = localManifest.collectionId,
+                            owner = lease.owner,
+                            ordinal = binding.localOrdinal,
+                        ) ?: return@execute RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                        if (
+                            chunk.metadata.sizeBytes != binding.sizeBytes ||
+                            chunk.metadata.sha256 != binding.sha256
+                        ) {
+                            chunk.plaintext.fill(0)
+                            return@execute RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                        }
+                        plaintextChunks += chunk
+                    }
                     val uploadCall = client.uploadCall(
                         session = lease.session,
                         consent = lease.confirmation,
                         networkBinding = lease.networkBinding,
                         localManifest = localManifest,
                         backendManifest = backendManifest,
-                        chunk = chunk,
+                        chunks = plaintextChunks,
                         isCurrent = {
                             !outer.isCancelled() && isLeaseCurrent(lease, contextProvider())
                         },
@@ -324,7 +378,7 @@ class RawCollectionRuntimeCoordinator private constructor(
                 } catch (_: CancellationException) {
                     RawCollectionUploadOutcome.CANCELLED
                 } finally {
-                    plaintext?.fill(0)
+                    plaintextChunks.forEach { it.plaintext.fill(0) }
                     synchronized(this) {
                         if (activeUpload?.call === outer) activeUpload = null
                     }
@@ -492,11 +546,6 @@ class RawCollectionRuntimeCoordinator private constructor(
     }
 }
 
-private fun RawRuntimeMetadataSample.rawChunkType(): RawChunkType = when (this) {
-    is RawDetectionMetadataSample -> RawChunkType.DETECTION
-    is RawPerformanceMetadataSample -> RawChunkType.PERFORMANCE
-}
-
 private fun encodeRuntimeMetadata(sample: RawRuntimeMetadataSample): ByteArray {
     val root = JSONObject()
         .put("schema_version", RAW_RUNTIME_METADATA_SCHEMA)
@@ -515,7 +564,7 @@ private fun encodeRuntimeMetadata(sample: RawRuntimeMetadataSample): ByteArray {
             .put("processed_frame_count", sample.processedFrameCount)
             .put("dropped_frame_count", sample.droppedFrameCount)
             .put("average_frame_duration_ms", sample.averageFrameDurationMs)
-            .put("thermal_throttled", sample.thermalThrottled)
+            .put("thermal_throttled", sample.thermalThrottled ?: JSONObject.NULL)
     }
     return root.toString().toByteArray(Charsets.UTF_8).also {
         require(it.size in 1..RAW_MAX_CHUNK_BYTES)
