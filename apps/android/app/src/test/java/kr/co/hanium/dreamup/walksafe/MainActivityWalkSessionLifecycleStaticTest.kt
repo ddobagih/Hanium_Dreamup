@@ -46,8 +46,12 @@ class MainActivityWalkSessionLifecycleStaticTest {
     @Test
     fun everyRuntimeEntryPointRequiresAnActiveWalkSession() {
         assertTrue(
-            functionBlock("private fun currentNavigationCollectionAllowsWork()")
+            functionBlock("private fun currentStepTrackingCollectionAllowsWork()")
                 .contains("isWalkSessionRuntimeActive()"),
+        )
+        assertTrue(
+            functionBlock("private fun currentNavigationCollectionAllowsWork()")
+                .contains("currentStepTrackingCollectionAllowsWork()"),
         )
         assertTrue(
             functionBlock("private fun startDepthSession()")

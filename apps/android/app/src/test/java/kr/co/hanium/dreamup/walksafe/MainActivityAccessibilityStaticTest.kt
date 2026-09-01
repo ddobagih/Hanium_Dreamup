@@ -129,9 +129,9 @@ class MainActivityAccessibilityStaticTest {
 
         listOf(
             "ObservedPermission.CAMERA -> \"카메라\"" to
-                "ObservedPermission.CAMERA -> \"장애물 인식과 신고 전송을 사용할 수 없습니다.\"",
+                "장애물 인식·미터 거리 안내와 카메라 기반 신고 전송을 사용할 수 없습니다.",
             "ObservedPermission.PRECISE_LOCATION -> \"정확한 위치\"" to
-                "ObservedPermission.PRECISE_LOCATION -> \"거리 측정, 길안내와 신고 전송을 사용할 수 없습니다.\"",
+                "위치·경로 안내와 위치가 필요한 신고 전송을 사용할 수 없습니다.",
             "ObservedPermission.MICROPHONE -> \"마이크\"" to
                 "ObservedPermission.MICROPHONE -> \"음성 명령과 음성 재개 확인을 사용할 수 없습니다.\"",
             "ObservedPermission.ACTIVITY_RECOGNITION -> \"보행 센서\"" to

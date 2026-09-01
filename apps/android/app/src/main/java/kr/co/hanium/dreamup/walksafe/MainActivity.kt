@@ -15173,6 +15173,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         if (
             postLoginDeviceCheckSnapshot.passesFeatureGate &&
+            !postLoginDeviceFeatureEnabled(
+                PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE,
+            )
+        ) {
+            add("카메라 기반 신고")
+        }
+        if (
+            postLoginDeviceCheckSnapshot.passesFeatureGate &&
+            !postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)
+        ) {
+            add("위치가 필요한 신고")
+        }
+        if (
+            postLoginDeviceCheckSnapshot.passesFeatureGate &&
             !hasActivityRecognitionPermission()
         ) {
             add("걸음 수 추적·정지 확인 후 대기 신고 자동 전송")
@@ -15262,7 +15276,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 if (hasCameraPermission()) "재점검 필요" else "권한 허용 후 재점검 필요"
             !postLoginDeviceFeatureEnabled(
                 PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE,
-            ) -> "통과(거리 제한 모드)"
+            ) -> "제한(거리 제한 모드)"
             postLoginMetricDepthState == PostLoginMetricDepthState.PENDING ->
                 "통과 · 보행 시작 시 재확인"
             else -> null
@@ -15297,6 +15311,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val missingPermissions = requiredPostLoginDeviceCheckPermissions()
             .map(::postLoginDeviceCheckPermissionLabel)
+            .distinct()
             .joinToString(", ")
         val permissionStatus = combined(
             observation.requiredPermissions,
@@ -15309,6 +15324,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             "제한($missingPermissions)"
         } else {
             label(permissionStatus)
+        }
+        val microphoneText = if (!hasRecordAudioPermission()) {
+            "제한(마이크 권한 필요)"
+        } else {
+            label(
+                combined(
+                    startup.microphoneAvailable.toDeviceCheckSignal(),
+                    observation.wakePhraseRecognition,
+                ),
+                "음성 모델 확인 중",
+            )
+        }
+        val locationText = if (!hasLocationPermission()) {
+            "제한(정확한 위치 권한 필요)"
+        } else {
+            label(
+                combined(
+                    startup.gpsAvailable.toDeviceCheckSignal(),
+                    observation.locationService,
+                ),
+            )
         }
         val cameraPending = if (postLoginCameraPipelinePreflightActive) {
             "카메라·모델 실행 중"
@@ -15336,15 +15372,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         } else when (observation.metricDepth) {
             PostLoginMetricDepthState.PENDING -> "검사 대기"
             PostLoginMetricDepthState.AVAILABLE -> "통과"
-            PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED -> "통과(거리 제한 모드)"
+            PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED -> "제한(거리 제한 모드)"
             PostLoginMetricDepthState.UNKNOWN -> "제한(상태 불명)"
             PostLoginMetricDepthState.TIMED_OUT -> "제한(측정 시간 초과)"
         }
         return listOf(
             "권한·알림·음성 고지: $permissionText",
             "한국어 음성 생성: ${label(observation.koreanTextToSpeech, "실제 음성 생성 중")}",
-            "호출어·마이크: ${label(combined(startup.microphoneAvailable.toDeviceCheckSignal(), observation.wakePhraseRecognition), "음성 모델 확인 중")}",
-            "위치 기능: ${label(combined(startup.gpsAvailable.toDeviceCheckSignal(), observation.locationService))}",
+            "호출어·마이크: $microphoneText",
+            "위치 기능: $locationText",
             "진동: ${label(combined(startup.vibrationAvailable.toDeviceCheckSignal(), observation.hapticFeedback))}",
             "카메라·탐지 모델: $cameraText",
             "배터리·저장공간·발열: ${label(observation.deviceResources)}",
@@ -16955,7 +16991,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (walkReadinessExpanded) View.VISIBLE else View.GONE
         walkReadinessSummaryText.visibility =
             if (walkReadinessExpanded) View.GONE else View.VISIBLE
-        val summary = "기기 준비 완료. 장착, 환경, 기기 점검을 모두 통과했습니다."
+        val summary = if (hasCurrentPostLoginDeviceRestrictions()) {
+            val preparation = if (cameraAnalysisFeaturesEnabled()) {
+                "장착과 사용 중인 기능 범위의 환경 점검을 통과했습니다."
+            } else {
+                "사용 중인 기능 범위의 환경 점검을 통과했고, " +
+                    "제한된 카메라 장착 점검은 생략했습니다."
+            }
+            "기기 준비 완료. $preparation 현재 제한 기능: " +
+                "${postLoginDeviceCheckDisabledFeatureText()}. " +
+                "나머지 기능은 사용할 수 있습니다."
+        } else {
+            "기기 준비 완료. 장착, 환경, 기기 점검을 모두 통과했습니다."
+        }
         walkReadinessSummaryText.text = summary
         walkReadinessSummaryText.contentDescription = summary
     }
@@ -18747,10 +18795,33 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val supportedLabel = if (candidateNotice.isNotEmpty()) "시험 기준 통과" else "지원"
         val blocking = assessment.blockingFactors.joinToString(", ") { it.labelKo() }
         val measurement = officialEnvironmentMeasurementDetail(assessment)
+        val locationQualityEnabled =
+            postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)
+        val cameraQualityEnabled = cameraAnalysisFeaturesEnabled()
+        val skippedQualityNotice = when {
+            !locationQualityEnabled && !cameraQualityEnabled ->
+                "기기 제한: 위치·카메라 품질 점검은 생략했습니다.\n"
+            !locationQualityEnabled -> "기기 제한: 위치 품질 점검은 생략했습니다.\n"
+            !cameraQualityEnabled -> "기기 제한: 카메라 품질 점검은 생략했습니다.\n"
+            else -> ""
+        }
+        val supportedReason = when {
+            locationQualityEnabled && cameraQualityEnabled ->
+                "밝고 건조하며 짙은 안개가 없는 일반 도심 보도와 위치·카메라 품질을 확인했습니다."
+            locationQualityEnabled ->
+                "밝고 건조하며 짙은 안개가 없는 일반 도심 보도와 위치 품질을 확인했습니다. " +
+                    "제한된 카메라 품질 점검은 생략했습니다."
+            cameraQualityEnabled ->
+                "밝고 건조하며 짙은 안개가 없는 일반 도심 보도와 카메라 품질을 확인했습니다. " +
+                    "제한된 위치 품질 점검은 생략했습니다."
+            else ->
+                "밝고 건조하며 짙은 안개가 없는 일반 도심 보도를 확인했습니다. " +
+                    "제한된 위치·카메라 품질 점검은 생략했습니다."
+        }
         return candidateNotice + when (assessment.support) {
             OfficialEnvironmentSupport.SUPPORTED ->
                 "$OFFICIAL_ENVIRONMENT_SUPPORT_NOTICE_KO\n$supportedLabel\n" +
-                    "원인: 밝고 건조하며 짙은 안개가 없는 일반 도심 보도와 위치·카메라 품질을 확인했습니다.\n" +
+                    "원인: $supportedReason\n" +
                     measurement +
                     "다음 행동: 장착 방식을 아직 선택하지 않았다면 아래에서 선택하고, " +
                     "완료했다면 보행 시작 확인 버튼을 누르세요."
@@ -18763,6 +18834,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         OfficialEnvironmentPreflightPhase.IDLE -> "확인 필요\n"
                     } +
                     "원인: ${blocking.ifBlank { "공식 환경 조건" }}을 확인하지 못했습니다.\n" +
+                    skippedQualityNotice +
                     measurement +
                     "다음 행동: 화면 안내에 따라 기다리거나 자세·장소를 조정하세요. " +
                     "점검이 끝났다면 다시 점검 버튼을 누르세요."
@@ -18770,6 +18842,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "$OFFICIAL_ENVIRONMENT_SUPPORT_NOTICE_KO\n" +
                     (if (officialEnvironmentCameraPreflightActive) "조정 필요\n" else "사용 불가\n") +
                     "원인: ${blocking.ifBlank { "현재 환경" }}이 공식 지원 조건과 다릅니다.\n" +
+                    skippedQualityNotice +
                     measurement +
                     "다음 행동: 안내된 문제를 바로잡는 동안 보행 안내를 시작하지 마세요."
         }
@@ -23842,11 +23915,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun startNavigationServicesIfNeeded() {
         if (!currentLocationCollectionAllowsWork()) {
             stopLocationUpdates()
-            stopStepTracking()
-            return
+        } else {
+            startLocationUpdatesIfAllowed()
         }
-        startLocationUpdatesIfAllowed()
-        if (!currentNavigationCollectionAllowsWork()) {
+        if (!currentStepTrackingCollectionAllowsWork()) {
             stopStepTracking()
             return
         }
@@ -23866,14 +23938,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         return walkSessionLifecycle.isRuntimeEpochCurrent(guard.epoch)
     }
 
-    private fun currentNavigationCollectionAllowsWork(): Boolean {
+    private fun currentStepTrackingCollectionAllowsWork(): Boolean {
         if (!firstRunOnboardingComplete()) return false
-        if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)) return false
         if (!isWalkSessionRuntimeActive()) return false
         if (!isStartupCapabilityConfirmed()) return false
         if (!officialEnvironmentOutputsAllowed) return false
         if (cameraAnalysisFeaturesEnabled() && !phoneMountingOutputsAllowed) return false
         return true
+    }
+
+    private fun currentNavigationCollectionAllowsWork(): Boolean {
+        if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)) return false
+        return currentStepTrackingCollectionAllowsWork()
     }
 
     private fun missingCameraPermissions(): List<String> {
@@ -23918,8 +23994,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun ObservedPermission.denialReasonKo(): String = when (this) {
-        ObservedPermission.CAMERA -> "장애물 인식과 신고 전송을 사용할 수 없습니다."
-        ObservedPermission.PRECISE_LOCATION -> "거리 측정, 길안내와 신고 전송을 사용할 수 없습니다."
+        ObservedPermission.CAMERA ->
+            "장애물 인식·미터 거리 안내와 카메라 기반 신고 전송을 사용할 수 없습니다."
+        ObservedPermission.PRECISE_LOCATION ->
+            "위치·경로 안내와 위치가 필요한 신고 전송을 사용할 수 없습니다."
         ObservedPermission.MICROPHONE -> "음성 명령과 음성 재개 확인을 사용할 수 없습니다."
         ObservedPermission.ACTIVITY_RECOGNITION ->
             "걸음 수 추적과 정지 확인 후 대기 신고 자동 전송을 사용할 수 없습니다."
@@ -24145,7 +24223,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!hasLocationPermission() || !isLocationServiceEnabledForDeviceCheck()) {
             navigationPermissionsRequestedForReport = false
             stopLocationUpdates()
-            stopStepTracking()
             if (sessionSnapshot.state == WalkSessionState.ACTIVE && isRouteActive) {
                 navigationRequests.cancelRoute()
                 resetRouteState()
@@ -29216,7 +29293,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun startStepTrackingIfAllowed() {
-        if (!currentNavigationCollectionAllowsWork()) {
+        if (!currentStepTrackingCollectionAllowsWork()) {
             stopStepTracking()
             return
         }

@@ -383,6 +383,10 @@ class MainActivityOfficialEnvironmentStaticTest {
             functionBlock("private fun applyObservedPermissionStateChange(")
 
         assertTrue(permissionChange.contains("stopLocationUpdates()"))
+        val locationRevocation = permissionChange.substringAfter(
+            "if (!hasLocationPermission() || !isLocationServiceEnabledForDeviceCheck())",
+        ).substringBefore("if (!hasHandsFreeNotificationPermission())")
+        assertFalse(locationRevocation.contains("stopStepTracking()"))
         assertTrue(permissionChange.contains("navigationRequests.cancelRoute()"))
         assertTrue(permissionChange.contains("resetRouteState()"))
         assertTrue(permissionChange.contains("해당 기능만 중지하고 나머지 기능은 계속 사용합니다."))

@@ -413,13 +413,17 @@ class MainActivityFirstRunRegistrationStaticTest {
         }
         listOf(
             "private fun currentLocationCollectionAllowsWork()",
-            "private fun currentNavigationCollectionAllowsWork()",
+            "private fun currentStepTrackingCollectionAllowsWork()",
             "private fun currentFeedbackDeviceGateAllowsAlerts()",
         ).forEach { marker ->
             assertTrue(
                 functionBlock(marker).contains("if (!firstRunOnboardingComplete()) return false"),
             )
         }
+        assertTrue(
+            functionBlock("private fun currentNavigationCollectionAllowsWork()")
+                .contains("return currentStepTrackingCollectionAllowsWork()"),
+        )
         assertTrue(
             functionBlock("private fun currentRuntimeMetricOutputAllowsWork(")
                 .contains("firstRunOnboardingComplete() &&"),
@@ -430,7 +434,7 @@ class MainActivityFirstRunRegistrationStaticTest {
         )
         assertTrue(
             functionBlock("private fun startStepTrackingIfAllowed()")
-                .contains("currentNavigationCollectionAllowsWork()"),
+                .contains("currentStepTrackingCollectionAllowsWork()"),
         )
         assertTrue(
             functionBlock("private fun requestRoute(")

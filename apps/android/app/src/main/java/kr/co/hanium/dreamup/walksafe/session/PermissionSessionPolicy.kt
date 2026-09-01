@@ -248,10 +248,10 @@ object PermissionDependencyPolicy {
         val stopped = buildSet {
             if (!observed.cameraGranted) {
                 add(PermissionDependentFeature.CAMERA_HAZARD_GUIDANCE)
+                add(PermissionDependentFeature.METRIC_DISTANCE)
                 add(PermissionDependentFeature.REPORT_TRANSMISSION)
             }
             if (!observed.preciseLocationGranted) {
-                add(PermissionDependentFeature.METRIC_DISTANCE)
                 add(PermissionDependentFeature.ROUTE_NAVIGATION)
                 add(PermissionDependentFeature.REPORT_TRANSMISSION)
             }
@@ -264,8 +264,7 @@ object PermissionDependencyPolicy {
         }
         return PermissionDependencyDecision(
             stoppedFeatures = stopped,
-            requiresWholeWalkSafetyStop =
-                !observed.cameraGranted || !observed.preciseLocationGranted,
+            requiresWholeWalkSafetyStop = false,
         )
     }
 }

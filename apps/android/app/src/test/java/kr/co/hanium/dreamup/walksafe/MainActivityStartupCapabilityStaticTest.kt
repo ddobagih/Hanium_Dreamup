@@ -175,10 +175,13 @@ class MainActivityStartupCapabilityStaticTest {
             .substringBefore("private fun missingCameraPermissions()")
         val navigationGate = activity.substringAfter("private fun currentNavigationCollectionAllowsWork()")
             .substringBefore("private fun missingCameraPermissions()")
+        val stepTrackingGate = activity.substringAfter(
+            "private fun currentStepTrackingCollectionAllowsWork()",
+        ).substringBefore("private fun currentNavigationCollectionAllowsWork()")
         val locationUpdate = activity.substringAfter("private fun handleLocationUpdate(")
             .substringBefore("private fun updateHeadingFromLocation(")
-        assertTrue(navigationStart.contains("if (!currentNavigationCollectionAllowsWork())"))
-        assertTrue(navigationGate.contains("if (!isStartupCapabilityConfirmed()) return false"))
+        assertTrue(navigationStart.contains("if (!currentStepTrackingCollectionAllowsWork())"))
+        assertTrue(stepTrackingGate.contains("if (!isStartupCapabilityConfirmed()) return false"))
         assertTrue(
             navigationGate.contains(
                 "postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)",

@@ -327,8 +327,12 @@ class MainActivityPhoneMountingStaticTest {
 
         assertTrue(combinedGate.contains("officialEnvironmentOutputsAllowed"))
         assertTrue(combinedGate.contains("phoneMountingOutputsAllowed"))
+        assertTrue(
+            functionBlock("private fun currentNavigationCollectionAllowsWork()")
+                .contains("currentStepTrackingCollectionAllowsWork()"),
+        )
         listOf(
-            "private fun currentNavigationCollectionAllowsWork()",
+            "private fun currentStepTrackingCollectionAllowsWork()",
             "private fun isCameraFallbackAdvisoryStillDeliverable(",
             "private fun currentFeedbackDeviceGateAllowsAlerts()",
             "private fun speakNavigation(",

@@ -69,7 +69,9 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         val withoutCamera = functionBlock("private fun startWalkSessionRuntimeWithoutCamera()")
         val permissions = functionBlock("private fun ensurePermissionsThenStart()")
         val confirmed = functionBlock("private fun startConfirmedRuntimeAfterCameraPermission()")
-        val navigation = functionBlock("private fun currentNavigationCollectionAllowsWork()")
+        val stepTracking = functionBlock(
+            "private fun currentStepTrackingCollectionAllowsWork()",
+        )
 
         assertTrue(activation.contains("if (cameraAnalysisFeaturesEnabled())"))
         assertTrue(afterRelease.contains("if (!cameraAnalysisFeaturesEnabled())"))
@@ -79,7 +81,7 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         assertTrue(permissions.contains("if (!cameraAnalysisFeaturesEnabled())"))
         assertTrue(confirmed.contains("if (!cameraAnalysisFeaturesEnabled())"))
         assertTrue(
-            navigation.contains(
+            stepTracking.contains(
                 "if (cameraAnalysisFeaturesEnabled() && !phoneMountingOutputsAllowed) return false",
             ),
         )
@@ -88,6 +90,9 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
     @Test
     fun permissionLossStopsOnlyDependentResourcesAndCanBeRecoveredFromSettings() {
         val observed = functionBlock("private fun applyObservedPermissionStateChange(")
+        val locationRevocation = observed.substringAfter(
+            "if (!hasLocationPermission() || !isLocationServiceEnabledForDeviceCheck())",
+        ).substringBefore("if (!hasHandsFreeNotificationPermission())")
         val settingsUi = source.substringAfter("postLoginDeviceCheckSettingsButton.apply {")
             .substringBefore("postLoginDeviceCheckWakePhraseInstructionText.visibility")
         val focus = functionBlock("override fun onWindowFocusChanged(hasFocus: Boolean)")
@@ -95,6 +100,7 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         assertTrue(observed.contains("stopDepthSession(closeSession = true)"))
         assertTrue(observed.contains("stopCameraFallbackSession(updateUi = false)"))
         assertTrue(observed.contains("stopLocationUpdates()"))
+        assertFalse(locationRevocation.contains("stopStepTracking()"))
         assertTrue(observed.contains("stopHandsFreeVoiceService()"))
         assertFalse(observed.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertTrue(observed.contains("activatePhoneMountingRuntime()"))
@@ -195,10 +201,68 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
                 "PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE",
             ),
         )
-        assertTrue(terminalDistanceStatus.contains("통과(거리 제한 모드)"))
+        assertTrue(terminalDistanceStatus.contains("제한(거리 제한 모드)"))
         assertTrue(terminalDistanceStatus.contains("통과 · 보행 시작 시 재확인"))
         assertFalse(terminalDistanceStatus.contains("검사 대기"))
         assertTrue(items.contains("terminalMetricDistanceStatusText()"))
+    }
+
+    @Test
+    fun missingMicrophonePermissionIsExplicitInItemsWithoutResettingTheStoredResult() {
+        val items = functionBlock("private fun postLoginDeviceCheckItemsMessage()")
+
+        assertTrue(items.contains("val microphoneText = if (!hasRecordAudioPermission())"))
+        assertTrue(items.contains("\"제한(마이크 권한 필요)\""))
+        assertTrue(items.contains("startup.microphoneAvailable.toDeviceCheckSignal()"))
+        assertTrue(items.contains("observation.wakePhraseRecognition"))
+        assertTrue(items.contains("\"호출어·마이크: \$microphoneText\""))
+        assertFalse(items.contains("postLoginDeviceCheckSnapshot ="))
+        assertFalse(items.contains("state = PostLoginDeviceCheckState.NOT_RUN"))
+    }
+
+    @Test
+    fun permissionLimitationsMatchTheFeaturesThatActuallyStop() {
+        val labels = functionBlock("private fun postLoginDeviceCheckDisabledFeatureText()")
+        val items = functionBlock("private fun postLoginDeviceCheckItemsMessage()")
+        val denial = functionBlock("private fun ObservedPermission.denialReasonKo()")
+
+        assertTrue(labels.contains("카메라 기반 신고"))
+        assertTrue(labels.contains("위치가 필요한 신고"))
+        assertTrue(
+            labels.contains(
+                "!postLoginDeviceFeatureEnabled(\n" +
+                    "                PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE",
+            ),
+        )
+        assertTrue(
+            labels.contains(
+                "!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)",
+            ),
+        )
+        assertTrue(items.contains(".distinct()"))
+        assertTrue(items.contains("val locationText = if (!hasLocationPermission())"))
+        assertTrue(items.contains("제한(정확한 위치 권한 필요)"))
+        assertTrue(items.contains("\"위치 기능: \$locationText\""))
+        assertTrue(denial.contains("위치·경로 안내와 위치가 필요한 신고 전송"))
+        assertFalse(denial.contains("거리 측정"))
+    }
+
+    @Test
+    fun collapsedReadinessAndEnvironmentCopyDiscloseLimitedFeatures() {
+        val readiness = functionBlock("private fun updateWalkReadinessSection()")
+        val environment = functionBlock("private fun officialEnvironmentStatusMessage(")
+
+        assertTrue(readiness.contains("if (hasCurrentPostLoginDeviceRestrictions())"))
+        assertTrue(readiness.contains("postLoginDeviceCheckDisabledFeatureText()"))
+        assertTrue(readiness.contains("제한된 카메라 장착 점검은 생략했습니다"))
+        assertTrue(readiness.contains("나머지 기능은 사용할 수 있습니다"))
+        assertTrue(environment.contains("val supportedReason = when"))
+        assertTrue(environment.contains("val skippedQualityNotice = when"))
+        assertTrue(environment.contains("skippedQualityNotice +"))
+        assertTrue(environment.contains("제한된 카메라 품질 점검은 생략했습니다"))
+        assertTrue(environment.contains("제한된 위치 품질 점검은 생략했습니다"))
+        assertTrue(environment.contains("제한된 위치·카메라 품질 점검은 생략했습니다"))
+        assertTrue(environment.contains("원인: \$supportedReason"))
     }
 
     @Test
