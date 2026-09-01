@@ -16,7 +16,7 @@ import stat
 from typing import Any, Callable
 import uuid
 
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -1298,13 +1298,6 @@ def raw_chunk_commit_state(
             collection.lifecycle_version == 2
             and collection.retention_class != RAW_QUARANTINE_CLASS
         )
-        or collection.object_count != 1
-        or collection.chunk_count != 1
-        or collection.total_bytes != item.size_bytes
-        or item.chunk_count != 1
-        or chunk.chunk_index != 0
-        or item.size_bytes != chunk.declared_size_bytes
-        or not hmac.compare_digest(item.sha256, chunk.declared_sha256)
     ):
         raise RuntimeError("raw chunk database inventory is inconsistent")
     persistence_values = (
@@ -1319,10 +1312,12 @@ def raw_chunk_commit_state(
         chunk.persisted_at,
     )
     if all(value is None for value in persistence_values):
-        if collection.state != "MANIFEST_ACCEPTED":
+        if collection.state not in {"MANIFEST_ACCEPTED", "RECEIVING"}:
             raise RuntimeError("raw chunk database persistence state is incomplete")
         return RawChunkCommitState(chunk_exists=True, metadata=None)
     if any(value is None for value in persistence_values) or collection.state not in {
+        "MANIFEST_ACCEPTED",
+        "RECEIVING",
         "READY_TO_COMMIT",
         "COMMITTED",
         "QUARANTINED",
@@ -1446,22 +1441,60 @@ def validate_raw_storage_database_inventory(
     expected: dict[str, tuple[RawCollection, RawCollectionObject, RawCollectionChunk]] = {}
     seen_chunk_keys: set[tuple[uuid.UUID, uuid.UUID]] = set()
     for collection in collections:
-        collection_objects = objects_by_collection.get(collection.collection_id, [])
-        if len(collection_objects) != 1:
-            raise RuntimeError("raw storage inventory requires one object per collection")
-        item = collection_objects[0]
-        key = (collection.collection_id, item.object_id)
-        collection_chunks = chunks_by_object.get(key, [])
-        if len(collection_chunks) != 1:
-            raise RuntimeError("raw storage inventory requires one chunk per object")
-        seen_chunk_keys.add(key)
-        chunk = collection_chunks[0]
-        state = raw_chunk_commit_state(collection, item, chunk)
-        if state.metadata is None:
-            continue
-        if state.metadata.storage_name in expected:
-            raise RuntimeError("raw storage inventory reuses an encrypted storage name")
-        expected[state.metadata.storage_name] = (collection, item, chunk)
+        collection_objects = sorted(
+            objects_by_collection.get(collection.collection_id, []),
+            key=lambda item: str(item.object_id),
+        )
+        if len(collection_objects) != collection.object_count:
+            raise RuntimeError("raw storage database inventory is inconsistent")
+        observed_chunks = 0
+        observed_bytes = 0
+        persisted_chunks = 0
+        for item in collection_objects:
+            key = (collection.collection_id, item.object_id)
+            collection_chunks = sorted(
+                chunks_by_object.get(key, []),
+                key=lambda chunk: chunk.chunk_index,
+            )
+            if (
+                len(collection_chunks) != item.chunk_count
+                or tuple(chunk.chunk_index for chunk in collection_chunks)
+                != tuple(range(item.chunk_count))
+                or sum(chunk.declared_size_bytes for chunk in collection_chunks)
+                != item.size_bytes
+            ):
+                raise RuntimeError("raw storage database inventory is inconsistent")
+            seen_chunk_keys.add(key)
+            observed_chunks += len(collection_chunks)
+            observed_bytes += item.size_bytes
+            for chunk in collection_chunks:
+                state = raw_chunk_commit_state(collection, item, chunk)
+                if state.metadata is None:
+                    continue
+                persisted_chunks += 1
+                if state.metadata.storage_name in expected:
+                    raise RuntimeError(
+                        "raw storage inventory reuses an encrypted storage name"
+                    )
+                expected[state.metadata.storage_name] = (collection, item, chunk)
+        if (
+            observed_chunks != collection.chunk_count
+            or observed_bytes != collection.total_bytes
+            or (
+                collection.state == "MANIFEST_ACCEPTED"
+                and persisted_chunks == collection.chunk_count
+            )
+            or (
+                collection.state == "RECEIVING"
+                and not 0 < persisted_chunks < collection.chunk_count
+            )
+            or (
+                collection.state
+                in {"READY_TO_COMMIT", "COMMITTED", "QUARANTINED"}
+                and persisted_chunks != collection.chunk_count
+            )
+        ):
+            raise RuntimeError("raw storage database inventory is inconsistent")
     if set(chunks_by_object) != seen_chunk_keys:
         raise RuntimeError("raw storage inventory contains an orphan chunk row")
 
@@ -1508,7 +1541,7 @@ def validate_raw_storage_database_inventory(
 
 
 class RawCollectionStorage:
-    """B1c handler for one encrypted object/chunk and its commit receipt."""
+    """Durable encrypted raw inventory handler and immutable commit receipt."""
 
     def __init__(
         self,
@@ -1594,37 +1627,9 @@ class RawCollectionStorage:
             )
 
     @staticmethod
-    def _supported_manifest(manifest: RawCollectionManifestV1) -> None:
-        if (
-            manifest.object_count != 1
-            or manifest.chunk_count != 1
-            or len(manifest.objects) != 1
-            or len(manifest.objects[0].chunks) != 1
-        ):
-            raise RawCollectionStorageError(
-                code="raw_manifest_shape_not_implemented",
-                message=(
-                    "This build persists exactly one raw object containing one chunk."
-                ),
-                status_code=503,
-            )
-        item = manifest.objects[0]
-        chunk = item.chunks[0]
-        if (
-            chunk.index != 0
-            or chunk.size_bytes != item.size_bytes
-            or not hmac.compare_digest(chunk.sha256, item.sha256)
-        ):
-            raise RawCollectionStorageError(
-                code="raw_manifest_single_chunk_inventory_invalid",
-                message="A single-chunk object must bind the same size and SHA-256.",
-                status_code=422,
-            )
-
-    @staticmethod
     def _receipt_payload_v1(
         collection: RawCollection,
-        item: RawCollectionObject,
+        inventory: list[tuple[RawCollectionObject, list[RawCollectionChunk]]],
         *,
         committed_at: datetime,
         retention_expires_at: datetime,
@@ -1646,6 +1651,7 @@ class RawCollectionStorage:
                     "sha256": item.sha256,
                     "chunk_count": item.chunk_count,
                 }
+                for item, _chunks in inventory
             ],
             "retention_class": collection.retention_class,
             "committed_at": _canonical_receipt_time(committed_at),
@@ -1655,7 +1661,7 @@ class RawCollectionStorage:
     @staticmethod
     def _receipt_payload_v2(
         collection: RawCollection,
-        item: RawCollectionObject,
+        inventory: list[tuple[RawCollectionObject, list[RawCollectionChunk]]],
         *,
         committed_at: datetime,
         quarantine_expires_at: datetime,
@@ -1677,6 +1683,7 @@ class RawCollectionStorage:
                     "sha256": item.sha256,
                     "chunk_count": item.chunk_count,
                 }
+                for item, _chunks in inventory
             ],
             "retention_class": collection.retention_class,
             "committed_at": _canonical_receipt_time(committed_at),
@@ -1689,7 +1696,7 @@ class RawCollectionStorage:
     def _receipt(
         cls,
         collection: RawCollection,
-        item: RawCollectionObject,
+        inventory: list[tuple[RawCollectionObject, list[RawCollectionChunk]]],
     ) -> RawCollectionReceiptV1 | RawCollectionReceiptV2 | None:
         values = (
             collection.committed_at,
@@ -1732,7 +1739,7 @@ class RawCollectionStorage:
                 return RawCollectionReceiptV1.model_validate({
                     **cls._receipt_payload_v1(
                         collection,
-                        item,
+                        inventory,
                         committed_at=collection.committed_at,
                         retention_expires_at=collection.retention_expires_at,
                     ),
@@ -1742,7 +1749,7 @@ class RawCollectionStorage:
             return RawCollectionReceiptV2.model_validate({
                 **cls._receipt_payload_v2(
                     collection,
-                    item,
+                    inventory,
                     committed_at=collection.committed_at,
                     quarantine_expires_at=collection.quarantine_expires_at,
                 ),
@@ -1758,37 +1765,71 @@ class RawCollectionStorage:
     def _status(
         cls,
         collection: RawCollection,
-        item: RawCollectionObject,
-        chunk: RawCollectionChunk,
+        inventory: list[tuple[RawCollectionObject, list[RawCollectionChunk]]],
     ) -> RawCollectionStatusV1:
-        received = chunk.storage_name is not None
+        received_chunk_count = sum(
+            chunk.storage_name is not None
+            for _item, chunks in inventory
+            for chunk in chunks
+        )
+        received_bytes = sum(
+            chunk.declared_size_bytes
+            for _item, chunks in inventory
+            for chunk in chunks
+            if chunk.storage_name is not None
+        )
+        # The existing DB guard moves directly from MANIFEST_ACCEPTED to ready;
+        # expose the contract's RECEIVING state while only part is persisted.
+        projected_state = (
+            "RECEIVING"
+            if collection.state == "MANIFEST_ACCEPTED" and received_chunk_count > 0
+            else collection.state
+        )
+        objects: list[dict[str, object]] = []
+        for item, chunks in inventory:
+            item_received = [chunk.storage_name is not None for chunk in chunks]
+            missing_ranges: list[dict[str, int]] = []
+            range_start: int | None = None
+            for index, received in enumerate(item_received):
+                if not received and range_start is None:
+                    range_start = index
+                if received and range_start is not None:
+                    missing_ranges.append({"start": range_start, "end": index - 1})
+                    range_start = None
+            if range_start is not None:
+                missing_ranges.append(
+                    {"start": range_start, "end": len(item_received) - 1}
+                )
+            objects.append(
+                {
+                    "object_id": str(item.object_id),
+                    "kind": item.kind,
+                    "sha256": item.sha256,
+                    "chunk_count": item.chunk_count,
+                    "received_chunk_count": sum(item_received),
+                    "size_bytes": item.size_bytes,
+                    "received_bytes": sum(
+                        chunk.declared_size_bytes
+                        for chunk in chunks
+                        if chunk.storage_name is not None
+                    ),
+                    "missing_ranges": missing_ranges,
+                }
+            )
         return RawCollectionStatusV1.model_validate(
             {
                 "schema_version": "walksafe.raw-collection-status.v1",
                 "collection_id": str(collection.collection_id),
                 "manifest_sha256": collection.manifest_sha256,
                 "purpose": collection.purpose,
-                "state": collection.state,
+                "state": projected_state,
                 "object_count": collection.object_count,
                 "chunk_count": collection.chunk_count,
                 "total_bytes": collection.total_bytes,
-                "received_chunk_count": 1 if received else 0,
-                "received_bytes": chunk.declared_size_bytes if received else 0,
-                "objects": [
-                    {
-                        "object_id": str(item.object_id),
-                        "kind": item.kind,
-                        "sha256": item.sha256,
-                        "chunk_count": item.chunk_count,
-                        "received_chunk_count": 1 if received else 0,
-                        "size_bytes": item.size_bytes,
-                        "received_bytes": (
-                            chunk.declared_size_bytes if received else 0
-                        ),
-                        "missing_ranges": [] if received else [{"start": 0, "end": 0}],
-                    }
-                ],
-                "receipt": cls._receipt(collection, item),
+                "received_chunk_count": received_chunk_count,
+                "received_bytes": received_bytes,
+                "objects": objects,
+                "receipt": cls._receipt(collection, inventory),
             }
         )
 
@@ -1805,41 +1846,82 @@ class RawCollectionStorage:
         collection_id: uuid.UUID,
         *,
         for_update: bool,
-    ) -> tuple[RawCollection, RawCollectionObject, RawCollectionChunk] | None:
-        statement = (
-            select(RawCollection, RawCollectionObject, RawCollectionChunk)
-            .join(
-                RawCollectionObject,
-                and_(
-                    RawCollectionObject.collection_id
-                    == RawCollection.collection_id,
-                    RawCollectionObject.manifest_sha256
-                    == RawCollection.manifest_sha256,
-                    RawCollectionObject.consent_receipt_sha256
-                    == RawCollection.consent_receipt_sha256,
-                ),
-            )
-            .join(
-                RawCollectionChunk,
-                and_(
-                    RawCollectionChunk.collection_id
-                    == RawCollectionObject.collection_id,
-                    RawCollectionChunk.object_id
-                    == RawCollectionObject.object_id,
-                    RawCollectionChunk.manifest_sha256
-                    == RawCollectionObject.manifest_sha256,
-                    RawCollectionChunk.consent_receipt_sha256
-                    == RawCollectionObject.consent_receipt_sha256,
-                ),
-            )
-            .where(RawCollection.collection_id == collection_id)
+    ) -> tuple[
+        RawCollection,
+        list[tuple[RawCollectionObject, list[RawCollectionChunk]]],
+    ] | None:
+        statement = select(RawCollection).where(
+            RawCollection.collection_id == collection_id
         )
         if for_update:
             statement = statement.with_for_update(of=RawCollection)
-        row = db.execute(statement).one_or_none()
-        if row is None:
+        collection = db.scalar(statement)
+        if collection is None:
             return None
-        return row[0], row[1], row[2]
+        objects = list(
+            db.scalars(
+                select(RawCollectionObject)
+                .where(
+                    RawCollectionObject.collection_id == collection_id,
+                    RawCollectionObject.manifest_sha256
+                    == collection.manifest_sha256,
+                    RawCollectionObject.consent_receipt_sha256
+                    == collection.consent_receipt_sha256,
+                )
+                .order_by(RawCollectionObject.object_id)
+            ).all()
+        )
+        chunks = list(
+            db.scalars(
+                select(RawCollectionChunk)
+                .where(
+                    RawCollectionChunk.collection_id == collection_id,
+                    RawCollectionChunk.manifest_sha256
+                    == collection.manifest_sha256,
+                    RawCollectionChunk.consent_receipt_sha256
+                    == collection.consent_receipt_sha256,
+                )
+                .order_by(
+                    RawCollectionChunk.object_id,
+                    RawCollectionChunk.chunk_index,
+                )
+            ).all()
+        )
+        chunks_by_object: dict[uuid.UUID, list[RawCollectionChunk]] = {}
+        for chunk in chunks:
+            chunks_by_object.setdefault(chunk.object_id, []).append(chunk)
+        inventory: list[
+            tuple[RawCollectionObject, list[RawCollectionChunk]]
+        ] = []
+        observed_chunks = 0
+        observed_bytes = 0
+        for item in objects:
+            item_chunks = chunks_by_object.pop(item.object_id, [])
+            if (
+                len(item_chunks) != item.chunk_count
+                or tuple(chunk.chunk_index for chunk in item_chunks)
+                != tuple(range(item.chunk_count))
+                or sum(chunk.declared_size_bytes for chunk in item_chunks)
+                != item.size_bytes
+            ):
+                raise _storage_error(
+                    "raw_collection_inventory_ambiguous",
+                    "The raw collection inventory is inconsistent.",
+                )
+            inventory.append((item, item_chunks))
+            observed_chunks += len(item_chunks)
+            observed_bytes += item.size_bytes
+        if (
+            chunks_by_object
+            or len(inventory) != collection.object_count
+            or observed_chunks != collection.chunk_count
+            or observed_bytes != collection.total_bytes
+        ):
+            raise _storage_error(
+                "raw_collection_inventory_ambiguous",
+                "The raw collection inventory is inconsistent.",
+            )
+        return collection, inventory
 
     @staticmethod
     def _owned(
@@ -1862,7 +1944,6 @@ class RawCollectionStorage:
         admission: RawCollectionAdmission,
         manifest: RawCollectionManifestV1,
     ) -> tuple[RawCollectionStatusV1, bool]:
-        self._supported_manifest(manifest)
         collection_id = uuid.UUID(manifest.collection_id)
         lock_raw_storage_write_transaction(db)
         lock_raw_capacity_reservation_transaction(db)
@@ -1879,7 +1960,7 @@ class RawCollectionStorage:
             for_update=True,
         )
         if existing is not None:
-            collection, item, chunk = existing
+            collection, inventory = existing
             if not self._owned(
                 collection,
                 privacy_subject=admission.privacy_subject_hmac,
@@ -1897,15 +1978,15 @@ class RawCollectionStorage:
                     ),
                     status_code=409,
                 )
-            if chunk.storage_name is not None:
-                self._verify_persisted_chunk(collection, item, chunk)
-            status = self._status(collection, item, chunk)
+            for item, chunks in inventory:
+                for chunk in chunks:
+                    if chunk.storage_name is not None:
+                        self._verify_persisted_chunk(collection, item, chunk)
+            status = self._status(collection, inventory)
             db.commit()
             return status, False
 
         self._assert_new_collection_capacity(db, manifest)
-        declared_object = manifest.objects[0]
-        declared_chunk = declared_object.chunks[0]
         collection = RawCollection(
             collection_id=collection_id,
             privacy_subject_hmac=admission.privacy_subject_hmac,
@@ -1924,34 +2005,48 @@ class RawCollectionStorage:
             total_bytes=manifest.total_bytes,
             state="MANIFEST_ACCEPTED",
         )
-        item = RawCollectionObject(
-            collection_id=collection_id,
-            object_id=uuid.UUID(declared_object.object_id),
-            manifest_sha256=manifest.manifest_sha256,
-            consent_receipt_sha256=admission.consent_receipt_sha256,
-            kind=declared_object.kind,
-            content_type=declared_object.content_type,
-            size_bytes=declared_object.size_bytes,
-            sha256=declared_object.sha256,
-            chunk_count=len(declared_object.chunks),
-        )
-        chunk = RawCollectionChunk(
-            collection_id=collection_id,
-            object_id=item.object_id,
-            chunk_index=declared_chunk.index,
-            manifest_sha256=manifest.manifest_sha256,
-            consent_receipt_sha256=admission.consent_receipt_sha256,
-            declared_size_bytes=declared_chunk.size_bytes,
-            declared_sha256=declared_chunk.sha256,
-        )
+        inventory: list[
+            tuple[RawCollectionObject, list[RawCollectionChunk]]
+        ] = []
+        for declared_object in manifest.objects:
+            item = RawCollectionObject(
+                collection_id=collection_id,
+                object_id=uuid.UUID(declared_object.object_id),
+                manifest_sha256=manifest.manifest_sha256,
+                consent_receipt_sha256=admission.consent_receipt_sha256,
+                kind=declared_object.kind,
+                content_type=declared_object.content_type,
+                size_bytes=declared_object.size_bytes,
+                sha256=declared_object.sha256,
+                chunk_count=len(declared_object.chunks),
+            )
+            chunks = [
+                RawCollectionChunk(
+                    collection_id=collection_id,
+                    object_id=item.object_id,
+                    chunk_index=declared_chunk.index,
+                    manifest_sha256=manifest.manifest_sha256,
+                    consent_receipt_sha256=admission.consent_receipt_sha256,
+                    declared_size_bytes=declared_chunk.size_bytes,
+                    declared_sha256=declared_chunk.sha256,
+                )
+                for declared_chunk in declared_object.chunks
+            ]
+            inventory.append((item, chunks))
         try:
             # No ORM relationships are declared for these write-only rows, so
             # make the composite-FK insert order explicit inside one transaction.
             db.add(collection)
             db.flush()
-            db.add(item)
+            db.add_all([item for item, _chunks in inventory])
             db.flush()
-            db.add(chunk)
+            db.add_all(
+                [
+                    chunk
+                    for _item, chunks in inventory
+                    for chunk in chunks
+                ]
+            )
             db.commit()
         except SQLAlchemyError as exc:
             self._rollback(db)
@@ -1959,7 +2054,7 @@ class RawCollectionStorage:
                 "raw_manifest_storage_unavailable",
                 "Raw manifest storage is temporarily unavailable.",
             ) from exc
-        status = self._status(collection, item, chunk)
+        status = self._status(collection, inventory)
         return status, True
 
     @staticmethod
@@ -1987,7 +2082,7 @@ class RawCollectionStorage:
         collection: RawCollection,
         item: RawCollectionObject,
         chunk: RawCollectionChunk,
-    ) -> None:
+    ) -> bytes:
         if (
             self._root is None
             or chunk.storage_name is None
@@ -2031,7 +2126,7 @@ class RawCollectionStorage:
                     "raw chunk envelope metadata differs"
                 )
             master_key = self._key_manager.decryption_key(chunk.key_id)
-            decrypt_raw_collection_chunk(
+            decrypted = decrypt_raw_collection_chunk(
                 envelope,
                 expected_binding=binding,
                 master_key=master_key,
@@ -2041,6 +2136,7 @@ class RawCollectionStorage:
                 "raw_chunk_persistence_ambiguous",
                 "Raw chunk persistence metadata does not match encrypted storage.",
             ) from exc
+        return decrypted.content
 
     def put_chunk(
         self,
@@ -2066,13 +2162,22 @@ class RawCollectionStorage:
         )
         if rows is None:
             raise _not_found()
-        collection, item, chunk = rows
+        collection, inventory = rows
         if not self._owned(
             collection,
             privacy_subject=admission.privacy_subject_hmac,
             account_generation=admission.account_generation,
         ):
             raise _not_found()
+        target = next(
+            (
+                (item, chunk)
+                for item, chunks in inventory
+                for chunk in chunks
+                if item.object_id == object_uuid and chunk.chunk_index == index
+            ),
+            None,
+        )
         if (
             collection.purpose != admission.purpose
             or collection.walk_id != uuid.UUID(walk_id)
@@ -2084,10 +2189,10 @@ class RawCollectionStorage:
                 collection.consent_receipt_sha256,
                 admission.consent_receipt_sha256,
             )
-            or item.object_id != object_uuid
-            or chunk.chunk_index != index
+            or target is None
         ):
             raise _not_found()
+        item, chunk = target
         if (
             len(content) != chunk.declared_size_bytes
             or not hmac.compare_digest(
@@ -2103,6 +2208,7 @@ class RawCollectionStorage:
         if chunk.storage_name is not None:
             self._verify_persisted_chunk(collection, item, chunk)
             assert chunk.persisted_at is not None
+            state = self._status(collection, inventory).state
             ack = RawCollectionChunkAckV1.model_validate(
                 {
                     "schema_version": "walksafe.raw-collection-chunk-ack.v1",
@@ -2111,7 +2217,7 @@ class RawCollectionStorage:
                     "index": chunk.chunk_index,
                     "size_bytes": chunk.declared_size_bytes,
                     "sha256": chunk.declared_sha256,
-                    "state": collection.state,
+                    "state": state,
                     "stored_at": _canonical_time(chunk.persisted_at),
                 }
             )
@@ -2182,7 +2288,18 @@ class RawCollectionStorage:
         chunk.envelope_sha256 = persisted.envelope_sha256
         chunk.envelope_size = persisted.envelope_size
         chunk.persisted_at = persisted_at
-        collection.state = "READY_TO_COMMIT"
+        received_chunk_count = sum(
+            candidate.storage_name is not None
+            for _item, chunks in inventory
+            for candidate in chunks
+        )
+        if received_chunk_count == collection.chunk_count:
+            collection.state = "READY_TO_COMMIT"
+        ack_state = (
+            "READY_TO_COMMIT"
+            if received_chunk_count == collection.chunk_count
+            else "RECEIVING"
+        )
         try:
             db.commit()
         except SQLAlchemyError as exc:
@@ -2207,7 +2324,7 @@ class RawCollectionStorage:
                     "index": index,
                     "size_bytes": len(content),
                     "sha256": content_sha256,
-                    "state": "READY_TO_COMMIT",
+                    "state": ack_state,
                     "stored_at": _canonical_time(persisted_at),
                 }
             ),
@@ -2237,7 +2354,7 @@ class RawCollectionStorage:
         )
         if rows is None:
             raise _not_found()
-        collection, item, chunk = rows
+        collection, inventory = rows
         if (
             not self._owned(
                 collection,
@@ -2252,9 +2369,11 @@ class RawCollectionStorage:
             )
         ):
             raise _not_found()
-        if chunk.storage_name is not None:
-            self._verify_persisted_chunk(collection, item, chunk)
-        return self._status(collection, item, chunk)
+        for item, chunks in inventory:
+            for chunk in chunks:
+                if chunk.storage_name is not None:
+                    self._verify_persisted_chunk(collection, item, chunk)
+        return self._status(collection, inventory)
 
     def commit(
         self,
@@ -2271,7 +2390,7 @@ class RawCollectionStorage:
         )
         if rows is None:
             raise _not_found()
-        collection, item, chunk = rows
+        collection, inventory = rows
         if (
             not self._owned(
                 collection,
@@ -2301,8 +2420,10 @@ class RawCollectionStorage:
                 status_code=409,
             )
         if collection.state in {"COMMITTED", "QUARANTINED"}:
-            self._verify_persisted_chunk(collection, item, chunk)
-            receipt = self._receipt(collection, item)
+            for item, chunks in inventory:
+                for chunk in chunks:
+                    self._verify_persisted_chunk(collection, item, chunk)
+            receipt = self._receipt(collection, inventory)
             assert receipt is not None
             try:
                 db.commit()
@@ -2313,7 +2434,7 @@ class RawCollectionStorage:
                     "Raw collection commit persistence is temporarily ambiguous.",
                 ) from exc
             return receipt
-        if collection.state == "MANIFEST_ACCEPTED":
+        if collection.state in {"MANIFEST_ACCEPTED", "RECEIVING"}:
             raise RawCollectionStorageError(
                 code="raw_collection_incomplete",
                 message="The raw collection still has missing chunks.",
@@ -2324,23 +2445,28 @@ class RawCollectionStorage:
                 "raw_collection_state_ambiguous",
                 "The raw collection cannot be committed from its current state.",
             )
-        if (
-            chunk.storage_name is None
-            or item.chunk_count != 1
-            or item.size_bytes != chunk.declared_size_bytes
-            or not hmac.compare_digest(item.sha256, chunk.declared_sha256)
-        ):
-            raise _storage_error(
-                "raw_collection_inventory_ambiguous",
-                "The raw collection inventory is inconsistent.",
-            )
-        self._verify_persisted_chunk(collection, item, chunk)
+        for item, chunks in inventory:
+            digest = hashlib.sha256()
+            for chunk in chunks:
+                if chunk.storage_name is None:
+                    raise _storage_error(
+                        "raw_collection_inventory_ambiguous",
+                        "The raw collection inventory is inconsistent.",
+                    )
+                digest.update(
+                    self._verify_persisted_chunk(collection, item, chunk)
+                )
+            if not hmac.compare_digest(digest.hexdigest(), item.sha256):
+                raise _storage_error(
+                    "raw_collection_inventory_ambiguous",
+                    "The raw collection inventory is inconsistent.",
+                )
         committed_at = datetime.now(UTC).replace(microsecond=0)
         if collection.lifecycle_version == 1:
             retention_expires_at = committed_at + timedelta(days=180)
             receipt_payload = self._receipt_payload_v1(
                 collection,
-                item,
+                inventory,
                 committed_at=committed_at,
                 retention_expires_at=retention_expires_at,
             )
@@ -2358,7 +2484,7 @@ class RawCollectionStorage:
             quarantine_expires_at = committed_at + timedelta(days=14)
             receipt_payload = self._receipt_payload_v2(
                 collection,
-                item,
+                inventory,
                 committed_at=committed_at,
                 quarantine_expires_at=quarantine_expires_at,
             )

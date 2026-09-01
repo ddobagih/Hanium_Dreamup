@@ -12,14 +12,7 @@ import uuid
 import pytest
 
 import backend.app.services.raw_collection_storage as raw_storage
-from backend.app.schemas import (
-    RawCollectionManifestV1,
-    raw_collection_manifest_sha256,
-)
-from backend.app.services.raw_collection_ingest import (
-    RawCollectionAdmission,
-    RawCollectionStorageError,
-)
+from backend.app.services.raw_collection_ingest import RawCollectionStorageError
 from backend.app.services.raw_collection_storage import (
     RawCollectionStorage,
     persist_raw_chunk_envelope,
@@ -33,8 +26,6 @@ from backend.app.services.raw_collection_storage import (
 COLLECTION_ID = uuid.UUID("123e4567-e89b-42d3-a456-426614174000")
 OBJECT_ID = uuid.UUID("123e4567-e89b-42d3-a456-426614174001")
 SECOND_OBJECT_ID = uuid.UUID("123e4567-e89b-42d3-a456-426614174002")
-WALK_ID = uuid.UUID("123e4567-e89b-42d3-a456-426614174003")
-SEGMENT_ID = uuid.UUID("123e4567-e89b-42d3-a456-426614174004")
 
 
 @pytest.mark.parametrize("block_size", (4096, 6000))
@@ -64,40 +55,6 @@ def _settings(root: Path | None) -> SimpleNamespace:
         raw_object_dir=root,
         walksafe_environment="test",
     )
-
-
-def _manifest(objects: list[tuple[uuid.UUID, bytes]]) -> RawCollectionManifestV1:
-    inventory = []
-    for object_id, content in objects:
-        digest = hashlib.sha256(content).hexdigest()
-        inventory.append(
-            {
-                "object_id": str(object_id),
-                "kind": "SENSOR",
-                "content_type": "application/octet-stream",
-                "size_bytes": len(content),
-                "sha256": digest,
-                "chunks": [
-                    {"index": 0, "size_bytes": len(content), "sha256": digest}
-                ],
-            }
-        )
-    value: dict[str, object] = {
-        "schema_version": "walksafe.raw-collection-manifest.v1",
-        "collection_id": str(COLLECTION_ID),
-        "walk_id": str(WALK_ID),
-        "segment_id": str(SEGMENT_ID),
-        "purpose": "GENERAL_RAW",
-        "captured_started_at": "2026-08-29T00:00:00Z",
-        "captured_ended_at": "2026-08-29T00:00:05Z",
-        "consent_receipt_sha256": "a" * 64,
-        "object_count": len(inventory),
-        "chunk_count": len(inventory),
-        "total_bytes": sum(len(content) for _object_id, content in objects),
-        "objects": inventory,
-    }
-    value["manifest_sha256"] = raw_collection_manifest_sha256(value)
-    return RawCollectionManifestV1.model_validate(value)
 
 
 def test_local_raw_root_is_created_private_and_revalidated(tmp_path: Path) -> None:
@@ -231,47 +188,73 @@ def test_fractional_persisted_receipt_time_is_fail_closed() -> None:
     )
 
     with pytest.raises(RawCollectionStorageError) as ambiguous:
-        RawCollectionStorage._receipt(collection, item)  # type: ignore[arg-type]
+        RawCollectionStorage._receipt(  # type: ignore[arg-type]
+            collection,
+            [(item, [])],
+        )
 
     assert ambiguous.value.code == "raw_receipt_persistence_ambiguous"
     assert ambiguous.value.status_code == 503
 
 
-def test_b1b_rejects_larger_valid_manifest_before_database_or_file_access() -> None:
-    class FailIfUsedDatabase:
-        def execute(self, *_args, **_kwargs):
-            raise AssertionError("unsupported manifest reached the database")
-
-    manifest = _manifest(
-        [
-            (OBJECT_ID, b"first synthetic chunk"),
-            (SECOND_OBJECT_ID, b"second synthetic chunk"),
-        ]
-    )
-    admission = RawCollectionAdmission(
-        actor_id="synthetic.raw.actor",
-        account_generation=1,
-        privacy_subject_hmac="b" * 64,
+def test_multi_inventory_status_projects_compact_missing_ranges() -> None:
+    collection = SimpleNamespace(
+        collection_id=COLLECTION_ID,
+        manifest_sha256="a" * 64,
         purpose="GENERAL_RAW",
-        consent_receipt_sha256="a" * 64,
+        lifecycle_version=2,
+        object_count=2,
+        chunk_count=3,
+        total_bytes=9,
+        state="MANIFEST_ACCEPTED",
+        committed_at=None,
+        retention_expires_at=None,
+        quarantine_expires_at=None,
+        receipt_sha256=None,
     )
-    storage = RawCollectionStorage(
-        raw_object_dir=None,
-        privacy_hmac_secret="synthetic-privacy-secret-for-unit-tests",
-        key_manager=object(),  # type: ignore[arg-type]
+    first = SimpleNamespace(
+        object_id=OBJECT_ID,
+        kind="SENSOR",
+        size_bytes=5,
+        sha256="b" * 64,
+        chunk_count=2,
+    )
+    second = SimpleNamespace(
+        object_id=SECOND_OBJECT_ID,
+        kind="PERFORMANCE",
+        size_bytes=4,
+        sha256="c" * 64,
+        chunk_count=1,
+    )
+    inventory = [
+        (
+            first,
+            [
+                SimpleNamespace(declared_size_bytes=2, storage_name="stored"),
+                SimpleNamespace(declared_size_bytes=3, storage_name=None),
+            ],
+        ),
+        (
+            second,
+            [SimpleNamespace(declared_size_bytes=4, storage_name=None)],
+        ),
+    ]
+
+    status = RawCollectionStorage._status(  # type: ignore[arg-type]
+        collection,
+        inventory,
     )
 
-    with pytest.raises(
-        RawCollectionStorageError,
-        match="exactly one raw object",
-    ) as rejected:
-        storage.put_manifest(  # type: ignore[arg-type]
-            FailIfUsedDatabase(),
-            admission,
-            manifest,
-        )
-
-    assert rejected.value.status_code == 503
+    assert status.state == "RECEIVING"
+    assert status.received_chunk_count == 1
+    assert status.received_bytes == 2
+    assert [
+        [item.model_dump() for item in status_object.missing_ranges]
+        for status_object in status.objects
+    ] == [
+        [{"start": 1, "end": 1}],
+        [{"start": 0, "end": 0}],
+    ]
 
 
 def test_b1b_migration_adds_and_removes_only_the_raw_rate_group(

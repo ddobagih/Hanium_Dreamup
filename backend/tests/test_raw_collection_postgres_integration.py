@@ -298,25 +298,37 @@ def _manifest(
     return RawCollectionManifestV1.model_validate(value)
 
 
-def _unsupported_manifest(
+def _multi_manifest(
     *,
     admission: RawCollectionAdmission,
-) -> RawCollectionManifestV1:
+) -> tuple[RawCollectionManifestV1, dict[tuple[str, int], bytes]]:
     object_ids = sorted((uuid.uuid4(), uuid.uuid4()), key=str)
-    contents = (b"first", b"second")
+    contents = ((b"first-", b"object"), (b"second",))
     objects: list[dict[str, object]] = []
-    for object_id, content in zip(object_ids, contents, strict=True):
-        digest = hashlib.sha256(content).hexdigest()
+    chunks_by_key: dict[tuple[str, int], bytes] = {}
+    for object_id, object_chunks in zip(object_ids, contents, strict=True):
+        content = b"".join(object_chunks)
         objects.append(
             {
                 "object_id": str(object_id),
                 "kind": "SENSOR",
                 "content_type": "application/octet-stream",
                 "size_bytes": len(content),
-                "sha256": digest,
+                "sha256": hashlib.sha256(content).hexdigest(),
                 "chunks": [
-                    {"index": 0, "size_bytes": len(content), "sha256": digest}
+                    {
+                        "index": index,
+                        "size_bytes": len(chunk),
+                        "sha256": hashlib.sha256(chunk).hexdigest(),
+                    }
+                    for index, chunk in enumerate(object_chunks)
                 ],
+            }
+        )
+        chunks_by_key.update(
+            {
+                (str(object_id), index): chunk
+                for index, chunk in enumerate(object_chunks)
             }
         )
     value: dict[str, object] = {
@@ -329,12 +341,14 @@ def _unsupported_manifest(
         "captured_ended_at": "2026-08-29T00:00:05Z",
         "consent_receipt_sha256": admission.consent_receipt_sha256,
         "object_count": 2,
-        "chunk_count": 2,
-        "total_bytes": sum(len(content) for content in contents),
+        "chunk_count": 3,
+        "total_bytes": sum(
+            len(chunk) for object_chunks in contents for chunk in object_chunks
+        ),
         "objects": objects,
     }
     value["manifest_sha256"] = raw_collection_manifest_sha256(value)
-    return RawCollectionManifestV1.model_validate(value)
+    return RawCollectionManifestV1.model_validate(value), chunks_by_key
 
 
 class _MutableCapacityState:
@@ -917,6 +931,179 @@ def test_raw_b1b_schema_acl_rate_group_and_state_guards(tmp_path: Path) -> None:
         engine.dispose()
 
 
+def test_raw_multi_object_chunk_manifest_status_commit_and_replay(
+    tmp_path: Path,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    actor_id = f"raw.multi.{uuid.uuid4().hex}"
+    admission = _record_admission(SessionFactory, actor_id=actor_id)
+    manifest, chunks_by_key = _multi_manifest(admission=admission)
+    root = tmp_path / "raw-multi-objects"
+    storage = _storage(root)
+    try:
+        with _runtime_session() as db:
+            accepted, created = storage.put_manifest(db, admission, manifest)
+        assert created is True
+        assert accepted.state == "MANIFEST_ACCEPTED"
+        assert accepted.object_count == 2
+        assert accepted.chunk_count == 3
+        assert [
+            [item.model_dump() for item in status_object.missing_ranges]
+            for status_object in accepted.objects
+        ] == [
+            [{"start": 0, "end": 1}],
+            [{"start": 0, "end": 0}],
+        ]
+
+        with _runtime_session() as db:
+            replayed, replay_created = storage.put_manifest(db, admission, manifest)
+        assert replay_created is False
+        assert replayed == accepted
+
+        first_object = manifest.objects[0]
+        first_content = chunks_by_key[(first_object.object_id, 0)]
+        with _runtime_session() as db:
+            first_ack, first_created = storage.put_chunk(
+                db,
+                admission,
+                collection_id=manifest.collection_id,
+                object_id=first_object.object_id,
+                index=0,
+                walk_id=manifest.walk_id,
+                manifest_sha256=manifest.manifest_sha256,
+                content=first_content,
+                content_sha256=hashlib.sha256(first_content).hexdigest(),
+            )
+        assert first_created is True
+        assert first_ack.state == "RECEIVING"
+        with SessionFactory() as db:
+            receiving = storage.get_status(
+                db,
+                actor_id=actor_id,
+                account_generation=1,
+                collection_id=manifest.collection_id,
+                purpose=manifest.purpose,
+                walk_id=manifest.walk_id,
+                manifest_sha256=manifest.manifest_sha256,
+            )
+        assert receiving.state == "RECEIVING"
+        assert receiving.received_chunk_count == 1
+        assert [
+            [item.model_dump() for item in status_object.missing_ranges]
+            for status_object in receiving.objects
+        ] == [
+            [{"start": 1, "end": 1}],
+            [{"start": 0, "end": 0}],
+        ]
+
+        commit = RawCollectionCommitV1.model_validate(
+            {
+                "schema_version": "walksafe.raw-collection-commit.v1",
+                "collection_id": manifest.collection_id,
+                "manifest_sha256": manifest.manifest_sha256,
+                "object_count": manifest.object_count,
+                "chunk_count": manifest.chunk_count,
+                "total_bytes": manifest.total_bytes,
+            }
+        )
+        with _runtime_session() as db, pytest.raises(
+            RawCollectionStorageError,
+        ) as incomplete:
+            storage.commit(db, admission, commit, walk_id=manifest.walk_id)
+        assert incomplete.value.code == "raw_collection_incomplete"
+        assert incomplete.value.status_code == 409
+
+        remaining = [
+            (item.object_id, chunk.index)
+            for item in manifest.objects
+            for chunk in item.chunks
+            if (item.object_id, chunk.index) != (first_object.object_id, 0)
+        ]
+        for ordinal, (object_id, index) in enumerate(remaining):
+            content = chunks_by_key[(object_id, index)]
+            with _runtime_session() as db:
+                ack, chunk_created = storage.put_chunk(
+                    db,
+                    admission,
+                    collection_id=manifest.collection_id,
+                    object_id=object_id,
+                    index=index,
+                    walk_id=manifest.walk_id,
+                    manifest_sha256=manifest.manifest_sha256,
+                    content=content,
+                    content_sha256=hashlib.sha256(content).hexdigest(),
+                )
+            assert chunk_created is True
+            assert ack.state == (
+                "READY_TO_COMMIT" if ordinal == len(remaining) - 1 else "RECEIVING"
+            )
+            with SessionFactory() as db:
+                upload_status = storage.get_status(
+                    db,
+                    actor_id=actor_id,
+                    account_generation=1,
+                    collection_id=manifest.collection_id,
+                    purpose=manifest.purpose,
+                    walk_id=manifest.walk_id,
+                    manifest_sha256=manifest.manifest_sha256,
+                )
+            assert upload_status.state == ack.state
+            assert upload_status.received_chunk_count == ordinal + 2
+
+        last_object_id, last_index = remaining[-1]
+        last_content = chunks_by_key[(last_object_id, last_index)]
+        with _runtime_session() as db:
+            replay_ack, replay_chunk_created = storage.put_chunk(
+                db,
+                admission,
+                collection_id=manifest.collection_id,
+                object_id=last_object_id,
+                index=last_index,
+                walk_id=manifest.walk_id,
+                manifest_sha256=manifest.manifest_sha256,
+                content=last_content,
+                content_sha256=hashlib.sha256(last_content).hexdigest(),
+            )
+        assert replay_chunk_created is False
+        assert replay_ack.state == "READY_TO_COMMIT"
+
+        with SessionFactory() as db:
+            ready = storage.get_status(
+                db,
+                actor_id=actor_id,
+                account_generation=1,
+                collection_id=manifest.collection_id,
+                purpose=manifest.purpose,
+                walk_id=manifest.walk_id,
+                manifest_sha256=manifest.manifest_sha256,
+            )
+        assert ready.state == "READY_TO_COMMIT"
+        assert ready.received_chunk_count == 3
+        assert ready.received_bytes == manifest.total_bytes
+        assert all(not item.missing_ranges for item in ready.objects)
+
+        with _runtime_session() as db:
+            receipt = storage.commit(db, admission, commit, walk_id=manifest.walk_id)
+        assert receipt.object_count == 2
+        assert receipt.chunk_count == 3
+        assert [item.object_id for item in receipt.objects] == [
+            item.object_id for item in manifest.objects
+        ]
+        assert [item.chunk_count for item in receipt.objects] == [2, 1]
+        assert receipt.receipt_sha256 == raw_collection_receipt_v2_sha256(receipt)
+
+        with _runtime_session() as db:
+            replayed_receipt = storage.commit(
+                db,
+                admission,
+                commit,
+                walk_id=manifest.walk_id,
+            )
+        assert replayed_receipt == receipt
+    finally:
+        engine.dispose()
+
+
 def test_raw_b1b_manifest_chunk_replay_hiding_and_encrypted_file(
     tmp_path: Path,
 ) -> None:
@@ -969,22 +1156,6 @@ def test_raw_b1b_manifest_chunk_replay_hiding_and_encrypted_file(
         ) as hidden_manifest:
             storage.put_manifest(db, other, manifest)
         assert hidden_manifest.value.status_code == 404
-
-        unsupported = _unsupported_manifest(admission=admission)
-        with SessionFactory() as db, pytest.raises(
-            RawCollectionStorageError,
-            match="exactly one raw object",
-        ) as unsupported_shape:
-            storage.put_manifest(db, admission, unsupported)
-        assert unsupported_shape.value.status_code == 503
-        with SessionFactory() as db:
-            assert db.scalar(
-                select(func.count()).select_from(RawCollection).where(
-                    RawCollection.collection_id
-                    == uuid.UUID(unsupported.collection_id)
-                )
-            ) == 0
-        assert list(root.iterdir()) == []
 
         with SessionFactory() as db, pytest.raises(
             RawCollectionStorageError,
@@ -1456,7 +1627,7 @@ def test_raw_b1c_concurrent_commit_returns_one_immutable_receipt(
     backend_pids: dict[int, int] = {}
     verify_persisted_chunk = storage._verify_persisted_chunk
 
-    def controlled_verification(collection, item, chunk) -> None:
+    def controlled_verification(collection, item, chunk) -> bytes:
         nonlocal verification_count
         with verification_lock:
             verification_count += 1
@@ -1464,7 +1635,7 @@ def test_raw_b1c_concurrent_commit_returns_one_immutable_receipt(
         if current == 1:
             first_verifying.set()
             assert release_first.wait(timeout=5)
-        verify_persisted_chunk(collection, item, chunk)
+        return verify_persisted_chunk(collection, item, chunk)
 
     monkeypatch.setattr(storage, "_verify_persisted_chunk", controlled_verification)
 

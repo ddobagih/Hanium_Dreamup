@@ -31,6 +31,7 @@ from backend.app.services.raw_collection_storage import (
     lock_raw_storage_write_transaction,
     pending_raw_journal_directory,
     persist_raw_chunk_envelope,
+    raw_chunk_commit_state,
     raw_chunk_storage_name,
     reconcile_pending_raw_chunk_writes,
     stage_raw_chunk_write,
@@ -441,6 +442,26 @@ def test_raw_inventory_accepts_exact_mapping_and_rejects_orphans(
             root,
             key_manager=_StaticKeyManager(),  # type: ignore[arg-type]
         )
+
+
+def test_raw_chunk_commit_state_accepts_persisted_partial_multi_inventory(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "raw-objects"
+    pending, encrypted = _stage(root)
+    _persist(root, pending, encrypted)
+    collection, item, chunk = _database_rows(pending)
+    collection.state = "MANIFEST_ACCEPTED"
+    collection.object_count = 2
+    collection.chunk_count = 3
+    collection.total_bytes += 10
+    item.chunk_count = 2
+    item.size_bytes += 5
+    item.sha256 = "d" * 64
+
+    state = raw_chunk_commit_state(collection, item, chunk)
+
+    assert state == RawChunkCommitState(True, pending.metadata)
 
 
 def test_raw_inventory_rejects_database_only_persisted_chunk(tmp_path: Path) -> None:
