@@ -57,7 +57,7 @@ Android 사용자 앱과 별도 Android 관리자 앱에 FastAPI 및 PostgreSQL/
 5. 설치한 systemd unit의 실제 `FragmentPath`가 root 소유이고 group/other 쓰기 불가인지 확인하고 `systemctl daemon-reload`를 실행한다. Backend는 migration만 자동 요구하며 issuer bind를 자동 실행하지 않는다는 점을 확인한다.
 6. 관리자 ingress에서 신규 요청을 차단하고 진행 중 요청을 배출한 다음 `walksafe-backend.service`를 명시적으로 정지한다. `walksafe-admin-issuer-bind.service`의 `Conflicts=`에 정지를 맡기지 않는다.
 7. 과거 `/etc/walksafe/backend.env`를 API가 읽었던 배치라면 거기에 있던 migration credential을 재사용하지 않는다. API를 정지한 상태에서 기존 credential·세션을 폐기 또는 회전하고, 새 maintenance 전용 credential은 `backend-migration.env`에만 넣는다.
-8. `walksafe-backend-migrate.service`를 수동 실행해 성공과 예상 Alembic head `202608300005`를 확인한다. migration 완료부터 issuer bind 성공 전까지 새 backend의 startup/readiness가 fail-closed하는 것이 정상이며 API를 시작하지 않는다. migration이 실패해도 API와 ingress를 정지한 채 원인을 해결하며 구 backend를 새 schema 위에서 시작하지 않는다.
+8. `walksafe-backend-migrate.service`를 수동 실행해 성공과 예상 Alembic head `202608300006`를 확인한다. migration 완료부터 issuer bind 성공 전까지 새 backend의 startup/readiness가 fail-closed하는 것이 정상이며 API를 시작하지 않는다. migration이 실패해도 API와 ingress를 정지한 채 원인을 해결하며 구 backend를 새 schema 위에서 시작하지 않는다.
 9. `walksafe-admin-issuer-bind.service`를 `walksafe-issuer-bind` 비권한 계정으로 수동 실행해 `BOUND`를 확인한다. 이 oneshot은 enable하지 않는다. migration 성공만으로 bind가 실행됐다고 가정하지 않는다.
 10. 결속에 사용한 migration credential을 다시 회전하거나 더 이상 필요 없으면 폐기하고 DB session을 무효화한다. 새 값은 계속 migration 환경에만 둔다. 기존 `/etc/walksafe/backend.env`의 정확한 대상·소유권·파일 종류를 확인한 뒤 삭제하며, 읽을 수 있는 백업이나 다른 서비스 환경으로 옮기지 않는다. 보존할 전환 증거에는 비밀값 대신 receipt와 지문만 남긴다.
 11. 아래 점검에서 파일·계정 분리가 모두 확인된 뒤에만 `walksafe-backend.service`를 시작한다. issuer 원본은 API가 계속 사용하므로 유지한다.
