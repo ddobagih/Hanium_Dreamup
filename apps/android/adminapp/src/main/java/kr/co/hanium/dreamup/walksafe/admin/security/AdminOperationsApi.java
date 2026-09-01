@@ -15,6 +15,12 @@ public interface AdminOperationsApi {
         public HistoryNotFoundException() { super("administrator history resource was not found"); }
     }
 
+    final class MutationConflictException extends IOException {
+        public MutationConflictException() {
+            super("administrator mutation conflicted with current server state");
+        }
+    }
+
     enum ResultKind {
         MUTATION,
         REVIEW_HISTORY,
@@ -43,6 +49,7 @@ public interface AdminOperationsApi {
     final class Result {
         private final String correlationId;
         private final int statusCode;
+        private final String mutationId;
         private final ResultKind kind;
         private final String reportId;
         private final long snapshotRevision;
@@ -52,8 +59,12 @@ public interface AdminOperationsApi {
         private final List<DeliveryHistoryItem> deliveryHistory;
 
         public Result(String correlationId, int statusCode) {
+            this(correlationId, statusCode, null);
+        }
+
+        public Result(String correlationId, int statusCode, String mutationId) {
             this(
-                correlationId, statusCode, ResultKind.MUTATION, null, 0L, 0L, null,
+                correlationId, statusCode, mutationId, ResultKind.MUTATION, null, 0L, 0L, null,
                 AdminJava8Collections.list(), AdminJava8Collections.list()
             );
         }
@@ -61,6 +72,7 @@ public interface AdminOperationsApi {
         private Result(
             String correlationId,
             int statusCode,
+            String mutationId,
             ResultKind kind,
             String reportId,
             long snapshotRevision,
@@ -71,6 +83,7 @@ public interface AdminOperationsApi {
         ) {
             this.correlationId = correlationId;
             this.statusCode = statusCode;
+            this.mutationId = mutationId;
             this.kind = kind;
             this.reportId = reportId;
             this.snapshotRevision = snapshotRevision;
@@ -82,6 +95,7 @@ public interface AdminOperationsApi {
 
         public String correlationId() { return correlationId; }
         public int statusCode() { return statusCode; }
+        public String mutationId() { return mutationId; }
         public ResultKind kind() { return kind; }
         public String reportId() { return reportId; }
         public long snapshotRevision() { return snapshotRevision; }
@@ -107,7 +121,7 @@ public interface AdminOperationsApi {
             List<ReviewHistoryItem> history
         ) {
             return new Result(
-                correlationId, statusCode, ResultKind.REVIEW_HISTORY, reportId,
+                correlationId, statusCode, null, ResultKind.REVIEW_HISTORY, reportId,
                 snapshotRevision, totalCount, nextCursor,
                 history, AdminJava8Collections.list()
             );
@@ -123,7 +137,7 @@ public interface AdminOperationsApi {
             List<DeliveryHistoryItem> history
         ) {
             return new Result(
-                correlationId, statusCode, ResultKind.DELIVERY_HISTORY, reportId,
+                correlationId, statusCode, null, ResultKind.DELIVERY_HISTORY, reportId,
                 snapshotRevision, totalCount, nextCursor,
                 AdminJava8Collections.list(), history
             );
@@ -132,6 +146,7 @@ public interface AdminOperationsApi {
 
     final class ReviewHistoryItem {
         private final long revision;
+        private final long contentRevision;
         private final AdminReportDecision.Decision decision;
         private final String reason;
         private final String userVisibleReason;
@@ -140,6 +155,7 @@ public interface AdminOperationsApi {
 
         ReviewHistoryItem(
             long revision,
+            long contentRevision,
             AdminReportDecision.Decision decision,
             String reason,
             String userVisibleReason,
@@ -147,6 +163,7 @@ public interface AdminOperationsApi {
             String decidedAt
         ) {
             this.revision = revision;
+            this.contentRevision = contentRevision;
             this.decision = decision;
             this.reason = reason;
             this.userVisibleReason = userVisibleReason;
@@ -155,6 +172,7 @@ public interface AdminOperationsApi {
         }
 
         public long revision() { return revision; }
+        public long contentRevision() { return contentRevision; }
         public AdminReportDecision.Decision decision() { return decision; }
         public String reason() { return reason; }
         public String userVisibleReason() { return userVisibleReason; }

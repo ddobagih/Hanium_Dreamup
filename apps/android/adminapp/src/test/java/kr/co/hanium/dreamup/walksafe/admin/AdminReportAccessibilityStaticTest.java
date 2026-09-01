@@ -79,8 +79,10 @@ public final class AdminReportAccessibilityStaticTest {
         assertFalse(activity.contains("Intent.ACTION_SEND"));
         assertTrue(reportClient.contains("new OkHttpTransport()"));
         assertTrue(httpTransport.contains(".cache(null)"));
-        assertTrue(panel.contains("highRiskConfirm.setEnabled(!loading)"));
-        assertTrue(panel.contains("for (Button button : mutationButtons) button.setEnabled(!loading)"));
+        assertTrue(panel.contains("highRiskConfirm.setEnabled(mutationEnabled)"));
+        assertTrue(panel.contains(
+            "for (Button button : mutationButtons) button.setEnabled(mutationEnabled)"
+        ));
         assertTrue(build.contains("release {"));
         assertTrue(build.contains("ADMIN_OPERATIONAL_WORKFLOWS_ENABLED\", \"false\""));
     }

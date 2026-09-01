@@ -79,6 +79,26 @@ public interface AdminReportRepository {
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException;
 
+    default AdminReportModels.StatusSnapshot updateStatus(
+        AdminOperationsApi.SessionContext session,
+        String reportId,
+        String nextStatus,
+        int expectedVersion,
+        Map<String, String> reconfirmationHeaders,
+        AdminReportWorkflowController.StatusDispatch dispatch
+    ) throws IOException, GeneralSecurityException {
+        if (dispatch == null || !dispatch.markDispatched()) {
+            throw new AdminReportWorkflowController.StatusDispatchCancelledException();
+        }
+        return updateStatus(
+            session,
+            reportId,
+            nextStatus,
+            expectedVersion,
+            reconfirmationHeaders
+        );
+    }
+
     AdminDeliveryPackage createDeliveryPackage(
         AdminOperationsApi.SessionContext session,
         AdminDeliveryPackage.Eligibility eligibility,

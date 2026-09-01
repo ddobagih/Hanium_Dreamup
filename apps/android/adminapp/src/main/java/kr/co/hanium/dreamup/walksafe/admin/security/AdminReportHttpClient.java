@@ -172,6 +172,26 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         int expectedVersion,
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException {
+        return updateStatus(
+            session,
+            reportId,
+            nextStatus,
+            expectedVersion,
+            reconfirmationHeaders,
+            () -> true
+        );
+    }
+
+    @Override
+    public AdminReportModels.StatusSnapshot updateStatus(
+        AdminOperationsApi.SessionContext session,
+        String reportId,
+        String nextStatus,
+        int expectedVersion,
+        Map<String, String> reconfirmationHeaders,
+        AdminReportWorkflowController.StatusDispatch dispatch
+    ) throws IOException, GeneralSecurityException {
+        if (dispatch == null) throw new IllegalArgumentException("status dispatch is required");
         String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
         if (!AdminJava8Collections.set("new", "reviewed", "resolved").contains(nextStatus)) {
             throw new IllegalArgumentException("next status is invalid");
@@ -190,7 +210,8 @@ public final class AdminReportHttpClient implements AdminReportRepository {
             null,
             body,
             requireReconfirmation(reconfirmationHeaders),
-            "application/json"
+            "application/json",
+            dispatch
         );
         if (response.statusCode == 409) {
             throw new StatusConflictException(
@@ -491,6 +512,32 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         Map<String, String> additionalHeaders,
         String accept
     ) throws IOException, GeneralSecurityException {
+        return executeProtected(
+            session,
+            method,
+            path,
+            canonicalQuery,
+            action,
+            readPurpose,
+            body,
+            additionalHeaders,
+            accept,
+            null
+        );
+    }
+
+    private Response executeProtected(
+        AdminOperationsApi.SessionContext session,
+        String method,
+        String path,
+        String canonicalQuery,
+        String action,
+        String readPurpose,
+        byte[] body,
+        Map<String, String> additionalHeaders,
+        String accept,
+        AdminReportWorkflowController.StatusDispatch dispatch
+    ) throws IOException, GeneralSecurityException {
         String correlationId = UUID.randomUUID().toString();
         AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
             action,
@@ -529,6 +576,9 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         headers.put("Accept", accept);
         if (body.length > 0) headers.put("Content-Type", "application/json; charset=utf-8");
         String url = origin + path + (canonicalQuery.isEmpty() ? "" : "?" + canonicalQuery);
+        if (dispatch != null && !dispatch.markDispatched()) {
+            throw new AdminReportWorkflowController.StatusDispatchCancelledException();
+        }
         return transport.execute(method, url, AdminJava8Collections.copyMap(headers), body.length == 0 ? null : body);
     }
 

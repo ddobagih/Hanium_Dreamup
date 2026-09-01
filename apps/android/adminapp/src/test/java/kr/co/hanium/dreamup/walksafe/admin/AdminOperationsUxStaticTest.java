@@ -26,6 +26,12 @@ public final class AdminOperationsUxStaticTest {
     private final String incidentController = read(
         "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminIncidentController.java"
     );
+    private final String incidentStatusAttempt = read(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminIncidentStatusAttempt.java"
+    );
+    private final String reviewDecisionAttempt = read(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminReviewDecisionAttempt.java"
+    );
     private final String auditController = read(
         "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminAuditController.java"
     );
@@ -188,7 +194,7 @@ public final class AdminOperationsUxStaticTest {
         String render = between(activity, "private void render()", "private void renderDevices(");
         String boundary = between(
             activity,
-            "private void resetSessionBoundReportState()",
+            "private void resetSessionBoundReportState(",
             "private String requireConnectedOperationsReportId()"
         );
         assertTrue(render.contains("reconcileOperationsAccessBinding("));
@@ -211,14 +217,14 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(boundary.contains("incidentPanel.clearSubmittedEvidence()"));
         assertTrue(boundary.contains("if (reportOperationsFormGroup != null)"));
         assertTrue(reports.contains("sessionBoundDraftsCleared = true"));
-        assertTrue(reports.contains("if (sessionBoundDraftsCleared)"));
+        assertTrue(reports.contains("if (sessionBoundDraftsCleared && !detailRecovery)"));
     }
 
     @Test
     public void authenticationBindingClearDropsEveryControllerSnapshotToIdle() {
         String boundary = between(
             activity,
-            "private void resetSessionBoundReportState()",
+            "private void resetSessionBoundReportState(",
             "private String requireConnectedOperationsReportId()"
         );
         assertTrue(boundary.contains("reportController.clearSessionState()"));
@@ -660,7 +666,7 @@ public final class AdminOperationsUxStaticTest {
             .contains("clearOriginalEvidence("));
         assertTrue(between(activity, "protected void onDestroy()", "protected void onActivityResult(")
             .contains("clearOriginalEvidence("));
-        assertTrue(between(activity, "private void resetSessionBoundReportState()", "private String requireConnectedOperationsReportId()")
+        assertTrue(between(activity, "private void resetSessionBoundReportState(", "private String requireConnectedOperationsReportId()")
             .contains("clearOriginalEvidence("));
         assertTrue(between(activity, "private void loadReportDetail(", "private void retryReportRequest()")
             .contains("clearOriginalEvidence("));
@@ -714,6 +720,122 @@ public final class AdminOperationsUxStaticTest {
     }
 
     @Test
+    public void reportStatusRefreshFailureOffersGetOnlyRecoveryAndBlocksNavigation() {
+        assertTrue(workflowController.contains("UPDATED_DETAIL_STALE"));
+        assertTrue(workflowController.contains("beginStatusDetailRetry()"));
+        assertTrue(workflowController.contains("Request.Kind.STATUS_DETAIL_RETRY"));
+        assertTrue(workflowController.contains("loader.refreshDetail(request.reportId)"));
+        assertTrue(workflowController.contains("suspendForLifecycle()"));
+        assertTrue(workflowController.contains("StatusDetailRecovery statusDetailRecovery()"));
+        assertTrue(workflowController.contains("StatusStage.NOT_DISPATCHED"));
+        assertTrue(workflowController.contains("StatusStage.PATCH_CONFIRMED"));
+        assertTrue(workflowController.contains(
+            "confirmedStatusVersion == detail.summary().statusVersion()"
+        ));
+        assertTrue(reports.contains("workflowDetailRetryAvailable"));
+        assertTrue(reports.contains("상태 변경 결과 확인을 위한 최신 신고 상세만 다시 조회"));
+        assertTrue(reports.contains("reportIdInput.setEnabled(enabled)"));
+        assertTrue(reports.contains("statusInput.setEnabled(enabled)"));
+        assertTrue(reports.contains("classInput.setEnabled(enabled)"));
+        assertTrue(reports.contains("createdFromInput.setEnabled(enabled)"));
+        assertTrue(reports.contains("createdToInput.setEnabled(enabled)"));
+        assertTrue(reports.contains("listener.onRetryWorkflowDetail()"));
+        assertTrue(reports.contains("applyWorkflowNavigationState()"));
+        assertTrue(reports.contains("navigationButtons.add(detail)"));
+        assertTrue(reports.contains("navigationButtons.add(use)"));
+        assertTrue(reports.contains("applyButton.setEnabled(enabled)"));
+        assertTrue(activity.contains(
+            "executeReportWorkflow(reportWorkflowController.beginStatusDetailRetry())"
+        ));
+        assertTrue(activity.contains("reportWorkflowController.suspendForLifecycle()"));
+        assertTrue(activity.contains("REPORT_STATUS_RECOVERY_ID_STATE"));
+        assertTrue(activity.contains("REPORT_STATUS_RECOVERY_TARGET_STATE"));
+        assertTrue(activity.contains("REPORT_STATUS_RECOVERY_VERSION_STATE"));
+    }
+
+    @Test
+    public void operationalMutationConflictRefreshesDetailAndMatchingHistoryWithoutReplay() {
+        String operation = between(
+            activity,
+            "private void runOperationalOperation(",
+            "private OperationalConflictRefresh refreshOperationalConflict("
+        );
+        String refresh = between(
+            activity,
+            "private OperationalConflictRefresh refreshOperationalConflict(",
+            "private void applyOperationalConflict("
+        );
+        assertTrue(operation.contains("catch (AdminOperationsApi.MutationConflictException"));
+        assertTrue(operation.contains("refreshOperationalConflict("));
+        assertTrue(occurrences(operation, "operation.run()") == 1);
+        assertTrue(refresh.contains("controller.getAdminReportDetail("));
+        assertTrue(refresh.contains("controller.readDeliveries("));
+        assertTrue(refresh.contains("controller.readReviewDecisions("));
+        assertFalse(refresh.contains("recordDelivery("));
+        assertFalse(refresh.contains("recordReviewDecision("));
+        assertTrue(activity.contains("operationalConflictSnapshotsMatch("));
+        assertTrue(activity.contains(
+            "refresh.detail.latestDeliveryRevision() == refresh.history.snapshotRevision()"
+        ));
+        assertTrue(activity.contains("refresh.history.nextCursor() != null"));
+        assertTrue(activity.contains(
+            "latest.contentRevision() < refresh.detail.contentRevision()"
+        ));
+    }
+
+    @Test
+    public void incidentAmbiguousResultKeepsOneIdempotencyAttemptUntilDetailReconciliation() {
+        String incident = between(
+            activity,
+            "private void runIncidentStatusUpdate(",
+            "private void reconcileIncidentStatusAttempt("
+        );
+        assertTrue(incident.contains("incidentStatusAttempt.prepare("));
+        assertTrue(incident.contains("incidentStatusAttempt.clear()"));
+        assertTrue(incident.contains("loadIncidentDetail(detail.summary().incidentId())"));
+        assertFalse(incident.contains("UUID.randomUUID()"));
+        assertTrue(incidentStatusAttempt.contains("return candidate"));
+        assertTrue(incidentStatusAttempt.contains("sameIntent(candidate)"));
+        assertTrue(incidentStatusAttempt.contains("Reconciliation.UNCONFIRMED"));
+        assertTrue(incidentStatusAttempt.contains("RecoverySnapshot recoverySnapshot()"));
+        assertTrue(incidentStatusAttempt.contains("int requestExpectedVersion"));
+        assertTrue(incidentStatusAttempt.contains("boolean canRetry("));
+        assertTrue(incidents.contains("renderPendingStatusRetry(String nextState)"));
+        assertTrue(incidents.contains("보존한 멱등키로 결과 확인"));
+        assertTrue(incident.contains("retryingPendingAttempt"));
+        assertTrue(activity.contains(
+            "incidentStatusAttempt.incidentId().equals(detail.summary().incidentId())"
+        ));
+        assertTrue(activity.contains("INCIDENT_RECOVERY_REASON_DIGEST_STATE"));
+        assertTrue(activity.contains("INCIDENT_RECOVERY_OBSERVATION_DIGEST_STATE"));
+        assertTrue(activity.contains("INCIDENT_RECOVERY_EVIDENCE_DIGEST_STATE"));
+        assertTrue(activity.contains("INCIDENT_RECOVERY_ACTOR_STATE"));
+        assertTrue(activity.contains("incidentStatusAttempt.belongsToActor(currentAdminId)"));
+        assertTrue(incidentStatusAttempt.contains("actorId.equals(event.actorId())"));
+        assertTrue(activity.contains("restorePendingMutationRecovery(savedInstanceState)"));
+    }
+
+    @Test
+    public void reviewDecisionUsesOneStableIdAndDoesNotAutomaticallyReplayAfterFailure() {
+        String record = between(
+            activity,
+            "private void recordReviewDecision()",
+            "private void loadOriginalEvidence()"
+        );
+        String operation = between(
+            activity,
+            "private void runOperationalOperation(",
+            "private OperationalConflictRefresh refreshOperationalConflict("
+        );
+        assertTrue(record.contains("reviewDecisionAttempt.prepare("));
+        assertTrue(reviewDecisionAttempt.contains("UUID.randomUUID().toString()"));
+        assertTrue(reviewDecisionAttempt.contains("return decision"));
+        assertTrue(occurrences(operation, "operation.run()") == 1);
+        assertTrue(occurrences(operation, "reviewDecisionAttempt.clear()") == 2);
+        assertTrue(activity.contains("reviewDecisionAttempt.clear();"));
+    }
+
+    @Test
     public void everyInteractiveReenableRevalidatesOriginalEvidenceAtTheSharedBoundary() {
         String load = between(
             activity,
@@ -754,10 +876,10 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(occurrences(load, "setInteractiveEnabled(contentRoot, true)") == 1);
         assertTrue(occurrences(apply, "setInteractiveEnabled(contentRoot, true)") == 3);
         assertTrue(occurrences(clear, "setInteractiveEnabled(contentRoot, true)") == 1);
-        assertTrue(occurrences(operational, "setInteractiveEnabled(contentRoot, true)") == 2);
+        assertTrue(occurrences(operational, "setInteractiveEnabled(contentRoot, true)") == 3);
         assertTrue(occurrences(security, "setInteractiveEnabled(contentRoot, true)") == 2);
         assertTrue(occurrences(incident, "setInteractiveEnabled(contentRoot, true)") == 4);
-        assertTrue(occurrences(activity, "setInteractiveEnabled(contentRoot, true)") == 16);
+        assertTrue(occurrences(activity, "setInteractiveEnabled(contentRoot, true)") == 17);
 
         assertFalse(activity.contains("private static void setInteractiveEnabled("));
         assertTrue(interactive.contains("if (view == originalEvidenceConfirmedInput)"));

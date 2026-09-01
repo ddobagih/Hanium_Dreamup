@@ -65,6 +65,7 @@ public final class AdminOperationsHttpClientTest {
         assertEquals("2026-08-09T01:02:04Z", deliveryRead.deliveryHistory().get(0).recordedAt());
         assertNull(deliveryRead.deliveryHistory().get(0).externalReceiptId());
         assertNull(reviewResult.returnedItemCount());
+        assertEquals(DECISION_ID, reviewResult.mutationId());
         assertNull(deliveryResult.returnedItemCount());
         for (Request request : transport.requests) {
             assertTrue(request.url.startsWith(ORIGIN + "/"));
@@ -90,6 +91,7 @@ public final class AdminOperationsHttpClientTest {
         assertEquals(EXACT_REVIEW_KEYS, keys(body));
         assertEquals(3, body.getInt("content_revision"));
         assertEquals(EVIDENCE_GRANT_ID, body.getString("evidence_grant_id"));
+        assertEquals(DECISION_ID, body.getString("decision_id"));
         assertTrue(body.has("user_visible_reason"));
         assertTrue(body.isNull("user_visible_reason"));
         assertTrue(body.isNull("duplicate_of_report_id"));
@@ -109,7 +111,8 @@ public final class AdminOperationsHttpClientTest {
             true,
             true,
             0,
-            null
+            null,
+            DECISION_ID
         );
         reviewClient.recordReviewDecision(SESSION, REPORT_ID, review);
         JSONObject reviewPost = new JSONObject(reviewTransport.requests.get(1).bodyText());
@@ -203,10 +206,39 @@ public final class AdminOperationsHttpClientTest {
 
         FakeTransport failed = new FakeTransport();
         failed.businessStatus = 409;
-        IOException error = assertThrows(IOException.class, () -> client(failed, new CapturingSigner())
+        AdminOperationsApi.MutationConflictException error = assertThrows(
+            AdminOperationsApi.MutationConflictException.class,
+            () -> client(failed, new CapturingSigner())
             .recordDelivery(SESSION, REPORT_ID, delivery()));
-        assertEquals("administrator operation returned unexpected status=409", error.getMessage());
+        assertEquals("administrator mutation conflicted with current server state", error.getMessage());
         assertFalse(error.getMessage().contains("private server detail"));
+    }
+
+    @Test
+    public void reviewMutationRejectsAResponseIdThatDiffersFromSubmittedDecisionId() {
+        FakeTransport transport = new FakeTransport();
+        transport.reviewMutationIdOverride = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+        assertThrows(IOException.class, () -> client(transport, new CapturingSigner())
+            .recordReviewDecision(SESSION, REPORT_ID, review()));
+    }
+
+    @Test
+    public void idempotentReviewReplayAcceptsOriginalCorrelationButRequiresSameAdmin() throws Exception {
+        FakeTransport replay = new FakeTransport();
+        replay.reviewMutationCorrelationOverride =
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+        assertEquals(
+            DECISION_ID,
+            client(replay, new CapturingSigner())
+                .recordReviewDecision(SESSION, REPORT_ID, review())
+                .mutationId()
+        );
+
+        FakeTransport wrongAdmin = new FakeTransport();
+        wrongAdmin.reviewMutationAdminOverride = "admin-002";
+        assertThrows(IOException.class, () -> client(wrongAdmin, new CapturingSigner())
+            .recordReviewDecision(SESSION, REPORT_ID, review()));
     }
 
     @Test
@@ -342,8 +374,10 @@ public final class AdminOperationsHttpClientTest {
         longContentRevision.reviewHistoryOverride = FakeTransport.reviewHistoryJson().replace(
             "\"content_revision\":0", "\"content_revision\":2147483648"
         );
-        assertEquals(1, client(longContentRevision, new CapturingSigner())
-            .readReviewDecisions(SESSION, REPORT_ID).reviewHistory().size());
+        AdminOperationsApi.Result parsed = client(longContentRevision, new CapturingSigner())
+            .readReviewDecisions(SESSION, REPORT_ID);
+        assertEquals(1, parsed.reviewHistory().size());
+        assertEquals(2_147_483_648L, parsed.reviewHistory().get(0).contentRevision());
     }
 
     @Test
@@ -658,7 +692,8 @@ public final class AdminOperationsHttpClientTest {
             true,
             true,
             3,
-            EVIDENCE_GRANT_ID
+            EVIDENCE_GRANT_ID,
+            DECISION_ID
         );
     }
 
@@ -756,6 +791,9 @@ public final class AdminOperationsHttpClientTest {
         int readStatus = 200;
         String reviewHistoryOverride;
         String deliveryHistoryOverride;
+        String reviewMutationIdOverride;
+        String reviewMutationAdminOverride;
+        String reviewMutationCorrelationOverride;
         String grantOverride;
         int binaryStatus = 200;
         String binaryContentType = "image/png";
@@ -828,6 +866,12 @@ public final class AdminOperationsHttpClientTest {
                     deliveryHistoryOverride == null ? deliveryHistoryJson() : deliveryHistoryOverride
                 );
             }
+            if ("POST".equals(method) && url.endsWith("/review-decisions")) {
+                return new AdminOperationsHttpClient.Response(
+                    businessStatus,
+                    reviewMutationJson(request)
+                );
+            }
             return new AdminOperationsHttpClient.Response(businessStatus, "{}");
         }
 
@@ -866,6 +910,48 @@ public final class AdminOperationsHttpClientTest {
             root.put("exact_location", exactLocation);
             root.put("image", image);
             return new JSONObject(root).toString();
+        }
+
+        private String reviewMutationJson(Request request) throws IOException {
+            try {
+                JSONObject submitted = new JSONObject(request.bodyText());
+                Map<String, Object> response = new LinkedHashMap<>();
+                response.put(
+                    "id",
+                    reviewMutationIdOverride == null
+                        ? submitted.getString("decision_id")
+                        : reviewMutationIdOverride
+                );
+                response.put("report_id", REPORT_ID);
+                response.put("revision", 1);
+                response.put("content_revision", submitted.getInt("content_revision"));
+                response.put("decision", submitted.getString("decision"));
+                response.put("reason", submitted.getString("reason"));
+                response.put("user_visible_reason", nullable(submitted, "user_visible_reason"));
+                response.put("duplicate_of_report_id", nullable(submitted, "duplicate_of_report_id"));
+                response.put("location_reviewed", submitted.getBoolean("location_reviewed"));
+                response.put("photo_reviewed", submitted.getBoolean("photo_reviewed"));
+                response.put("privacy_reviewed", submitted.getBoolean("privacy_reviewed"));
+                response.put(
+                    "admin_id",
+                    reviewMutationAdminOverride == null
+                        ? "admin-001"
+                        : reviewMutationAdminOverride
+                );
+                response.put("session_id", AdminDeviceProofTest.SESSION_ID);
+                response.put("device_id", DEVICE_ID);
+                response.put(
+                    "correlation_id",
+                    reviewMutationCorrelationOverride == null
+                        ? request.headers.get(AdminOperationsHttpClient.CORRELATION_ID_HEADER)
+                        : reviewMutationCorrelationOverride
+                );
+                response.put("decided_at", "2026-08-09T01:00:00Z");
+                response.put("created_at", "2026-08-09T01:00:00Z");
+                return AdminCanonicalEncoding.canonicalJson(response);
+            } catch (Exception error) {
+                throw new IOException("fake review mutation response failed", error);
+            }
         }
 
         private static String reviewHistoryJson() {
@@ -955,11 +1041,12 @@ public final class AdminOperationsHttpClientTest {
     private static final Set<String> EXACT_REVIEW_KEYS = Set.of(
         "decision", "reason", "user_visible_reason", "duplicate_of_report_id",
         "location_reviewed", "photo_reviewed", "privacy_reviewed", "content_revision",
-        "evidence_grant_id"
+        "evidence_grant_id", "decision_id"
     );
     private static final String ORIGIN = "http://127.0.0.1:8000";
     private static final String REPORT_ID = "44444444-4444-4444-8444-444444444444";
     private static final String EVIDENCE_GRANT_ID = "88888888-8888-4888-8888-888888888888";
+    private static final String DECISION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     private static final String DEVICE_ID = AdminDeviceProofTest.DEVICE_ID;
     private static final String MARKER = AdminDeviceProofTest.MARKER;
     private static final String ACCESS_TOKEN = "opaque-access-token-for-tests-123456";

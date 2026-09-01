@@ -155,7 +155,8 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             REVIEW_ACTION,
             null,
             decision.requestBody(safeReportId),
-            HistoryType.NONE
+            HistoryType.NONE,
+            decision.decisionId()
         );
     }
 
@@ -172,7 +173,8 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             null,
             REVIEW_READ_PURPOSE,
             null,
-            HistoryType.REVIEW
+            HistoryType.REVIEW,
+            null
         );
         requireFirstHistoryRevision(result, cursor);
         return result;
@@ -191,7 +193,8 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             DELIVERY_ACTION,
             null,
             delivery.requestBody(),
-            HistoryType.NONE
+            HistoryType.NONE,
+            null
         );
     }
 
@@ -208,7 +211,8 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             null,
             DELIVERY_READ_PURPOSE,
             null,
-            HistoryType.DELIVERY
+            HistoryType.DELIVERY,
+            null
         );
         requireFirstHistoryRevision(result, cursor);
         return result;
@@ -328,7 +332,8 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         String action,
         String readPurpose,
         byte[] body,
-        HistoryType historyType
+        HistoryType historyType,
+        String expectedReviewDecisionId
     ) throws IOException, GeneralSecurityException {
         String correlationId = UUID.randomUUID().toString();
         byte[] transmittedBody = body == null ? new byte[0] : body;
@@ -386,13 +391,27 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         if (historyType != HistoryType.NONE && operationResponse.statusCode == 422) {
             throw new HistoryCursorException();
         }
+        if (historyType == HistoryType.NONE && operationResponse.statusCode == 409) {
+            throw new MutationConflictException();
+        }
         requireExactStatus(
             operationResponse.statusCode,
             "POST".equals(method) ? 201 : 200,
             "administrator operation"
         );
         return switch (historyType) {
-            case NONE -> new Result(correlationId, operationResponse.statusCode);
+            case NONE -> new Result(
+                correlationId,
+                operationResponse.statusCode,
+                expectedReviewDecisionId == null
+                    ? null
+                    : requireReviewDecisionResponseId(
+                        operationResponse.body,
+                        reportIdFromPath(path),
+                        expectedReviewDecisionId,
+                        session.adminId()
+                    )
+            );
             case REVIEW -> parseReviewHistory(
                 operationResponse.body, reportIdFromPath(path),
                 correlationId, operationResponse.statusCode
@@ -674,6 +693,45 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         if (actual != expected) throw new IOException(operation + " returned unexpected status=" + actual);
     }
 
+    private static String requireReviewDecisionResponseId(
+        String body,
+        String expectedReportId,
+        String expectedDecisionId,
+        String expectedAdminId
+    ) throws IOException {
+        if (body.getBytes(StandardCharsets.UTF_8).length > MAX_HISTORY_RESPONSE_BYTES) {
+            throw new IOException("administrator review response is too large");
+        }
+        Map<String, Object> value = AdminStrictJson.parseObject(body);
+        requireExactKeys(value, AdminJava8Collections.set(
+            "id", "report_id", "revision", "content_revision", "decision", "reason",
+            "user_visible_reason", "duplicate_of_report_id", "location_reviewed",
+            "photo_reviewed", "privacy_reviewed", "admin_id", "session_id", "device_id",
+            "correlation_id", "decided_at", "created_at"
+        ));
+        String decisionId = requiredUuid(value, "id");
+        if (!expectedDecisionId.equals(decisionId)
+            || !expectedReportId.equals(requiredUuid(value, "report_id"))
+            || !expectedAdminId.equals(requiredAdminId(value, "admin_id"))) {
+            throw new IOException("administrator review response binding is invalid");
+        }
+        requiredLong(value, "revision", 1L);
+        requiredLong(value, "content_revision", 0L);
+        reviewDecision(requiredText(value, "decision", 16));
+        requiredText(value, "reason", 500);
+        nullableText(value, "user_visible_reason", 500);
+        nullableUuid(value, "duplicate_of_report_id");
+        requiredBoolean(value, "location_reviewed");
+        requiredBoolean(value, "photo_reviewed");
+        requiredBoolean(value, "privacy_reviewed");
+        requiredUuid(value, "session_id");
+        requiredDeviceId(value, "device_id");
+        requiredUuid(value, "correlation_id");
+        requiredInstant(value, "decided_at", false);
+        requiredInstant(value, "created_at", false);
+        return decisionId;
+    }
+
     private static Result parseReviewHistory(
         String body,
         String expectedReportId,
@@ -702,7 +760,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 throw new IOException("review history revisions are not contiguous");
             }
             previousRevision = revision;
-            requiredLong(item, "content_revision", 0L);
+            long contentRevision = requiredLong(item, "content_revision", 0L);
             AdminReportDecision.Decision decision = reviewDecision(requiredText(item, "decision", 16));
             String reason = requiredText(item, "reason", 500);
             String userVisibleReason = nullableText(item, "user_visible_reason", 500);
@@ -732,6 +790,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             requiredInstant(item, "created_at", false);
             result.add(new ReviewHistoryItem(
                 revision,
+                contentRevision,
                 decision,
                 reason,
                 userVisibleReason,

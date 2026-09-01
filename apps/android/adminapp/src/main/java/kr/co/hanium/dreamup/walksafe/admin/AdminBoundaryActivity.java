@@ -55,6 +55,7 @@ import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentHttpClient;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentModels;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentRepository;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentStatusAttempt;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOperationsApi;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOperationsHttpClient;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOriginalEvidence;
@@ -65,6 +66,7 @@ import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportRequestController
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportRequestModels;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportRepository;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportWorkflowController;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminReviewDecisionAttempt;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryMessagePolicy;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryCustodyState;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportDecision;
@@ -86,6 +88,14 @@ public final class AdminBoundaryActivity extends Activity {
     private static final String REPORT_FILTER_FROM_STATE = "admin_report_filter_from";
     private static final String REPORT_FILTER_TO_STATE = "admin_report_filter_to";
     private static final String REPORT_SELECTED_ID_STATE = "admin_report_selected_id";
+    private static final String REPORT_STATUS_RECOVERY_ID_STATE =
+        "admin_report_status_recovery_id";
+    private static final String REPORT_STATUS_RECOVERY_TARGET_STATE =
+        "admin_report_status_recovery_target";
+    private static final String REPORT_STATUS_RECOVERY_VERSION_STATE =
+        "admin_report_status_recovery_version";
+    private static final String REPORT_STATUS_RECOVERY_CONFIRMED_STATE =
+        "admin_report_status_recovery_confirmed";
     private static final String REQUEST_FILTER_REPORT_STATE = "admin_request_filter_report";
     private static final String REQUEST_FILTER_TYPE_STATE = "admin_request_filter_type";
     private static final String REQUEST_FILTER_STATUS_STATE = "admin_request_filter_status";
@@ -98,6 +108,19 @@ public final class AdminBoundaryActivity extends Activity {
     private static final String AUDIT_ACTOR_STATE = "admin_audit_actor";
     private static final String INCIDENT_FILTER_STATUS_STATE = "admin_incident_filter_status";
     private static final String INCIDENT_SELECTED_ID_STATE = "admin_incident_selected_id";
+    private static final String INCIDENT_RECOVERY_ID_STATE = "admin_incident_recovery_id";
+    private static final String INCIDENT_RECOVERY_ACTOR_STATE =
+        "admin_incident_recovery_actor";
+    private static final String INCIDENT_RECOVERY_NEXT_STATE = "admin_incident_recovery_next";
+    private static final String INCIDENT_RECOVERY_VERSION_STATE =
+        "admin_incident_recovery_version";
+    private static final String INCIDENT_RECOVERY_KEY_STATE = "admin_incident_recovery_key";
+    private static final String INCIDENT_RECOVERY_REASON_DIGEST_STATE =
+        "admin_incident_recovery_reason_digest";
+    private static final String INCIDENT_RECOVERY_OBSERVATION_DIGEST_STATE =
+        "admin_incident_recovery_observation_digest";
+    private static final String INCIDENT_RECOVERY_EVIDENCE_DIGEST_STATE =
+        "admin_incident_recovery_evidence_digest";
     private static final String RAW_COLLECTION_SELECTED_ID_STATE =
         "admin_raw_collection_selected_id";
     private static final int OPEN_DELIVERY_PACKAGE_DOCUMENT = 7_300;
@@ -132,6 +155,13 @@ public final class AdminBoundaryActivity extends Activity {
     private AdminReportWorkflowController reportWorkflowController;
     private AdminAuditController auditController;
     private AdminIncidentController incidentController;
+    private final AdminIncidentStatusAttempt incidentStatusAttempt =
+        new AdminIncidentStatusAttempt();
+    private final AdminReviewDecisionAttempt reviewDecisionAttempt =
+        new AdminReviewDecisionAttempt();
+    private boolean restoredReportStatusRecovery;
+    private boolean restoredIncidentStatusRecovery;
+    private boolean incidentRecoveryRefreshPending;
     private AdminRawCollectionController rawCollectionController;
     private String deviceId;
     private AdminDeviceKeyStore.Descriptor deviceKeyDescriptor;
@@ -237,6 +267,7 @@ public final class AdminBoundaryActivity extends Activity {
     private Integer connectedOperationsPackageRevision;
     private String connectedOperationsDeliveryStatus;
     private volatile String boundOperationsSessionId;
+    private volatile String boundOperationsAdminId;
     private boolean operationsAccessBindingInitialized;
     private volatile boolean boundOperationsAccessActive;
     private volatile long operationsSessionGeneration;
@@ -271,6 +302,19 @@ public final class AdminBoundaryActivity extends Activity {
         private synchronized void clear() {
             Arrays.fill(password, '\0');
             Arrays.fill(totp, '\0');
+        }
+    }
+
+    private static final class OperationalConflictRefresh {
+        private final AdminReportModels.Detail detail;
+        private final AdminOperationsApi.Result history;
+
+        private OperationalConflictRefresh(
+            AdminReportModels.Detail detail,
+            AdminOperationsApi.Result history
+        ) {
+            this.detail = detail;
+            this.history = history;
         }
     }
 
@@ -445,6 +489,27 @@ public final class AdminBoundaryActivity extends Activity {
                         }
 
                         @Override
+                        public AdminReportModels.StatusSnapshot updateStatus(
+                            String reportId,
+                            String nextStatus,
+                            int expectedVersion,
+                            char[] password,
+                            char[] totp,
+                            AdminReportWorkflowController.StatusDispatch dispatch
+                        ) throws Exception {
+                            return controller.updateAdminReportStatus(
+                                reportId,
+                                nextStatus,
+                                expectedVersion,
+                                password,
+                                totp,
+                                System.currentTimeMillis(),
+                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED,
+                                dispatch
+                            );
+                        }
+
+                        @Override
                         public AdminDeliveryPackage createPackage(
                             AdminDeliveryPackage.Eligibility eligibility,
                             char[] password,
@@ -517,11 +582,18 @@ public final class AdminBoundaryActivity extends Activity {
         }
         setContentView(buildContent());
         render();
+        restorePendingMutationRecovery(savedInstanceState);
         restoreReportPanelState(savedInstanceState);
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
+        if (!awaitingSafResult && reportWorkflowController != null) {
+            reportWorkflowController.suspendForLifecycle();
+            if (reportPanel != null) {
+                reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+            }
+        }
         if (reportPanel != null) {
             AdminReportPanel.FilterDraft draft = reportPanel.filterDraft();
             outState.putString(REPORT_FILTER_ID_STATE, draft.reportId());
@@ -530,6 +602,27 @@ public final class AdminBoundaryActivity extends Activity {
             outState.putString(REPORT_FILTER_FROM_STATE, draft.createdFrom());
             outState.putString(REPORT_FILTER_TO_STATE, draft.createdTo());
             outState.putString(REPORT_SELECTED_ID_STATE, reportPanel.selectedReportId());
+        }
+        if (reportWorkflowController != null) {
+            AdminReportWorkflowController.StatusDetailRecovery recovery =
+                reportWorkflowController.statusDetailRecovery();
+            if (recovery != null) {
+                outState.putString(REPORT_STATUS_RECOVERY_ID_STATE, recovery.reportId());
+                outState.putBoolean(
+                    REPORT_STATUS_RECOVERY_CONFIRMED_STATE,
+                    recovery.patchConfirmed()
+                );
+                if (recovery.patchConfirmed()) {
+                    outState.putString(
+                        REPORT_STATUS_RECOVERY_TARGET_STATE,
+                        recovery.targetStatus()
+                    );
+                    outState.putInt(
+                        REPORT_STATUS_RECOVERY_VERSION_STATE,
+                        recovery.targetStatusVersion()
+                    );
+                }
+            }
         }
         if (reportRequestPanel != null) {
             AdminReportRequestPanel.FilterDraft draft = reportRequestPanel.filterDraft();
@@ -556,6 +649,27 @@ public final class AdminBoundaryActivity extends Activity {
             outState.putString(INCIDENT_FILTER_STATUS_STATE, incidentPanel.filterStatus());
             outState.putString(INCIDENT_SELECTED_ID_STATE, incidentPanel.selectedIncidentId());
         }
+        AdminIncidentStatusAttempt.RecoverySnapshot incidentRecovery =
+            incidentStatusAttempt.recoverySnapshot();
+        if (incidentRecovery != null) {
+            outState.putString(INCIDENT_RECOVERY_ID_STATE, incidentRecovery.incidentId());
+            outState.putString(INCIDENT_RECOVERY_ACTOR_STATE, incidentRecovery.actorId());
+            outState.putString(INCIDENT_RECOVERY_NEXT_STATE, incidentRecovery.nextState());
+            outState.putInt(INCIDENT_RECOVERY_VERSION_STATE, incidentRecovery.expectedVersion());
+            outState.putString(INCIDENT_RECOVERY_KEY_STATE, incidentRecovery.idempotencyKey());
+            outState.putString(
+                INCIDENT_RECOVERY_REASON_DIGEST_STATE,
+                incidentRecovery.reasonDigest()
+            );
+            outState.putString(
+                INCIDENT_RECOVERY_OBSERVATION_DIGEST_STATE,
+                incidentRecovery.observationDigest()
+            );
+            outState.putString(
+                INCIDENT_RECOVERY_EVIDENCE_DIGEST_STATE,
+                incidentRecovery.evidenceDigest()
+            );
+        }
         if (rawCollectionPanel != null) {
             outState.putString(
                 RAW_COLLECTION_SELECTED_ID_STATE,
@@ -578,7 +692,10 @@ public final class AdminBoundaryActivity extends Activity {
         if (incidentController != null) incidentController.invalidate();
         if (rawCollectionController != null) rawCollectionController.invalidate();
         if (!awaitingSafResult && reportWorkflowController != null) {
-            reportWorkflowController.invalidate();
+            reportWorkflowController.suspendForLifecycle();
+            if (reportPanel != null) {
+                reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+            }
         }
         if (reportPanel != null) reportPanel.clearHighRiskInputs();
         if (reportRequestPanel != null) reportRequestPanel.clearSensitiveInputs();
@@ -925,6 +1042,11 @@ public final class AdminBoundaryActivity extends Activity {
             @Override
             public void onRetry() {
                 retryReportRequest();
+            }
+
+            @Override
+            public void onRetryWorkflowDetail() {
+                retryReportStatusDetail();
             }
 
             @Override
@@ -1383,7 +1505,9 @@ public final class AdminBoundaryActivity extends Activity {
             AdminReportDecision.Decision selectedDecision =
                 REVIEW_DECISIONS[reviewDecisionInput.getSelectedItemPosition()];
             String evidenceGrantId = null;
-            if (selectedDecision == AdminReportDecision.Decision.APPROVED) {
+            boolean retryingPendingDecision = reviewDecisionAttempt.isPending();
+            if (selectedDecision == AdminReportDecision.Decision.APPROVED
+                && !retryingPendingDecision) {
                 if (originalEvidenceConfirmedInput == null
                     || !originalEvidenceConfirmedInput.isChecked()) {
                     if (originalEvidenceConfirmedInput != null) {
@@ -1407,10 +1531,11 @@ public final class AdminBoundaryActivity extends Activity {
                     return;
                 }
                 evidenceGrantId = originalEvidence.grantId();
-            } else {
+            } else if (selectedDecision != AdminReportDecision.Decision.APPROVED) {
                 clearOriginalEvidence("승인 외 결정에는 원본 열람 grant를 사용하지 않습니다.");
             }
-            AdminReportDecision decision = new AdminReportDecision(
+            AdminReportDecision decision = reviewDecisionAttempt.prepare(
+                reportId,
                 selectedDecision,
                 normalized(reviewReasonInput),
                 nullableNormalized(reviewUserVisibleReasonInput),
@@ -1421,7 +1546,8 @@ public final class AdminBoundaryActivity extends Activity {
                 connectedOperationsContentRevision,
                 evidenceGrantId
             );
-            if (selectedDecision == AdminReportDecision.Decision.APPROVED) {
+            if (selectedDecision == AdminReportDecision.Decision.APPROVED
+                && !retryingPendingDecision) {
                 clearOriginalEvidence("확인한 원본 증거를 승인 요청에 한 번 결속했습니다.");
             }
             runOperationalOperation("검토 결정을 기록하고 있습니다.", () ->
@@ -2042,6 +2168,8 @@ public final class AdminBoundaryActivity extends Activity {
 
     private void runOperationalOperation(String pendingMessage, OperationalOperation operation) {
         if (controller == null || operationInFlight) return;
+        boolean deliveryMutation = recordingDelivery;
+        String reportId = connectedOperationsReportId;
         operationInFlight = true;
         setInteractiveEnabled(contentRoot, false);
         resultText.setText(pendingMessage);
@@ -2056,23 +2184,151 @@ public final class AdminBoundaryActivity extends Activity {
                     if (recordingDelivery && result.kind() == AdminOperationsApi.ResultKind.MUTATION) {
                         rotateDeliveryRecordInputsAfterSuccess();
                     }
+                    if (!deliveryMutation
+                        && result.kind() == AdminOperationsApi.ResultKind.MUTATION) {
+                        reviewDecisionAttempt.clear();
+                    }
                     recordingDelivery = false;
                     render();
                     if (result.kind() == AdminOperationsApi.ResultKind.MUTATION) {
                         refreshConnectedReportDetail();
                     }
                 });
+            } catch (AdminOperationsApi.MutationConflictException conflict) {
+                if (!deliveryMutation) reviewDecisionAttempt.clear();
+                OperationalConflictRefresh refresh = refreshOperationalConflict(
+                    reportId,
+                    deliveryMutation
+                );
+                runOnUiThread(() -> applyOperationalConflict(
+                    reportId,
+                    deliveryMutation,
+                    refresh
+                ));
             } catch (Exception error) {
                 runOnUiThread(() -> {
                     if (isDestroyed()) return;
                     operationInFlight = false;
                     setInteractiveEnabled(contentRoot, true);
-                    resultText.setText("관리자 내부 업무를 완료하지 못했습니다. 입력과 서버 상태를 확인해 주세요.");
+                    resultText.setText(
+                        !deliveryMutation && reviewDecisionAttempt.isPending()
+                            ? "검토 결정 기록 결과를 확정할 수 없습니다. 자동 재전송하지 않으며 같은 입력으로 다시 시도하면 기존 decision_id만 재사용합니다."
+                            : "관리자 내부 업무를 완료하지 못했습니다. 입력과 서버 상태를 확인해 주세요."
+                    );
                     recordingDelivery = false;
                     render();
                 });
             }
         });
+    }
+
+    private OperationalConflictRefresh refreshOperationalConflict(
+        String reportId,
+        boolean deliveryMutation
+    ) {
+        AdminReportModels.Detail detail = null;
+        AdminOperationsApi.Result history = null;
+        if (reportId != null) {
+            try {
+                detail = controller.getAdminReportDetail(
+                    reportId,
+                    BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                );
+            } catch (Exception ignored) {
+                // The conflict remains explicit even when reconciliation reads are unavailable.
+            }
+            try {
+                history = deliveryMutation
+                    ? controller.readDeliveries(
+                        reportId,
+                        null,
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    )
+                    : controller.readReviewDecisions(
+                        reportId,
+                        null,
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    );
+            } catch (Exception ignored) {
+                // The operator can retry the read without replaying the mutation.
+            }
+        }
+        return new OperationalConflictRefresh(detail, history);
+    }
+
+    private void applyOperationalConflict(
+        String reportId,
+        boolean deliveryMutation,
+        OperationalConflictRefresh refresh
+    ) {
+        if (isDestroyed()) return;
+        operationInFlight = false;
+        setInteractiveEnabled(contentRoot, true);
+        recordingDelivery = false;
+        if (reportId == null || !reportId.equals(connectedOperationsReportId)) {
+            render();
+            return;
+        }
+        boolean consistentRefresh = operationalConflictSnapshotsMatch(
+            reportId,
+            deliveryMutation,
+            refresh
+        );
+        boolean detailApplied = false;
+        if (consistentRefresh) {
+            reportController.replaceDetail(refresh.detail);
+            reportPanel.render(reportController.snapshot());
+            connectReportToOperations(refresh.detail);
+            detailApplied = true;
+        }
+        boolean historyApplied = false;
+        if (consistentRefresh) {
+            try {
+                applyReportHistoryPage(!deliveryMutation, true, null, refresh.history);
+                historyApplied = true;
+            } catch (IOException ignored) {
+                // A fresh first-page read remains available and the mutation is never replayed.
+            }
+        }
+        if (!historyApplied) {
+            if (deliveryMutation) deliveryHistoryNeedsFirstPage = true;
+            else reviewHistoryNeedsFirstPage = true;
+        }
+        renderReportHistory();
+        render();
+        resultText.setText(
+            detailApplied && historyApplied
+                ? "다른 관리자의 변경과 충돌했습니다. 자동 재제출하지 않고 최신 상세와 이력을 반영했습니다."
+                : "다른 관리자의 변경과 충돌했습니다. 자동 재제출하지 않았으며 상세와 이력의 revision을 함께 확인할 수 없어 GET으로 다시 조회해 주세요."
+        );
+    }
+
+    private static boolean operationalConflictSnapshotsMatch(
+        String reportId,
+        boolean deliveryMutation,
+        OperationalConflictRefresh refresh
+    ) {
+        if (refresh.detail == null || refresh.history == null
+            || !reportId.equals(refresh.detail.summary().id())
+            || !reportId.equals(refresh.history.reportId())) {
+            return false;
+        }
+        if (deliveryMutation) {
+            return refresh.history.kind() == AdminOperationsApi.ResultKind.DELIVERY_HISTORY
+                && refresh.detail.latestDeliveryRevision() == refresh.history.snapshotRevision();
+        }
+        if (refresh.history.kind() != AdminOperationsApi.ResultKind.REVIEW_HISTORY) {
+            return false;
+        }
+        if (refresh.detail.review() != null) {
+            return refresh.detail.review().revision() == refresh.history.snapshotRevision();
+        }
+        if (refresh.history.snapshotRevision() == 0L) return true;
+        List<AdminOperationsApi.ReviewHistoryItem> items = refresh.history.reviewHistory();
+        if (refresh.history.nextCursor() != null || items.isEmpty()) return false;
+        AdminOperationsApi.ReviewHistoryItem latest = items.get(items.size() - 1);
+        return latest.revision() == refresh.history.snapshotRevision()
+            && latest.contentRevision() < refresh.detail.contentRevision();
     }
 
     private String operationalResultMessage(AdminOperationsApi.Result result) {
@@ -2247,7 +2503,7 @@ public final class AdminBoundaryActivity extends Activity {
             ));
         }
         if (controller == null) {
-            reconcileOperationsAccessBinding(false, null);
+            reconcileOperationsAccessBinding(false, null, null);
             statusText.setText("관리자 보안 기능은 잠겨 있습니다.");
             metadataText.setText(BuildConfig.ADMIN_WORKFLOW_STATE);
             custodyText.setText("복구자료 외부 보관 상태를 확인할 수 없습니다.");
@@ -2269,7 +2525,11 @@ public final class AdminBoundaryActivity extends Activity {
 
         boolean accessActive = snapshot.isAccessSessionActive();
         boolean recoveryActive = snapshot.isRecoveryActive();
-        reconcileOperationsAccessBinding(accessActive, snapshot.currentSessionId());
+        reconcileOperationsAccessBinding(
+            accessActive,
+            snapshot.currentSessionId(),
+            snapshot.authenticatedAdminId()
+        );
         boolean custodyAttested =
             snapshot.recoveryCustodyState() == AdminRecoveryCustodyState.ATTESTED;
         loginGroup.setVisibility(!accessActive && !recoveryActive ? View.VISIBLE : View.GONE);
@@ -2330,6 +2590,12 @@ public final class AdminBoundaryActivity extends Activity {
             );
         }
         renderOriginalEvidenceConfirmationState();
+        if (operationsVisible && incidentRecoveryRefreshPending
+            && incidentStatusAttempt.isPending()) {
+            String recoveryIncidentId = incidentStatusAttempt.incidentId();
+            incidentRecoveryRefreshPending = false;
+            loadIncidentDetail(recoveryIncidentId);
+        }
     }
 
     private void renderDevices(
@@ -2615,18 +2881,45 @@ public final class AdminBoundaryActivity extends Activity {
         });
     }
 
-    private void reconcileOperationsAccessBinding(boolean accessActive, String currentSessionId) {
+    private void reconcileOperationsAccessBinding(
+        boolean accessActive,
+        String currentSessionId,
+        String currentAdminId
+    ) {
         if (!operationsAccessBindingInitialized
             || boundOperationsAccessActive != accessActive
-            || !java.util.Objects.equals(boundOperationsSessionId, currentSessionId)) {
-            resetSessionBoundReportState();
+            || !java.util.Objects.equals(boundOperationsSessionId, currentSessionId)
+            || !java.util.Objects.equals(boundOperationsAdminId, currentAdminId)) {
+            boolean restoringAccess = operationsAccessBindingInitialized
+                && !boundOperationsAccessActive
+                && accessActive;
+            boolean preserveReportRecovery = restoringAccess
+                && restoredReportStatusRecovery
+                && reportWorkflowController != null
+                && reportWorkflowController.statusDetailRecoveryReportId() != null;
+            boolean preserveIncidentRecovery = restoringAccess
+                && restoredIncidentStatusRecovery
+                && incidentStatusAttempt.belongsToActor(currentAdminId);
+            resetSessionBoundReportState(
+                preserveReportRecovery,
+                preserveIncidentRecovery
+            );
+            if (preserveReportRecovery) restoredReportStatusRecovery = false;
+            if (preserveIncidentRecovery) {
+                restoredIncidentStatusRecovery = false;
+                incidentRecoveryRefreshPending = true;
+            }
         }
         operationsAccessBindingInitialized = true;
         boundOperationsAccessActive = accessActive;
         boundOperationsSessionId = currentSessionId;
+        boundOperationsAdminId = currentAdminId;
     }
 
-    private void resetSessionBoundReportState() {
+    private void resetSessionBoundReportState(
+        boolean preserveReportRecovery,
+        boolean preserveIncidentRecovery
+    ) {
         operationsSessionGeneration += 1L;
         reportHistoryGeneration += 1L;
         safSaveGeneration += 1L;
@@ -2668,13 +2961,17 @@ public final class AdminBoundaryActivity extends Activity {
             incidentPanel.clearSensitiveInputs();
             incidentPanel.clearSubmittedEvidence();
         }
+        reviewDecisionAttempt.clear();
+        if (!preserveIncidentRecovery) incidentStatusAttempt.clear();
         if (rawCollectionPanel != null) rawCollectionPanel.clearSessionBoundDrafts();
         if (reportController != null) reportController.clearSessionState();
         if (reportRequestController != null) reportRequestController.clearSessionState();
         if (externalCopyDeletionController != null) {
             externalCopyDeletionController.clearSessionState();
         }
-        if (reportWorkflowController != null) reportWorkflowController.clearSessionState();
+        if (reportWorkflowController != null && !preserveReportRecovery) {
+            reportWorkflowController.clearSessionState();
+        }
         if (auditController != null) auditController.clearSessionState();
         if (incidentController != null) incidentController.clearSessionState();
         if (rawCollectionController != null) rawCollectionController.clearSessionState();
@@ -2854,6 +3151,56 @@ public final class AdminBoundaryActivity extends Activity {
         if (reportWorkflowController != null) reportWorkflowController.invalidate();
     }
 
+    private void restorePendingMutationRecovery(Bundle savedInstanceState) {
+        if (savedInstanceState == null) return;
+        String recoveryReportId = savedInstanceState.getString(
+            REPORT_STATUS_RECOVERY_ID_STATE
+        );
+        if (reportWorkflowController != null && recoveryReportId != null) {
+            try {
+                boolean patchConfirmed = savedInstanceState.getBoolean(
+                    REPORT_STATUS_RECOVERY_CONFIRMED_STATE,
+                    false
+                );
+                reportWorkflowController.restoreStatusDetailRecovery(
+                    recoveryReportId,
+                    patchConfirmed
+                        ? savedInstanceState.getString(REPORT_STATUS_RECOVERY_TARGET_STATE)
+                        : null,
+                    patchConfirmed
+                        ? savedInstanceState.getInt(REPORT_STATUS_RECOVERY_VERSION_STATE, 0)
+                        : 0,
+                    patchConfirmed
+                );
+                restoredReportStatusRecovery = true;
+                reportPanel.renderWorkflow(reportWorkflowController.snapshot());
+            } catch (IllegalArgumentException ignored) {
+                reportWorkflowController.clearSessionState();
+            }
+        }
+        String recoveryIncidentId = savedInstanceState.getString(INCIDENT_RECOVERY_ID_STATE);
+        if (recoveryIncidentId == null) return;
+        try {
+            incidentStatusAttempt.restore(
+                recoveryIncidentId,
+                savedInstanceState.getString(INCIDENT_RECOVERY_ACTOR_STATE),
+                savedInstanceState.getString(INCIDENT_RECOVERY_NEXT_STATE),
+                savedInstanceState.getInt(INCIDENT_RECOVERY_VERSION_STATE, 0),
+                savedInstanceState.getString(INCIDENT_RECOVERY_KEY_STATE),
+                savedInstanceState.getString(INCIDENT_RECOVERY_REASON_DIGEST_STATE),
+                savedInstanceState.getString(INCIDENT_RECOVERY_OBSERVATION_DIGEST_STATE),
+                savedInstanceState.getString(INCIDENT_RECOVERY_EVIDENCE_DIGEST_STATE)
+            );
+            restoredIncidentStatusRecovery = true;
+            incidentRecoveryRefreshPending = true;
+            resultText.setText(
+                "이전 중대 사고 상태 기록 결과를 복원했습니다. 재로그인 후 최신 이력을 확인하며 새 멱등키를 만들지 않습니다."
+            );
+        } catch (IllegalArgumentException ignored) {
+            incidentStatusAttempt.clear();
+        }
+    }
+
     private void refreshConnectedReportDetail() {
         if (reportPanel == null || reportPanel.selectedReportId() == null) return;
         if (!reportPanel.selectedReportId().equals(normalized(reportIdInput))) return;
@@ -2948,6 +3295,14 @@ public final class AdminBoundaryActivity extends Activity {
             executeReportWorkflow(request);
         } catch (IllegalArgumentException | IllegalStateException error) {
             resultText.setText("제출본 생성 재인증 입력을 확인해 주세요.");
+        }
+    }
+
+    private void retryReportStatusDetail() {
+        try {
+            executeReportWorkflow(reportWorkflowController.beginStatusDetailRetry());
+        } catch (IllegalStateException error) {
+            resultText.setText("최신 상세만 다시 조회할 상태 변경 결과가 없습니다.");
         }
     }
 
@@ -3300,7 +3655,9 @@ public final class AdminBoundaryActivity extends Activity {
             boolean applied = incidentController.execute(request);
             runOnUiThread(() -> {
                 if (isDestroyed() || !applied) return;
-                incidentPanel.render(incidentController.snapshot());
+                AdminIncidentController.State state = incidentController.snapshot();
+                incidentPanel.render(state);
+                reconcileIncidentStatusAttempt(state.detail(), state.historyItems());
             });
         });
     }
@@ -3315,14 +3672,26 @@ public final class AdminBoundaryActivity extends Activity {
         char[] totp
     ) {
         try {
-            if (detail == null || !detail.allowedNextStates().contains(nextState)
-                || !AdminIncidentModels.isAllowedTransition(detail.summary().status(), nextState)) {
+            String actorId = controller.snapshot().authenticatedAdminId();
+            boolean retryingPendingAttempt = detail != null
+                && incidentStatusAttempt.canRetry(
+                    actorId,
+                    detail.summary().incidentId(),
+                    nextState
+                );
+            if (detail == null || (!retryingPendingAttempt
+                && (!detail.allowedNextStates().contains(nextState)
+                    || !AdminIncidentModels.isAllowedTransition(
+                        detail.summary().status(),
+                        nextState
+                    )))) {
                 throw new IllegalArgumentException("incident transition is not allowed");
             }
-            AdminIncidentModels.StatusRequest request = new AdminIncidentModels.StatusRequest(
+            AdminIncidentModels.StatusRequest request = incidentStatusAttempt.prepare(
+                actorId,
+                detail.summary().incidentId(),
                 nextState,
                 detail.summary().statusVersion(),
-                UUID.randomUUID().toString(),
                 reason,
                 observation,
                 evidenceSha256
@@ -3341,21 +3710,25 @@ public final class AdminBoundaryActivity extends Activity {
                         System.currentTimeMillis(),
                         BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                     );
+                    incidentStatusAttempt.clear();
                     runOnUiThread(() -> {
                         if (isDestroyed()) return;
                         operationInFlight = false;
                         setInteractiveEnabled(contentRoot, true);
                         incidentPanel.clearSubmittedEvidence();
+                        incidentPanel.renderPendingStatusRetry(null);
                         resultText.setText(
                             "중대 사고 상태를 기록했습니다. 이 기록은 자동 복구나 자동 제어를 수행하지 않습니다."
                         );
                         loadIncidentDetail(detail.summary().incidentId());
                     });
                 } catch (AdminIncidentRepository.StatusConflictException conflict) {
+                    incidentStatusAttempt.clear();
                     runOnUiThread(() -> {
                         if (isDestroyed()) return;
                         operationInFlight = false;
                         setInteractiveEnabled(contentRoot, true);
+                        incidentPanel.renderPendingStatusRetry(null);
                         resultText.setText(
                             "다른 변경으로 상태 version이 달라졌습니다. 자동 재제출하지 않고 최신 기록을 조회합니다."
                         );
@@ -3366,7 +3739,10 @@ public final class AdminBoundaryActivity extends Activity {
                         if (isDestroyed()) return;
                         operationInFlight = false;
                         setInteractiveEnabled(contentRoot, true);
-                        resultText.setText("중대 사고 상태 기록을 저장하지 못했습니다. 입력과 서버 상태를 확인해 주세요.");
+                        resultText.setText(
+                            "중대 사고 상태 기록 결과를 확정할 수 없습니다. 새 요청을 만들지 않고 최신 상세에서 같은 멱등키의 결과를 확인합니다."
+                        );
+                        loadIncidentDetail(detail.summary().incidentId());
                     });
                 } finally {
                     Arrays.fill(password, '\0');
@@ -3377,6 +3753,30 @@ public final class AdminBoundaryActivity extends Activity {
             Arrays.fill(password, '\0');
             Arrays.fill(totp, '\0');
             resultText.setText("허용된 다음 상태, 사유, 관찰, SHA-256과 재인증 정보를 확인해 주세요.");
+        }
+    }
+
+    private void reconcileIncidentStatusAttempt(
+        AdminIncidentModels.Detail detail,
+        List<AdminIncidentModels.Event> events
+    ) {
+        AdminIncidentStatusAttempt.Reconciliation reconciliation =
+            incidentStatusAttempt.reconcile(detail, events);
+        incidentPanel.renderPendingStatusRetry(
+            incidentStatusAttempt.isPending()
+                && detail != null
+                && incidentStatusAttempt.incidentId().equals(detail.summary().incidentId())
+                ? incidentStatusAttempt.nextState()
+                : null
+        );
+        switch (reconciliation) {
+            case NONE -> { }
+            case UNCONFIRMED -> resultText.setText(
+                "최신 이력만으로는 보존한 멱등키의 성공을 확정할 수 없습니다. 같은 내용을 다시 입력하면 기존 키만 재사용합니다."
+            );
+            case CHANGED -> resultText.setText(
+                "최신 상세가 이전 기록 시도와 다른 상태로 변경되었습니다. 자동 재제출하지 않았습니다."
+            );
         }
     }
 
