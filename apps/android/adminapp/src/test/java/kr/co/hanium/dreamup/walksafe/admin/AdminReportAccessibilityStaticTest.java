@@ -85,6 +85,23 @@ public final class AdminReportAccessibilityStaticTest {
         assertTrue(build.contains("ADMIN_OPERATIONAL_WORKFLOWS_ENABLED\", \"false\""));
     }
 
+    @Test
+    public void sensitiveBoundaryInputsRestorePasswordMaskingAfterSingleLineMode() {
+        int inputStart = activity.indexOf("private EditText input(String hint, int inputType");
+        int inputEnd = activity.indexOf("private Button button(String label)", inputStart);
+        assertTrue(inputStart >= 0);
+        assertTrue(inputEnd > inputStart);
+        String input = activity.substring(inputStart, inputEnd);
+
+        assertTrue(input.indexOf("view.setSingleLine(true)") >= 0);
+        assertTrue(
+            input.indexOf("view.setSingleLine(true)")
+                < input.indexOf("view.setInputType(inputType)")
+        );
+        assertTrue(activity.contains("InputType.TYPE_TEXT_VARIATION_PASSWORD"));
+        assertTrue(activity.contains("InputType.TYPE_NUMBER_VARIATION_PASSWORD"));
+    }
+
     private static String read(String path) {
         try {
             return new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);

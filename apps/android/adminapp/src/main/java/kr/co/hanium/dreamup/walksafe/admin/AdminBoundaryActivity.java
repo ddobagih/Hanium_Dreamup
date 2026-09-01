@@ -3668,8 +3668,8 @@ public final class AdminBoundaryActivity extends Activity {
         EditText view = new EditText(this);
         view.setHint(hint);
         view.setContentDescription(hint);
-        view.setInputType(inputType);
         view.setSingleLine(true);
+        view.setInputType(inputType);
         view.setMinHeight(dp(48));
         view.setSaveEnabled(false);
         view.setId(View.NO_ID);
