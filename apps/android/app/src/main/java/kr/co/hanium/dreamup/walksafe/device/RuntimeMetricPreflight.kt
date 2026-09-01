@@ -191,11 +191,11 @@ class RuntimeMetricPreflightSession(
     @Synchronized
     fun observe(frame: RuntimeMetricFrameEvidence): RuntimeMetricPreflightResult {
         if (status != RuntimeMetricPreflightStatus.IN_PROGRESS) return result()
-        if (hasReachedDeadline(frame.observedAtElapsedRealtimeMs)) {
-            return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, frame.observedAtElapsedRealtimeMs)
-        }
         if (frame.generation != generation) {
             return finishUnknown(RuntimeMetricPreflightReason.GENERATION_MISMATCH, null)
+        }
+        if (hasReachedDeadline(frame.observedAtElapsedRealtimeMs)) {
+            return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, frame.observedAtElapsedRealtimeMs)
         }
         if (!frame.isWellFormed()) {
             return finishUnknown(RuntimeMetricPreflightReason.INVALID_FRAME_EVIDENCE, frame.observedAtElapsedRealtimeMs)

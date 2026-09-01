@@ -245,20 +245,21 @@ class RuntimeMetricPreflightTest {
 
     @Test
     fun mismatchedGenerationCannotContributeEvidence() {
-        val session = supportedSession(generation = 9L)
+        val deadlineMs = START_MS + RuntimeMetricPreflightPolicy.MAX_DURATION_MS
 
-        val mismatchedObservedAtMs = START_MS + 321L
-        val result = session.observe(
-            frame(index = 0, passing = true).copy(
-                generation = 8L,
-                observedAtElapsedRealtimeMs = mismatchedObservedAtMs,
-            ),
-        )
+        listOf(START_MS + 321L, deadlineMs, deadlineMs + 1L).forEach { observedAtMs ->
+            val result = supportedSession(generation = 9L).observe(
+                frame(index = 0, passing = true).copy(
+                    generation = 8L,
+                    observedAtElapsedRealtimeMs = observedAtMs,
+                ),
+            )
 
-        assertEquals(RuntimeMetricPreflightStatus.UNKNOWN, result.status)
-        assertEquals(RuntimeMetricPreflightReason.GENERATION_MISMATCH, result.reason)
-        assertEquals(0, result.distinctFrameCount)
-        assertNull(result.completedAtElapsedRealtimeMs)
+            assertEquals(RuntimeMetricPreflightStatus.UNKNOWN, result.status)
+            assertEquals(RuntimeMetricPreflightReason.GENERATION_MISMATCH, result.reason)
+            assertEquals(0, result.distinctFrameCount)
+            assertNull(result.completedAtElapsedRealtimeMs)
+        }
     }
 
     @Test
