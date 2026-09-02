@@ -33,7 +33,8 @@ class MainActivityEmailAccountStaticTest {
     @Test
     fun signupValidatesRequiredConsentAndDoesNotPersistSensitiveInputs() {
         val request = functionBlock("private fun requestEmailAccountOtp()")
-        assertTrue(request.contains("if (!selections.requiredGranted)"))
+        // 동의는 AppDesign signup-3 으로 옮겼다. 필수 3개는 계정 생성이 검사한다.
+        assertFalse(request.contains("if (!selections.requiredGranted)"))
         assertTrue(request.contains("EmailEnrollmentPartial("))
         assertFalse(request.contains("putString(email"))
         assertFalse(request.contains("putString(dateOfBirth"))
@@ -156,14 +157,15 @@ class MainActivityEmailAccountStaticTest {
             "firstRunProgressBar = LinearLayout(this).apply",
             "firstRunOnboardingStatusText = TextView(this).apply",
         )
-        assertTrue(
-            progress.contains(
-                "repeat(firstRunStageCount(firstRunOnboardingSnapshot))",
-            ),
-        )
+        // AppDesign Steps 는 5칸이다. 정책의 7 stage 는 그대로 두고 표시만 디자인을 따른다.
+        assertTrue(progress.contains("val stageCount = DESIGN_STEP_COUNT"))
+        assertTrue(progress.contains("repeat(stageCount) { index ->"))
+        assertTrue(source.contains("const val DESIGN_STEP_COUNT = 5"))
 
         val update = functionBlock("private fun updateFirstRunOnboardingUi()")
-        assertTrue(update.contains("val stageCount = firstRunStageCount(snapshot)"))
+        // 안내 문장도 AppDesign 의 표시용 5단계를 쓴다.
+        assertTrue(update.contains("val stageNumber = designStepNumber(snapshot)"))
+        assertTrue(update.contains("val stageCount = DESIGN_STEP_COUNT"))
         assertTrue(update.contains("\$stageNumber/\${stageCount}단계"))
         assertFalse(update.contains("\$stageNumber/6"))
         assertFalse(update.contains("\$stageNumber/7"))
@@ -182,10 +184,14 @@ class MainActivityEmailAccountStaticTest {
         )
         assertInOrder(
             controls,
-            "addView(accountEmailInput)",
-            "addView(accountPasswordInput)",
+            // AppDesign signup-1 의 라벨 붙은 입력칸이라 wsFieldGroup 으로 감싼다.
+            "wsFieldGroup(accountEmailInput",
+            "wsFieldGroup(accountPasswordInput",
             "addView(accountLoginButton)",
+            // AppDesign Welcome 은 고르는 화면이다. 「새 계정 만들기」와 「로그인」 두 개뿐이고
+            // 로그인 폼은 그 뒤의 별도 화면이다.
             "addView(accountSignupToggleButton)",
+            "addView(accountLoginEntryButton)",
             "addView(accountSignupControls)",
         )
         assertFalse(source.contains("accountRememberMeCheck"))
@@ -199,10 +205,14 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(update.contains("accountSignupControls.visibility ="))
         assertTrue(update.contains("accountConsentDisclosureExpanded"))
         assertTrue(update.contains("accountConsentDisclosureText.visibility ="))
+        // 로그인 제출 버튼은 로그인 화면에만 있다. 고르는 화면에는 진입 버튼만 온다.
         assertTrue(
             update.contains(
-                "accountLoginButton.visibility = if (signupVisible) View.GONE else View.VISIBLE",
+                "accountLoginButton.visibility = if (loginVisible) View.VISIBLE else View.GONE",
             ),
+        )
+        assertTrue(
+            update.contains("accountLoginEntryButton.visibility ="),
         )
         assertTrue(update.contains("로그인 화면으로 돌아가기"))
         assertTrue(update.contains("FirstRunOnboardingStage.ACCOUNT_CREATED"))
@@ -225,8 +235,14 @@ class MainActivityEmailAccountStaticTest {
         assertFalse(sessionChange.contains("firstRunOnboardingSnapshot = FirstRunOnboardingPolicy.initialEmailAccount("))
         assertTrue(update.contains("currentPostLoginDeviceCheckSessionBinding()"))
         assertTrue(update.contains("로그인 세션이 만료되었습니다"))
-        assertTrue(update.contains("val credentialFieldsVisible = !onConsentStep"))
-        assertTrue(update.contains("if (credentialFieldsVisible) View.VISIBLE else View.GONE"))
+        // 로그인 입력칸은 로그인 화면과 가입의 해당 단계에서만 보인다. 고르는 화면에는 없다.
+        assertTrue(update.contains("if (loginVisible || onDetailsStep) View.VISIBLE else View.GONE"))
+        assertTrue(
+            update.contains(
+                "if (loginVisible || onDetailsStep) View.VISIBLE else View.GONE",
+            ),
+        )
+        assertTrue(update.contains("val onLandingScreen = !signupVisible && !loginVisible"))
         assertTrue(update.contains("accountLoginButton.visibility"))
         assertTrue(update.contains("이전 로그인 상태 정리"))
         assertTrue(login.contains("mayReauthenticateVerifiedEmailActor"))

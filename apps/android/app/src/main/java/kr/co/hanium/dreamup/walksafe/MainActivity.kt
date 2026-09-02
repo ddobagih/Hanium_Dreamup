@@ -603,6 +603,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var accountConsentContinueButton: Button
     private lateinit var accountConsentStepControls: LinearLayout
     private lateinit var accountDetailsStepControls: LinearLayout
+    private lateinit var accountOtpStepControls: LinearLayout
+    private lateinit var accountCredentialStepControls: LinearLayout
+    private lateinit var accountSignupNavBar: LinearLayout
+    private lateinit var accountSignupNavTitle: TextView
+    private lateinit var accountOtpContinueButton: Button
+    private lateinit var accountSignupNavBackButton: Button
+    private lateinit var accountLoginEntryButton: Button
+    private lateinit var accountSignupHeadingText: TextView
+    private lateinit var accountSignupSubtextText: TextView
+    /** AppDesign Welcome 은 고르는 화면이다. 로그인 폼은 그 뒤의 별도 화면이다. */
+    private var accountLoginExpanded = false
     private lateinit var accountRequestOtpButton: Button
     private lateinit var accountCreateButton: Button
     private lateinit var accountLoginButton: Button
@@ -611,7 +622,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var accountSignupBackButton: Button
     private lateinit var accountConsentDisclosureToggleButton: Button
     private var accountSignupExpanded = false
-    private enum class AccountSignupStep { CONSENT, DETAILS }
+    /**
+     * AppDesign 회원가입 단계. signup-1..3 을 그대로 옮긴 순서다.
+     *
+     * 동의가 OTP 뒤로 간다. 서버는 OTP 요청에 동의값을 받지 않고 이메일·생년월일 형식과
+     * 연령만 검사하며(문안 초안 20260829 §4), 필수 3개는 createEmailAccount 가 계정을
+     * 만들 때 검사한다. 그래서 앱의 사전 검사만 옮기면 되고 서버 계약은 그대로다.
+     */
+    private enum class AccountSignupStep { DETAILS, OTP, CONSENT }
     private var accountSignupStep = AccountSignupStep.CONSENT
     private var accountConsentDisclosureExpanded = false
     private var accountInputErrorActive = false
@@ -651,8 +669,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val wsEmphasisButtons = mutableListOf<Button>()
     private lateinit var walkStatusSection: LinearLayout
     private lateinit var runtimeControls: LinearLayout
-    private lateinit var homeCardGrid: GridLayout
+    private lateinit var homeCardGrid: LinearLayout
     private val homeCardRefreshers = mutableListOf<() -> Unit>()
+    private lateinit var homeWalkPauseButton: Button
     private lateinit var controlsScroll: ScrollView
     private lateinit var walkSafetyScroll: ScrollView
     private lateinit var walkSafetyOverlay: LinearLayout
@@ -6981,10 +7000,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             )
             return
         }
-        if (!selections.requiredGranted) {
-            showMissingRequiredConsentError()
-            return
-        }
+        // 동의는 AppDesign signup-3 으로 옮겨졌다. 서버는 OTP 요청에 동의값을 받지 않고,
+        // 필수 3개는 createEmailAccount 가 계정을 만들 때 검사한다.
         val ownerBinding = emailEnrollmentOwnerBindingSha256
         val gatewayOrigin = configuredGatewayOriginOrNull()
         if (ownerBinding == null || gatewayOrigin == null) {
@@ -7038,6 +7055,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         emailEnrollmentPartial = partial
                         firstRunOnboardingSnapshot = transition.current
                         accountSignupExpanded = true
+                        accountSignupStep = AccountSignupStep.OTP
                         accountDateOfBirthInput.text?.clear()
                         applyAccountConsentSelections(selections)
                         updateFirstRunOnboardingUi()
@@ -7402,7 +7420,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun showMissingRequiredConsentError() {
         accountSignupExpanded = true
-        accountSignupStep = AccountSignupStep.CONSENT
+        accountSignupStep = AccountSignupStep.DETAILS
         val message = "필수 약관 세 가지에 모두 동의해야 가입할 수 있습니다."
         showAccountMessage(message)
         updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
@@ -11801,8 +11819,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             .show()
     }
 
-    /** AppDesign 홈 2x2 카드 그리드. 순서·문구·색은 HOME_CARDS 를 따른다. */
-    private fun buildHomeCardGrid(): GridLayout {
+    /** AppDesign 홈. 2x2 격자에서 세로 1열로 바뀌었고 카드는 3장이다. */
+    private fun buildHomeCardGrid(): LinearLayout {
         val density = resources.displayMetrics.density
         val gap = (WS_CARD_GAP_DP * density).roundToInt()
         homeCardRefreshers.clear()
@@ -11830,17 +11848,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 },
             ),
             wsHomeCard(
-                iconRes = R.drawable.ws_ic_card_arc,
-                title = "ARCore Depth 시작",
-                subtitle = "주변 위험을 감지합니다",
-                fill = WS_COLOR_CARD_ARC,
-                lockTitle = "ARCore 지원 확인 중",
-                lockDetail = "기기 거리 기능을 확인하고 있습니다. 카메라 권한이 필요합니다. " +
-                    "설정에서 카메라 권한을 허용해주세요.",
-                unlocked = { ::actionButton.isInitialized && actionButton.isEnabled },
-                onOpen = { actionButton.performClick() },
-            ),
-            wsHomeCard(
                 iconRes = R.drawable.ws_ic_card_mic,
                 title = "서버 음성 명령",
                 subtitle = "음성으로 명령합니다",
@@ -11851,18 +11858,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 onOpen = { ensureVoicePermissionThenListen() },
             ),
             wsHomeCard(
-                iconRes = R.drawable.ws_ic_card_report,
-                title = "손상 점자블록\n신고 요청",
-                subtitle = "신고를 접수합니다",
-                fill = WS_COLOR_CARD_REPORT,
-                lockTitle = "신고 저장 기능 준비 중",
-                lockDetail = "현재 앱 빌드에서는 손상 점자블록 신고 저장 기능을 사용할 수 없습니다.",
-                unlocked = { ::explicitReportButton.isInitialized && explicitReportButton.isEnabled },
-                onOpen = { requestExplicitReport(ExplicitReportRequestSource.ON_SCREEN) },
+                iconRes = R.drawable.ws_ic_card_settings,
+                title = "설정",
+                subtitle = "앱 환경을 조정합니다",
+                fill = WS_COLOR_CARD_SET,
+                lockTitle = "설정",
+                lockDetail = "설정 화면은 준비 중입니다.",
+                unlocked = { false },
+                onOpen = {},
             ),
         )
-        return GridLayout(this).apply {
-            columnCount = 2
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -11874,19 +11881,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             cards.forEachIndexed { index, card ->
                 addView(
                     card,
-                    GridLayout.LayoutParams(
-                        GridLayout.spec(index / 2, 1f),
-                        GridLayout.spec(index % 2, 1f),
-                    ).apply {
-                        // FILL 이 없으면 카드가 늘어난 행 높이를 채우지 않아
-                        // 아이콘 위 / 글자 아래(justify-between) 배치가 무너진다.
-                        setGravity(Gravity.FILL)
-                        width = 0
-                        height = ViewGroup.LayoutParams.WRAP_CONTENT
-                        leftMargin = if (index % 2 == 0) 0 else gap / 2
-                        rightMargin = if (index % 2 == 0) gap / 2 else 0
-                        bottomMargin = if (index < 2) gap else 0
-                    },
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply { if (index > 0) topMargin = gap },
                 )
             }
         }
@@ -11894,9 +11892,107 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun refreshHomeCards() {
         if (!::homeCardGrid.isInitialized) return
-        homeCardGrid.visibility =
-            if (firstRunOnboardingComplete()) View.VISIBLE else View.GONE
+        val visibility = if (firstRunOnboardingComplete()) View.VISIBLE else View.GONE
+        homeCardGrid.visibility = visibility
+        if (::homeWalkPauseButton.isInitialized) homeWalkPauseButton.visibility = visibility
         homeCardRefreshers.forEach { it() }
+    }
+
+    /**
+     * AppDesign NavBar. 회원가입 단계 위에 붙어 뒤로가기와 현재 단계 제목을 준다.
+     * accessiblePriorityUserButton 은 buildContentView 지역 함수라 여기서는 직접 만든다.
+     */
+    private fun buildAccountSignupNavBar(): LinearLayout {
+        val density = resources.displayMetrics.density
+        fun px(dp: Float) = (dp * density).roundToInt()
+
+        accountSignupNavBackButton = Button(this).apply {
+            id = View.generateViewId()
+            text = "\u2039"
+            // 첫 단계에서는 로그인 화면으로 빠지므로 "이전 단계"라고 단정하지 않는다.
+            contentDescription = "뒤로 가기. 이전 화면으로 돌아갑니다"
+            isAllCaps = false
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, MIN_INTERACTIVE_TEXT_SP)
+            minimumWidth = accessibilityTargetSizePx()
+            minimumHeight = accessibilityTargetSizePx()
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            setOnClickListener { accountSignupStepBack() }
+        }
+        val back = accountSignupNavBackButton
+        applyWsSecondaryButtonStyle(back)
+        accountSignupNavTitle = TextView(this).apply {
+            text = "회원가입"
+            gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_SUBTEXT_SP)
+            setTextColor(WS_COLOR_BUTTON_TEXT)
+            typeface = wsTypeface(Typeface.NORMAL, medium = true)
+            // 제목은 아래 단계 안내 heading 이 이미 읽는다.
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f,
+            )
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = px(WS_TITLE_GAP_DP) }
+            addView(
+                back,
+                LinearLayout.LayoutParams(
+                    accessibilityTargetSizePx(),
+                    accessibilityTargetSizePx(),
+                ),
+            )
+            addView(accountSignupNavTitle)
+            // 제목이 가운데 오도록 뒤로가기와 같은 폭을 반대쪽에 비운다.
+            addView(
+                View(this@MainActivity).apply {
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                },
+                LinearLayout.LayoutParams(accessibilityTargetSizePx(), 1),
+            )
+        }
+    }
+
+    /**
+     * NavBar 뒤로가기. 첫 단계에서는 로그인 화면으로 빠진다.
+     * 인증번호 단계에서는 정보 입력을 건너뛰고 동의로 간다. OTP 를 이미 보낸 뒤라
+     * 정보 입력에는 누를 수 있는 버튼이 없다.
+     */
+    private fun accountSignupStepBack() {
+        if (accountLoginExpanded && !accountSignupExpanded) {
+            accountLoginExpanded = false
+            updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
+            return
+        }
+        val previous = when (accountSignupStep) {
+            AccountSignupStep.CONSENT -> AccountSignupStep.OTP
+            // OTP 를 이미 보낸 뒤라 정보 입력에는 누를 버튼이 없다.
+            AccountSignupStep.OTP -> null
+            AccountSignupStep.DETAILS -> null
+        }
+        if (previous == null) {
+            accountSignupToggleButton.performClick()
+            return
+        }
+        accountSignupStep = previous
+        updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
+    }
+
+    /**
+     * AppDesign Home 하단의 보행 안내 일시중지.
+     * 진행 중인 보행이 없으면 시스템 뒤로가기와 같은 판정이라 사유만 알린다.
+     */
+    private fun requestHomeWalkPause() {
+        if (!handleWalkScreenBackPressed()) {
+            showHomeCardLockNotice(HOME_WALK_PAUSE_IDLE_TITLE, HOME_WALK_PAUSE_IDLE_DETAIL)
+        }
     }
 
     /**
@@ -12117,6 +12213,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
      * 둘 다 두면 TalkBack 이 같은 내용을 두 번 읽는다.
      * 디자인의 14sp 대신 16sp 를 쓴다. 근거는 MIN_INTERACTIVE_TEXT_SP 와 같다.
      */
+    /**
+     * wsFieldGroup 은 라벨·입력칸·힌트를 한 덩어리로 묶는다. 입력칸만 숨기면
+     * 라벨과 힌트가 화면에 남으므로 가시성은 반드시 이 그룹 단위로 바꾼다.
+     */
+    private fun wsFieldGroupOf(input: EditText): View = input.parent as? View ?: input
+
     private fun wsFieldGroup(
         input: EditText,
         label: String,
@@ -12205,7 +12307,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!::firstRunOnboardingSnapshot.isInitialized) return
         val current = firstRunOnboardingSnapshot
         if (current.stage == FirstRunOnboardingStage.FP004_TRAINING) {
-            completeFirstRunFp004TrainingIfReady("preview")
+            // actorId 는 verifiedActorBinding.value 와 대조된다. 리터럴을 넘기면
+            // 두 번째 guard 에서 무조건 false 라 이 분기가 아무 일도 하지 않았다.
+            // 다른 호출자와 같은 값을 쓰고, 교육 actor 도 같은 자리에서 묶는다.
+            bindFirstRunVerifiedActorForTraining()
+            firstRunOnboardingSnapshot.verifiedActorBinding?.value?.let {
+                completeFirstRunFp004TrainingIfReady(it)
+            }
             updateFirstRunOnboardingUi()
             return
         }
@@ -12626,13 +12734,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             // 같은 정보를 아래 heading 문장이 낭독하므로 접근성 트리에서 제외한다.
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            // NO 는 이 view 만 빼고 자식은 남긴다. 그러면 원 안의 "1".."7" 이 그대로
+            // 낭독되므로 반드시 자손까지 숨기는 쪽을 쓴다.
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             val density = resources.displayMetrics.density
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply { topMargin = (WS_TITLE_GAP_DP * density).roundToInt() }
-            val stageCount = firstRunStageCount(firstRunOnboardingSnapshot)
+            val stageCount = DESIGN_STEP_COUNT
             // ponytail: 단계가 많은 흐름에서는 원을 줄여 한 줄에 담는다.
             // 폭을 재서 맞추는 방식은 단계 수가 더 늘 때 고려한다.
             val circlePx = (
@@ -13059,9 +13169,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 if (!currentAccountConsentSelections().requiredGranted) {
                     showMissingRequiredConsentError()
                 } else {
-                    accountSignupStep = AccountSignupStep.DETAILS
-                    updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
-                    accountEmailInput.post { accountEmailInput.requestFocus() }
+                    // AppDesign signup-3 이 마지막 가입 화면이다. 여기서 계정을 만든다.
+                    createEmailAccount()
                 }
             },
         )
@@ -13069,6 +13178,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             label = "이메일 인증번호 받기",
             emphasis = true,
             onClick = ::requestEmailAccountOtp,
+        )
+        accountOtpContinueButton = accessiblePriorityUserButton(
+            label = "다음",
+            emphasis = true,
+            spokenLabel =
+                "다음. 비밀번호를 입력하는 화면으로 넘어갑니다. " +
+                    "인증번호는 계정을 만들 때 함께 확인합니다",
+            onClick = {
+                if (accountOtpInput.text.isNullOrBlank()) {
+                    showAccountInputError(accountOtpInput, "인증번호를 입력해 주세요.")
+                } else {
+                    accountSignupStep = AccountSignupStep.DETAILS
+                    updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
+                    accountConsentAllCheck.post { accountConsentAllCheck.requestFocus() }
+                }
+            },
         )
         accountCreateButton = accessiblePriorityUserButton(
             label = "인증번호 확인 후 계정 만들기",
@@ -13080,25 +13205,39 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             emphasis = true,
             onClick = { loginEmailAccount() },
         )
+        accountLoginEntryButton = accessiblePriorityUserButton(
+            label = "로그인",
+            spokenLabel = "로그인. 기존 계정으로 로그인하는 화면을 엽니다",
+            onClick = {
+                accountLoginExpanded = true
+                updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
+                accountEmailInput.post { accountEmailInput.requestFocus() }
+            },
+        )
         accountSessionLogoutButton = accessiblePriorityUserButton(
             label = "현재 계정 로그아웃",
             onClick = ::onAccountSessionButtonClicked,
         )
         accountSignupToggleButton = accessiblePriorityUserButton(
             label = "새 계정 만들기",
+            // AppDesign Welcome 에서 회원가입이 주 행동이고 로그인이 보조다.
+            emphasis = true,
             spokenLabel = "새 계정 만들기, 가입 입력 펼치기",
             onClick = {
                 val opening = !accountSignupExpanded
                 accountSignupExpanded = opening
+                // 가입을 열거나 닫으면 로그인 폼은 접는다. 두 화면이 겹치지 않는다.
+                accountLoginExpanded = false
                 accountSignupStep =
                     if (
                         opening &&
                         firstRunOnboardingSnapshot.stage ==
                         FirstRunOnboardingStage.ACCOUNT_CREATED
                     ) {
-                        AccountSignupStep.DETAILS
+                        // OTP 를 이미 받은 상태라 인증번호 단계로 되돌아간다.
+                        AccountSignupStep.OTP
                     } else {
-                        AccountSignupStep.CONSENT
+                        AccountSignupStep.DETAILS
                     }
                 updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
                 if (opening) {
@@ -13107,9 +13246,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             firstRunOnboardingSnapshot.stage ==
                             FirstRunOnboardingStage.ACCOUNT_CREATED
                         ) {
-                            accountPasswordInput
+                            accountOtpInput
                         } else {
-                            accountConsentDisclosureToggleButton
+                            accountEmailInput
                         }
                     focusTarget.post {
                         focusTarget.requestFocus()
@@ -13139,6 +13278,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
             },
         )
+        accountSignupHeadingText = TextView(this).apply {
+            id = View.generateViewId()
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_SIGNUP_HEADING_SP)
+            setTextColor(WS_COLOR_BUTTON_TEXT)
+            typeface = wsTypeface(Typeface.BOLD)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
+        ViewCompat.setAccessibilityHeading(accountSignupHeadingText, true)
+        accountSignupSubtextText = TextView(this).apply {
+            id = View.generateViewId()
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_SUBTEXT_SP)
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            setLineSpacing(0f, 1.35f)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
         accountConsentStepControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -13150,39 +13304,64 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             addView(accountConsentSummaryText)
             addView(accountConsentContinueButton)
+            addView(accountCreateButton)
         }
         accountDetailsStepControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            addView(wsFieldGroup(accountDateOfBirthInput, "생년월일"))
+            addView(
+                wsFieldGroup(
+                    accountDateOfBirthInput,
+                    "생년월일",
+                    "만 14세 미만은 가입 및 서비스 이용이 제한됩니다",
+                ),
+            )
             addView(accountRequestOtpButton)
+        }
+        accountOtpStepControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(wsFieldGroup(accountOtpInput, "인증번호"))
+            addView(accountOtpContinueButton)
+        }
+        accountCredentialStepControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            visibility = View.GONE
         }
         accountSignupBackButton = accessiblePriorityUserButton(
             label = "로그인 화면으로 돌아가기",
             spokenLabel = "로그인 화면으로 돌아가기. 두 번 탭하여 가입 입력을 닫습니다",
             onClick = { accountSignupToggleButton.performClick() },
         )
+        accountSignupNavBar = buildAccountSignupNavBar()
         accountSignupControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             addView(accountConsentStepControls)
             addView(accountDetailsStepControls)
-            addView(wsFieldGroup(accountPasswordConfirmationInput, "비밀번호 확인"))
-            addView(wsFieldGroup(accountOtpInput, "인증번호"))
-            addView(accountCreateButton)
+            addView(accountOtpStepControls)
+            addView(accountCredentialStepControls)
             addView(accountSignupBackButton)
         }
         accountAccessControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            // 이메일·비밀번호는 로그인과 공유하는 입력칸이라 가입 컨테이너 밖에 있다.
+            // AppDesign signup-1 의 순서대로 제목·부제도 여기에 둔다.
+            addView(accountSignupNavBar)
+            addView(accountSignupHeadingText)
+            addView(accountSignupSubtextText)
             addView(accountAccessStatusText)
             addView(wsFieldGroup(accountEmailInput, "이메일"))
             addView(
                 wsFieldGroup(accountPasswordInput, "비밀번호", "10자 이상 128자 이하"),
             )
+            addView(wsFieldGroup(accountPasswordConfirmationInput, "비밀번호 확인"))
             addView(accountLoginButton)
             addView(accountSignupToggleButton)
+            addView(accountLoginEntryButton)
             addView(accountSignupControls)
             addView(accountSessionLogoutButton)
         }
@@ -14196,6 +14375,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         applyAccessibleControlDefaults(overlay)
         homeCardGrid = buildHomeCardGrid()
         overlay.addView(homeCardGrid, overlay.indexOfChild(walkStatusSection))
+        homeWalkPauseButton = accessiblePriorityUserButton(
+            label = HOME_WALK_PAUSE_LABEL,
+            spokenLabel = "$HOME_WALK_PAUSE_LABEL. 진행 중인 보행 안내를 일시중지합니다",
+            onClick = ::requestHomeWalkPause,
+        )
+        overlay.addView(homeWalkPauseButton, overlay.indexOfChild(walkStatusSection))
+        applyWsSecondaryButtonStyle(homeWalkPauseButton)
         applyWsButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)
         applyWsButtonStyle(
             startupCapabilityConfirmButton,
@@ -14211,7 +14397,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             walkReadinessToggleButton,
             runtimeDebugControlsToggleButton,
             gatewaySessionControlsToggleButton,
-            accountSignupToggleButton,
+            // accountSignupToggleButton 은 주 행동이라 여기 넣지 않는다.
+            // secondary 는 emphasis 뒤에 돌아 배경을 덮어쓴다.
             accountSignupBackButton,
             accountConsentDisclosureToggleButton,
             firstRunDisclosureToggleButton,
@@ -14426,7 +14613,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 WalkSessionState.ACTIVE,
                 WalkSessionState.PAUSED,
             )
-        if (walkScreenVisible) {
+        if (walkScreenVisible || onAccountStepScreen()) {
             productPurposeText.visibility = View.GONE
             firstRunNoticeToggleButton.visibility = View.GONE
             return
@@ -14457,11 +14644,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             add(productPurposeText)
             add(firstRunNoticeToggleButton)
             add(firstRunOnboardingStatusText)
+            add(accountSignupNavBackButton)
             add(accountAccessStatusText)
             add(accountEmailInput)
             add(accountPasswordInput)
             add(accountLoginButton)
             add(accountSignupToggleButton)
+            add(accountLoginEntryButton)
             add(accountConsentDisclosureToggleButton)
             add(accountConsentDisclosureText)
             add(accountConsentAllCheck)
@@ -14475,6 +14664,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             add(accountRequestOtpButton)
             add(accountPasswordConfirmationInput)
             add(accountOtpInput)
+            add(accountOtpContinueButton)
             add(accountCreateButton)
             add(accountSignupBackButton)
             add(accountSessionLogoutButton)
@@ -14507,6 +14697,54 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             current.nextFocusUpId = previous.id
         }
     }
+
+    /**
+     * 가입·로그인 단계 화면인가. 고르는 화면(Welcome)은 여기 해당하지 않는다.
+     *
+     * AppDesign 의 signup-1..3 에는 안전 배너와 스테퍼가 모두 들어 있어 접지 않는다.
+     * 접으려면 `accountSignupExpanded || accountLoginExpanded` 를 반환하게 하면 된다.
+     */
+    private fun onAccountStepScreen(): Boolean = false
+
+    /**
+     * 계정 화면 위의 고정 크롬. AppDesign 에서 Welcome 은 독립 화면이라 스테퍼가 없고,
+     * 로그인 화면과 가입 S1~S6 에는 브랜드도 일러스트도 없다. 남겨두면 그 화면의
+     * 실제 내용이 밖으로 밀린다.
+     *
+     * 이 세 view 의 가시성 소유자는 이 함수 하나다. 화면 모드를 바꾸는 곳은
+     * updateEmailAccountAccessUi 를 거치므로 거기서 한 번만 부른다.
+     */
+    private fun syncAccountScreenChrome() {
+        val landing = onAccountLandingScreen()
+        val foldChrome = landing || onAccountStepScreen()
+        if (::firstRunProgressBar.isInitialized) {
+            firstRunProgressBar.visibility =
+                if (firstRunOnboardingComplete() || foldChrome) View.GONE else View.VISIBLE
+        }
+        if (::firstRunOnboardingStatusText.isInitialized) {
+            firstRunOnboardingStatusText.visibility =
+                if (foldChrome) View.GONE else View.VISIBLE
+        }
+        if (::brandHeader.isInitialized) {
+            brandHeader.visibility = if (landing) View.VISIBLE else View.GONE
+        }
+        // 안전 배너 소유자는 refreshFirstRunNoticeUi 하나다. 모드가 바뀌면 같이 갱신한다.
+        refreshFirstRunNoticeUi()
+    }
+
+    /**
+     * AppDesign Welcome. 아직 계정 단계이고 로그인 폼도 가입도 열지 않은 상태다.
+     * 이 화면에는 브랜드·일러스트·헤드라인과 「새 계정 만들기」·「로그인」만 있다.
+     */
+    private fun onAccountLandingScreen(): Boolean =
+        ::firstRunOnboardingSnapshot.isInitialized &&
+            firstRunOnboardingSnapshot.stage in setOf(
+                FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT,
+                // OTP 를 보낸 뒤 가입을 닫아도 「계정 만들기 계속」으로 돌아올 자리가 필요하다.
+                FirstRunOnboardingStage.ACCOUNT_CREATED,
+            ) &&
+            !accountSignupExpanded &&
+            !accountLoginExpanded
 
     private fun firstRunOnboardingComplete(): Boolean {
         if (
@@ -14775,6 +15013,36 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             storedDeviceCheckBindingValidationPending = false
             startupCapabilityProbe.close()
         }
+    }
+
+    /**
+     * AppDesign Steps 는 5칸이다. 가입 화면 3개는 EMAIL_OTP_ENROLLMENT·ACCOUNT_CREATED
+     * 안에서 나뉘므로 표시 번호는 stage 가 아니라 accountSignupStep 에서 나온다.
+     * 정책의 7 stage 는 그대로 두고 표시만 디자인을 따른다.
+     */
+    private fun designStepNumber(snapshot: FirstRunOnboardingSnapshot): Int =
+        when (snapshot.stage) {
+            FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT,
+            FirstRunOnboardingStage.ACCOUNT_CREATED,
+            -> when (accountSignupStep) {
+                AccountSignupStep.DETAILS -> 1
+                AccountSignupStep.OTP -> 2
+                AccountSignupStep.CONSENT -> 3
+            }
+            FirstRunOnboardingStage.VERIFIED_LOGIN,
+            FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
+            FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+            FirstRunOnboardingStage.DEVICE_CHECK,
+            -> 4
+            else -> 5
+        }
+
+    private fun designStepName(number: Int): String = when (number) {
+        1 -> "정보 입력"
+        2 -> "인증번호 확인"
+        3 -> "약관 동의"
+        4 -> "기기 기능 점검"
+        else -> "안전교육·연습"
     }
 
     private fun firstRunStageNumber(snapshot: FirstRunOnboardingSnapshot): Int =
@@ -17515,32 +17783,73 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val verifiedLogin = snapshot.stage == FirstRunOnboardingStage.VERIFIED_LOGIN
         if (verifiedLogin || reauthenticationRequired) {
             accountSignupExpanded = false
-            accountSignupStep = AccountSignupStep.CONSENT
+            accountSignupStep = AccountSignupStep.DETAILS
         }
         val signupVisible =
             accountSignupExpanded && !verifiedLogin && !reauthenticationRequired
-        if (!signupVisible) accountSignupStep = AccountSignupStep.CONSENT
+        if (!signupVisible) accountSignupStep = AccountSignupStep.DETAILS
+        // 재로그인이 필요하면 고르는 화면을 거치지 않고 바로 로그인 폼을 연다.
+        if (reauthenticationRequired) accountLoginExpanded = true
+        val loginVisible = accountLoginExpanded && !signupVisible && !verifiedLogin
+        // AppDesign Welcome: 브랜드·일러스트·헤드라인과 「새 계정 만들기」·「로그인」 두 개뿐이다.
+        val onLandingScreen = !signupVisible && !loginVisible && !verifiedLogin
         val busy = accountRequestFence.isInFlight()
-        val inSignup = signupVisible && !creating
-        val onConsentStep =
-            inSignup && accountSignupStep == AccountSignupStep.CONSENT
+        // enrollment 가 없으면 입력할 인증번호가 없고, 발송한 뒤에는 정보 입력이 막다른 길이다.
+        // accountRequestOtpButton 이 ACCOUNT_CREATED 에서 숨겨져 앞으로 갈 수단이 없기 때문이다.
+        if (signupVisible && !creating && accountSignupStep > AccountSignupStep.DETAILS) {
+            accountSignupStep = AccountSignupStep.DETAILS
+        }
+        if (signupVisible && creating && accountSignupStep < AccountSignupStep.OTP) {
+            accountSignupStep = AccountSignupStep.OTP
+        }
         val onDetailsStep =
-            inSignup && accountSignupStep == AccountSignupStep.DETAILS
+            signupVisible && accountSignupStep == AccountSignupStep.DETAILS
+        val onOtpStep =
+            signupVisible && accountSignupStep == AccountSignupStep.OTP
+        val onConsentStep =
+            signupVisible && accountSignupStep == AccountSignupStep.CONSENT
+        // 비밀번호·비밀번호 확인은 AppDesign signup-1 로 올라갔다.
+        val onCredentialStep = onDetailsStep
         accountConsentStepControls.visibility =
             if (onConsentStep) View.VISIBLE else View.GONE
         accountDetailsStepControls.visibility =
             if (onDetailsStep) View.VISIBLE else View.GONE
-        val credentialFieldsVisible = !onConsentStep
-        accountEmailInput.visibility =
-            if (credentialFieldsVisible) View.VISIBLE else View.GONE
-        accountPasswordInput.visibility =
-            if (credentialFieldsVisible) View.VISIBLE else View.GONE
-        accountLoginButton.visibility = if (signupVisible) View.GONE else View.VISIBLE
-        accountSignupToggleButton.visibility = when {
-            verifiedLogin || reauthenticationRequired -> View.GONE
-            signupVisible -> View.GONE
-            else -> View.VISIBLE
+        accountOtpStepControls.visibility = if (onOtpStep) View.VISIBLE else View.GONE
+        accountCredentialStepControls.visibility =
+            if (onCredentialStep) View.VISIBLE else View.GONE
+        // 이메일은 로그인 화면과 가입 정보 입력 단계, 비밀번호는 로그인 화면과 계정 생성 단계.
+        // 고르는 화면에는 입력칸이 없다.
+        wsFieldGroupOf(accountEmailInput).visibility =
+            if (loginVisible || onDetailsStep) View.VISIBLE else View.GONE
+        wsFieldGroupOf(accountPasswordInput).visibility =
+            if (loginVisible || onDetailsStep) View.VISIBLE else View.GONE
+        accountSignupNavBar.visibility =
+            if (signupVisible || loginVisible) View.VISIBLE else View.GONE
+        if (::accountSignupHeadingText.isInitialized) {
+            val heading = when (accountSignupStep) {
+                AccountSignupStep.DETAILS -> SIGNUP_DETAILS_HEADING_KO
+                AccountSignupStep.OTP -> SIGNUP_OTP_HEADING_KO
+                AccountSignupStep.CONSENT -> SIGNUP_CONSENT_HEADING_KO
+            }
+            accountSignupHeadingText.text = heading
+            accountSignupHeadingText.contentDescription = heading
+            accountSignupHeadingText.visibility =
+                if (signupVisible) View.VISIBLE else View.GONE
+            accountSignupSubtextText.text = SIGNUP_DETAILS_SUBTEXT_KO
+            accountSignupSubtextText.contentDescription = SIGNUP_DETAILS_SUBTEXT_KO
+            accountSignupSubtextText.visibility =
+                if (onDetailsStep) View.VISIBLE else View.GONE
         }
+        syncAccountScreenChrome()
+        if (::accountSignupNavTitle.isInitialized) {
+            accountSignupNavTitle.text =
+                if (loginVisible) "로그인" else SIGNUP_NAV_TITLE_KO
+        }
+        accountLoginButton.visibility = if (loginVisible) View.VISIBLE else View.GONE
+        accountLoginEntryButton.visibility =
+            if (onLandingScreen) View.VISIBLE else View.GONE
+        accountSignupToggleButton.visibility =
+            if (onLandingScreen) View.VISIBLE else View.GONE
         accountSignupBackButton.visibility =
             if (signupVisible) View.VISIBLE else View.GONE
         accountSignupToggleButton.text =
@@ -17560,11 +17869,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         accountSignupControls.visibility =
             if (signupVisible && !verifiedLogin) View.VISIBLE else View.GONE
-        accountDateOfBirthInput.visibility =
+        wsFieldGroupOf(accountDateOfBirthInput).visibility =
             if (onDetailsStep) View.VISIBLE else View.GONE
-        accountPasswordConfirmationInput.visibility =
-            if (creating && signupVisible) View.VISIBLE else View.GONE
-        accountOtpInput.visibility = if (creating && signupVisible) View.VISIBLE else View.GONE
+        wsFieldGroupOf(accountPasswordConfirmationInput).visibility =
+            if (onDetailsStep) View.VISIBLE else View.GONE
+        wsFieldGroupOf(accountOtpInput).visibility =
+            if (onOtpStep) View.VISIBLE else View.GONE
         accountConsentDisclosureToggleButton.visibility =
             if (onConsentStep) View.VISIBLE else View.GONE
         accountConsentDisclosureToggleButton.text =
@@ -17621,6 +17931,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "필수 약관 3개를 확인한 뒤 가입 정보 입력으로 진행하세요. 선택 약관은 가입 조건이 아닙니다."
             onDetailsStep ->
                 "이메일과 생년월일을 입력하고 인증번호를 받으세요."
+            onLandingScreen ->
+                "계정을 만들거나 기존 계정으로 로그인하세요."
             else ->
                 "이메일과 비밀번호를 입력하세요."
         }
@@ -17698,48 +18010,48 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             !::firstRunOnboardingStatusText.isInitialized
         ) return
         val snapshot = firstRunOnboardingSnapshot
-        val stageNumber = firstRunStageNumber(snapshot)
-        val stageCount = firstRunStageCount(snapshot)
+        val stageNumber = designStepNumber(snapshot)
+        val stageCount = DESIGN_STEP_COUNT
         val message = when (snapshot.stage) {
             FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT ->
-                "첫 실행 $stageNumber/${stageCount}단계. 로그인하거나 새 계정을 만드세요."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 로그인하거나 새 계정을 만드세요."
             FirstRunOnboardingStage.ACCOUNT_CREATED ->
-                "첫 실행 $stageNumber/${stageCount}단계. 인증번호를 입력해 계정을 만드세요."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 인증번호를 입력해 계정을 만드세요."
             FirstRunOnboardingStage.PURPOSE_AND_SAFETY ->
-                "첫 실행 $stageNumber/${stageCount}단계. 서비스 목적과 안전 한계를 확인하세요."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 서비스 목적과 안전 한계를 확인하세요."
             FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED ->
-                "첫 실행 $stageNumber/${stageCount}단계. 연령 구간을 확인하세요."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 연령 구간을 확인하세요."
             FirstRunOnboardingStage.INTEGRATED_CONSENT ->
-                "첫 실행 $stageNumber/${stageCount}단계. 필수·선택 동의를 확인하세요."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 필수·선택 동의를 확인하세요."
             FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION ->
-                "첫 실행 $stageNumber/${stageCount}단계. 본인 확인 제출 상태를 확인하세요."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 본인 확인 제출 상태를 확인하세요."
             FirstRunOnboardingStage.VERIFIED_SMS ->
-                "첫 실행 $stageNumber/${stageCount}단계. 인증 확인을 기다리는 중입니다."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 인증 확인을 기다리는 중입니다."
             FirstRunOnboardingStage.GUARDIAN_APPROVAL ->
-                "첫 실행 $stageNumber/${stageCount}단계. 보호자 확인을 기다리는 중입니다."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 보호자 확인을 기다리는 중입니다."
             FirstRunOnboardingStage.ACCOUNT_ACTIVATION ->
-                "첫 실행 $stageNumber/${stageCount}단계. 계정 활성화를 기다리는 중입니다."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 계정 활성화를 기다리는 중입니다."
             FirstRunOnboardingStage.VERIFIED_LOGIN ->
                 if (snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4) {
-                    "첫 실행 $stageNumber/${stageCount}단계. 만든 계정으로 로그인하세요."
+                    "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 만든 계정으로 로그인하세요."
                 } else {
-                    "첫 실행 $stageNumber/${stageCount}단계. 로그인 확인을 기다리는 중입니다."
+                    "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 로그인 확인을 기다리는 중입니다."
                 }
             FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION ->
-                "첫 실행 $stageNumber/${stageCount}단계. 필요한 권한을 확인하세요."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 필요한 권한을 확인하세요."
             FirstRunOnboardingStage.DEVICE_CHECK ->
-                "첫 실행 $stageNumber/${stageCount}단계. 기기 기능을 점검하세요."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 기기 기능을 점검하세요."
             FirstRunOnboardingStage.FP004_TRAINING ->
-                "첫 실행 $stageNumber/${stageCount}단계. 안전교육과 조작 연습을 완료하세요."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 안전교육과 조작 연습을 완료하세요."
             FirstRunOnboardingStage.COMPLETE ->
                 if (firstRunOnboardingComplete()) {
-                    "첫 실행 $stageNumber/${stageCount}단계 완료. 첫 설정을 완료했습니다."
+                    "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)} 완료. 첫 설정을 완료했습니다."
                 } else {
-                    "첫 실행 $stageNumber/${stageCount}단계 완료 기록은 있으나 " +
+                    "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)} 완료 기록은 있으나 " +
                         "현재 권한·안전 상태 재확인이 필요합니다. 기능은 잠겨 있습니다."
                 }
             FirstRunOnboardingStage.BLOCKED_UNDER_14 ->
-                "첫 실행 $stageNumber/${stageCount}단계. 만 14세 미만은 가입할 수 없습니다."
+                "첫 실행 $stageNumber/${stageCount}단계 · ${designStepName(stageNumber)}. 만 14세 미만은 가입할 수 없습니다."
         }
         firstRunOnboardingStatusText.text = message
         firstRunOnboardingStatusText.contentDescription = message
@@ -17925,19 +18237,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 )
                 circle.text = if (done) "✓" else "${index + 1}"
             }
-            firstRunProgressBar.visibility =
-                if (firstRunOnboardingComplete()) View.GONE else View.VISIBLE
         }
-        if (::brandHeader.isInitialized) {
-            // AppDesign 에서 Welcome 은 독립 화면이다. S1~S6 에는 브랜드도 일러스트도 없다.
-            // 모든 단계에 남겨두면 그 단계의 실제 내용이 화면 밖으로 밀린다.
-            brandHeader.visibility =
-                if (snapshot.stage == FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT) {
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
-        }
+        syncAccountScreenChrome()
         updatePrivacySectionVisibility()
     }
 
@@ -32733,6 +33034,13 @@ generation != cameraFallbackGeneration
         const val WS_WELCOME_ILLUSTRATION_DP = 200f
         const val WS_TEXT_HEADLINE_SP = 38f
         const val WS_TEXT_SUBTEXT_SP = 15f
+        /** AppDesign signup-1..3 의 h2 (text-xl). */
+        const val WS_TEXT_SIGNUP_HEADING_SP = 20f
+        const val SIGNUP_DETAILS_HEADING_KO = "기본 정보를 입력해주세요"
+        const val SIGNUP_DETAILS_SUBTEXT_KO = "이름과 전화번호는 수집하지 않습니다"
+        const val SIGNUP_OTP_HEADING_KO = "인증번호를 입력해주세요"
+        const val SIGNUP_CONSENT_HEADING_KO = "약관에 동의해주세요"
+        const val SIGNUP_NAV_TITLE_KO = "회원가입"
         /**
          * AppDesign Welcome 의 h1. 원본에서 이 문구 바로 아래에
          * `[ProposalTag] — 팀 승인 전 문구` 가 붙어 있다. 팀 승인 전이다.
@@ -32758,9 +33066,8 @@ generation != cameraFallbackGeneration
 
         /* 홈 카드 (AppDesign WALKSAFE_TOKENS_V3 — color.card.*, size.card.*) */
         const val WS_COLOR_CARD_NAV = 0xff1b4cd8.toInt()
-        const val WS_COLOR_CARD_ARC = 0xffb85200.toInt()
         const val WS_COLOR_CARD_MIC = 0xff1e6b38.toInt()
-        const val WS_COLOR_CARD_REPORT = 0xff5b1896.toInt()
+        const val WS_COLOR_CARD_SET = 0xff3d3b38.toInt()
 
         /**
          * 카드 위 글자. 제목·부제 모두 흰색 100%.
@@ -32773,7 +33080,8 @@ generation != cameraFallbackGeneration
         const val WS_COLOR_CARD_LOCK_BADGE_FILL = 0x33000000.toInt()
 
         const val WS_CARD_HEIGHT_DP = 148f
-        const val WS_CARD_PADDING_DP = 16f
+        /** AppDesign 카드가 p-4 에서 p-5 로 바뀌었다. */
+        const val WS_CARD_PADDING_DP = 20f
         const val WS_CARD_CORNER_RADIUS_DP = 24f
         const val WS_CARD_GAP_DP = 12f
         const val WS_CARD_FOCUS_RING_DP = 2f
@@ -32782,6 +33090,12 @@ generation != cameraFallbackGeneration
         const val WS_CARD_BADGE_DP = 26f
         const val WS_TEXT_CARD_TITLE_SP = 17f
         const val WS_TEXT_CARD_SUBTITLE_SP = 14f
+
+
+        const val HOME_WALK_PAUSE_LABEL = "보행 안내 일시중지"
+        const val HOME_WALK_PAUSE_IDLE_TITLE = "진행 중인 보행 안내 없음"
+        const val HOME_WALK_PAUSE_IDLE_DETAIL =
+            "현재 일시중지할 보행 안내가 없습니다. 목적지를 검색하고 경로를 시작한 뒤 사용할 수 있습니다."
         const val ACCOUNT_CONSENT_ALL_LABEL = "필수 3개와 선택 3개에 모두 동의합니다"
         const val INTEGRATED_CONSENT_ALL_LABEL = "네 항목 모두 허용"
         const val FIRST_RUN_STAGE_COUNT = 12
@@ -32790,6 +33104,8 @@ generation != cameraFallbackGeneration
         const val FIRST_RUN_WAITING_DOT_PERIOD_MS = 750L
         const val FIRST_RUN_WAITING_DOT_STAGGER_MS = 300L
         const val EMAIL_FIRST_RUN_STAGE_COUNT = 7
+        /** AppDesign Steps 의 칸 수. 정책의 stage 수와 별개인 표시값이다. */
+        const val DESIGN_STEP_COUNT = 5
         const val WS_SECTION_GAP_DP = 24f
         /** 같은 그룹의 버튼 사이. 섹션 간격보다 좁아야 덩어리로 읽힌다. */
         const val WS_GROUP_GAP_DP = 8f

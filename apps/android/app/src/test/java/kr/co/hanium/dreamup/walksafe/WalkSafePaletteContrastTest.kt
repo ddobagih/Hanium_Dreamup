@@ -123,9 +123,8 @@ class WalkSafePaletteContrastTest {
         // 제목·부제 모두 흰색 100% 이고, 위계는 크기와 굵기로 낸다.
         listOf(
             "WS_COLOR_CARD_NAV",
-            "WS_COLOR_CARD_ARC",
             "WS_COLOR_CARD_MIC",
-            "WS_COLOR_CARD_REPORT",
+            "WS_COLOR_CARD_SET",
         ).forEach { card ->
             assertRatio("WS_COLOR_CARD_TEXT", card, 4.5)
         }
@@ -135,9 +134,8 @@ class WalkSafePaletteContrastTest {
     fun homeCardLockBadgeGlyphStaysVisible() {
         listOf(
             "WS_COLOR_CARD_NAV",
-            "WS_COLOR_CARD_ARC",
             "WS_COLOR_CARD_MIC",
-            "WS_COLOR_CARD_REPORT",
+            "WS_COLOR_CARD_SET",
         ).forEach { card ->
             assertCompositeRatio(
                 "WS_COLOR_CARD_TEXT",

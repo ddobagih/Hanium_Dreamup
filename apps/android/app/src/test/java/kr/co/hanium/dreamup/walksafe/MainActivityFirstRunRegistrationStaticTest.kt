@@ -18,11 +18,10 @@ class MainActivityFirstRunRegistrationStaticTest {
             "firstRunProgressBar = LinearLayout(this).apply",
             "firstRunOnboardingStatusText = TextView(this).apply",
         )
-        assertTrue(
-            progress.contains(
-                "repeat(firstRunStageCount(firstRunOnboardingSnapshot))",
-            ),
-        )
+        // AppDesign Steps 는 5칸이다. 정책의 7 stage 는 그대로 두고 표시만 디자인을 따른다.
+        assertTrue(progress.contains("val stageCount = DESIGN_STEP_COUNT"))
+        assertTrue(progress.contains("repeat(stageCount) { index ->"))
+        assertTrue(source.contains("const val DESIGN_STEP_COUNT = 5"))
 
         val mapping = functionBlock("private fun firstRunStageNumber(")
         assertInOrder(
@@ -36,9 +35,38 @@ class MainActivityFirstRunRegistrationStaticTest {
         )
 
         val update = functionBlock("private fun updateFirstRunOnboardingUi()")
-        assertTrue(update.contains("val stageNumber = firstRunStageNumber(snapshot)"))
-        assertTrue(update.contains("val stageCount = firstRunStageCount(snapshot)"))
-        assertTrue(update.contains("if (index < stageNumber)"))
+        // 정책 매핑(firstRunStageNumber, 7/12 stage)은 그대로 두고 표시만 5단계다.
+        assertTrue(update.contains("val stageNumber = designStepNumber(snapshot)"))
+        assertTrue(update.contains("val stageCount = DESIGN_STEP_COUNT"))
+        assertTrue(source.contains("private fun firstRunStageNumber("))
+        assertTrue(source.contains("private fun firstRunStageCount("))
+        // NO 는 컨테이너만 빼고 원 안의 "1".."7" 을 TalkBack 트리에 남긴다.
+        // 에뮬레이터 uiautomator --compressed 로 확인한 실측: 14노드 -> 7노드.
+        assertTrue(
+            progress.contains(
+                "importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS",
+            ),
+        )
+
+        // AppDesign Steps: 지난 단계는 체크 표시, 현재 단계는 채운 원이다.
+        assertTrue(update.contains("val done = index < stageNumber - 1"))
+        assertTrue(update.contains("val current = index == stageNumber - 1"))
+    }
+
+    @Test
+    fun debugPreviewPassesTheActorBindingNotALiteralToFp004Completion() {
+        val preview = functionBlock("private fun previewAdvanceFirstRunStage()")
+
+        // completeFirstRunFp004TrainingIfReady 는 actorId 를
+        // firstRunOnboardingSnapshot.verifiedActorBinding.value 와 대조한다.
+        // 다른 호출자들과 같은 값을 넘겨야 하며 리터럴을 넘기면 항상 false 로 떨어진다.
+        assertFalse(preview.contains("completeFirstRunFp004TrainingIfReady(\"preview\")"))
+        assertTrue(preview.contains("bindFirstRunVerifiedActorForTraining()"))
+        assertTrue(
+            preview.contains(
+                "firstRunOnboardingSnapshot.verifiedActorBinding?.value?.let {",
+            ),
+        )
     }
 
     @Test

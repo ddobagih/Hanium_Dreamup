@@ -112,7 +112,7 @@ class WalkSafeDesignTokenConformanceTest {
             """wsFieldGroup\(accountEmailInput, "이메일"\)""",
             """wsFieldGroup\(accountPasswordInput, "비밀번호", "10자 이상 128자 이하"\)""",
             """wsFieldGroup\(accountPasswordConfirmationInput, "비밀번호 확인"\)""",
-            """wsFieldGroup\(accountDateOfBirthInput, "생년월일"\)""",
+            """wsFieldGroup\(\s*accountDateOfBirthInput,\s*"생년월일",""",
             """wsFieldGroup\(accountOtpInput, "인증번호"\)""",
         ).forEach { assertTrue(it, Regex(it).containsMatchIn(build)) }
 
@@ -128,7 +128,8 @@ class WalkSafeDesignTokenConformanceTest {
         val build = functionBlock("private fun buildContentView()")
         val header = functionBlock("private fun buildBrandRow()")
         val welcome = functionBlock("private fun buildWelcomeBlock()")
-        val update = functionBlock("private fun updateFirstRunOnboardingUi()")
+        // 가시성 소유자는 이 함수 하나다. 두 곳에서 다른 규칙으로 쓰면 호출 순서에 따라 갈린다.
+        val update = functionBlock("private fun syncAccountScreenChrome()")
         assertTrue(build.contains("brandHeader = buildWelcomeBlock()"))
         // AppDesign 은 SafetyBar 아래가 브랜드 행이다.
         assertTrue(
@@ -141,7 +142,14 @@ class WalkSafeDesignTokenConformanceTest {
         assertTrue(header.contains("\"WALKSAFE\""))
         // 워드마크는 장식이다. 화면 제목이 같은 정보를 낭독한다.
         assertTrue(header.contains("View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
-        assertTrue(update.contains("brandHeader.visibility ="))
+        assertTrue(update.contains("brandHeader.visibility = if (landing) View.VISIBLE else View.GONE"))
+        // AppDesign Welcome 은 고르는 화면이라 스테퍼도 단계 안내도 없다.
+        assertTrue(update.contains("firstRunProgressBar.visibility ="))
+        assertTrue(update.contains("firstRunOnboardingStatusText.visibility ="))
+        assertEquals(
+            1,
+            Regex("brandHeader\\.visibility =").findAll(source).count(),
+        )
 
         // AppDesign Welcome 의 h1 과 부제. 워드마크와 달리 실제 내용이라 낭독되어야 한다.
         assertTrue(source.contains("const val WELCOME_HEADLINE_KO"))
@@ -186,16 +194,16 @@ class WalkSafeDesignTokenConformanceTest {
 
     @Test
     fun homeCardTokensMatchTheAppDesignHomeScreen() {
+        // AppDesign 홈이 카드 4장에서 3장으로 줄었다. ARCore·신고는 보행 흐름 안으로 갔다.
         val expected = mapOf(
             "WS_COLOR_CARD_NAV" to "#FF1B4CD8",
-            "WS_COLOR_CARD_ARC" to "#FFB85200",
             "WS_COLOR_CARD_MIC" to "#FF1E6B38",
-            "WS_COLOR_CARD_REPORT" to "#FF5B1896",
+            "WS_COLOR_CARD_SET" to "#FF3D3B38",
             "WS_COLOR_CARD_TEXT" to "#FFFFFFFF",
         )
         expected.forEach { (name, value) -> assertEquals(name, value, argb(name)) }
         assertEquals("148dp", dimension("WS_CARD_HEIGHT_DP"))
-        assertEquals("16dp", dimension("WS_CARD_PADDING_DP"))
+        assertEquals("20dp", dimension("WS_CARD_PADDING_DP"))
         assertEquals("24dp", dimension("WS_CARD_CORNER_RADIUS_DP"))
         assertEquals("12dp", dimension("WS_CARD_GAP_DP"))
         assertEquals("34dp", dimension("WS_CARD_ICON_DP"))
@@ -220,12 +228,13 @@ class WalkSafeDesignTokenConformanceTest {
                     """overlay\.addView\(homeCardGrid, overlay\.indexOfChild\(walkStatusSection\)\)""",
             ).containsMatchIn(build),
         )
-        assertTrue(grid.contains("columnCount = 2"))
+        // AppDesign 은 flex flex-col — 카드가 화면 폭을 채우며 세로로 쌓인다.
+        assertTrue(grid.contains("orientation = LinearLayout.VERTICAL"))
+        assertFalse(grid.contains("columnCount"))
         listOf(
             "R.drawable.ws_ic_card_nav",
-            "R.drawable.ws_ic_card_arc",
             "R.drawable.ws_ic_card_mic",
-            "R.drawable.ws_ic_card_report",
+            "R.drawable.ws_ic_card_settings",
         ).forEach { assertTrue(it, grid.contains(it)) }
         // 잠긴 카드는 사유를 알리고, 열린 카드만 기존 컨트롤을 호출한다.
         assertTrue(card.contains("if (unlocked()) {"))
@@ -234,6 +243,46 @@ class WalkSafeDesignTokenConformanceTest {
         assertTrue(card.contains("R.drawable.ws_ic_card_lock"))
         assertTrue(refresh.contains("firstRunOnboardingComplete()"))
         assertTrue(update.contains("refreshHomeCards()"))
+    }
+
+    @Test
+    fun accountStepScreensFoldTheStandingChrome() {
+        val fold = functionBlock("private fun onAccountStepScreen()")
+        val chrome = functionBlock("private fun syncAccountScreenChrome()")
+        val notice = functionBlock("private fun refreshFirstRunNoticeUi()")
+
+        // AppDesign signup-1..3 에는 안전 배너와 스테퍼가 모두 있어 접지 않는다.
+        assertTrue(fold.contains("Boolean = false"))
+        assertTrue(chrome.contains("val foldChrome = landing || onAccountStepScreen()"))
+        assertTrue(chrome.contains("if (foldChrome) View.GONE else View.VISIBLE"))
+
+        // 안전 배너 소유자는 그대로 하나다. 보행 화면과 같은 자리에서 함께 판단한다.
+        assertTrue(notice.contains("if (walkScreenVisible || onAccountStepScreen())"))
+        // 배너 가시성 대입은 전부 이 함수 안에만 있어야 한다. 밖으로 새면 소유자가 둘이 된다.
+        val assignment = Regex("firstRunNoticeToggleButton\\.visibility =")
+        assertEquals(
+            assignment.findAll(notice).count(),
+            assignment.findAll(source).count(),
+        )
+        // 모드가 바뀌는 경로가 배너 갱신을 놓치지 않도록 크롬 동기화가 직접 부른다.
+        assertTrue(chrome.contains("refreshFirstRunNoticeUi()"))
+    }
+
+    @Test
+    fun homeWalkPauseFollowsTheAppDesignHomeScreen() {
+        val refresh = functionBlock("private fun refreshHomeCards()")
+        val pause = functionBlock("private fun requestHomeWalkPause()")
+
+        // 첫 실행이 끝나기 전에는 카드와 함께 감춘다.
+        assertTrue(refresh.contains("homeWalkPauseButton.visibility = visibility"))
+
+        // 진행 중인 보행이 없으면 시스템 뒤로가기와 같은 판정으로 사유만 알린다.
+        assertTrue(pause.contains("if (!handleWalkScreenBackPressed())"))
+        assertTrue(pause.contains("showHomeCardLockNotice("))
+
+        // AppDesign 홈에서 신고 내역 행과 현재 상태 행은 빠졌다.
+        assertFalse(source.contains("buildHomeInfoRows"))
+        assertFalse(source.contains("wsHomeRow("))
     }
 
     @Test
