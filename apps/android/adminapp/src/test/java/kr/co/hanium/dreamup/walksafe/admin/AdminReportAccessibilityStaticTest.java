@@ -15,6 +15,9 @@ public final class AdminReportAccessibilityStaticTest {
     private final String reportClient = read(
         "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminReportHttpClient.java"
     );
+    private final String httpTransport = read(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOkHttpTransport.java"
+    );
     private final String build = read("build.gradle.kts");
 
     @Test
@@ -74,11 +77,31 @@ public final class AdminReportAccessibilityStaticTest {
             "makeReadOnly(expectedRevisionInput, \"앱이 관리하는 현재 전달 기록 버전\")"
         ));
         assertFalse(activity.contains("Intent.ACTION_SEND"));
-        assertTrue(reportClient.contains("connection.setUseCaches(false)"));
-        assertTrue(panel.contains("highRiskConfirm.setEnabled(!loading)"));
-        assertTrue(panel.contains("for (Button button : mutationButtons) button.setEnabled(!loading)"));
+        assertTrue(reportClient.contains("new OkHttpTransport()"));
+        assertTrue(httpTransport.contains(".cache(null)"));
+        assertTrue(panel.contains("highRiskConfirm.setEnabled(mutationEnabled)"));
+        assertTrue(panel.contains(
+            "for (Button button : mutationButtons) button.setEnabled(mutationEnabled)"
+        ));
         assertTrue(build.contains("release {"));
         assertTrue(build.contains("ADMIN_OPERATIONAL_WORKFLOWS_ENABLED\", \"false\""));
+    }
+
+    @Test
+    public void sensitiveBoundaryInputsRestorePasswordMaskingAfterSingleLineMode() {
+        int inputStart = activity.indexOf("private EditText input(String hint, int inputType");
+        int inputEnd = activity.indexOf("private Button button(String label)", inputStart);
+        assertTrue(inputStart >= 0);
+        assertTrue(inputEnd > inputStart);
+        String input = activity.substring(inputStart, inputEnd);
+
+        assertTrue(input.indexOf("view.setSingleLine(true)") >= 0);
+        assertTrue(
+            input.indexOf("view.setSingleLine(true)")
+                < input.indexOf("view.setInputType(inputType)")
+        );
+        assertTrue(activity.contains("InputType.TYPE_TEXT_VARIATION_PASSWORD"));
+        assertTrue(activity.contains("InputType.TYPE_NUMBER_VARIATION_PASSWORD"));
     }
 
     private static String read(String path) {

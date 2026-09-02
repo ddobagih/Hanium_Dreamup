@@ -100,6 +100,8 @@ class MainActivityUserReportStaticTest {
         assertTrue(deletion.contains("신고 한 건 삭제 요청 확인"))
         assertTrue(deletion.contains("계정과 개인정보 전체 삭제 요청이 아닙니다."))
         assertTrue(deletion.contains("UserReportRequestType.DELETE"))
+        assertTrue(deletion.contains("validUserReportRequestText(requestText)"))
+        assertFalse(deletion.contains("requestText.length > 500"))
         assertTrue(main.contains("계정과 개인정보 삭제 요청 확인"))
     }
 

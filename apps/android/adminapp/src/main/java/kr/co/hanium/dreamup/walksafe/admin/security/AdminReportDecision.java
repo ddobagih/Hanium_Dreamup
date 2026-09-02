@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Exact nine-field, append-only administrator review decision request. */
+/** Exact ten-field, append-only administrator review decision request. */
 public final class AdminReportDecision {
     public enum Decision {
         APPROVED,
@@ -22,7 +22,8 @@ public final class AdminReportDecision {
         "photo_reviewed",
         "privacy_reviewed",
         "content_revision",
-        "evidence_grant_id"
+        "evidence_grant_id",
+        "decision_id"
     );
 
     private final Decision decision;
@@ -34,6 +35,7 @@ public final class AdminReportDecision {
     private final boolean privacyReviewed;
     private final int contentRevision;
     private final String evidenceGrantId;
+    private final String decisionId;
 
     public AdminReportDecision(
         Decision decision,
@@ -44,7 +46,8 @@ public final class AdminReportDecision {
         boolean photoReviewed,
         boolean privacyReviewed,
         int contentRevision,
-        String evidenceGrantId
+        String evidenceGrantId,
+        String decisionId
     ) {
         if (decision == null) throw new IllegalArgumentException("decision is required");
         this.decision = decision;
@@ -78,13 +81,16 @@ public final class AdminReportDecision {
         if ((decision == Decision.APPROVED) != (this.evidenceGrantId != null)) {
             throw new IllegalArgumentException("evidence_grant_id is required only for APPROVED");
         }
+        this.decisionId = canonicalUuid(decisionId, "decision_id");
     }
 
     public Decision decision() { return decision; }
     public String reason() { return reason; }
     public String userVisibleReason() { return userVisibleReason; }
     public String duplicateOfReportId() { return duplicateOfReportId; }
+    public int contentRevision() { return contentRevision; }
     public String evidenceGrantId() { return evidenceGrantId; }
+    public String decisionId() { return decisionId; }
 
     public byte[] requestBody(String reportId) {
         String canonicalReportId = canonicalUuid(reportId, "report_id");
@@ -101,7 +107,10 @@ public final class AdminReportDecision {
         fields.put("privacy_reviewed", privacyReviewed);
         fields.put("content_revision", contentRevision);
         fields.put("evidence_grant_id", evidenceGrantId);
-        if (!fields.keySet().equals(EXACT_KEYS)) throw new IllegalStateException("invalid exact9 review shape");
+        fields.put("decision_id", decisionId);
+        if (!fields.keySet().equals(EXACT_KEYS)) {
+            throw new IllegalStateException("invalid exact10 review shape");
+        }
         return AdminCanonicalEncoding.canonicalJsonBytes(fields);
     }
 

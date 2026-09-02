@@ -12,6 +12,7 @@ import path from "node:path";
 import { afterEach, test } from "node:test";
 
 import {
+  SHORT_DEVICE_SESSION_LIMIT,
   SHORT_SESSION_MAX_PLAINTEXT_BYTES,
   validShortSessionStateForMaintenance
 } from "../src/auth.js";
@@ -261,6 +262,53 @@ test("short-session maintenance requires an exact signed session scope", () => {
     validShortSessionStateForMaintenance({ ...state, extra: true }, recordId),
     false
   );
+});
+
+test("short-session maintenance rejects malformed, duplicate, and mixed v7 ledgers", () => {
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3040";
+  const recordId = `field-${digest(`field\0${actorId}`)}.json`;
+  const session = (
+    index: number,
+    override: Record<string, unknown> = {}
+  ): Record<string, unknown> => ({
+    actorId,
+    accountGeneration: 1,
+    authEpoch: 1,
+    deviceId: `maintenance-device-${index}`,
+    expiresAtSeconds: 2_000_000_000,
+    sessionId: String(index).padStart(32, "0"),
+    sessionKind: "backend_account_device",
+    sessionScope: "general",
+    ...override
+  });
+  const first = session(0);
+  const valid = { actorId, sessions: [first] };
+  assert.equal(validShortSessionStateForMaintenance(valid, recordId), true);
+  assert.equal(validShortSessionStateForMaintenance({
+    actorId,
+    accountGeneration: 1,
+    authEpoch: 1
+  }, recordId), true);
+  for (const invalid of [
+    { actorId, sessions: [] },
+    { actorId, sessions: [first, session(1, { deviceId: first.deviceId })] },
+    { actorId, sessions: [first, session(1, { sessionId: first.sessionId })] },
+    { actorId, sessions: [first, session(1, { accountGeneration: 2 })] },
+    { actorId, sessions: [first, session(1, { authEpoch: 2 })] },
+    { actorId, sessions: [session(0, { sessionScope: "account_deletion_recovery" })] },
+    { actorId, sessions: [{ ...first, unexpected: true }] },
+    { actorId, accountGeneration: 1, authEpoch: 0 },
+    { actorId, accountGeneration: 1, authEpoch: 1, unexpected: true },
+    {
+      actorId,
+      sessions: Array.from(
+        { length: SHORT_DEVICE_SESSION_LIMIT + 1 },
+        (_, index) => session(index)
+      )
+    }
+  ]) {
+    assert.equal(validShortSessionStateForMaintenance(invalid, recordId), false);
+  }
 });
 
 test("startup accepts a known legacy v3 state for safe session invalidation", async () => {

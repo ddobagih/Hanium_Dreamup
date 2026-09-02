@@ -20,6 +20,7 @@ public final class AdminSecurityController implements AutoCloseable {
 
     public static final class Snapshot {
         private final AdminSecurityState securityState;
+        private final String authenticatedAdminId;
         private final String currentSessionId;
         private final List<AdminSecurityApi.SessionInfo> sessions;
         private final List<AdminSecurityApi.DeviceInfo> devices;
@@ -33,6 +34,7 @@ public final class AdminSecurityController implements AutoCloseable {
 
         private Snapshot(
             AdminSecurityState securityState,
+            String authenticatedAdminId,
             String currentSessionId,
             List<AdminSecurityApi.SessionInfo> sessions,
             List<AdminSecurityApi.DeviceInfo> devices,
@@ -45,6 +47,7 @@ public final class AdminSecurityController implements AutoCloseable {
             boolean recoveryActive
         ) {
             this.securityState = securityState;
+            this.authenticatedAdminId = authenticatedAdminId;
             this.currentSessionId = currentSessionId;
             this.sessions = Collections.unmodifiableList(new ArrayList<>(sessions));
             this.devices = Collections.unmodifiableList(new ArrayList<>(devices));
@@ -58,6 +61,7 @@ public final class AdminSecurityController implements AutoCloseable {
         }
 
         public AdminSecurityState securityState() { return securityState; }
+        public String authenticatedAdminId() { return authenticatedAdminId; }
         public String currentSessionId() { return currentSessionId; }
         public List<AdminSecurityApi.SessionInfo> sessions() { return sessions; }
         public List<AdminSecurityApi.DeviceInfo> devices() { return devices; }
@@ -201,6 +205,7 @@ public final class AdminSecurityController implements AutoCloseable {
     public synchronized Snapshot snapshot() {
         return new Snapshot(
             securityState,
+            authenticatedAdminId,
             currentSessionId,
             sessions,
             devices,
@@ -738,6 +743,34 @@ public final class AdminSecurityController implements AutoCloseable {
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
+        try {
+            return updateAdminReportStatus(
+                reportId,
+                nextStatus,
+                expectedVersion,
+                password,
+                totpCode,
+                nowEpochMs,
+                operationalWorkflowsEnabled,
+                () -> true
+            );
+        } catch (AdminReportWorkflowController.StatusDispatchCancelledException impossible) {
+            throw new IllegalStateException("unconditional report status dispatch was cancelled", impossible);
+        }
+    }
+
+    public synchronized AdminReportModels.StatusSnapshot updateAdminReportStatus(
+        String reportId,
+        String nextStatus,
+        int expectedVersion,
+        char[] password,
+        char[] totpCode,
+        long nowEpochMs,
+        boolean operationalWorkflowsEnabled,
+        AdminReportWorkflowController.StatusDispatch dispatch
+    ) throws IOException, GeneralSecurityException,
+        AdminReportWorkflowController.StatusDispatchCancelledException {
+        if (dispatch == null) throw new IllegalArgumentException("status dispatch is required");
         AdminHighRiskActionGate.Operation operation = AdminHighRiskActionGate.reportStatus(reportId);
         reauthenticate(password, totpCode, operation, nowEpochMs);
         AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
@@ -751,7 +784,8 @@ public final class AdminSecurityController implements AutoCloseable {
             reportId,
             nextStatus,
             expectedVersion,
-            decision.requestHeaders()
+            decision.requestHeaders(),
+            dispatch
         );
     }
 

@@ -63,6 +63,8 @@ public final class AdminIncidentPanel extends LinearLayout {
     private final EditText totpInput;
     private final LinearLayout actions;
     private String selectedIncidentId;
+    private AdminIncidentModels.Detail displayedDetail;
+    private Button pendingRetryButton;
 
     public AdminIncidentPanel(Context context, Listener listener) {
         super(context);
@@ -194,6 +196,9 @@ public final class AdminIncidentPanel extends LinearLayout {
                     + (state.historyNextCursor() == null ? " 전체 이력 조회 완료." : "")
             );
             historyMoreButton.setVisibility(state.canLoadMoreHistory() ? VISIBLE : GONE);
+        } else {
+            displayedDetail = null;
+            pendingRetryButton = null;
         }
         if (state.errorMessage() != null && state.phase() != AdminIncidentController.Phase.ERROR) {
             stateText.append(" " + state.errorMessage());
@@ -209,6 +214,22 @@ public final class AdminIncidentPanel extends LinearLayout {
         reasonInput.setText("");
         observationInput.setText("");
         evidenceInput.setText("");
+    }
+
+    public void renderPendingStatusRetry(String nextState) {
+        if (pendingRetryButton != null) {
+            actions.removeView(pendingRetryButton);
+            pendingRetryButton = null;
+        }
+        if (displayedDetail == null || nextState == null
+            || displayedDetail.allowedNextStates().contains(nextState)) {
+            return;
+        }
+        pendingRetryButton = button(
+            actionLabel(nextState) + " (보존한 멱등키로 결과 확인)"
+        );
+        pendingRetryButton.setOnClickListener(view -> submit(displayedDetail, nextState));
+        actions.addView(pendingRetryButton, matchWrap());
     }
 
     private void renderItems(List<AdminIncidentModels.Summary> values) {
@@ -243,6 +264,8 @@ public final class AdminIncidentPanel extends LinearLayout {
         AdminIncidentModels.Detail detail,
         List<AdminIncidentModels.Event> history
     ) {
+        displayedDetail = detail;
+        pendingRetryButton = null;
         AdminIncidentModels.Summary summary = detail.summary();
         detailText.setText(
             "CRITICAL · " + statusIcon(summary.status()) + " " + statusLabel(summary.status())

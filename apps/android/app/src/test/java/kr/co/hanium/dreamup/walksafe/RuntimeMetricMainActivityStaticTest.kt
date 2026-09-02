@@ -408,7 +408,7 @@ class RuntimeMetricMainActivityStaticTest {
         )
         assertTrue(
             functionBlock("private fun startStepTrackingIfAllowed()")
-                .contains("currentNavigationCollectionAllowsWork()"),
+                .contains("currentStepTrackingCollectionAllowsWork()"),
         )
 
         val confirmation = functionBlock("private fun completeStartupCapabilityConfirmation(")

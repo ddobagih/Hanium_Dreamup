@@ -206,6 +206,7 @@ import kr.co.hanium.dreamup.walksafe.feedback.utteranceTerminalTimeoutMs
 import kr.co.hanium.dreamup.walksafe.voice.BundledVoskModelInstaller
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceController
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceEligibility
+import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceTerminalFailure
 import kr.co.hanium.dreamup.walksafe.voice.WalkSafeApplication
 import kr.co.hanium.dreamup.walksafe.voice.WalkVoiceForegroundService
 import kr.co.hanium.dreamup.walksafe.voice.VoskWakePhraseProbe
@@ -266,6 +267,7 @@ import kr.co.hanium.dreamup.walksafe.navigation.WalkSessionVoiceControlPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.formatDestinationDistance
 import kr.co.hanium.dreamup.walksafe.navigation.reliableMovementHeadingDegrees
 import kr.co.hanium.dreamup.walksafe.navigation.classifyNavigationBackendFailure
+import kr.co.hanium.dreamup.walksafe.navigation.canonicalDestinationSearchQueryOrNull
 import kr.co.hanium.dreamup.walksafe.navigation.selectAndroidVoiceAction
 import kr.co.hanium.dreamup.walksafe.navigation.createProductionAndroidTactileFrameCoordinator
 import kr.co.hanium.dreamup.walksafe.network.AndroidNavigationCancellation
@@ -393,10 +395,12 @@ import kr.co.hanium.dreamup.walksafe.report.automaticCooldownScopeOrNull
 import kr.co.hanium.dreamup.walksafe.report.automaticReportCooldownScopeOrNull
 import kr.co.hanium.dreamup.walksafe.report.canonicalUserReportCorrectionDescriptionOrNull
 import kr.co.hanium.dreamup.walksafe.report.reportRetryDelayMs
+import kr.co.hanium.dreamup.walksafe.report.validUserReportRequestText
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionRuntimeContext
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionRuntimeCoordinator
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionUploadOutcome
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawDetectionMetadataSample
+import kr.co.hanium.dreamup.walksafe.rawcollection.RawPerformanceMetadataSample
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
 import kr.co.hanium.dreamup.walksafe.security.AndroidSensitivePreferenceStore
 import kr.co.hanium.dreamup.walksafe.security.SensitivePreferenceSpec
@@ -529,6 +533,9 @@ private fun CameraFrameQualityReason.isTransientPreflightQualityFailure(): Boole
     -> true
     else -> false
 }
+
+internal fun shouldPermanentlyLimitOneShotSpeechRecognition(error: Int): Boolean =
+    error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED
 
 internal fun userReportAuthorityExpiryDelayMs(
     accessExpiresAtEpochMs: Long,
@@ -959,12 +966,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
     private lateinit var rawCollectionRuntimeCoordinator: RawCollectionRuntimeCoordinator
     private var rawDetectionWindowWalkId: String? = null
-    private var rawDetectionWindowStartedAtEpochMs = 0L
     private var rawDetectionWindowStartedAtElapsedMs = 0L
     private var rawDetectionProcessedFrameCount = 0
+    private var rawDetectionDroppedFrameCount = 0
     private var rawDetectionCount = 0
     private var rawDetectionInferenceTotalMs = 0L
     private var rawDetectionModelRevision: String? = null
+    private val rawDetectionDueButInFlightDropCount = AtomicInteger(0)
     @Volatile
     private var rawCollectionUploadWalkId: String? = null
     private val reportQueueDrainLock = Any()
@@ -1016,9 +1024,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val movementGeneration: Long,
     )
 
-    private enum class ExplicitReportRequestSource {
-        ON_SCREEN,
-        VOICE,
+    private enum class ExplicitReportRequestSource(
+        val reportTrigger: String,
+    ) {
+        ON_SCREEN(AndroidReportCandidatePolicy.TRIGGER_ON_SCREEN),
+        VOICE(AndroidReportCandidatePolicy.TRIGGER_VOICE),
     }
 
     private val privacyStartupInspectionLock = Any()
@@ -1420,6 +1430,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var runtimeMetricLastFrameTimestampNanos = 0L
     private var runtimeMetricInitialNavigationStartPending = false
     private var onDeviceSpeechRecognitionCapabilityOverride: Boolean? = null
+    private var oneShotSpeechRecognitionLimited = false
     private var offlineKoreanTextToSpeechCapabilityOverride: Boolean? = null
     private var voiceDataInstallRecheckPending = false
     private var voiceDataInstallRecheckInFlight = false
@@ -9449,7 +9460,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             return
         }
         val requestText = userReportRequestTextInput.text?.toString()?.trim().orEmpty()
-        if (requestText.isEmpty() || requestText.length > 500) {
+        if (!validUserReportRequestText(requestText)) {
             setUserReportStatusMessage(
                 "내 신고 상태: 요청 사유를 1자 이상 500자 이하로 입력하세요.",
             )
@@ -10859,7 +10870,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun handleVoicePermissionResult() {
         if (permissionRecoveryGate.blocksAutomaticResourceStart) return
         if (hasRecordAudioPermission()) {
-            toggleGatewayVoiceCapture()
+            startVoiceCommandRecognition()
         } else {
             updateNavigationStatus("voice=record_audio_permission_missing")
             speakInteraction("음성 명령을 사용하려면 마이크 권한이 필요합니다.")
@@ -13767,22 +13778,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             setOnClickListener { requestExplicitReport(ExplicitReportRequestSource.ON_SCREEN) }
         }
         voiceReportButton = Button(this).apply {
-            text = "서버 음성 명령"
-            contentDescription = "서버 음성 명령 녹음 시작"
+            text = "기기 내 음성 명령"
+            contentDescription = "기기 내 음성 명령 듣기 시작"
             minimumHeight = accessibilityTargetSizePx()
             isSingleLine = false
             setOnClickListener { ensureVoicePermissionThenListen() }
         }
         gatewayVoiceStatusText = TextView(this).apply {
-            text = "서버 음성 명령 대기"
+            text = "기기 내 음성 명령 대기"
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         walkSafetyVoiceButton = Button(this).apply {
             id = View.generateViewId()
-            text = "서버 음성 명령"
-            contentDescription = "서버 음성 명령 녹음 시작"
+            text = "기기 내 음성 명령"
+            contentDescription = "기기 내 음성 명령 듣기 시작"
             minimumHeight = accessibilityTargetSizePx()
             minimumWidth = accessibilityTargetSizePx()
             isSingleLine = false
@@ -13790,7 +13801,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         walkSafetyVoiceStatusText = TextView(this).apply {
             id = View.generateViewId()
-            text = "서버 음성 명령 대기"
+            text = "기기 내 음성 명령 대기"
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -14607,9 +14618,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val installationId = gatewaySessionStore.getOrCreateInstallDeviceId() ?: return null
         val startup = startupCapabilityProbe.snapshot()
         val offlineKoreanTextToSpeechAvailable =
-            startup.offlineKoreanTextToSpeechAvailable ?: return null
+            startup.offlineKoreanTextToSpeechAvailable
         val onDeviceSpeechRecognitionAvailable =
-            startup.onDeviceSpeechRecognitionAvailable ?: return null
+            startup.onDeviceSpeechRecognitionAvailable
         val environmentProfile = activeEnvironmentProfiles
         val deviceProfile = startupCapabilityProbe.deviceProfileMatch()
         return PostLoginDeviceCheckResultBinding(
@@ -14690,10 +14701,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             } else {
                 null
             }
-            onDeviceSpeechRecognitionCapabilityOverride =
-                PostLoginDeviceCheckFeature.HANDS_FREE_VOICE !in restored.disabledFeatures
-            offlineKoreanTextToSpeechCapabilityOverride =
-                PostLoginDeviceCheckFeature.VOICE_GUIDANCE !in restored.disabledFeatures
+            onDeviceSpeechRecognitionCapabilityOverride = if (
+                PostLoginDeviceCheckFeature.HANDS_FREE_VOICE in restored.disabledFeatures
+            ) {
+                false
+            } else {
+                null
+            }
+            offlineKoreanTextToSpeechCapabilityOverride = if (
+                PostLoginDeviceCheckFeature.VOICE_GUIDANCE in restored.disabledFeatures
+            ) {
+                false
+            } else {
+                null
+            }
         } else if (sessionBindingChanged) {
             postLoginCameraDependentChecksDeferred = false
             metricDistanceCapabilityOverride = null
@@ -14907,17 +14928,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun maybeStartFirstRunDeviceCheckProbes() {
         if (!firstRunDeviceCheckAllowsPreflight()) return
-        if (
-            ::walkSessionResourceProbe.isInitialized &&
-            !walkSessionResourceProbeStarted
-        ) {
-            walkSessionResourceProbeStarted = true
-            walkSessionResourceProbe.start {
-                observeWalkRuntimeResourceSafety()
-                maybeContinuePostLoginDeviceCheck()
-                refreshStartupCapabilityUi()
-            }
-        }
+        ensureWalkSessionResourceMonitoring()
         if (
             ::startupCapabilityProbe.isInitialized &&
             !startupCapabilityProbeStarted
@@ -14925,6 +14936,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             startupCapabilityProbeStarted = true
             startupCapabilityProbe.start()
         }
+    }
+
+    private fun ensureWalkSessionResourceMonitoring() {
+        if (!::walkSessionResourceProbe.isInitialized || walkSessionResourceProbeStarted) return
+        walkSessionResourceProbeStarted = true
+        walkSessionResourceProbeStarted =
+            runCatching {
+                walkSessionResourceProbe.start {
+                    observeWalkRuntimeResourceSafety()
+                    maybeContinuePostLoginDeviceCheck()
+                    refreshStartupCapabilityUi()
+                }
+            }.getOrDefault(false)
+    }
+
+    private fun resetWalkSessionResourceProbe() {
+        if (::walkSessionResourceProbe.isInitialized) walkSessionResourceProbe.close()
+        walkSessionResourceProbe = AndroidWalkSessionResourceProbe(this)
+        walkSessionResourceProbeStarted = false
     }
 
     private fun startPostLoginDeviceCheckRuntime(
@@ -14939,9 +14969,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             refreshStartupCapabilityUi()
         }
         startupCapabilityProbeStarted = false
-        if (::walkSessionResourceProbe.isInitialized) walkSessionResourceProbe.close()
-        walkSessionResourceProbe = AndroidWalkSessionResourceProbe(this)
-        walkSessionResourceProbeStarted = false
+        resetWalkSessionResourceProbe()
         postLoginMetricPreflightStarted = false
         lateinit var timeout: Runnable
         timeout = Runnable {
@@ -15309,8 +15337,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         storedDeviceCheckBindingValidationPending = false
         if (::walkSessionResourceProbe.isInitialized && walkSessionResourceProbeStarted) {
-            walkSessionResourceProbe.close()
-            walkSessionResourceProbeStarted = false
+            resetWalkSessionResourceProbe()
         }
         postLoginDeviceCheckPermissionRequestCode?.let { requestCode ->
             permissionRequestLeases.remove(requestCode)
@@ -15810,7 +15837,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         PostLoginDeviceCheckFeature.OBSTACLE_DETECTION -> "장애물 인식"
                         PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE -> "미터 거리 안내"
                         PostLoginDeviceCheckFeature.LOCATION_GUIDANCE -> "위치·경로 안내"
-                        PostLoginDeviceCheckFeature.HANDS_FREE_VOICE -> "호출어·음성 명령"
+                        PostLoginDeviceCheckFeature.HANDS_FREE_VOICE -> if (
+                            feature in postLoginDeviceCheckSnapshot.disabledFeatures ||
+                            !hasRecordAudioPermission() ||
+                            (
+                                ::startupCapabilityProbe.isInitialized &&
+                                    startupCapabilityProbe.snapshot()
+                                        .onDeviceSpeechRecognitionAvailable == false
+                            )
+                        ) {
+                            "호출어·음성 명령"
+                        } else {
+                            "호출어 대기"
+                        }
                         PostLoginDeviceCheckFeature.VOICE_GUIDANCE -> "음성 안내"
                         PostLoginDeviceCheckFeature.HAPTIC_FEEDBACK -> "진동 알림"
                     },
@@ -15818,9 +15857,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         if (
             postLoginDeviceCheckSnapshot.passesFeatureGate &&
+            !postLoginDeviceFeatureEnabled(
+                PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE,
+            )
+        ) {
+            add("카메라 기반 신고")
+        }
+        if (
+            postLoginDeviceCheckSnapshot.passesFeatureGate &&
+            !postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)
+        ) {
+            add("위치가 필요한 신고")
+        }
+        if (
+            postLoginDeviceCheckSnapshot.passesFeatureGate &&
             !hasActivityRecognitionPermission()
         ) {
-            add("걸음 수 추적")
+            add("걸음 수 추적·정지 확인 후 대기 신고 자동 전송")
         }
     }.joinToString(", ")
 
@@ -15850,6 +15903,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (!hasLocationPermission() || !isLocationServiceEnabledForDeviceCheck()) {
             add(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)
+        }
+        if (
+            ::startupCapabilityProbe.isInitialized &&
+            startupCapabilityProbe.snapshot().onDeviceSpeechRecognitionAvailable == false
+        ) {
+            add(PostLoginDeviceCheckFeature.HANDS_FREE_VOICE)
+        }
+        if (
+            ::startupCapabilityProbe.isInitialized &&
+            startupCapabilityProbe.snapshot().offlineKoreanTextToSpeechAvailable == false
+        ) {
+            add(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)
         }
         if (
             !hasRecordAudioPermission() ||
@@ -15895,7 +15960,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 if (hasCameraPermission()) "재점검 필요" else "권한 허용 후 재점검 필요"
             !postLoginDeviceFeatureEnabled(
                 PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE,
-            ) -> "통과(거리 제한 모드)"
+            ) -> "제한(거리 제한 모드)"
             postLoginMetricDepthState == PostLoginMetricDepthState.PENDING ->
                 "통과 · 보행 시작 시 재확인"
             else -> null
@@ -15930,6 +15995,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val missingPermissions = requiredPostLoginDeviceCheckPermissions()
             .map(::postLoginDeviceCheckPermissionLabel)
+            .distinct()
             .joinToString(", ")
         val permissionStatus = combined(
             observation.requiredPermissions,
@@ -15942,6 +16008,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             "제한($missingPermissions)"
         } else {
             label(permissionStatus)
+        }
+        val microphoneText = if (!hasRecordAudioPermission()) {
+            "제한(마이크 권한 필요)"
+        } else {
+            label(
+                combined(
+                    startup.microphoneAvailable.toDeviceCheckSignal(),
+                    observation.wakePhraseRecognition,
+                ),
+                "음성 모델 확인 중",
+            )
+        }
+        val locationText = if (!hasLocationPermission()) {
+            "제한(정확한 위치 권한 필요)"
+        } else {
+            label(
+                combined(
+                    startup.gpsAvailable.toDeviceCheckSignal(),
+                    observation.locationService,
+                ),
+            )
         }
         val cameraPending = if (postLoginCameraPipelinePreflightActive) {
             "카메라·모델 실행 중"
@@ -15969,15 +16056,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         } else when (observation.metricDepth) {
             PostLoginMetricDepthState.PENDING -> "검사 대기"
             PostLoginMetricDepthState.AVAILABLE -> "통과"
-            PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED -> "통과(거리 제한 모드)"
+            PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED -> "제한(거리 제한 모드)"
             PostLoginMetricDepthState.UNKNOWN -> "제한(상태 불명)"
             PostLoginMetricDepthState.TIMED_OUT -> "제한(측정 시간 초과)"
         }
         return listOf(
             "권한·알림·음성 고지: $permissionText",
             "한국어 음성 생성: ${label(observation.koreanTextToSpeech, "실제 음성 생성 중")}",
-            "호출어·마이크: ${label(combined(startup.microphoneAvailable.toDeviceCheckSignal(), observation.wakePhraseRecognition), "음성 모델 확인 중")}",
-            "위치 기능: ${label(combined(startup.gpsAvailable.toDeviceCheckSignal(), observation.locationService))}",
+            "호출어·마이크: $microphoneText",
+            "위치 기능: $locationText",
             "진동: ${label(combined(startup.vibrationAvailable.toDeviceCheckSignal(), observation.hapticFeedback))}",
             "카메라·탐지 모델: $cameraText",
             "배터리·저장공간·발열: ${label(observation.deviceResources)}",
@@ -16397,7 +16484,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun observeWalkRuntimeResourceSafety(
         expectedEpoch: WalkRuntimeEpoch? = null,
     ): Boolean {
-        if (!walkRuntimeSafetyCoordinator.configured) return true
         if (!::walkSessionLifecycle.isInitialized || !::walkSessionResourceProbe.isInitialized) {
             return true
         }
@@ -16723,7 +16809,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 add("마이크: 호출어와 음성 명령")
             }
             if (Manifest.permission.ACTIVITY_RECOGNITION in missing) {
-                add("신체 활동: 걸음 수 추적")
+                add("신체 활동: 걸음 수 추적·정지 확인 후 대기 신고 자동 전송")
             }
             if (Manifest.permission.POST_NOTIFICATIONS in missing) {
                 add("알림: 백그라운드 호출어 알림")
@@ -17398,8 +17484,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             accountLoginButton.visibility = View.GONE
             accountSignupToggleButton.visibility = View.GONE
             accountSignupControls.visibility = View.GONE
-            val authenticatedStatus =
+            val authenticatedStatus = if (snapshot.isComplete) {
+                "로그인과 첫 실행 등록을 완료했습니다. 보행 전 실제 상태를 확인하세요."
+            } else {
                 "로그인했습니다. 다음 단계가 끝날 때까지 보행 기능은 잠깁니다."
+            }
             accountAccessStatusText.text = authenticatedStatus
             accountAccessStatusText.contentDescription = authenticatedStatus
             return
@@ -17586,7 +17675,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (walkReadinessExpanded) View.VISIBLE else View.GONE
         walkReadinessSummaryText.visibility =
             if (walkReadinessExpanded) View.GONE else View.VISIBLE
-        val summary = "기기 준비 완료. 장착, 환경, 기기 점검을 모두 통과했습니다."
+        val summary = if (hasCurrentPostLoginDeviceRestrictions()) {
+            val preparation = if (cameraAnalysisFeaturesEnabled()) {
+                "장착과 사용 중인 기능 범위의 환경 점검을 통과했습니다."
+            } else {
+                "사용 중인 기능 범위의 환경 점검을 통과했고, " +
+                    "제한된 카메라 장착 점검은 생략했습니다."
+            }
+            "기기 준비 완료. $preparation 현재 제한 기능: " +
+                "${postLoginDeviceCheckDisabledFeatureText()}. " +
+                "나머지 기능은 사용할 수 있습니다."
+        } else {
+            "기기 준비 완료. 장착, 환경, 기기 점검을 모두 통과했습니다."
+        }
         walkReadinessSummaryText.text = summary
         walkReadinessSummaryText.contentDescription = summary
     }
@@ -19401,10 +19502,33 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val supportedLabel = if (candidateNotice.isNotEmpty()) "시험 기준 통과" else "지원"
         val blocking = assessment.blockingFactors.joinToString(", ") { it.labelKo() }
         val measurement = officialEnvironmentMeasurementDetail(assessment)
+        val locationQualityEnabled =
+            postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)
+        val cameraQualityEnabled = cameraAnalysisFeaturesEnabled()
+        val skippedQualityNotice = when {
+            !locationQualityEnabled && !cameraQualityEnabled ->
+                "기기 제한: 위치·카메라 품질 점검은 생략했습니다.\n"
+            !locationQualityEnabled -> "기기 제한: 위치 품질 점검은 생략했습니다.\n"
+            !cameraQualityEnabled -> "기기 제한: 카메라 품질 점검은 생략했습니다.\n"
+            else -> ""
+        }
+        val supportedReason = when {
+            locationQualityEnabled && cameraQualityEnabled ->
+                "밝고 건조하며 짙은 안개가 없는 일반 도심 보도와 위치·카메라 품질을 확인했습니다."
+            locationQualityEnabled ->
+                "밝고 건조하며 짙은 안개가 없는 일반 도심 보도와 위치 품질을 확인했습니다. " +
+                    "제한된 카메라 품질 점검은 생략했습니다."
+            cameraQualityEnabled ->
+                "밝고 건조하며 짙은 안개가 없는 일반 도심 보도와 카메라 품질을 확인했습니다. " +
+                    "제한된 위치 품질 점검은 생략했습니다."
+            else ->
+                "밝고 건조하며 짙은 안개가 없는 일반 도심 보도를 확인했습니다. " +
+                    "제한된 위치·카메라 품질 점검은 생략했습니다."
+        }
         return candidateNotice + when (assessment.support) {
             OfficialEnvironmentSupport.SUPPORTED ->
                 "$OFFICIAL_ENVIRONMENT_SUPPORT_NOTICE_KO\n$supportedLabel\n" +
-                    "원인: 밝고 건조하며 짙은 안개가 없는 일반 도심 보도와 위치·카메라 품질을 확인했습니다.\n" +
+                    "원인: $supportedReason\n" +
                     measurement +
                     "다음 행동: 장착 방식을 아직 선택하지 않았다면 아래에서 선택하고, " +
                     "완료했다면 보행 시작 확인 버튼을 누르세요."
@@ -19417,6 +19541,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         OfficialEnvironmentPreflightPhase.IDLE -> "확인 필요\n"
                     } +
                     "원인: ${blocking.ifBlank { "공식 환경 조건" }}을 확인하지 못했습니다.\n" +
+                    skippedQualityNotice +
                     measurement +
                     "다음 행동: 화면 안내에 따라 기다리거나 자세·장소를 조정하세요. " +
                     "점검이 끝났다면 다시 점검 버튼을 누르세요."
@@ -19424,6 +19549,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "$OFFICIAL_ENVIRONMENT_SUPPORT_NOTICE_KO\n" +
                     (if (officialEnvironmentCameraPreflightActive) "조정 필요\n" else "사용 불가\n") +
                     "원인: ${blocking.ifBlank { "현재 환경" }}이 공식 지원 조건과 다릅니다.\n" +
+                    skippedQualityNotice +
                     measurement +
                     "다음 행동: 안내된 문제를 바로잡는 동안 보행 안내를 시작하지 마세요."
         }
@@ -20961,6 +21087,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         startupCapabilityConfirmButton.apply {
             val walkSession = walkSessionLifecycle.snapshot()
             val paused = walkSession.state == WalkSessionState.PAUSED
+            val preparesNewWalk = walkSession.state in setOf(
+                WalkSessionState.SAFE_STOP,
+                WalkSessionState.ENDED,
+            )
             val resumeRecheckRequired =
                 paused &&
                     walkSession.recoveryStage == WalkSessionRecoveryStage.RECHECK_REQUIRED
@@ -20979,21 +21109,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     walkSession.confirmationToken != null
                 else -> true
             }
-            if (awaitingExplicitResume) {
+            if (awaitingExplicitResume && !preparesNewWalk) {
                 renderAwaitingExplicitResumeControl()
             } else {
                 isEnabled = firstRunOnboardingComplete() &&
-                    decision.mayConfirmAndStart &&
-                    priorityUserDecision.mayStartWalk &&
-                    officialEnvironmentReady &&
-                    phoneMountingReady &&
                     mayConfirmSession &&
-                    confirmationTokenReady &&
                     !startupCapabilityConfirmationPending &&
                     !walkSessionResumePromptPending &&
-                    (!confirmed || paused)
+                    (
+                        preparesNewWalk ||
+                            (
+                                decision.mayConfirmAndStart &&
+                                    priorityUserDecision.mayStartWalk &&
+                                    officialEnvironmentReady &&
+                                    phoneMountingReady &&
+                                    confirmationTokenReady &&
+                                    (!confirmed || paused)
+                            )
+                    )
                 text = when {
                     !firstRunOnboardingComplete() -> "첫 실행 등록 완료 필요"
+                    preparesNewWalk -> "새 보행 준비"
                     !priorityUserDecision.mayStartWalk -> "교육과 연습 완료 필요"
                     !officialEnvironmentReady -> "공식 사용환경 확인 필요"
                     !phoneMountingReady -> "휴대전화 장착 확인 필요"
@@ -21001,8 +21137,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     !confirmationTokenReady -> "보행 준비 확인 중"
                     paused && walkSessionResumePromptPending -> "보행 재개 음성 확인 중"
                     paused -> "보행 안내 재개 확인"
-                    walkSession.state == WalkSessionState.SAFE_STOP -> "새 보행 준비"
-                    walkSession.state == WalkSessionState.ENDED -> "새 보행 준비"
                     startupCapabilityRetryRequiresUserAction -> "보행 시작 다시 시도"
                     confirmed && decision.tier == WalkSafeStartupCapabilityTier.FULL -> "목적과 안전 제한 확인 완료"
                     confirmed -> "기능 제한 확인 완료"
@@ -21115,14 +21249,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
-    private fun clearRawDetectionWindow() {
+    private fun clearRawDetectionWindow(clearPendingDropCount: Boolean = true) {
         rawDetectionWindowWalkId = null
-        rawDetectionWindowStartedAtEpochMs = 0L
         rawDetectionWindowStartedAtElapsedMs = 0L
         rawDetectionProcessedFrameCount = 0
+        rawDetectionDroppedFrameCount = 0
         rawDetectionCount = 0
         rawDetectionInferenceTotalMs = 0L
         rawDetectionModelRevision = null
+        if (clearPendingDropCount) {
+            rawDetectionDueButInFlightDropCount.set(0)
+        }
     }
 
     private fun recordRawCollectionDetectionMetadata(
@@ -21134,6 +21271,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val observedAtEpochMs = System.currentTimeMillis()
         val observedAtElapsedMs = SystemClock.elapsedRealtime()
         val detectorWasAvailable = detectorAvailable
+        val dueButInFlightDropCount = rawDetectionDueButInFlightDropCount.getAndSet(0)
         executeRawCollectionTask {
             val context = currentRawCollectionRuntimeContextOrNull()
             if (
@@ -21145,12 +21283,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 return@executeRawCollectionTask
             }
             if (rawDetectionWindowWalkId != expectedWalkEpoch.walkSessionId) {
-                clearRawDetectionWindow()
+                clearRawDetectionWindow(clearPendingDropCount = false)
                 rawDetectionWindowWalkId = expectedWalkEpoch.walkSessionId
-                rawDetectionWindowStartedAtEpochMs = observedAtEpochMs
                 rawDetectionWindowStartedAtElapsedMs = observedAtElapsedMs
             }
             rawDetectionProcessedFrameCount += 1
+            rawDetectionDroppedFrameCount += dueButInFlightDropCount
             rawDetectionCount += detectionCount.coerceAtLeast(0)
             rawDetectionInferenceTotalMs += inferenceMs.coerceAtLeast(0L)
             rawDetectionModelRevision = modelRevision?.takeIf {
@@ -21158,27 +21296,46 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             val elapsedWindowMs =
                 observedAtElapsedMs - rawDetectionWindowStartedAtElapsedMs
-            val epochWindowMs = observedAtEpochMs - rawDetectionWindowStartedAtEpochMs
-            if (
-                elapsedWindowMs < RAW_COLLECTION_CAPTURE_INTERVAL_MS ||
-                epochWindowMs < RAW_COLLECTION_CAPTURE_INTERVAL_MS
-            ) return@executeRawCollectionTask
+            if (elapsedWindowMs < RAW_COLLECTION_CAPTURE_INTERVAL_MS) {
+                return@executeRawCollectionTask
+            }
+            val capturedWindowStartedAtEpochMs =
+                (observedAtEpochMs - elapsedWindowMs).coerceAtLeast(0L)
             val processedFrames = rawDetectionProcessedFrameCount
-            val sample = RawDetectionMetadataSample(
-                windowStartedAtEpochMs = rawDetectionWindowStartedAtEpochMs,
+            val averageProcessingFrameMs = if (processedFrames == 0) {
+                0L
+            } else {
+                rawDetectionInferenceTotalMs / processedFrames
+            }
+            val detectionSample = RawDetectionMetadataSample(
+                windowStartedAtEpochMs = capturedWindowStartedAtEpochMs,
                 capturedAtEpochMs = observedAtEpochMs,
                 processedFrameCount = processedFrames,
                 detectionCount = rawDetectionCount,
-                averageInferenceMs = if (processedFrames == 0) {
-                    0L
-                } else {
-                    rawDetectionInferenceTotalMs / processedFrames
-                },
+                averageInferenceMs = averageProcessingFrameMs,
                 detectorAvailable = detectorWasAvailable,
                 modelRevision = rawDetectionModelRevision,
             )
-            clearRawDetectionWindow()
-            rawCollectionRuntimeCoordinator.captureMetadata(context, sample)
+            val performanceSample = RawPerformanceMetadataSample(
+                windowStartedAtEpochMs = capturedWindowStartedAtEpochMs,
+                capturedAtEpochMs = observedAtEpochMs,
+                processedFrameCount = processedFrames,
+                droppedFrameCount = rawDetectionDroppedFrameCount,
+                averageFrameDurationMs = averageProcessingFrameMs,
+                thermalThrottled = if (::walkSessionResourceProbe.isInitialized) {
+                    runCatching {
+                        walkSessionResourceProbe.snapshot().thermalThrottled
+                    }.getOrNull()
+                } else {
+                    null
+                },
+            )
+            clearRawDetectionWindow(clearPendingDropCount = false)
+            rawCollectionRuntimeCoordinator.captureMetadataBatch(
+                context,
+                detectionSample,
+                performanceSample,
+            )
         }
     }
 
@@ -22917,13 +23074,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             walkSessionPermissionRequestInFlight ||
             walkSessionPermissionRequestAttempted
         ) return
-        val missing = missingWalkSessionPermissions(decision)
-        if (missing.isEmpty()) return
+        val requestable = missingWalkSessionPermissions(decision).filterNot { permission ->
+            permission == Manifest.permission.RECORD_AUDIO ||
+                permission == Manifest.permission.ACTIVITY_RECOGNITION
+        }
+        if (requestable.isEmpty()) return
         walkSessionPermissionRequestAttempted = true
         walkSessionPermissionRequestInFlight = true
         walkSessionPermissionRequestCode = try {
             requestPermissionsWithLease(
-                missing.toTypedArray(),
+                requestable.toTypedArray(),
                 PermissionRequestPurpose.WALK_SESSION,
             )
         } catch (error: RuntimeException) {
@@ -22989,6 +23149,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val runtimeEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull()
             ?: return handleGatewayWalkAuthorityLost("walk_epoch_missing_before_runtime")
         if (!walkRuntimeSafetyCoordinator.beginEpoch(runtimeEpoch).safetyOutputsAllowed) return
+        ensureWalkSessionResourceMonitoring()
         if (!observeWalkRuntimeResourceSafety(runtimeEpoch)) return
         scheduleGatewayWalkRenewal()
         persistWalkSessionInterruptionMarker()
@@ -23205,10 +23366,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun voiceResumeConfirmationAvailable(): Boolean {
         val decision = startupCapabilityDecision ?: return false
-        return postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.HANDS_FREE_VOICE) &&
+        if (
+            !hasRecordAudioPermission() ||
+            oneShotSpeechRecognitionLimited ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+        ) {
+            return false
+        }
+        val oneShotRecognitionAvailable = runCatching {
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
+        }.getOrDefault(false)
+        return oneShotRecognitionAvailable &&
             postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE) &&
             decision.allowsRequirement(WalkSafeStartupRequirement.MICROPHONE) &&
-            decision.allowsRequirement(WalkSafeStartupRequirement.ON_DEVICE_STT) &&
             decision.allowsRequirement(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS)
     }
 
@@ -23745,19 +23915,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun handleStartupCapabilityConfirmAction() {
         val session = walkSessionLifecycle.snapshot()
+        val preparesNewWalk = session.state in setOf(
+            WalkSessionState.SAFE_STOP,
+            WalkSessionState.ENDED,
+        )
         startupCapabilityRetryRequiresUserAction = false
         if (session.state == WalkSessionState.PAUSED) {
             walkSessionResumePromptPending = false
             walkSessionResumeRetryRequiresUserAction = false
         }
+        if (preparesNewWalk) {
+            startFreshWalk("user_requested_after_${session.state.name.lowercase(Locale.US)}")
+            refreshStartupCapabilityUi()
+            return
+        }
         if (resumePermissionRecoveryFromExplicitUserAction()) return
         when (session.state) {
-            WalkSessionState.SAFE_STOP,
-            WalkSessionState.ENDED,
-            -> {
-                startFreshWalk("user_requested_after_${session.state.name.lowercase(Locale.US)}")
-                refreshStartupCapabilityUi()
-            }
             WalkSessionState.PAUSED -> {
                 if (session.recoveryStage == WalkSessionRecoveryStage.RECHECK_REQUIRED) {
                     refreshStartupCapabilityUi()
@@ -24412,8 +24585,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             missing += Manifest.permission.ACCESS_FINE_LOCATION
             missing += Manifest.permission.ACCESS_COARSE_LOCATION
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && requireActivityRecognition && !hasActivityRecognitionPermission()) {
-            missing += Manifest.permission.ACTIVITY_RECOGNITION
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            requireActivityRecognition &&
+            !hasActivityRecognitionPermission()
+        ) {
+            updateNavigationStatus(
+                "navigation=activity_recognition_permission_missing step_tracking_limited",
+            )
         }
         if (missing.isEmpty()) return
         requestPermissionsWithLease(
@@ -24443,11 +24622,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun startNavigationServicesIfNeeded() {
         if (!currentLocationCollectionAllowsWork()) {
             stopLocationUpdates()
-            stopStepTracking()
-            return
+        } else {
+            startLocationUpdatesIfAllowed()
         }
-        startLocationUpdatesIfAllowed()
-        if (!currentNavigationCollectionAllowsWork()) {
+        if (!currentStepTrackingCollectionAllowsWork()) {
             stopStepTracking()
             return
         }
@@ -24467,14 +24645,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         return walkSessionLifecycle.isRuntimeEpochCurrent(guard.epoch)
     }
 
-    private fun currentNavigationCollectionAllowsWork(): Boolean {
+    private fun currentStepTrackingCollectionAllowsWork(): Boolean {
         if (!firstRunOnboardingComplete()) return false
-        if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)) return false
         if (!isWalkSessionRuntimeActive()) return false
         if (!isStartupCapabilityConfirmed()) return false
         if (!officialEnvironmentOutputsAllowed) return false
         if (cameraAnalysisFeaturesEnabled() && !phoneMountingOutputsAllowed) return false
         return true
+    }
+
+    private fun currentNavigationCollectionAllowsWork(): Boolean {
+        if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)) return false
+        return currentStepTrackingCollectionAllowsWork()
     }
 
     private fun missingCameraPermissions(): List<String> {
@@ -24519,10 +24701,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun ObservedPermission.denialReasonKo(): String = when (this) {
-        ObservedPermission.CAMERA -> "장애물 인식과 신고 전송을 사용할 수 없습니다."
-        ObservedPermission.PRECISE_LOCATION -> "거리 측정, 길안내와 신고 전송을 사용할 수 없습니다."
+        ObservedPermission.CAMERA ->
+            "장애물 인식·미터 거리 안내와 카메라 기반 신고 전송을 사용할 수 없습니다."
+        ObservedPermission.PRECISE_LOCATION ->
+            "위치·경로 안내와 위치가 필요한 신고 전송을 사용할 수 없습니다."
         ObservedPermission.MICROPHONE -> "음성 명령과 음성 재개 확인을 사용할 수 없습니다."
-        ObservedPermission.ACTIVITY_RECOGNITION -> "걸음 수 추적을 사용할 수 없습니다."
+        ObservedPermission.ACTIVITY_RECOGNITION ->
+            "걸음 수 추적과 정지 확인 후 대기 신고 자동 전송을 사용할 수 없습니다."
     }
 
     private fun persistPermissionRecoveryGate() {
@@ -24745,14 +24930,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!hasLocationPermission() || !isLocationServiceEnabledForDeviceCheck()) {
             navigationPermissionsRequestedForReport = false
             stopLocationUpdates()
-            stopStepTracking()
             if (sessionSnapshot.state == WalkSessionState.ACTIVE && isRouteActive) {
                 navigationRequests.cancelRoute()
                 resetRouteState()
                 updateNavigationStatus("navigation=stopped location_unavailable reason=$reason")
             }
         }
-        if (!hasHandsFreeNotificationPermission() || !hasRecordAudioPermission()) {
+        if (!hasHandsFreeNotificationPermission()) {
+            stopHandsFreeVoiceService()
+        }
+        if (!hasRecordAudioPermission()) {
             stopHandsFreeVoiceService()
             cancelVoiceCommandRecognition()
         }
@@ -24761,7 +24948,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             stopStepTracking()
         }
         if (
-            sessionSnapshot.state == WalkSessionState.ACTIVE &&
+            sessionSnapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
             hasCurrentPostLoginDeviceRestrictions()
         ) {
             val stoppedOnly = setOfNotNull(
@@ -24778,6 +24965,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "제한 기능: ${postLoginDeviceCheckDisabledFeatureText()}. " +
                     "해당 기능만 중지하고 나머지 기능은 계속 사용합니다.",
             )
+        } else if (
+            sessionSnapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
+            !hasCurrentPostLoginDeviceRestrictions() &&
+            !permissionRecoveryGate.blocksAutomaticResourceStart &&
+            ::permissionDenialPanel.isInitialized
+        ) {
+            permissionDenialPanel.visibility = View.GONE
         }
         if (::startupCapabilityProbe.isInitialized) {
             refreshStartupCapabilityUi()
@@ -25609,7 +25803,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 recordRawCollectionDetectionMetadata(
                     expectedWalkEpoch = expectedWalkEpoch,
                     detectionCount = result.detections.size,
-                    inferenceMs = result.timing.totalMs ?: 0L,
+                    inferenceMs = result.timing.totalMs
+                        ?: (
+                            SystemClock.elapsedRealtime() -
+                                detectorStartedAtElapsedRealtimeMs
+                            ).coerceAtLeast(0L),
                     modelRevision = result.timing.modelKey ?: detectorLoadedModelKey,
                 )
             }
@@ -25712,7 +25910,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         observedAtElapsedRealtimeMs: Long,
         inferenceLatencyMs: Long,
     ): Boolean {
-        if (!walkRuntimeSafetyCoordinator.configured) return true
         return walkRuntimeSafetyCoordinator.observe(
             WalkRuntimeSafetyObservation(
                 epoch = epoch,
@@ -25914,7 +26111,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (!isCurrentFrameGeneration(frameGeneration, expectedWalkEpoch)) return
             if (!detectorAvailable) return
             if (elapsedRealtimeMs - lastDetectionRunMs < DETECTION_INTERVAL_MS) return
-            if (!detectionInFlight.compareAndSet(false, true)) return
+            if (!detectionInFlight.compareAndSet(false, true)) {
+                rawDetectionDueButInFlightDropCount.incrementAndGet()
+                return
+            }
             lastDetectionRunMs = elapsedRealtimeMs
             frameCaptureRequested.getAndSet(false)
         }
@@ -26570,11 +26770,13 @@ generation != cameraFallbackGeneration
         val missing = requiredStartWalkObservedPermissions()
             .filterNot(currentObservedPermissionSnapshot()::isGranted)
             .toSet()
-        if (!permissionRecoveryGate.blocksAutomaticResourceStart) {
-            enterPermissionRecoveryBarrier(missing, "settings_requested")
+        if (missing.isNotEmpty() || permissionRecoveryGate.blocksAutomaticResourceStart) {
+            if (!permissionRecoveryGate.blocksAutomaticResourceStart) {
+                enterPermissionRecoveryBarrier(missing, "settings_requested")
+            }
+            permissionRecoveryGate = permissionRecoveryGate.settingsPending()
+            persistPermissionRecoveryGate()
         }
-        permissionRecoveryGate = permissionRecoveryGate.settingsPending()
-        persistPermissionRecoveryGate()
         startActivity(
             Intent(
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
@@ -27396,7 +27598,9 @@ generation != cameraFallbackGeneration
                 )
             },
             onStatus = ::updateNavigationStatus,
-            onTerminalError = ::handleHandsFreeVoiceTerminalError,
+            onCommandListeningStarted = ::handleHandsFreeVoiceCommandListeningStarted,
+            onTerminalFailure = ::handleHandsFreeVoiceTerminalFailure,
+            onSessionEnded = ::handleHandsFreeVoiceSessionEnded,
         )
         handsFreeVoiceController = controller
         (application as? WalkSafeApplication)?.attachWalkVoiceSessionController(controller)
@@ -27424,13 +27628,59 @@ generation != cameraFallbackGeneration
             )
     }
 
-    private fun handleHandsFreeVoiceTerminalError() {
+    private fun handleHandsFreeVoiceCommandListeningStarted() {
+        runCatching { ensureFeedbackActuator().playVoiceListeningStartVibration() }
+        updateGatewayVoiceStatus("호출어를 인식했습니다. 음성 명령을 듣고 있습니다.")
+        updateNavigationStatus("voice_hands_free=listening_command")
+    }
+
+    private fun handleHandsFreeVoiceSessionEnded() {
         handsFreeVoiceRestartRunnable?.let { pending ->
             if (::statusText.isInitialized) statusText.removeCallbacks(pending)
         }
         handsFreeVoiceRestartRunnable = null
         handsFreeVoiceServiceRequested = false
         runCatching { stopService(Intent(this, WalkVoiceForegroundService::class.java)) }
+    }
+
+    private fun handleHandsFreeVoiceTerminalFailure(
+        failure: HandsFreeVoiceTerminalFailure,
+    ) {
+        handsFreeVoiceRestartRunnable?.let { pending ->
+            if (::statusText.isInitialized) statusText.removeCallbacks(pending)
+        }
+        handsFreeVoiceRestartRunnable = null
+        handsFreeVoiceServiceRequested = false
+        runCatching { stopService(Intent(this, WalkVoiceForegroundService::class.java)) }
+        when (failure) {
+            is HandsFreeVoiceTerminalFailure.Transcriber -> {
+                val wasConfirmed = isStartupCapabilityConfirmed()
+                onDeviceSpeechRecognitionCapabilityOverride = false
+                refreshStartupCapabilityUi()
+                if (wasConfirmed) {
+                    confirmedStartupCapabilityDecision = startupCapabilityDecision?.takeIf {
+                        it.mayConfirmAndStart
+                    }
+                    refreshStartupCapabilityUi()
+                }
+                updateStatus(
+                    "호출어 음성 기능 제한",
+                    "기기 내 Vosk 음성 처리 오류로 호출어 기능만 제한했습니다. " +
+                        "화면 음성 명령과 보행의 다른 기능은 계속 사용할 수 있습니다.",
+                )
+                updateNavigationStatus(
+                    "voice_hands_free=transcriber_limited_${failure.statusToken}",
+                )
+            }
+            HandsFreeVoiceTerminalFailure.CommandDispatchFailed,
+            HandsFreeVoiceTerminalFailure.OutputTimeout,
+            -> {
+                updateNavigationStatus(
+                    "voice_hands_free=internal_restart_${failure.statusToken}",
+                )
+                scheduleHandsFreeVoiceRestart()
+            }
+        }
     }
 
     private fun maybeStartHandsFreeVoiceService() {
@@ -27688,29 +27938,47 @@ generation != cameraFallbackGeneration
         }
     }
 
+    private fun handleOneShotSpeechRecognitionFailure(
+        detail: String,
+        permanentlyLimit: Boolean,
+    ) {
+        if (permanentlyLimit) oneShotSpeechRecognitionLimited = true
+        voiceRecognitionGeneration += 1
+        voiceRecognitionActive = false
+        voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
+        clearVoiceEndConfirmation()
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+        updateGatewayVoiceStatus(
+            if (permanentlyLimit) {
+                "기기 내 화면 음성 명령을 사용할 수 없습니다."
+            } else {
+                "기기 내 화면 음성 듣기가 종료됐습니다. 다시 시도할 수 있습니다."
+            },
+        )
+        updateVoiceCommandButton(active = false)
+        scheduleHandsFreeVoiceRestart()
+        if (permanentlyLimit) {
+            updateStatus(
+                "화면 음성 명령 기능 제한",
+                "$detail 기기 내 호출어와 보행의 다른 기능은 계속 사용할 수 있습니다.",
+            )
+        } else {
+            updateStatus(
+                "화면 음성 명령 종료",
+                "$detail 다시 시도할 수 있으며 호출어와 보행의 다른 기능은 계속 사용할 수 있습니다.",
+            )
+        }
+    }
+
     private fun handleRuntimeSpeechCapabilityFailure(
         requirement: WalkSafeStartupRequirement,
         detail: String,
     ) {
+        if (requirement != WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS) return
         val wasConfirmed = isStartupCapabilityConfirmed()
-        val featureLabel = when (requirement) {
-            WalkSafeStartupRequirement.ON_DEVICE_STT -> "음성 명령"
-            WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS -> "음성 안내"
-            else -> return
-        }
-        when (requirement) {
-            WalkSafeStartupRequirement.ON_DEVICE_STT -> {
-                if (onDeviceSpeechRecognitionCapabilityOverride == false) return
-                onDeviceSpeechRecognitionCapabilityOverride = false
-                stopHandsFreeVoiceService()
-                cancelVoiceCommandRecognition()
-            }
-            WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS -> {
-                if (offlineKoreanTextToSpeechCapabilityOverride == false) return
-                offlineKoreanTextToSpeechCapabilityOverride = false
-            }
-            else -> return
-        }
+        if (offlineKoreanTextToSpeechCapabilityOverride == false) return
+        offlineKoreanTextToSpeechCapabilityOverride = false
         refreshStartupCapabilityUi()
         if (wasConfirmed) {
             confirmedStartupCapabilityDecision = startupCapabilityDecision?.takeIf {
@@ -27719,7 +27987,7 @@ generation != cameraFallbackGeneration
             refreshStartupCapabilityUi()
         }
         updateStatus(
-            "$featureLabel 기능 제한",
+            "음성 안내 기능 제한",
             "$detail 화면과 사용 가능한 다른 기능은 계속 사용할 수 있습니다.",
         )
         if (isScreenReaderActive()) startupCapabilityText.announceForAccessibility(detail)
@@ -28061,6 +28329,7 @@ generation != cameraFallbackGeneration
             return
         }
         val status = prepareExplicitReportCandidateIfCurrent(
+            source = source,
             nowMs = System.currentTimeMillis(),
             confirmationContext = context,
             requestedAtElapsedRealtimeMs = nowElapsedRealtimeMs,
@@ -28192,6 +28461,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun prepareExplicitReportCandidateIfCurrent(
+        source: ExplicitReportRequestSource,
         nowMs: Long,
         confirmationContext: ExplicitReportConfirmationContext,
         requestedAtElapsedRealtimeMs: Long,
@@ -28212,7 +28482,7 @@ generation != cameraFallbackGeneration
                     reportImage = latestExplicitReportImage,
                     nowMs = nowMs,
                     capturedAtMs = latestExplicitReportCapturedAtMs.takeIf { it > 0L } ?: nowMs,
-                    trigger = "voice",
+                    trigger = source.reportTrigger,
                     explicitRequest = true,
                     explicitConfirmationContext = confirmationContext,
                     explicitConfirmationRequestedAtElapsedRealtimeMs =
@@ -28412,33 +28682,24 @@ generation != cameraFallbackGeneration
     }
 
     private fun ensureVoicePermissionThenListen() {
-        if (gatewayVoiceRecorder?.isRecording == true) {
-            stopGatewayVoiceCapture()
-            return
-        }
-        if (!requireFirstRunOnboardingComplete("voice_command")) return
-        if (
-            !::firstRunOnboardingSnapshot.isInitialized ||
-            firstRunOnboardingSnapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ||
-            currentGatewaySpeechSessionOrNull() == null
-        ) {
-            updateGatewayVoiceStatus("이메일 로그인과 기기 점검을 완료해야 사용할 수 있습니다.")
-            speakInteraction("이메일 로그인과 기기 점검을 완료한 뒤 서버 음성 명령을 사용할 수 있습니다.")
-            return
-        }
         val snapshot = walkSessionLifecycle.snapshot()
         if (
             !snapshot.isForeground ||
             snapshot.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
-        ) return
-        if (!hasRecordAudioPermission()) {
-            requestPermissionsWithLease(
-                arrayOf(Manifest.permission.RECORD_AUDIO),
-                PermissionRequestPurpose.VOICE_COMMAND,
-            )
+        ) {
+            updateGatewayVoiceStatus("화면 음성 명령은 보행 안내 또는 일시정지 중에만 사용할 수 있습니다.")
             return
         }
-        toggleGatewayVoiceCapture()
+        if (!hasRecordAudioPermission()) {
+            updateNavigationStatus("voice_command=microphone_permission_missing feature_limited")
+            showPermissionDenialPanel(
+                missingPermissions = setOf(ObservedPermission.MICROPHONE),
+                reason = "voice_command_microphone_missing",
+            )
+            updateVoiceCommandButton(active = false)
+            return
+        }
+        startVoiceCommandRecognition()
     }
 
     /** Explicit foreground button capture only; this is not a 길라잡이 wake-word listener. */
@@ -28741,19 +29002,16 @@ generation != cameraFallbackGeneration
         purpose: VoiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND,
         expectedGatewayWalkOperationId: String? = null,
     ): Boolean {
-        if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.HANDS_FREE_VOICE)) {
-            updateNavigationStatus("voice_command=device_feature_limited")
+        if (!hasRecordAudioPermission()) {
+            updateNavigationStatus("voice_command=microphone_permission_missing")
             return false
         }
         if (
             startupCapabilityDecision?.allowsRequirement(
                 WalkSafeStartupRequirement.MICROPHONE,
-            ) == false ||
-            startupCapabilityDecision?.allowsRequirement(
-                WalkSafeStartupRequirement.ON_DEVICE_STT,
             ) == false
         ) {
-            updateNavigationStatus("voice_command=runtime_feature_limited")
+            updateNavigationStatus("voice_command=microphone_limited")
             return false
         }
         val sessionSnapshot = walkSessionLifecycle.snapshot()
@@ -28771,15 +29029,12 @@ generation != cameraFallbackGeneration
         val mayListen = when (purpose) {
             VoiceRecognitionPurpose.COMMAND -> {
                 sessionSnapshot.isForeground &&
-                    sessionSnapshot.state in setOf(
-                        WalkSessionState.ACTIVE,
-                        WalkSessionState.PAUSED,
-                    ) &&
                     sessionSnapshot.epoch == expectedWalkEpoch &&
-                    (
-                        sessionSnapshot.state == WalkSessionState.PAUSED ||
-                            requireStartupCapabilityConfirmation()
-                    )
+                    when (sessionSnapshot.state) {
+                        WalkSessionState.ACTIVE -> requireStartupCapabilityConfirmation()
+                        WalkSessionState.PAUSED -> voiceResumeConfirmationAvailable()
+                        else -> false
+                    }
             }
             VoiceRecognitionPurpose.WALK_SESSION_RESUME -> {
                 sessionSnapshot.state == WalkSessionState.PAUSED &&
@@ -28815,47 +29070,47 @@ generation != cameraFallbackGeneration
             updateNavigationStatus("voice=blocked_by_risk_speech")
             return false
         }
-        stopHandsFreeVoiceService()
+        fun unavailable(detail: String, permanentlyLimit: Boolean): Boolean {
+            updateNavigationStatus("voice=recognizer_unavailable")
+            handleOneShotSpeechRecognitionFailure(detail, permanentlyLimit)
+            return false
+        }
+        if (oneShotSpeechRecognitionLimited) {
+            return unavailable(
+                "휴대폰 내부 one-shot 음성 인식이 제한되어 있습니다.",
+                permanentlyLimit = true,
+            )
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            updateNavigationStatus("voice=recognizer_unavailable")
-            if (purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER) {
-                handleGatewayWalkTakeoverRecognition(emptyList())
-                return false
-            }
-            handleRuntimeSpeechCapabilityFailure(
-                WalkSafeStartupRequirement.ON_DEVICE_STT,
-                "휴대폰 내부 음성 인식을 사용할 수 없어 음성 명령 기능을 제한합니다.",
+            return unavailable(
+                "휴대폰 내부 one-shot 음성 인식을 지원하지 않습니다.",
+                permanentlyLimit = true,
             )
-            return false
         }
-        val onDeviceRecognitionAvailable =
-            runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(this) }.getOrDefault(false)
+        val onDeviceRecognitionAvailable = try {
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
+        } catch (_: RuntimeException) {
+            return unavailable(
+                "휴대폰 내부 one-shot 음성 인식 상태를 확인하지 못했습니다.",
+                permanentlyLimit = false,
+            )
+        }
         if (!onDeviceRecognitionAvailable) {
-            updateNavigationStatus("voice=recognizer_unavailable")
-            if (purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER) {
-                handleGatewayWalkTakeoverRecognition(emptyList())
-                return false
-            }
-            handleRuntimeSpeechCapabilityFailure(
-                WalkSafeStartupRequirement.ON_DEVICE_STT,
-                "휴대폰 내부 음성 인식을 사용할 수 없어 음성 명령 기능을 제한합니다.",
+            return unavailable(
+                "휴대폰 내부 one-shot 음성 인식을 사용할 수 없습니다.",
+                permanentlyLimit = true,
             )
-            return false
         }
+        stopHandsFreeVoiceService()
         val generation = ++voiceRecognitionGeneration
         val recognizer = speechRecognizer ?: runCatching {
             SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
         }.getOrElse {
             updateNavigationStatus("voice=on_device_recognizer_creation_failed")
-            if (purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER) {
-                handleGatewayWalkTakeoverRecognition(emptyList())
-                return false
-            }
-            handleRuntimeSpeechCapabilityFailure(
-                WalkSafeStartupRequirement.ON_DEVICE_STT,
-                "휴대폰 내부 음성 인식을 시작할 수 없어 음성 명령 기능을 제한합니다.",
+            return unavailable(
+                "휴대폰 내부 one-shot 음성 인식기를 만들 수 없습니다.",
+                permanentlyLimit = false,
             )
-            return false
         }.also {
             speechRecognizer = it
         }
@@ -28891,18 +29146,10 @@ generation != cameraFallbackGeneration
             recognizer.startListening(intent)
             true
         }.getOrElse {
-            voiceRecognitionActive = false
-            voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
-            updateVoiceCommandButton(active = false)
-            if (purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER) {
-                handleGatewayWalkTakeoverRecognition(emptyList())
-                return false
-            }
-            handleRuntimeSpeechCapabilityFailure(
-                WalkSafeStartupRequirement.ON_DEVICE_STT,
-                "휴대폰 내부 음성 인식을 시작할 수 없어 음성 명령 기능을 제한합니다.",
+            unavailable(
+                "휴대폰 내부 one-shot 음성 인식을 시작할 수 없습니다.",
+                permanentlyLimit = false,
             )
-            false
         }
     }
 
@@ -29000,14 +29247,17 @@ generation != cameraFallbackGeneration
                 }
                 speechRecognizer?.destroy()
                 speechRecognizer = null
-                if (purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER) {
-                    handleGatewayWalkTakeoverRecognition(emptyList())
-                    return
-                }
-                handleRuntimeSpeechCapabilityFailure(
-                    WalkSafeStartupRequirement.ON_DEVICE_STT,
-                    "휴대폰 내부 음성 인식에 오류가 발생해 음성 명령 기능을 제한합니다.",
+                handleOneShotSpeechRecognitionFailure(
+                    "휴대폰 내부 one-shot 음성 인식에 오류가 발생했습니다.",
+                    permanentlyLimit = shouldPermanentlyLimitOneShotSpeechRecognition(error),
                 )
+                when (purpose) {
+                    VoiceRecognitionPurpose.WALK_SESSION_RESUME ->
+                        handleWalkSessionResumeRecognizerNotStarted()
+                    VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER ->
+                        handleGatewayWalkTakeoverRecognition(emptyList())
+                    VoiceRecognitionPurpose.COMMAND -> Unit
+                }
             }
 
             override fun onResults(results: Bundle?) {
@@ -29024,6 +29274,7 @@ generation != cameraFallbackGeneration
                 voiceRecognitionActive = false
                 voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
                 updateVoiceCommandButton(active = false)
+                updateGatewayVoiceStatus("기기 내 음성 명령을 처리했습니다.")
                 val phrases = results
                     ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     .orEmpty()
@@ -29061,10 +29312,8 @@ generation != cameraFallbackGeneration
                 walkSessionLifecycle.snapshot().let { snapshot ->
                     snapshot.epoch == expectedWalkEpoch &&
                         snapshot.isForeground &&
-                        snapshot.state in setOf(
-                            WalkSessionState.ACTIVE,
-                            WalkSessionState.PAUSED,
-                        )
+                        snapshot.state in
+                        setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
                 }
             VoiceRecognitionPurpose.WALK_SESSION_RESUME -> {
                 val snapshot = walkSessionLifecycle.snapshot()
@@ -29583,27 +29832,38 @@ generation != cameraFallbackGeneration
         val snapshot = walkSessionLifecycle.snapshot()
         val gatewayRecording = gatewayVoiceRecorder?.isRecording == true
         val gatewayProcessing = activeGatewaySpeechInteraction != null && !gatewayRecording
+        val voiceCommandAvailable = hasRecordAudioPermission() &&
+            when (snapshot.state) {
+                WalkSessionState.ACTIVE -> !oneShotSpeechRecognitionLimited
+                WalkSessionState.PAUSED -> voiceResumeConfirmationAvailable()
+                else -> false
+            }
         val enabled = if (gatewayRecording) {
             snapshot.isForeground && isActivityForeground
         } else {
             !active &&
                 !gatewayProcessing &&
                 snapshot.isForeground &&
-                snapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
-                currentGatewaySpeechSessionOrNull() != null
+                voiceCommandAvailable
         }
+        val voiceCommandUnavailable = !gatewayRecording && !gatewayProcessing &&
+            !active &&
+            snapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
+            !voiceCommandAvailable
         listOf(voiceReportButton, walkSafetyVoiceButton).forEach { button ->
             button.text = when {
                 gatewayRecording -> "녹음 중지"
                 gatewayProcessing -> "음성 처리 중"
                 active -> "음성 듣는 중"
-                else -> "서버 음성 명령"
+                voiceCommandUnavailable -> "기기 내 음성 명령 제한"
+                else -> "기기 내 음성 명령"
             }
             button.contentDescription = when {
                 gatewayRecording -> "서버 음성 명령 녹음 중지"
                 gatewayProcessing -> "서버 음성 명령 처리 중"
                 active -> "음성 명령을 듣는 중"
-                else -> "서버 음성 명령 녹음 시작"
+                voiceCommandUnavailable -> "기기 내 음성 명령을 사용할 수 없음"
+                else -> "기기 내 음성 명령 듣기 시작"
             }
             button.isEnabled = enabled
         }
@@ -29615,6 +29875,7 @@ generation != cameraFallbackGeneration
             button.text = label
             button.contentDescription = label
         }
+        updateGatewayVoiceStatus(label)
         updateNavigationStatus("voice=${label.toStatusToken(maxLength = 32)}")
     }
 
@@ -29741,7 +30002,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun startStepTrackingIfAllowed() {
-        if (!currentNavigationCollectionAllowsWork()) {
+        if (!currentStepTrackingCollectionAllowsWork()) {
             stopStepTracking()
             return
         }
@@ -30246,6 +30507,16 @@ generation != cameraFallbackGeneration
             return false
         }
         if (blockRouteMutationWhileDeviationChoicePending()) return false
+        val rawQuery = destinationQueryInput.text?.toString().orEmpty()
+        if (rawQuery.isBlank()) {
+            updateNavigationStatus("navigation=destination_query_missing")
+            return false
+        }
+        val query = canonicalDestinationSearchQueryOrNull(rawQuery) ?: run {
+            updateNavigationStatus("navigation=destination_query_invalid max_code_points=80")
+            speakInteraction("목적지는 80자 이하로 입력해 주세요.")
+            return false
+        }
         val expectedWalkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return false
         if (!requireReporterUserId("login_required_destination_search")) return false
         if (!isGatewayNetworkAllowed(reason = "destination_search")) return false
@@ -30262,11 +30533,6 @@ generation != cameraFallbackGeneration
         )
         if (destinationSearchInFlight || navigationRequests.hasActiveDestinationSearch()) return false
         if (!isRouteLocationPermissionReady() && !ensureNavigationPermissionForRouteOrStep()) {
-            return false
-        }
-        val query = destinationQueryInput.text?.toString()?.trim().orEmpty()
-        if (query.isBlank()) {
-            updateNavigationStatus("navigation=destination_query_missing")
             return false
         }
         val requestId = destinationSearchGeneration + 1
@@ -31778,7 +32044,9 @@ generation != cameraFallbackGeneration
                         add(WalkSafeStartupRequirement.METRIC_DISTANCE)
                     PostLoginDeviceCheckFeature.LOCATION_GUIDANCE ->
                         add(WalkSafeStartupRequirement.GPS)
-                    PostLoginDeviceCheckFeature.HANDS_FREE_VOICE -> {
+                    PostLoginDeviceCheckFeature.HANDS_FREE_VOICE -> if (
+                        feature in postLoginDeviceCheckSnapshot.disabledFeatures
+                    ) {
                         add(WalkSafeStartupRequirement.MICROPHONE)
                         add(WalkSafeStartupRequirement.ON_DEVICE_STT)
                     }

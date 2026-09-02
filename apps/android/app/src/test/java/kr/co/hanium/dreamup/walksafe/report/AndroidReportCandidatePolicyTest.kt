@@ -118,6 +118,21 @@ class AndroidReportCandidatePolicyTest {
         assertNull(policy.prepare(input(trigger = "manual")))
     }
 
+    @Test
+    fun explicitOnScreenReportPreservesItsTriggerInMetadata() {
+        assertEquals("on_screen", AndroidReportCandidatePolicy.TRIGGER_ON_SCREEN)
+        val candidate = policy.prepare(
+            input(
+                depth = depth(trackAgeFrames = 1, trackStableMs = 0L),
+                trigger = AndroidReportCandidatePolicy.TRIGGER_ON_SCREEN,
+            ),
+        )
+
+        assertNotNull(candidate)
+        assertEquals("on_screen", candidate!!.metadata.getString("trigger"))
+        assertEquals(false, candidate.metadata.getBoolean("auto_reported"))
+    }
+
     private fun input(
         depth: TrackedObjectDepth = depth(),
         location: TrustedLocation? = TrustedLocation(37.0, 127.0, 8f, 1_000L),

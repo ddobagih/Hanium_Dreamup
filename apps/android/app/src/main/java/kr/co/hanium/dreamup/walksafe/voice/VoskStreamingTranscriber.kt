@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.voice
 import android.content.Context
 import java.io.Closeable
 import java.io.File
+import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -21,6 +22,16 @@ internal interface VoskStreamingListener {
     fun onReady(runId: Long)
     fun onTranscript(runId: Long, transcript: VoskTranscript)
     fun onError(runId: Long, error: VoskStreamingError)
+}
+
+internal fun submitReservedVoskStreamingRun(
+    runId: Long,
+    onRunReserved: (Long) -> Unit,
+    executor: Executor,
+    task: Runnable,
+) {
+    onRunReserved(runId)
+    executor.execute(task)
 }
 
 /**
@@ -57,18 +68,24 @@ internal class VoskStreamingTranscriber(
     private var lastPartial = ""
     private var lastPartialEmittedAtNanos = 0L
 
-    fun start() {
+    fun start(onRunReserved: (Long) -> Unit = {}): Long? {
         val startGeneration = synchronized(stateLock) {
-            if (state != State.STOPPED) return
+            if (state != State.STOPPED) return null
             state = State.STARTING
             generation += 1L
             generation
         }
         try {
-            loader.execute { loadAndStart(startGeneration) }
+            submitReservedVoskStreamingRun(
+                runId = startGeneration,
+                onRunReserved = onRunReserved,
+                executor = loader,
+                task = Runnable { loadAndStart(startGeneration) },
+            )
         } catch (_: RejectedExecutionException) {
             failStart(startGeneration, VoskStreamingError.MODEL_LOAD_FAILED)
         }
+        return startGeneration
     }
 
     fun stop() {

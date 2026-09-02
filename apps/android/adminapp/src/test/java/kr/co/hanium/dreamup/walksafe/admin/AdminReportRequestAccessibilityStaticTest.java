@@ -48,7 +48,12 @@ public final class AdminReportRequestAccessibilityStaticTest {
         assertFalse(panel.contains("ACTION_SEND"));
         assertFalse(panel.contains("mailto:"));
         assertFalse(panel.contains("sms:"));
-        assertTrue(activity.indexOf("render();\n        restoreReportPanelState(savedInstanceState);") > 0);
+        assertTrue(activity.indexOf(
+            "render();\n        restorePendingMutationRecovery(savedInstanceState);"
+        ) > 0);
+        assertTrue(activity.indexOf(
+            "restorePendingMutationRecovery(savedInstanceState);\n        restoreReportPanelState(savedInstanceState);"
+        ) > 0);
     }
 
     @Test

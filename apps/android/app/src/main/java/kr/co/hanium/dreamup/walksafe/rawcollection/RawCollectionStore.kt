@@ -21,6 +21,12 @@ internal data class RawPlaintextChunk(
     val plaintext: ByteArray,
 )
 
+internal data class RawPlaintextBatchItem(
+    val type: RawChunkType,
+    val capturedAtEpochMs: Long,
+    val plaintext: ByteArray,
+)
+
 /** Crash-safe local raw collection core. Network upload is intentionally outside this class. */
 internal class RawCollectionStore private constructor(
     private val storage: RawCollectionStorage,
@@ -46,12 +52,15 @@ internal class RawCollectionStore private constructor(
         owner: RawCollectionOwner,
         walkSessionId: String,
         consentReceiptSha256: String,
+        capturedStartedAtEpochMs: Long? = null,
         rawConsentGranted: Boolean,
         walkState: RawWalkState,
     ): Boolean {
         val now = nowMillis()
+        val startedAt = capturedStartedAtEpochMs ?: now
         if (
             now < 0L ||
+            startedAt !in 0L..now ||
             !isCanonicalUuid(collectionId) ||
             !isCanonicalUuid(walkSessionId) ||
             !SHA256_HEX.matches(consentReceiptSha256) ||
@@ -75,14 +84,14 @@ internal class RawCollectionStore private constructor(
                 now < active.expiresAtEpochMs
         }
         if (storage.readManifest(collectionId) != null) return false
-        val expiresAt = now + RAW_COLLECTION_TTL_MS
-        if (expiresAt < now) return false
+        val expiresAt = startedAt + RAW_COLLECTION_TTL_MS
+        if (expiresAt < startedAt || expiresAt <= now) return false
         val manifest = RawCollectionManifest(
             collectionId = collectionId,
             owner = owner,
             walkSessionId = walkSessionId,
             consentReceiptSha256 = consentReceiptSha256,
-            capturedStartedAtEpochMs = now,
+            capturedStartedAtEpochMs = startedAt,
             capturedEndedAtEpochMs = null,
             expiresAtEpochMs = expiresAt,
             state = RawManifestState.PARTIAL,
@@ -95,57 +104,79 @@ internal class RawCollectionStore private constructor(
     }
 
     @Synchronized
-    fun append(
+    fun appendBatch(
         owner: RawCollectionOwner,
         walkSessionId: String,
         rawConsentGranted: Boolean,
         walkState: RawWalkState,
-        type: RawChunkType,
-        capturedAtEpochMs: Long,
-        plaintext: ByteArray,
-    ): RawChunkMetadata? {
+        items: List<RawPlaintextBatchItem>,
+    ): List<RawChunkMetadata>? {
         if (!rawConsentGranted || walkState != RawWalkState.ACTIVE) return null
         val now = nowMillis()
         if (
-            now < 0L || plaintext.isEmpty() || plaintext.size > RAW_MAX_CHUNK_BYTES ||
-            type !in RAW_RUNTIME_CHUNK_TYPES ||
+            now < 0L ||
+            items.size != RAW_MAX_CHUNKS ||
+            items.map(RawPlaintextBatchItem::type) != RAW_RUNTIME_CHUNK_TYPE_ORDER ||
+            items.map(RawPlaintextBatchItem::type).distinct().size != items.size ||
+            items.any { it.plaintext.isEmpty() || it.plaintext.size > RAW_MAX_CHUNK_BYTES } ||
+            items.sumOf { it.plaintext.size.toLong() } > RAW_MAX_COLLECTION_BYTES ||
+            items.map(RawPlaintextBatchItem::capturedAtEpochMs).distinct().size != 1 ||
             storage.hasFence(GLOBAL_DELETE_FENCE)
         ) {
             return null
         }
         val collectionId = reconcileActivePointer() ?: return null
-        val manifest = readManifest(collectionId) ?: return closeAfterFailure()
+        val manifest = readManifest(collectionId) ?: run {
+            discardCollectionAndPointer(collectionId)
+            return null
+        }
+        val capturedAtEpochMs = items.first().capturedAtEpochMs
         if (
             manifest.owner != owner ||
             manifest.walkSessionId != walkSessionId ||
             storage.hasFence(revocationFence(manifest.consentReceiptSha256)) ||
             manifest.state != RawManifestState.PARTIAL ||
             now >= manifest.expiresAtEpochMs ||
-            manifest.chunks.size >= RAW_MAX_CHUNKS ||
+            manifest.chunks.isNotEmpty() ||
             capturedAtEpochMs < manifest.capturedStartedAtEpochMs ||
-            capturedAtEpochMs > now ||
-            (manifest.chunks.lastOrNull()?.capturedAtEpochMs ?: Long.MIN_VALUE) > capturedAtEpochMs
+            capturedAtEpochMs > now
         ) {
             if (now >= manifest.expiresAtEpochMs) {
-                storage.clearActiveCollectionId()
-                storage.deleteCollection(collectionId)
+                discardCollectionAndPointer(collectionId)
             }
             return null
         }
-        val metadata = RawChunkMetadata(
-            ordinal = manifest.chunks.size,
-            type = type,
-            capturedAtEpochMs = capturedAtEpochMs,
-            sizeBytes = plaintext.size,
-            sha256 = sha256Hex(plaintext),
-        )
-        val sealed = aead.seal(plaintext, chunkAad(manifest.collectionId, metadata), CHUNK_LIMITS)
-        val envelope = (sealed as? AeadSealResult.Sealed)?.envelope ?: return null
-        if (!storage.writeChunkAtomically(collectionId, metadata.ordinal, envelope)) return null
-        if (writeManifest(manifest.copy(chunks = manifest.chunks + metadata))) return metadata
-        storage.deleteChunk(collectionId, metadata.ordinal)
-        storage.clearActiveCollectionId()
-        return null
+        val metadata = items.mapIndexed { ordinal, item ->
+            RawChunkMetadata(
+                ordinal = ordinal,
+                type = item.type,
+                capturedAtEpochMs = item.capturedAtEpochMs,
+                sizeBytes = item.plaintext.size,
+                sha256 = sha256Hex(item.plaintext),
+            )
+        }
+        val envelopes = items.zip(metadata).map { (item, chunkMetadata) ->
+            val sealed = aead.seal(
+                item.plaintext,
+                chunkAad(manifest.collectionId, chunkMetadata),
+                CHUNK_LIMITS,
+            )
+            (sealed as? AeadSealResult.Sealed)?.envelope ?: run {
+                discardCollectionAndPointer(collectionId)
+                return null
+            }
+        }
+        metadata.zip(envelopes).forEach { (chunkMetadata, envelope) ->
+            if (!storage.writeChunkAtomically(collectionId, chunkMetadata.ordinal, envelope)) {
+                discardCollectionAndPointer(collectionId)
+                return null
+            }
+        }
+        if (!writeManifest(manifest.copy(chunks = metadata))) {
+            discardCollectionAndPointer(collectionId)
+            return null
+        }
+        return metadata
     }
 
     @Synchronized
@@ -177,14 +208,13 @@ internal class RawCollectionStore private constructor(
         walkSessionId: String,
     ): Boolean {
         val collectionId = storage.readActiveCollectionId() ?: return true
-        val manifest = readManifest(collectionId) ?: return storage.clearActiveCollectionId()
+        val manifest = readManifest(collectionId) ?: return discardCollectionAndPointer(collectionId)
         if (
             manifest.owner != owner ||
             manifest.walkSessionId != walkSessionId ||
             manifest.state != RawManifestState.PARTIAL
         ) return false
-        if (!storage.clearActiveCollectionId()) return false
-        return storage.deleteCollection(collectionId)
+        return discardCollectionAndPointer(collectionId)
     }
 
     @Synchronized
@@ -202,15 +232,17 @@ internal class RawCollectionStore private constructor(
             manifest.walkSessionId != walkSessionId ||
             manifest.state != RawManifestState.PARTIAL
         ) return null
-        if (manifest.chunks.size != RAW_MAX_CHUNKS) return null
+        if (!manifest.chunks.isCompleteRuntimeBatch()) return null
+        if (manifest.chunks.any { !isStoredChunkValid(manifest, it) }) return null
         val now = nowMillis()
         if (now < manifest.capturedStartedAtEpochMs || now >= manifest.expiresAtEpochMs) {
             storage.clearActiveCollectionId()
             if (now >= manifest.expiresAtEpochMs) storage.deleteCollection(collectionId)
             return null
         }
+        val capturedEndedAtEpochMs = manifest.chunks.first().capturedAtEpochMs
         val complete = manifest.copy(
-            capturedEndedAtEpochMs = now,
+            capturedEndedAtEpochMs = capturedEndedAtEpochMs,
             state = RawManifestState.COMPLETE,
         )
         if (!writeManifest(complete)) return null
@@ -331,6 +363,7 @@ internal class RawCollectionStore private constructor(
         receipt: RawCollectionReceipt,
     ): Boolean {
         if (
+            receipt.schemaVersion != BACKEND_RECEIPT_SCHEMA ||
             !isCanonicalUuid(receipt.collectionId) ||
             !SHA256_HEX.matches(receipt.manifestSha256) ||
             receipt.persistenceMarker != RAW_RECEIPT_PERSISTENCE_MARKER
@@ -403,16 +436,38 @@ internal class RawCollectionStore private constructor(
         return storage.clearActiveCollectionId()
     }
 
-    private fun closeAfterFailure(): RawChunkMetadata? {
-        storage.clearActiveCollectionId()
-        return null
-    }
-
     private fun reconcileActivePointer(): String? {
         val collectionId = storage.readActiveCollectionId() ?: return null
         val manifest = readManifest(collectionId)
         if (manifest?.state == RawManifestState.PARTIAL) return collectionId
+        if (manifest == null) {
+            discardCollectionAndPointer(collectionId)
+            return null
+        }
         return if (storage.clearActiveCollectionId()) null else collectionId
+    }
+
+    private fun isStoredChunkValid(
+        manifest: RawCollectionManifest,
+        metadata: RawChunkMetadata,
+    ): Boolean {
+        val envelope = storage.readChunk(manifest.collectionId, metadata.ordinal) ?: return false
+        val opened = aead.open(
+            envelope,
+            chunkAad(manifest.collectionId, metadata),
+            CHUNK_LIMITS,
+        ) as? AeadOpenResult.Opened ?: return false
+        return try {
+            opened.plaintext.size == metadata.sizeBytes &&
+                sha256Hex(opened.plaintext) == metadata.sha256
+        } finally {
+            opened.plaintext.fill(0)
+        }
+    }
+
+    private fun discardCollectionAndPointer(collectionId: String): Boolean {
+        if (!storage.deleteCollection(collectionId)) return false
+        return storage.readActiveCollectionId() != collectionId || storage.clearActiveCollectionId()
     }
 
     private fun pruneExpiredLocked(now: Long): Int {

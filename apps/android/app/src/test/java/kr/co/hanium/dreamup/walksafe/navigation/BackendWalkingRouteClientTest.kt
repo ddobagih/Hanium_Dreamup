@@ -3,6 +3,8 @@ package kr.co.hanium.dreamup.walksafe.navigation
 import java.io.File
 import kr.co.hanium.dreamup.walksafe.network.GatewayFieldSession
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.json.JSONArray
@@ -77,6 +79,50 @@ class BackendWalkingRouteClientTest {
         assertEquals(session, requestedSession)
         assertEquals(true, requestedUrl!!.startsWith("https://field.example/api/navigation/destinations/search?"))
         assertEquals(true, requestedUrl!!.contains("origin_lat=37.0"))
+    }
+
+    @Test
+    fun destinationSearchUsesTheBackendUnicodeCodePointLimit() {
+        val acceptedQuery = "😀".repeat(80)
+        var getCalled = false
+        val client = BackendWalkingRouteClient(
+            transport = object : WalkingRouteTransport {
+                override fun post(url: String, body: String, session: GatewayFieldSession): String =
+                    error("POST should not be called by destination search")
+
+                override fun get(url: String, session: GatewayFieldSession): String {
+                    getCalled = true
+                    return JSONObject()
+                        .put("schema_version", "walksafe.destination_search.v1")
+                        .put("provider", "tmap_poi")
+                        .put("query", acceptedQuery)
+                        .put("results", JSONArray())
+                        .toString()
+                }
+            },
+        )
+
+        assertEquals(
+            acceptedQuery,
+            client.searchDestinations(
+                session = session("search-tester"),
+                query = acceptedQuery,
+                limit = 5,
+                origin = null,
+            ).query,
+        )
+        assertEquals(acceptedQuery, canonicalDestinationSearchQueryOrNull(acceptedQuery))
+        assertNull(canonicalDestinationSearchQueryOrNull("😀".repeat(81)))
+        getCalled = false
+        assertThrows(IllegalArgumentException::class.java) {
+            client.searchDestinations(
+                session = session("search-tester"),
+                query = "😀".repeat(81),
+                limit = 5,
+                origin = null,
+            )
+        }
+        assertFalse(getCalled)
     }
 
     @Test

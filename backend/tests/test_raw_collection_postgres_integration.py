@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 import hashlib
 import importlib
 import os
@@ -103,6 +103,8 @@ _HISTORICAL_V1_CONSENT_ITEM_VERSIONS = {
 
 
 class _StaticKeyManager:
+    keyring = SimpleNamespace(generation=1, manifest_sha256="e" * 64)
+
     def synchronize(self, _db) -> None:
         return None
 
@@ -818,6 +820,8 @@ def test_raw_b1b_schema_acl_rate_group_and_state_guards(tmp_path: Path) -> None:
                 "committed_at",
                 "retention_expires_at",
                 "receipt_sha256",
+                "digest_rejected_at",
+                "digest_rejected_object_id",
             ):
                 assert connection.execute(
                     text(
@@ -826,6 +830,17 @@ def test_raw_b1b_schema_acl_rate_group_and_state_guards(tmp_path: Path) -> None:
                     ),
                     {"column_name": column_name},
                 ).scalar_one() is True
+            for role in (
+                "walksafe_account_deletion_worker",
+                "walksafe_raw_retention_worker",
+            ):
+                assert connection.execute(
+                    text(
+                        "SELECT has_column_privilege(:role, 'raw_collections', "
+                        "'digest_rejected_at', 'UPDATE')"
+                    ),
+                    {"role": role},
+                ).scalar_one() is False
             assert connection.execute(
                 text(
                     "SELECT has_column_privilege('walksafe_backend_runtime', "
@@ -892,6 +907,35 @@ def test_raw_b1b_schema_acl_rate_group_and_state_guards(tmp_path: Path) -> None:
                 finally:
                     invalid_transition.rollback()
 
+                digest_rejection = connection.begin_nested()
+                try:
+                    connection.execute(
+                        text(
+                            "UPDATE raw_collections SET digest_rejected_at = "
+                            "clock_timestamp(), digest_rejected_object_id = :object_id "
+                            "WHERE collection_id = :collection_id"
+                        ),
+                        {
+                            "collection_id": uuid.UUID(manifest.collection_id),
+                            "object_id": uuid.UUID(manifest.objects[0].object_id),
+                        },
+                    )
+                    with pytest.raises(SQLAlchemyError) as rejected_state_change:
+                        connection.execute(
+                            text(
+                                "UPDATE raw_collections SET state = 'READY_TO_COMMIT' "
+                                "WHERE collection_id = :collection_id"
+                            ),
+                            {"collection_id": uuid.UUID(manifest.collection_id)},
+                        )
+                    assert getattr(
+                        rejected_state_change.value.orig,
+                        "sqlstate",
+                        None,
+                    ) == "23514"
+                finally:
+                    digest_rejection.rollback()
+
                 object_id = uuid.UUID(manifest.objects[0].object_id)
                 persisted_insert = connection.begin_nested()
                 try:
@@ -931,10 +975,273 @@ def test_raw_b1b_schema_acl_rate_group_and_state_guards(tmp_path: Path) -> None:
         engine.dispose()
 
 
-def test_raw_multi_object_chunk_manifest_status_commit_and_replay(
+def test_raw_single_chunk_manifest_rejects_object_digest_disagreement(
     tmp_path: Path,
 ) -> None:
     engine, SessionFactory = _session_factory()
+    _truncate_raw_tables(engine)
+    actor_id = f"raw.invalid-single-digest.{uuid.uuid4().hex}"
+    admission = _record_admission(SessionFactory, actor_id=actor_id)
+    value = _manifest(
+        admission=admission,
+        content=b"single chunk digest contract",
+    ).model_dump(mode="json")
+    object_value = value["objects"][0]
+    object_value["sha256"] = "0" * 64
+    value["manifest_sha256"] = raw_collection_manifest_sha256(value)
+    manifest = RawCollectionManifestV1.model_validate(value)
+    storage = _storage(tmp_path / "raw-invalid-single-digest")
+    try:
+        with _runtime_session() as db, pytest.raises(
+            RawCollectionStorageError,
+        ) as rejected:
+            storage.put_manifest(db, admission, manifest)
+        assert rejected.value.code == "raw_manifest_single_chunk_inventory_invalid"
+        assert rejected.value.status_code == 422
+        with SessionFactory() as db:
+            assert db.get(
+                RawCollection,
+                uuid.UUID(manifest.collection_id),
+            ) is None
+    finally:
+        engine.dispose()
+
+
+def test_raw_multi_chunk_object_digest_mismatch_never_becomes_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    _truncate_raw_tables(engine)
+    actor_id = f"raw.invalid-multi-digest.{uuid.uuid4().hex}"
+    admission = _record_admission(SessionFactory, actor_id=actor_id)
+    valid, chunks_by_key = _multi_manifest(admission=admission)
+    value = valid.model_dump(mode="json")
+    value["objects"][0]["sha256"] = "0" * 64
+    value["manifest_sha256"] = raw_collection_manifest_sha256(value)
+    manifest = RawCollectionManifestV1.model_validate(value)
+    first_object = manifest.objects[0]
+    storage = _storage(tmp_path / "raw-invalid-multi-digest")
+    try:
+        with _runtime_session() as db:
+            storage.put_manifest(db, admission, manifest)
+        first = chunks_by_key[(first_object.object_id, 0)]
+        with _runtime_session() as db:
+            ack, created = storage.put_chunk(
+                db,
+                admission,
+                collection_id=manifest.collection_id,
+                object_id=first_object.object_id,
+                index=0,
+                walk_id=manifest.walk_id,
+                manifest_sha256=manifest.manifest_sha256,
+                content=first,
+                content_sha256=hashlib.sha256(first).hexdigest(),
+            )
+        assert created is True
+        assert ack.state == "RECEIVING"
+
+        final = chunks_by_key[(first_object.object_id, 1)]
+        with _runtime_session() as db, pytest.raises(
+            RawCollectionStorageError,
+        ) as rejected:
+            storage.put_chunk(
+                db,
+                admission,
+                collection_id=manifest.collection_id,
+                object_id=first_object.object_id,
+                index=1,
+                walk_id=manifest.walk_id,
+                manifest_sha256=manifest.manifest_sha256,
+                content=final,
+                content_sha256=hashlib.sha256(final).hexdigest(),
+            )
+        assert rejected.value.code == "raw_collection_digest_rejected"
+        assert rejected.value.status_code == 409
+        with SessionFactory() as db:
+            collection = db.get(
+                RawCollection,
+                uuid.UUID(manifest.collection_id),
+            )
+            assert collection is not None
+            assert collection.state == "MANIFEST_ACCEPTED"
+            assert collection.digest_rejected_at is not None
+            assert collection.digest_rejected_object_id == uuid.UUID(
+                first_object.object_id
+            )
+
+        commit = RawCollectionCommitV1.model_validate(
+            {
+                "schema_version": "walksafe.raw-collection-commit.v1",
+                "collection_id": manifest.collection_id,
+                "manifest_sha256": manifest.manifest_sha256,
+                "object_count": manifest.object_count,
+                "chunk_count": manifest.chunk_count,
+                "total_bytes": manifest.total_bytes,
+            }
+        )
+        with monkeypatch.context() as scoped:
+            scoped.setattr(
+                storage,
+                "_verify_persisted_chunk",
+                lambda *_args: (_ for _ in ()).throw(
+                    AssertionError("digest rejection replay bulk-decrypted content")
+                ),
+            )
+            operations = (
+                lambda db: storage.put_manifest(db, admission, manifest),
+                lambda db: storage.get_status(
+                    db,
+                    actor_id=actor_id,
+                    account_generation=1,
+                    collection_id=manifest.collection_id,
+                    purpose=manifest.purpose,
+                    walk_id=manifest.walk_id,
+                    manifest_sha256=manifest.manifest_sha256,
+                ),
+                lambda db: storage.put_chunk(
+                    db,
+                    admission,
+                    collection_id=manifest.collection_id,
+                    object_id=first_object.object_id,
+                    index=1,
+                    walk_id=manifest.walk_id,
+                    manifest_sha256=manifest.manifest_sha256,
+                    content=final,
+                    content_sha256=hashlib.sha256(final).hexdigest(),
+                ),
+                lambda db: storage.commit(
+                    db,
+                    admission,
+                    commit,
+                    walk_id=manifest.walk_id,
+                ),
+            )
+            for operation in operations:
+                with _runtime_session() as db, pytest.raises(
+                    RawCollectionStorageError,
+                ) as replayed:
+                    operation(db)
+                assert replayed.value.code == "raw_collection_digest_rejected"
+                assert replayed.value.status_code == 409
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize("terminal", (False, True))
+def test_raw_startup_converges_nonterminal_and_rejects_terminal_object_digest(
+    tmp_path: Path,
+    terminal: bool,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    _truncate_raw_tables(engine)
+    actor_id = f"raw.startup-multi-digest.{terminal}.{uuid.uuid4().hex}"
+    admission = _record_admission(SessionFactory, actor_id=actor_id)
+    manifest, chunks_by_key = _multi_manifest(admission=admission)
+    root = tmp_path / f"raw-startup-multi-digest-{terminal}"
+    storage = _storage(root)
+    try:
+        with _runtime_session() as db:
+            storage.put_manifest(db, admission, manifest)
+        for declared_object in manifest.objects:
+            for declared_chunk in declared_object.chunks:
+                content = chunks_by_key[
+                    (declared_object.object_id, declared_chunk.index)
+                ]
+                with _runtime_session() as db:
+                    storage.put_chunk(
+                        db,
+                        admission,
+                        collection_id=manifest.collection_id,
+                        object_id=declared_object.object_id,
+                        index=declared_chunk.index,
+                        walk_id=manifest.walk_id,
+                        manifest_sha256=manifest.manifest_sha256,
+                        content=content,
+                        content_sha256=hashlib.sha256(content).hexdigest(),
+                    )
+        if terminal:
+            commit = RawCollectionCommitV1.model_validate(
+                {
+                    "schema_version": "walksafe.raw-collection-commit.v1",
+                    "collection_id": manifest.collection_id,
+                    "manifest_sha256": manifest.manifest_sha256,
+                    "object_count": manifest.object_count,
+                    "chunk_count": manifest.chunk_count,
+                    "total_bytes": manifest.total_bytes,
+                }
+            )
+            with _runtime_session() as db:
+                storage.commit(
+                    db,
+                    admission,
+                    commit,
+                    walk_id=manifest.walk_id,
+                )
+
+        first_object_id = uuid.UUID(manifest.objects[0].object_id)
+        with SessionFactory() as db:
+            item = db.get(
+                RawCollectionObject,
+                (uuid.UUID(manifest.collection_id), first_object_id),
+            )
+            assert item is not None
+            item.sha256 = "0" * 64
+            db.commit()
+
+        previous_cache = dict(storage._verified_chunk_files)
+        if terminal:
+            with SessionFactory() as db, pytest.raises(
+                RuntimeError,
+                match="terminal raw object digest",
+            ):
+                raw_storage.validate_raw_storage_database_inventory(
+                    db,
+                    root,
+                    key_manager=_StaticKeyManager(),  # type: ignore[arg-type]
+                    storage=storage,
+                )
+            assert storage._verified_chunk_files == previous_cache
+        else:
+            with SessionFactory() as db:
+                raw_storage.validate_raw_storage_database_inventory(
+                    db,
+                    root,
+                    key_manager=_StaticKeyManager(),  # type: ignore[arg-type]
+                    storage=storage,
+                )
+            with SessionFactory() as db:
+                collection = db.get(
+                    RawCollection,
+                    uuid.UUID(manifest.collection_id),
+                )
+                assert collection is not None
+                assert collection.digest_rejected_at is not None
+                assert collection.digest_rejected_object_id == first_object_id
+                assert collection.receipt_sha256 is None
+            with SessionFactory() as db, pytest.raises(
+                RawCollectionStorageError,
+            ) as rejected:
+                storage.get_status(
+                    db,
+                    actor_id=actor_id,
+                    account_generation=1,
+                    collection_id=manifest.collection_id,
+                    purpose=manifest.purpose,
+                    walk_id=manifest.walk_id,
+                    manifest_sha256=manifest.manifest_sha256,
+                )
+            assert rejected.value.code == "raw_collection_digest_rejected"
+    finally:
+        engine.dispose()
+
+
+def test_raw_multi_object_chunk_manifest_status_commit_and_replay(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    _truncate_raw_tables(engine)
     actor_id = f"raw.multi.{uuid.uuid4().hex}"
     admission = _record_admission(SessionFactory, actor_id=actor_id)
     manifest, chunks_by_key = _multi_manifest(admission=admission)
@@ -996,6 +1303,41 @@ def test_raw_multi_object_chunk_manifest_status_commit_and_replay(
             [{"start": 0, "end": 0}],
         ]
 
+        with monkeypatch.context() as scoped:
+            scoped.setattr(
+                raw_storage,
+                "lock_raw_capacity_reservation_transaction",
+                lambda _db: (_ for _ in ()).throw(
+                    AssertionError("manifest replay took the global capacity lock")
+                ),
+            )
+            scoped.setattr(
+                storage,
+                "_verify_persisted_chunk",
+                lambda *_args: (_ for _ in ()).throw(
+                    AssertionError("status replay bulk-decrypted persisted chunks")
+                ),
+            )
+            with _runtime_session() as db:
+                partial_replay, partial_replay_created = storage.put_manifest(
+                    db,
+                    admission,
+                    manifest,
+                )
+            assert partial_replay_created is False
+            assert partial_replay == receiving
+            with SessionFactory() as db:
+                metadata_only_status = storage.get_status(
+                    db,
+                    actor_id=actor_id,
+                    account_generation=1,
+                    collection_id=manifest.collection_id,
+                    purpose=manifest.purpose,
+                    walk_id=manifest.walk_id,
+                    manifest_sha256=manifest.manifest_sha256,
+                )
+            assert metadata_only_status == receiving
+
         commit = RawCollectionCommitV1.model_validate(
             {
                 "schema_version": "walksafe.raw-collection-commit.v1",
@@ -1052,18 +1394,33 @@ def test_raw_multi_object_chunk_manifest_status_commit_and_replay(
 
         last_object_id, last_index = remaining[-1]
         last_content = chunks_by_key[(last_object_id, last_index)]
-        with _runtime_session() as db:
-            replay_ack, replay_chunk_created = storage.put_chunk(
-                db,
-                admission,
-                collection_id=manifest.collection_id,
-                object_id=last_object_id,
-                index=last_index,
-                walk_id=manifest.walk_id,
-                manifest_sha256=manifest.manifest_sha256,
-                content=last_content,
-                content_sha256=hashlib.sha256(last_content).hexdigest(),
+        with monkeypatch.context() as scoped:
+            scoped.setattr(
+                raw_storage,
+                "lock_raw_capacity_reservation_transaction",
+                lambda _db: (_ for _ in ()).throw(
+                    AssertionError("chunk replay took the global capacity lock")
+                ),
             )
+            scoped.setattr(
+                storage,
+                "_verify_persisted_chunk",
+                lambda *_args: (_ for _ in ()).throw(
+                    AssertionError("chunk replay bulk-decrypted persisted content")
+                ),
+            )
+            with _runtime_session() as db:
+                replay_ack, replay_chunk_created = storage.put_chunk(
+                    db,
+                    admission,
+                    collection_id=manifest.collection_id,
+                    object_id=last_object_id,
+                    index=last_index,
+                    walk_id=manifest.walk_id,
+                    manifest_sha256=manifest.manifest_sha256,
+                    content=last_content,
+                    content_sha256=hashlib.sha256(last_content).hexdigest(),
+                )
         assert replay_chunk_created is False
         assert replay_ack.state == "READY_TO_COMMIT"
 
@@ -1100,7 +1457,107 @@ def test_raw_multi_object_chunk_manifest_status_commit_and_replay(
                 walk_id=manifest.walk_id,
             )
         assert replayed_receipt == receipt
+        with monkeypatch.context() as scoped:
+            scoped.setattr(
+                storage,
+                "_verify_persisted_chunk",
+                lambda *_args: (_ for _ in ()).throw(
+                    AssertionError("receipt replay bulk-decrypted persisted chunks")
+                ),
+            )
+            with _runtime_session() as db:
+                metadata_only_receipt = storage.commit(
+                    db,
+                    admission,
+                    commit,
+                    walk_id=manifest.walk_id,
+                )
+            assert metadata_only_receipt == receipt
     finally:
+        engine.dispose()
+
+
+def test_raw_status_holds_one_collection_snapshot_while_final_chunk_commits(
+    tmp_path: Path,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    _truncate_raw_tables(engine)
+    actor_id = f"raw.status-snapshot.{uuid.uuid4().hex}"
+    admission = _record_admission(SessionFactory, actor_id=actor_id)
+    content = b"status snapshot boundary"
+    manifest = _manifest(admission=admission, content=content)
+    storage = _storage(tmp_path / "raw-status-snapshot")
+    parent_read = threading.Event()
+    release_reader = threading.Event()
+    writer_started = threading.Event()
+    writer_pid: dict[str, int] = {}
+    try:
+        with SessionFactory() as db:
+            storage.put_manifest(db, _authorize_raw_write(db, admission), manifest)
+
+        def read_status():
+            with SessionFactory() as db:
+                real_scalar = db.scalar
+                first_scalar = True
+
+                def pause_after_parent(statement, *args, **kwargs):
+                    nonlocal first_scalar
+                    result = real_scalar(statement, *args, **kwargs)
+                    if first_scalar:
+                        first_scalar = False
+                        parent_read.set()
+                        assert release_reader.wait(timeout=5)
+                    return result
+
+                db.scalar = pause_after_parent  # type: ignore[method-assign]
+                return storage.get_status(
+                    db,
+                    actor_id=actor_id,
+                    account_generation=1,
+                    collection_id=manifest.collection_id,
+                    purpose=manifest.purpose,
+                    walk_id=manifest.walk_id,
+                    manifest_sha256=manifest.manifest_sha256,
+                )
+
+        def write_final_chunk():
+            with SessionFactory() as db:
+                authorized = _authorize_raw_write(db, admission)
+                writer_pid["value"] = db.execute(
+                    text("SELECT pg_backend_pid()")
+                ).scalar_one()
+                writer_started.set()
+                return storage.put_chunk(
+                    db,
+                    authorized,
+                    collection_id=manifest.collection_id,
+                    object_id=manifest.objects[0].object_id,
+                    index=0,
+                    walk_id=manifest.walk_id,
+                    manifest_sha256=manifest.manifest_sha256,
+                    content=content,
+                    content_sha256=hashlib.sha256(content).hexdigest(),
+                )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            reader = executor.submit(read_status)
+            assert parent_read.wait(timeout=5)
+            writer = executor.submit(write_final_chunk)
+            assert writer_started.wait(timeout=5)
+            _wait_for_database_lock_waiter(
+                SessionFactory,
+                writer_pid["value"],
+            )
+            assert not writer.done()
+            release_reader.set()
+            status = reader.result(timeout=5)
+            ack, created = writer.result(timeout=5)
+        assert status.state == "MANIFEST_ACCEPTED"
+        assert status.received_chunk_count == 0
+        assert created is True
+        assert ack.state == "READY_TO_COMMIT"
+    finally:
+        release_reader.set()
         engine.dispose()
 
 
@@ -1150,6 +1607,20 @@ def test_raw_b1b_manifest_chunk_replay_hiding_and_encrypted_file(
         ) as manifest_conflict:
             storage.put_manifest(db, admission, conflict)
         assert manifest_conflict.value.status_code == 409
+
+        other_consent = RawCollectionAdmission(
+            actor_id=admission.actor_id,
+            account_generation=admission.account_generation,
+            privacy_subject_hmac=admission.privacy_subject_hmac,
+            purpose=admission.purpose,
+            consent_receipt_sha256="d" * 64,
+        )
+        with SessionFactory() as db, pytest.raises(
+            RawCollectionStorageError,
+        ) as hidden_consent_binding:
+            storage.put_manifest(db, other_consent, conflict)
+        assert hidden_consent_binding.value.code == "raw_collection_not_found"
+        assert hidden_consent_binding.value.status_code == 404
 
         with SessionFactory() as db, pytest.raises(
             RawCollectionStorageError
@@ -1978,6 +2449,22 @@ def test_raw_b1d_startup_keeps_database_committed_file_and_clears_journal(
         assert len(list((root / ".raw-write-journal").glob("*.json"))) == 1
 
         monkeypatch.setattr(raw_storage, "complete_raw_chunk_write", complete_write)
+        with SessionFactory() as db:
+            replay, replay_created = storage.put_chunk(
+                db,
+                _authorize_raw_write(db, admission),
+                collection_id=manifest.collection_id,
+                object_id=manifest.objects[0].object_id,
+                index=0,
+                walk_id=manifest.walk_id,
+                manifest_sha256=manifest.manifest_sha256,
+                content=content,
+                content_sha256=hashlib.sha256(content).hexdigest(),
+            )
+        assert replay_created is False
+        assert replay.state == "READY_TO_COMMIT"
+        assert not (root / ".raw-write-journal").exists()
+
         monkeypatch.setattr(main_app, "SessionLocal", SessionFactory)
         monkeypatch.setattr(main_app.settings, "raw_object_dir", root)
         monkeypatch.setattr(main_app, "report_image_key_manager", key_manager)
@@ -2384,6 +2871,87 @@ def test_raw_b1e_capacity_reservation_serializes_concurrent_manifests(
         assert sorted(results) == ["created", "raw_capacity_reservation_unavailable"]
         with SessionFactory() as db:
             assert db.scalar(select(func.count(RawCollection.collection_id))) == 1
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize("digest_rejected", (False, True))
+def test_raw_capacity_reserves_only_unpersisted_partial_chunks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    digest_rejected: bool,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    _truncate_raw_tables(engine)
+    actor_id = f"raw.capacity.partial.{uuid.uuid4().hex}"
+    admission = _record_admission(SessionFactory, actor_id=actor_id)
+    partial, chunks_by_key = _multi_manifest(admission=admission)
+    storage = _storage(tmp_path / "capacity-partial")
+    try:
+        with SessionFactory() as db:
+            storage.put_manifest(db, _authorize_raw_write(db, admission), partial)
+        first_object = partial.objects[0]
+        first_content = chunks_by_key[(first_object.object_id, 0)]
+        with SessionFactory() as db:
+            storage.put_chunk(
+                db,
+                _authorize_raw_write(db, admission),
+                collection_id=partial.collection_id,
+                object_id=first_object.object_id,
+                index=0,
+                walk_id=partial.walk_id,
+                manifest_sha256=partial.manifest_sha256,
+                content=first_content,
+                content_sha256=hashlib.sha256(first_content).hexdigest(),
+            )
+        if digest_rejected:
+            with SessionFactory() as db:
+                collection = db.get(
+                    RawCollection,
+                    uuid.UUID(partial.collection_id),
+                )
+                assert collection is not None
+                collection.digest_rejected_at = datetime.now(UTC)
+                collection.digest_rejected_object_id = uuid.UUID(
+                    first_object.object_id
+                )
+                db.commit()
+
+        requested_content = b"next capacity session"
+        requested = _manifest(admission=admission, content=requested_content)
+        remaining_chunks = [
+            content
+            for key, content in chunks_by_key.items()
+            if key != (first_object.object_id, 0)
+        ]
+        block_size = 4096
+        outstanding = (
+            0
+            if digest_rejected
+            else raw_storage._raw_capacity_reservation_bytes(
+                sum(map(len, remaining_chunks)),
+                len(remaining_chunks),
+                block_size,
+            )
+        )
+        available = outstanding + raw_storage._raw_capacity_reservation_bytes(
+            len(requested_content),
+            1,
+            block_size,
+        )
+        monkeypatch.setattr(
+            raw_storage,
+            "_raw_filesystem_capacity",
+            lambda _root: (available, block_size, 100),
+        )
+        with SessionFactory() as db:
+            status, created = storage.put_manifest(
+                db,
+                _authorize_raw_write(db, admission),
+                requested,
+            )
+        assert created is True
+        assert status.state == "MANIFEST_ACCEPTED"
     finally:
         engine.dispose()
 

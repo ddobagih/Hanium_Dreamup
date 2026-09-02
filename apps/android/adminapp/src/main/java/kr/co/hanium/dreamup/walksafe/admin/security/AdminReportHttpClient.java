@@ -1,14 +1,9 @@
 package kr.co.hanium.dreamup.walksafe.admin.security;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,7 +88,7 @@ public final class AdminReportHttpClient implements AdminReportRepository {
             descriptor == null ? 0 : descriptor.version(),
             signer,
             System::currentTimeMillis,
-            new UrlConnectionTransport()
+            new OkHttpTransport()
         );
     }
 
@@ -177,6 +172,26 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         int expectedVersion,
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException {
+        return updateStatus(
+            session,
+            reportId,
+            nextStatus,
+            expectedVersion,
+            reconfirmationHeaders,
+            () -> true
+        );
+    }
+
+    @Override
+    public AdminReportModels.StatusSnapshot updateStatus(
+        AdminOperationsApi.SessionContext session,
+        String reportId,
+        String nextStatus,
+        int expectedVersion,
+        Map<String, String> reconfirmationHeaders,
+        AdminReportWorkflowController.StatusDispatch dispatch
+    ) throws IOException, GeneralSecurityException {
+        if (dispatch == null) throw new IllegalArgumentException("status dispatch is required");
         String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
         if (!AdminJava8Collections.set("new", "reviewed", "resolved").contains(nextStatus)) {
             throw new IllegalArgumentException("next status is invalid");
@@ -195,7 +210,8 @@ public final class AdminReportHttpClient implements AdminReportRepository {
             null,
             body,
             requireReconfirmation(reconfirmationHeaders),
-            "application/json"
+            "application/json",
+            dispatch
         );
         if (response.statusCode == 409) {
             throw new StatusConflictException(
@@ -496,6 +512,32 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         Map<String, String> additionalHeaders,
         String accept
     ) throws IOException, GeneralSecurityException {
+        return executeProtected(
+            session,
+            method,
+            path,
+            canonicalQuery,
+            action,
+            readPurpose,
+            body,
+            additionalHeaders,
+            accept,
+            null
+        );
+    }
+
+    private Response executeProtected(
+        AdminOperationsApi.SessionContext session,
+        String method,
+        String path,
+        String canonicalQuery,
+        String action,
+        String readPurpose,
+        byte[] body,
+        Map<String, String> additionalHeaders,
+        String accept,
+        AdminReportWorkflowController.StatusDispatch dispatch
+    ) throws IOException, GeneralSecurityException {
         String correlationId = UUID.randomUUID().toString();
         AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
             action,
@@ -534,6 +576,9 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         headers.put("Accept", accept);
         if (body.length > 0) headers.put("Content-Type", "application/json; charset=utf-8");
         String url = origin + path + (canonicalQuery.isEmpty() ? "" : "?" + canonicalQuery);
+        if (dispatch != null && !dispatch.markDispatched()) {
+            throw new AdminReportWorkflowController.StatusDispatchCancelledException();
+        }
         return transport.execute(method, url, AdminJava8Collections.copyMap(headers), body.length == 0 ? null : body);
     }
 
@@ -654,70 +699,21 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         }
     }
 
-    private static final class UrlConnectionTransport implements Transport {
+    private static final class OkHttpTransport implements Transport {
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException {
-            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setUseCaches(false);
-            connection.setRequestMethod(method);
-            connection.setConnectTimeout(8_000);
-            connection.setReadTimeout(12_000);
-            connection.setInstanceFollowRedirects(false);
-            connection.setDoInput(true);
-            connection.setDoOutput(body != null);
-            headers.forEach(connection::setRequestProperty);
-            try {
-                if (body != null) {
-                    try (var output = connection.getOutputStream()) {
-                        output.write(body);
-                    }
-                }
-                int status = connection.getResponseCode();
-                InputStream stream = status >= 200 && status <= 299
-                    ? connection.getInputStream()
-                    : connection.getErrorStream();
-                byte[] bytes = stream == null ? new byte[0] : readBounded(stream);
-                Map<String, String> responseHeaders = new LinkedHashMap<>();
-                connection.getHeaderFields().forEach((key, values) -> {
-                    if (key != null && values != null && values.size() == 1) {
-                        responseHeaders.put(key, values.get(0));
-                    }
-                });
-                return new Response(status, bytes, responseHeaders);
-            } finally {
-                connection.disconnect();
-            }
-        }
-
-        private static byte[] readBounded(InputStream input) throws IOException {
-            try (input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-                byte[] buffer = new byte[4_096];
-                int zeroReads = 0;
-                try {
-                    while (true) {
-                        if (Thread.currentThread().isInterrupted()) {
-                            throw new IOException("administrator report response read was cancelled");
-                        }
-                        int read = input.read(buffer);
-                        if (read < 0) break;
-                        if (read == 0) {
-                            if (++zeroReads > 3) {
-                                throw new IOException("administrator report response made no progress");
-                            }
-                            continue;
-                        }
-                        zeroReads = 0;
-                        if (output.size() + read > MAX_PACKAGE_RESPONSE_BYTES) {
-                            throw new IOException("administrator report response is too large");
-                        }
-                        output.write(buffer, 0, read);
-                    }
-                    return output.toByteArray();
-                } finally {
-                    Arrays.fill(buffer, (byte) 0);
-                }
-            }
+            AdminOkHttpTransport.Result response = AdminOkHttpTransport.execute(
+                method,
+                url,
+                headers,
+                body,
+                MAX_PACKAGE_RESPONSE_BYTES,
+                "administrator report response read was cancelled",
+                "administrator report response made no progress",
+                "administrator report response is too large"
+            );
+            return new Response(response.statusCode, response.body, response.headers);
         }
     }
 }

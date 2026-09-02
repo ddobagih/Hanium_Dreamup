@@ -2838,6 +2838,21 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         "/reports/{report_id}/review-decisions",
         response_model=ReportReviewDecisionResponse,
         status_code=status.HTTP_201_CREATED,
+        responses={
+            status.HTTP_201_CREATED: {
+                "description": (
+                    "Created review decision or exact idempotent replay of the "
+                    "original decision."
+                )
+            },
+            status.HTTP_409_CONFLICT: {
+                "description": (
+                    "Review workflow conflict, including "
+                    "review_decision_idempotency_conflict when decision_id is "
+                    "reused for a different payload, report, or administrator."
+                )
+            },
+        },
     )
     def create_report_review_decision(
         report_id: uuid.UUID,

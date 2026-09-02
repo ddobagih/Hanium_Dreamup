@@ -30,33 +30,68 @@ import org.junit.Test
 
 class AndroidRawCollectionClientNetworkTest {
     @Test
-    fun uploadsManifestThenGetsStatusAndOnlyMissingChunkBeforeCommit() {
+    fun uploadsManifestThenGetsStatusAndBothMissingChunksBeforeCommit() {
         val local = localManifest()
         val backend = requireNotNull(local.toBackendManifest())
         val observed = mutableListOf<Int>()
         LocalHttpTestServer { index, socket ->
             synchronized(observed) { observed += index }
             val response = when (index) {
-                0, 1 -> statusJson(backend, received = false)
-                2 -> chunkAckJson(backend)
-                3 -> statusJson(backend, received = true)
-                4 -> receiptJson(exactClientReceipt(backend))
+                0, 1 -> statusJson(backend, receivedOrdinals = emptySet())
+                2 -> chunkAckJson(backend, localOrdinal = 0, state = "RECEIVING")
+                3 -> chunkAckJson(backend, localOrdinal = 1, state = "READY_TO_COMMIT")
+                4 -> statusJson(backend, receivedOrdinals = setOf(0, 1))
+                5 -> receiptJson(exactClientReceipt(backend))
                 else -> error("unexpected raw request $index")
             }.toString().toByteArray(Charsets.UTF_8)
             socket.writeFixedResponse(
-                statusCode = if (index == 0 || index == 2) 201 else 200,
+                statusCode = if (index in setOf(0, 2, 3)) 201 else 200,
                 body = response,
                 headers = mapOf("Cache-Control" to "no-store"),
             )
         }.use { server ->
-            val plaintext = PAYLOAD.copyOf()
             val receipt = AndroidRawCollectionClient().uploadCall(
                 session = v7Session(server.baseUrl),
                 consent = confirmation(),
                 networkBinding = wifiBinding(),
                 localManifest = local,
                 backendManifest = backend,
-                chunk = RawPlaintextChunk(local.chunks.single(), plaintext),
+                chunks = plaintextChunks(local),
+                isCurrent = { true },
+            ).execute()
+
+            assertEquals(exactClientReceipt(backend), receipt)
+            assertEquals(listOf(0, 1, 2, 3, 4, 5), synchronized(observed) { observed.toList() })
+        }
+    }
+
+    @Test
+    fun resumesByUploadingOnlyTheOneMissingObject() {
+        val local = localManifest()
+        val backend = requireNotNull(local.toBackendManifest())
+        val observed = mutableListOf<Int>()
+        LocalHttpTestServer { index, socket ->
+            synchronized(observed) { observed += index }
+            val response = when (index) {
+                0, 1 -> statusJson(backend, receivedOrdinals = setOf(0))
+                2 -> chunkAckJson(backend, localOrdinal = 1, state = "READY_TO_COMMIT")
+                3 -> statusJson(backend, receivedOrdinals = setOf(0, 1))
+                4 -> receiptJson(exactClientReceipt(backend))
+                else -> error("unexpected raw request $index")
+            }.toString().toByteArray(Charsets.UTF_8)
+            socket.writeFixedResponse(
+                statusCode = if (index == 2) 201 else 200,
+                body = response,
+                headers = mapOf("Cache-Control" to "no-store"),
+            )
+        }.use { server ->
+            val receipt = AndroidRawCollectionClient().uploadCall(
+                session = v7Session(server.baseUrl),
+                consent = confirmation(),
+                networkBinding = wifiBinding(),
+                localManifest = local,
+                backendManifest = backend,
+                chunks = plaintextChunks(local),
                 isCurrent = { true },
             ).execute()
 
@@ -86,7 +121,7 @@ class AndroidRawCollectionClientNetworkTest {
                     networkBinding = wifiBinding(),
                     localManifest = local,
                     backendManifest = backend,
-                    chunk = RawPlaintextChunk(local.chunks.single(), PAYLOAD.copyOf()),
+                    chunks = plaintextChunks(local),
                     isCurrent = { true },
                 ).execute()
             }
@@ -116,7 +151,7 @@ class AndroidRawCollectionClientNetworkTest {
                         networkBinding = wifiBinding(),
                         localManifest = local,
                         backendManifest = backend,
-                        chunk = RawPlaintextChunk(local.chunks.single(), PAYLOAD.copyOf()),
+                        chunks = plaintextChunks(local),
                         isCurrent = { true },
                     ).execute()
                 }
@@ -142,7 +177,7 @@ class AndroidRawCollectionClientNetworkTest {
                 networkBinding = wifiBinding(),
                 localManifest = local,
                 backendManifest = backend,
-                chunk = RawPlaintextChunk(local.chunks.single(), PAYLOAD.copyOf()),
+                chunks = plaintextChunks(local),
                 isCurrent = { true },
             )
             val executor = Executors.newSingleThreadExecutor()
@@ -158,6 +193,33 @@ class AndroidRawCollectionClientNetworkTest {
                 executor.shutdownNow()
             }
         }
+    }
+
+    @Test
+    fun rejectsStatusContainingAnUnknownObject() {
+        val local = localManifest()
+        val backend = requireNotNull(local.toBackendManifest())
+        val malformed = statusJson(backend, receivedOrdinals = emptySet()).also { status ->
+            status.getJSONArray("objects")
+                .getJSONObject(0)
+                .put("object_id", "123e4567-e89b-42d3-a456-426614174099")
+        }
+        assertMalformedManifestStatusIsRejected(local, backend, malformed)
+    }
+
+    @Test
+    fun rejectsStatusContainingAnOutOfBoundsMissingRange() {
+        val local = localManifest()
+        val backend = requireNotNull(local.toBackendManifest())
+        val malformed = statusJson(backend, receivedOrdinals = emptySet()).also { status ->
+            status.getJSONArray("objects")
+                .getJSONObject(0)
+                .put(
+                    "missing_ranges",
+                    JSONArray().put(JSONObject().put("start", 0).put("end", 1)),
+                )
+        }
+        assertMalformedManifestStatusIsRejected(local, backend, malformed)
     }
 
     @Test
@@ -181,8 +243,33 @@ class AndroidRawCollectionClientNetworkTest {
         assertTrue(source.contains("method = \"GET\""))
     }
 
+    private fun assertMalformedManifestStatusIsRejected(
+        local: RawCollectionManifest,
+        backend: BackendRawManifest,
+        malformed: JSONObject,
+    ) {
+        LocalHttpTestServer { _, socket ->
+            socket.writeFixedResponse(
+                statusCode = 201,
+                body = malformed.toString().toByteArray(Charsets.UTF_8),
+                headers = mapOf("Cache-Control" to "no-store"),
+            )
+        }.use { server ->
+            assertThrows(RawCollectionProtocolException::class.java) {
+                AndroidRawCollectionClient().uploadCall(
+                    session = v7Session(server.baseUrl),
+                    consent = confirmation(),
+                    networkBinding = wifiBinding(),
+                    localManifest = local,
+                    backendManifest = backend,
+                    chunks = plaintextChunks(local),
+                    isCurrent = { true },
+                ).execute()
+            }
+        }
+    }
+
     private fun localManifest(): RawCollectionManifest {
-        val sha = sha256(PAYLOAD)
         return RawCollectionManifest(
             collectionId = COLLECTION_ID,
             owner = RawCollectionOwner(ACTOR_ID, 1L, DEVICE_ID),
@@ -197,12 +284,24 @@ class AndroidRawCollectionClientNetworkTest {
                     ordinal = 0,
                     type = RawChunkType.DETECTION,
                     capturedAtEpochMs = CAPTURE_STARTED_AT + 1_000L,
-                    sizeBytes = PAYLOAD.size,
-                    sha256 = sha,
+                    sizeBytes = DETECTION_PAYLOAD.size,
+                    sha256 = sha256(DETECTION_PAYLOAD),
+                ),
+                RawChunkMetadata(
+                    ordinal = 1,
+                    type = RawChunkType.PERFORMANCE,
+                    capturedAtEpochMs = CAPTURE_STARTED_AT + 1_000L,
+                    sizeBytes = PERFORMANCE_PAYLOAD.size,
+                    sha256 = sha256(PERFORMANCE_PAYLOAD),
                 ),
             ),
         )
     }
+
+    private fun plaintextChunks(local: RawCollectionManifest): List<RawPlaintextChunk> = listOf(
+        RawPlaintextChunk(local.chunks[0], DETECTION_PAYLOAD.copyOf()),
+        RawPlaintextChunk(local.chunks[1], PERFORMANCE_PAYLOAD.copyOf()),
+    )
 
     private fun v7Session(gatewayBaseUrl: String): GatewayFieldSession {
         val expiresAt = System.currentTimeMillis() + 3_600_000L
@@ -248,45 +347,67 @@ class AndroidRawCollectionClientNetworkTest {
         const val DEVICE_ID = "device-installation-00000001"
         const val CAPTURE_STARTED_AT = 1_787_961_600_000L
         val CONSENT_SHA = "c".repeat(64)
-        val PAYLOAD = "{\"aggregate\":true}".toByteArray()
+        val DETECTION_PAYLOAD = "{\"aggregate\":true}".toByteArray()
+        val PERFORMANCE_PAYLOAD = "{\"frame_count\":30}".toByteArray()
     }
 }
 
-private fun statusJson(manifest: BackendRawManifest, received: Boolean): JSONObject {
-    val objectValue = manifest.objects.single()
-    val missing = if (received) JSONArray() else JSONArray().put(
-        JSONObject().put("start", 0).put("end", 0),
-    )
+private fun statusJson(
+    manifest: BackendRawManifest,
+    receivedOrdinals: Set<Int>,
+): JSONObject {
+    val receivedBindings = manifest.chunkBindings.filter { it.localOrdinal in receivedOrdinals }
+    val receivedBytes = receivedBindings.sumOf { it.sizeBytes.toLong() }
+    val state = when (receivedBindings.size) {
+        0 -> "MANIFEST_ACCEPTED"
+        manifest.chunkCount -> "READY_TO_COMMIT"
+        else -> "RECEIVING"
+    }
     return JSONObject()
         .put("schema_version", "walksafe.raw-collection-status.v1")
         .put("collection_id", manifest.collectionId)
         .put("manifest_sha256", manifest.manifestSha256)
         .put("purpose", BACKEND_RAW_PURPOSE)
-        .put("state", if (received) "READY_TO_COMMIT" else "MANIFEST_ACCEPTED")
-        .put("object_count", 1)
-        .put("chunk_count", 1)
+        .put("state", state)
+        .put("object_count", manifest.objects.size)
+        .put("chunk_count", manifest.chunkCount)
         .put("total_bytes", manifest.totalBytes)
-        .put("received_chunk_count", if (received) 1 else 0)
-        .put("received_bytes", if (received) manifest.totalBytes else 0L)
+        .put("received_chunk_count", receivedBindings.size)
+        .put("received_bytes", receivedBytes)
         .put(
             "objects",
-            JSONArray().put(
-                JSONObject()
-                    .put("object_id", objectValue.objectId)
-                    .put("kind", objectValue.kind)
-                    .put("sha256", objectValue.sha256)
-                    .put("chunk_count", 1)
-                    .put("received_chunk_count", if (received) 1 else 0)
-                    .put("size_bytes", objectValue.sizeBytes)
-                    .put("received_bytes", if (received) objectValue.sizeBytes else 0L)
-                    .put("missing_ranges", missing),
-            ),
+            JSONArray().also { objects ->
+                manifest.objects.forEach { objectValue ->
+                    val binding = manifest.chunkBindings.single {
+                        it.objectId == objectValue.objectId
+                    }
+                    val received = binding.localOrdinal in receivedOrdinals
+                    val missing = if (received) JSONArray() else JSONArray().put(
+                        JSONObject().put("start", 0).put("end", 0),
+                    )
+                    objects.put(
+                        JSONObject()
+                            .put("object_id", objectValue.objectId)
+                            .put("kind", objectValue.kind)
+                            .put("sha256", objectValue.sha256)
+                            .put("chunk_count", objectValue.chunkCount)
+                            .put("received_chunk_count", if (received) 1 else 0)
+                            .put("size_bytes", objectValue.sizeBytes)
+                            .put("received_bytes", if (received) objectValue.sizeBytes else 0L)
+                            .put("missing_ranges", missing),
+                    )
+                }
+            },
         )
         .put("receipt", JSONObject.NULL)
 }
 
-private fun chunkAckJson(manifest: BackendRawManifest): JSONObject {
-    val binding = manifest.chunkBindings.single()
+private fun chunkAckJson(
+    manifest: BackendRawManifest,
+    localOrdinal: Int,
+    state: String,
+): JSONObject {
+    val binding = manifest.chunkBindings.single { it.localOrdinal == localOrdinal }
     return JSONObject()
         .put("schema_version", "walksafe.raw-collection-chunk-ack.v1")
         .put("collection_id", manifest.collectionId)
@@ -294,7 +415,7 @@ private fun chunkAckJson(manifest: BackendRawManifest): JSONObject {
         .put("index", binding.chunkIndex)
         .put("size_bytes", binding.sizeBytes)
         .put("sha256", binding.sha256)
-        .put("state", "READY_TO_COMMIT")
+        .put("state", state)
         .put("stored_at", "2026-08-29T00:00:06Z")
 }
 
@@ -305,8 +426,8 @@ private fun exactClientReceipt(manifest: BackendRawManifest): RawCollectionRecei
         manifestSha256 = manifest.manifestSha256,
         purpose = BACKEND_RAW_PURPOSE,
         persistenceMarker = RAW_RECEIPT_PERSISTENCE_MARKER,
-        objectCount = 1,
-        chunkCount = 1,
+        objectCount = manifest.objects.size,
+        chunkCount = manifest.chunkCount,
         totalBytes = manifest.totalBytes,
         objects = manifest.objects,
         retentionClass = BACKEND_RETENTION_CLASS,

@@ -18,10 +18,12 @@ class WalkSessionDeviceResourceSnapshotTest {
             batteryNotLow = true,
             privateStorageAboveSystemLow = true,
             thermalBelowCritical = true,
+            thermalThrottled = true,
         )
 
         assertEquals(WalkSessionReadinessStatus.READY, snapshot.readinessStatus)
         assertEquals("", snapshot.reason)
+        assertEquals(true, snapshot.thermalThrottled)
     }
 
     @Test
@@ -54,10 +56,30 @@ class WalkSessionDeviceResourceSnapshotTest {
         assertTrue(probeSource.contains("battery?.hasExtra("))
         assertTrue(probeSource.contains("Intent.ACTION_DEVICE_STORAGE_LOW"))
         assertTrue(probeSource.contains("Intent.ACTION_DEVICE_STORAGE_OK"))
+        assertTrue(probeSource.contains("currentThermalStatus"))
         assertTrue(probeSource.contains("PowerManager.THERMAL_STATUS_CRITICAL"))
+        assertTrue(probeSource.contains("PowerManager.THERMAL_STATUS_SEVERE"))
+        assertTrue(probeSource.contains("thermalThrottled = thermalThrottled"))
         assertTrue(probeSource.contains("addThermalStatusListener("))
         assertTrue(probeSource.contains("removeThermalStatusListener("))
         assertTrue(probeSource.contains("appContext.unregisterReceiver(registered)"))
         assertFalse(probeSource.contains("getStorageLowBytes"))
+    }
+
+    @Test
+    fun listenerRegistrationFailureIsReportedAndLeavesTheProbeRetryable() {
+        val start = probeSource.substringAfter("fun start")
+            .substringBefore("fun snapshot")
+
+        assertTrue(start.contains("): Boolean"))
+        assertTrue(start.contains("val receiverRegistered ="))
+        assertTrue(start.contains("if (!receiverRegistered) return false"))
+        assertTrue(start.contains("val thermalListenerRegistered ="))
+        assertTrue(start.contains("if (!thermalListenerRegistered)"))
+        assertTrue(start.contains("appContext.unregisterReceiver(resourceReceiver)"))
+        assertTrue(
+            start.indexOf("receiver = null") < start.lastIndexOf("return false"),
+        )
+        assertTrue(start.lastIndexOf("return true") > start.lastIndexOf("return false"))
     }
 }

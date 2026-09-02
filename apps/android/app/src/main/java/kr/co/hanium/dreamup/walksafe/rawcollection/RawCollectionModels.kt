@@ -55,7 +55,7 @@ internal data class RawCollectionManifest(
     val chunks: List<RawChunkMetadata>,
 ) {
     val uploadReady: Boolean
-        get() = state == RawManifestState.COMPLETE && chunks.isNotEmpty()
+        get() = state == RawManifestState.COMPLETE && chunks.isCompleteRuntimeBatch()
 }
 
 internal data class RawCollectionReceipt(
@@ -189,6 +189,9 @@ internal fun decodeRawManifest(bytes: ByteArray): RawCollectionManifest? = runCa
             sha256 = sha256,
         )
     }
+    require(chunks.all { it.type in RAW_RUNTIME_CHUNK_TYPES })
+    require(chunks.map(RawChunkMetadata::type).distinct().size == chunks.size)
+    require(chunks.size < RAW_MAX_CHUNKS || chunks.isCompleteRuntimeBatch())
     require(chunks.all { it.capturedAtEpochMs < expiresAt })
     if (endedAt != null) {
         require(chunks.lastOrNull()?.capturedAtEpochMs?.let { endedAt >= it } ?: true)
@@ -215,7 +218,7 @@ internal fun RawCollectionManifest.toBackendManifest(): BackendRawManifest? {
     if (
         !uploadReady ||
         chunks.size != RAW_BACKEND_OBJECT_COUNT ||
-        chunks.any { it.type !in RAW_RUNTIME_CHUNK_TYPES }
+        !chunks.isCompleteRuntimeBatch()
     ) return null
     val endedAt = capturedEndedAtEpochMs ?: return null
     val backendObjects = chunks.map { chunk ->
@@ -285,7 +288,7 @@ internal fun BackendRawManifest.commitPayload(): BackendRawCommit? {
         objects.size != RAW_BACKEND_OBJECT_COUNT ||
         chunkBindings.size != RAW_MAX_CHUNKS ||
         chunkCount != RAW_MAX_CHUNKS ||
-        totalBytes !in 1..RAW_MAX_CHUNK_BYTES.toLong()
+        totalBytes !in 1..RAW_MAX_COLLECTION_BYTES
     ) {
         return null
     }
@@ -434,14 +437,24 @@ internal const val BACKEND_RAW_PURPOSE = "GENERAL_RAW"
 internal const val BACKEND_RETENTION_CLASS = "RAW_QUARANTINE_14D"
 internal const val LEGACY_BACKEND_RETENTION_CLASS = "RAW_ORIGINAL_180D"
 internal const val RAW_MAX_CHUNK_BYTES = 64 * 1_024
-internal const val RAW_MAX_CHUNKS = 1
-internal const val RAW_BACKEND_OBJECT_COUNT = 1
+internal const val RAW_MAX_CHUNKS = 2
+internal const val RAW_BACKEND_OBJECT_COUNT = 2
+internal const val RAW_MAX_COLLECTION_BYTES = 128L * 1_024L
 internal const val RAW_COLLECTION_TTL_MS = 30L * 24L * 60L * 60L * 1_000L
 internal val SHA256_HEX = Regex("[0-9a-f]{64}")
-internal val RAW_RUNTIME_CHUNK_TYPES = setOf(
+internal val RAW_RUNTIME_CHUNK_TYPE_ORDER = listOf(
     RawChunkType.DETECTION,
     RawChunkType.PERFORMANCE,
 )
+internal val RAW_RUNTIME_CHUNK_TYPES = RAW_RUNTIME_CHUNK_TYPE_ORDER.toSet()
+
+internal fun List<RawChunkMetadata>.isCompleteRuntimeBatch(): Boolean =
+    map(RawChunkMetadata::type) == RAW_RUNTIME_CHUNK_TYPE_ORDER &&
+        withIndex().all { (index, chunk) ->
+            chunk.ordinal == index && chunk.sizeBytes in 1..RAW_MAX_CHUNK_BYTES
+        } &&
+        map(RawChunkMetadata::capturedAtEpochMs).distinct().size == 1 &&
+        sumOf { it.sizeBytes.toLong() } in 1..RAW_MAX_COLLECTION_BYTES
 private val REPORT_SHA256 = Regex("[0-9a-f]{64}")
 private val BACKEND_MANIFEST_DOMAIN = "walksafe/raw-collection-manifest/v1\u0000".toByteArray()
 private val BACKEND_COMMIT_DOMAIN = "walksafe/raw-collection-commit/v1\u0000".toByteArray()

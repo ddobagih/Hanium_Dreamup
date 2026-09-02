@@ -12,6 +12,10 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         "src/main/java/kr/co/hanium/dreamup/walksafe/network/" +
             "GatewaySessionProcessCoordinator.kt",
     ).readText()
+    private val deviceCheckResultStoreSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/device/" +
+            "AndroidDeviceCheckResultStore.kt",
+    ).readText()
 
     @Test
     fun acceptedDeviceCheckAndTrainingTransitionsPublishTheLatestFirstRunSnapshot() {
@@ -142,8 +146,8 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         assertTrue(bind.contains("onDeviceSpeechRecognitionCapabilityOverride ="))
         assertTrue(bind.contains("offlineKoreanTextToSpeechCapabilityOverride ="))
         assertTrue(bind.contains("METRIC_DISTANCE_GUIDANCE !in"))
-        assertTrue(bind.contains("HANDS_FREE_VOICE !in"))
-        assertTrue(bind.contains("VOICE_GUIDANCE !in"))
+        assertTrue(bind.contains("HANDS_FREE_VOICE in restored.disabledFeatures"))
+        assertTrue(bind.contains("VOICE_GUIDANCE in restored.disabledFeatures"))
         assertFalse(bind.contains("startPostLoginDeviceCheckRuntime("))
         assertFalse(bind.contains("beginPostLoginDeviceCheckFromUserAction("))
         assertTrue(revalidate.contains("currentPostLoginDeviceCheckResultBinding"))
@@ -209,6 +213,66 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         assertTrue(storedValidation.contains("restoreBoundPostLoginDeviceCheckResultIfPossible()"))
         assertTrue(storedValidation.contains("storedDeviceCheckBindingValidationPending = false"))
         assertFalse(storedValidation.contains("startPostLoginDeviceCheckRuntime("))
+    }
+
+    @Test
+    fun mutableRuntimePrerequisitesDoNotResetARestoredFullOrLimitedGate() {
+        val bindingDigest = functionBlockFrom(
+            deviceCheckResultStoreSource,
+            "private fun PostLoginDeviceCheckResultBinding.sha256OrNull()",
+        )
+        val revalidate = functionBlock(
+            "private fun revalidateCompletedPostLoginDeviceCheckPrerequisites()",
+        )
+        val resultBinding = functionBlock(
+            "private fun currentPostLoginDeviceCheckResultBinding(",
+        )
+        val bind = functionBlock("private fun bindPostLoginDeviceCheckSession(")
+        val currentDisabled = functionBlock("private fun currentPostLoginDisabledFeatures()")
+        val mutableVoiceBinding = resultBinding
+            .substringAfterRequired("val offlineKoreanTextToSpeechAvailable =")
+            .substringBeforeRequired("val environmentProfile =")
+        val handsFreeOverride = bind
+            .substringAfterRequired("onDeviceSpeechRecognitionCapabilityOverride = if (")
+            .substringBeforeRequired("offlineKoreanTextToSpeechCapabilityOverride = if (")
+        val voiceGuidanceOverride = bind
+            .substringAfterRequired("offlineKoreanTextToSpeechCapabilityOverride = if (")
+            .substringBeforeRequired("} else if (sessionBindingChanged)")
+
+        listOf(
+            "missingRequiredPermissions",
+            "locationServiceEnabled",
+            "voiceDisclosureAccepted",
+            "offlineKoreanTextToSpeechAvailable",
+            "onDeviceSpeechRecognitionAvailable",
+        ).forEach { mutablePrerequisite ->
+            assertFalse(
+                "$mutablePrerequisite must not invalidate the persisted measurement binding",
+                bindingDigest.contains(mutablePrerequisite),
+            )
+        }
+        assertFalse(mutableVoiceBinding.contains("?: return null"))
+        assertInOrder(
+            revalidate,
+            "restored != null",
+            ") return false",
+            "cancelPostLoginDeviceCheckRuntime(\"saved_result_prerequisites_changed\")",
+            "state = PostLoginDeviceCheckState.NOT_RUN",
+        )
+        assertTrue(handsFreeOverride.contains("HANDS_FREE_VOICE in restored.disabledFeatures"))
+        assertTrue(handsFreeOverride.contains("false"))
+        assertTrue(handsFreeOverride.contains("else"))
+        assertTrue(handsFreeOverride.contains("null"))
+        assertTrue(voiceGuidanceOverride.contains("VOICE_GUIDANCE in restored.disabledFeatures"))
+        assertTrue(voiceGuidanceOverride.contains("false"))
+        assertTrue(voiceGuidanceOverride.contains("else"))
+        assertTrue(voiceGuidanceOverride.contains("null"))
+        assertTrue(
+            currentDisabled.contains("onDeviceSpeechRecognitionAvailable == false"),
+        )
+        assertTrue(
+            currentDisabled.contains("offlineKoreanTextToSpeechAvailable == false"),
+        )
     }
 
     @Test

@@ -105,7 +105,7 @@ class MainActivityFirstRunRegistrationStaticTest {
     }
 
     @Test
-    fun startupProbesOnlyStartBehindTheDeviceCheckGate() {
+    fun startupProbeUsesTheDeviceCheckGateAndResourceMonitoringAlsoStartsForActiveWalks() {
         val create = functionBlock("override fun onCreate(savedInstanceState: Bundle?)")
         assertInOrder(
             create,
@@ -119,10 +119,20 @@ class MainActivityFirstRunRegistrationStaticTest {
         assertInOrder(
             start,
             "if (!firstRunDeviceCheckAllowsPreflight()) return",
+            "ensureWalkSessionResourceMonitoring()",
+            "startupCapabilityProbe.start()",
+        )
+        val resourceMonitoring =
+            functionBlock("private fun ensureWalkSessionResourceMonitoring()")
+        assertInOrder(
+            resourceMonitoring,
             "walkSessionResourceProbe.start {",
             "observeWalkRuntimeResourceSafety()",
             "refreshStartupCapabilityUi()",
-            "startupCapabilityProbe.start()",
+        )
+        assertTrue(
+            functionBlock("private fun activateWalkSessionRuntime()")
+                .contains("ensureWalkSessionResourceMonitoring()"),
         )
         val gate = functionBlock("private fun firstRunDeviceCheckAllowsPreflight()")
         assertTrue(gate.contains("PostLoginDeviceCheckState.RUNNING"))
@@ -403,13 +413,17 @@ class MainActivityFirstRunRegistrationStaticTest {
         }
         listOf(
             "private fun currentLocationCollectionAllowsWork()",
-            "private fun currentNavigationCollectionAllowsWork()",
+            "private fun currentStepTrackingCollectionAllowsWork()",
             "private fun currentFeedbackDeviceGateAllowsAlerts()",
         ).forEach { marker ->
             assertTrue(
                 functionBlock(marker).contains("if (!firstRunOnboardingComplete()) return false"),
             )
         }
+        assertTrue(
+            functionBlock("private fun currentNavigationCollectionAllowsWork()")
+                .contains("return currentStepTrackingCollectionAllowsWork()"),
+        )
         assertTrue(
             functionBlock("private fun currentRuntimeMetricOutputAllowsWork(")
                 .contains("firstRunOnboardingComplete() &&"),
@@ -420,7 +434,7 @@ class MainActivityFirstRunRegistrationStaticTest {
         )
         assertTrue(
             functionBlock("private fun startStepTrackingIfAllowed()")
-                .contains("currentNavigationCollectionAllowsWork()"),
+                .contains("currentStepTrackingCollectionAllowsWork()"),
         )
         assertTrue(
             functionBlock("private fun requestRoute(")

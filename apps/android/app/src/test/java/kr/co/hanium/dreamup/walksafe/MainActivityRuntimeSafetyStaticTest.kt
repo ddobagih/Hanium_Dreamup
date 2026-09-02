@@ -37,11 +37,13 @@ class MainActivityRuntimeSafetyStaticTest {
         assertTrue(resource.contains("storageCritical = resources.privateStorageAboveSystemLow == false"))
         assertTrue(resource.contains("thermalCritical = resources.thermalBelowCritical == false"))
         assertTrue(resource.contains("walkRuntimeSafetyCoordinator.observe("))
+        assertFalse(resource.contains("if (!walkRuntimeSafetyCoordinator.configured) return true"))
 
         val timing = functionBlock("private fun observeWalkRuntimeDetectorTiming(")
         assertTrue(timing.contains("frameCapturedAtElapsedRealtimeMs"))
         assertTrue(timing.contains("inferenceLatencyMs"))
         assertTrue(timing.contains("walkRuntimeSafetyCoordinator.observe("))
+        assertFalse(timing.contains("if (!walkRuntimeSafetyCoordinator.configured) return true"))
         assertTrue(source.contains("!observeWalkRuntimeDetectorTiming("))
     }
 

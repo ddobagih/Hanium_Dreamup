@@ -112,7 +112,7 @@ class PermissionSessionPolicyTest {
     }
 
     @Test
-    fun locationRevocationRequiresWholeWalkSafetyStop() {
+    fun locationRevocationStopsOnlyNavigationAndReportTransmission() {
         val decision = PermissionDependencyPolicy.evaluate(
             ObservedPermissionSnapshot(
                 cameraGranted = true,
@@ -122,8 +122,8 @@ class PermissionSessionPolicyTest {
             ),
         )
 
-        assertTrue(decision.requiresWholeWalkSafetyStop)
-        assertTrue(PermissionDependentFeature.METRIC_DISTANCE in decision.stoppedFeatures)
+        assertFalse(decision.requiresWholeWalkSafetyStop)
+        assertFalse(PermissionDependentFeature.METRIC_DISTANCE in decision.stoppedFeatures)
         assertTrue(PermissionDependentFeature.ROUTE_NAVIGATION in decision.stoppedFeatures)
         assertTrue(PermissionDependentFeature.REPORT_TRANSMISSION in decision.stoppedFeatures)
         assertFalse(PermissionDependentFeature.CAMERA_HAZARD_GUIDANCE in decision.stoppedFeatures)
@@ -131,7 +131,7 @@ class PermissionSessionPolicyTest {
     }
 
     @Test
-    fun cameraRevocationRequiresWholeWalkSafetyStop() {
+    fun cameraRevocationStopsOnlyCameraGuidanceAndReportTransmission() {
         val decision = PermissionDependencyPolicy.evaluate(
             ObservedPermissionSnapshot(
                 cameraGranted = false,
@@ -141,8 +141,9 @@ class PermissionSessionPolicyTest {
             ),
         )
 
-        assertTrue(decision.requiresWholeWalkSafetyStop)
+        assertFalse(decision.requiresWholeWalkSafetyStop)
         assertTrue(PermissionDependentFeature.CAMERA_HAZARD_GUIDANCE in decision.stoppedFeatures)
+        assertTrue(PermissionDependentFeature.METRIC_DISTANCE in decision.stoppedFeatures)
         assertTrue(PermissionDependentFeature.REPORT_TRANSMISSION in decision.stoppedFeatures)
     }
 
@@ -238,7 +239,7 @@ class PermissionSessionPolicyTest {
 
         assertEquals(setOf(PermissionDependentFeature.VOICE_COMMAND), microphone.stoppedFeatures)
         assertFalse(microphone.requiresWholeWalkSafetyStop)
-        assertTrue(camera.requiresWholeWalkSafetyStop)
+        assertFalse(camera.requiresWholeWalkSafetyStop)
         assertTrue(PermissionDependentFeature.REPORT_TRANSMISSION in camera.stoppedFeatures)
     }
 }

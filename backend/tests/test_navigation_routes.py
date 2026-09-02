@@ -255,6 +255,37 @@ def test_destination_search_route_returns_app_schema(monkeypatch) -> None:
     assert body["results"][0]["point"] == {"latitude": 37.3947, "longitude": 127.1112, "name": "판교역"}
 
 
+def test_destination_search_uses_unicode_code_point_limit(monkeypatch) -> None:
+    accepted = "😀" * 80
+    calls: list[str] = []
+
+    async def fake_fetch_tmap_poi_search(
+        query: str,
+        settings,
+        *,
+        limit: int,
+        origin_lat: float | None = None,
+        origin_lng: float | None = None,
+    ) -> DestinationSearchResponse:
+        calls.append(query)
+        return sample_destination_search_response().model_copy(update={"query": query})
+
+    monkeypatch.setattr(navigation_api, "fetch_tmap_poi_search", fake_fetch_tmap_poi_search)
+
+    accepted_response = client().get(
+        "/navigation/destinations/search",
+        params={"query": accepted},
+    )
+    rejected_response = client().get(
+        "/navigation/destinations/search",
+        params={"query": "😀" * 81},
+    )
+
+    assert accepted_response.status_code == 200
+    assert rejected_response.status_code == 422
+    assert calls == [accepted]
+
+
 def test_tmap_poi_search_service_normalizes_provider_response(monkeypatch) -> None:
     settings = get_settings()
     monkeypatch.setattr(settings, "tmap_app_key", "test-tmap-key")

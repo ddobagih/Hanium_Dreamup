@@ -14,6 +14,7 @@ data class WalkSessionDeviceResourceSnapshot(
     val batteryNotLow: Boolean?,
     val privateStorageAboveSystemLow: Boolean?,
     val thermalBelowCritical: Boolean?,
+    val thermalThrottled: Boolean? = null,
 ) {
     val readinessStatus: WalkSessionReadinessStatus
         get() = when {
@@ -50,7 +51,7 @@ class AndroidWalkSessionResourceProbe(
     private var closed = false
 
     @Suppress("DEPRECATION")
-    fun start(onResourceChanged: () -> Unit) {
+    fun start(onResourceChanged: () -> Unit): Boolean {
         check(receiver == null) { "AndroidWalkSessionResourceProbe may only be started once" }
         check(!closed) { "AndroidWalkSessionResourceProbe is closed" }
         val resourceReceiver = object : BroadcastReceiver() {
@@ -63,20 +64,27 @@ class AndroidWalkSessionResourceProbe(
             addAction(Intent.ACTION_DEVICE_STORAGE_LOW)
             addAction(Intent.ACTION_DEVICE_STORAGE_OK)
         }
-        runCatching {
+        val receiverRegistered = runCatching {
             appContext.registerReceiver(resourceReceiver, filter)
             receiver = resourceReceiver
-        }
+        }.isSuccess
+        if (!receiverRegistered) return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val listener = PowerManager.OnThermalStatusChangedListener {
                 if (!closed) onResourceChanged()
             }
             val powerManager = appContext.getSystemService(PowerManager::class.java)
-            runCatching {
-                powerManager?.addThermalStatusListener(appContext.mainExecutor, listener)
-                if (powerManager != null) thermalListener = listener
+            val thermalListenerRegistered = powerManager != null && runCatching {
+                powerManager.addThermalStatusListener(appContext.mainExecutor, listener)
+                thermalListener = listener
+            }.isSuccess
+            if (!thermalListenerRegistered) {
+                runCatching { appContext.unregisterReceiver(resourceReceiver) }
+                receiver = null
+                return false
             }
         }
+        return true
     }
 
     @Suppress("DEPRECATION")
@@ -93,12 +101,17 @@ class AndroidWalkSessionResourceProbe(
         } else {
             null
         }
-        val thermalBelowCritical = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             appContext.getSystemService(PowerManager::class.java)
                 ?.currentThermalStatus
-                ?.let { it < PowerManager.THERMAL_STATUS_CRITICAL }
         } else {
             null
+        }
+        val thermalBelowCritical = thermalStatus?.let {
+            it < PowerManager.THERMAL_STATUS_CRITICAL
+        }
+        val thermalThrottled = thermalStatus?.let {
+            it >= PowerManager.THERMAL_STATUS_SEVERE
         }
         val files = appContext.filesDir
         val privateStorageAboveSystemLow = runCatching {
@@ -112,6 +125,7 @@ class AndroidWalkSessionResourceProbe(
             batteryNotLow = batteryNotLow,
             privateStorageAboveSystemLow = privateStorageAboveSystemLow,
             thermalBelowCritical = thermalBelowCritical,
+            thermalThrottled = thermalThrottled,
         )
     }
 

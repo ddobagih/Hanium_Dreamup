@@ -1,10 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.admin.security;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
@@ -71,7 +67,7 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
             descriptor == null ? 0 : descriptor.version(),
             signer,
             System::currentTimeMillis,
-            new UrlConnectionTransport()
+            new OkHttpTransport()
         );
     }
 
@@ -348,46 +344,25 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
         return canonical;
     }
 
-    private static final class UrlConnectionTransport implements Transport {
+    private static final class OkHttpTransport implements Transport {
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException {
-            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setUseCaches(false);
-            connection.setRequestMethod(method);
-            connection.setConnectTimeout(8_000);
-            connection.setReadTimeout(12_000);
-            connection.setInstanceFollowRedirects(false);
-            connection.setDoInput(true);
-            connection.setDoOutput(body != null);
-            headers.forEach(connection::setRequestProperty);
-            try {
-                if (body != null) {
-                    try (var output = connection.getOutputStream()) { output.write(body); }
-                }
-                int status = connection.getResponseCode();
-                InputStream stream = status >= 200 && status <= 299
-                    ? connection.getInputStream() : connection.getErrorStream();
-                byte[] bytes = stream == null ? new byte[0] : readBounded(stream);
-                return new Response(status, bytes, connection.getHeaderField("Content-Type"));
-            } finally {
-                connection.disconnect();
-            }
-        }
-
-        private static byte[] readBounded(InputStream input) throws IOException {
-            try (input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-                byte[] buffer = new byte[4_096];
-                while (true) {
-                    int read = input.read(buffer);
-                    if (read < 0) break;
-                    if (output.size() + read > MAX_RESPONSE_BYTES) {
-                        throw new IOException("administrator incident response is too large");
-                    }
-                    output.write(buffer, 0, read);
-                }
-                return output.toByteArray();
-            }
+            AdminOkHttpTransport.Result response = AdminOkHttpTransport.execute(
+                method,
+                url,
+                headers,
+                body,
+                MAX_RESPONSE_BYTES,
+                "administrator incident response read was cancelled",
+                "administrator incident response made no progress",
+                "administrator incident response is too large"
+            );
+            return new Response(
+                response.statusCode,
+                response.body,
+                response.header("Content-Type")
+            );
         }
     }
 }

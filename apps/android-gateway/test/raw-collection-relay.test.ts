@@ -702,6 +702,148 @@ test("chunk relays HEAD then PUT with a strict ack and blocks actual PUT on SHA 
   }
 });
 
+test("stalled authenticated PUT times out and releases raw write admission", async () => {
+  resetRawCollectionRelayForTests();
+  const body = canonicalJson(manifest());
+  const template = rawWriteRequest("/manifest", body);
+  const cancelAbort = new AbortController();
+  let stalledController!: ReadableStreamDefaultController<Uint8Array>;
+  let cancelReason: unknown;
+  const stalledRequest = new Request(template.url, {
+    method: "PUT",
+    headers: template.headers,
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        stalledController = controller;
+      },
+      pull: () => new Promise<void>(() => undefined),
+      cancel(reason) {
+        cancelReason = reason;
+        cancelAbort.abort(reason);
+      }
+    }),
+    signal: cancelAbort.signal,
+    duplex: "half"
+  } as RequestInit & { duplex: "half" });
+  const stalledMethods: string[] = [];
+  const startedAt = Date.now();
+  const stalledResponsePromise = handleGatewayRequest(stalledRequest, {
+    fieldLongSessionBindingResolver: bindingResolver,
+    fetchImpl: async (_input, init) => {
+      stalledMethods.push(String(init?.method));
+      assert.equal(init?.method, "HEAD");
+      return new Response(null, { status: 204 });
+    }
+  });
+  let guard: NodeJS.Timeout | undefined;
+  try {
+    const stalledResponse = await Promise.race([
+      stalledResponsePromise,
+      new Promise<Response>((_resolve, reject) => {
+        guard = setTimeout(() => {
+          try { stalledController.error(new Error("raw body deadline test guard")); } catch {}
+          reject(new Error("stalled raw body did not reach its 15 second deadline"));
+        }, 30_000);
+      })
+    ]);
+    const elapsedMs = Date.now() - startedAt;
+    assert.equal(stalledResponse.status, 408);
+    assert.equal(
+      (await stalledResponse.json() as { detail: { code: string } }).detail.code,
+      "raw_body_read_timeout"
+    );
+    assert.ok(elapsedMs >= 14_000 && elapsedMs < 30_000, `elapsed ${elapsedMs}ms`);
+    assert.deepEqual(stalledMethods, ["HEAD"]);
+    assert.equal(stalledRequest.bodyUsed, true);
+    assert.equal(cancelReason, "raw body read cancelled");
+    assert.equal(stalledRequest.signal.aborted, true);
+
+    const recoveredMethods: string[] = [];
+    const recovered = await handleGatewayRequest(rawWriteRequest("/manifest", body), {
+      fieldLongSessionBindingResolver: bindingResolver,
+      fetchImpl: async (_input, init) => {
+        recoveredMethods.push(String(init?.method));
+        if (init?.method === "HEAD") return new Response(null, { status: 204 });
+        assert.equal(init?.method, "PUT");
+        return Response.json(statusPayload(), { status: 201 });
+      }
+    });
+    assert.equal(recovered.status, 201);
+    assert.deepEqual(await recovered.json(), statusPayload());
+    assert.deepEqual(recoveredMethods, ["HEAD", "PUT"]);
+  } finally {
+    if (guard) clearTimeout(guard);
+    try { stalledController.error(new Error("raw body deadline test finished")); } catch {}
+  }
+});
+
+test("client abort during a stalled raw PUT remains 499", async () => {
+  resetRawCollectionRelayForTests();
+  const body = canonicalJson(manifest());
+  const template = rawWriteRequest("/manifest", body);
+  const clientAbort = new AbortController();
+  let stalledController!: ReadableStreamDefaultController<Uint8Array>;
+  let cancelReason: unknown;
+  const request = new Request(template.url, {
+    method: "PUT",
+    headers: template.headers,
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        stalledController = controller;
+      },
+      pull: () => new Promise<void>(() => undefined),
+      cancel(reason) {
+        cancelReason = reason;
+      }
+    }),
+    signal: clientAbort.signal,
+    duplex: "half"
+  } as RequestInit & { duplex: "half" });
+  let markBodyOpened!: () => void;
+  const bodyOpened = new Promise<void>((resolve) => { markBodyOpened = resolve; });
+  const requestBody = request.body!;
+  const originalGetReader = requestBody.getReader.bind(requestBody);
+  Object.defineProperty(requestBody, "getReader", {
+    configurable: true,
+    value: () => {
+      markBodyOpened();
+      return originalGetReader();
+    }
+  });
+  const methods: string[] = [];
+  const responsePromise = handleGatewayRequest(request, {
+    fieldLongSessionBindingResolver: bindingResolver,
+    fetchImpl: async (_input, init) => {
+      methods.push(String(init?.method));
+      assert.equal(init?.method, "HEAD");
+      return new Response(null, { status: 204 });
+    }
+  });
+  let guard: NodeJS.Timeout | undefined;
+  const guardFailure = new Promise<never>((_resolve, reject) => {
+    guard = setTimeout(() => {
+      try { stalledController.error(new Error("client abort test guard")); } catch {}
+      reject(new Error("client abort did not settle the stalled raw body read"));
+    }, 5_000);
+  });
+  try {
+    await Promise.race([bodyOpened, guardFailure]);
+    clientAbort.abort(new Error("client disconnected"));
+    const response = await Promise.race([responsePromise, guardFailure]);
+    assert.equal(response.status, 499);
+    assert.equal(
+      (await response.json() as { detail: { code: string } }).detail.code,
+      "gateway_client_closed"
+    );
+    assert.deepEqual(methods, ["HEAD"]);
+    assert.equal(request.signal.aborted, true);
+    assert.equal(cancelReason, "raw body read cancelled");
+  } finally {
+    if (guard) clearTimeout(guard);
+    try { stalledController.error(new Error("client abort test finished")); } catch {}
+  }
+});
+
 test("valid commit projects quarantine receipt v2 while a concurrent second write is busy", async () => {
   resetRawCollectionRelayForTests();
   const payload = manifest();

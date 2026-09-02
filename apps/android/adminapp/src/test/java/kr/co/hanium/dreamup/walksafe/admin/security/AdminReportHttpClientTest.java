@@ -126,6 +126,49 @@ public final class AdminReportHttpClientTest {
     }
 
     @Test
+    public void statusDispatchGateRunsAfterChallengeAndCanCancelPatch() throws Exception {
+        Map<String, String> reconfirmation = Map.of(
+            AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER,
+            "AAECAwQFBgcICQoLDA0ODw"
+        );
+        FakeTransport cancelled = new FakeTransport();
+        assertThrows(
+            AdminReportWorkflowController.StatusDispatchCancelledException.class,
+            () -> client(cancelled).updateStatus(
+                SESSION,
+                REPORT_ID,
+                "resolved",
+                2,
+                reconfirmation,
+                () -> {
+                    assertEquals(1, cancelled.requests.size());
+                    return false;
+                }
+            )
+        );
+        assertEquals(1, cancelled.requests.size());
+        assertTrue(cancelled.requests.get(0).url.endsWith(AdminReportHttpClient.CHALLENGE_PATH));
+
+        FakeTransport dispatched = new FakeTransport();
+        final int[] gates = {0};
+        client(dispatched).updateStatus(
+            SESSION,
+            REPORT_ID,
+            "resolved",
+            2,
+            reconfirmation,
+            () -> {
+                gates[0] += 1;
+                assertEquals(1, dispatched.requests.size());
+                return true;
+            }
+        );
+        assertEquals(1, gates[0]);
+        assertEquals(2, dispatched.requests.size());
+        assertEquals("PATCH", dispatched.requests.get(1).method);
+    }
+
+    @Test
     public void packageRequiresExactStartDetailAndNewResponseHeaders() {
         Map<String, String> reconfirmation = Map.of(
             AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER,

@@ -27,7 +27,7 @@ class WalkRuntimeSafetyCoordinatorTest {
     }
 
     @Test
-    fun productionProfileIsNotConfiguredAndNeverInvokesCallback() {
+    fun productionProfileAllowsSafeTestFlowWithoutApprovedTimingThresholds() {
         val callbacks = mutableListOf<WalkRuntimeSafetyStop>()
         val coordinator = WalkRuntimeSafetyCoordinator(
             thresholdProfile = WalkRuntimeSafetyCoordinator.productionThresholdProfile,
@@ -42,8 +42,6 @@ class WalkRuntimeSafetyCoordinatorTest {
         val result = coordinator.observe(
             observation(
                 epoch = EPOCH_1,
-                cameraTrusted = false,
-                batteryCritical = true,
                 frameCapturedAtElapsedRealtimeMs = 0L,
                 inferenceLatencyMs = Long.MAX_VALUE,
             ),
@@ -52,6 +50,36 @@ class WalkRuntimeSafetyCoordinatorTest {
         assertEquals(WalkRuntimeSafetyDisposition.NOT_CONFIGURED, result.disposition)
         assertTrue(result.safetyOutputsAllowed)
         assertTrue(callbacks.isEmpty())
+    }
+
+    @Test
+    fun unconfiguredProfileStillLatchesThresholdIndependentUnsafeCauses() {
+        val callbacks = mutableListOf<WalkRuntimeSafetyStop>()
+        val coordinator = WalkRuntimeSafetyCoordinator(
+            thresholdProfile = WalkRuntimeSafetyCoordinator.productionThresholdProfile,
+            onSafeStop = callbacks::add,
+        )
+        coordinator.beginEpoch(EPOCH_1)
+
+        val result = coordinator.observe(
+            observation(
+                cameraTrusted = false,
+                batteryCritical = true,
+                frameCapturedAtElapsedRealtimeMs = 0L,
+                inferenceLatencyMs = Long.MAX_VALUE,
+            ),
+        )
+
+        assertEquals(WalkRuntimeSafetyDisposition.SAFE_STOP_LATCHED, result.disposition)
+        assertEquals(
+            setOf(
+                WalkRuntimeSafetyStopCause.CAMERA_TRUST_LOST,
+                WalkRuntimeSafetyStopCause.BATTERY_CRITICAL,
+            ),
+            result.causes,
+        )
+        assertFalse(result.safetyOutputsAllowed)
+        assertEquals(1, callbacks.size)
     }
 
     @Test

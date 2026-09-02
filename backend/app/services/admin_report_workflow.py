@@ -325,6 +325,77 @@ def _commit_append(db: Session, *, conflict_code: str) -> None:
         _raise_database_unavailable(db, exc)
 
 
+def _review_decision_intent_matches(
+    existing: ReportReviewDecision,
+    *,
+    report_id: uuid.UUID,
+    payload: ReportReviewDecisionRequest,
+    identity: AdminSessionIdentity,
+) -> bool:
+    return bool(
+        existing.report_id == report_id
+        and int(existing.content_revision) == payload.content_revision
+        and existing.decision == payload.decision
+        and existing.reason == payload.reason
+        and existing.user_visible_reason == payload.user_visible_reason
+        and existing.duplicate_of_report_id == payload.duplicate_of_report_id
+        and existing.location_reviewed == payload.location_reviewed
+        and existing.photo_reviewed == payload.photo_reviewed
+        and existing.privacy_reviewed == payload.privacy_reviewed
+        and existing.evidence_grant_id == payload.evidence_grant_id
+        and existing.admin_id == identity.admin_id
+    )
+
+
+def _raise_review_decision_idempotency_conflict(db: Session) -> NoReturn:
+    _rollback_or_database_unavailable(db)
+    raise AdminReportWorkflowError(
+        "review_decision_idempotency_conflict",
+        "The decision ID was already used for a different review decision.",
+        status_code=409,
+    )
+
+
+def _commit_review_decision(
+    db: Session,
+    *,
+    report_id: uuid.UUID,
+    payload: ReportReviewDecisionRequest,
+    identity: AdminSessionIdentity,
+) -> ReportReviewDecision | None:
+    try:
+        db.commit()
+        return None
+    except IntegrityError as exc:
+        _rollback_or_database_unavailable(db)
+        try:
+            existing = db.get(ReportReviewDecision, payload.decision_id)
+        except SQLAlchemyError as lookup_exc:
+            _raise_database_unavailable(db, lookup_exc)
+        if existing is None:
+            _rollback_or_database_unavailable(db)
+            raise AdminReportWorkflowError(
+                "review_decision_conflict",
+                "The report workflow changed concurrently.",
+                status_code=409,
+            ) from exc
+        if not _review_decision_intent_matches(
+            existing,
+            report_id=report_id,
+            payload=payload,
+            identity=identity,
+        ):
+            _raise_review_decision_idempotency_conflict(db)
+        try:
+            db.expunge(existing)
+        except SQLAlchemyError as detach_exc:
+            _raise_database_unavailable(db, detach_exc)
+        _rollback_or_database_unavailable(db)
+        return existing
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+
+
 def _secured_review_dml_required(db: Session) -> bool:
     if not _is_postgresql_session(db):
         return False
@@ -369,7 +440,26 @@ def append_report_review_decision(
         secured_dml = _secured_review_dml_required(db)
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
-    if secured_dml:
+    try:
+        existing = db.get(ReportReviewDecision, payload.decision_id)
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    if existing is not None and not _review_decision_intent_matches(
+        existing,
+        report_id=report_id,
+        payload=payload,
+        identity=identity,
+    ):
+        _raise_review_decision_idempotency_conflict(db)
+    if existing is not None and not secured_dml:
+        try:
+            db.expunge(existing)
+        except SQLAlchemyError as exc:
+            _raise_database_unavailable(db, exc)
+        _rollback_or_database_unavailable(db)
+        return existing
+
+    if existing is None and secured_dml:
         try:
             report = db.get(Report, report_id)
         except SQLAlchemyError as exc:
@@ -379,37 +469,38 @@ def append_report_review_decision(
             raise AdminReportWorkflowError(
                 "report_not_found", "Report was not found.", status_code=404
             )
-    else:
+    elif existing is None:
         report = _locked_report(db, report_id)
-    current_content_revision = int(report.content_revision or 0)
-    if payload.content_revision != current_content_revision:
-        _rollback_or_database_unavailable(db)
-        raise AdminReportWorkflowError(
-            "report_content_revision_conflict",
-            "The report content changed before this review was recorded.",
-            status_code=409,
-        )
-    if payload.duplicate_of_report_id == report_id:
-        _rollback_or_database_unavailable(db)
-        raise AdminReportWorkflowError(
-            "duplicate_report_self_reference",
-            "A report cannot be marked as a duplicate of itself.",
-            status_code=422,
-        )
-    try:
-        duplicate_target_missing = (
-            payload.duplicate_of_report_id is not None
-            and db.get(Report, payload.duplicate_of_report_id) is None
-        )
-    except SQLAlchemyError as exc:
-        _raise_database_unavailable(db, exc)
-    if duplicate_target_missing:
-        _rollback_or_database_unavailable(db)
-        raise AdminReportWorkflowError(
-            "duplicate_report_not_found",
-            "The duplicate target report was not found.",
-            status_code=422,
-        )
+    if existing is None:
+        current_content_revision = int(report.content_revision or 0)
+        if payload.content_revision != current_content_revision:
+            _rollback_or_database_unavailable(db)
+            raise AdminReportWorkflowError(
+                "report_content_revision_conflict",
+                "The report content changed before this review was recorded.",
+                status_code=409,
+            )
+        if payload.duplicate_of_report_id == report_id:
+            _rollback_or_database_unavailable(db)
+            raise AdminReportWorkflowError(
+                "duplicate_report_self_reference",
+                "A report cannot be marked as a duplicate of itself.",
+                status_code=422,
+            )
+        try:
+            duplicate_target_missing = (
+                payload.duplicate_of_report_id is not None
+                and db.get(Report, payload.duplicate_of_report_id) is None
+            )
+        except SQLAlchemyError as exc:
+            _raise_database_unavailable(db, exc)
+        if duplicate_target_missing:
+            _rollback_or_database_unavailable(db)
+            raise AdminReportWorkflowError(
+                "duplicate_report_not_found",
+                "The duplicate target report was not found.",
+                status_code=422,
+            )
 
     decided_at = _as_utc(now or datetime.now(UTC))
     if secured_dml:
@@ -425,7 +516,6 @@ def append_report_review_decision(
                 db,
                 credential_issuer_key,
             )
-            decision_id = uuid.uuid4()
             stored = db.execute(
                 text(
                     "SELECT * FROM public.walksafe_append_report_review_decision_v3("
@@ -445,9 +535,9 @@ def append_report_review_decision(
                     "CAST(:credential_issuer_key AS text))"
                 ),
                 {
-                    "decision_id": decision_id,
+                    "decision_id": payload.decision_id,
                     "report_id": report_id,
-                    "content_revision": current_content_revision,
+                    "content_revision": payload.content_revision,
                     "decision": payload.decision,
                     "reason": payload.reason,
                     "user_visible_reason": payload.user_visible_reason,
@@ -511,6 +601,11 @@ def append_report_review_decision(
                 "AUTH_INVALID": (
                     "review_evidence_grant_invalid",
                     "The administrator session changed before this review was recorded.",
+                    409,
+                ),
+                "IDEMPOTENCY_CONFLICT": (
+                    "review_decision_idempotency_conflict",
+                    "The decision ID was already used for a different review decision.",
                     409,
                 ),
             }
@@ -603,7 +698,7 @@ def append_report_review_decision(
             )
 
     previous = _latest_review_decision(db, report_id)
-    decision_id = uuid.uuid4()
+    decision_id = payload.decision_id
     decision = ReportReviewDecision(
         id=decision_id,
         report_id=report_id,
@@ -630,7 +725,14 @@ def append_report_review_decision(
         db.add(decision)
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
-    _commit_append(db, conflict_code="review_decision_conflict")
+    replay = _commit_review_decision(
+        db,
+        report_id=report_id,
+        payload=payload,
+        identity=identity,
+    )
+    if replay is not None:
+        return replay
     try:
         db.refresh(decision)
     except SQLAlchemyError as exc:

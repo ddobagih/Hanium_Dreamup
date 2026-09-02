@@ -17,8 +17,9 @@ import {
   isGatewayAccessConfigured,
   isGatewayActorConfigured,
   isGatewaySessionAuthorized,
+  listBackendDeviceGatewaySessionDevices,
   recordGatewayLoginAttempt,
-  revokeFieldSessionsForSecurityEvent,
+  revokeBackendDeviceGatewaySession,
   verifyGatewayCredential,
   withGatewayLoginLock
 } from "./auth.js";
@@ -328,6 +329,113 @@ function cancelUpstream(response: Response): void {
   void response.body?.cancel().catch(() => undefined);
 }
 
+function responseWithPrivacyOperation(
+  response: Response,
+  lease: PrivacyOperationLease,
+  requestSignal: AbortSignal
+): Response {
+  if (!response.body) {
+    finishPrivacyOperation(lease);
+    return response;
+  }
+
+  const reader = response.body.getReader();
+  const signal = AbortSignal.any([lease.controller.signal, requestSignal]);
+  let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
+  let terminal = false;
+  let finished = false;
+  let readPending = false;
+  let readerReleased = false;
+  const releaseReader = (): void => {
+    if (readerReleased || readPending) return;
+    try {
+      reader.releaseLock();
+      readerReleased = true;
+    } catch { /* a pending cancellation can retain the lock */ }
+  };
+  const finish = (): void => {
+    if (finished) return;
+    finished = true;
+    signal.removeEventListener("abort", abort);
+    finishPrivacyOperation(lease);
+  };
+  const cancelReader = (reason: unknown): void => {
+    void reader.cancel(reason).catch(() => undefined).finally(releaseReader);
+  };
+  const abort = (): void => {
+    if (terminal) return;
+    terminal = true;
+    const reason = signal.reason ?? new Error("privacy operation was cancelled");
+    try { controller?.error(reason); } catch { /* already terminal */ }
+    finish();
+    cancelReader(reason);
+  };
+
+  try {
+    const guarded = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        controller = streamController;
+        signal.addEventListener("abort", abort, { once: true });
+        if (signal.aborted) abort();
+      },
+      async pull(streamController) {
+        if (terminal) return;
+        readPending = true;
+        try {
+          const chunk = await reader.read();
+          readPending = false;
+          if (terminal) {
+            releaseReader();
+            return;
+          }
+          if (signal.aborted) {
+            abort();
+            releaseReader();
+            return;
+          }
+          if (chunk.done) {
+            terminal = true;
+            streamController.close();
+            releaseReader();
+            finish();
+            return;
+          }
+          streamController.enqueue(chunk.value);
+        } catch (error) {
+          readPending = false;
+          if (!terminal) {
+            terminal = true;
+            try { streamController.error(error); } catch { /* already terminal */ }
+            finish();
+            cancelReader(error);
+          }
+          releaseReader();
+        }
+      },
+      async cancel(reason) {
+        if (terminal) return;
+        terminal = true;
+        finish();
+        try {
+          await reader.cancel(reason);
+        } finally {
+          releaseReader();
+        }
+      }
+    }, { highWaterMark: 0 });
+    return new Response(guarded, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers
+    });
+  } catch (error) {
+    terminal = true;
+    finish();
+    cancelReader(error);
+    throw error;
+  }
+}
+
 async function withFieldActorOperation(
   actorId: string,
   operation: () => Response | Promise<Response>,
@@ -547,7 +655,8 @@ async function fieldSession(
       return actorId
         ? withFieldActorOperation(
             actorId,
-            () => listFieldLongSessionDevices(request),
+            () => listBackendDeviceGatewaySessionDevices(request)
+              ?? listFieldLongSessionDevices(request),
             gatewaySessionAccountGeneration(request)
           )
         : gatewayUnauthorizedResponse();
@@ -573,7 +682,10 @@ async function fieldSession(
       return actorId
         ? withFieldActorOperation(
             actorId,
-            () => revokeFieldLongSessionDevice(request, queryEntries[0]![1]),
+            () => revokeBackendDeviceGatewaySession(
+              request,
+              queryEntries[0]![1]
+            ) ?? revokeFieldLongSessionDevice(request, queryEntries[0]![1]),
             gatewaySessionAccountGeneration(request)
           )
         : gatewayUnauthorizedResponse();
@@ -795,6 +907,7 @@ async function walkingRoute(request: Request, fetchImpl?: GatewayFetch): Promise
     gatewaySessionAccountGeneration(request)
   );
   if (operation.error) return operation.error;
+  let responseOwnsOperation = false;
   try {
     const bounded = await readBoundedTextBody(request, 16 * 1024);
     if (bounded.error) return bounded.error;
@@ -815,9 +928,15 @@ async function walkingRoute(request: Request, fetchImpl?: GatewayFetch): Promise
       cancelUpstream(response);
       return privacyOperationInactive();
     }
-    return toBackendResponse(response);
+    const protectedResponse = responseWithPrivacyOperation(
+      await toBackendResponse(response),
+      operation.lease,
+      request.signal
+    );
+    responseOwnsOperation = true;
+    return protectedResponse;
   } finally {
-    finishPrivacyOperation(operation.lease);
+    if (!responseOwnsOperation) finishPrivacyOperation(operation.lease);
   }
 }
 
@@ -831,6 +950,7 @@ async function destinationSearch(request: Request, fetchImpl?: GatewayFetch): Pr
     gatewaySessionAccountGeneration(request)
   );
   if (operation.error) return operation.error;
+  let responseOwnsOperation = false;
   try {
     if (!privacyOperationIsCurrent(operation.lease)) return privacyOperationInactive();
     const init: RequestInit = {
@@ -851,9 +971,15 @@ async function destinationSearch(request: Request, fetchImpl?: GatewayFetch): Pr
       cancelUpstream(response);
       return privacyOperationInactive();
     }
-    return toBackendResponse(response);
+    const protectedResponse = responseWithPrivacyOperation(
+      await toBackendResponse(response),
+      operation.lease,
+      request.signal
+    );
+    responseOwnsOperation = true;
+    return protectedResponse;
   } finally {
-    finishPrivacyOperation(operation.lease);
+    if (!responseOwnsOperation) finishPrivacyOperation(operation.lease);
   }
 }
 
@@ -880,6 +1006,7 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
     finishPrivacyOperation(operation.lease);
     return admission.error;
   }
+  let responseOwnsOperation = false;
   try {
     const networkTransport =
       request.headers.get(CONSENT_NETWORK_TRANSPORT_HEADER)?.trim() ?? "";
@@ -984,9 +1111,15 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
       cancelUpstream(response);
       return finalConsent.error;
     }
-    return toBackendResponse(response);
+    const protectedResponse = responseWithPrivacyOperation(
+      await toBackendResponse(response),
+      operation.lease,
+      request.signal
+    );
+    responseOwnsOperation = true;
+    return protectedResponse;
   } finally {
-    finishPrivacyOperation(operation.lease);
+    if (!responseOwnsOperation) finishPrivacyOperation(operation.lease);
     admission.release();
   }
 }
@@ -1234,7 +1367,8 @@ function validAwareDateTime(value: unknown): value is string {
 
 function optionalBoundedText(value: unknown): value is string | null {
   return value === null || (
-    typeof value === "string" && value.length >= 1 && value.length <= 500
+    typeof value === "string" &&
+    Array.from(value).length >= 1 && Array.from(value).length <= 500
   );
 }
 
@@ -1718,7 +1852,8 @@ function validUserRequestBody(value: unknown): Record<string, unknown> | null {
     (payload.request_type !== "CORRECTION" && payload.request_type !== "DELETE") ||
     typeof payload.request_text !== "string" ||
     payload.request_text !== payload.request_text.trim() ||
-    payload.request_text.length < 1 || payload.request_text.length > 500
+    Array.from(payload.request_text).length < 1 ||
+    Array.from(payload.request_text).length > 500
   ) return null;
   return payload;
 }
@@ -2046,19 +2181,11 @@ async function accountDeletionRequestV2(
     if (accepted.kind === "conflict" || accepted.kind === "inactive") {
       return deletionConflict();
     }
-    if (accepted.kind === "accepted") {
+    if (accepted.kind === "accepted" || accepted.kind === "replay") {
       abortPrivacyOperationsForAccountDeletion(
         accepted.actorId,
         accepted.accountGeneration
       );
-      try {
-        await revokeFieldSessionsForSecurityEvent(
-          accepted.actorId,
-          "security_incident"
-        );
-      } catch {
-        return deletionPending(5);
-      }
     }
     const forwarded = await forwardAccountDeletionRequestV2(
       accepted.requestId,
@@ -2386,11 +2513,31 @@ async function dispatchGatewayRequest(
         ?? gatewayFieldLongSessionBinding
     );
   }
-  else if (pathname === "/api/speech/stt") {
-    response = await relaySpeechStt(request, correlationId, dependencies.fetchImpl);
-  }
-  else if (pathname === "/api/speech/tts") {
-    response = await relaySpeechTts(request, correlationId, dependencies.fetchImpl);
+  else if (pathname === "/api/speech/stt" || pathname === "/api/speech/tts") {
+    const relay = () => pathname === "/api/speech/stt"
+      ? relaySpeechStt(request, correlationId, dependencies.fetchImpl)
+      : relaySpeechTts(request, correlationId, dependencies.fetchImpl);
+    const actorId = gatewaySessionActor(request);
+    const accountGeneration = gatewaySessionAccountGeneration(request);
+    const deletionFence = (): Response | null => {
+      if (!actorId || accountGeneration === null) return null;
+      try {
+        return isAccountGenerationFencedV2(actorId, accountGeneration)
+          ? privacyOperationInactive()
+          : null;
+      } catch {
+        return privacyLedgerUnavailable();
+      }
+    };
+    const beforeRelay = deletionFence();
+    if (beforeRelay) {
+      response = beforeRelay;
+    } else {
+      const relayed = await relay();
+      const afterRelay = deletionFence();
+      if (afterRelay) cancelUpstream(relayed);
+      response = afterRelay ?? relayed;
+    }
   }
   else if (pathname === "/api/navigation/walking") {
     response = await walkingRoute(request, dependencies.fetchImpl);

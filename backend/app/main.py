@@ -231,6 +231,7 @@ def reconcile_raw_collection_storage() -> None:
                 db,
                 root,
                 key_manager=report_image_key_manager,
+                storage=raw_collection_storage,
             )
 
 

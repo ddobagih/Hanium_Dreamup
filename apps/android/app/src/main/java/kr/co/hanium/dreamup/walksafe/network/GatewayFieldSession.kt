@@ -796,12 +796,10 @@ class GatewayFieldSessionClient(
             throw status.toSessionException("gateway_status_failed")
         }
         val statusJson = runCatching { JSONObject(status.responseBody) }.getOrNull()
-        val expectedStatusFields =
-            setOf("required", "authenticated", "actor_id", "session_scope")
         val actor = statusJson?.optString("actor_id")
         if (
             statusJson == null ||
-            statusJson.jsonKeySet() != expectedStatusFields ||
+            !statusJson.hasBackendAccountBasicStatusFields() ||
             statusJson.opt("required") !is Boolean ||
             statusJson.opt("authenticated") !is Boolean ||
             !statusJson.getBoolean("required") ||
@@ -839,8 +837,7 @@ class GatewayFieldSessionClient(
         if (
             response.statusCode !in 200..299 ||
             status == null ||
-            status.jsonKeySet() !=
-            setOf("required", "authenticated", "actor_id", "session_scope") ||
+            !status.hasBackendAccountBasicStatusFields() ||
             status.opt("required") !is Boolean ||
             status.opt("authenticated") !is Boolean ||
             !status.getBoolean("required") ||
@@ -1217,6 +1214,14 @@ private fun JSONObject.jsonKeySet(): Set<String> {
     return result
 }
 
+private fun JSONObject.hasBackendAccountBasicStatusFields(): Boolean {
+    val fields = jsonKeySet()
+    val fieldsAreAllowed = fields == BACKEND_ACCOUNT_BASIC_STATUS_REQUIRED_FIELDS ||
+        fields == BACKEND_ACCOUNT_BASIC_STATUS_ALLOWED_FIELDS
+    if (!fieldsAreAllowed) return false
+    return GatewayCapacityParser.fromSessionStatus(this) != GatewayCapacityParseResult.Malformed
+}
+
 class GatewaySessionHttpException(
     val statusCode: Int,
     val reason: String,
@@ -1470,6 +1475,10 @@ private val ALLOWED_SERVER_ERROR_CODES = setOf(
 )
 private val BACKEND_ACCOUNT_ACTOR_ID =
     Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+private val BACKEND_ACCOUNT_BASIC_STATUS_REQUIRED_FIELDS =
+    setOf("required", "authenticated", "actor_id", "session_scope")
+private val BACKEND_ACCOUNT_BASIC_STATUS_ALLOWED_FIELDS =
+    BACKEND_ACCOUNT_BASIC_STATUS_REQUIRED_FIELDS + "capacity"
 private val BASE64_URL_NO_PADDING = Regex("^[A-Za-z0-9_-]+$")
 private val POSITIVE_CANONICAL_INTEGER = Regex("^[1-9][0-9]{0,18}$")
 private val BACKEND_SESSION_ID = Regex("^[A-Za-z0-9_-]{32,128}$")

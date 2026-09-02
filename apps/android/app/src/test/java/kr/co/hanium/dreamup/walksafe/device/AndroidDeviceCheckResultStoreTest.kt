@@ -357,19 +357,26 @@ class AndroidDeviceCheckResultStoreTest {
     }
 
     @Test
-    fun restoreRejectsPermissionAndVoicePrerequisiteChanges() {
+    fun restoreKeepsMeasuredResultAcrossMutableRuntimePrerequisiteChanges() {
         val store = AndroidDeviceCheckResultStore(FakeSharedPreferences())
         assertTrue(store.save(snapshot(PostLoginDeviceCheckState.FULL), binding()))
+        val expected = PersistedPostLoginDeviceCheckResult(
+            state = PostLoginDeviceCheckState.FULL,
+            disabledFeatures = emptySet(),
+            cameraDependentChecksDeferred = false,
+        )
 
         val changedPrerequisites = listOf(
             binding(missingRequiredPermissions = setOf("android.permission.CAMERA")),
             binding(locationServiceEnabled = false),
             binding(voiceDisclosureAccepted = false),
             binding(offlineKoreanTextToSpeechAvailable = false),
+            binding(offlineKoreanTextToSpeechAvailable = null),
             binding(onDeviceSpeechRecognitionAvailable = false),
+            binding(onDeviceSpeechRecognitionAvailable = null),
         )
 
-        changedPrerequisites.forEach { assertNull(store.restore(it)) }
+        changedPrerequisites.forEach { assertEquals(expected, store.restore(it)) }
     }
 
     private fun snapshot(
@@ -422,8 +429,8 @@ class AndroidDeviceCheckResultStoreTest {
         missingRequiredPermissions: Set<String> = emptySet(),
         locationServiceEnabled: Boolean = true,
         voiceDisclosureAccepted: Boolean = true,
-        offlineKoreanTextToSpeechAvailable: Boolean = true,
-        onDeviceSpeechRecognitionAvailable: Boolean = true,
+        offlineKoreanTextToSpeechAvailable: Boolean? = true,
+        onDeviceSpeechRecognitionAvailable: Boolean? = true,
     ): PostLoginDeviceCheckResultBinding = PostLoginDeviceCheckResultBinding(
         actorId = actorId,
         installationId = installationId,
@@ -531,7 +538,7 @@ class AndroidDeviceCheckResultStoreTest {
 
     private companion object {
         const val POLICY_VERSION_KEY = "device_check_result_policy_v1"
-        const val BINDING_SHA256_KEY = "device_check_result_binding_sha256_v3"
+        const val BINDING_SHA256_KEY = "device_check_result_binding_sha256_v4"
         const val TIER_KEY = "device_check_result_tier_v1"
         const val DISABLED_FEATURES_KEY = "device_check_result_disabled_features_v1"
         const val CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY =

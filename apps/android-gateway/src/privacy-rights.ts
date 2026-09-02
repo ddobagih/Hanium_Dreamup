@@ -1167,6 +1167,10 @@ export function finishPrivacyOperation(lease: PrivacyOperationLease): void {
   activeOperations.delete(lease.token);
 }
 
+export function activePrivacyOperationCountForTests(): number {
+  return activeOperations.size;
+}
+
 export function consentActorBindingId(lease: PrivacyOperationLease): string {
   return `${lease.actorId}\0generation:${lease.accountGeneration}`;
 }

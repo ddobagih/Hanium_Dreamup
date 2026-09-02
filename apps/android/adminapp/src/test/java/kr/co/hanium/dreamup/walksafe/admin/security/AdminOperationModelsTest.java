@@ -11,7 +11,7 @@ import org.junit.Test;
 
 public final class AdminOperationModelsTest {
     @Test
-    public void reviewBodyIsExactNineWithContentRevisionAndEvidenceGrant() throws Exception {
+    public void reviewBodyIsExactTenWithDecisionIdAndEvidenceGrant() throws Exception {
         AdminReportDecision approved = new AdminReportDecision(
             AdminReportDecision.Decision.APPROVED,
             "현장 정보와 사진을 확인함",
@@ -21,14 +21,15 @@ public final class AdminOperationModelsTest {
             true,
             true,
             3,
-            EVIDENCE_GRANT_ID
+            EVIDENCE_GRANT_ID,
+            DECISION_ID
         );
         JSONObject body = new JSONObject(new String(approved.requestBody(REPORT_ID), StandardCharsets.UTF_8));
 
         assertEquals(Set.of(
             "decision", "reason", "user_visible_reason", "duplicate_of_report_id",
             "location_reviewed", "photo_reviewed", "privacy_reviewed", "content_revision",
-            "evidence_grant_id"
+            "evidence_grant_id", "decision_id"
         ), keys(body));
         assertTrue(body.has("user_visible_reason"));
         assertTrue(body.isNull("user_visible_reason"));
@@ -37,14 +38,15 @@ public final class AdminOperationModelsTest {
         assertEquals("APPROVED", body.getString("decision"));
         assertEquals(3, body.getInt("content_revision"));
         assertEquals(EVIDENCE_GRANT_ID, body.getString("evidence_grant_id"));
+        assertEquals(DECISION_ID, body.getString("decision_id"));
 
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
             AdminReportDecision.Decision.APPROVED, "reason", null, null, true, false, true, 0,
-            EVIDENCE_GRANT_ID
+            EVIDENCE_GRANT_ID, DECISION_ID
         ));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
             AdminReportDecision.Decision.APPROVED, "reason", null, OTHER_REPORT_ID, true, true, true, 0,
-            EVIDENCE_GRANT_ID
+            EVIDENCE_GRANT_ID, DECISION_ID
         ));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
             AdminReportDecision.Decision.APPROVED,
@@ -55,17 +57,24 @@ public final class AdminOperationModelsTest {
             true,
             true,
             0,
-            EVIDENCE_GRANT_ID
+            EVIDENCE_GRANT_ID,
+            DECISION_ID
         ));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.REJECTED, "reason", "공개 사유", null, true, true, true, -1, null
+            AdminReportDecision.Decision.REJECTED, "reason", "공개 사유", null, true, true, true, -1,
+            null, DECISION_ID
         ));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.APPROVED, "reason", null, null, true, true, true, 0, null
+            AdminReportDecision.Decision.APPROVED, "reason", null, null, true, true, true, 0, null,
+            DECISION_ID
         ));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
             AdminReportDecision.Decision.REJECTED, "reason", "공개 사유", null, true, true, true, 0,
-            EVIDENCE_GRANT_ID
+            EVIDENCE_GRANT_ID, DECISION_ID
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
+            AdminReportDecision.Decision.REJECTED, "reason", "공개 사유", null, true, true, true, 0,
+            null, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa".toUpperCase()
         ));
     }
 
@@ -80,7 +89,8 @@ public final class AdminOperationModelsTest {
             false,
             true,
             0,
-            null
+            null,
+            DECISION_ID
         );
         JSONObject rejectedBody = new JSONObject(new String(
             rejected.requestBody(REPORT_ID), StandardCharsets.UTF_8
@@ -96,7 +106,8 @@ public final class AdminOperationModelsTest {
             true,
             false,
             0,
-            null
+            null,
+            DECISION_ID
         );
         JSONObject duplicateBody = new JSONObject(new String(
             duplicate.requestBody(REPORT_ID), StandardCharsets.UTF_8
@@ -115,14 +126,17 @@ public final class AdminOperationModelsTest {
             true,
             true,
             0,
-            null
+            null,
+            DECISION_ID
         );
         assertThrows(IllegalArgumentException.class, () -> duplicate.requestBody(OTHER_REPORT_ID));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.DUPLICATE, "reason", "공개 사유", null, true, true, true, 0, null
+            AdminReportDecision.Decision.DUPLICATE, "reason", "공개 사유", null, true, true, true, 0,
+            null, DECISION_ID
         ));
         assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
-            AdminReportDecision.Decision.REJECTED, "reason", " ", null, true, true, true, 0, null
+            AdminReportDecision.Decision.REJECTED, "reason", " ", null, true, true, true, 0, null,
+            DECISION_ID
         ));
     }
 
@@ -137,7 +151,8 @@ public final class AdminOperationModelsTest {
             true,
             true,
             0,
-            null
+            null,
+            DECISION_ID
         );
         JSONObject reviewBody = new JSONObject(new String(
             review.requestBody(REPORT_ID), StandardCharsets.UTF_8
@@ -184,7 +199,8 @@ public final class AdminOperationModelsTest {
                 true,
                 true,
                 0,
-                null
+                null,
+                DECISION_ID
             ));
             assertThrows(IllegalArgumentException.class, () -> new AdminInstitutionDelivery(
                 "institution",
@@ -267,5 +283,6 @@ public final class AdminOperationModelsTest {
     private static final String REPORT_ID = "11111111-1111-4111-8111-111111111111";
     private static final String OTHER_REPORT_ID = "22222222-2222-4222-8222-222222222222";
     private static final String EVIDENCE_GRANT_ID = "44444444-4444-4444-8444-444444444444";
+    private static final String DECISION_ID = "55555555-5555-4555-8555-555555555555";
     private static final String IDEMPOTENCY_KEY = "33333333-3333-4333-8333-333333333333";
 }

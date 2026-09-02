@@ -12,6 +12,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.Test;
@@ -85,6 +88,428 @@ public final class AdminReportWave5Test {
         assertEquals(1, updates[0]);
         assertEquals(1, refreshes[0]);
         assertTrue(controller.snapshot().message().contains("자동 재제출하지 않았습니다"));
+    }
+
+    @Test
+    public void successfulStatusKeepsSuccessWhenDetailRefreshFailsAndRetryIsGetOnly()
+        throws Exception {
+        final int[] updates = {0};
+        final int[] refreshes = {0};
+        AdminReportWorkflowController controller = new AdminReportWorkflowController(
+            new AdminReportWorkflowController.Loader() {
+                @Override
+                public AdminReportModels.StatusSnapshot updateStatus(
+                    String reportId,
+                    String nextStatus,
+                    int expectedVersion,
+                    char[] password,
+                    char[] totp
+                ) throws Exception {
+                    updates[0] += 1;
+                    return AdminReportModels.parseStatus("""
+                        {"schema_version":"walksafe.admin-report-status.v1",
+                         "id":"11111111-1111-4111-8111-111111111111","status":"resolved",
+                         "status_version":2,"allowed_next_statuses":[],
+                         "updated_at":"2026-08-29T02:00:00Z"}
+                        """, reportId);
+                }
+
+                @Override
+                public AdminDeliveryPackage createPackage(
+                    AdminDeliveryPackage.Eligibility eligibility,
+                    char[] password,
+                    char[] totp
+                ) {
+                    throw new AssertionError("package must not run");
+                }
+
+                @Override
+                public AdminReportModels.Detail refreshDetail(String reportId) throws Exception {
+                    refreshes[0] += 1;
+                    if (refreshes[0] == 1) throw new IOException("detail response was lost");
+                    return statusDetail(reportId, "resolved", 2);
+                }
+            }
+        );
+
+        assertTrue(controller.execute(controller.beginStatus(
+            REPORT_ID,
+            "resolved",
+            1,
+            "long-test-password".toCharArray(),
+            "123456".toCharArray()
+        )));
+        assertEquals(1, updates[0]);
+        assertEquals(1, refreshes[0]);
+        assertEquals(
+            AdminReportWorkflowController.Phase.UPDATED_DETAIL_STALE,
+            controller.snapshot().phase()
+        );
+        assertTrue(controller.snapshot().message().contains("상태 변경은 성공했습니다"));
+        assertTrue(controller.execute(controller.beginStatusDetailRetry()));
+        assertEquals(1, updates[0]);
+        assertEquals(2, refreshes[0]);
+        assertEquals(AdminReportWorkflowController.Phase.SUCCEEDED, controller.snapshot().phase());
+        assertEquals(REPORT_ID, controller.snapshot().refreshedDetail().summary().id());
+    }
+
+    @Test
+    public void lifecycleFenceBeforePatchDispatchCancelsWithoutGetOnlyRecovery()
+        throws Exception {
+        final int[] updates = {0};
+        final int[] refreshes = {0};
+        AdminReportWorkflowController.Loader loader = new AdminReportWorkflowController.Loader() {
+            @Override
+            public AdminReportModels.StatusSnapshot updateStatus(
+                String reportId,
+                String nextStatus,
+                int expectedVersion,
+                char[] password,
+                char[] totp
+            ) {
+                updates[0] += 1;
+                throw new AssertionError("a lifecycle-fenced PATCH must not run");
+            }
+
+            @Override
+            public AdminDeliveryPackage createPackage(
+                AdminDeliveryPackage.Eligibility eligibility,
+                char[] password,
+                char[] totp
+            ) {
+                throw new AssertionError("package must not run");
+            }
+
+            @Override
+            public AdminReportModels.Detail refreshDetail(String reportId) {
+                refreshes[0] += 1;
+                throw new AssertionError("an undispatched PATCH has nothing to reconcile");
+            }
+        };
+        AdminReportWorkflowController oldController =
+            new AdminReportWorkflowController(loader);
+        AdminReportWorkflowController.Request oldRequest = oldController.beginStatus(
+            REPORT_ID,
+            "resolved",
+            1,
+            "long-test-password".toCharArray(),
+            "123456".toCharArray()
+        );
+        assertEquals(null, oldController.statusDetailRecoveryReportId());
+        oldController.suspendForLifecycle();
+        assertEquals(AdminReportWorkflowController.Phase.IDLE, oldController.snapshot().phase());
+        assertFalse(oldController.execute(oldRequest));
+        assertEquals(0, updates[0]);
+        assertEquals(0, refreshes[0]);
+    }
+
+    @Test
+    public void lifecycleFenceWhileReauthenticationIsPendingPreventsPatchDispatch()
+        throws Exception {
+        CountDownLatch readyToDispatch = new CountDownLatch(1);
+        CountDownLatch releaseDispatch = new CountDownLatch(1);
+        final int[] patches = {0};
+        AdminReportWorkflowController controller = new AdminReportWorkflowController(
+            new AdminReportWorkflowController.Loader() {
+                @Override
+                public AdminReportModels.StatusSnapshot updateStatus(
+                    String reportId,
+                    String nextStatus,
+                    int expectedVersion,
+                    char[] password,
+                    char[] totp
+                ) {
+                    throw new AssertionError("the dispatch-aware loader must be used");
+                }
+
+                @Override
+                public AdminReportModels.StatusSnapshot updateStatus(
+                    String reportId,
+                    String nextStatus,
+                    int expectedVersion,
+                    char[] password,
+                    char[] totp,
+                    AdminReportWorkflowController.StatusDispatch dispatch
+                ) throws Exception {
+                    readyToDispatch.countDown();
+                    if (!releaseDispatch.await(2, TimeUnit.SECONDS)) {
+                        throw new IOException("test dispatch release timed out");
+                    }
+                    if (!dispatch.markDispatched()) {
+                        throw new AdminReportWorkflowController.StatusDispatchCancelledException();
+                    }
+                    patches[0] += 1;
+                    throw new AssertionError("a lifecycle-fenced PATCH must not run");
+                }
+
+                @Override
+                public AdminDeliveryPackage createPackage(
+                    AdminDeliveryPackage.Eligibility eligibility,
+                    char[] password,
+                    char[] totp
+                ) {
+                    throw new AssertionError("package must not run");
+                }
+
+                @Override
+                public AdminReportModels.Detail refreshDetail(String reportId) {
+                    throw new AssertionError("an undispatched PATCH has nothing to reconcile");
+                }
+            }
+        );
+        AdminReportWorkflowController.Request request = controller.beginStatus(
+            REPORT_ID,
+            "resolved",
+            1,
+            "long-test-password".toCharArray(),
+            "123456".toCharArray()
+        );
+        AtomicReference<Boolean> applied = new AtomicReference<>();
+        Thread worker = new Thread(() -> applied.set(controller.execute(request)));
+        worker.start();
+        assertTrue(readyToDispatch.await(2, TimeUnit.SECONDS));
+
+        controller.suspendForLifecycle();
+        assertEquals(AdminReportWorkflowController.Phase.IDLE, controller.snapshot().phase());
+        releaseDispatch.countDown();
+        worker.join(2_000L);
+
+        assertFalse(worker.isAlive());
+        assertEquals(Boolean.FALSE, applied.get());
+        assertEquals(0, patches[0]);
+        assertEquals(null, controller.statusDetailRecovery());
+    }
+
+    @Test
+    public void reauthenticationFailureBeforeDispatchNeverOffersGetOnlyRecovery()
+        throws Exception {
+        AdminReportWorkflowController controller = new AdminReportWorkflowController(
+            new AdminReportWorkflowController.Loader() {
+                @Override
+                public AdminReportModels.StatusSnapshot updateStatus(
+                    String reportId,
+                    String nextStatus,
+                    int expectedVersion,
+                    char[] password,
+                    char[] totp
+                ) {
+                    throw new AssertionError("the dispatch-aware loader must be used");
+                }
+
+                @Override
+                public AdminReportModels.StatusSnapshot updateStatus(
+                    String reportId,
+                    String nextStatus,
+                    int expectedVersion,
+                    char[] password,
+                    char[] totp,
+                    AdminReportWorkflowController.StatusDispatch dispatch
+                ) throws IOException {
+                    throw new IOException("reauthentication failed before PATCH dispatch");
+                }
+
+                @Override
+                public AdminDeliveryPackage createPackage(
+                    AdminDeliveryPackage.Eligibility eligibility,
+                    char[] password,
+                    char[] totp
+                ) {
+                    throw new AssertionError("package must not run");
+                }
+
+                @Override
+                public AdminReportModels.Detail refreshDetail(String reportId) {
+                    throw new AssertionError("an undispatched PATCH has nothing to reconcile");
+                }
+            }
+        );
+
+        assertTrue(controller.execute(controller.beginStatus(
+            REPORT_ID,
+            "resolved",
+            1,
+            "long-test-password".toCharArray(),
+            "123456".toCharArray()
+        )));
+        assertEquals(AdminReportWorkflowController.Phase.ERROR, controller.snapshot().phase());
+        assertEquals(null, controller.statusDetailRecovery());
+        assertThrows(IllegalStateException.class, controller::beginStatusDetailRetry);
+    }
+
+    @Test
+    public void lifecycleAfterPatchConfirmationRestoresExactTargetAndUsesGetOnly()
+        throws Exception {
+        CountDownLatch refreshStarted = new CountDownLatch(1);
+        CountDownLatch releaseRefresh = new CountDownLatch(1);
+        final int[] updates = {0};
+        final int[] refreshes = {0};
+        AdminReportWorkflowController.Loader loader = new AdminReportWorkflowController.Loader() {
+            @Override
+            public AdminReportModels.StatusSnapshot updateStatus(
+                String reportId,
+                String nextStatus,
+                int expectedVersion,
+                char[] password,
+                char[] totp
+            ) throws Exception {
+                updates[0] += 1;
+                return AdminReportModels.parseStatus("""
+                    {"schema_version":"walksafe.admin-report-status.v1",
+                     "id":"11111111-1111-4111-8111-111111111111","status":"resolved",
+                     "status_version":2,"allowed_next_statuses":[],
+                     "updated_at":"2026-08-29T02:00:00Z"}
+                    """, reportId);
+            }
+
+            @Override
+            public AdminDeliveryPackage createPackage(
+                AdminDeliveryPackage.Eligibility eligibility,
+                char[] password,
+                char[] totp
+            ) {
+                throw new AssertionError("package must not run");
+            }
+
+            @Override
+            public AdminReportModels.Detail refreshDetail(String reportId) throws Exception {
+                refreshes[0] += 1;
+                refreshStarted.countDown();
+                if (!releaseRefresh.await(2, TimeUnit.SECONDS)) {
+                    throw new IOException("test refresh release timed out");
+                }
+                return statusDetail(reportId, "resolved", 2);
+            }
+        };
+        AdminReportWorkflowController oldController =
+            new AdminReportWorkflowController(loader);
+        AdminReportWorkflowController.Request oldRequest = oldController.beginStatus(
+            REPORT_ID,
+            "resolved",
+            1,
+            "long-test-password".toCharArray(),
+            "123456".toCharArray()
+        );
+        AtomicReference<Boolean> oldApplied = new AtomicReference<>();
+        Thread oldWorker = new Thread(() -> oldApplied.set(oldController.execute(oldRequest)));
+        oldWorker.start();
+        assertTrue(refreshStarted.await(2, TimeUnit.SECONDS));
+
+        AdminReportWorkflowController.StatusDetailRecovery beforeSuspend =
+            oldController.statusDetailRecovery();
+        assertTrue(beforeSuspend.patchConfirmed());
+        assertEquals("resolved", beforeSuspend.targetStatus());
+        assertEquals(2, beforeSuspend.targetStatusVersion());
+        oldController.suspendForLifecycle();
+        AdminReportWorkflowController.StatusDetailRecovery recovery =
+            oldController.statusDetailRecovery();
+        assertEquals(REPORT_ID, recovery.reportId());
+        assertTrue(recovery.patchConfirmed());
+        releaseRefresh.countDown();
+        oldWorker.join(2_000L);
+        assertFalse(oldWorker.isAlive());
+        assertEquals(Boolean.FALSE, oldApplied.get());
+
+        AdminReportWorkflowController restored = new AdminReportWorkflowController(loader);
+        restored.restoreStatusDetailRecovery(
+            recovery.reportId(),
+            recovery.targetStatus(),
+            recovery.targetStatusVersion(),
+            recovery.patchConfirmed()
+        );
+        assertTrue(restored.execute(restored.beginStatusDetailRetry()));
+        assertEquals(1, updates[0]);
+        assertEquals(2, refreshes[0]);
+        assertEquals(AdminReportWorkflowController.Phase.SUCCEEDED, restored.snapshot().phase());
+    }
+
+    @Test
+    public void patchResponseLossNeverTreatsMatchingDetailAsThisRequestsSuccess()
+        throws Exception {
+        final int[] updates = {0};
+        final int[] refreshes = {0};
+        AdminReportWorkflowController controller = new AdminReportWorkflowController(
+            new AdminReportWorkflowController.Loader() {
+                @Override
+                public AdminReportModels.StatusSnapshot updateStatus(
+                    String reportId,
+                    String nextStatus,
+                    int expectedVersion,
+                    char[] password,
+                    char[] totp
+                ) throws Exception {
+                    updates[0] += 1;
+                    throw new IOException("PATCH response was lost");
+                }
+
+                @Override
+                public AdminDeliveryPackage createPackage(
+                    AdminDeliveryPackage.Eligibility eligibility,
+                    char[] password,
+                    char[] totp
+                ) {
+                    throw new AssertionError("package must not run");
+                }
+
+                @Override
+                public AdminReportModels.Detail refreshDetail(String reportId) throws Exception {
+                    refreshes[0] += 1;
+                    return statusDetail(reportId, "resolved", 2);
+                }
+            }
+        );
+
+        assertTrue(controller.execute(controller.beginStatus(
+            REPORT_ID,
+            "resolved",
+            1,
+            "long-test-password".toCharArray(),
+            "123456".toCharArray()
+        )));
+        assertEquals(AdminReportWorkflowController.Phase.UPDATED_DETAIL_STALE,
+            controller.snapshot().phase());
+        assertFalse(controller.statusDetailRecovery().patchConfirmed());
+        assertTrue(controller.execute(controller.beginStatusDetailRetry()));
+        assertEquals(AdminReportWorkflowController.Phase.CONFLICT,
+            controller.snapshot().phase());
+        assertEquals(null, controller.statusDetailRecovery());
+        assertEquals(1, updates[0]);
+        assertEquals(1, refreshes[0]);
+    }
+
+    @Test
+    public void confirmedRecoveryRequiresExactStatusAndVersion() throws Exception {
+        AdminReportWorkflowController controller = new AdminReportWorkflowController(
+            new AdminReportWorkflowController.Loader() {
+                @Override
+                public AdminReportModels.StatusSnapshot updateStatus(
+                    String reportId,
+                    String nextStatus,
+                    int expectedVersion,
+                    char[] password,
+                    char[] totp
+                ) {
+                    throw new AssertionError("recovery must not PATCH");
+                }
+
+                @Override
+                public AdminDeliveryPackage createPackage(
+                    AdminDeliveryPackage.Eligibility eligibility,
+                    char[] password,
+                    char[] totp
+                ) {
+                    throw new AssertionError("package must not run");
+                }
+
+                @Override
+                public AdminReportModels.Detail refreshDetail(String reportId) throws Exception {
+                    return statusDetail(reportId, "reviewed", 2);
+                }
+            }
+        );
+        controller.restoreStatusDetailRecovery(REPORT_ID, "resolved", 2, true);
+
+        assertTrue(controller.execute(controller.beginStatusDetailRetry()));
+        assertEquals(AdminReportWorkflowController.Phase.CONFLICT, controller.snapshot().phase());
     }
 
     @Test
@@ -487,6 +912,23 @@ public final class AdminReportWave5Test {
         for (char item : value) assertEquals('\0', item);
     }
 
+    private static AdminReportModels.Detail statusDetail(
+        String reportId,
+        String status,
+        int statusVersion
+    ) throws Exception {
+        String body = AdminReportModelsTest.wave5DetailFixture()
+            .replace("\"status\": \"reviewed\",", "\"status\": \"" + status + "\",")
+            .replace("\"status_version\": 1,", "\"status_version\": " + statusVersion + ",");
+        if ("resolved".equals(status)) {
+            body = body.replace(
+                "\"allowed_next_statuses\": [\n    \"new\",\n    \"resolved\"\n  ],",
+                "\"allowed_next_statuses\": [],"
+            );
+        }
+        return AdminReportModels.parseDetail(body, reportId);
+    }
+
     private static String conflictJson() {
         return "{\"detail\":{\"code\":\"report_status_version_conflict\","
             + "\"message\":\"conflict\",\"latest\":{\"status\":\"resolved\","
@@ -637,7 +1079,7 @@ public final class AdminReportWave5Test {
 
         @Override
         public AdminReportModels.Detail refreshDetail(String reportId) throws Exception {
-            return AdminReportModels.parseDetail(AdminReportModelsTest.wave5DetailFixture(), reportId);
+            return statusDetail(reportId, "resolved", 2);
         }
     }
 

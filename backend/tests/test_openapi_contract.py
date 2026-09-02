@@ -493,6 +493,26 @@ def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
     review_request = schema["components"]["schemas"][
         "ReportReviewDecisionRequest"
     ]
+    assert "decision_id" in review_request["required"]
+    assert review_request["properties"]["decision_id"] == {
+        "type": "string",
+        "format": "uuid",
+        "pattern": (
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+            r"[0-9a-f]{4}-[0-9a-f]{12}$"
+        ),
+        "title": "Decision Id",
+    }
+    review_create = schema["paths"][
+        "/reports/{report_id}/review-decisions"
+    ]["post"]
+    assert review_create["responses"]["201"]["description"] == (
+        "Created review decision or exact idempotent replay of the original decision."
+    )
+    assert review_create["responses"]["409"]["description"] == (
+        "Review workflow conflict, including review_decision_idempotency_conflict "
+        "when decision_id is reused for a different payload, report, or administrator."
+    )
     evidence_rule = review_request["allOf"][0]
     assert evidence_rule["if"]["properties"]["decision"] == {
         "const": "APPROVED"

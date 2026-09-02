@@ -63,6 +63,7 @@ DISALLOWED_ADMIN_TEXT_CONTROLS = tuple(
 
 def _approved_request(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
+        "decision_id": str(DECISION_ID),
         "decision": "APPROVED",
         "reason": "  확인 완료  ",
         "duplicate_of_report_id": None,
@@ -126,6 +127,32 @@ def _evidence_grant(**overrides: object) -> ReportOriginalAccessGrant:
     }
     values.update(overrides)
     return ReportOriginalAccessGrant(**values)
+
+
+def _stored_review_decision(**overrides: object) -> ReportReviewDecision:
+    decided_at = datetime(2026, 8, 9, 3, 2, tzinfo=UTC)
+    values: dict[str, object] = {
+        "id": DECISION_ID,
+        "report_id": REPORT_ID,
+        "revision": 4,
+        "content_revision": 0,
+        "decision": "APPROVED",
+        "reason": "확인 완료",
+        "user_visible_reason": None,
+        "duplicate_of_report_id": None,
+        "evidence_grant_id": EVIDENCE_GRANT_ID,
+        "location_reviewed": True,
+        "photo_reviewed": True,
+        "privacy_reviewed": True,
+        "admin_id": _identity().admin_id,
+        "session_id": SESSION_ID,
+        "device_id": _identity().device_id,
+        "correlation_id": CORRELATION_ID,
+        "decided_at": decided_at,
+        "created_at": decided_at,
+    }
+    values.update(overrides)
+    return ReportReviewDecision(**values)
 
 
 def _proof(
@@ -358,6 +385,7 @@ class _OperationFailureSession(_FakeSession):
 
 def test_workflow_request_contracts_have_exact_fields_and_normalize_bounded_text() -> None:
     assert set(ReportReviewDecisionRequest.model_fields) == {
+        "decision_id",
         "decision",
         "reason",
         "user_visible_reason",
@@ -388,6 +416,7 @@ def test_workflow_request_contracts_have_exact_fields_and_normalize_bounded_text
     delivery = ReportInstitutionDeliveryRequest.model_validate(_delivery_request())
 
     assert review.reason == "확인 완료"
+    assert review.decision_id == DECISION_ID
     assert review.user_visible_reason is None
     assert delivery.institution == "서울시청"
     assert delivery.channel == "WEB_PORTAL"
@@ -395,6 +424,27 @@ def test_workflow_request_contracts_have_exact_fields_and_normalize_bounded_text
     assert delivery.reason == "관리자가 공식 창구에 수동 제출함"
     assert delivery.observed_at.tzinfo is UTC
     assert delivery.idempotency_key == IDEMPOTENCY_KEY
+
+
+@pytest.mark.parametrize(
+    "decision_id",
+    [
+        None,
+        "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+        "urn:uuid:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    ],
+)
+def test_review_request_requires_canonical_client_decision_id(
+    decision_id: str | None,
+) -> None:
+    request = _approved_request()
+    if decision_id is None:
+        request.pop("decision_id")
+    else:
+        request["decision_id"] = decision_id
+
+    with pytest.raises(ValidationError):
+        ReportReviewDecisionRequest.model_validate(request)
 
 
 def test_workflow_request_text_preserves_allowed_internal_whitespace() -> None:
@@ -643,7 +693,7 @@ def test_integrity_conflict_preserves_409_unless_rollback_fails(
     assert captured.value.status_code == expected_status
     assert "sensitive" not in str(captured.value)
     assert db.commit_count == 1
-    assert db.rollback_count == 1
+    assert db.rollback_count == (1 if rollback_fails else 2)
 
 
 @pytest.mark.parametrize(
@@ -1469,6 +1519,7 @@ def test_review_append_is_monotonic_and_does_not_change_legacy_authority() -> No
     )
 
     assert decision.revision == 3
+    assert decision.id == DECISION_ID
     assert decision.admin_id == _identity().admin_id
     assert decision.session_id == SESSION_ID
     assert decision.device_id == _identity().device_id
@@ -1480,6 +1531,168 @@ def test_review_append_is_monotonic_and_does_not_change_legacy_authority() -> No
     assert db.added == [decision]
     assert db.commit_count == 1
     assert db.rollback_count == 0
+
+
+def test_review_exact_replay_returns_the_original_non_postgres_row() -> None:
+    existing = _stored_review_decision()
+    db = _FakeSession(
+        [],
+        get_results={(ReportReviewDecision, DECISION_ID): existing},
+    )
+
+    replayed = append_report_review_decision(
+        db,  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        payload=ReportReviewDecisionRequest.model_validate(_approved_request()),
+        identity=replace(
+            _identity(),
+            session_id=uuid.uuid4(),
+            device_id="replacement-admin-device",
+        ),
+        correlation_id=uuid.uuid4(),
+    )
+
+    assert replayed is existing
+    assert replayed.id == DECISION_ID
+    assert replayed.revision == 4
+    assert db.added == []
+    assert db.commit_count == 0
+    assert db.expunge_count == 1
+    assert db.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    ("report_id", "payload_overrides", "identity"),
+    [
+        (REPORT_ID, {"reason": "다른 검토 사유"}, _identity()),
+        (
+            uuid.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            {},
+            _identity(),
+        ),
+        (
+            REPORT_ID,
+            {},
+            replace(_identity(), admin_id="other-reviewer@example.com"),
+        ),
+    ],
+)
+def test_review_decision_id_reuse_with_different_intent_report_or_actor_conflicts(
+    report_id: uuid.UUID,
+    payload_overrides: dict[str, object],
+    identity: AdminSessionIdentity,
+) -> None:
+    existing = _stored_review_decision()
+    db = _FakeSession(
+        [],
+        get_results={(ReportReviewDecision, DECISION_ID): existing},
+    )
+
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        append_report_review_decision(
+            db,  # type: ignore[arg-type]
+            report_id=report_id,
+            payload=ReportReviewDecisionRequest.model_validate(
+                _approved_request(**payload_overrides)
+            ),
+            identity=identity,
+            correlation_id=uuid.uuid4(),
+        )
+
+    assert captured.value.code == "review_decision_idempotency_conflict"
+    assert captured.value.status_code == 409
+    assert existing.revision == 4
+    assert db.added == []
+    assert db.commit_count == 0
+    assert db.rollback_count == 1
+
+
+@pytest.mark.parametrize(
+    ("existing_reason", "expected_conflict"),
+    [
+        ("확인 완료", False),
+        ("다른 검토 사유", True),
+    ],
+)
+def test_review_commit_race_replays_exact_intent_or_rejects_divergent_reuse(
+    existing_reason: str,
+    expected_conflict: bool,
+) -> None:
+    payload = ReportReviewDecisionRequest.model_validate(
+        _approved_request(decision="REJECTED")
+    )
+    existing = _stored_review_decision(
+        decision="REJECTED",
+        reason=existing_reason,
+        user_visible_reason=payload.user_visible_reason,
+        evidence_grant_id=None,
+    )
+    replay_identity = replace(
+        _identity(),
+        session_id=uuid.uuid4(),
+        device_id="replacement-admin-device",
+    )
+
+    class CommitRaceSession(_OperationFailureSession):
+        def __init__(self) -> None:
+            super().__init__(
+                [Report(id=REPORT_ID), None],
+                fail_operation="integrity_commit",
+            )
+            self.decision_lookup_count = 0
+
+        def get(
+            self,
+            model: type[object],
+            key: uuid.UUID,
+            **kwargs: object,
+        ) -> object | None:
+            if model is ReportReviewDecision and key == DECISION_ID:
+                self.decision_lookup_count += 1
+                return None if self.decision_lookup_count == 1 else existing
+            return super().get(model, key, **kwargs)
+
+    db = CommitRaceSession()
+
+    if expected_conflict:
+        with pytest.raises(AdminReportWorkflowError) as captured:
+            append_report_review_decision(
+                db,  # type: ignore[arg-type]
+                report_id=REPORT_ID,
+                payload=payload,
+                identity=replay_identity,
+                correlation_id=uuid.uuid4(),
+            )
+        assert captured.value.code == "review_decision_idempotency_conflict"
+        assert captured.value.status_code == 409
+        assert db.expunge_count == 0
+    else:
+        replayed = append_report_review_decision(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            payload=payload,
+            identity=replay_identity,
+            correlation_id=uuid.uuid4(),
+        )
+        assert replayed is existing
+        assert (
+            replayed.id,
+            replayed.revision,
+            replayed.correlation_id,
+            replayed.decided_at,
+            replayed.created_at,
+        ) == (
+            DECISION_ID,
+            4,
+            CORRELATION_ID,
+            datetime(2026, 8, 9, 3, 2, tzinfo=UTC),
+            datetime(2026, 8, 9, 3, 2, tzinfo=UTC),
+        )
+        assert db.expunge_count == 1
+
+    assert db.decision_lookup_count == 2
+    assert db.commit_count == 1
+    assert db.rollback_count == 2
 
 
 def test_approval_atomically_binds_one_fresh_consumed_evidence_grant() -> None:
@@ -1512,7 +1725,9 @@ def test_approval_atomically_binds_one_fresh_consumed_evidence_grant() -> None:
         append_report_review_decision(
             replay_db,  # type: ignore[arg-type]
             report_id=REPORT_ID,
-            payload=ReportReviewDecisionRequest.model_validate(_approved_request()),
+            payload=ReportReviewDecisionRequest.model_validate(
+                _approved_request(decision_id=str(uuid.uuid4()))
+            ),
             identity=_identity(),
             correlation_id=CORRELATION_ID,
             now=decided_at,

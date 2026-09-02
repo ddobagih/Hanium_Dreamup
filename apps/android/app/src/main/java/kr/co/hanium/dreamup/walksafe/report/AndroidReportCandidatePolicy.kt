@@ -133,13 +133,14 @@ class AndroidReportCandidatePolicy {
     companion object {
         const val DAMAGED_TACTILE_BLOCK = "damaged_tactile_block"
         const val TRIGGER_AUTO = "auto"
+        const val TRIGGER_ON_SCREEN = "on_screen"
         const val TRIGGER_VOICE = "voice"
         const val AUTO_REPORT_MIN_TRACK_AGE_FRAMES = 3
         const val AUTO_REPORT_MIN_TRACK_STABLE_MS = 700L
         const val AUTO_REPORT_MIN_DETECTION_CONFIDENCE = 0.70f
         const val REPORT_MAX_DETECTION_AGE_MS = 1_200L
         val ALLOWED_MODEL_KEYS = setOf("custom_tactile", "unified_walksafe")
-        val ALLOWED_TRIGGERS = setOf(TRIGGER_AUTO, TRIGGER_VOICE)
+        val ALLOWED_TRIGGERS = setOf(TRIGGER_AUTO, TRIGGER_ON_SCREEN, TRIGGER_VOICE)
         val REPORT_CLASS_IDS = mapOf(
             "custom_tactile" to 1,
             "unified_walksafe" to 8,

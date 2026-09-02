@@ -109,6 +109,8 @@ android {
 }
 
 dependencies {
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver3:5.4.0")
     testImplementation("org.json:json:20240303")
 }

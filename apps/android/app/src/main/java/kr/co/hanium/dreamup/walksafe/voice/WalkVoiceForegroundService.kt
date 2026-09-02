@@ -12,7 +12,7 @@ import android.os.Build
 import android.os.IBinder
 
 internal interface WalkVoiceSessionController {
-    fun start()
+    fun start(): Boolean
     fun stop()
 }
 
@@ -65,9 +65,18 @@ class WalkVoiceForegroundService : Service() {
 
         sessionStarted = true
         try {
-            activeController =
+            val controller =
                 (application as? WalkVoiceSessionControllerProvider)?.walkVoiceSessionController
-            activeController?.start()
+                    ?: run {
+                        stopVoiceSession(stopController = false)
+                        stopSelf()
+                        return
+                    }
+            activeController = controller
+            if (!controller.start()) {
+                stopVoiceSession(stopController = false)
+                stopSelf()
+            }
         } catch (error: Throwable) {
             stopVoiceSession()
             stopSelf()
@@ -75,12 +84,12 @@ class WalkVoiceForegroundService : Service() {
         }
     }
 
-    private fun stopVoiceSession() {
+    private fun stopVoiceSession(stopController: Boolean = true) {
         val controller = activeController
         activeController = null
         if (sessionStarted) {
             sessionStarted = false
-            runCatching { controller?.stop() }
+            if (stopController) runCatching { controller?.stop() }
         }
         if (foregroundStarted) {
             foregroundStarted = false

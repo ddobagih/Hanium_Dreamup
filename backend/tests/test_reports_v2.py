@@ -521,7 +521,7 @@ def test_create_report_v2_rejects_source_model_paths_and_urls(
 
 @pytest.mark.parametrize(
     "trigger,auto_reported",
-    [("auto", False), ("voice", True)],
+    [("auto", False), ("on_screen", True), ("voice", True)],
 )
 def test_create_report_v2_rejects_trigger_auto_report_mismatch(
     client: ASGITestClient,
@@ -670,14 +670,16 @@ def test_create_report_v2_rejects_invalid_gateway_actor(client: ASGITestClient, 
     assert response.json()["detail"]["code"] == "invalid_actor_id"
 
 
+@pytest.mark.parametrize("trigger", ["on_screen", "voice"])
 @pytest.mark.parametrize(
     "class_name,model_class_id",
     [
         ("damaged_tactile_block", 1),
     ],
 )
-def test_create_report_v2_stores_voice_damage_without_auto_report(
+def test_create_report_v2_stores_explicit_damage_without_auto_report(
     client: ASGITestClient,
+    trigger: str,
     class_name: str,
     model_class_id: int,
 ) -> None:
@@ -685,7 +687,7 @@ def test_create_report_v2_stores_voice_damage_without_auto_report(
         class_name=class_name,
         model_class_id=model_class_id,
         captured_at="2026-05-22T12:40:00.000Z",
-        trigger="voice",
+        trigger=trigger,
         auto_reported=False,
     )
 
@@ -695,7 +697,7 @@ def test_create_report_v2_stores_voice_damage_without_auto_report(
     body = response.json()
     assert body["class_id"] == model_class_id
     assert body["class_name"] == class_name
-    assert body["metadata"]["trigger"] == "voice"
+    assert body["metadata"]["trigger"] == trigger
     assert body["metadata"]["auto_reported"] is False
     for key, value in metadata.items():
         if key == "captured_at":

@@ -14,7 +14,7 @@ import org.junit.Test;
 
 public final class AdminSecurityControllerTest {
     @Test
-    public void loginLoadsServerAuthorityAndKeepsOnlyAnOpaqueSessionIndicatorInSnapshot() throws Exception {
+    public void loginLoadsServerAuthorityAndBindsSnapshotToAuthenticatedAdministrator() throws Exception {
         FakeApi api = new FakeApi();
         AdminSecurityController controller = new AdminSecurityController(api);
 
@@ -27,6 +27,7 @@ public final class AdminSecurityControllerTest {
         assertEquals(AdminRecoveryCustodyState.ATTESTED, snapshot.recoveryCustodyState());
         assertEquals("2026-07-21T23:00:00Z", snapshot.recoveryCustodyAttestedAt());
         assertEquals(CURRENT_SESSION_ID, snapshot.currentSessionId());
+        assertEquals("admin-01", snapshot.authenticatedAdminId());
         assertEquals(2, snapshot.sessions().size());
         assertEquals(3, snapshot.devices().size());
         assertTrue(snapshot.isAccessSessionActive());
@@ -57,7 +58,8 @@ public final class AdminSecurityControllerTest {
             "11111111-1111-4111-8111-111111111111",
             new AdminReportDecision(
                 AdminReportDecision.Decision.APPROVED, "reviewed", null, null, true, true, true, 0,
-                EVIDENCE_GRANT_ID
+                EVIDENCE_GRANT_ID,
+                DECISION_ID
             ),
             true
         ));
@@ -386,7 +388,8 @@ public final class AdminSecurityControllerTest {
         controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
         AdminReportDecision review = new AdminReportDecision(
             AdminReportDecision.Decision.APPROVED, "reviewed", null, null, true, true, true, 0,
-            EVIDENCE_GRANT_ID
+            EVIDENCE_GRANT_ID,
+            DECISION_ID
         );
 
         assertThrows(IllegalStateException.class, () -> controller.recordReviewDecision(
@@ -963,6 +966,7 @@ public final class AdminSecurityControllerTest {
     private static final String CURRENT_SESSION_ID = "11111111-1111-4111-8111-111111111111";
     private static final String OTHER_SESSION_ID = "22222222-2222-4222-8222-222222222222";
     private static final String EVIDENCE_GRANT_ID = "44444444-4444-4444-8444-444444444444";
+    private static final String DECISION_ID = "55555555-5555-4555-8555-555555555555";
     private static final String OTHER_DEVICE_ID = "admin-device-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     private static final String KEY_ONLY_DEVICE_ID = "admin-device-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
     private static final String PASSWORD = "correct horse battery staple";

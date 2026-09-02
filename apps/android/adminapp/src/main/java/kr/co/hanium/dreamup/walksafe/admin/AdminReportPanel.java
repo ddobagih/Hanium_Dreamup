@@ -30,6 +30,7 @@ public final class AdminReportPanel extends LinearLayout {
         void onLoadMore();
         void onOpenDetail(String reportId);
         void onRetry();
+        void onRetryWorkflowDetail();
         void onUseInOperations(AdminReportModels.Detail detail);
         void onUpdateStatus(
             AdminReportModels.Detail detail,
@@ -101,6 +102,7 @@ public final class AdminReportPanel extends LinearLayout {
     private final ProgressBar loadingIndicator;
     private final LinearLayout listContainer;
     private final LinearLayout detailContainer;
+    private final Button applyButton;
     private final Button loadMoreButton;
     private final Button retryButton;
     private final LinearLayout workflowActions;
@@ -109,10 +111,14 @@ public final class AdminReportPanel extends LinearLayout {
     private final Button highRiskConfirm;
     private final TextView workflowText;
     private final List<Button> mutationButtons = new ArrayList<>();
+    private final List<Button> navigationButtons = new ArrayList<>();
     private AdminReportModels.Detail displayedDetail;
     private String pendingStatus;
     private boolean pendingPackage;
     private boolean sessionBoundDraftsCleared;
+    private boolean reportRetryAvailable;
+    private boolean workflowDetailRetryAvailable;
+    private boolean workflowBlocksNavigation;
     private String selectedReportId;
 
     public AdminReportPanel(Context context, Listener listener) {
@@ -154,9 +160,9 @@ public final class AdminReportPanel extends LinearLayout {
         addView(createdFromInput, matchWrap());
         addView(createdToInput, matchWrap());
 
-        Button apply = button("조건으로 신고 조회", "현재 조건으로 신고 목록 조회");
-        apply.setOnClickListener(view -> listener.onApplyFilters(filterDraft()));
-        addView(apply, matchWrap());
+        applyButton = button("조건으로 신고 조회", "현재 조건으로 신고 목록 조회");
+        applyButton.setOnClickListener(view -> listener.onApplyFilters(filterDraft()));
+        addView(applyButton, matchWrap());
 
         stateText = text("조회 전입니다.", 16);
         stateText.setPadding(0, dp(12), 0, dp(8));
@@ -174,7 +180,10 @@ public final class AdminReportPanel extends LinearLayout {
         loadMoreButton.setOnClickListener(view -> listener.onLoadMore());
         addView(loadMoreButton, matchWrap());
         retryButton = button("다시 시도", "실패한 신고 조회 다시 시도");
-        retryButton.setOnClickListener(view -> listener.onRetry());
+        retryButton.setOnClickListener(view -> {
+            if (workflowDetailRetryAvailable) listener.onRetryWorkflowDetail();
+            else listener.onRetry();
+        });
         addView(retryButton, matchWrap());
 
         detailContainer = verticalGroup();
@@ -240,27 +249,33 @@ public final class AdminReportPanel extends LinearLayout {
         summaryText.setText(workSummary(state.items()));
         priorityText.setText(priorityMessage(state.items()));
         loadingIndicator.setVisibility(isLoading(state.phase()) ? VISIBLE : GONE);
-        retryButton.setVisibility(state.phase() == AdminReportController.Phase.ERROR ? VISIBLE : GONE);
+        reportRetryAvailable = state.phase() == AdminReportController.Phase.ERROR;
         loadMoreButton.setVisibility(state.canLoadMore() ? VISIBLE : GONE);
         loadMoreButton.setEnabled(state.phase() != AdminReportController.Phase.LOADING_MORE);
+        navigationButtons.clear();
         renderList(state);
         renderDetail(state.detail());
+        renderRetryAction();
+        applyWorkflowNavigationState();
     }
 
     public void renderWorkflow(AdminReportWorkflowController.State state) {
-        if (sessionBoundDraftsCleared) {
+        boolean detailRecovery =
+            state.phase() == AdminReportWorkflowController.Phase.UPDATED_DETAIL_STALE;
+        if (sessionBoundDraftsCleared && !detailRecovery) {
             workflowActions.setVisibility(GONE);
             return;
         }
+        if (detailRecovery) sessionBoundDraftsCleared = false;
         if (state.message() != null) workflowText.setText(state.message());
         if (state.phase() != AdminReportWorkflowController.Phase.IDLE) {
             workflowActions.setVisibility(VISIBLE);
         }
         boolean loading = state.phase() == AdminReportWorkflowController.Phase.LOADING;
-        highRiskPassword.setEnabled(!loading);
-        highRiskTotp.setEnabled(!loading);
-        highRiskConfirm.setEnabled(!loading);
-        for (Button button : mutationButtons) button.setEnabled(!loading);
+        workflowDetailRetryAvailable = detailRecovery;
+        workflowBlocksNavigation = loading || workflowDetailRetryAvailable;
+        renderRetryAction();
+        applyWorkflowNavigationState();
     }
 
     public void clearHighRiskInputs() {
@@ -272,8 +287,12 @@ public final class AdminReportPanel extends LinearLayout {
         sessionBoundDraftsCleared = true;
         pendingStatus = null;
         pendingPackage = false;
+        workflowDetailRetryAvailable = false;
+        workflowBlocksNavigation = false;
         clearHighRiskInputs();
         workflowActions.setVisibility(GONE);
+        renderRetryAction();
+        applyWorkflowNavigationState();
     }
 
     private void renderList(AdminReportController.State state) {
@@ -300,6 +319,7 @@ public final class AdminReportPanel extends LinearLayout {
                 statusLabel(item.status()) + " " + classLabel(item.className()) + " 신고 상세 보기"
             );
             detail.setOnClickListener(view -> listener.onOpenDetail(item.id()));
+            navigationButtons.add(detail);
             card.addView(detail, matchWrap());
             listContainer.addView(card, cardParams);
         }
@@ -363,8 +383,39 @@ public final class AdminReportPanel extends LinearLayout {
             "선택 신고를 아래 검수 결정과 수동 기관 제출 기록 폼에 연결"
         );
         use.setOnClickListener(view -> listener.onUseInOperations(detail));
+        navigationButtons.add(use);
         card.addView(use, matchWrap());
         detailContainer.addView(card, matchWrap());
+    }
+
+    private void renderRetryAction() {
+        retryButton.setText(workflowDetailRetryAvailable ? "최신 신고 상세 다시 조회" : "다시 시도");
+        retryButton.setContentDescription(
+            workflowDetailRetryAvailable
+                ? "상태 변경 결과 확인을 위한 최신 신고 상세만 다시 조회"
+                : "실패한 신고 조회 다시 시도"
+        );
+        retryButton.setVisibility(
+            reportRetryAvailable || workflowDetailRetryAvailable ? VISIBLE : GONE
+        );
+    }
+
+    private void applyWorkflowNavigationState() {
+        boolean enabled = !workflowBlocksNavigation;
+        boolean mutationEnabled = enabled;
+        reportIdInput.setEnabled(enabled);
+        statusInput.setEnabled(enabled);
+        classInput.setEnabled(enabled);
+        createdFromInput.setEnabled(enabled);
+        createdToInput.setEnabled(enabled);
+        applyButton.setEnabled(enabled);
+        retryButton.setEnabled(enabled || workflowDetailRetryAvailable);
+        if (loadMoreButton.getVisibility() == VISIBLE) loadMoreButton.setEnabled(enabled);
+        for (Button button : navigationButtons) button.setEnabled(enabled);
+        highRiskPassword.setEnabled(mutationEnabled);
+        highRiskTotp.setEnabled(mutationEnabled);
+        highRiskConfirm.setEnabled(mutationEnabled);
+        for (Button button : mutationButtons) button.setEnabled(mutationEnabled);
     }
 
     private static String stateMessage(AdminReportController.State state) {
