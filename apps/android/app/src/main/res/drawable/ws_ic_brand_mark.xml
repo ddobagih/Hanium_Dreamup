@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppDesign Welcome 로고 마크. 파란 rounded square 위 흰지팡이 보행자.
+     원본 svg viewBox 0 0 20 22 를 32dp 안에 x=9,y=8, 배율 0.7 로 배치했다. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp" android:height="32dp"
+    android:viewportWidth="32" android:viewportHeight="32">
+    <path
+        android:pathData="M12,0h8a12,12 0 0 1 12,12v8a12,12 0 0 1 -12,12h-8a12,12 0 0 1 -12,-12v-8a12,12 0 0 1 12,-12z"
+        android:fillColor="#1B4CD8" />
+    <!-- 머리 -->
+    <path android:pathData="M18.1,10.18a2.1,2.1 0 1,1 -4.2,0a2.1,2.1 0 1,1 4.2,0"
+        android:fillColor="#FFFFFF" />
+    <!-- 뒷다리 -->
+    <path android:pathData="M16,12.36L14.25,18.18L11.8,23.27"
+        android:strokeColor="#FFFFFF" android:strokeWidth="1.4" android:strokeLineCap="round" />
+    <!-- 앞다리 -->
+    <path android:pathData="M16,12.36L17.75,18.18L20.2,22.55"
+        android:strokeColor="#FFFFFF" android:strokeWidth="1.4" android:strokeLineCap="round" />
+    <!-- 흰지팡이 -->
+    <path android:pathData="M14.25,15.64L17.75,15.64"
+        android:strokeColor="#FFFFFF" android:strokeWidth="1.26" android:strokeLineCap="round" />
+</vector>

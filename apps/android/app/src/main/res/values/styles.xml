@@ -2,7 +2,7 @@
 <resources>
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:colorAccent">#0b6b58</item>
+        <item name="android:colorAccent">#1b4cd8</item>
         <item name="android:fontFamily">@font/pretendard</item>
     </style>
 </resources>

@@ -11,6 +11,7 @@ import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Outline
 import android.graphics.Rect
 import android.graphics.RectF
 import android.text.Editable
@@ -22,7 +23,9 @@ import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.StateListDrawable
 import android.hardware.GeomagneticField
 import android.location.Location
@@ -46,11 +49,13 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.text.InputType
 import android.text.method.ScrollingMovementMethod
+import android.text.style.BackgroundColorSpan
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
@@ -63,6 +68,8 @@ import android.widget.CheckBox
 import android.widget.CompoundButton
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.GridLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -637,6 +644,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val wsEmphasisButtons = mutableListOf<Button>()
     private lateinit var walkStatusSection: LinearLayout
     private lateinit var runtimeControls: LinearLayout
+    private lateinit var homeCardGrid: GridLayout
+    private val homeCardRefreshers = mutableListOf<() -> Unit>()
     private lateinit var controlsScroll: ScrollView
     private lateinit var walkSafetyScroll: ScrollView
     private lateinit var walkSafetyOverlay: LinearLayout
@@ -695,7 +704,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var firstRunNoticeToggleButton: Button
     private var firstRunNoticeExpandedByUser = false
     private lateinit var firstRunProgressBar: LinearLayout
+    private lateinit var brandHeader: LinearLayout
+    private var previewAdvanceButton: Button? = null
     private val firstRunProgressSegments = mutableListOf<View>()
+    private val firstRunStepCircles = mutableListOf<TextView>()
     private lateinit var privacySectionToggleButton: Button
     private var privacySectionExpanded = false
     private lateinit var privacyControls: LinearLayout
@@ -11615,6 +11627,626 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         view.text = builder
     }
 
+    /**
+     * AppDesign 홈 2x2 카드 하나.
+     * 화면 전환 대신 각 기능의 기존 컨트롤을 그대로 호출한다. 잠긴 카드는 사유를 알린다.
+     */
+    private fun wsHomeCard(
+        iconRes: Int,
+        title: String,
+        subtitle: String,
+        fill: Int,
+        lockTitle: String,
+        lockDetail: String,
+        unlocked: () -> Boolean,
+        onOpen: () -> Unit,
+    ): View {
+        val density = resources.displayMetrics.density
+        fun px(dp: Float) = (dp * density).roundToInt()
+
+        val icon = ImageView(this).apply {
+            setImageDrawable(ResourcesCompat.getDrawable(resources, iconRes, theme))
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(px(WS_CARD_ICON_DP), px(WS_CARD_ICON_DP))
+        }
+        val spacer = View(this).apply {
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
+        }
+        val titleText = TextView(this).apply {
+            text = title
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_CARD_TITLE_SP)
+            setTextColor(WS_COLOR_CARD_TEXT)
+            typeface = wsTypeface(Typeface.BOLD)
+            setLineSpacing(0f, 1.15f)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        val subtitleText = TextView(this).apply {
+            text = subtitle
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_CARD_SUBTITLE_SP)
+            // 불투명도를 낮추지 않는다. 근거는 WS_COLOR_CARD_TEXT 주석.
+            setTextColor(WS_COLOR_CARD_TEXT)
+            setLineSpacing(0f, 1.15f)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = px(4f) }
+        }
+        val stack = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            // 최소 높이는 카드가 아니라 여기에 준다. FrameLayout 의 minimumHeight 는
+            // MATCH_PARENT 자식을 다시 측정하지 않아 spacer 의 weight 가 죽는다.
+            minimumHeight = px(WS_CARD_HEIGHT_DP - 2 * WS_CARD_PADDING_DP)
+            addView(icon)
+            addView(spacer)
+            addView(titleText)
+            addView(subtitleText)
+        }
+        val lockBadge = ImageView(this).apply {
+            setImageDrawable(ResourcesCompat.getDrawable(resources, R.drawable.ws_ic_card_lock, theme))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(WS_COLOR_CARD_LOCK_BADGE_FILL)
+            }
+            setPadding(px(6f), px(6f), px(6f), px(6f))
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = FrameLayout.LayoutParams(
+                px(WS_CARD_BADGE_DP),
+                px(WS_CARD_BADGE_DP),
+                Gravity.TOP or Gravity.END,
+            )
+        }
+        val card = FrameLayout(this).apply {
+            isClickable = true
+            isFocusable = true
+            setPadding(
+                px(WS_CARD_PADDING_DP),
+                px(WS_CARD_PADDING_DP),
+                px(WS_CARD_PADDING_DP),
+                px(WS_CARD_PADDING_DP),
+            )
+            background = StateListDrawable().apply {
+                // 포커스 링은 흰 테두리다. focus.fill 은 card.nav 와 같은 색이라 그 카드에서 안 보인다.
+                addState(
+                    intArrayOf(android.R.attr.state_focused),
+                    wsHomeCardFace(fill, density, focusRing = true),
+                )
+                addState(
+                    intArrayOf(android.R.attr.state_pressed),
+                    wsHomeCardFace(fill, density, focusRing = true),
+                )
+                addState(intArrayOf(), wsHomeCardFace(fill, density))
+            }
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            addView(
+                stack,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                ),
+            )
+            addView(lockBadge)
+            setOnClickListener {
+                if (unlocked()) {
+                    onOpen()
+                } else {
+                    showHomeCardLockNotice(lockTitle, lockDetail)
+                }
+            }
+        }
+        val spokenTitle = title.replace('\n', ' ')
+        homeCardRefreshers += {
+            val open = unlocked()
+            lockBadge.visibility = if (open) View.GONE else View.VISIBLE
+            card.contentDescription = if (open) {
+                "$spokenTitle. $subtitle"
+            } else {
+                "$spokenTitle. $subtitle. 잠김. $lockTitle"
+            }
+        }
+        return card
+    }
+
+    /**
+     * AppDesign 카드 면. focusRing 은 ring-2 + ring-offset-2 를 그대로 옮긴 것이다.
+     * 바깥 테두리가 focus 색, 그 안 2dp 는 비워서 ground 가 비치고, 카드 면은 4dp 안쪽이다.
+     * focus.fill 이 card.nav 와 같은 색이어도 이 틈 덕분에 구분된다.
+     */
+    private fun wsHomeCardFace(
+        fill: Int,
+        density: Float,
+        focusRing: Boolean = false,
+    ): Drawable {
+        val radius = WS_CARD_CORNER_RADIUS_DP * density
+        val face = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = radius
+            setColor(fill)
+        }
+        if (!focusRing) return face
+        val ringPx = (WS_CARD_FOCUS_RING_DP * density).roundToInt()
+        val offsetPx = (WS_CARD_FOCUS_OFFSET_DP * density).roundToInt()
+        val inset = ringPx + offsetPx
+        val ring = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = radius
+            setColor(0x00000000)
+            setStroke(ringPx, WS_COLOR_FOCUS)
+        }
+        face.cornerRadius = (radius - inset).coerceAtLeast(0f)
+        return LayerDrawable(arrayOf(ring, face)).apply {
+            setLayerInset(1, inset, inset, inset, inset)
+        }
+    }
+
+    private fun showHomeCardLockNotice(title: String, detail: String) {
+        speakInteraction("$title. $detail")
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(detail)
+            .setPositiveButton("확인", null)
+            .show()
+    }
+
+    /** AppDesign 홈 2x2 카드 그리드. 순서·문구·색은 HOME_CARDS 를 따른다. */
+    private fun buildHomeCardGrid(): GridLayout {
+        val density = resources.displayMetrics.density
+        val gap = (WS_CARD_GAP_DP * density).roundToInt()
+        homeCardRefreshers.clear()
+        val cards = listOf(
+            wsHomeCard(
+                iconRes = R.drawable.ws_ic_card_nav,
+                title = "목적지 검색",
+                subtitle = "경로를 시작합니다",
+                fill = WS_COLOR_CARD_NAV,
+                lockTitle = "첫 실행 등록 필요",
+                lockDetail = "첫 실행 등록과 안전교육을 먼저 완료하세요. " +
+                    "이메일 로그인과 기기 점검을 완료해야 사용할 수 있습니다.",
+                unlocked = {
+                    ::destinationQueryInput.isInitialized &&
+                        ::runtimeControls.isInitialized &&
+                        destinationQueryInput.isEnabled &&
+                        runtimeControls.visibility == View.VISIBLE
+                },
+                onOpen = {
+                    destinationQueryInput.requestFocus()
+                    destinationQueryInput.performAccessibilityAction(
+                        AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS,
+                        null,
+                    )
+                },
+            ),
+            wsHomeCard(
+                iconRes = R.drawable.ws_ic_card_arc,
+                title = "ARCore Depth 시작",
+                subtitle = "주변 위험을 감지합니다",
+                fill = WS_COLOR_CARD_ARC,
+                lockTitle = "ARCore 지원 확인 중",
+                lockDetail = "기기 거리 기능을 확인하고 있습니다. 카메라 권한이 필요합니다. " +
+                    "설정에서 카메라 권한을 허용해주세요.",
+                unlocked = { ::actionButton.isInitialized && actionButton.isEnabled },
+                onOpen = { actionButton.performClick() },
+            ),
+            wsHomeCard(
+                iconRes = R.drawable.ws_ic_card_mic,
+                title = "서버 음성 명령",
+                subtitle = "음성으로 명령합니다",
+                fill = WS_COLOR_CARD_MIC,
+                lockTitle = "서버 음성 명령 사용 불가",
+                lockDetail = "이메일 로그인과 기기 점검을 완료한 뒤 서버 음성 명령을 사용할 수 있습니다.",
+                unlocked = { ::voiceReportButton.isInitialized && voiceReportButton.isEnabled },
+                onOpen = { ensureVoicePermissionThenListen() },
+            ),
+            wsHomeCard(
+                iconRes = R.drawable.ws_ic_card_report,
+                title = "손상 점자블록\n신고 요청",
+                subtitle = "신고를 접수합니다",
+                fill = WS_COLOR_CARD_REPORT,
+                lockTitle = "신고 저장 기능 준비 중",
+                lockDetail = "현재 앱 빌드에서는 손상 점자블록 신고 저장 기능을 사용할 수 없습니다.",
+                unlocked = { ::explicitReportButton.isInitialized && explicitReportButton.isEnabled },
+                onOpen = { requestExplicitReport(ExplicitReportRequestSource.ON_SCREEN) },
+            ),
+        )
+        return GridLayout(this).apply {
+            columnCount = 2
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = (WS_SECTION_GAP_DP * density).roundToInt()
+                bottomMargin = (WS_SECTION_GAP_DP * density).roundToInt()
+            }
+            cards.forEachIndexed { index, card ->
+                addView(
+                    card,
+                    GridLayout.LayoutParams(
+                        GridLayout.spec(index / 2, 1f),
+                        GridLayout.spec(index % 2, 1f),
+                    ).apply {
+                        // FILL 이 없으면 카드가 늘어난 행 높이를 채우지 않아
+                        // 아이콘 위 / 글자 아래(justify-between) 배치가 무너진다.
+                        setGravity(Gravity.FILL)
+                        width = 0
+                        height = ViewGroup.LayoutParams.WRAP_CONTENT
+                        leftMargin = if (index % 2 == 0) 0 else gap / 2
+                        rightMargin = if (index % 2 == 0) gap / 2 else 0
+                        bottomMargin = if (index < 2) gap else 0
+                    },
+                )
+            }
+        }
+    }
+
+    private fun refreshHomeCards() {
+        if (!::homeCardGrid.isInitialized) return
+        homeCardGrid.visibility =
+            if (firstRunOnboardingComplete()) View.VISIBLE else View.GONE
+        homeCardRefreshers.forEach { it() }
+    }
+
+    /**
+     * AppDesign SafetyBar 의 앰버 배너.
+     * 디자인의 12sp 는 쓰지 않는다. 이 앱의 상호작용 텍스트 하한은 MIN_INTERACTIVE_TEXT_SP 이고
+     * 저시력 사용자가 대상이라 색만 가져오고 크기·터치 영역 하한은 그대로 둔다.
+     */
+    private fun applyWsSafetyBannerStyle(button: Button) {
+        val density = resources.displayMetrics.density
+        fun px(dp: Float) = (dp * density).roundToInt()
+        button.background = StateListDrawable().apply {
+            addState(
+                intArrayOf(android.R.attr.state_pressed),
+                wsSafetyBannerFace(density, focused = false, pressed = true),
+            )
+            addState(
+                intArrayOf(android.R.attr.state_focused),
+                wsSafetyBannerFace(density, focused = true, pressed = false),
+            )
+            addState(intArrayOf(), wsSafetyBannerFace(density, focused = false, pressed = false))
+        }
+        button.setTextColor(WS_COLOR_SAFETY_BANNER_TEXT)
+        button.typeface = wsTypeface(Typeface.NORMAL, medium = true)
+        // AppDesign 은 좌측 정렬에 느낌표 배지가 앞에 온다.
+        button.gravity = Gravity.START or Gravity.CENTER_VERTICAL
+        button.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            ResourcesCompat.getDrawable(resources, R.drawable.ws_ic_safety_badge, theme),
+            null,
+            null,
+            null,
+        )
+        button.compoundDrawablePadding = px(WS_SAFETY_BANNER_BADGE_GAP_DP)
+        button.setPadding(
+            px(WS_SAFETY_BANNER_PAD_H_DP),
+            px(WS_SAFETY_BANNER_PAD_V_DP),
+            px(WS_SAFETY_BANNER_PAD_H_DP),
+            px(WS_SAFETY_BANNER_PAD_V_DP),
+        )
+        // 화면 폭을 꽉 채운다. overlay 의 좌우 padding 을 음수 margin 으로 상쇄한다.
+        val bleed = (OVERLAY_HORIZONTAL_PADDING_DP * density).roundToInt()
+        (button.layoutParams as? LinearLayout.LayoutParams)?.apply {
+            width = ViewGroup.LayoutParams.MATCH_PARENT
+            marginStart = -bleed
+            marginEnd = -bleed
+            // 위로 당기지 않는다. overlay 의 top padding 이 상태바 여백 역할을 한다.
+            bottomMargin = (WS_SECTION_GAP_DP * density).roundToInt()
+        }
+    }
+    /**
+     * AppDesign SafetyBar 는 알약이 아니라 바다. 모서리를 두지 않고 아래 테두리만 그린다.
+     * 포커스일 때만 전체 테두리를 둘러 어디에 포커스가 있는지 보이게 한다.
+     */
+    private fun wsSafetyBannerFace(
+        density: Float,
+        focused: Boolean,
+        pressed: Boolean,
+    ): Drawable {
+        val fill = if (pressed) WS_COLOR_BUTTON_PRESSED_FILL else WS_COLOR_SAFETY_BANNER_FILL
+        if (focused) {
+            return GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(fill)
+                setStroke(
+                    (WS_FOCUS_BORDER_DP * density).roundToInt(),
+                    WS_COLOR_FOCUS,
+                )
+            }
+        }
+        val border = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(WS_COLOR_SAFETY_BANNER_BORDER)
+        }
+        val face = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(fill)
+        }
+        return LayerDrawable(arrayOf(border, face)).apply {
+            setLayerInset(1, 0, 0, 0, (WS_SAFETY_BANNER_BORDER_DP * density).roundToInt())
+        }
+    }
+
+    /** 펼친 안전 고지 본문도 같은 앰버 면에 둔다. */
+    private fun applyWsSafetyNoticeBody(view: TextView) {
+        val density = resources.displayMetrics.density
+        view.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = WS_CORNER_RADIUS_DP * density
+            setColor(WS_COLOR_SAFETY_BANNER_FILL)
+            setStroke((WS_BUTTON_BORDER_DP * density).roundToInt(), WS_COLOR_SAFETY_BANNER_BORDER)
+        }
+        view.setTextColor(WS_COLOR_SAFETY_BANNER_TEXT)
+    }
+
+    /** AppDesign Welcome 의 브랜드 행. 로고 마크 + 워드마크. */
+    private fun buildBrandRow(): LinearLayout {
+        val density = resources.displayMetrics.density
+        fun px(dp: Float) = (dp * density).roundToInt()
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            // 워드마크를 아래 제목이 대신 읽으므로 장식으로 둔다.
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = px(WS_SECTION_GAP_DP) }
+            addView(
+                ImageView(this@MainActivity).apply {
+                    setImageDrawable(
+                        ResourcesCompat.getDrawable(resources, R.drawable.ws_ic_brand_mark, theme),
+                    )
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    layoutParams = LinearLayout.LayoutParams(
+                        px(WS_BRAND_MARK_DP),
+                        px(WS_BRAND_MARK_DP),
+                    )
+                },
+            )
+            addView(
+                TextView(this@MainActivity).apply {
+                    text = "WALKSAFE"
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_BRAND_SP)
+                    setTextColor(WS_COLOR_NOTICE_TEXT)
+                    typeface = wsTypeface(Typeface.BOLD)
+                    letterSpacing = WS_BRAND_LETTER_SPACING
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply { marginStart = px(WS_GROUP_GAP_DP) }
+                },
+            )
+        }
+    }
+
+    /** AppDesign Welcome 의 로고 행 + 헤드라인 + 부제. */
+    private fun buildWelcomeBlock(): LinearLayout {
+        val density = resources.displayMetrics.density
+        fun px(dp: Float) = (dp * density).roundToInt()
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = px(WS_SECTION_GAP_DP) }
+            addView(buildBrandRow())
+            addView(
+                ImageView(this@MainActivity).apply {
+                    setImageDrawable(
+                        ResourcesCompat.getDrawable(resources, R.drawable.ws_img_welcome, theme),
+                    )
+                    // 원본 svg 는 preserveAspectRatio 기본값이라 넘치지 않게 맞춰 넣는다.
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    // 장식이다. 아래 헤드라인이 같은 내용을 말한다.
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = WS_CARD_CORNER_RADIUS_DP * density
+                        setColor(WS_COLOR_GROUND)
+                    }
+                    // rounded-3xl 안으로 내용을 자른다.
+                    outlineProvider = object : ViewOutlineProvider() {
+                        override fun getOutline(view: View, outline: Outline) {
+                            outline.setRoundRect(
+                                0,
+                                0,
+                                view.width,
+                                view.height,
+                                WS_CARD_CORNER_RADIUS_DP * density,
+                            )
+                        }
+                    }
+                    clipToOutline = true
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        px(WS_WELCOME_ILLUSTRATION_DP),
+                    ).apply { topMargin = px(WS_SECTION_GAP_DP) }
+                },
+            )
+            addView(
+                TextView(this@MainActivity).apply {
+                    text = WELCOME_HEADLINE_KO
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_HEADLINE_SP)
+                    setTextColor(WS_COLOR_EMPHASIS)
+                    typeface = wsTypeface(Typeface.BOLD)
+                    setLineSpacing(0f, 1.15f)
+                    // 워드마크와 달리 이건 실제 내용이다. TalkBack 이 읽어야 한다.
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                    ViewCompat.setAccessibilityHeading(this, true)
+                    contentDescription = WELCOME_HEADLINE_KO.replace('\n', ' ')
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply { topMargin = px(WS_SECTION_GAP_DP) }
+                },
+            )
+            addView(
+                TextView(this@MainActivity).apply {
+                    text = WELCOME_SUBTEXT_KO
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_SUBTEXT_SP)
+                    setTextColor(WS_COLOR_NOTICE_TEXT)
+                    setLineSpacing(0f, 1.6f)
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply { topMargin = px(WS_GROUP_GAP_DP) }
+                },
+            )
+        }
+    }
+
+    /**
+     * AppDesign Fld — 입력칸 위 고정 라벨.
+     * hint 는 입력을 시작하면 사라져 무슨 칸인지 알 수 없다. 라벨은 남는다.
+     * 라벨은 접근성 트리에서 뺀다. 입력칸의 contentDescription 이 더 자세하고,
+     * 둘 다 두면 TalkBack 이 같은 내용을 두 번 읽는다.
+     * 디자인의 14sp 대신 16sp 를 쓴다. 근거는 MIN_INTERACTIVE_TEXT_SP 와 같다.
+     */
+    private fun wsFieldGroup(
+        input: EditText,
+        label: String,
+        hint: String? = null,
+    ): LinearLayout {
+        val density = resources.displayMetrics.density
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(
+                TextView(this@MainActivity).apply {
+                    text = label
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_FIELD_LABEL_SP)
+                    setTextColor(WS_COLOR_EMPHASIS)
+                    typeface = wsTypeface(Typeface.NORMAL, medium = true)
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply { bottomMargin = (WS_FIELD_LABEL_GAP_DP * density).roundToInt() }
+                },
+            )
+            addView(input)
+            hint?.let { hintText ->
+                addView(
+                    TextView(this@MainActivity).apply {
+                        text = hintText
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_FIELD_HINT_SP)
+                        setTextColor(WS_COLOR_NOTICE_TEXT)
+                        setLineSpacing(0f, 1.35f)
+                        // 규칙은 입력칸 contentDescription 이 이미 읽는다.
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ).apply { topMargin = (WS_FIELD_LABEL_GAP_DP * density).roundToInt() }
+                    },
+                )
+            }
+        }
+    }
+
+    /**
+     * AppDesign ChkRow 의 필수/선택 배지.
+     * 앱은 이미 라벨 앞에 `[필수]`·`[선택]` 을 텍스트로 갖고 있다. 그 구간에만 색을 입힌다.
+     * 문구는 그대로 두므로 색만으로 구분하지 않으며 TalkBack 낭독도 바뀌지 않는다.
+     */
+    private fun applyWsConsentBadge(check: CheckBox) {
+        val label = check.text?.toString() ?: return
+        val required = label.startsWith("[필수]")
+        if (!required && !label.startsWith("[선택]")) return
+        val end = label.indexOf(']') + 1
+        if (end <= 0) return
+        val styled = SpannableString(label)
+        val exclusive = Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        styled.setSpan(
+            BackgroundColorSpan(
+                if (required) WS_COLOR_BADGE_REQUIRED_FILL else WS_COLOR_GROUND,
+            ),
+            0,
+            end,
+            exclusive,
+        )
+        styled.setSpan(
+            ForegroundColorSpan(
+                if (required) WS_COLOR_WARNING else WS_COLOR_NOTICE_TEXT,
+            ),
+            0,
+            end,
+            exclusive,
+        )
+        styled.setSpan(StyleSpan(Typeface.BOLD), 0, end, exclusive)
+        styled.setSpan(RelativeSizeSpan(WS_BADGE_TEXT_SCALE), 0, end, exclusive)
+        check.text = styled
+    }
+
+    /**
+     * DEBUG 전용 화면 미리보기. release 빌드에는 컴파일되지 않는다.
+     *
+     * 스냅샷을 위조하지 않고 정책의 정상 전이만 합성 증거로 통과시킨다. 불변식은 그대로 검사되고
+     * 거부되면 아무것도 바뀌지 않는다. 저장하지 않으므로 앱을 다시 켜면 실제 단계로 돌아온다.
+     * 서버 세션을 만들지 않으므로 이 상태로는 보행·신고 같은 실제 기능을 쓸 수 없다.
+     */
+    private fun previewAdvanceFirstRunStage() {
+        if (!BuildConfig.DEBUG) return
+        if (!::firstRunOnboardingSnapshot.isInitialized) return
+        val current = firstRunOnboardingSnapshot
+        if (current.stage == FirstRunOnboardingStage.FP004_TRAINING) {
+            completeFirstRunFp004TrainingIfReady("preview")
+            updateFirstRunOnboardingUi()
+            return
+        }
+        val transition = when (current.stage) {
+            FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT ->
+                FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
+                    snapshot = current,
+                    actorBinding = FirstRunOpaqueActorBinding.fromProvider(
+                        "actor_" + sha256Hex("preview|${current.epoch}".toByteArray()).take(32),
+                    ),
+                    receiptHash = firstRunLocalReceipt("preview_login"),
+                )
+            FirstRunOnboardingStage.ACCOUNT_CREATED ->
+                FirstRunOnboardingPolicy.recordEmailAccountCreated(
+                    snapshot = current,
+                    receiptHash = firstRunLocalReceipt("preview_account_created"),
+                )
+            FirstRunOnboardingStage.PURPOSE_AND_SAFETY ->
+                FirstRunOnboardingPolicy.acknowledgePurposeAndSafety(
+                    snapshot = current,
+                    request = firstRunLocalRequest("preview_purpose"),
+                    receiptHash = firstRunLocalReceipt("preview_purpose"),
+                )
+            FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED ->
+                FirstRunOnboardingPolicy.recordAgeAndGuardianNeed(
+                    snapshot = current,
+                    request = firstRunLocalRequest("preview_age"),
+                    ageBand = FirstRunAgeBand.ADULT_18_PLUS,
+                    receiptHash = firstRunLocalReceipt("preview_age"),
+                )
+            FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION ->
+                FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+                    snapshot = current,
+                    expectedEpoch = current.epoch,
+                    expectedRevision = current.revision,
+                )
+            FirstRunOnboardingStage.DEVICE_CHECK ->
+                FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(
+                    snapshot = current,
+                    expectedEpoch = current.epoch,
+                    expectedRevision = current.revision,
+                )
+            else -> null
+        }
+        if (transition == null || !transition.accepted) {
+            speakInteraction("미리보기: 이 단계에서는 더 넘길 수 없습니다.")
+            return
+        }
+        firstRunOnboardingSnapshot = transition.current
+        updateFirstRunOnboardingUi()
+    }
+
     private fun applyWsStatusCard(view: TextView) {
         val density = resources.displayMetrics.density
         view.background = GradientDrawable().apply {
@@ -11978,8 +12610,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             },
         )
         firstRunProgressSegments.clear()
+        firstRunStepCircles.clear()
         firstRunProgressBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             // 같은 정보를 아래 heading 문장이 낭독하므로 접근성 트리에서 제외한다.
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             val density = resources.displayMetrics.density
@@ -11987,19 +12621,44 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply { topMargin = (WS_TITLE_GAP_DP * density).roundToInt() }
-            repeat(firstRunStageCount(firstRunOnboardingSnapshot)) { index ->
-                val segment = View(this@MainActivity).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        0,
-                        (3f * density).roundToInt(),
-                        1f,
-                    ).apply {
-                        if (index > 0) marginStart = (6f * density).roundToInt()
+            val stageCount = firstRunStageCount(firstRunOnboardingSnapshot)
+            // ponytail: 단계가 많은 흐름에서는 원을 줄여 한 줄에 담는다.
+            // 폭을 재서 맞추는 방식은 단계 수가 더 늘 때 고려한다.
+            val circlePx = (
+                if (stageCount > WS_STEP_COMPACT_THRESHOLD) {
+                    WS_STEP_CIRCLE_COMPACT_DP
+                } else {
+                    WS_STEP_CIRCLE_DP
+                } * density
+                ).roundToInt()
+            repeat(stageCount) { index ->
+                if (index > 0) {
+                    val connector = View(this@MainActivity).apply {
+                        layoutParams = LinearLayout.LayoutParams(
+                            0,
+                            (WS_STEP_LINE_DP * density).roundToInt(),
+                            1f,
+                        )
+                        setBackgroundColor(WS_COLOR_LINE)
                     }
-                    setBackgroundColor(WS_COLOR_LINE)
+                    firstRunProgressSegments += connector
+                    addView(connector)
                 }
-                firstRunProgressSegments += segment
-                addView(segment)
+                val circle = TextView(this@MainActivity).apply {
+                    text = "${index + 1}"
+                    gravity = Gravity.CENTER
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, WS_TEXT_STEP_NUMBER_SP)
+                    typeface = wsTypeface(Typeface.BOLD)
+                    includeFontPadding = false
+                    setTextColor(WS_COLOR_NOTICE_TEXT)
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(WS_COLOR_LINE)
+                    }
+                    layoutParams = LinearLayout.LayoutParams(circlePx, circlePx)
+                }
+                firstRunStepCircles += circle
+                addView(circle)
             }
         }
         firstRunOnboardingStatusText = TextView(this).apply {
@@ -12237,7 +12896,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ViewCompat.setAccessibilityHeading(accountAccessStatusText, true)
         accountEmailInput = EditText(this).apply {
             id = View.generateViewId()
-            hint = "이메일"
+            hint = "example@email.com"
             contentDescription = "계정 이메일 입력"
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT or
@@ -12255,7 +12914,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         accountPasswordInput = EditText(this).apply {
             id = View.generateViewId()
-            hint = "비밀번호 (10자 이상)"
+            hint = "비밀번호 입력"
             contentDescription = "계정 비밀번호 입력, 10자 이상 128자 이하"
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
@@ -12263,7 +12922,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         accountPasswordConfirmationInput = EditText(this).apply {
             id = View.generateViewId()
-            hint = "비밀번호 확인"
+            hint = "비밀번호 다시 입력"
             contentDescription = "계정 비밀번호 다시 입력"
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
@@ -12484,7 +13143,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountDetailsStepControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            addView(accountDateOfBirthInput)
+            addView(wsFieldGroup(accountDateOfBirthInput, "생년월일"))
             addView(accountRequestOtpButton)
         }
         accountSignupBackButton = accessiblePriorityUserButton(
@@ -12498,8 +13157,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             addView(accountConsentStepControls)
             addView(accountDetailsStepControls)
-            addView(accountPasswordConfirmationInput)
-            addView(accountOtpInput)
+            addView(wsFieldGroup(accountPasswordConfirmationInput, "비밀번호 확인"))
+            addView(wsFieldGroup(accountOtpInput, "인증번호"))
             addView(accountCreateButton)
             addView(accountSignupBackButton)
         }
@@ -12507,8 +13166,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             addView(accountAccessStatusText)
-            addView(accountEmailInput)
-            addView(accountPasswordInput)
+            addView(wsFieldGroup(accountEmailInput, "이메일"))
+            addView(
+                wsFieldGroup(accountPasswordInput, "비밀번호", "10자 이상 128자 이하"),
+            )
             addView(accountLoginButton)
             addView(accountSignupToggleButton)
             addView(accountSignupControls)
@@ -13501,8 +14162,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 overlayBottomPaddingPx,
             )
             setBackgroundColor(WS_COLOR_OVERLAY_FILL)
-            addView(productPurposeText)
+            // AppDesign SafetyBar: 바가 먼저, 펼친 본문이 그 아래다.
             addView(firstRunNoticeToggleButton)
+            addView(productPurposeText)
             addView(permissionDenialPanel)
             addView(firstRunOnboardingControls)
             addView(walkReadinessSummaryText)
@@ -13521,6 +14183,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             postLoginDeviceCheckLiveStatusText,
         ).forEach(::applyWsStatusCard)
         applyAccessibleControlDefaults(overlay)
+        homeCardGrid = buildHomeCardGrid()
+        overlay.addView(homeCardGrid, overlay.indexOfChild(walkStatusSection))
         applyWsButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)
         applyWsButtonStyle(
             startupCapabilityConfirmButton,
@@ -13541,6 +14205,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             accountConsentDisclosureToggleButton,
             firstRunDisclosureToggleButton,
         ).forEach(::applyWsSecondaryButtonStyle)
+        // secondary 스타일이 배경을 덮어쓰므로 반드시 그 뒤에서 앰버를 입힌다.
+        applyWsSafetyBannerStyle(firstRunNoticeToggleButton)
+        applyWsSafetyNoticeBody(productPurposeText)
+        accountConsentChecks.values.forEach(::applyWsConsentBadge)
+        brandHeader = buildWelcomeBlock()
+        overlay.addView(brandHeader, overlay.indexOfChild(firstRunNoticeToggleButton) + 1)
+        if (BuildConfig.DEBUG) {
+            val previewButton = accessiblePriorityUserButton(
+                label = "미리보기: 다음 단계",
+                spokenLabel = "디버그 미리보기. 다음 첫 실행 단계 화면으로 넘깁니다",
+                onClick = { previewAdvanceFirstRunStage() },
+            )
+            previewAdvanceButton = previewButton
+            applyWsSecondaryButtonStyle(previewButton)
+            overlay.addView(previewButton, overlay.indexOfChild(brandHeader) + 1)
+        }
         walkSafetyOverlay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.START
@@ -13652,7 +14332,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         styled.setSpan(RelativeSizeSpan(0.78f), 0, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         styled.setSpan(StyleSpan(Typeface.BOLD), 0, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         styled.setSpan(
-            ForegroundColorSpan(WS_COLOR_EMPHASIS),
+            ForegroundColorSpan(WS_COLOR_SAFETY_BANNER_TEXT),
             0,
             end,
             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
@@ -17124,15 +17804,38 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
         }
         if (::destinationQueryInput.isInitialized) updateWalkFeatureAvailabilityUi()
+        refreshHomeCards()
         refreshFirstRunNoticeUi()
         if (::firstRunProgressBar.isInitialized) {
+            // 연결선 index 는 원 index 와 원 index+1 사이다. 앞 원이 끝났을 때만 채운다.
             firstRunProgressSegments.forEachIndexed { index, segment ->
                 segment.setBackgroundColor(
-                    if (index < stageNumber) WS_COLOR_EMPHASIS else WS_COLOR_LINE,
+                    if (index < stageNumber - 1) WS_COLOR_PRIMARY_ACTION_FILL else WS_COLOR_LINE,
                 )
+            }
+            firstRunStepCircles.forEachIndexed { index, circle ->
+                val done = index < stageNumber - 1
+                val current = index == stageNumber - 1
+                (circle.background as? GradientDrawable)?.setColor(
+                    if (done || current) WS_COLOR_PRIMARY_ACTION_FILL else WS_COLOR_LINE,
+                )
+                circle.setTextColor(
+                    if (done || current) WS_COLOR_PRIMARY_ACTION_TEXT else WS_COLOR_NOTICE_TEXT,
+                )
+                circle.text = if (done) "✓" else "${index + 1}"
             }
             firstRunProgressBar.visibility =
                 if (firstRunOnboardingComplete()) View.GONE else View.VISIBLE
+        }
+        if (::brandHeader.isInitialized) {
+            // AppDesign 에서 Welcome 은 독립 화면이다. S1~S6 에는 브랜드도 일러스트도 없다.
+            // 모든 단계에 남겨두면 그 단계의 실제 내용이 화면 밖으로 밀린다.
+            brandHeader.visibility =
+                if (snapshot.stage == FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
         }
         updatePrivacySectionVisibility()
     }
@@ -31716,35 +32419,101 @@ generation != cameraFallbackGeneration
 
     private companion object {
         /** 마지막 컨트롤 아래 확보할 여백. 화면 밀도에 맞춰 px 로 환산한다. */
-        /** 팀원 UI/UX 디자인 토큰. */
+        /** 팀원 UI/UX 디자인 토큰. 정본: AppDesign/src/index.css WALKSAFE_TOKENS_V3. */
         const val WS_COLOR_BUTTON_FILL = 0xffffffff.toInt()
-        const val WS_COLOR_BUTTON_TEXT = 0xff1a1916.toInt()
-        const val WS_COLOR_BUTTON_PRESSED_FILL = 0xffe8e5df.toInt()
+        const val WS_COLOR_BUTTON_TEXT = 0xff1b1b1d.toInt()
+        const val WS_COLOR_BUTTON_PRESSED_FILL = 0xffe8e5e0.toInt()
         const val WS_COLOR_BUTTON_FOCUSED_FILL = 0xff765d00.toInt()
-        const val WS_COLOR_BUTTON_DISABLED_FILL = 0xffe4e1db.toInt()
-        const val WS_COLOR_BUTTON_DISABLED_TEXT = 0xff8c8782.toInt()
-        const val WS_COLOR_NOTICE_TEXT = 0xff5c5853.toInt()
+        const val WS_COLOR_BUTTON_DISABLED_FILL = 0xfff0ede8.toInt()
+        const val WS_COLOR_BUTTON_DISABLED_TEXT = 0xff6e6b66.toInt()
+        const val WS_COLOR_NOTICE_TEXT = 0xff5f5c57.toInt()
         const val WS_COLOR_NOTICE_FILL = 0xffffffff.toInt()
-        const val WS_COLOR_LINE = 0xffc8bfb0.toInt()
-        const val WS_COLOR_BUTTON_BORDER = 0xff7a7570.toInt()
-        const val WS_COLOR_GROUND = 0xfffff9f0.toInt()
-        const val WS_COLOR_FOCUS = 0xff1a4fbf.toInt()
+        const val WS_COLOR_LINE = 0xffdedbd5.toInt()
+        const val WS_COLOR_BUTTON_BORDER = 0xff888380.toInt()
+        const val WS_COLOR_GROUND = 0xfffaf9f7.toInt()
+        const val WS_COLOR_FOCUS = 0xff1b4cd8.toInt()
         const val WS_BUTTON_BORDER_DP = 1.5f
         const val WS_FOCUS_BORDER_DP = 3f
         const val SAFETY_NOTICE_HEADING = "안전 고지"
-        const val WS_COLOR_EMPHASIS = 0xff0a0906.toInt()
-        const val WS_COLOR_WARNING = 0xffc0340e.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_FILL = 0xff1c1a17.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_TEXT = 0xfffff9f0.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_PRESSED_FILL = 0xff3a3730.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff6b6761.toInt()
-        const val WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT = 0xfffff9f0.toInt()
+        const val WS_COLOR_EMPHASIS = 0xff1b1b1d.toInt()
+        const val WS_COLOR_WARNING = 0xffb3341a.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_FILL = 0xff1b4cd8.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_TEXT = 0xffffffff.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_PRESSED_FILL = 0xff1540b5.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_DISABLED_FILL = 0xff566ea0.toInt()
+        const val WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT = 0xffffffff.toInt()
         const val WS_TOUCH_PRIMARY_DP = 56f
         const val WS_TOUCH_WALK_ACTION_DP = 56f
         const val WS_TOUCH_MIN_DP = 48f
         const val WS_TOUCH_WALK_PRIMARY_DP = 80f
-        const val WS_CORNER_RADIUS_DP = 10f
+        const val WS_CORNER_RADIUS_DP = 16f
         const val WS_CLAUSE_BOX_MAX_HEIGHT_DP = 132f
+
+        /* 동의 배지 (AppDesign ChkRow — 필수/선택) */
+        const val WS_COLOR_BADGE_REQUIRED_FILL = 0xfffef2f2.toInt()
+        const val WS_BADGE_TEXT_SCALE = 0.786f
+
+        /* 입력 필드 (AppDesign Fld) */
+        const val WS_TEXT_FIELD_LABEL_SP = 14f
+        const val WS_TEXT_FIELD_HINT_SP = 12f
+        const val WS_FIELD_LABEL_GAP_DP = 6f
+
+        /* 브랜드 헤더 (AppDesign Welcome) */
+        const val WS_BRAND_MARK_DP = 32f
+        const val WS_TEXT_BRAND_SP = 12f
+        const val WS_BRAND_LETTER_SPACING = 0.18f
+        const val WS_WELCOME_ILLUSTRATION_DP = 200f
+        const val WS_TEXT_HEADLINE_SP = 38f
+        const val WS_TEXT_SUBTEXT_SP = 15f
+        /**
+         * AppDesign Welcome 의 h1. 원본에서 이 문구 바로 아래에
+         * `[ProposalTag] — 팀 승인 전 문구` 가 붙어 있다. 팀 승인 전이다.
+         */
+        const val WELCOME_HEADLINE_KO = "도심 보행을\n안내합니다"
+        const val WELCOME_SUBTEXT_KO = "시각장애인·저시력 사용자를 위한 도심 보행 보조 앱"
+
+        /* 스텝 인디케이터 (AppDesign Steps — size.step.*, type.step.number) */
+        const val WS_STEP_CIRCLE_DP = 36f
+        const val WS_STEP_CIRCLE_COMPACT_DP = 28f
+        const val WS_STEP_LINE_DP = 2f
+        const val WS_TEXT_STEP_NUMBER_SP = 14f
+        const val WS_STEP_COMPACT_THRESHOLD = 8
+
+        /* 안전 고지 배너 (AppDesign SafetyBar — color.am.*) */
+        const val WS_COLOR_SAFETY_BANNER_FILL = 0xfffef9ee.toInt()
+        const val WS_COLOR_SAFETY_BANNER_BORDER = 0xff9a6800.toInt()
+        const val WS_COLOR_SAFETY_BANNER_TEXT = 0xff7a5300.toInt()
+        const val WS_SAFETY_BANNER_BORDER_DP = 1f
+        const val WS_SAFETY_BANNER_PAD_H_DP = 16f
+        const val WS_SAFETY_BANNER_PAD_V_DP = 10f
+        const val WS_SAFETY_BANNER_BADGE_GAP_DP = 10f
+
+        /* 홈 카드 (AppDesign WALKSAFE_TOKENS_V3 — color.card.*, size.card.*) */
+        const val WS_COLOR_CARD_NAV = 0xff1b4cd8.toInt()
+        const val WS_COLOR_CARD_ARC = 0xffb85200.toInt()
+        const val WS_COLOR_CARD_MIC = 0xff1e6b38.toInt()
+        const val WS_COLOR_CARD_REPORT = 0xff5b1896.toInt()
+
+        /**
+         * 카드 위 글자. 제목·부제 모두 흰색 100%.
+         * 디자인의 부제 white/60 은 card.arc 위에서 2.77:1 이라 AA 미달이고 90% 도 4.33 이다.
+         * 위계는 불투명도 대신 크기·굵기(17sp bold / 14sp regular)로 낸다.
+         */
+        const val WS_COLOR_CARD_TEXT = 0xffffffff.toInt()
+
+        /** 디자인의 bg-black/20. 이 위 흰 자물쇠는 최저 6.95:1 이라 그대로 쓴다. */
+        const val WS_COLOR_CARD_LOCK_BADGE_FILL = 0x33000000.toInt()
+
+        const val WS_CARD_HEIGHT_DP = 148f
+        const val WS_CARD_PADDING_DP = 16f
+        const val WS_CARD_CORNER_RADIUS_DP = 24f
+        const val WS_CARD_GAP_DP = 12f
+        const val WS_CARD_FOCUS_RING_DP = 2f
+        const val WS_CARD_FOCUS_OFFSET_DP = 2f
+        const val WS_CARD_ICON_DP = 34f
+        const val WS_CARD_BADGE_DP = 26f
+        const val WS_TEXT_CARD_TITLE_SP = 17f
+        const val WS_TEXT_CARD_SUBTITLE_SP = 14f
         const val ACCOUNT_CONSENT_ALL_LABEL = "필수 3개와 선택 3개에 모두 동의합니다"
         const val INTEGRATED_CONSENT_ALL_LABEL = "네 항목 모두 허용"
         const val FIRST_RUN_STAGE_COUNT = 12
@@ -31766,8 +32535,8 @@ generation != cameraFallbackGeneration
         const val OVERLAY_BOTTOM_PADDING_DP = 24f
         const val OVERLAY_HORIZONTAL_PADDING_DP = 20f
         const val OVERLAY_TOP_PADDING_DP = 24f
-        const val WS_COLOR_OVERLAY_FILL = 0xfafff9f0.toInt()
-        const val WS_COLOR_WALK_OVERLAY_FILL = 0xf2fff9f0.toInt()
+        const val WS_COLOR_OVERLAY_FILL = 0xfafaf9f7.toInt()
+        const val WS_COLOR_WALK_OVERLAY_FILL = 0xf2faf9f7.toInt()
 
         val PRIVACY_STARTUP_PROCESS_LOCK = Any()
         var accountDeletionStartupResetHandoffPending = false

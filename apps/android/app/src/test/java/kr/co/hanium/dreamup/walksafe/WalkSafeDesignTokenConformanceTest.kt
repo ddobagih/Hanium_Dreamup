@@ -26,27 +26,27 @@ class WalkSafeDesignTokenConformanceTest {
     @Test
     fun colorsMatchTheTeammateDesignTokens() {
         val expected = mapOf(
-            "WS_COLOR_OVERLAY_FILL" to "#FAFFF9F0",
-            "WS_COLOR_WALK_OVERLAY_FILL" to "#F2FFF9F0",
+            "WS_COLOR_OVERLAY_FILL" to "#FAFAF9F7",
+            "WS_COLOR_WALK_OVERLAY_FILL" to "#F2FAF9F7",
             "WS_COLOR_NOTICE_FILL" to "#FFFFFFFF",
-            "WS_COLOR_LINE" to "#FFC8BFB0",
-            "WS_COLOR_BUTTON_TEXT" to "#FF1A1916",
-            "WS_COLOR_NOTICE_TEXT" to "#FF5C5853",
-            "WS_COLOR_EMPHASIS" to "#FF0A0906",
-            "WS_COLOR_WARNING" to "#FFC0340E",
+            "WS_COLOR_LINE" to "#FFDEDBD5",
+            "WS_COLOR_BUTTON_TEXT" to "#FF1B1B1D",
+            "WS_COLOR_NOTICE_TEXT" to "#FF5F5C57",
+            "WS_COLOR_EMPHASIS" to "#FF1B1B1D",
+            "WS_COLOR_WARNING" to "#FFB3341A",
             "WS_COLOR_BUTTON_FILL" to "#FFFFFFFF",
-            "WS_COLOR_BUTTON_BORDER" to "#FF7A7570",
-            "WS_COLOR_BUTTON_PRESSED_FILL" to "#FFE8E5DF",
+            "WS_COLOR_BUTTON_BORDER" to "#FF888380",
+            "WS_COLOR_BUTTON_PRESSED_FILL" to "#FFE8E5E0",
             "WS_COLOR_BUTTON_FOCUSED_FILL" to "#FF765D00",
-            "WS_COLOR_BUTTON_DISABLED_FILL" to "#FFE4E1DB",
-            "WS_COLOR_BUTTON_DISABLED_TEXT" to "#FF8C8782",
-            "WS_COLOR_GROUND" to "#FFFFF9F0",
-            "WS_COLOR_PRIMARY_ACTION_FILL" to "#FF1C1A17",
-            "WS_COLOR_PRIMARY_ACTION_TEXT" to "#FFFFF9F0",
-            "WS_COLOR_PRIMARY_ACTION_PRESSED_FILL" to "#FF3A3730",
-            "WS_COLOR_PRIMARY_ACTION_DISABLED_FILL" to "#FF6B6761",
-            "WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT" to "#FFFFF9F0",
-            "WS_COLOR_FOCUS" to "#FF1A4FBF",
+            "WS_COLOR_BUTTON_DISABLED_FILL" to "#FFF0EDE8",
+            "WS_COLOR_BUTTON_DISABLED_TEXT" to "#FF6E6B66",
+            "WS_COLOR_GROUND" to "#FFFAF9F7",
+            "WS_COLOR_PRIMARY_ACTION_FILL" to "#FF1B4CD8",
+            "WS_COLOR_PRIMARY_ACTION_TEXT" to "#FFFFFFFF",
+            "WS_COLOR_PRIMARY_ACTION_PRESSED_FILL" to "#FF1540B5",
+            "WS_COLOR_PRIMARY_ACTION_DISABLED_FILL" to "#FF566EA0",
+            "WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT" to "#FFFFFFFF",
+            "WS_COLOR_FOCUS" to "#FF1B4CD8",
         )
         expected.forEach { (name, value) -> assertEquals(name, value, argb(name)) }
     }
@@ -56,9 +56,183 @@ class WalkSafeDesignTokenConformanceTest {
         assertEquals("48dp", dimension("WS_TOUCH_MIN_DP"))
         assertEquals("56dp", dimension("WS_TOUCH_WALK_ACTION_DP"))
         assertEquals("80dp", dimension("WS_TOUCH_WALK_PRIMARY_DP"))
-        assertEquals("10dp", dimension("WS_CORNER_RADIUS_DP"))
+        assertEquals("16dp", dimension("WS_CORNER_RADIUS_DP"))
         assertEquals("24dp", dimension("WS_SECTION_GAP_DP"))
         assertEquals("8dp", dimension("WS_GROUP_GAP_DP"))
+    }
+
+    @Test
+    fun stepIndicatorUsesNumberedCirclesFromTheAppDesignStepper() {
+        assertEquals("36dp", dimension("WS_STEP_CIRCLE_DP"))
+        assertEquals("2dp", dimension("WS_STEP_LINE_DP"))
+        assertTrue(source.contains("const val WS_TEXT_STEP_NUMBER_SP = 14f"))
+
+        val build = functionBlock("private fun buildContentView()")
+        val update = functionBlock("private fun updateFirstRunOnboardingUi()")
+        assertTrue(build.contains("GradientDrawable.OVAL"))
+        assertTrue(build.contains("firstRunStepCircles += circle"))
+        assertTrue(build.contains("firstRunProgressSegments += connector"))
+        // 끝난 단계는 체크, 현재 단계는 번호. 연결선은 앞 원이 끝났을 때만 채운다.
+        assertTrue(update.contains("""circle.text = if (done) "✓" else "${'$'}{index + 1}""""))
+        assertTrue(update.contains("val done = index < stageNumber - 1"))
+        assertTrue(update.contains("val current = index == stageNumber - 1"))
+        assertTrue(update.contains("if (index < stageNumber - 1) WS_COLOR_PRIMARY_ACTION_FILL"))
+    }
+
+    @Test
+    fun consentRowsCarryTheRequiredOptionalBadgeFromTheAppDesignChkRow() {
+        assertEquals("WS_COLOR_BADGE_REQUIRED_FILL", "#FFFEF2F2", argb("WS_COLOR_BADGE_REQUIRED_FILL"))
+        val badge = functionBlock("private fun applyWsConsentBadge(")
+        val build = functionBlock("private fun buildContentView()")
+
+        // 라벨의 `[필수]`/`[선택]` 구간에만 색을 입힌다. 문구는 바꾸지 않는다.
+        assertTrue(badge.contains("""label.startsWith("[필수]")"""))
+        assertTrue(badge.contains("""label.startsWith("[선택]")"""))
+        assertTrue(badge.contains("BackgroundColorSpan("))
+        assertTrue(badge.contains("WS_COLOR_BADGE_REQUIRED_FILL"))
+        assertTrue(badge.contains("WS_COLOR_WARNING"))
+        // 색만으로 구분하지 않는다. 원문 대괄호 표기가 그대로 남는다.
+        assertFalse(badge.contains("check.text = check.text.toString().replace"))
+        assertTrue(build.contains("accountConsentChecks.values.forEach(::applyWsConsentBadge)"))
+    }
+
+    @Test
+    fun accountFieldsCarryAPersistentLabelFromTheAppDesignFld() {
+        val group = functionBlock("private fun wsFieldGroup(")
+        val build = functionBlock("private fun buildContentView()")
+
+        // hint 는 입력을 시작하면 사라진다. 라벨은 남아야 한다.
+        assertTrue(group.contains("addView(input)"))
+        assertTrue(group.contains("hint?.let { hintText ->"))
+        // 라벨과 hint 는 장식이다. 입력칸 contentDescription 이 더 자세하게 읽는다.
+        assertEquals(3, Regex("""IMPORTANT_FOR_ACCESSIBILITY_NO""").findAll(group).count())
+
+        listOf(
+            """wsFieldGroup\(accountEmailInput, "이메일"\)""",
+            """wsFieldGroup\(accountPasswordInput, "비밀번호", "10자 이상 128자 이하"\)""",
+            """wsFieldGroup\(accountPasswordConfirmationInput, "비밀번호 확인"\)""",
+            """wsFieldGroup\(accountDateOfBirthInput, "생년월일"\)""",
+            """wsFieldGroup\(accountOtpInput, "인증번호"\)""",
+        ).forEach { assertTrue(it, Regex(it).containsMatchIn(build)) }
+
+        // placeholder 는 AppDesign 값이며 라벨과 겹치지 않는다.
+        assertTrue(source.contains("""hint = "example@email.com""""))
+        assertTrue(source.contains("""hint = "비밀번호 입력""""))
+        assertTrue(source.contains("""hint = "비밀번호 다시 입력""""))
+    }
+
+    @Test
+    fun brandHeaderIsPresentBeforeLoginAndHiddenAfterOnboarding() {
+        assertEquals("32dp", dimension("WS_BRAND_MARK_DP"))
+        val build = functionBlock("private fun buildContentView()")
+        val header = functionBlock("private fun buildBrandRow()")
+        val welcome = functionBlock("private fun buildWelcomeBlock()")
+        val update = functionBlock("private fun updateFirstRunOnboardingUi()")
+        assertTrue(build.contains("brandHeader = buildWelcomeBlock()"))
+        // AppDesign 은 SafetyBar 아래가 브랜드 행이다.
+        assertTrue(
+            build.contains(
+                "overlay.addView(brandHeader, " +
+                    "overlay.indexOfChild(firstRunNoticeToggleButton) + 1)",
+            ),
+        )
+        assertTrue(header.contains("R.drawable.ws_ic_brand_mark"))
+        assertTrue(header.contains("\"WALKSAFE\""))
+        // 워드마크는 장식이다. 화면 제목이 같은 정보를 낭독한다.
+        assertTrue(header.contains("View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
+        assertTrue(update.contains("brandHeader.visibility ="))
+
+        // AppDesign Welcome 의 h1 과 부제. 워드마크와 달리 실제 내용이라 낭독되어야 한다.
+        assertTrue(source.contains("const val WELCOME_HEADLINE_KO"))
+        assertTrue(source.contains("const val WELCOME_SUBTEXT_KO"))
+        assertTrue(welcome.contains("WS_TEXT_HEADLINE_SP"))
+        assertTrue(welcome.contains("ViewCompat.setAccessibilityHeading(this, true)"))
+        assertTrue(welcome.contains("IMPORTANT_FOR_ACCESSIBILITY_YES"))
+        assertTrue(source.contains("const val WS_TEXT_HEADLINE_SP = 38f"))
+        assertTrue(source.contains("const val WS_TEXT_SUBTEXT_SP = 15f"))
+
+        // AppDesign Welcome 일러스트. 장식이라 낭독하지 않고 rounded-3xl 로 자른다.
+        assertTrue(welcome.contains("R.drawable.ws_img_welcome"))
+        assertTrue(welcome.contains("ImageView.ScaleType.FIT_CENTER"))
+        assertTrue(welcome.contains("clipToOutline = true"))
+        assertEquals("200dp", dimension("WS_WELCOME_ILLUSTRATION_DP"))
+    }
+
+    @Test
+    fun safetyBannerUsesTheAppDesignAmberAndKeepsTheAccessibleTextFloor() {
+        val expected = mapOf(
+            "WS_COLOR_SAFETY_BANNER_FILL" to "#FFFEF9EE",
+            "WS_COLOR_SAFETY_BANNER_BORDER" to "#FF9A6800",
+            "WS_COLOR_SAFETY_BANNER_TEXT" to "#FF7A5300",
+        )
+        expected.forEach { (name, value) -> assertEquals(name, value, argb(name)) }
+
+        val build = functionBlock("private fun buildContentView()")
+        val banner = functionBlock("private fun applyWsSafetyBannerStyle(")
+        // secondary 스타일이 배경을 덮어쓰므로 앰버는 그 뒤에 와야 한다.
+        assertTrue(
+            Regex(
+                """\)\.forEach\(::applyWsSecondaryButtonStyle\)[\s\S]*?""" +
+                    """applyWsSafetyBannerStyle\(firstRunNoticeToggleButton\)\s*""" +
+                    """applyWsSafetyNoticeBody\(productPurposeText\)""",
+            ).containsMatchIn(build),
+        )
+        // 디자인의 12sp 를 따라가지 않는다. 크기는 접근성 기본값이 정한다.
+        assertFalse(banner.contains("textSize"))
+        assertFalse(banner.contains("minimumHeight"))
+        assertTrue(source.contains("const val MIN_INTERACTIVE_TEXT_SP = 16f"))
+    }
+
+    @Test
+    fun homeCardTokensMatchTheAppDesignHomeScreen() {
+        val expected = mapOf(
+            "WS_COLOR_CARD_NAV" to "#FF1B4CD8",
+            "WS_COLOR_CARD_ARC" to "#FFB85200",
+            "WS_COLOR_CARD_MIC" to "#FF1E6B38",
+            "WS_COLOR_CARD_REPORT" to "#FF5B1896",
+            "WS_COLOR_CARD_TEXT" to "#FFFFFFFF",
+        )
+        expected.forEach { (name, value) -> assertEquals(name, value, argb(name)) }
+        assertEquals("148dp", dimension("WS_CARD_HEIGHT_DP"))
+        assertEquals("16dp", dimension("WS_CARD_PADDING_DP"))
+        assertEquals("24dp", dimension("WS_CARD_CORNER_RADIUS_DP"))
+        assertEquals("12dp", dimension("WS_CARD_GAP_DP"))
+        assertEquals("34dp", dimension("WS_CARD_ICON_DP"))
+        assertEquals("26dp", dimension("WS_CARD_BADGE_DP"))
+        assertTrue(source.contains("const val WS_TEXT_CARD_TITLE_SP = 17f"))
+        assertTrue(source.contains("const val WS_TEXT_CARD_SUBTITLE_SP = 14f"))
+    }
+
+    @Test
+    fun homeCardGridIsBuiltAfterDefaultsAndRefreshedWithTheRestOfTheUi() {
+        val build = functionBlock("private fun buildContentView()")
+        val grid = functionBlock("private fun buildHomeCardGrid()")
+        val card = functionBlock("private fun wsHomeCard(")
+        val refresh = functionBlock("private fun refreshHomeCards()")
+        val update = functionBlock("private fun updateFirstRunOnboardingUi()")
+
+        // 기본 컨트롤 스타일 재귀가 카드 내부를 덮어쓰지 않도록 그 뒤에 붙인다.
+        assertTrue(
+            Regex(
+                """applyAccessibleControlDefaults\(overlay\)\s*""" +
+                    """homeCardGrid = buildHomeCardGrid\(\)\s*""" +
+                    """overlay\.addView\(homeCardGrid, overlay\.indexOfChild\(walkStatusSection\)\)""",
+            ).containsMatchIn(build),
+        )
+        assertTrue(grid.contains("columnCount = 2"))
+        listOf(
+            "R.drawable.ws_ic_card_nav",
+            "R.drawable.ws_ic_card_arc",
+            "R.drawable.ws_ic_card_mic",
+            "R.drawable.ws_ic_card_report",
+        ).forEach { assertTrue(it, grid.contains(it)) }
+        // 잠긴 카드는 사유를 알리고, 열린 카드만 기존 컨트롤을 호출한다.
+        assertTrue(card.contains("if (unlocked()) {"))
+        assertTrue(card.contains("showHomeCardLockNotice(lockTitle, lockDetail)"))
+        assertTrue(card.contains(". 잠김. "))
+        assertTrue(card.contains("R.drawable.ws_ic_card_lock"))
+        assertTrue(refresh.contains("firstRunOnboardingComplete()"))
+        assertTrue(update.contains("refreshHomeCards()"))
     }
 
     @Test

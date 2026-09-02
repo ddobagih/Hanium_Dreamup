@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppDesign SafetyBar 의 느낌표 배지.
+     원본: w-4 h-4 rounded, border am-ink/40, 9px black mono "!" -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp" android:height="16dp"
+    android:viewportWidth="16" android:viewportHeight="16">
+    <path
+        android:pathData="M3.2,1.1h9.6a2.1,2.1 0 0 1 2.1,2.1v9.6a2.1,2.1 0 0 1 -2.1,2.1h-9.6a2.1,2.1 0 0 1 -2.1,-2.1v-9.6a2.1,2.1 0 0 1 2.1,-2.1z"
+        android:strokeColor="#7A5300" android:strokeWidth="1.5" android:strokeAlpha="0.55" />
+    <path android:pathData="M8,3.6L8,9.2" android:strokeColor="#7A5300"
+        android:strokeWidth="1.8" android:strokeLineCap="round" />
+    <path android:pathData="M8,11.6L8.01,11.6" android:strokeColor="#7A5300"
+        android:strokeWidth="1.9" android:strokeLineCap="round" />
+</vector>

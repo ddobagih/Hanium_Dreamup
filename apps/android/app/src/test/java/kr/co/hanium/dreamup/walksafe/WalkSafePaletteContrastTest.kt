@@ -109,6 +109,46 @@ class WalkSafePaletteContrastTest {
     }
 
     @Test
+    fun safetyBannerStaysReadableOnItsAmberFill() {
+        assertRatio("WS_COLOR_SAFETY_BANNER_TEXT", "WS_COLOR_SAFETY_BANNER_FILL", 4.5)
+        assertRatio("WS_COLOR_SAFETY_BANNER_BORDER", "WS_COLOR_SAFETY_BANNER_FILL", 3.0)
+        // 배너는 ground 위에 놓인다. 눌림 상태에서도 글자가 읽혀야 한다.
+        assertRatio("WS_COLOR_SAFETY_BANNER_TEXT", "WS_COLOR_BUTTON_PRESSED_FILL", 4.5)
+        assertRatio("WS_COLOR_SAFETY_BANNER_FILL", "WS_COLOR_GROUND", 1.0)
+    }
+
+    @Test
+    fun homeCardTextStaysReadableOnEveryCardColor() {
+        // 디자인의 부제 white/60 은 card.arc 위에서 2.77:1 이라 쓰지 않는다.
+        // 제목·부제 모두 흰색 100% 이고, 위계는 크기와 굵기로 낸다.
+        listOf(
+            "WS_COLOR_CARD_NAV",
+            "WS_COLOR_CARD_ARC",
+            "WS_COLOR_CARD_MIC",
+            "WS_COLOR_CARD_REPORT",
+        ).forEach { card ->
+            assertRatio("WS_COLOR_CARD_TEXT", card, 4.5)
+        }
+    }
+
+    @Test
+    fun homeCardLockBadgeGlyphStaysVisible() {
+        listOf(
+            "WS_COLOR_CARD_NAV",
+            "WS_COLOR_CARD_ARC",
+            "WS_COLOR_CARD_MIC",
+            "WS_COLOR_CARD_REPORT",
+        ).forEach { card ->
+            assertCompositeRatio(
+                "WS_COLOR_CARD_TEXT",
+                "WS_COLOR_CARD_LOCK_BADGE_FILL",
+                rgb(card),
+                3.0,
+            )
+        }
+    }
+
+    @Test
     fun translucentOverlaysKeepContrastOverDarkAndLightCameraFrames() {
         listOf("WS_COLOR_OVERLAY_FILL", "WS_COLOR_WALK_OVERLAY_FILL").forEach { overlay ->
             listOf(0x000000, 0xFFFFFF).forEach { underlay ->
