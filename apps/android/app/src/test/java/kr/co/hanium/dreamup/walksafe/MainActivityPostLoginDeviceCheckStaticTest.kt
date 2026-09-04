@@ -301,6 +301,19 @@ class MainActivityPostLoginDeviceCheckStaticTest {
     }
 
     @Test
+    fun missingOfflineKoreanVoiceBlocksTheDeviceCheck() {
+        // RQ-FP-027-001: 오프라인 한국어 음성이 준비되지 않은 기기에서는 보행을 시작하지 않는다.
+        // 안내 문구·ACTION_INSTALL_TTS_DATA 인텐트·설치 버튼은 이미 있고 실패를 만드는 곳만 없었다.
+        val observation = source.substringAfter(
+            "private fun currentPostLoginDeviceCheckObservation()",
+        ).substringBefore("private fun completePostLoginDeviceCheckPass(")
+        val blocking = observation.substringAfter("blockingFailure = when {")
+
+        assertTrue(blocking.contains("koreanTextToSpeechAvailable == false"))
+        assertTrue(blocking.contains("PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE"))
+    }
+
+    @Test
     fun inconclusiveFeatureMeasurementsBecomeLimitsInsteadOfBlockingTheApp() {
         val observation = source.substringAfter(
             "private fun currentPostLoginDeviceCheckObservation()",

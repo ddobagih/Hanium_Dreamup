@@ -107,6 +107,18 @@ object WalkSafeStartupCapabilityResolver {
                     "사용할 수 없는 기능: ${unavailable.labelsKo()}",
             )
         }
+        // RQ-FP-027-001: 오프라인 한국어 음성이 준비되지 않은 기기에서는 보행을 시작하지 않는다.
+        // 위험 경고를 네트워크 없이 말할 수 없으므로 기능 제한이 아니라 차단이다.
+        if (WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in unavailable) {
+            return WalkSafeStartupCapabilityDecision(
+                tier = WalkSafeStartupCapabilityTier.BLOCKED,
+                unavailableRequirements = unavailable,
+                pendingRequirements = pending,
+                noticeKo = "오프라인 한국어 안내 음성이 없어 WalkSafe를 시작할 수 없습니다. " +
+                    "한국어 음성 데이터를 설치한 뒤 다시 점검하세요. " +
+                    "사용할 수 없는 기능: ${unavailable.labelsKo()}",
+            )
+        }
         if (pending.isNotEmpty()) {
             val unavailableNotice = if (unavailable.isEmpty()) {
                 ""

@@ -107,6 +107,22 @@ class WalkSafeStartupCapabilityTest {
     }
 
     @Test
+    fun missingOfflineKoreanVoiceBlocksTheStartInsteadOfLimitingIt() {
+        // RQ-FP-027-001: 오프라인 한국어 음성이 준비되지 않은 기기에서는 보행을 시작하지 않는다.
+        val decision = WalkSafeStartupCapabilityResolver.resolve(
+            availableInput().copy(offlineKoreanTextToSpeechAvailable = false),
+        )
+
+        assertEquals(WalkSafeStartupCapabilityTier.BLOCKED, decision.tier)
+        assertFalse(decision.mayConfirmAndStart)
+        assertEquals(
+            listOf(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS),
+            decision.unavailableRequirements,
+        )
+        assertTrue(decision.noticeKo.contains(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS.labelKo))
+    }
+
+    @Test
     fun everyUnavailableFeatureYieldsLimitedTierAndNamesTheRestriction() {
         val unavailableInputs = listOf(
             WalkSafeStartupRequirement.CAMERA to availableInput().copy(cameraAvailable = false),
@@ -117,8 +133,6 @@ class WalkSafeStartupCapabilityTest {
                 availableInput().copy(vibrationAvailable = false),
             WalkSafeStartupRequirement.ON_DEVICE_STT to
                 availableInput().copy(onDeviceSpeechRecognitionAvailable = false),
-            WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS to
-                availableInput().copy(offlineKoreanTextToSpeechAvailable = false),
             WalkSafeStartupRequirement.METRIC_DISTANCE to
                 availableInput().copy(metricDistanceAvailable = false),
             WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE to availableInput().copy(

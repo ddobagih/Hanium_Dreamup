@@ -15440,6 +15440,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     PostLoginDeviceCheckFailure.MINIMUM_ANDROID_VERSION
                 resources.readinessStatus == WalkSessionReadinessStatus.UNAVAILABLE ->
                     PostLoginDeviceCheckFailure.DEVICE_RESOURCE
+                // RQ-FP-027-001: 오프라인 한국어 음성이 없는 기기에서는 보행을 시작하지 않는다.
+                // 측정이 끝나지 않은 null 은 여기서 막지 않는다. hasPendingAutomaticProbe 가 기다린다.
+                koreanTextToSpeechAvailable == false ->
+                    PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE
                 else -> null
             },
         )
