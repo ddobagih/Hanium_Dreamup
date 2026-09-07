@@ -110,6 +110,7 @@ data class RuntimeMetricPreflightResult(
     val generation: Long,
     val status: RuntimeMetricPreflightStatus,
     val reason: RuntimeMetricPreflightReason,
+    // Counts and span describe the recent qualification window, not startup history.
     val distinctFrameCount: Int,
     val passingFrameCount: Int,
     val observationSpanMs: Long,
@@ -163,6 +164,7 @@ class RuntimeMetricPreflightSession(
     }
     private var distinctFrameCount = 0
     private var passingFrameCount = 0
+    private val recentFrames = ArrayDeque<RuntimeMetricFrameEvidence>()
     private var firstFrameTimestampNanos: Long? = null
     private var lastFrameTimestampNanos: Long? = null
     private var lastObservedAtElapsedRealtimeMs: Long? = null
@@ -200,9 +202,17 @@ class RuntimeMetricPreflightSession(
         if (!frame.isWellFormed()) {
             return finishUnknown(RuntimeMetricPreflightReason.INVALID_FRAME_EVIDENCE, frame.observedAtElapsedRealtimeMs)
         }
+        if (frame.frameTimestampNanos == 0L) {
+            lastObservedAtElapsedRealtimeMs = frame.observedAtElapsedRealtimeMs
+            return result()
+        }
         val priorTimestamp = lastFrameTimestampNanos
-        if (priorTimestamp != null && frame.frameTimestampNanos <= priorTimestamp) {
+        if (priorTimestamp != null && frame.frameTimestampNanos < priorTimestamp) {
             return finishUnknown(RuntimeMetricPreflightReason.INVALID_FRAME_ORDER, frame.observedAtElapsedRealtimeMs)
+        }
+        if (frame.frameTimestampNanos == priorTimestamp) {
+            lastObservedAtElapsedRealtimeMs = frame.observedAtElapsedRealtimeMs
+            return result()
         }
 
         firstFrameTimestampNanos = firstFrameTimestampNanos ?: frame.frameTimestampNanos
@@ -210,6 +220,17 @@ class RuntimeMetricPreflightSession(
         lastObservedAtElapsedRealtimeMs = frame.observedAtElapsedRealtimeMs
         distinctFrameCount += 1
         if (frame.isPassing()) passingFrameCount += 1
+        recentFrames.addLast(frame)
+        while (
+            recentFrames.size > profile.minimumDistinctFrames &&
+            (frame.frameTimestampNanos - recentFrames[1].frameTimestampNanos) / 1_000_000L >=
+                profile.minimumObservationSpanMs
+        ) {
+            val expiredFrame = recentFrames.removeFirst()
+            distinctFrameCount -= 1
+            if (expiredFrame.isPassing()) passingFrameCount -= 1
+        }
+        firstFrameTimestampNanos = recentFrames.first().frameTimestampNanos
 
         if (depthSupport == RuntimeMetricDepthSupport.SUPPORTED && hasStableEvidence()) {
             status = RuntimeMetricPreflightStatus.AVAILABLE
@@ -240,7 +261,7 @@ class RuntimeMetricPreflightSession(
         finishUnknown(RuntimeMetricPreflightReason.LIFECYCLE_CANCELLED, nowElapsedRealtimeMs)
 
     private fun RuntimeMetricFrameEvidence.isWellFormed(): Boolean =
-        frameTimestampNanos > 0L &&
+        frameTimestampNanos >= 0L &&
             observedAtElapsedRealtimeMs >= startedAtElapsedRealtimeMs &&
             (lastObservedAtElapsedRealtimeMs == null ||
                 observedAtElapsedRealtimeMs >= checkNotNull(lastObservedAtElapsedRealtimeMs)) &&

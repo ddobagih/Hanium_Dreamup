@@ -1,0 +1,17 @@
+{"record_type":"header","schema_version":"walksafe.location_replay.v1","coordinate_frame":"LOCAL_ENU_METERS","absolute_coordinates":false,"wall_clock_time":false,"synthetic_contract_only":true}
+{"record_type":"sample","scenario_id":"nominal_walk","t_ms":0,"truth_e_m":0.0,"truth_n_m":0.0,"estimate_e_m":0.5,"estimate_n_m":0.0,"estimate_age_ms":0}
+{"record_type":"sample","scenario_id":"nominal_walk","t_ms":1000,"truth_e_m":1.0,"truth_n_m":0.0,"estimate_e_m":2.0,"estimate_n_m":0.0,"estimate_age_ms":100}
+{"record_type":"sample","scenario_id":"nominal_walk","t_ms":2000,"truth_e_m":2.0,"truth_n_m":0.0,"estimate_e_m":null,"estimate_n_m":null,"estimate_age_ms":null}
+{"record_type":"sample","scenario_id":"nominal_walk","t_ms":3000,"truth_e_m":3.0,"truth_n_m":0.0,"estimate_e_m":6.0,"estimate_n_m":0.0,"estimate_age_ms":200}
+{"record_type":"sample","scenario_id":"gps_outlier","t_ms":0,"truth_e_m":0.0,"truth_n_m":0.0,"estimate_e_m":0.0,"estimate_n_m":0.0,"estimate_age_ms":0}
+{"record_type":"sample","scenario_id":"gps_outlier","t_ms":1000,"truth_e_m":1.0,"truth_n_m":0.0,"estimate_e_m":21.0,"estimate_n_m":0.0,"estimate_age_ms":0}
+{"record_type":"sample","scenario_id":"gnss_outage","t_ms":0,"truth_e_m":0.0,"truth_n_m":0.0,"estimate_e_m":0.0,"estimate_n_m":0.0,"estimate_age_ms":0}
+{"record_type":"sample","scenario_id":"gnss_outage","t_ms":1000,"truth_e_m":1.0,"truth_n_m":0.0,"estimate_e_m":null,"estimate_n_m":null,"estimate_age_ms":null}
+{"record_type":"sample","scenario_id":"gnss_outage","t_ms":2000,"truth_e_m":2.0,"truth_n_m":0.0,"estimate_e_m":null,"estimate_n_m":null,"estimate_age_ms":null}
+{"record_type":"sample","scenario_id":"gnss_outage","t_ms":3000,"truth_e_m":3.0,"truth_n_m":0.0,"estimate_e_m":3.5,"estimate_n_m":0.0,"estimate_age_ms":100}
+{"record_type":"sample","scenario_id":"low_speed","t_ms":0,"truth_e_m":0.0,"truth_n_m":0.0,"estimate_e_m":0.0,"estimate_n_m":0.0,"estimate_age_ms":0}
+{"record_type":"sample","scenario_id":"low_speed","t_ms":1000,"truth_e_m":0.3,"truth_n_m":0.0,"estimate_e_m":0.4,"estimate_n_m":0.0,"estimate_age_ms":100}
+{"record_type":"sample","scenario_id":"cane_sweep_stop_go","t_ms":0,"truth_e_m":0.0,"truth_n_m":0.0,"estimate_e_m":0.0,"estimate_n_m":0.0,"estimate_age_ms":0}
+{"record_type":"sample","scenario_id":"cane_sweep_stop_go","t_ms":1000,"truth_e_m":0.0,"truth_n_m":0.0,"estimate_e_m":0.2,"estimate_n_m":0.1,"estimate_age_ms":100}
+{"record_type":"sample","scenario_id":"parallel_walkway","t_ms":0,"truth_e_m":0.0,"truth_n_m":0.0,"estimate_e_m":0.0,"estimate_n_m":4.0,"estimate_age_ms":0}
+{"record_type":"sample","scenario_id":"parallel_walkway","t_ms":1000,"truth_e_m":1.0,"truth_n_m":0.0,"estimate_e_m":1.0,"estimate_n_m":4.0,"estimate_age_ms":100}

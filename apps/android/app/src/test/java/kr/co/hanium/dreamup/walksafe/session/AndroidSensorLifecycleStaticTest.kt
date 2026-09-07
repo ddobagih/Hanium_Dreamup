@@ -41,5 +41,39 @@ class AndroidSensorLifecycleStaticTest {
             orientationTracker.contains("registrationGeneration += 1"),
         )
         assertTrue(orientationTracker.contains("listener?.let(sensorManager::unregisterListener)"))
+        assertTrue(orientationTracker.contains("Sensor.TYPE_MAGNETIC_FIELD"))
+        assertTrue(orientationTracker.contains("val rotationRegistered ="))
+        assertTrue(orientationTracker.contains("if (!rotationRegistered)"))
+        assertTrue(orientationTracker.contains("chestMountedHeading.reset()"))
+    }
+
+    @Test
+    fun orientationAccuracyPromotionRequiresANewSensorEvent() {
+        val orientationTracker = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
+        ).readText()
+
+        assertTrue(
+            orientationTracker.contains(
+                "sample.copy(accuracy = sample.accuracy.downgradedTo(mappedAccuracy))",
+            ),
+        )
+        assertTrue(orientationTracker.contains("if (reported < this) reported else this"))
+    }
+
+    @Test
+    fun magneticRegistrationFailureKeepsRotationOnlyStartSuccessful() {
+        val orientationTracker = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
+        ).readText()
+
+        assertTrue(
+            orientationTracker.contains(
+                "magneticSensorRegistered = magneticFieldSensor?.let",
+            ),
+        )
+        assertTrue(orientationTracker.contains("}.getOrDefault(false)"))
+        assertTrue(orientationTracker.contains("magneticSensorAvailable = magneticSensorRegistered"))
+        assertTrue(orientationTracker.contains("return true"))
     }
 }

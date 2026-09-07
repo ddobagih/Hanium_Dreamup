@@ -79,6 +79,7 @@ class ObjectDepthRuntimePipeline(
                     mapper = effectiveMapper,
                     rawDepth = snapshot.rawDepth,
                     rawConfidence = snapshot.rawConfidence,
+                    rawDepthFreshnessQuality = snapshot.rawDepthFreshnessQuality,
                     fullDepth = snapshot.fullDepth,
                     motionContext = motionContext,
                 ),

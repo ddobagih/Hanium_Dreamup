@@ -10,21 +10,26 @@ class MainActivityOfficialEnvironmentStaticTest {
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
 
     @Test
-    fun confirmationIsMemoryOnlyAndBoundToCurrentEpoch() {
+    fun educationAcknowledgmentNeverCreatesCurrentEnvironmentPassEvidence() {
         val confirmation = functionBlock("private fun confirmOfficialEnvironmentConditions()")
+        val assessment = functionBlock("private fun currentOfficialEnvironmentAssessment(")
+        val notice = functionBlock("private fun officialEnvironmentStatusMessage(")
 
-        assertTrue(confirmation.contains("epoch = snapshot.epoch"))
-        assertTrue(confirmation.contains("brightTime = EnvironmentEvidenceStatus.PASS"))
-        assertTrue(confirmation.contains("dryWeather = EnvironmentEvidenceStatus.PASS"))
-        assertTrue(confirmation.contains("noDenseFog = EnvironmentEvidenceStatus.PASS"))
-        assertTrue(confirmation.contains("ordinaryUrbanSidewalk = EnvironmentEvidenceStatus.PASS"))
-        assertTrue(confirmation.contains("noConstruction = EnvironmentEvidenceStatus.PASS"))
-        assertTrue(confirmation.contains("noSevereCrowding = EnvironmentEvidenceStatus.PASS"))
-        assertTrue(
-            confirmation.contains(
-                "supportLimitsNoticeAcknowledged = EnvironmentEvidenceStatus.PASS",
-            ),
-        )
+        assertTrue(confirmation.contains("requireFirstRunOnboardingComplete("))
+        assertTrue(confirmation.contains("priorityUserOnboardingActorId != reporterUserId"))
+        assertTrue(confirmation.contains("!priorityUserOnboardingPolicy.snapshot().nativeEducationComplete"))
+        assertFalse(confirmation.contains("OfficialEnvironmentUserConfirmation("))
+        assertFalse(confirmation.contains("EnvironmentEvidenceStatus.PASS"))
+        assertTrue(confirmation.contains("startOfficialEnvironmentCameraPreflight(snapshot.epoch)"))
+        assertTrue(confirmation.contains("requestOfficialEnvironmentGpsPreflight(snapshot.epoch)"))
+        assertTrue(assessment.contains("currentEpoch = epoch"))
+        assertTrue(assessment.contains("gpsQuality = officialEnvironmentGpsEvidence"))
+        assertTrue(assessment.contains("cameraQuality = officialEnvironmentCameraEvidence"))
+        assertTrue(assessment.contains("userConfirmation = officialEnvironmentUserConfirmation"))
+        assertTrue(assessment.contains("priorityUserOnboardingActorId == reporterUserId"))
+        assertTrue(assessment.contains("priorityUserOnboardingPolicy.snapshot().nativeEducationComplete"))
+        assertTrue(notice.contains("assessment.conditionallyAllowed"))
+        assertTrue(notice.contains("현재 조건은 미확인"))
         assertFalse(confirmation.contains("stepLengthPrefs"))
         assertFalse(source.contains("PREF_OFFICIAL_ENVIRONMENT"))
     }
@@ -169,10 +174,14 @@ class MainActivityOfficialEnvironmentStaticTest {
         assertTrue(retry.contains("officialEnvironmentOutputsAllowed = false"))
         assertTrue(retry.contains("reportPrivacyConsentSession.cancelActiveCalls()"))
         assertTrue(retry.contains("scheduleOfficialEnvironmentRuntimeWatchdog"))
-        assertTrue(
-            retry.indexOf("cancelVoiceCommandRecognition()") <
-                retry.indexOf("speakInteraction("),
+        assertInOrder(
+            retry,
+            "officialEnvironmentOutputsAllowed = false",
+            "cancelVoiceCommandRecognition()",
+            "speakStatusExplanation(",
         )
+        assertFalse(retry.contains("officialEnvironmentOutputsAllowed = true"))
+        assertFalse(retry.contains("speakInteraction("))
         assertFalse(retry.contains("cancelWalkSessionOutputs("))
         assertFalse(retry.contains("stopLocationUpdates("))
         assertFalse(retry.contains("stopCameraFallbackSession("))
@@ -182,6 +191,26 @@ class MainActivityOfficialEnvironmentStaticTest {
                 "enterWalkSessionSafetyStopAndCancelOutputs(",
             ),
         )
+        assertInOrder(
+            terminal,
+            "officialEnvironmentOutputsAllowed = false",
+            "enterWalkSessionSafetyStopAndCancelOutputs(",
+            "speakStatusExplanation(",
+        )
+        // Expression-bodied wrappers end before the next declaration, not its closing brace.
+        val explanation = functionBlock("private fun speakStatusExplanation(")
+            .substringBefore("\n    private fun ")
+        val ordinaryInteraction = functionBlock("private fun speakInteraction(")
+            .substringBefore("\n    private fun ")
+        val response = functionBlock("private fun speakCommandResponse(")
+        assertTrue(explanation.contains("speakCommandResponse(message, statusExplanation = true)"))
+        assertFalse(explanation.contains("OutputsAllowed = true"))
+        assertFalse(ordinaryInteraction.contains("statusExplanation = true"))
+        assertTrue(response.contains("statusExplanation: Boolean = false"))
+        assertTrue(response.contains("if (homeResponse || statusExplanation)"))
+        assertTrue(response.contains("actuator.speakInteraction(message, onCompleted = completed, onFailed = failed)"))
+        assertFalse(functionBlock("private fun speakNextNavigationInstruction(").contains("speakStatusExplanation("))
+        assertFalse(functionBlock("private fun emitFeedbackAction(").contains("speakStatusExplanation("))
         assertTrue(
             functionBlock("private fun isCameraFallbackAdvisoryStillDeliverable(")
                 .contains("officialEnvironmentOutputsAllowed"),
@@ -256,10 +285,34 @@ class MainActivityOfficialEnvironmentStaticTest {
         assertInOrder(
             readiness,
             "addView(priorityUserOnboardingControls)",
-            "addView(officialEnvironmentStatusText)",
-            "addView(officialEnvironmentConfirmButton)",
             "addView(startupCapabilityText)",
+            "addView(nativeDeviceCheckPanel)",
+            "addView(postLoginDeviceCheckLiveStatusText)",
+            "addView(startupMetricPreflightButton)",
+            "addView(startupCapabilityConfirmButton)",
         )
+        assertTrue(readiness.contains("addView(officialEnvironmentStatusText)"))
+        assertTrue(readiness.contains("addView(officialEnvironmentConfirmButton)"))
+        val presentation = functionBlock("private fun applyNativePreviewPresentation(")
+        assertTrue(presentation.contains("val guidanceVisible = homeAvailable && nativeUiPage == NativeUiPage.GUIDANCE"))
+        assertTrue(presentation.contains("val showPhysicalPreparation = !guidanceVisible && homeAvailable && preparing"))
+        assertTrue(presentation.contains("show(walkReadinessControls, !guidanceVisible"))
+        assertTrue(presentation.contains("show(officialEnvironmentStatusText, showPhysicalPreparation)"))
+        assertTrue(presentation.contains("show(officialEnvironmentConfirmButton, showPhysicalPreparation)"))
+        val guidanceMessage = functionBlock("private fun nativeGuidanceStatusMessage(")
+        assertTrue(guidanceMessage.contains("presentation.routeMessageKo"))
+        assertTrue(guidanceMessage.contains("presentation.cameraMessageKo"))
+        assertTrue(guidanceMessage.contains("nativeDestinationPreparationMessage()"))
+        assertTrue(guidanceMessage.contains("officialEnvironmentMeasurementDetail(currentOfficialEnvironmentAssessment())"))
+        val guidanceAssessment = functionBlock("private fun currentNativeGuidancePresentation()")
+        assertTrue(guidanceAssessment.contains("currentOfficialEnvironmentAssessment()"))
+        assertFalse(guidanceAssessment.contains("officialEnvironmentOutputsAllowed = true"))
+        val guidanceStatusMarker = "nativeGuidanceStatusText = TextView(this).apply {"
+        assertTrue(source.contains(guidanceStatusMarker))
+        val guidanceStatusView = source.substringAfter(guidanceStatusMarker)
+            .substringBefore("nativeGuidanceRetryButton =")
+        assertTrue(guidanceStatusView.contains("View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
+        assertTrue(guidanceStatusView.contains("View.ACCESSIBILITY_LIVE_REGION_POLITE"))
         assertTrue(overlay.contains("addView(walkReadinessControls)"))
     }
 

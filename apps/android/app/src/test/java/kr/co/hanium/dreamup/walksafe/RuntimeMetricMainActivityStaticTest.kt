@@ -140,22 +140,20 @@ class RuntimeMetricMainActivityStaticTest {
     }
 
     @Test
-    fun missingOrOutdatedArCoreLimitsMetricDistanceWithoutAnInstallPrompt() {
+    fun deviceCheckReportsUnknownWithoutInstallingOrStartingAFrameSession() {
         val continuation = functionBlock("private fun continueRuntimeMetricPreflightStart(")
-        val unsupportedBranch = continuation.substringAfter(
-            "availability == ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED",
-        ).substringBefore("var candidateSession")
-
-        assertTrue(
-            unsupportedBranch.contains(
-                "availability == ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD",
-            ),
+        val installedGate = continuation.indexOf(
+            "availability != ArCoreApk.Availability.SUPPORTED_INSTALLED",
         )
-        assertTrue(unsupportedBranch.contains("finishRuntimeMetricPreflightWithoutSession("))
-        assertTrue(unsupportedBranch.contains("RuntimeMetricDepthSupport.UNSUPPORTED"))
-        assertTrue(unsupportedBranch.contains("return"))
-        assertFalse(unsupportedBranch.contains("requestInstall("))
-        assertFalse(unsupportedBranch.contains("updateStatus("))
+        val sessionCreation = continuation.indexOf("Session(this)")
+
+        assertTrue(installedGate >= 0)
+        assertTrue(sessionCreation >= 0)
+        assertTrue(installedGate < sessionCreation)
+        assertTrue(continuation.contains("RuntimeMetricDepthSupport.UNKNOWN"))
+        assertTrue(continuation.contains("finishDeviceMetricDepthSupportCheck("))
+        assertFalse(continuation.contains("requestInstall("))
+        assertFalse(continuation.contains("startRuntimeMetricPreflightSession("))
     }
 
     @Test
@@ -383,8 +381,8 @@ class RuntimeMetricMainActivityStaticTest {
             "walkLastResultText = TextView(this).apply",
         )
         assertFalse(runtimeControls.contains("addView(fieldSessionLogButton)"))
-        assertTrue(readiness.contains("if (BuildConfig.DEBUG)"))
-        assertTrue(readiness.contains("addView(fieldSessionLogButton)"))
+        assertFalse(readiness.contains("addView(fieldSessionLogButton)"))
+        assertFalse(source.contains("addView(fieldSessionLogButton)"))
         val fieldButton = functionBlock("private fun updateFieldSessionLogButton()")
         assertTrue(fieldButton.contains("if (!BuildConfig.DEBUG)"))
         assertTrue(fieldButton.contains("fieldSessionLogButton.visibility = View.GONE"))

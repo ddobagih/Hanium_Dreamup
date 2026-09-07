@@ -58,6 +58,41 @@ class RuntimeMetricPreflightTest {
     }
 
     @Test
+    fun startupFailuresAgeOutButTheRecentWindowStillRequiresEightyPercentPassing() {
+        val session = supportedSession()
+        repeat(30) { index -> session.observe(frame(index, passing = false)) }
+        assertEquals(RuntimeMetricPreflightStatus.IN_PROGRESS, session.result().status)
+
+        repeat(7) { index -> session.observe(frame(30 + index, passing = true)) }
+        val insufficient = session.result()
+        assertEquals(RuntimeMetricPreflightStatus.IN_PROGRESS, insufficient.status)
+        assertEquals(10, insufficient.distinctFrameCount)
+        assertEquals(7, insufficient.passingFrameCount)
+
+        val available = session.observe(frame(37, passing = true))
+        assertEquals(RuntimeMetricPreflightStatus.AVAILABLE, available.status)
+        assertEquals(10, available.distinctFrameCount)
+        assertEquals(8, available.passingFrameCount)
+        assertTrue(available.observationSpanMs >= 1_000L)
+    }
+
+    @Test
+    fun recentWindowRetainsAtLeastOneSecondAtCameraFrameRate() {
+        val session = supportedSession()
+        repeat(90) { index ->
+            session.observe(frame(index, passing = false).copy(
+                frameTimestampNanos = FIRST_FRAME_NS + index * 33_000_000L,
+                observedAtElapsedRealtimeMs = START_MS + index * 33L,
+            ))
+        }
+        val result = session.result()
+        assertEquals(RuntimeMetricPreflightStatus.IN_PROGRESS, result.status)
+        assertEquals(32, result.distinctFrameCount)
+        assertEquals(1_023L, result.observationSpanMs)
+        assertEquals(RuntimeMetricPreflightStatus.UNKNOWN, session.expire(START_MS + 10_000L).status)
+    }
+
+    @Test
     fun observeAndExpireUseTheSameFailClosedDeadlineBoundary() {
         val deadlineMs = START_MS + RuntimeMetricPreflightPolicy.MAX_DURATION_MS
 
@@ -167,28 +202,43 @@ class RuntimeMetricPreflightTest {
     }
 
     @Test
-    fun duplicateOrOutOfOrderTimestampFailsClosed() {
-        listOf(0L, -1L).forEach { timestampDelta ->
-            val session = supportedSession()
-            val first = frame(index = 0, passing = true)
-            session.observe(first)
+    fun zeroAndDuplicateTimestampsAreSkippedUntilDistinctFramesArrive() {
+        val session = supportedSession()
+        val zeroTimestamp = frame(index = 0, passing = true).copy(frameTimestampNanos = 0L)
+        val first = frame(index = 0, passing = true).copy(observedAtElapsedRealtimeMs = START_MS + 1L)
+        val duplicate = first.copy(observedAtElapsedRealtimeMs = START_MS + 2L)
 
-            val result = session.observe(
-                frame(index = 1, passing = true).copy(
-                    frameTimestampNanos = first.frameTimestampNanos + timestampDelta,
-                ),
-            )
+        assertEquals(RuntimeMetricPreflightStatus.IN_PROGRESS, session.observe(zeroTimestamp).status)
+        assertEquals(RuntimeMetricPreflightStatus.IN_PROGRESS, session.observe(first).status)
+        val duplicateResult = session.observe(duplicate)
 
-            assertEquals(RuntimeMetricPreflightStatus.UNKNOWN, result.status)
-            assertEquals(RuntimeMetricPreflightReason.INVALID_FRAME_ORDER, result.reason)
-            assertEquals(RuntimeMetricStartupDisposition.BLOCKED, result.startupDisposition)
-        }
+        assertEquals(RuntimeMetricPreflightStatus.IN_PROGRESS, duplicateResult.status)
+        assertEquals(RuntimeMetricPreflightReason.AWAITING_STABLE_EVIDENCE, duplicateResult.reason)
+        assertEquals(1, duplicateResult.distinctFrameCount)
+        assertEquals(1, duplicateResult.passingFrameCount)
+    }
+
+    @Test
+    fun outOfOrderTimestampStillFailsClosed() {
+        val session = supportedSession()
+        val first = frame(index = 0, passing = true)
+        session.observe(first)
+
+        val result = session.observe(
+            frame(index = 1, passing = true).copy(
+                frameTimestampNanos = first.frameTimestampNanos - 1L,
+            ),
+        )
+
+        assertEquals(RuntimeMetricPreflightStatus.UNKNOWN, result.status)
+        assertEquals(RuntimeMetricPreflightReason.INVALID_FRAME_ORDER, result.reason)
+        assertEquals(RuntimeMetricStartupDisposition.BLOCKED, result.startupDisposition)
     }
 
     @Test
     fun malformedFrameEvidenceFailsClosed() {
         val malformedFrames = listOf(
-            frame(index = 0, passing = true).copy(frameTimestampNanos = 0L),
+            frame(index = 0, passing = true).copy(frameTimestampNanos = -1L),
             frame(index = 0, passing = true).copy(observedAtElapsedRealtimeMs = START_MS - 1L),
             frame(index = 0, passing = true).copy(validMetricSamplesInRange = -1),
             frame(index = 0, passing = true).copy(

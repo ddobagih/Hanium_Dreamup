@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "WalkSafeAndroid"
 include(":app")
 include(":adminapp")
+include(":positionevalapp")

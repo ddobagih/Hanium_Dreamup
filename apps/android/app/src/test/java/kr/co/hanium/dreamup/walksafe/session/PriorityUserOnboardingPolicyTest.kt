@@ -316,6 +316,176 @@ class PriorityUserOnboardingPolicyTest {
         }
     }
 
+
+    @Test
+    fun nativeSafetyConsentLeadsToUsageEducationNotHome() {
+        val policy = adultPolicy()
+        assertEquals(PriorityUserNativeEducationStep.SAFETY_EDUCATION, policy.snapshot().nativeEducationStep)
+        assertEquals(null, policy.beginAppUsageEducationPlayback())
+        policy.reviewSafetyEducation(voicePlaybackCompleted = true)
+        policy.reviewPracticeNecessity(voicePlaybackCompleted = true)
+        policy.acceptEducationConsent()
+
+        assertTrue(policy.snapshot().safetyEducationConsentComplete)
+        assertFalse(policy.snapshot().phonePostureAcknowledged)
+        assertEquals(PriorityUserNativeEducationStep.APP_USAGE_EDUCATION, policy.snapshot().nativeEducationStep)
+        assertFalse(policy.evaluate(supportedEnvironment).mayStartWalk)
+    }
+
+    @Test
+    fun usageRequiresAcknowledgmentTerminalPlaybackAndSeparateAcceptance() {
+        val policy = safetyConsentPolicy()
+        policy.acknowledgeUsageConditions()
+        policy.acceptAppUsageEducation()
+        assertFalse(policy.snapshot().nativeEducationComplete)
+        val token = policy.beginAppUsageEducationPlayback()!!
+        assertFalse(policy.snapshot().appUsageReviewed)
+        policy.finishAppUsageEducationPlayback(token, completed = true)
+        assertFalse(policy.snapshot().nativeEducationComplete)
+        policy.acceptAppUsageEducation()
+
+        assertTrue(policy.snapshot().nativeEducationComplete)
+        assertEquals(PriorityUserNativeEducationStep.COMPLETE, policy.snapshot().nativeEducationStep)
+        assertTrue(policy.evaluate(supportedEnvironment).mayStartWalk)
+    }
+
+    @Test
+    fun successfulPlaybackAloneCannotAcknowledgeOperatingScope() {
+        val policy = safetyConsentPolicy()
+        val token = policy.beginAppUsageEducationPlayback()!!
+        policy.finishAppUsageEducationPlayback(token, completed = true)
+        policy.acceptAppUsageEducation()
+
+        assertTrue(policy.snapshot().appUsageReviewed)
+        assertFalse(policy.snapshot().usageConditionsAcknowledged)
+        assertFalse(policy.snapshot().appUsageAccepted)
+        assertFalse(policy.snapshot().nativeEducationComplete)
+    }
+
+    @Test
+    fun failedCancelledAndStaleUsageCallbacksCannotCompleteAndRetryCan() {
+        val policy = safetyConsentPolicy()
+        policy.acknowledgeUsageConditions()
+        val failed = policy.beginAppUsageEducationPlayback()!!
+        policy.finishAppUsageEducationPlayback(failed, completed = false)
+        val cancelled = policy.beginAppUsageEducationPlayback()!!
+        policy.cancelAppUsageEducationPlayback()
+        val current = policy.beginAppUsageEducationPlayback()!!
+        policy.finishAppUsageEducationPlayback(failed, completed = true)
+        policy.finishAppUsageEducationPlayback(cancelled, completed = true)
+        policy.acceptAppUsageEducation()
+        assertFalse(policy.snapshot().nativeEducationComplete)
+
+        policy.finishAppUsageEducationPlayback(current, completed = true)
+        policy.acceptAppUsageEducation()
+        assertTrue(policy.snapshot().nativeEducationComplete)
+    }
+
+    @Test
+    fun rotationOrReentryRestoresEvidenceButNeverPendingPlaybackOwnership() {
+        val original = safetyConsentPolicy()
+        original.acknowledgeUsageConditions()
+        val old = original.beginAppUsageEducationPlayback()!!
+        val restored = PriorityUserOnboardingPolicy(original.snapshot())
+        val current = restored.beginAppUsageEducationPlayback()!!
+        restored.finishAppUsageEducationPlayback(old, completed = true)
+        assertFalse(restored.snapshot().appUsageReviewed)
+        restored.finishAppUsageEducationPlayback(current, completed = true)
+        restored.acceptAppUsageEducation()
+
+        val relogged = PriorityUserOnboardingPolicy(restored.snapshot())
+        assertTrue(relogged.snapshot().nativeEducationComplete)
+        assertEquals(PriorityUserNativeEducationStep.COMPLETE, relogged.snapshot().nativeEducationStep)
+        assertEquals(WalkSessionState.ACTIVE, relogged.practiceLifecycleSnapshot().state)
+    }
+
+    @Test
+    fun usageCancellationDoesNotErasePreviouslyPersistedCompletion() {
+        val policy = safetyConsentPolicy()
+        policy.acknowledgeUsageConditions()
+        policy.finishAppUsageEducationPlayback(policy.beginAppUsageEducationPlayback()!!, completed = true)
+        policy.acceptAppUsageEducation()
+        val replay = policy.beginAppUsageEducationPlayback()!!
+        policy.finishAppUsageEducationPlayback(replay, completed = false)
+        assertTrue(PriorityUserOnboardingPolicy(policy.snapshot()).snapshot().nativeEducationComplete)
+    }
+
+    @Test
+    fun resettingOrChangingActorEligibilityInvalidatesUsagePlayback() {
+        val reset = safetyConsentPolicy()
+        val resetToken = reset.beginAppUsageEducationPlayback()!!
+        reset.resetTraining()
+        reset.finishAppUsageEducationPlayback(resetToken, completed = true)
+        assertFalse(reset.snapshot().appUsageReviewed)
+
+        val ageChanged = safetyConsentPolicy()
+        val ageToken = ageChanged.beginAppUsageEducationPlayback()!!
+        ageChanged.selectAgeBand(PriorityUserAgeBand.UNDER_14)
+        ageChanged.finishAppUsageEducationPlayback(ageToken, completed = true)
+        assertFalse(ageChanged.snapshot().appUsageReviewed)
+        assertFalse(ageChanged.evaluate(supportedEnvironment).mayActivateAccount)
+    }
+
+    @Test
+    fun legacySafetyCompletionMigratesOnlyNewUsageStepWithoutReenteringDeviceCheck() {
+        val legacyEducation = PriorityUserOnboardingSnapshot(
+            ageBand = PriorityUserAgeBand.VERIFIED_14_PLUS,
+            phonePostureAcknowledged = true,
+            educationReviewed = true,
+            practiceNecessityReviewed = true,
+            educationAccepted = true,
+        )
+        assertTrue(legacyEducation.educationConsentComplete)
+        assertFalse(legacyEducation.nativeEducationComplete)
+        assertEquals(PriorityUserNativeEducationStep.APP_USAGE_EDUCATION, legacyEducation.nativeEducationStep)
+        val receipt = FirstRunReceiptHash.fromSha256Hex("a".repeat(64))
+        val restoration = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+            epoch = 1L,
+            orderedEvidence = listOf(
+                FirstRunOnboardingEvidence.VerifiedLogin(
+                    receiptHash = receipt,
+                    actorBinding = FirstRunOpaqueActorBinding.fromProvider("actor_" + "a".repeat(32)),
+                ),
+                FirstRunOnboardingEvidence.PurposeAndSafety(receipt),
+                FirstRunOnboardingEvidence.JitPermissionObservation(receipt),
+                FirstRunOnboardingEvidence.DeviceCheck(receipt),
+                FirstRunOnboardingEvidence.Fp004Training(receipt),
+            ),
+            verifier = FirstRunOnboardingEvidenceVerifier { _, _ -> true },
+        )
+        assertEquals(null, restoration.rejection)
+        assertEquals(5, restoration.restoredEvidenceCount)
+        val completed = restoration.snapshot
+        assertTrue(completed.isComplete)
+        val migrated = FirstRunOnboardingPolicy.restartFp004Training(completed)
+        assertTrue(migrated.accepted)
+        assertEquals(FirstRunOnboardingStage.FP004_TRAINING, migrated.current.stage)
+        assertEquals(
+            completed.completedReceiptHashes - FirstRunOnboardingStage.FP004_TRAINING,
+            migrated.current.completedReceiptHashes,
+        )
+        // Email JIT/device checks are local stages; their result store is actor/device bound,
+        // not a remote receipt or an onboarding-epoch-bound cache.
+        assertEquals(
+            setOf(FirstRunOnboardingStage.VERIFIED_LOGIN, FirstRunOnboardingStage.PURPOSE_AND_SAFETY),
+            migrated.current.completedReceiptHashes.keys,
+        )
+        assertEquals(completed.verifiedActorBinding, migrated.current.verifiedActorBinding)
+        assertEquals(completed.epoch + 1L, migrated.current.epoch)
+        assertEquals(null, migrated.current.pendingAttempt)
+        assertEquals(
+            PriorityUserNativeEducationStep.APP_USAGE_EDUCATION,
+            PriorityUserOnboardingPolicy(legacyEducation).snapshot().nativeEducationStep,
+        )
+        assertFalse(FirstRunOnboardingPolicy.restartFp004Training(migrated.current).accepted)
+    }
+
+    private fun safetyConsentPolicy() = adultPolicy().apply {
+        reviewSafetyEducation(voicePlaybackCompleted = true)
+        reviewPracticeNecessity(voicePlaybackCompleted = true)
+        acceptEducationConsent()
+    }
+
     private fun adultPolicy() = PriorityUserOnboardingPolicy().apply {
         selectAgeBand(PriorityUserAgeBand.ADULT_18_PLUS)
     }

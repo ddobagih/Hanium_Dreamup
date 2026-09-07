@@ -209,8 +209,9 @@ class GatewayProxyHttpException(
 
 enum class NavigationBackendErrorKind(val statusToken: String, val userMessage: String) {
     AUTHENTICATION("authentication", "길안내 로그인을 다시 확인해 주세요."),
-    PROVIDER_CONFIGURATION("provider_configuration", "TMAP 서버 설정 오류로 길안내를 사용할 수 없습니다."),
-    RATE_LIMITED("rate_limited", "TMAP 사용 한도에 도달해 새 경로를 요청할 수 없습니다."),
+    PROVIDER_CONFIGURATION("provider_configuration", "TMAP API 키나 이용 권한 등 서버 설정 문제입니다. 서비스 관리자에게 문의해 주세요."),
+    RATE_LIMITED("rate_limited", "TMAP 사용 한도에 도달해 목적지 검색과 새 경로 요청을 할 수 없습니다. 나중에 다시 시도해 주세요."),
+    STAIRS_PRESENT("route_stairs_present", "요청한 경로에 계단이 포함되어 새 경로를 사용할 수 없습니다. 다른 목적지를 선택하거나 경로를 다시 요청해 주세요."),
     TIMEOUT("timeout", "TMAP 응답 시간이 초과되었습니다."),
     PROVIDER_UNAVAILABLE("provider_unavailable", "TMAP 연결 장애로 새 경로를 확인할 수 없습니다."),
     INVALID_RESPONSE("invalid_response", "TMAP 경로 응답을 안전하게 확인할 수 없습니다."),
@@ -229,11 +230,16 @@ fun classifyNavigationBackendFailure(error: Throwable): NavigationBackendFailure
     if (error is GatewayProxyHttpException) {
         val code = error.backendCode
         val kind = when {
+            code in setOf(
+                "tmap_app_key_missing",
+                "tmap_invalid_api_key",
+                "walking_route_provider_invalid",
+                "tmap_poi_provider_invalid",
+            ) -> NavigationBackendErrorKind.PROVIDER_CONFIGURATION
             error.statusCode in setOf(401, 403) || code == "gateway_upstream_auth_failed" ->
                 NavigationBackendErrorKind.AUTHENTICATION
-            error.statusCode == 429 -> NavigationBackendErrorKind.RATE_LIMITED
-            code in setOf("tmap_app_key_missing", "tmap_invalid_api_key", "walking_route_provider_invalid") ->
-                NavigationBackendErrorKind.PROVIDER_CONFIGURATION
+            error.statusCode == 429 || code == "tmap_rate_limited" -> NavigationBackendErrorKind.RATE_LIMITED
+            code == "route_stairs_present" -> NavigationBackendErrorKind.STAIRS_PRESENT
             code == "tmap_timeout" || error.statusCode == 504 -> NavigationBackendErrorKind.TIMEOUT
             code in setOf("tmap_network_error", "tmap_provider_error", "route_unavailable") ->
                 NavigationBackendErrorKind.PROVIDER_UNAVAILABLE

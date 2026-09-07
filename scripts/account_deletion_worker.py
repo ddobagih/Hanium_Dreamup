@@ -945,10 +945,15 @@ def _read_journal(path: Path) -> dict[str, object]:
             or not isinstance(raw_objects, list)
             or len(raw_collections) > 10_000
             or len(raw_objects) > 10_000
-            or value.get("raw_collection_count") != len(raw_collections)
         ):
             raise AccountDeletionWorkerError("worker raw journal inventory is invalid")
         _validate_raw_journal_inventory(raw_collections, raw_objects)
+        if (
+            type(value.get("raw_collection_count")) is not int
+            or value["raw_collection_count"]
+            != len({item["collection_id"] for item in raw_collections})
+        ):
+            raise AccountDeletionWorkerError("worker raw journal inventory is invalid")
     if value["schema_version"] in _CREDENTIAL_JOURNAL_SCHEMAS:
         credential_account_count = value.get("credential_account_count")
         account_enrollment_count = value.get("account_enrollment_count")
@@ -1470,92 +1475,121 @@ def _raw_inventory(
 
     inventory: list[dict[str, object]] = []
     stored_objects: list[dict[str, object]] = []
+    if len(declared_chunks) > 10_000:
+        raise AccountDeletionWorkerError("one request exceeds the local raw chunk ceiling")
     for collection in collections:
         items = objects_by_collection.get(collection.collection_id, [])
         chunks = chunks_by_collection.get(collection.collection_id, [])
-        if len(items) != 1 or len(chunks) != 1:
+        chunks_by_object: dict[object, list[RawCollectionChunk]] = {}
+        for chunk in chunks:
+            chunks_by_object.setdefault(chunk.object_id, []).append(chunk)
+        if (
+            len(items) != collection.object_count
+            or len(chunks) != collection.chunk_count
+            or sum(item.size_bytes for item in items) != collection.total_bytes
+            or set(chunks_by_object) != {item.object_id for item in items}
+        ):
             raise AccountDeletionWorkerError("raw collection inventory is incomplete")
-        item = items[0]
-        chunk = chunks[0]
+        bound_inventory = [
+            (item, chunks_by_object[item.object_id])
+            for item in items
+        ]
+        for item, item_chunks in bound_inventory:
+            if (
+                len(item_chunks) != item.chunk_count
+                or [chunk.chunk_index for chunk in item_chunks]
+                != list(range(item.chunk_count))
+                or sum(chunk.declared_size_bytes for chunk in item_chunks) != item.size_bytes
+                or (
+                    len(item_chunks) == 1
+                    and item_chunks[0].declared_sha256 != item.sha256
+                )
+            ):
+                raise AccountDeletionWorkerError("raw collection inventory is incomplete")
         try:
-            commit_state = raw_chunk_commit_state(collection, item, chunk)
-            receipt = RawCollectionStorage._receipt(collection, item)
+            receipt = RawCollectionStorage._receipt(collection, bound_inventory)
+            commit_states = [
+                (item, chunk, raw_chunk_commit_state(collection, item, chunk))
+                for item, item_chunks in bound_inventory
+                for chunk in item_chunks
+            ]
         except Exception as exc:
             raise AccountDeletionWorkerError(
                 "raw collection persistence or receipt binding is invalid"
             ) from exc
-        metadata = commit_state.metadata
-        record: dict[str, object] = {
-            "collection_id": str(collection.collection_id),
-            "object_id": str(item.object_id),
-            "chunk_index": chunk.chunk_index,
-            "manifest_sha256": collection.manifest_sha256,
-            "consent_receipt_sha256": collection.consent_receipt_sha256,
-            "state": collection.state,
-            "retention_class": collection.retention_class,
-            "committed_at": (
-                _iso(collection.committed_at) if collection.committed_at else None
-            ),
-            "retention_expires_at": (
-                _iso(collection.retention_expires_at)
-                if collection.retention_expires_at
-                else None
-            ),
-            "quarantine_expires_at": (
-                _iso(collection.quarantine_expires_at)
-                if collection.quarantine_expires_at
-                else None
-            ),
-            "receipt_sha256": receipt.receipt_sha256 if receipt is not None else None,
-            "storage_name": metadata.storage_name if metadata is not None else None,
-            "envelope_sha256": (
-                metadata.envelope_sha256 if metadata is not None else None
-            ),
-            "envelope_size": metadata.envelope_size if metadata is not None else None,
-        }
-        inventory.append(record)
-        if metadata is None:
-            continue
-        if RAW_STORAGE_NAME.fullmatch(metadata.storage_name) is None:
-            raise AccountDeletionWorkerError("raw storage binding is invalid")
-        pending_journal = (
-            raw_object_dir
-            / ".raw-write-journal"
-            / f"{metadata.storage_name}.json"
-        )
-        if _entry_exists(pending_journal):
-            raise AccountDeletionWorkerError(
-                "raw storage has an unreconciled write journal"
-            )
-        source = raw_object_dir / metadata.storage_name
-        quarantine = quarantine_dir / metadata.storage_name
-        source_mode = 0o640 if raw_group_gid is not None else 0o600
-        source_parent_mode = 0o2750 if raw_group_gid is not None else 0o700
-        identity = _validated_object(
-            source,
-            size=metadata.envelope_size,
-            sha256=metadata.envelope_sha256,
-            expected_mode=source_mode,
-            expected_gid=raw_group_gid,
-            expected_parent_mode=source_parent_mode,
-            expected_parent_gid=raw_group_gid,
-        )
-        stored_objects.append(
-            {
+        for item, chunk, commit_state in commit_states:
+            metadata = commit_state.metadata
+            record: dict[str, object] = {
                 "collection_id": str(collection.collection_id),
                 "object_id": str(item.object_id),
                 "chunk_index": chunk.chunk_index,
-                "storage_name": metadata.storage_name,
-                "envelope_sha256": metadata.envelope_sha256,
-                "envelope_size": metadata.envelope_size,
-                "source_path": str(source),
-                "quarantine_path": str(quarantine),
-                "source_identity": dict(identity),
-                "source_mode": source_mode,
-                "source_gid": raw_group_gid,
-                "source_parent_mode": source_parent_mode,
+                "manifest_sha256": collection.manifest_sha256,
+                "consent_receipt_sha256": collection.consent_receipt_sha256,
+                "state": collection.state,
+                "retention_class": collection.retention_class,
+                "committed_at": (
+                    _iso(collection.committed_at) if collection.committed_at else None
+                ),
+                "retention_expires_at": (
+                    _iso(collection.retention_expires_at)
+                    if collection.retention_expires_at
+                    else None
+                ),
+                "quarantine_expires_at": (
+                    _iso(collection.quarantine_expires_at)
+                    if collection.quarantine_expires_at
+                    else None
+                ),
+                "receipt_sha256": receipt.receipt_sha256 if receipt is not None else None,
+                "storage_name": metadata.storage_name if metadata is not None else None,
+                "envelope_sha256": (
+                    metadata.envelope_sha256 if metadata is not None else None
+                ),
+                "envelope_size": metadata.envelope_size if metadata is not None else None,
             }
-        )
+            inventory.append(record)
+            if metadata is None:
+                continue
+            if RAW_STORAGE_NAME.fullmatch(metadata.storage_name) is None:
+                raise AccountDeletionWorkerError("raw storage binding is invalid")
+            pending_journal = (
+                raw_object_dir
+                / ".raw-write-journal"
+                / f"{metadata.storage_name}.json"
+            )
+            if _entry_exists(pending_journal):
+                raise AccountDeletionWorkerError(
+                    "raw storage has an unreconciled write journal"
+                )
+            source = raw_object_dir / metadata.storage_name
+            quarantine = quarantine_dir / metadata.storage_name
+            source_mode = 0o640 if raw_group_gid is not None else 0o600
+            source_parent_mode = 0o2750 if raw_group_gid is not None else 0o700
+            identity = _validated_object(
+                source,
+                size=metadata.envelope_size,
+                sha256=metadata.envelope_sha256,
+                expected_mode=source_mode,
+                expected_gid=raw_group_gid,
+                expected_parent_mode=source_parent_mode,
+                expected_parent_gid=raw_group_gid,
+            )
+            stored_objects.append(
+                {
+                    "collection_id": str(collection.collection_id),
+                    "object_id": str(item.object_id),
+                    "chunk_index": chunk.chunk_index,
+                    "storage_name": metadata.storage_name,
+                    "envelope_sha256": metadata.envelope_sha256,
+                    "envelope_size": metadata.envelope_size,
+                    "source_path": str(source),
+                    "quarantine_path": str(quarantine),
+                    "source_identity": dict(identity),
+                    "source_mode": source_mode,
+                    "source_gid": raw_group_gid,
+                    "source_parent_mode": source_parent_mode,
+                }
+            )
     if set(objects_by_collection) != set(collection_ids) or set(
         chunks_by_collection
     ) != set(collection_ids):

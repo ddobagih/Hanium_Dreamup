@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.admin.security;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -84,8 +85,47 @@ public final class AdminIncidentControllerTest {
         assertEquals(INCIDENT_A, controller.snapshot().detail().summary().incidentId());
     }
 
+    @Test
+    public void paginationWaitsForDetailAndRejectsDuplicateInFlightRequests() {
+        JsonLoader loader = new JsonLoader();
+        loader.paginate = true;
+        AdminIncidentController controller = new AdminIncidentController(loader);
+        assertTrue(controller.execute(controller.beginFirstPage(new AdminIncidentModels.Filters("OPEN"))));
+        assertTrue(controller.snapshot().canLoadMore());
+
+        var detailRequest = controller.beginDetail(INCIDENT_A);
+        assertFalse(controller.snapshot().canLoadMore());
+        assertThrows(IllegalStateException.class, controller::beginNextPage);
+        assertTrue(controller.execute(detailRequest));
+        assertEquals(INCIDENT_A, controller.snapshot().detail().summary().incidentId());
+        assertTrue(controller.snapshot().canLoadMore());
+
+        var nextPage = controller.beginNextPage();
+        assertFalse(controller.snapshot().canLoadMore());
+        assertThrows(IllegalStateException.class, controller::beginNextPage);
+        assertTrue(controller.execute(nextPage));
+        assertEquals(2, controller.snapshot().items().size());
+        assertFalse(controller.snapshot().canLoadMore());
+    }
+
+    @Test
+    public void paginationCannotSupersedeHistoryRequest() {
+        AdminIncidentController controller = new AdminIncidentController(new PagedHistoryLoader());
+        assertTrue(controller.execute(controller.beginFirstPage(new AdminIncidentModels.Filters("OPEN"))));
+        assertTrue(controller.execute(controller.beginDetail(INCIDENT_A)));
+        assertTrue(controller.snapshot().canLoadMore());
+
+        var historyRequest = controller.beginNextHistoryPage();
+        assertFalse(controller.snapshot().canLoadMore());
+        assertThrows(IllegalStateException.class, controller::beginNextPage);
+        assertTrue(controller.execute(historyRequest));
+        assertEquals(2, controller.snapshot().historyItems().size());
+        assertTrue(controller.snapshot().canLoadMore());
+    }
+
     private static final class JsonLoader implements AdminIncidentController.Loader {
         boolean fail;
+        boolean paginate;
 
         @Override
         public AdminIncidentModels.Page loadPage(AdminIncidentModels.Filters filters, String cursor)
@@ -98,7 +138,12 @@ public final class AdminIncidentControllerTest {
                 );
             }
             String id = "OPEN".equals(filters.status()) ? INCIDENT_A : INCIDENT_B;
-            return AdminIncidentModels.parsePage(page(id, filters.status()));
+            if (cursor != null) id = INCIDENT_B;
+            String page = page(id, filters.status());
+            if (paginate && cursor == null) {
+                page = page.replace("\"next_cursor\":null", "\"next_cursor\":\"cursor_A\"");
+            }
+            return AdminIncidentModels.parsePage(page);
         }
 
         @Override
@@ -119,8 +164,9 @@ public final class AdminIncidentControllerTest {
         public AdminIncidentModels.Page loadPage(AdminIncidentModels.Filters filters, String cursor)
             throws Exception {
             return AdminIncidentModels.parsePage(
-                "{\"schema_version\":\"walksafe.admin-incident-list.v1\","
-                    + "\"items\":[],\"next_cursor\":null}"
+                page(INCIDENT_A, "OPEN").replace(
+                    "\"next_cursor\":null", "\"next_cursor\":\"list_cursor_A\""
+                )
             );
         }
 

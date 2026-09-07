@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import ipaddress
 import json
@@ -11,11 +12,12 @@ import os
 from pathlib import Path
 import re
 import stat
-from urllib.parse import parse_qsl, unquote, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urlsplit, urlunsplit
 
 
 POSTGRES_SCHEMES = {"postgres", "postgresql"}
 SECRET_QUERY_KEYS = {"password", "passfile", "sslpassword"}
+AMBIGUOUS_TLS_QUERY_KEYS = {"ssl", "requiressl"}
 RESTORE_TARGET_SELECTOR_KEYS = {
     "client_encoding",
     "database",
@@ -29,6 +31,99 @@ RESTORE_TARGET_SELECTOR_KEYS = {
     "user",
 }
 RESTORE_OUTPUT_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+POSTGRES_CLIENT_PATHS = {
+    "pg_dump": "/usr/bin/pg_dump",
+    "pg_restore": "/usr/bin/pg_restore",
+    "psql": "/usr/bin/psql",
+}
+PG_DUMP_ARGUMENTS = ("--format=custom", "--no-owner", "--no-acl")
+PG_RESTORE_ARGUMENTS = (
+    "--exit-on-error",
+    "--single-transaction",
+    "--no-owner",
+    "--no-acl",
+)
+PSQL_SERVER_VERSION_ARGUMENTS = (
+    "--no-psqlrc",
+    "--tuples-only",
+    "--no-align",
+    "--command",
+    "SHOW server_version_num",
+)
+PSQL_EMPTY_TARGET_ARGUMENTS = (
+    "--no-psqlrc",
+    "--set",
+    "ON_ERROR_STOP=1",
+    "--tuples-only",
+    "--no-align",
+)
+PSQL_REPORT_COUNT_ARGUMENTS = (
+    "--no-psqlrc",
+    "--set",
+    "ON_ERROR_STOP=1",
+    "--tuples-only",
+    "--no-align",
+    "--command",
+    "SELECT count(*) FROM reports;",
+)
+PSQL_REPORT_IMAGES_QUERY = (
+    "SELECT reports.id::text, COALESCE(objects.storage_name, ''), "
+    "COALESCE(objects.envelope_sha256, ''), "
+    "COALESCE(objects.envelope_size::text, '') FROM reports "
+    "LEFT JOIN report_image_objects AS objects ON objects.report_id = reports.id "
+    "ORDER BY reports.id;"
+)
+PSQL_REPORT_IMAGES_ARGUMENTS = (
+    "--no-psqlrc",
+    "--set",
+    "ON_ERROR_STOP=1",
+    "--tuples-only",
+    "--no-align",
+    "--field-separator=\t",
+    "--csv",
+    "--command",
+    PSQL_REPORT_IMAGES_QUERY,
+)
+PSQL_ARGUMENT_PROFILES = frozenset(
+    {
+        PSQL_SERVER_VERSION_ARGUMENTS,
+        PSQL_EMPTY_TARGET_ARGUMENTS,
+        PSQL_REPORT_COUNT_ARGUMENTS,
+        PSQL_REPORT_IMAGES_ARGUMENTS,
+    }
+)
+POSTGRES_FD_PATH_PATTERN = re.compile(r"/proc/self/fd/[0-9]+")
+INVALID_PERCENT_ESCAPE_PATTERN = re.compile(r"%(?![0-9A-Fa-f]{2})")
+MAX_PSQL_STDIN_BYTES = 1024 * 1024
+PSQL_EMPTY_TARGET_STDIN_SHA256 = (
+    "cad6615ede8ce7e3291f0e8b6de2a21ed5fc8655f1ae547330f226566f8fa359"
+)
+
+
+def _strict_uri_unquote(value: str, *, context: str) -> str:
+    if INVALID_PERCENT_ESCAPE_PATTERN.search(value):
+        raise ValueError(f"{context} contains invalid percent encoding")
+    try:
+        decoded = unquote(value, encoding="utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{context} is not valid UTF-8") from exc
+    if "\x00" in decoded:
+        raise ValueError(f"{context} contains a null byte")
+    return decoded
+
+
+def _postgresql_query_pairs(raw_query: str) -> list[tuple[str, str]]:
+    if not raw_query:
+        return []
+    pairs: list[tuple[str, str]] = []
+    for field in raw_query.split("&"):
+        raw_key, separator, raw_value = field.partition("=")
+        if not separator or not raw_key:
+            raise ValueError("database URL query must use non-empty name=value fields")
+        key = _strict_uri_unquote(raw_key, context="database URL query name")
+        value = _strict_uri_unquote(raw_value, context="database URL query value")
+        pairs.append((key, value))
+    return pairs
 
 
 def normalized_postgresql_url(database_url: str) -> str:
@@ -51,15 +146,19 @@ def explicit_restore_database_url(database_url: str) -> str:
         port = parts.port
     except ValueError as exc:
         raise ValueError("restore database URL port is invalid") from exc
-    query = parse_qsl(parts.query, keep_blank_values=True)
+    query = _postgresql_query_pairs(parts.query)
     query_names = [key.casefold() for key, _value in query]
     raw_hostname = parts.hostname or ""
-    decoded_hostname = unquote(raw_hostname)
+    decoded_hostname = _strict_uri_unquote(raw_hostname, context="restore database URL host")
+    username = _strict_uri_unquote(parts.username or "", context="restore database URL user")
+    database = _strict_uri_unquote(
+        parts.path.lstrip("/"), context="restore database URL database"
+    )
     if (
-        not unquote(parts.username or "")
+        not username
         or not raw_hostname
         or port is None
-        or not unquote(parts.path.lstrip("/"))
+        or not database
         or "%" in raw_hostname
         or decoded_hostname != raw_hostname
         or any(character in decoded_hostname for character in (",", "/", "\\"))
@@ -67,6 +166,8 @@ def explicit_restore_database_url(database_url: str) -> str:
         or parts.fragment
         or len(query_names) != len(set(query_names))
         or RESTORE_TARGET_SELECTOR_KEYS.intersection(query_names)
+        or AMBIGUOUS_TLS_QUERY_KEYS.intersection(query_names)
+        or SECRET_QUERY_KEYS.intersection(query_names)
     ):
         raise ValueError(
             "restore database URL must explicitly bind one user, host, port and database without selector overrides"
@@ -129,7 +230,7 @@ def private_restore_output_path(output_path: str, *, user_id: int | None = None)
 
 def postgresql_database_name(database_url: str) -> str:
     parts = urlsplit(normalized_postgresql_url(database_url))
-    name = unquote(parts.path.lstrip("/"))
+    name = _strict_uri_unquote(parts.path.lstrip("/"), context="database URL database")
     if not name or "/" in name:
         raise ValueError("database URL must name exactly one PostgreSQL database")
     return name
@@ -139,16 +240,18 @@ def database_identity_sha256(database_url: str) -> str:
     parts = urlsplit(normalized_postgresql_url(database_url))
     query = [
         (key, value)
-        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        for key, value in _postgresql_query_pairs(parts.query)
         if key.casefold() not in SECRET_QUERY_KEYS
     ]
     query.sort()
     identity = {
         "scheme": "postgresql",
-        "username": unquote(parts.username or ""),
+        "username": _strict_uri_unquote(parts.username or "", context="database URL user"),
         "host": (parts.hostname or "").casefold(),
         "port": parts.port or 5432,
-        "database": unquote(parts.path.lstrip("/")),
+        "database": _strict_uri_unquote(
+            parts.path.lstrip("/"), context="database URL database"
+        ),
         "query": query,
     }
     canonical = json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -160,37 +263,158 @@ def path_identity_sha256(path: Path) -> str:
     return hashlib.sha256(resolved.encode("utf-8")).hexdigest()
 
 
+def _validate_postgres_client_arguments(tool: str, arguments: list[str]) -> None:
+    if any(not isinstance(argument, str) or "\x00" in argument for argument in arguments):
+        raise ValueError("PostgreSQL client arguments contain an unsupported value")
+
+    if tool == "pg_dump":
+        if tuple(arguments) != PG_DUMP_ARGUMENTS:
+            raise ValueError("pg_dump arguments are not allowed for the bound target")
+        return
+
+    if tool == "pg_restore":
+        options = tuple(arguments[:-1])
+        input_path = arguments[-1] if arguments else ""
+        if (
+            options != PG_RESTORE_ARGUMENTS
+            or POSTGRES_FD_PATH_PATTERN.fullmatch(input_path) is None
+        ):
+            raise ValueError("pg_restore arguments are not allowed for the bound target")
+        return
+
+    if tool != "psql":
+        raise ValueError("PostgreSQL client tool is not allowed")
+
+    if tuple(arguments) not in PSQL_ARGUMENT_PROFILES:
+        raise ValueError("psql arguments are not allowed for the bound target")
+
+
+def _validated_psql_stdin(arguments: list[str], payload: bytes) -> bytes:
+    if tuple(arguments) != PSQL_EMPTY_TARGET_ARGUMENTS:
+        raise ValueError("PostgreSQL client stdin is not allowed for this operation")
+    if not payload or len(payload) > MAX_PSQL_STDIN_BYTES:
+        raise ValueError("psql stdin is empty or exceeds the operational limit")
+    if b"\\" in payload or b"\x00" in payload:
+        raise ValueError("psql stdin must not contain meta-commands or null bytes")
+    if hashlib.sha256(payload).hexdigest() != PSQL_EMPTY_TARGET_STDIN_SHA256:
+        raise ValueError("psql stdin does not match the pinned empty-target proof")
+    return payload
+
+
+def _replace_stdin_with_validated_sql(arguments: list[str]) -> None:
+    chunks: list[bytes] = []
+    size = 0
+    while size <= MAX_PSQL_STDIN_BYTES:
+        chunk = os.read(0, min(64 * 1024, MAX_PSQL_STDIN_BYTES + 1 - size))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        size += len(chunk)
+    payload = _validated_psql_stdin(arguments, b"".join(chunks))
+    descriptor = os.memfd_create(
+        "walksafe-psql-stdin", os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING
+    )
+    try:
+        offset = 0
+        while offset < len(payload):
+            offset += os.write(descriptor, payload[offset:])
+        fcntl.fcntl(
+            descriptor,
+            fcntl.F_ADD_SEALS,
+            fcntl.F_SEAL_SEAL
+            | fcntl.F_SEAL_SHRINK
+            | fcntl.F_SEAL_GROW
+            | fcntl.F_SEAL_WRITE,
+        )
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        os.dup2(descriptor, 0, inheritable=True)
+    finally:
+        os.close(descriptor)
+
+
+def postgres_client_invocation(
+    database_url: str,
+    *,
+    tool: str,
+    arguments: list[str],
+) -> tuple[str, list[str], dict[str, str]]:
+    normalized = explicit_restore_database_url(database_url)
+    executable = POSTGRES_CLIENT_PATHS.get(tool)
+    if executable is None:
+        raise ValueError("PostgreSQL client tool is not allowed")
+    _validate_postgres_client_arguments(tool, arguments)
+
+    parts = urlsplit(normalized)
+    authority = parts.netloc.rsplit("@", 1)[-1]
+    username = _strict_uri_unquote(parts.username or "", context="database URL user")
+    password = (
+        _strict_uri_unquote(parts.password, context="database URL password")
+        if parts.password is not None
+        else None
+    )
+
+    passwordless_url = urlunsplit(
+        (
+            "postgresql",
+            f"{quote(username, safe='')}@{authority}",
+            parts.path,
+            parts.query,
+            "",
+        )
+    )
+    environment = {"PATH": "/usr/bin:/bin"}
+    if password is not None:
+        environment["PGPASSWORD"] = password
+    return (
+        executable,
+        [executable, f"--dbname={passwordless_url}", *arguments],
+        environment,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    normalize = subparsers.add_parser("normalize-database-url")
-    normalize.add_argument("--database-url", required=True)
-    restore_database = subparsers.add_parser("validate-restore-database-url")
-    restore_database.add_argument("--database-url", required=True)
-    backup_database = subparsers.add_parser("validate-backup-database-url")
-    backup_database.add_argument("--database-url", required=True)
+    subparsers.add_parser("normalize-database-url")
+    subparsers.add_parser("validate-restore-database-url")
+    subparsers.add_parser("validate-backup-database-url")
     restore_output = subparsers.add_parser("validate-private-restore-output")
     restore_output.add_argument("--path", required=True)
-    database_name = subparsers.add_parser("database-name")
-    database_name.add_argument("--database-url", required=True)
-    database_identity = subparsers.add_parser("database-identity")
-    database_identity.add_argument("--database-url", required=True)
+    subparsers.add_parser("database-name")
+    subparsers.add_parser("database-identity")
     path_identity = subparsers.add_parser("path-identity")
     path_identity.add_argument("--path", type=Path, required=True)
+    postgres_client = subparsers.add_parser("exec-postgres-client")
+    postgres_client.add_argument("--tool", choices=sorted(POSTGRES_CLIENT_PATHS), required=True)
+    postgres_client.add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.command == "exec-postgres-client":
+        arguments = list(args.arguments)
+        if arguments[:1] == ["--"]:
+            arguments = arguments[1:]
+        executable, invocation, environment = postgres_client_invocation(
+            os.environ.get("DATABASE_URL", ""),
+            tool=args.tool,
+            arguments=arguments,
+        )
+        if args.tool == "psql" and tuple(arguments) == PSQL_EMPTY_TARGET_ARGUMENTS:
+            _replace_stdin_with_validated_sql(arguments)
+        os.execve(executable, invocation, environment)
+        raise AssertionError("PostgreSQL client exec unexpectedly returned")
 
+    database_url = os.environ.get("DATABASE_URL", "")
     if args.command == "normalize-database-url":
-        print(normalized_postgresql_url(args.database_url))
+        print(normalized_postgresql_url(database_url))
     elif args.command == "validate-restore-database-url":
-        print(explicit_restore_database_url(args.database_url))
+        print(explicit_restore_database_url(database_url))
     elif args.command == "validate-backup-database-url":
-        print(explicit_backup_database_url(args.database_url))
+        print(explicit_backup_database_url(database_url))
     elif args.command == "validate-private-restore-output":
         print(private_restore_output_path(args.path))
     elif args.command == "database-name":
-        print(postgresql_database_name(args.database_url))
+        print(postgresql_database_name(database_url))
     elif args.command == "database-identity":
-        print(database_identity_sha256(args.database_url))
+        print(database_identity_sha256(database_url))
     else:
         print(path_identity_sha256(args.path))
     return 0

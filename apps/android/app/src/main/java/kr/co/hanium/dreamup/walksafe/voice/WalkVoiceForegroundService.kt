@@ -31,8 +31,7 @@ class WalkVoiceForegroundService : Service() {
         when (intent?.action) {
             ACTION_START -> startVoiceSession()
             ACTION_STOP -> {
-                stopVoiceSession()
-                stopSelfResult(startId)
+                if (stopSelfResult(startId)) stopVoiceSession()
             }
             else -> {
                 // A null intent can be delivered only for a system recreation. Never resume the mic.
@@ -47,8 +46,8 @@ class WalkVoiceForegroundService : Service() {
         super.onDestroy()
     }
 
-    private fun startVoiceSession() {
-        if (sessionStarted) return
+    private fun ensureForegroundStarted() {
+        if (foregroundStarted) return
 
         createNotificationChannel()
         val notification = createNotification()
@@ -62,6 +61,11 @@ class WalkVoiceForegroundService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
         foregroundStarted = true
+    }
+
+    private fun startVoiceSession() {
+        ensureForegroundStarted()
+        if (sessionStarted) return
 
         sessionStarted = true
         try {

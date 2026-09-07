@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>안내 경로 지도</title>
+  <link rel="stylesheet" href="map.css">
+  <!-- TMAP_SDK_TAG -->
+  <script src="map.js" defer></script>
+</head>
+<body>
+  <header>
+    <p id="destination">선택한 목적지의 경로</p>
+    <p id="instruction" role="status">기존 안내 정보를 기다리고 있습니다.</p>
+    <p id="position-status">현재 위치 확인 중</p>
+  </header>
+  <main>
+    <div id="map" aria-label="안내 경로 지도"></div>
+    <p id="tile-status" role="status">경로 또는 현재 위치를 기다리고 있습니다.</p>
+  </main>
+  <footer>
+    <p class="legend"><span class="start">출</span> 출발 <span class="end">도</span> 목적지 <span class="position-dot"></span> 현재 위치 <span class="guide-dot"></span> 안내 지점</p>
+    <div class="buttons">
+      <button id="zoom-in" type="button" aria-label="지도 확대">＋</button>
+      <button id="zoom-out" type="button" aria-label="지도 축소">−</button>
+      <button id="fit-route" type="button">전체 경로</button>
+      <button id="recenter" type="button">내 위치</button>
+    </div>
+  </footer>
+</body>
+</html>

@@ -33,9 +33,11 @@ class PriorityUserOnboardingStaticTest {
             ),
         )
         assertTrue(capture.contains("priorityUserOnboardingPolicy.evaluate("))
+        assertTrue(source.contains("get() = BuildConfig.DEBUG && BuildConfig.DEVELOPMENT_QUICK_START"))
+        assertTrue(blockReason.contains("if (!firstRunOnboardingComplete())"))
         assertTrue(capture.contains("currentReporterUserId() != null"))
         assertTrue(capture.contains("account_profile_unbound"))
-        assertTrue(blockReason.contains("if (!onboarding.mayStartWalk) return onboarding.noticeKo"))
+        assertTrue(blockReason.contains("if (!developmentQuickStartEnabled && !onboarding.mayStartWalk) return onboarding.noticeKo"))
         assertTrue(
             blockReason.indexOf("priorityUserOnboardingPolicy.evaluate(") <
                 blockReason.indexOf("currentReporterUserId()"),
@@ -154,7 +156,7 @@ class PriorityUserOnboardingStaticTest {
     }
 
     @Test
-    fun limitedVoiceOrHapticUsesTheAvailableTrainingChannelsAndScreenConfirmation() {
+    fun educationRequiresPlaybackWhilePracticeKeepsItsAvailableChannels() {
         val update = functionBlock("private fun updatePriorityUserOnboardingUi(")
         val practiceButtons = update.substringAfter(
             "priorityUserPracticeButtons.forEach",
@@ -169,18 +171,15 @@ class PriorityUserOnboardingStaticTest {
 
         assertFalse(practiceButtons.contains("environment.offlineKoreanVoiceAvailable"))
         assertFalse(practiceButtons.contains("environment.vibrationAvailable"))
-        assertTrue(
-            education.contains(
-                "postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)",
-            ),
-        )
-        assertTrue(education.contains("if (!voiceGuidanceEnabled)"))
-        assertTrue(education.contains("화면의 안전 안내 확인으로 교육을 진행합니다."))
-        assertTrue(
-            education.substringAfter("if (!voiceGuidanceEnabled) {")
-                .substringBefore("val dispatch")
-                .contains("completed()"),
-        )
+        assertFalse(education.contains("if (!voiceGuidanceEnabled)"))
+        assertFalse(education.contains("completed()"))
+        assertTrue(education.contains("onCompleted = completed"))
+        assertTrue(education.contains("onFailed = failed"))
+        assertTrue(education.contains("speakPriorityUserTraining("))
+        val native = functionBlock("private fun playNativeSafetyEducation(")
+        assertTrue(native.contains("onCompleted = {"))
+        assertTrue(native.contains("isPriorityUserTrainingDeliveryCurrent(generation, actorId, policy)"))
+        assertTrue(native.contains("voicePlaybackCompleted = true"))
         assertTrue(
             practice.contains(
                 "postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)",
@@ -348,7 +347,9 @@ class PriorityUserOnboardingStaticTest {
         assertTrue(listener.contains("onError"))
         assertTrue(listener.contains("onStop"))
         assertTrue(inference.contains("explicitTerminalRequiredUtterances.remove(predecessor)"))
-        assertTrue(inference.contains("completed = !explicitTerminalRequired"))
+        assertTrue(inference.contains("completed = false"))
+        assertFalse(inference.contains("completed = true"))
+        assertFalse(inference.contains("completed = !explicitTerminalRequired"))
     }
 
     @Test
@@ -405,7 +406,7 @@ class PriorityUserOnboardingStaticTest {
         assertTrue(factory.contains("setSingleLine(false)"))
         assertTrue(factory.contains("ellipsize = null"))
         assertFalse(factory.contains("maxLines ="))
-        assertTrue(factory.contains("minimumHeight = (48f * resources.displayMetrics.density).roundToInt()"))
+        assertTrue(factory.contains("minimumHeight = (WS_TOUCH_MIN_DP * resources.displayMetrics.density).roundToInt()"))
         assertTrue(factory.contains("ViewGroup.LayoutParams.WRAP_CONTENT"))
         assertTrue(content.contains("ViewCompat.setAccessibilityHeading("))
         assertTrue(traversal.contains("accessibilityTraversalAfter = previous.id"))
@@ -425,34 +426,44 @@ class PriorityUserOnboardingStaticTest {
     }
 
     @Test
-    fun visibleAndAccessibilityOrderStartsWithAccountSelectionThenOneActionSteps() {
+    fun nativeEducationKeepsPostureListeningAndConsentInAccessibleOrder() {
         val content = functionBlock("private fun buildContentView()")
-        val controls = content.substringAfter("priorityUserOnboardingControls =")
-            .substringBefore("linkPriorityUserAccessibilityTraversal()")
-        val traversal = functionBlock("private fun linkPriorityUserAccessibilityTraversal()")
-
-        assertInOrder(
-            controls,
-            "addView(priorityUserOnboardingStatusText)",
-            "addView(loginUserIdInput)",
-            "addView(loginSaveButton)",
-            "addView(accountLogoutButton)",
-            "addView(priorityUserEducationButton)",
-            "addView(priorityUserSafePlaceButton)",
-            "addView(priorityUserResetButton)",
+        val controls = content.substringAfter("priorityUserOnboardingControls =").substringBefore("linkPriorityUserAccessibilityTraversal()")
+        assertInOrder(controls, "addView(priorityUserOnboardingStatusText)", "addView(firstRunPhonePostureControls)", "addView(priorityUserEducationButton)", "addView(priorityUserPracticeNecessityButton)", "addView(priorityUserEducationAgreeButton)")
+        assertFalse(controls.contains("addView(loginUserIdInput)"))
+        val update = functionBlock("private fun updateNativeSafetyEducationUi()")
+        assertTrue(update.contains("val heading = if (showPosture) \"사전 연습\" else \"안전 교육\""))
+        assertTrue(update.contains("firstRunPhonePostureButton.accessibilityTraversalAfter = firstRunPhonePostureText.id"))
+        assertTrue(update.contains("priorityUserPracticeNecessityButton.accessibilityTraversalAfter = priorityUserEducationButton.id"))
+        assertTrue(update.contains("priorityUserEducationAgreeButton.accessibilityTraversalAfter ="))
+        assertTrue(update.contains("if (showPosture) priorityUserEducationButton.id else priorityUserPracticeNecessityButton.id"))
+        assertTrue(update.contains("if (showPosture) firstRunPhonePostureButton.id else priorityUserOnboardingStatusText.id"))
+        assertTrue(update.contains("state.usageConditionsAcknowledged && state.appUsageReviewed"))
+        val safetyStep = source.substringAfter("private fun shouldShowFirstRunEducation()")
+            .substringBefore("private fun ")
+        val usageStep = source.substringAfter("private fun shouldShowFirstRunPhonePosture()")
+            .substringBefore("private fun ")
+        assertTrue(safetyStep.contains("!priorityUserOnboardingPolicy.snapshot().safetyEducationConsentComplete"))
+        assertTrue(usageStep.contains("priorityUserOnboardingPolicy.snapshot().safetyEducationConsentComplete"))
+        val playback = functionBlock("private fun playNativeSafetyEducation(")
+        assertTrue(update.contains("val educationPlaying = priorityUserEducationInFlight && !priorityUserEducationPlaybackIsPracticeNecessity"))
+        assertTrue(update.contains("val necessityPlaying = priorityUserEducationInFlight && priorityUserEducationPlaybackIsPracticeNecessity"))
+        assertTrue(
+            update.contains(
+                "educationPlaying -> if (showPosture) \"사전 연습 듣기 중지\" else \"1. 안전 제한 안내 듣기 중지\"",
+            ),
         )
-        assertInOrder(
-            traversal,
-            "add(priorityUserOnboardingStatusText)",
-            "add(loginUserIdInput)",
-            "add(loginSaveButton)",
-            "add(accountLogoutButton)",
-            "add(priorityUserEducationButton)",
-            "add(priorityUserSafePlaceButton)",
-            "add(priorityUserResetButton)",
-        )
-        assertTrue(content.contains("1. 안전 제한 안내 듣기"))
-        assertTrue(content.contains("2. 안전한 연습 장소 확인"))
+        assertTrue(update.contains("necessityPlaying -> \"2. 연습 필요성 듣기 중지\""))
+        assertTrue(playback.contains("if (practiceNecessity == priorityUserEducationPlaybackIsPracticeNecessity)"))
+        assertTrue(playback.contains("cancelPendingPriorityUserTrainingFeedback()"))
+        assertTrue(playback.contains("이미 완료한 청취 기록은 유지됩니다."))
+        val completion = playback.substringAfter("onCompleted = {").substringBefore("onFailed = failed")
+        assertInOrder(completion, "isPriorityUserTrainingDeliveryCurrent",
+            "beginPriorityUserProfileMutationOrFailClosed",
+            "policy.finishAppUsageEducationPlayback(usageToken, completed = true)",
+            "persistPriorityUserOnboardingOrFailClosed")
+        assertTrue(update.contains("state.educationReviewed && state.practiceNecessityReviewed"))
+        assertTrue(content.contains("onClick = ::acceptNativeSafetyEducation"))
     }
 
     private fun functionBlock(signature: String): String {

@@ -72,4 +72,4 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. .venv/bin/python -m pytest -p no:cachepro
   tests/test_voice_intents.py tests/test_voice_tts.py -q
 ```
 
-단위 테스트는 실제 STT/TTS model load와 실기기 microphone/speaker 품질을 검증하지 않는다. 현재 실제 모델/GPU smoke는 `NOT_RUN`이며, 고정 revision/manifest가 준비된 뒤 샘플 추론과 실제 청취 평가를 별도로 수행한다.
+단위 테스트만으로 실기기 microphone/speaker 품질을 검증하지 않는다. 2026-08-30 고정 revision/manifest 후보로 faster-whisper와 Qwen3-TTS의 실제 GPU load·샘플 추론은 통과했다. Gateway relay, 실기기 microphone/speaker와 실제 청취 평가는 아직 `NOT_RUN`이다.

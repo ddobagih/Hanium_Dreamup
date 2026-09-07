@@ -84,6 +84,7 @@ data class OfficialEnvironmentAssessment(
     val assessedAtElapsedRealtimeMs: Long,
     val profileId: String?,
     val factorStatuses: Map<OfficialEnvironmentFactor, EnvironmentEvidenceStatus>,
+    val usageLimitsAcknowledged: Boolean = false,
 ) {
     init {
         require(factorStatuses.keys == OfficialEnvironmentFactor.entries.toSet()) {
@@ -103,7 +104,14 @@ data class OfficialEnvironmentAssessment(
         }
 
     val canStartWalk: Boolean
-        get() = support == OfficialEnvironmentSupport.SUPPORTED
+        get() = support == OfficialEnvironmentSupport.SUPPORTED ||
+            (usageLimitsAcknowledged && profileId != null &&
+                factorStatuses.values.none { it == EnvironmentEvidenceStatus.FAIL } &&
+                factorStatuses[OfficialEnvironmentFactor.GPS_QUALITY] == EnvironmentEvidenceStatus.PASS &&
+                factorStatuses[OfficialEnvironmentFactor.CAMERA_QUALITY] == EnvironmentEvidenceStatus.PASS)
+
+    val conditionallyAllowed: Boolean
+        get() = canStartWalk && support != OfficialEnvironmentSupport.SUPPORTED
 
     val blockingFactors: Set<OfficialEnvironmentFactor>
         get() = factorStatuses
@@ -192,6 +200,7 @@ object OfficialEnvironmentPolicy {
         cameraQuality: MeasuredEnvironmentEvidence?,
         userConfirmation: OfficialEnvironmentUserConfirmation?,
         approvedProfile: ApprovedOfficialEnvironmentProfile?,
+        usageLimitsAcknowledged: Boolean = false,
     ): OfficialEnvironmentAssessment {
         val statuses = linkedMapOf<OfficialEnvironmentFactor, EnvironmentEvidenceStatus>()
         statuses[OfficialEnvironmentFactor.GPS_QUALITY] = normalizeMeasuredEvidence(
@@ -232,6 +241,7 @@ object OfficialEnvironmentPolicy {
             assessedAtElapsedRealtimeMs = nowElapsedRealtimeMs,
             profileId = approvedProfile?.profileId,
             factorStatuses = statuses,
+            usageLimitsAcknowledged = usageLimitsAcknowledged,
         )
     }
 
@@ -351,7 +361,7 @@ class OfficialEnvironmentRuntimeGuard(
             freshAssessment &&
             assessment.epoch == epoch &&
                 assessment.profileId == profile.profileId &&
-                assessment.support == OfficialEnvironmentSupport.SUPPORTED
+                assessment.canStartWalk
         if (
             assessment == lastAssessment &&
             supported == lastAssessmentSupportedAtEvaluation

@@ -8,7 +8,9 @@ polyline; it does not fuse public accessibility datasets or correct GPS.
 from __future__ import annotations
 
 import asyncio
+from hashlib import sha256
 import json
+from math import isfinite
 import re
 from threading import Lock
 from time import monotonic
@@ -274,8 +276,11 @@ def _int_field(payload: dict[str, Any], name: str) -> int:
     value = payload.get(name)
     if isinstance(value, bool):
         return 0
-    if isinstance(value, (int, float)):
-        return max(int(value), 0)
+    if isinstance(value, (int, float, str)):
+        try:
+            return max(int(value), 0)
+        except (ValueError, OverflowError):
+            return 0
     return 0
 
 
@@ -553,6 +558,18 @@ def _normalize_tmap_response(
             code=exc.code,
             message=f"TMAP {exc.message}",
         ) from exc
+    if request.priority == "STAIR_AVOID" and (
+        any(step.facility_type == 17 for step in steps)
+        or any(
+            guide.facility_type == 17 or guide.turn_type in {127, 129}
+            for guide in guide_points
+        )
+    ):
+        raise TmapPedestrianRouteError(
+            code="route_stairs_present",
+            message="TMAP returned stairs despite the stair-exclusion request.",
+            http_status=422,
+        )
     if summary_distance_m:
         for guide_point in guide_points:
             if guide_point.distance_from_start_m is not None and guide_point.remaining_distance_m is None:
@@ -651,7 +668,6 @@ async def fetch_tmap_pedestrian_route(
 
     if provider_status < 200 or provider_status >= 300:
         provider_code = None
-        provider_message = None
         try:
             error_payload = _load_tmap_json(response_body, deadline_at=deadline_at)
         except _TmapResponseLimitError as exc:
@@ -671,18 +687,21 @@ async def fetch_tmap_pedestrian_route(
             error_detail = error_payload["error"]
             if isinstance(error_detail.get("code"), str):
                 provider_code = error_detail["code"]
-            if isinstance(error_detail.get("message"), str):
-                provider_message = error_detail["message"]
-
         error_code = "tmap_provider_error"
         error_message = "TMAP pedestrian route provider returned an error."
+        error_http_status = 502
         if provider_status in (401, 403) or provider_code == "INVALID_API_KEY":
             error_code = "tmap_invalid_api_key"
             error_message = "TMAP appKey is invalid or not allowed to use pedestrian route API."
+        elif provider_status == 429:
+            error_code = "tmap_rate_limited"
+            error_message = "TMAP pedestrian route request limit was reached."
+            error_http_status = 503
 
         raise TmapPedestrianRouteError(
             code=error_code,
-            message=provider_message or error_message,
+            message=error_message,
+            http_status=error_http_status,
             provider_status=provider_status,
         )
 
@@ -735,22 +754,24 @@ def _poi_text(payload: dict[str, Any], name: str) -> str | None:
 def _poi_float(payload: dict[str, Any], *names: str) -> float | None:
     for name in names:
         value = payload.get(name)
-        if value in (None, ""):
+        if value in (None, "") or isinstance(value, bool):
             continue
         try:
-            return float(value)
+            number = float(value)
         except (TypeError, ValueError):
             continue
+        if isfinite(number):
+            return number
     return None
 
 
-def _poi_int(payload: dict[str, Any], name: str) -> int | None:
-    value = payload.get(name)
-    if value in (None, ""):
+def _poi_distance_m(payload: dict[str, Any]) -> int | None:
+    radius_km = _poi_float(payload, "radius")
+    if radius_km is None or radius_km < 0:
         return None
     try:
-        return max(int(float(value)), 0)
-    except (TypeError, ValueError):
+        return int(round(radius_km * 1000))
+    except (ValueError, OverflowError):
         return None
 
 
@@ -798,6 +819,7 @@ def _normalize_poi_search_response(
         )
 
     results: list[DestinationSearchResult] = []
+    seen_candidate_ids: set[str] = set()
     for item_index, item in enumerate(items):
         if item_index % 32 == 0:
             _ensure_tmap_deadline(deadline_at)
@@ -827,18 +849,41 @@ def _normalize_poi_search_response(
             _join_address_number(_poi_text(item, "firstNo"), _poi_text(item, "secondNo")),
         )
 
-        results.append(
-            DestinationSearchResult(
+        destination = DestinationSearchResult(
                 id=_poi_text(item, "id") or _poi_text(item, "pkey") or f"{latitude},{longitude}",
                 name=name,
                 point=RoutePoint(latitude=latitude, longitude=longitude, name=name),
                 address=address,
                 road_address=road_address,
-                category=_poi_text(item, "bizCatName") or _poi_text(item, "catName"),
+                category=(
+                    _poi_text(item, "bizCatName")
+                    or _poi_text(item, "catName")
+                    or _poi_text(item, "lowerBizName")
+                    or _poi_text(item, "middleBizName")
+                    or _poi_text(item, "upperBizName")
+                    or _poi_text(item, "bizName")
+                ),
                 result_type="poi",
-                distance_m=_poi_int(item, "radius"),
-            )
+                distance_m=_poi_distance_m(item),
         )
+        # Provider IDs can be shared by distinct entrances or facilities. This is
+        # an opaque candidate key, independent of query, ordering and distance.
+        identity = (
+            destination.id,
+            _poi_text(item, "pkey"),
+            destination.name,
+            destination.point.latitude,
+            destination.point.longitude,
+            destination.address,
+            destination.road_address,
+            destination.category,
+        )
+        identity_bytes = json.dumps(identity, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        destination.id = "tmap-poi:v1:" + sha256(identity_bytes).hexdigest()
+        if destination.id in seen_candidate_ids:
+            continue
+        seen_candidate_ids.add(destination.id)
+        results.append(destination)
         if len(results) > TMAP_MAX_POI_RESULTS:
             raise TmapPoiSearchError(
                 code="invalid_tmap_response",
@@ -900,6 +945,17 @@ def _mock_poi_search_response(
     )
 
 
+def _is_named_university_query(query: str) -> bool:
+    words = query.split()
+    if len(words) > 1 and (len(words) != 2 or words[0] not in ("국립", "공립", "사립")):
+        return False
+    compact_query = "".join(words)
+    if any(marker in compact_query for marker in ("주변", "근처", "인근", "가까운")):
+        return False
+    match = re.fullmatch(r"([가-힣A-Za-z0-9]+?)(?:대학교|대학|공대)", compact_query)
+    return match is not None and match.group(1) not in ("국립", "공립", "사립")
+
+
 async def fetch_tmap_poi_search(
     query: str,
     settings: Settings,
@@ -943,6 +999,9 @@ async def fetch_tmap_poi_search(
         "version": settings.tmap_pedestrian_api_version,
         "searchKeyword": normalized_query,
         "searchType": "all",
+        "searchtypCd": "A",
+        "radius": 0,
+        "reqCoordType": "WGS84GEO",
         "resCoordType": "WGS84GEO",
         "page": 1,
         "count": max(min(limit, 10), 1),
@@ -950,6 +1009,9 @@ async def fetch_tmap_poi_search(
         "poiGroupYn": "N",
     }
     if origin_lat is not None and origin_lng is not None:
+        # Named institutions need relevance before the bounded provider page.
+        # Keep nearby/category and explicitly qualified facility searches unchanged.
+        params["searchtypCd"] = "A" if _is_named_university_query(normalized_query) else "R"
         params["centerLat"] = origin_lat
         params["centerLon"] = origin_lng
     headers = {"Accept": "application/json", "appKey": settings.tmap_app_key}
@@ -980,7 +1042,6 @@ async def fetch_tmap_poi_search(
             await client.aclose()
 
     if provider_status < 200 or provider_status >= 300:
-        provider_message = None
         provider_code = None
         try:
             error_payload = _load_tmap_json(response_body, deadline_at=deadline_at)
@@ -1001,18 +1062,21 @@ async def fetch_tmap_poi_search(
             error_detail = error_payload["error"]
             if isinstance(error_detail.get("code"), str):
                 provider_code = error_detail["code"]
-            if isinstance(error_detail.get("message"), str):
-                provider_message = error_detail["message"]
-
         error_code = "tmap_provider_error"
         error_message = "TMAP POI search provider returned an error."
+        error_http_status = 502
         if provider_status in (401, 403) or provider_code == "INVALID_API_KEY":
             error_code = "tmap_invalid_api_key"
             error_message = "TMAP appKey is invalid or not allowed to use POI search API."
+        elif provider_status == 429:
+            error_code = "tmap_rate_limited"
+            error_message = "TMAP POI search request limit was reached."
+            error_http_status = 503
 
         raise TmapPoiSearchError(
             code=error_code,
-            message=provider_message or error_message,
+            message=error_message,
+            http_status=error_http_status,
             provider_status=provider_status,
         )
 
@@ -1038,7 +1102,18 @@ async def fetch_tmap_poi_search(
             normalized_query,
             deadline_at=deadline_at,
         )
-        result = normalized.model_copy(update={"results": normalized.results[: max(min(limit, 10), 1)]})
+        results = normalized.results[: max(min(limit, 10), 1)]
+        for destination in results:
+            if origin_lat is None or origin_lng is None:
+                destination.distance_m = None
+            elif destination.distance_m is None:
+                destination.distance_m = _haversine_m(
+                    origin_lat,
+                    origin_lng,
+                    destination.point.latitude,
+                    destination.point.longitude,
+                )
+        result = normalized.model_copy(update={"results": results})
         _ensure_tmap_deadline(deadline_at)
         _record_tmap_success("poi")
         return result

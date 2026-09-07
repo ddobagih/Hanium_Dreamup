@@ -43,6 +43,7 @@ class AndroidFeedbackActuator(
     private val onOfflineKoreanSpeechUnavailable: () -> Unit = {},
     private val speechAllowed: () -> Boolean = { true },
     private val hapticAllowed: () -> Boolean = { true },
+    private val onOfflineKoreanSpeechReady: () -> Unit = {},
 ) : TextToSpeech.OnInitListener, Closeable {
     private val appContext = context.applicationContext
     private val audioManager = appContext.getSystemService(AudioManager::class.java)
@@ -52,7 +53,10 @@ class AndroidFeedbackActuator(
     @Volatile
     private var ttsState = TtsState.INITIALIZING
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val textToSpeech = TextToSpeech(appContext, this)
+    private lateinit var textToSpeech: TextToSpeech
+    private val ttsRecoveryBudget = TtsEngineRecoveryBudget()
+    private var ttsEngineGeneration = 0L
+    private var ttsInitializationWatchdog: Runnable? = null
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         appContext.getSystemService(VibratorManager::class.java)?.defaultVibrator
     } else {
@@ -91,6 +95,10 @@ class AndroidFeedbackActuator(
     private var progressToneVolumePercent = -1
     private var progressToneGeneration = 0
 
+    init {
+        initializeTextToSpeech()
+    }
+
     companion object {
         private const val ANNOUNCE_ASSERTIVE_PREFIX = "risk"
         private const val ANNOUNCE_INTERACTION_PREFIX = "interaction"
@@ -103,34 +111,71 @@ class AndroidFeedbackActuator(
         private const val PROGRESS_BEEP_DURATION_MS = 80
         private const val PROGRESS_BEEP_FOCUS_MARGIN_MS = 50L
         private const val UTTERANCE_START_TIMEOUT_MS = 8_000L
+        private const val TTS_INITIALIZATION_TIMEOUT_MS = 10_000L
+        private const val TTS_RECOVERY_DELAY_MS = 250L
+    }
+
+    private fun initializeTextToSpeech() {
+        if (ttsState == TtsState.CLOSED) return
+        val engineGeneration = ++ttsEngineGeneration
+        ready.set(false)
+        ttsState = TtsState.INITIALIZING
+        ttsInitializationWatchdog?.let(mainHandler::removeCallbacks)
+        if (::textToSpeech.isInitialized) {
+            runCatching { textToSpeech.stop() }
+            runCatching { textToSpeech.shutdown() }
+        }
+        try {
+            textToSpeech = TextToSpeech(appContext) { status ->
+                mainHandler.post {
+                    if (engineGeneration == ttsEngineGeneration) onInit(status)
+                }
+            }
+        } catch (_: RuntimeException) {
+            mainHandler.post {
+                if (engineGeneration == ttsEngineGeneration) recoverTextToSpeechOrFail()
+            }
+            return
+        }
+        val watchdog = Runnable {
+            if (engineGeneration == ttsEngineGeneration && ttsState == TtsState.INITIALIZING) {
+                recoverTextToSpeechOrFail()
+            }
+        }
+        ttsInitializationWatchdog = watchdog
+        mainHandler.postDelayed(watchdog, TTS_INITIALIZATION_TIMEOUT_MS)
     }
 
     override fun onInit(status: Int) {
         if (ttsState == TtsState.CLOSED) return
+        if (ttsState != TtsState.INITIALIZING) return
+        ttsInitializationWatchdog?.let(mainHandler::removeCallbacks)
+        ttsInitializationWatchdog = null
         if (status != TextToSpeech.SUCCESS) {
-            ttsState = TtsState.FAILED
-            pendingSpeechQueue.clear()
-            notifyOfflineKoreanSpeechUnavailable()
+            recoverTextToSpeechOrFail()
             return
         }
-        val languageStatus = textToSpeech.setLanguage(Locale.KOREAN)
+        val languageStatus = runCatching { textToSpeech.setLanguage(Locale.KOREAN) }.getOrElse {
+            recoverTextToSpeechOrFail()
+            return
+        }
         if (languageStatus == TextToSpeech.LANG_MISSING_DATA || languageStatus == TextToSpeech.LANG_NOT_SUPPORTED) {
-            ttsState = TtsState.LANGUAGE_UNSUPPORTED
-            pendingSpeechQueue.clear()
-            notifyOfflineKoreanSpeechUnavailable()
+            failOfflineKoreanLanguage()
             return
         }
-        val offlineKoreanVoice = textToSpeech.voices.orEmpty()
+        val offlineKoreanVoice = runCatching { textToSpeech.voices }.getOrNull().orEmpty()
             .filter { voice ->
                 voice.locale.language.equals(Locale.KOREAN.language, ignoreCase = true) &&
                     !voice.isNetworkConnectionRequired
             }
             .sortedBy { it.name }
             .firstOrNull()
-        if (offlineKoreanVoice == null || textToSpeech.setVoice(offlineKoreanVoice) == TextToSpeech.ERROR) {
-            ttsState = TtsState.LANGUAGE_UNSUPPORTED
-            pendingSpeechQueue.clear()
-            notifyOfflineKoreanSpeechUnavailable()
+        if (offlineKoreanVoice == null) {
+            failOfflineKoreanLanguage()
+            return
+        }
+        if (runCatching { textToSpeech.setVoice(offlineKoreanVoice) }.getOrDefault(TextToSpeech.ERROR) == TextToSpeech.ERROR) {
+            recoverTextToSpeechOrFail()
             return
         }
         textToSpeech.setAudioAttributes(
@@ -139,57 +184,128 @@ class AndroidFeedbackActuator(
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .build(),
         )
-        textToSpeech.setOnUtteranceProgressListener(
+        val engineGeneration = ttsEngineGeneration
+        val listenerResult = textToSpeech.setOnUtteranceProgressListener(
             object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
-                    if (!isUtteranceStillValidAtStart(utteranceId)) return
-                    armUtteranceTerminalWatchdog(utteranceId)
+                    postUtteranceCallback(engineGeneration, utteranceId) {
+                        if (isUtteranceStillValidAtStart(utteranceId)) {
+                            armUtteranceTerminalWatchdog(utteranceId)
+                        }
+                    }
                 }
 
                 override fun onDone(utteranceId: String?) {
-                    markUtteranceFinished(utteranceId, completed = true)
+                    postUtteranceCallback(engineGeneration, utteranceId) {
+                        markUtteranceFinished(utteranceId, completed = true)
+                    }
                 }
 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
-                    failRequiredSpeechRuntime(utteranceId)
+                    postUtteranceCallback(engineGeneration, utteranceId) {
+                        failRequiredSpeechRuntime(utteranceId, TextToSpeech.ERROR)
+                    }
                 }
 
                 override fun onError(utteranceId: String?, errorCode: Int) {
-                    failRequiredSpeechRuntime(utteranceId)
+                    postUtteranceCallback(engineGeneration, utteranceId) {
+                        failRequiredSpeechRuntime(utteranceId, errorCode)
+                    }
                 }
 
                 override fun onStop(utteranceId: String?, interrupted: Boolean) {
-                    markUtteranceFinished(utteranceId, completed = false)
+                    postUtteranceCallback(engineGeneration, utteranceId) {
+                        markUtteranceFinished(utteranceId, completed = false)
+                    }
                 }
             },
         )
+        if (listenerResult == TextToSpeech.ERROR) {
+            recoverTextToSpeechOrFail()
+            return
+        }
         ready.set(true)
         ttsState = TtsState.READY
+        speechUnavailableNotified.set(false)
+        runCatching(onOfflineKoreanSpeechReady)
         flushPendingSpeech()
+    }
+
+    private fun postUtteranceCallback(engineGeneration: Long, utteranceId: String?, callback: () -> Unit) {
+        mainHandler.post {
+            if (ttsState != TtsState.READY || engineGeneration != ttsEngineGeneration) return@post
+            if (utteranceId == null || synchronized(pendingUtterances) { utteranceId !in pendingUtterances }) {
+                return@post
+            }
+            callback()
+        }
     }
 
     private fun notifyOfflineKoreanSpeechUnavailable() {
         if (speechUnavailableNotified.compareAndSet(false, true)) {
-            mainHandler.post(onOfflineKoreanSpeechUnavailable)
+            val engineGeneration = ttsEngineGeneration
+            mainHandler.post {
+                if (
+                    engineGeneration == ttsEngineGeneration &&
+                    (ttsState == TtsState.FAILED || ttsState == TtsState.LANGUAGE_UNSUPPORTED)
+                ) onOfflineKoreanSpeechUnavailable()
+            }
         }
     }
 
-    private fun failRequiredSpeechRuntime(utteranceId: String?) {
-        if (ttsState == TtsState.CLOSED) return
-        ready.set(false)
-        ttsState = TtsState.FAILED
-        pendingSpeechQueue.clear()
-        textToSpeech.stop()
-        val interrupted = synchronized(pendingUtterances) {
-            pendingUtterances.toList().let { pending ->
-                if (utteranceId != null && utteranceId in pending) {
-                    listOf(utteranceId) + pending.filterNot { it == utteranceId }
-                } else {
-                    pending
-                }
+    private fun failRequiredSpeechRuntime(
+        utteranceId: String?,
+        errorCode: Int = TextToSpeech.ERROR_SERVICE,
+        notifyFailure: Boolean = true,
+    ) {
+        val pending = utteranceId != null && synchronized(pendingUtterances) { utteranceId in pendingUtterances }
+        when (ttsRuntimeFailureDisposition(errorCode, pending, ttsState == TtsState.READY)) {
+            TtsRuntimeFailureDisposition.IGNORE -> Unit
+            TtsRuntimeFailureDisposition.UTTERANCE ->
+                markUtteranceFinished(utteranceId, completed = false, notifyFailure = notifyFailure)
+            TtsRuntimeFailureDisposition.ENGINE -> {
+                if (!notifyFailure) markUtteranceFinished(utteranceId, completed = false, notifyFailure = false)
+                recoverTextToSpeechOrFail()
             }
+            TtsRuntimeFailureDisposition.LANGUAGE -> failOfflineKoreanLanguage()
         }
+    }
+
+    private fun recoverTextToSpeechOrFail() {
+        if (ttsState == TtsState.CLOSED) return
+        val recover = ttsRecoveryBudget.claimRetry()
+        val engineGeneration = ++ttsEngineGeneration
+        ready.set(false)
+        if (recover) ttsState = TtsState.INITIALIZING else ttsState = TtsState.FAILED
+        ttsInitializationWatchdog?.let(mainHandler::removeCallbacks)
+        ttsInitializationWatchdog = null
+        pendingSpeechQueue.clear()
+        val interrupted = synchronized(pendingUtterances) { pendingUtterances.toList() }
+        if (::textToSpeech.isInitialized) runCatching { textToSpeech.stop() }
+        failPendingSpeech(interrupted, stopTts = false)
+        if (recover) {
+            mainHandler.postDelayed(
+                {
+                    if (engineGeneration == ttsEngineGeneration && ttsState == TtsState.INITIALIZING) {
+                        initializeTextToSpeech()
+                    }
+                },
+                TTS_RECOVERY_DELAY_MS,
+            )
+        } else {
+            notifyOfflineKoreanSpeechUnavailable()
+        }
+    }
+
+    private fun failOfflineKoreanLanguage() {
+        if (ttsState == TtsState.CLOSED) return
+        ttsEngineGeneration += 1L
+        ready.set(false)
+        ttsState = TtsState.LANGUAGE_UNSUPPORTED
+        pendingSpeechQueue.clear()
+        val interrupted = synchronized(pendingUtterances) { pendingUtterances.toList() }
+        if (::textToSpeech.isInitialized) runCatching { textToSpeech.stop() }
         failPendingSpeech(interrupted, stopTts = false)
         notifyOfflineKoreanSpeechUnavailable()
     }
@@ -261,9 +377,26 @@ class AndroidFeedbackActuator(
         return true
     }
 
+    fun cancelCommandInteraction() {
+        val commandUtterances = synchronized(pendingUtterances) {
+            if (pendingUtterances.any { it.startsWith("$ANNOUNCE_ASSERTIVE_PREFIX-") }) return
+            val owned = utteranceCallbacks.exclusiveCommandUtteranceIds(
+                pendingUtteranceIds = pendingUtterances,
+                explicitTerminalRequiredIds = explicitTerminalRequiredUtterances,
+            )
+            if (owned.isEmpty()) return
+            // Keep the ownership check and engine stop atomic with utterance registration.
+            if (ttsState == TtsState.READY) textToSpeech.stop()
+            lastInteractionMessage = ""
+            lastInteractionMessageAtMs = 0L
+            owned
+        }
+        commandUtterances.forEach { markUtteranceFinished(it, completed = false) }
+    }
+
     fun cancelPriorityUserTrainingFeedback() {
         val strictUtterances = synchronized(pendingUtterances) {
-            explicitTerminalRequiredUtterances.toList()
+            utteranceCallbacks.protectedUtteranceIds()
         }
         if (strictUtterances.isNotEmpty() && ttsState == TtsState.READY) {
             textToSpeech.stop()
@@ -339,6 +472,24 @@ class AndroidFeedbackActuator(
         return true
     }
 
+    /** Explicit home command responses need a real offline voice, not walking capability approval. */
+    fun speakHomeCommandInteraction(
+        message: String,
+        onFailed: () -> Unit,
+        onCompleted: (() -> Unit)? = null,
+    ): NavigationSpeechDispatchResult {
+        if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
+        if (ttsState != TtsState.READY) return NavigationSpeechDispatchResult.UNAVAILABLE
+        return speakReady(
+            message = message,
+            priority = SpeechPriority.INTERACTION,
+            onCompleted = onCompleted,
+            onFailed = onFailed,
+            requiresExplicitTerminalCallback = true,
+            protectsFromFollowingSpeech = false,
+        )
+    }
+
     fun speakInteraction(message: String): Boolean =
         speak(message, SpeechPriority.INTERACTION) == NavigationSpeechDispatchResult.ACCEPTED
 
@@ -351,6 +502,8 @@ class AndroidFeedbackActuator(
         priority = SpeechPriority.INTERACTION,
         onCompleted = onCompleted,
         onFailed = onFailed,
+        requiresExplicitTerminalCallback = true,
+        protectsFromFollowingSpeech = false,
     )
 
     fun speakExplicitConfirmation(
@@ -364,6 +517,23 @@ class AndroidFeedbackActuator(
         onFailed = onFailed,
         requiresExplicitTerminalCallback = true,
     )
+
+    /** Explicit consent reading can precede startup checks, but still requires a ready offline voice. */
+    fun speakConsentClause(
+        message: String,
+        onCompleted: () -> Unit,
+        onFailed: () -> Unit,
+    ): NavigationSpeechDispatchResult {
+        if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
+        if (ttsState != TtsState.READY) return NavigationSpeechDispatchResult.UNAVAILABLE
+        return speakReady(
+            message = message,
+            priority = SpeechPriority.INTERACTION,
+            onCompleted = onCompleted,
+            onFailed = onFailed,
+            requiresExplicitTerminalCallback = true,
+        )
+    }
 
     fun speakPriorityUserTraining(
         message: String,
@@ -471,6 +641,8 @@ class AndroidFeedbackActuator(
         )
     }
 
+    fun isSpeechInitializing(): Boolean = ttsState == TtsState.INITIALIZING
+
     fun statusText(): String {
         return when (ttsState) {
             TtsState.INITIALIZING -> "tts=initializing"
@@ -490,6 +662,7 @@ class AndroidFeedbackActuator(
         advisoryStartDeadlineMs: Long? = null,
         advisoryStartValidator: (() -> Boolean)? = null,
         requiresExplicitTerminalCallback: Boolean = false,
+        protectsFromFollowingSpeech: Boolean = requiresExplicitTerminalCallback,
     ): NavigationSpeechDispatchResult {
         if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
         if (!speechAllowed()) return NavigationSpeechDispatchResult.UNAVAILABLE
@@ -524,6 +697,7 @@ class AndroidFeedbackActuator(
             advisoryStartDeadlineMs,
             advisoryStartValidator,
             requiresExplicitTerminalCallback,
+            protectsFromFollowingSpeech,
         )
     }
 
@@ -544,12 +718,13 @@ class AndroidFeedbackActuator(
         advisoryStartDeadlineMs: Long? = null,
         advisoryStartValidator: (() -> Boolean)? = null,
         requiresExplicitTerminalCallback: Boolean = false,
+        protectsFromFollowingSpeech: Boolean = requiresExplicitTerminalCallback,
     ): NavigationSpeechDispatchResult {
         val isRisk = priority == SpeechPriority.RISK
         val isInteraction = priority == SpeechPriority.INTERACTION
         val isAdvisory = priority == SpeechPriority.ADVISORY
         val strictTrainingUtterance = synchronized(pendingUtterances) {
-            explicitTerminalRequiredUtterances.firstOrNull()
+            utteranceCallbacks.protectedUtteranceIds().firstOrNull()
         }
         if (strictTrainingUtterance != null) {
             if (!isRisk) return NavigationSpeechDispatchResult.SUPPRESSED
@@ -588,6 +763,10 @@ class AndroidFeedbackActuator(
         val riskPending = synchronized(pendingUtterances) {
             pendingUtterances.any { it.startsWith("$ANNOUNCE_ASSERTIVE_PREFIX-") }
         }
+        val isCommandInteraction = isInteraction && requiresExplicitTerminalCallback &&
+            !protectsFromFollowingSpeech
+        // Do not queue cancellable commands behind risk speech: stopping that queue would stop risk.
+        if (isCommandInteraction && riskPending) return NavigationSpeechDispatchResult.SUPPRESSED
         if (priority == SpeechPriority.NAVIGATION) {
             val pendingIds = synchronized(pendingUtterances) { pendingUtterances.toList() }
             if (pendingIds.isNotEmpty()) {
@@ -628,6 +807,7 @@ class AndroidFeedbackActuator(
             advisoryStartDeadlineMs,
             advisoryStartValidator,
             requiresExplicitTerminalCallback,
+            protectsFromFollowingSpeech,
         )
         if (!requestAudioFocus(isRisk)) {
             if (queueMode == TextToSpeech.QUEUE_FLUSH) textToSpeech.stop()
@@ -637,7 +817,7 @@ class AndroidFeedbackActuator(
         val speakResult = textToSpeech.speak(message, queueMode, params, utteranceId)
         if (speakResult == TextToSpeech.ERROR) {
             if (queueMode == TextToSpeech.QUEUE_FLUSH) textToSpeech.stop()
-            failRequiredSpeechRuntime(utteranceId)
+            failRequiredSpeechRuntime(utteranceId, notifyFailure = false)
             return NavigationSpeechDispatchResult.UNAVAILABLE
         }
         if (isRisk) {
@@ -820,11 +1000,12 @@ class AndroidFeedbackActuator(
         startDeadlineMs: Long?,
         startValidator: (() -> Boolean)?,
         requiresExplicitTerminalCallback: Boolean,
+        protectsFromFollowingSpeech: Boolean,
     ) {
         synchronized(pendingUtterances) {
             pendingUtterances.add(utteranceId)
             pendingUtteranceOrder.add(utteranceId)
-            utteranceCallbacks.register(utteranceId, onCompleted, onFailed)
+            utteranceCallbacks.register(utteranceId, onCompleted, onFailed, protectsFromFollowingSpeech)
             utteranceMessageLengths[utteranceId] = messageLength
             riskRank?.let { utteranceRiskRanks[utteranceId] = it }
             startDeadlineMs?.let { utteranceStartDeadlines[utteranceId] = it }
@@ -877,11 +1058,10 @@ class AndroidFeedbackActuator(
                 utteranceRiskRanks.remove(predecessor)
                 utteranceStartDeadlines.remove(predecessor)
                 utteranceStartValidators.remove(predecessor)
-                val explicitTerminalRequired =
-                    explicitTerminalRequiredUtterances.remove(predecessor)
+                explicitTerminalRequiredUtterances.remove(predecessor)
                 utteranceCallbacks.takeTerminalCallback(
                     utteranceId = predecessor,
-                    completed = !explicitTerminalRequired,
+                    completed = false,
                     notifyFailure = true,
                 )?.let(inferredTerminalCallbacks::add)
             }
@@ -1002,6 +1182,7 @@ class AndroidFeedbackActuator(
     override fun close() {
         ready.set(false)
         ttsState = TtsState.CLOSED
+        ttsEngineGeneration += 1L
         pendingSpeechQueue.clear()
         cancelPriorityUserTrainingVibration(notifyFailure = false)
         val watchdogs: List<Runnable>
@@ -1025,8 +1206,10 @@ class AndroidFeedbackActuator(
         progressTone?.release()
         progressTone = null
         vibrator?.cancel()
-        textToSpeech.stop()
-        textToSpeech.shutdown()
+        if (::textToSpeech.isInitialized) {
+            textToSpeech.stop()
+            textToSpeech.shutdown()
+        }
     }
 
     private enum class TtsState {
@@ -1035,5 +1218,35 @@ class AndroidFeedbackActuator(
         FAILED,
         LANGUAGE_UNSUPPORTED,
         CLOSED,
+    }
+}
+
+internal enum class TtsRuntimeFailureDisposition {
+    IGNORE,
+    UTTERANCE,
+    ENGINE,
+    LANGUAGE,
+}
+
+internal fun ttsRuntimeFailureDisposition(
+    errorCode: Int,
+    utterancePending: Boolean,
+    currentEngine: Boolean,
+): TtsRuntimeFailureDisposition {
+    if (!utterancePending || !currentEngine) return TtsRuntimeFailureDisposition.IGNORE
+    return when (errorCode) {
+        TextToSpeech.ERROR_SERVICE -> TtsRuntimeFailureDisposition.ENGINE
+        TextToSpeech.ERROR_NOT_INSTALLED_YET -> TtsRuntimeFailureDisposition.LANGUAGE
+        else -> TtsRuntimeFailureDisposition.UTTERANCE
+    }
+}
+
+internal class TtsEngineRecoveryBudget {
+    private var retryUsed = false
+
+    fun claimRetry(): Boolean {
+        if (retryUsed) return false
+        retryUsed = true
+        return true
     }
 }

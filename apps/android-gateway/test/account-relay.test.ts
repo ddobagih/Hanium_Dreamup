@@ -447,6 +447,86 @@ test("account relays bound malformed and oversized upstream bodies and redact er
   });
 });
 
+test("email OTP retry preserves the Backend delivery lease for the same request", async () => {
+  const clientIp = nextClientIp();
+  const payload = enrollmentBody({ email: "person@EXAMPLE.ORG" });
+  const request = (): Request => postJson(
+    "/api/account-enrollments/email-otp",
+    payload,
+    { "cf-connecting-ip": clientIp }
+  );
+  let attempts = 0;
+  const fetchImpl: GatewayFetch = async (input, init) => {
+    assert.equal(new URL(String(input)).pathname, "/account-enrollments/email-otp");
+    assert.equal(init?.method, "POST");
+    assert.deepEqual(JSON.parse(String(init?.body)), { ...payload, email: "person@example.org" });
+    assert.equal(new Headers(init?.headers).get(BACKEND_ACCOUNT_CLIENT_IP_HEADER), clientIp);
+    attempts += 1;
+    if (attempts === 1) throw new TypeError("test transport disconnected after admission");
+    if (attempts === 2) {
+      return Response.json({
+        detail: {
+          code: "account_enrollment_in_progress",
+          message: "private delivery details"
+        }
+      }, { status: 409, headers: { "retry-after": "17" } });
+    }
+    return Response.json({
+      schema_version: "walksafe.account-enrollment-email-otp-response.v1",
+      enrollment_handle: ENROLLMENT_HANDLE,
+      expires_at: "2026-09-06T01:10:00Z",
+      resend_available_at: "2026-09-06T01:01:00Z"
+    }, { status: 202 });
+  };
+
+  const disconnected = await handleGatewayRequest(request(), { fetchImpl });
+  assert.equal(disconnected.status, 502);
+  assert.deepEqual(await disconnected.json(), {
+    detail: { code: "gateway_upstream_unavailable" }
+  });
+  const pending = await handleGatewayRequest(request(), { fetchImpl });
+  assert.equal(pending.status, 409);
+  assert.equal(pending.headers.get("retry-after"), "17");
+  assert.equal(pending.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await pending.json(), {
+    detail: { code: "account_enrollment_in_progress" }
+  });
+  const delivered = await handleGatewayRequest(request(), { fetchImpl });
+  assert.equal(delivered.status, 202);
+  assert.equal((await delivered.json() as { enrollment_handle: string }).enrollment_handle, ENROLLMENT_HANDLE);
+  assert.equal(attempts, 3);
+});
+
+test("email OTP delivery lease rejects malformed retry hints and unrelated conflicts", async () => {
+  for (const retryAfter of ["0", "-1", "1.5", "1000000", "private-details"]) {
+    const response = await handleGatewayRequest(
+      postJson("/api/account-enrollments/email-otp", enrollmentBody(), {
+        "cf-connecting-ip": nextClientIp()
+      }),
+      {
+        fetchImpl: async () => Response.json(
+          { detail: { code: "account_enrollment_in_progress" } },
+          { status: 409, headers: { "retry-after": retryAfter } }
+        )
+      }
+    );
+    assert.equal(response.status, 409);
+    assert.equal(response.headers.get("retry-after"), null);
+  }
+  const conflict = await handleGatewayRequest(
+    postJson("/api/account-enrollments/email-otp", enrollmentBody(), {
+      "cf-connecting-ip": nextClientIp()
+    }),
+    {
+      fetchImpl: async () => Response.json(
+        { detail: { code: "account_enrollment_idempotency_conflict" } },
+        { status: 409, headers: { "retry-after": "17" } }
+      )
+    }
+  );
+  assert.equal(conflict.headers.get("retry-after"), null);
+});
+
 test("password login creates a v6 Backend account session without static accounts", async () => {
   delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
   const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3003";

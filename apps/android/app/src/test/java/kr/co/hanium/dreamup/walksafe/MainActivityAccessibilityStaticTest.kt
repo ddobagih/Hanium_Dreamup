@@ -10,34 +10,44 @@ class MainActivityAccessibilityStaticTest {
     private val manifest = File("src/main/AndroidManifest.xml").readText()
 
     @Test
-    fun screenReaderModeKeepsRiskHapticAndFallsBackAfterNavigationTtsFailure() {
-        assertTrue(source.contains("private fun isScreenReaderActive()"))
-        val screenReaderDetection = source.substringAfter("private fun isScreenReaderActive()")
-            .substringBefore("private fun isFeedbackLifecycleCurrent")
-        assertTrue(screenReaderDetection.contains("AccessibilityServiceInfo.FEEDBACK_SPOKEN"))
-        assertTrue(screenReaderDetection.contains("getEnabledAccessibilityServiceList("))
-        assertFalse(screenReaderDetection.contains("isTouchExplorationEnabled"))
-        assertTrue(source.contains("actuator.vibrateRiskOnly(action)"))
-        assertTrue(source.contains("actuator.prepareForExternalRiskAnnouncement()"))
-        val navigation = source
-            .substringAfter("private fun speakNavigation(message: String, onCompleted: (() -> Unit)? = null)")
-            .substringBefore("private fun speakInteraction(message: String)")
+    fun appOwnedFeedbackUsesTtsCompletionWithScreenReaderEnabledOrDisabled() {
+        val detection = functionBlock("private fun isScreenReaderActive()")
+        assertTrue(detection.contains("AccessibilityServiceInfo.FEEDBACK_SPOKEN"))
+        assertTrue(detection.contains("getEnabledAccessibilityServiceList("))
+        assertFalse(detection.contains("isTouchExplorationEnabled"))
+        val risk = functionBlock("private fun emitFeedbackAction(")
+        assertTrue(risk.contains("val dispatch = actuator.emit("))
+        assertTrue(risk.contains("vibrationAccepted = dispatch.vibrationAccepted"))
+        assertTrue(risk.contains("onSpeechCompleted = {"))
+        assertTrue(risk.contains("onSpeechFailed = {"))
+        assertFalse(risk.contains("announceForTalkBack("))
+        assertFalse(risk.contains("isScreenReaderActive()"))
+        val navigation = functionBlock("private fun speakNavigation(")
         assertTrue(navigation.contains("val mainThreadCompletion = onCompleted?.let"))
         assertTrue(navigation.contains("if (isFeedbackLifecycleCurrent(generation)) completion()"))
         assertTrue(navigation.contains("onCompleted = mainThreadCompletion"))
-        assertTrue(navigation.contains("return dispatchNavigationSpeech("))
-        assertTrue(navigation.contains("ensureFeedbackActuator().speakNavigation(ttsMessage, onTtsCompleted, onTtsFailed)"))
-        assertTrue(navigation.contains("dispatchNavigationTalkBackFallback(fallbackMessage, onDelivered, generation)"))
-        val fallback = source
-            .substringAfter("private fun dispatchNavigationTalkBackFallback(")
-            .substringBefore("private fun speakInteraction(message: String)")
-        assertTrue(fallback.contains("Looper.myLooper() != Looper.getMainLooper()"))
-        assertTrue(fallback.contains("dispatchNavigationTalkBackFallback(message, onDelivered, generation)"))
-        assertTrue(fallback.contains("if (!isFeedbackLifecycleCurrent(generation)) return false"))
-        assertTrue(fallback.contains("if (!isScreenReaderActive()) return false"))
-        assertTrue(fallback.contains("priority = TalkBackAnnouncementPriority.NAVIGATION"))
-        assertTrue(fallback.contains("onDelivered = onDelivered"))
-        assertTrue(source.contains("statusText.announceForAccessibility(message)\n            onDelivered?.invoke()"))
+        assertTrue(navigation.contains("return ensureFeedbackActuator().speakNavigation("))
+        assertFalse(navigation.contains("announceForTalkBack("))
+        assertFalse(source.contains("private fun dispatchNavigationTalkBackFallback("))
+        val interaction = functionBlock("private fun speakInteraction(")
+        val commandResponse = functionBlock("private fun speakCommandResponse(")
+        assertTrue(interaction.contains("speakCommandResponse(message)"))
+        assertFalse(interaction.contains("announceForTalkBack("))
+        assertTrue(commandResponse.contains("commandSpeechResponseCallbacks.registerLatest("))
+        assertTrue(commandResponse.contains("val completed: () -> Unit = {"))
+        assertTrue(commandResponse.contains("val failed: () -> Unit = {"))
+        assertTrue(
+            commandResponse.contains(
+                "actuator.speakHomeCommandInteraction(message, onFailed = failed, onCompleted = completed)",
+            ),
+        )
+        assertTrue(
+            commandResponse.contains(
+                "actuator.speakInteraction(message, onCompleted = completed, onFailed = failed)",
+            ),
+        )
+        assertFalse(commandResponse.contains("isScreenReaderActive()"))
+        assertFalse(commandResponse.contains("announceForTalkBack("))
     }
 
     @Test
@@ -241,39 +251,27 @@ class MainActivityAccessibilityStaticTest {
     }
 
     @Test
-    fun riskFeedbackMovesToMainThreadAndCancelsActiveSpeechRecognition() {
-        val feedback = source.substringAfter(
-            "private fun emitFeedbackAction(action: FeedbackAction, policyEvaluatedAtMs: Long)",
-        )
-            .substringBefore("private fun speakNavigation(message: String, onCompleted: (() -> Unit)? = null)")
-
+    fun riskFeedbackKeepsFreshnessTerminalEvidenceAndRecognitionPreemption() {
+        val feedback = functionBlock("private fun emitFeedbackAction(")
         assertTrue(feedback.contains("Looper.myLooper() != Looper.getMainLooper()"))
         assertTrue(feedback.contains("if (!isFeedbackLifecycleCurrent(generation)) {"))
         assertTrue(feedback.contains("emitFeedbackAction(action, policyEvaluatedAtMs)"))
         assertTrue(feedback.contains("if (isRisk && voiceRecognitionActive) cancelVoiceCommandRecognition()"))
         assertTrue(feedback.contains("shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk)"))
-        assertTrue(source.contains("!feedbackPolicy.canSpeakNavigation(SystemClock.elapsedRealtime())"))
-        assertTrue(source.contains("voice=blocked_by_active_feedback"))
-        assertTrue(source.contains("feedbackActuator?.prepareForSpeechRecognition() == false"))
-        assertTrue(source.contains("voice=blocked_by_risk_speech"))
-        assertTrue(feedback.indexOf("prepareForExternalRiskAnnouncement()") < feedback.indexOf("announceForTalkBack("))
-        assertTrue(feedback.contains("confirmFeedbackDelivery(action, policyEvaluatedAtMs)"))
-        assertTrue(feedback.contains("SystemClock.elapsedRealtime()"))
-        assertTrue(feedback.contains("feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)"))
+        assertTrue(feedback.contains("isFeedbackActionStillDeliverable(action)"))
         assertTrue(feedback.contains("feedbackPolicy.claimFeedbackDelivery(action.trackId, policyEvaluatedAtMs)"))
-        assertTrue(feedback.contains("val vibrationAccepted = if (isRisk) actuator.vibrateRiskOnly(action) else false"))
-        assertTrue(feedback.contains("if (screenReaderActive)"))
-        assertTrue(feedback.contains("} else if (isRisk) {"))
-        assertTrue(
-            feedback.indexOf("if (screenReaderActive)") <
-                feedback.indexOf("val talkBackAccepted = announceForTalkBack("),
-        )
+        assertTrue(feedback.contains("feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)"))
+        assertTrue(feedback.contains("confirmFeedbackDelivery(action, policyEvaluatedAtMs)"))
         assertTrue(feedback.contains("onSpeechCompleted = {"))
         assertTrue(feedback.contains("onSpeechFailed = {"))
         assertTrue(feedback.contains("scheduleFeedbackTerminalResolution("))
         assertTrue(feedback.contains("dispatch.speech != NavigationSpeechDispatchResult.ACCEPTED"))
-        val progressBeep = source.substringAfter("private fun maybePlayProgressBeep(")
-            .substringBefore("private fun updateDebugUploadButton()")
+        assertFalse(feedback.contains("talkBackAccepted"))
+        val current = functionBlock("private fun isFeedbackActionStillDeliverable(")
+        assertTrue(current.contains("nowMs <= action.validUntilMs"))
+        assertTrue(current.contains("action.deliveryKey in current.activeFeedbackDeliveryKeys"))
+        assertTrue(source.contains("feedbackActuator?.prepareForSpeechRecognition() == false"))
+        val progressBeep = functionBlock("private fun maybePlayProgressBeep(")
         assertTrue(progressBeep.contains("if (!isActivityForeground) return"))
         assertTrue(progressBeep.contains("shouldSuppressFeedbackDuringVoiceRecognition"))
     }
@@ -324,8 +322,8 @@ class MainActivityAccessibilityStaticTest {
         val navigation = source
             .substringAfter("private fun speakNavigation(message: String, onCompleted: (() -> Unit)? = null)")
             .substringBefore("private fun speakInteraction(message: String)")
-        val interaction = source.substringAfter("private fun speakInteraction(message: String)")
-            .substringBefore("private fun isScreenReaderActive()")
+        val interaction = functionBlock("private fun speakInteraction(")
+        val commandResponse = functionBlock("private fun speakCommandResponse(")
 
         assertTrue(source.contains("private var feedbackLifecycleGeneration = 0"))
         assertTrue(lifecycle.contains("feedbackLifecycleGeneration += 1\n        isActivityForeground = true"))
@@ -335,8 +333,18 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(navigation.contains("if (!isFeedbackLifecycleCurrent(generation)) return false"))
         assertTrue(navigation.contains("shouldSuppressFeedbackDuringVoiceRecognition"))
         assertTrue(navigation.contains("if (isFeedbackLifecycleCurrent(generation)) completion()"))
-        assertTrue(interaction.contains("if (!isFeedbackLifecycleCurrent(generation)) return false"))
-        assertTrue(interaction.contains("shouldSuppressFeedbackDuringVoiceRecognition"))
+        assertTrue(interaction.contains("speakCommandResponse(message)"))
+        assertTrue(commandResponse.contains("val lifecycleGeneration = feedbackLifecycleGeneration"))
+        assertTrue(
+            commandResponse.contains(
+                "if (!isFeedbackLifecycleCurrent(lifecycleGeneration))",
+            ),
+        )
+        assertTrue(commandResponse.contains("shouldSuppressFeedbackDuringVoiceRecognition"))
+        assertTrue(commandResponse.contains("isFeedbackLifecycleCurrent(lifecycleGeneration)"))
+        assertTrue(commandResponse.contains("recognitionGeneration == voiceRecognitionGeneration"))
+        assertTrue(commandResponse.contains("responseActor == reporterUserId"))
+        assertTrue(commandResponse.contains("walkSessionLifecycle.snapshot().epoch == responseEpoch"))
         val locationCallback = source.substringAfter(
             "override fun onLocationResult(result: LocationResult)",
         ).substringBefore("private fun freshTrustedLocationOrNull(")
@@ -453,62 +461,45 @@ class MainActivityAccessibilityStaticTest {
         assertFalse(source.contains("setPadding(32, 48, 32, 32)"))
     }
     @Test
-    fun settingsSectionStaysHiddenUntilFirstRunOnboardingCompletes() {
-        // 온보딩 중에는 설정·동의·계정 섹션을 접근성 트리에서 제거한다. 단계와 무관한
-        // 컨트롤이 낭독 순서를 채우고, 안전 고지를 읽기 전에 동의 초안이 기록되는 것을 막는다.
-        // 계정 삭제 복구 로그인 화면은 온보딩 완료 전에도 필요하므로 예외로 둔다.
+    fun settingsPageKeepsOnboardingGatesAndDeletionRecoveryAccess() {
         val update = functionBlock("private fun updateFirstRunOnboardingUi")
-
         assertTrue(update.contains("updatePrivacySectionVisibility()"))
-
-        val visibility = functionBlock("private fun updatePrivacySectionVisibility")
-        assertTrue(visibility.contains("privacySettingsControls.visibility"))
-        assertTrue(visibility.contains("accountDeletionControls.visibility"))
-        assertTrue(visibility.contains("gatewaySessionControls.visibility"))
-        assertTrue(visibility.contains("firstRunOnboardingComplete()"))
-        assertTrue(visibility.contains("accountDeletionRecoveryLoginRequired()"))
-        assertTrue(visibility.contains("BuildConfig.DEBUG"))
-        assertTrue(visibility.contains("View.GONE"))
-        assertTrue(visibility.contains("privacySectionExpanded"))
-        assertTrue(visibility.contains("deletionRecoverySurface"))
-        assertTrue(visibility.contains("gatewaySessionControlsExpanded"))
-        assertTrue(source.contains("label = \"설정과 개인정보 펼치기\""))
-        assertTrue(source.contains("label = \"개발자용 Gateway 설정 펼치기\""))
+        assertTrue(functionBlock("private fun updatePrivacySectionVisibility").contains("renderMainUi()"))
+        val renderer = functionBlock("private fun renderMainUi()")
+        assertTrue(renderer.contains("val homeAvailable = shouldShowNativeHome()"))
+        assertTrue(renderer.contains("accountDeletionRecoveryLoginRequired()"))
+        assertTrue(renderer.contains("if (!homeAvailable && !forceSettings)"))
+        assertTrue(renderer.contains("settingsVisible && homeAvailable && !deletionRecovery"))
+        assertTrue(renderer.contains("gatewaySessionControls.visibility = if (deletionRecovery) View.VISIBLE else View.GONE"))
+        assertTrue(renderer.contains("privacySectionToggleButton.visibility = View.GONE"))
+        assertTrue(renderer.contains("gatewaySessionControlsToggleButton.visibility = View.GONE"))
     }
 
     @Test
-    fun secondaryAndGatewayControlsUseExplicitCollapsedDisclosure() {
-        val privacy = functionBlock("private fun updatePrivacySectionVisibility()")
-        assertTrue(privacy.contains("privacyControls.visibility"))
-        assertTrue(privacy.contains("privacySectionExpanded"))
-        assertTrue(privacy.contains("gatewaySessionControls.visibility"))
-        assertTrue(privacy.contains("gatewaySessionControlsExpanded"))
-        assertTrue(privacy.contains("accountDeletionRecoveryLoginRequired()"))
-        assertTrue(privacy.contains("contentDescription"))
-
-        val overlay = sourceBlock(
-            "val overlay = LinearLayout(this).apply",
-            "walkSafetyOverlay = LinearLayout(this).apply",
-        )
-        val disclosure = overlay.indexOf("addView(privacySectionToggleButton)")
-        val controls = overlay.indexOf("addView(privacyControls)")
-        assertTrue(disclosure >= 0)
-        assertTrue(controls >= 0)
-        assertTrue(disclosure < controls)
+    fun settingsUsesTheExplicitPageWithoutRestoringRemovedDisclosureControls() {
+        val renderer = functionBlock("private fun renderMainUi()")
+        assertTrue(renderer.contains("nativeUiPage == NativeUiPage.SETTINGS"))
+        assertTrue(renderer.contains("privacyControls.visibility = if (settingsVisible) View.VISIBLE else View.GONE"))
+        assertTrue(renderer.contains("nativeSettingsHomeButton.visibility"))
+        assertTrue(renderer.contains("privacySectionToggleButton.visibility = View.GONE"))
+        val overlay = sourceBlock("val overlay = LinearLayout(this).apply", "walkSafetyOverlay = LinearLayout(this).apply")
+        assertTrue(overlay.contains("addView(privacyControls)"))
+        assertFalse(overlay.contains("addView(privacySectionToggleButton)"))
     }
 
     @Test
-    fun allInteractiveControlsReceiveReadableTextAndFortyEightDpTargets() {
+    fun allInteractiveControlsReceiveReadableTextAndCurrentMinimumTargets() {
         val defaults = functionBlock("private fun applyAccessibleControlDefaults(")
         assertTrue(defaults.contains("accessibilityTargetSizePx()"))
         assertTrue(defaults.contains("minimumHeight = maxOf"))
         assertTrue(defaults.contains("minimumWidth = maxOf"))
-        assertTrue(source.contains("const val MIN_INTERACTIVE_TEXT_SP = 16f"))
+        assertTrue(source.contains("const val MIN_INTERACTIVE_TEXT_SP = 18f"))
         assertTrue(defaults.contains("TypedValue.applyDimension("))
         assertTrue(defaults.contains("if (root.textSize < minimumTextSizePx)"))
         assertTrue(defaults.contains("root is ViewGroup"))
         assertTrue(source.contains("applyAccessibleControlDefaults(overlay)"))
     }
+
     @Test
     fun controlsCarryTheMeasuredDesignTokensInsteadOfPlatformDefaults() {
         // 측정된 대비값을 코드 상수로 고정한다. 흰 글자/회색 면 6.97:1, 테두리 4.08:1.
@@ -527,7 +518,7 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(factory.contains("bottomMargin"))
         // 기존 접근성 계약은 그대로 유지한다.
         assertTrue(factory.contains("setSingleLine(false)"))
-        assertTrue(factory.contains("minimumHeight = (48f * resources.displayMetrics.density).roundToInt()"))
+        assertTrue(factory.contains("minimumHeight = (WS_TOUCH_MIN_DP * resources.displayMetrics.density).roundToInt()"))
     }
     @Test
     fun onboardingShowsStepProgressAsDecorationAndStatusTextAsTitle() {
@@ -551,52 +542,41 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(title.contains("textSize = 20f"))
     }
     @Test
-    fun acknowledgedSafetyNoticeCollapsesToACompactDisclosure() {
-        // 최초 안전 확인 뒤에는 카드 전문을 숨기고 한 개의 명시적인
-        // 펼침 동작만 남겨 1.5배 글꼴에서도 현재 단계와 로그인을 먼저 볼 수 있게 한다.
-        assertTrue(source.contains("WS_COLOR_NOTICE_TEXT"))
-        assertTrue(source.contains("WS_COLOR_NOTICE_FILL"))
-
-        val notice = sourceBlock(
-            "productPurposeText = TextView(this).apply",
-            "firstRunProgressSegments.clear()",
-        )
-        assertTrue(notice.contains("GradientDrawable()"))
-        assertTrue(notice.contains("WS_COLOR_NOTICE_TEXT"))
-        assertFalse(notice.contains("setTextColor(0xffffffff.toInt())"))
-
-        val update = functionBlock("private fun refreshFirstRunNoticeUi")
-        assertTrue(update.contains("productPurposeText.visibility"))
-        assertTrue(update.contains("if (expanded) View.VISIBLE else View.GONE"))
-        assertTrue(
-            update.contains(
-                "안전 보장·보조수단 대체 아님 · 자세히 보기",
-            ),
-        )
-        assertFalse(update.contains("신고는 자동 아님"))
-    }
-    @Test
-    fun safetyNoticeCollapsesOnlyAfterTheUserAcknowledgesIt() {
-        // 1단계에서는 전문이 펼쳐진 채 확인 버튼이 그 아래에 온다. 순서 자체가 게이트이므로
-        // 스크롤 위치 같은 시각 전용 조건을 걸지 않는다. 확인 뒤에는 접히고, 접힌 줄은
-        // 정책 상수 WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO 를 그대로 발췌해 새 문구를 만들지 않는다.
-        assertTrue(source.contains("firstRunNoticeToggleButton"))
-        assertTrue(source.contains("WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO"))
-
+    fun safetyNoticeUsesTheCurrentFullBodyOnlyOnItsOnboardingStage() {
         val update = functionBlock("private fun refreshFirstRunNoticeUi")
         assertTrue(update.contains("FirstRunOnboardingStage.PURPOSE_AND_SAFETY"))
-        assertTrue(update.contains("WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO"))
-        assertTrue(update.contains("contentDescription"))
-        assertFalse(update.contains("scrollY"))
-        assertFalse(update.contains("canScrollVertically"))
+        assertTrue(update.contains("firstRunNoticeToggleButton.visibility = View.GONE"))
+        assertTrue(update.contains("productPurposeText.visibility = if (visible) View.VISIBLE else View.GONE"))
+        assertTrue(update.contains("모든 장애물과 위험을 감지하지 못하며"))
+        assertTrue(update.contains("흰지팡이·안내견 등 기존 보조수단을 대신하지 않습니다."))
+        assertTrue(update.contains("안내가 없더라도 안전하다고 판단하지 마세요."))
+        assertTrue(update.contains("productPurposeText.contentDescription = productPurposeText.text"))
+        assertTrue(update.contains("applyWsSafetyNoticeBody(productPurposeText)"))
     }
 
     @Test
-    fun dynamicDestinationResultsKeepReadableTextAndTouchTargets() {
+    fun safetyNoticeAcknowledgmentRemainsExplicitAndIndependentOfScrolling() {
+        val update = functionBlock("private fun refreshFirstRunNoticeUi")
+        assertTrue(update.contains("FirstRunOnboardingStage.PURPOSE_AND_SAFETY"))
+        assertFalse(update.contains("scrollY"))
+        assertFalse(update.contains("canScrollVertically"))
+        val action = sourceBlock("firstRunPurposeButton = accessiblePriorityUserButton(", "firstRunAgeButtons.clear()")
+        assertTrue(action.contains("onClick = ::acknowledgeFirstRunPurposeAndSafety"))
+        assertTrue(action.contains("emphasis = true"))
+        val acknowledgment = functionBlock("private fun acknowledgeFirstRunPurposeAndSafety()")
+        assertTrue(acknowledgment.contains("FirstRunOnboardingStage.PURPOSE_AND_SAFETY"))
+    }
+
+    @Test
+    fun dynamicDestinationResultsKeepReadableNamesAddressesAndFullWidthTargets() {
         val update = functionBlock("private fun updateDestinationSearchUi")
-        assertTrue(update.contains("textSize = MIN_INTERACTIVE_TEXT_SP"))
-        assertTrue(update.contains("minimumHeight = accessibilityTargetSizePx()"))
-        assertTrue(update.contains("minimumWidth = accessibilityTargetSizePx()"))
+        assertTrue(update.contains("applyWsButtonStyle(this, WS_TOUCH_WALK_ACTION_DP)"))
+        assertTrue(update.contains("textSize = 22f"))
+        assertTrue(update.contains("AbsoluteSizeSpan(18, true)"))
+        assertTrue(update.contains("minimumHeight = (200 * density).toInt()"))
+        assertTrue(update.contains("ViewGroup.LayoutParams.MATCH_PARENT"))
+        assertTrue(update.contains("setSingleLine(false)"))
+        assertTrue(update.contains("openNativeDestinationConfirmation(result)"))
         assertFalse(update.contains("textSize = 12f"))
         assertFalse(update.contains("textSize = 11f"))
     }
@@ -670,24 +650,20 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(complete.contains("권한·안전 상태"))
     }
     @Test
-    fun primaryActionIsVisuallySeparatedFromSecondaryChoices() {
-        // 각 단계의 주 행동만 56dp 와 강조 테두리를 갖는다. 연령 3개처럼 대등한 선택은
-        // 어느 하나를 권장처럼 보이게 하면 안 되므로 모두 보조로 둔다.
-        assertTrue(source.contains("WS_TOUCH_PRIMARY_DP"))
-        assertTrue(source.contains("WS_COLOR_EMPHASIS"))
-
-        val factory = source.substringAfter("fun accessiblePriorityUserButton(")
-            .substringBefore("firstRunNoticeToggleButton =")
+    fun primaryActionsRetainTheirSharedAccessibleSizeAndExplicitHandlers() {
+        val factory = source.substringAfter("fun accessiblePriorityUserButton(").substringBefore("productPurposeText =")
         assertTrue(factory.contains("emphasis: Boolean"))
-        // 기존 접근성 계약 유지
-        assertTrue(factory.contains("minimumHeight = (48f * resources.displayMetrics.density).roundToInt()"))
+        assertTrue(factory.contains("minimumHeight = (WS_TOUCH_MIN_DP * resources.displayMetrics.density).roundToInt()"))
         assertTrue(factory.contains("setSingleLine(false)"))
-
-        assertTrue(source.contains("label = \"목적과 안전 한계 확인\",\n            emphasis = true,"))
-        assertTrue(
-            source.contains("label = \"네 가지 선택을 서버에 저장하고 확인\",\n            emphasis = true,"),
-        )
+        assertTrue(factory.contains("wsEmphasisButtons += this"))
+        val purpose = sourceBlock("firstRunPurposeButton = accessiblePriorityUserButton(", "firstRunAgeButtons.clear()")
+        assertTrue(purpose.contains("emphasis = true"))
+        assertTrue(purpose.contains("onClick = ::acknowledgeFirstRunPurposeAndSafety"))
+        val education = sourceBlock("priorityUserEducationAgreeButton = accessiblePriorityUserButton(", "firstRunPhonePostureText =")
+        assertTrue(education.contains("emphasis = true"))
+        assertTrue(education.contains("onClick = ::acceptNativeSafetyEducation"))
     }
+
     @Test
     fun buttonLabelsStayShortOnScreenWhileTalkBackKeepsTheContext() {
         // 화면에는 "만 18세 이상", TalkBack 에는 "가입 연령: 만 18세 이상".

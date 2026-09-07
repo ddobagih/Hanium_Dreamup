@@ -45,6 +45,14 @@ class PriorityUserPracticeAttemptToken internal constructor(
     val sequence: Long,
 )
 
+class PriorityUserUsagePlaybackToken internal constructor(val sequence: Long)
+
+enum class PriorityUserNativeEducationStep {
+    SAFETY_EDUCATION,
+    APP_USAGE_EDUCATION,
+    COMPLETE,
+}
+
 enum class PriorityUserBlockReason(val noticeKo: String) {
     AGE_SELECTION_REQUIRED("먼저 연령대를 선택하세요."),
     MINIMUM_AGE_NOT_MET("만 14세 미만은 계정을 활성화하거나 보행을 시작할 수 없습니다."),
@@ -55,6 +63,7 @@ enum class PriorityUserBlockReason(val noticeKo: String) {
         "오프라인 한국어 음성 안내를 사용할 수 없어 보행을 시작할 수 없습니다.",
     ),
     VIBRATION_UNAVAILABLE("진동 안내를 사용할 수 없어 보행을 시작할 수 없습니다."),
+    APP_USAGE_EDUCATION_INCOMPLETE("사용환경 확인과 앱 사용교육을 완료하세요."),
     SAFETY_EDUCATION_NOT_REVIEWED("안전 제한 안내를 먼저 확인하세요."),
     SAFE_PRACTICE_PLACE_NOT_CONFIRMED("실제 도로가 아닌 안전한 연습 장소를 먼저 확인하세요."),
     REQUIRED_PRACTICE_INCOMPLETE("위험 안내·일시정지·재개·안전정지 연습을 모두 완료하세요."),
@@ -75,6 +84,12 @@ data class PriorityUserOnboardingSnapshot(
     val educationReviewed: Boolean = false,
     val safePracticePlaceConfirmed: Boolean = false,
     val completedPractices: Set<PriorityUserPractice> = emptySet(),
+    val phonePostureAcknowledged: Boolean = false,
+    val practiceNecessityReviewed: Boolean = false,
+    val educationAccepted: Boolean = false,
+    val usageConditionsAcknowledged: Boolean = false,
+    val appUsageReviewed: Boolean = false,
+    val appUsageAccepted: Boolean = false,
 ) {
     init {
         require(policyVersion == PRIORITY_USER_TRAINING_POLICY_VERSION) {
@@ -82,6 +97,22 @@ data class PriorityUserOnboardingSnapshot(
         }
         require(!guardianVerified || ageBand == PriorityUserAgeBand.AGE_14_TO_17) {
             "Guardian verification is meaningful only for a minor account"
+        }
+        require(!practiceNecessityReviewed || educationReviewed) {
+            "Practice-necessity playback requires completed safety education"
+        }
+        require(!educationAccepted ||
+            (educationReviewed && practiceNecessityReviewed)) {
+            "Safety agreement requires both completed playbacks"
+        }
+        require(!usageConditionsAcknowledged || (educationAccepted && phonePostureAcknowledged)) {
+            "Usage-scope acknowledgment requires safety agreement and mounting instructions"
+        }
+        require(!appUsageReviewed || educationAccepted) {
+            "App-usage playback follows safety agreement"
+        }
+        require(!appUsageAccepted || (usageConditionsAcknowledged && appUsageReviewed)) {
+            "App-usage completion requires scope acknowledgment and terminal playback"
         }
         require(!safePracticePlaceConfirmed || educationReviewed) {
             "A safe practice place can be confirmed only after education review"
@@ -96,6 +127,24 @@ data class PriorityUserOnboardingSnapshot(
             "Completed practices must be one ordered prefix"
         }
     }
+
+    val educationConsentComplete: Boolean
+        get() = phonePostureAcknowledged && educationReviewed &&
+            practiceNecessityReviewed && educationAccepted
+
+    val safetyEducationConsentComplete: Boolean
+        get() = educationReviewed && practiceNecessityReviewed && educationAccepted
+
+    val nativeEducationComplete: Boolean
+        get() = educationConsentComplete && usageConditionsAcknowledged &&
+            appUsageReviewed && appUsageAccepted
+
+    val nativeEducationStep: PriorityUserNativeEducationStep
+        get() = when {
+            nativeEducationComplete -> PriorityUserNativeEducationStep.COMPLETE
+            safetyEducationConsentComplete -> PriorityUserNativeEducationStep.APP_USAGE_EDUCATION
+            else -> PriorityUserNativeEducationStep.SAFETY_EDUCATION
+        }
 
     val nextRequiredPractice: PriorityUserPractice?
         get() = PriorityUserPractice.entries.getOrNull(completedPractices.size)
@@ -120,7 +169,7 @@ data class PriorityUserOnboardingDecision(
         get() = walkBlockReason == null
 
     val noticeKo: String
-        get() = walkBlockReason?.noticeKo ?: "최초 보행 전 교육과 안전한 조작 연습을 완료했습니다."
+        get() = walkBlockReason?.noticeKo ?: "최초 보행 전 안전교육 확인을 완료했습니다."
 }
 
 /**
@@ -272,6 +321,8 @@ class PriorityUserOnboardingPolicy(
     private val lock = Any()
     private var current = initial
     private var nextAttemptSequence = 1L
+    private var nextUsageSequence = 1L
+    private var pendingUsagePlayback: PriorityUserUsagePlaybackToken? = null
     private var pendingPractice: PendingPracticeAttempt? = null
     private var practiceLifecycle = PriorityUserPracticeLifecycle(initial.completedPractices)
 
@@ -309,6 +360,67 @@ class PriorityUserOnboardingPolicy(
     ): PriorityUserOnboardingSnapshot = synchronized(lock) {
         if (voicePlaybackCompleted && accountBlockReason(current) == null) {
             current = current.copy(educationReviewed = true)
+        }
+        current
+    }
+
+    fun acknowledgePhonePosture(): PriorityUserOnboardingSnapshot = synchronized(lock) {
+        if (accountBlockReason(current) == null) {
+            current = current.copy(phonePostureAcknowledged = true)
+        }
+        current
+    }
+
+    fun reviewPracticeNecessity(
+        voicePlaybackCompleted: Boolean,
+    ): PriorityUserOnboardingSnapshot = synchronized(lock) {
+        if (voicePlaybackCompleted && current.educationReviewed && accountBlockReason(current) == null) {
+            current = current.copy(practiceNecessityReviewed = true)
+        }
+        current
+    }
+
+    fun acceptEducationConsent(): PriorityUserOnboardingSnapshot = synchronized(lock) {
+        if (current.educationReviewed && current.practiceNecessityReviewed && accountBlockReason(current) == null) {
+            current = current.copy(educationAccepted = true)
+        }
+        current
+    }
+
+    fun acknowledgeUsageConditions(): PriorityUserOnboardingSnapshot = synchronized(lock) {
+        if (current.safetyEducationConsentComplete && accountBlockReason(current) == null) {
+            // Understanding operating limits is not evidence of the current physical environment.
+            current = current.copy(phonePostureAcknowledged = true, usageConditionsAcknowledged = true)
+        }
+        current
+    }
+
+    fun beginAppUsageEducationPlayback(): PriorityUserUsagePlaybackToken? = synchronized(lock) {
+        if (!current.safetyEducationConsentComplete || accountBlockReason(current) != null ||
+            pendingUsagePlayback != null) return@synchronized null
+        PriorityUserUsagePlaybackToken(nextUsageSequence++).also { pendingUsagePlayback = it }
+    }
+
+    fun finishAppUsageEducationPlayback(
+        token: PriorityUserUsagePlaybackToken,
+        completed: Boolean,
+    ): PriorityUserOnboardingSnapshot = synchronized(lock) {
+        if (pendingUsagePlayback !== token) return@synchronized current
+        pendingUsagePlayback = null
+        if (completed && current.safetyEducationConsentComplete && accountBlockReason(current) == null) {
+            current = current.copy(appUsageReviewed = true)
+        }
+        current
+    }
+
+    fun cancelAppUsageEducationPlayback() = synchronized(lock) {
+        pendingUsagePlayback = null
+    }
+
+    fun acceptAppUsageEducation(): PriorityUserOnboardingSnapshot = synchronized(lock) {
+        if (current.safetyEducationConsentComplete && current.usageConditionsAcknowledged &&
+            current.appUsageReviewed && accountBlockReason(current) == null) {
+            current = current.copy(appUsageAccepted = true)
         }
         current
     }
@@ -384,6 +496,12 @@ class PriorityUserOnboardingPolicy(
             educationReviewed = false,
             safePracticePlaceConfirmed = false,
             completedPractices = emptySet(),
+            phonePostureAcknowledged = false,
+            practiceNecessityReviewed = false,
+            educationAccepted = false,
+            usageConditionsAcknowledged = false,
+            appUsageReviewed = false,
+            appUsageAccepted = false,
         )
         cancelPendingPracticeLocked()
         current
@@ -398,6 +516,8 @@ class PriorityUserOnboardingPolicy(
             current.completedPractices::contains,
         )
         val walkBlock = accountBlock ?: when {
+            current.nativeEducationComplete -> null
+            current.safetyEducationConsentComplete -> PriorityUserBlockReason.APP_USAGE_EDUCATION_INCOMPLETE
             !current.educationReviewed ->
                 PriorityUserBlockReason.SAFETY_EDUCATION_NOT_REVIEWED
             !current.safePracticePlaceConfirmed ->
@@ -436,6 +556,7 @@ class PriorityUserOnboardingPolicy(
     }
 
     private fun cancelPendingPracticeLocked() {
+        pendingUsagePlayback = null
         pendingPractice = null
         practiceLifecycle = PriorityUserPracticeLifecycle(current.completedPractices)
     }

@@ -1540,6 +1540,86 @@ test("client abort releases an unconsumed proxied response and its privacy lease
   assert.equal(activePrivacyOperationCountForTests(), baselineOperations);
 });
 
+test("destination search keeps each origin and permits retry without replacing the session", async () => {
+  const cookie = await login();
+  const origins: Array<Record<string, string>> = [
+    {},
+    { origin_lat: "37.5665", origin_lng: "126.978" },
+    { origin_lat: "35.1796", origin_lng: "129.0756" },
+    { origin_lat: "37.5665" },
+    { origin_lat: "nan", origin_lng: "126.978" }
+  ];
+  for (const origin of origins) {
+    const query = new URLSearchParams({ query: "Cafe & Station", limit: "2", ...origin });
+    const invalidOrigin = Object.keys(origin).length === 1 || origin.origin_lat === "nan";
+    const response = await handleGatewayRequest(
+      new Request("http://127.0.0.1:8081/api/navigation/destinations/search?" + query, {
+        headers: { cookie, [ACTOR_ID_HEADER]: "spoofed-actor" }
+      }),
+      {
+        fetchImpl: async (input, init) => {
+          const upstreamUrl = new URL(String(input));
+          assert.equal(upstreamUrl.pathname, "/navigation/destinations/search");
+          assert.deepEqual([...upstreamUrl.searchParams], [...query]);
+          assert.equal(init?.cache, "no-store");
+          const headers = new Headers(init?.headers);
+          assert.equal(headers.get(ACTOR_ID_HEADER), ACTOR_ID);
+          assert.equal(headers.get(FIELD_TEST_TOKEN_HEADER), INTERNAL_TOKEN);
+          assert.equal(headers.get(ACCOUNT_GENERATION_HEADER), "1");
+          return Response.json(
+            invalidOrigin
+              ? { detail: { code: "origin_coordinates_invalid" } }
+              : { schema_version: "walksafe.destination_search.v1", provider: "tmap_poi",
+                  query: "Cafe & Station", results: [] },
+            { status: invalidOrigin ? 422 : 200 }
+          );
+        }
+      }
+    );
+    assert.equal(response.status, invalidOrigin ? 422 : 200);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    await response.json();
+    assert.equal(activePrivacyOperationCountForTests(), 0);
+  }
+
+  const query = new URLSearchParams({
+    query: "Cafe & Station", limit: "2", origin_lat: "35.1796", origin_lng: "129.0756"
+  });
+  let attempts = 0;
+  const fetchImpl: GatewayFetch = async (input) => {
+    assert.deepEqual([...new URL(String(input)).searchParams], [...query]);
+    attempts += 1;
+    if (attempts === 1) {
+      return Response.json(
+        { detail: { code: "tmap_rate_limited" } },
+        { status: 503, headers: { "retry-after": "2" } }
+      );
+    }
+    if (attempts === 2) throw new TypeError("test transport disconnected");
+    return Response.json({
+      schema_version: "walksafe.destination_search.v1", provider: "tmap_poi",
+      query: "Cafe & Station", results: []
+    });
+  };
+  for (const expectedStatus of [503, 502, 200]) {
+    const response = await handleGatewayRequest(
+      new Request("http://127.0.0.1:8081/api/navigation/destinations/search?" + query, {
+        headers: { cookie }
+      }),
+      { fetchImpl }
+    );
+    assert.equal(response.status, expectedStatus);
+    if (expectedStatus === 503) assert.equal(response.headers.get("retry-after"), "2");
+    await response.json();
+    assert.equal(activePrivacyOperationCountForTests(), 0);
+  }
+  assert.equal(attempts, 3);
+  const status = await handleGatewayRequest(
+    new Request("http://127.0.0.1:8081/api/field-session", { headers: { cookie } })
+  );
+  assert.equal((await status.json() as { authenticated: boolean }).authenticated, true);
+});
+
 test("upstream 401 and 403 never invalidate the Android field session", async () => {
   const cookie = await login();
   for (const upstreamStatus of [401, 403]) {

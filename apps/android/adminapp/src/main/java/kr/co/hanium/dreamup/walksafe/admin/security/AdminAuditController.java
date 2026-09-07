@@ -39,18 +39,25 @@ public final class AdminAuditController {
         public List<AdminAuditModels.Event> items() { return items; }
         public String nextCursor() { return nextCursor; }
         public String errorMessage() { return errorMessage; }
-        public boolean canLoadMore() { return nextCursor != null && phase != Phase.LOADING_MORE; }
+        public boolean canLoadMore() { return nextCursor != null && phase == Phase.CONTENT; }
     }
 
     public static final class Request {
         private final long generation;
         private final AdminAuditModels.Filters filters;
         private final String cursor;
+        private boolean claimed;
 
         private Request(long generation, AdminAuditModels.Filters filters, String cursor) {
             this.generation = generation;
             this.filters = filters;
             this.cursor = cursor;
+        }
+
+        private synchronized boolean claim() {
+            if (claimed) return false;
+            claimed = true;
+            return true;
         }
     }
 
@@ -80,7 +87,7 @@ public final class AdminAuditController {
     }
 
     public synchronized Request beginNext() {
-        if (state.nextCursor == null) throw new IllegalStateException("audit next page is unavailable");
+        if (!state.canLoadMore()) throw new IllegalStateException("audit next page is unavailable");
         Request request = new Request(++generation, state.filters, state.nextCursor);
         retry = request;
         state = new State(Phase.LOADING_MORE, state.filters, state.items, state.nextCursor, null);
@@ -102,6 +109,8 @@ public final class AdminAuditController {
     }
 
     public boolean execute(Request request) {
+        if (request == null || !request.claim()) return false;
+        if (!isCurrent(request)) return false;
         try {
             return apply(request, loader.load(request.filters, request.cursor));
         } catch (Exception error) {
@@ -109,7 +118,18 @@ public final class AdminAuditController {
         }
     }
 
-    public synchronized void invalidate() { generation += 1; }
+    public synchronized void invalidate() {
+        generation += 1;
+        if (state.phase == Phase.LOADING || state.phase == Phase.LOADING_MORE) {
+            state = new State(
+                Phase.ERROR,
+                state.filters,
+                state.items,
+                state.nextCursor,
+                "화면이 중단되어 조회를 취소했습니다. 다시 시도해 주세요."
+            );
+        }
+    }
 
     public synchronized void clearSessionState() {
         generation += 1;
@@ -121,6 +141,11 @@ public final class AdminAuditController {
             null,
             null
         );
+    }
+
+    private synchronized boolean isCurrent(Request request) {
+        return request.generation == generation
+            && (state.phase == Phase.LOADING || state.phase == Phase.LOADING_MORE);
     }
 
     private synchronized boolean apply(Request request, AdminAuditModels.Page page) {

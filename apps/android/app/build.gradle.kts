@@ -30,7 +30,27 @@ val configuredGatewayOrigin = providers.gradleProperty("WALKSAFE_GATEWAY_ORIGIN"
     .orNull
     ?.trim()
 val verifiedReleaseGatewayOrigin = normalizedHttpsOriginOrNull(configuredGatewayOrigin)
-val debugGatewayOrigin = verifiedReleaseGatewayOrigin ?: "http://127.0.0.1:8081"
+val developmentReportQueue = providers.gradleProperty("developmentReportQueue").orNull == "true"
+val developmentQuickStart = providers.gradleProperty("developmentQuickStart").orNull == "true"
+val developmentQuickStartEmail = if (developmentQuickStart) {
+    providers.gradleProperty("developmentQuickStartEmail").orNull ?: "test0905@example.com"
+} else ""
+val developmentQuickStartPassword = if (developmentQuickStart) {
+    providers.environmentVariable("WALKSAFE_DEVELOPMENT_TEST_PASSWORD").orNull.orEmpty()
+} else ""
+if (developmentQuickStart) {
+    check(developmentQuickStartPassword.isNotBlank()) {
+        "Development quick start requires WALKSAFE_DEVELOPMENT_TEST_PASSWORD for a local test account"
+    }
+}
+fun buildConfigString(value: String): String = "\"" + value
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+    .replace("\n", "\\n")
+    .replace("\r", "\\r") + "\""
+val debugGatewayOrigin = if (developmentQuickStart) {
+    "http://127.0.0.1:8081"
+} else verifiedReleaseGatewayOrigin ?: "http://127.0.0.1:8081"
 fun configuredReportQueueValue(name: String): String? = providers.gradleProperty(name)
     .orElse(providers.environmentVariable(name))
     .orNull
@@ -237,16 +257,45 @@ android {
 
     buildTypes {
         debug {
+            if (developmentReportQueue && !reportQueueEnabled) {
+                // Local development only; reserve 16 MiB beyond automatic storage for explicit reports.
+                buildConfigField("boolean", "WALKSAFE_REPORT_QUEUE_ENABLED", "true")
+                buildConfigField(
+                    "String",
+                    "WALKSAFE_REPORT_QUEUE_TEST_ORIGIN",
+                    "\"http://127.0.0.1:8081\"",
+                )
+                buildConfigField("int", "WALKSAFE_REPORT_QUEUE_MAX_ENTRIES", "8")
+                buildConfigField("int", "WALKSAFE_REPORT_QUEUE_MAX_PAYLOAD_BYTES", "4194304")
+                buildConfigField(
+                    "long",
+                    "WALKSAFE_REPORT_QUEUE_MAX_STORED_ENTRY_BYTES",
+                    "12582912L",
+                )
+                buildConfigField("long", "WALKSAFE_REPORT_QUEUE_MAX_TOTAL_BYTES", "67108864L")
+                buildConfigField("int", "WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_ENTRIES", "6")
+                buildConfigField(
+                    "long",
+                    "WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES",
+                    "50331648L",
+                )
+            }
             buildConfigField("String", "WALKSAFE_SOURCE_COMMIT", "\"${verifiedSourceCommit ?: "unverified"}\"")
             buildConfigField("String", "WALKSAFE_GATEWAY_ORIGIN", "\"$debugGatewayOrigin\"")
             buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walksafe-debug-v1\"")
             buildConfigField("boolean", "WALKSAFE_LONG_LIVED_LOGIN_ENABLED", "$debugLongLivedLoginEnabled")
+            buildConfigField("boolean", "DEVELOPMENT_QUICK_START", "$developmentQuickStart")
+            buildConfigField("String", "DEVELOPMENT_QUICK_START_EMAIL", buildConfigString(developmentQuickStartEmail))
+            buildConfigField("String", "DEVELOPMENT_QUICK_START_PASSWORD", buildConfigString(developmentQuickStartPassword))
         }
         release {
             buildConfigField("String", "WALKSAFE_SOURCE_COMMIT", "\"${verifiedSourceCommit ?: "unverified"}\"")
             buildConfigField("String", "WALKSAFE_GATEWAY_ORIGIN", "\"${verifiedReleaseGatewayOrigin ?: "invalid-release-origin"}\"")
             buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walksafe-release-v1\"")
             buildConfigField("boolean", "WALKSAFE_LONG_LIVED_LOGIN_ENABLED", "false")
+            buildConfigField("boolean", "DEVELOPMENT_QUICK_START", "false")
+            buildConfigField("String", "DEVELOPMENT_QUICK_START_EMAIL", "\"\"")
+            buildConfigField("String", "DEVELOPMENT_QUICK_START_PASSWORD", "\"\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

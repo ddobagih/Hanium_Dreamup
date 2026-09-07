@@ -202,7 +202,12 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
             ),
         )
         assertTrue(terminalDistanceStatus.contains("제한(거리 제한 모드)"))
-        assertTrue(terminalDistanceStatus.contains("통과 · 보행 시작 시 재확인"))
+        assertTrue(terminalDistanceStatus.contains("PostLoginMetricDepthState.SUPPORTED"))
+        assertTrue(terminalDistanceStatus.contains("\"지원\""))
+        assertTrue(terminalDistanceStatus.contains("PostLoginMetricDepthState.UNKNOWN"))
+        assertTrue(terminalDistanceStatus.contains("확인 불가(AR 서비스·권한 확인)"))
+        assertTrue(terminalDistanceStatus.contains("지원 확인 대기"))
+        assertFalse(terminalDistanceStatus.contains("통과"))
         assertFalse(terminalDistanceStatus.contains("검사 대기"))
         assertTrue(items.contains("terminalMetricDistanceStatusText()"))
     }
@@ -215,7 +220,7 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         assertTrue(items.contains("\"제한(마이크 권한 필요)\""))
         assertTrue(items.contains("startup.microphoneAvailable.toDeviceCheckSignal()"))
         assertTrue(items.contains("observation.wakePhraseRecognition"))
-        assertTrue(items.contains("\"호출어·마이크: \$microphoneText\""))
+        assertTrue(items.contains("\"호출어\\t\$microphoneText\""))
         assertFalse(items.contains("postLoginDeviceCheckSnapshot ="))
         assertFalse(items.contains("state = PostLoginDeviceCheckState.NOT_RUN"))
     }
@@ -239,10 +244,10 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
                 "!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)",
             ),
         )
-        assertTrue(items.contains(".distinct()"))
+        assertTrue(items.contains("\"ARCore Depth\\t\$distanceText\""))
         assertTrue(items.contains("val locationText = if (!hasLocationPermission())"))
         assertTrue(items.contains("제한(정확한 위치 권한 필요)"))
-        assertTrue(items.contains("\"위치 기능: \$locationText\""))
+        assertTrue(items.contains("\"위치\\t\$locationText\""))
         assertTrue(denial.contains("위치·경로 안내와 위치가 필요한 신고 전송"))
         assertFalse(denial.contains("거리 측정"))
     }
@@ -351,6 +356,27 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
     }
 
     @Test
+    fun wakePhraseFailuresOnlyLimitHandsFreeVoiceCapability() {
+        val observation = functionBlock("private fun currentPostLoginDeviceCheckObservation(")
+
+        assertTrue(observation.contains("postLoginWakePhraseSignal == PostLoginDeviceCheckSignal.UNAVAILABLE"))
+        assertTrue(observation.contains("handsFreeVoiceModelPreparationFailed"))
+        assertTrue(observation.contains("add(PostLoginDeviceCheckFeature.HANDS_FREE_VOICE)"))
+        assertTrue(
+            !Regex(
+                """postLoginWakePhraseSignal\s*=\s*PostLoginDeviceCheckSignal\.UNAVAILABLE\s+""" +
+                    """onDeviceSpeechRecognitionCapabilityOverride\s*=\s*false""",
+            ).containsMatchIn(source),
+        )
+        assertTrue(
+            !Regex(
+                """postLoginWakePhraseSignal\s*=\s*available\.toDeviceCheckSignal\(\)\s+""" +
+                    """onDeviceSpeechRecognitionCapabilityOverride\s*=\s*available""",
+            ).containsMatchIn(source),
+        )
+    }
+
+    @Test
     fun activeFeatureChangesRebindConfirmationAndNoCameraDevicesRemainInstallable() {
         val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
         val firstRunUi = functionBlock("private fun updateFirstRunOnboardingUi()")
@@ -369,14 +395,13 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         assertTrue(
             Regex(
                 """phoneMountingChestConfirmButton\.visibility\s*=\s*""" +
-                    """if \(showPhoneMountingPreparation\) View\.VISIBLE else View\.GONE""",
+                    """if \(showPhoneMountingPreparation &&\s*""" +
+                    """\(!developmentQuickStartEnabled \|\| walkState != WalkSessionState.READY\)\s*""" +
+                    """\) View\.VISIBLE else View\.GONE""",
             ).containsMatchIn(firstRunUi),
         )
         assertTrue(
-            Regex(
-                """phoneMountingNecklaceConfirmButton\.visibility\s*=\s*""" +
-                    """if \(showPhoneMountingPreparation\) View\.VISIBLE else View\.GONE""",
-            ).containsMatchIn(firstRunUi),
+            firstRunUi.contains("phoneMountingNecklaceConfirmButton.visibility = View.GONE"),
         )
         assertTrue(
             refresh.indexOf("updateFirstRunOnboardingUi()") <
@@ -384,7 +409,7 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         )
         val noCamera = mountingUi
             .substringAfter("if (!cameraAnalysisFeaturesEnabled()) {")
-            .substringBefore("phoneMountingChestConfirmButton.visibility = View.VISIBLE")
+            .substringBefore("val mountingChoiceVisibility")
         assertTrue(noCamera.contains("phoneMountingChestConfirmButton.visibility = View.GONE"))
         assertTrue(noCamera.contains("phoneMountingNecklaceConfirmButton.visibility = View.GONE"))
         assertTrue(noCamera.contains("return"))

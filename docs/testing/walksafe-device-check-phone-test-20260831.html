@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WalkSafe 휴대폰 테스트 안내</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #17202a;
+      background: #f4f6f8;
+    }
+    body { margin: 0; padding: 24px; }
+    main { max-width: 900px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 0 0 14px; font-size: 20px; }
+    p { line-height: 1.6; }
+    .muted { color: #5d6d7e; }
+    .card {
+      margin: 16px 0;
+      padding: 20px;
+      border: 1px solid #d5dce3;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(23, 32, 42, 0.05);
+    }
+    .account { border: 2px solid #1769aa; background: #eef7ff; }
+    .credentials {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 10px;
+      margin: 14px 0;
+      font-size: 18px;
+    }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; border-bottom: 1px solid #e5e9ed; text-align: left; vertical-align: top; }
+    th { width: 180px; color: #455a64; }
+    ul, ol { padding-left: 22px; line-height: 1.65; }
+    .ok { color: #0b6b3a; font-weight: 700; }
+    .wait { color: #9a5a00; font-weight: 700; }
+    .note { padding: 12px 14px; border-left: 4px solid #e6a700; background: #fff8df; }
+    @media (max-width: 640px) {
+      body { padding: 12px; }
+      .card { padding: 16px; }
+      .credentials { grid-template-columns: 1fr; gap: 2px; }
+      th { width: 115px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>WalkSafe 휴대폰 테스트 안내</h1>
+  <p class="muted">2026-09-01 03:37 KST · 수정 APK 설치와 연결 기기 1회 기기점검을 완료했습니다.</p>
+
+  <section class="card account">
+    <h2>빠른 로그인</h2>
+    <div class="credentials">
+      <strong>아이디</strong><code>test@walksafe.local</code>
+      <strong>비밀번호</strong><code>test123456</code>
+    </div>
+    <p><strong>“이메일과 비밀번호로 로그인”</strong> 버튼을 누르세요. 정식 가입 API로 만든 로컬 개발 전용 계정이며, 로그인 API 응답 200까지 확인했습니다.</p>
+  </section>
+
+  <section class="card">
+    <h2>설치 상태</h2>
+    <table>
+      <tr><th>휴대폰</th><td>Samsung SM-G981N · Android 13</td></tr>
+      <tr><th>앱</th><td><code>kr.co.hanium.dreamup.walksafe</code> · v0.1.0 (1)</td></tr>
+      <tr><th>APK</th><td><span class="ok">최신 Debug APK 업데이트 설치 완료</span><br><code>8140785f2ce608131d6b6e40de73db62e0e2fcc41dc64fc0d678c6b35ab7aa2c</code></td></tr>
+      <tr><th>서버 연결</th><td><span class="ok">ADB reverse 8081 연결됨</span> · Gateway/Backend 계정 로그인 확인</td></tr>
+      <tr><th>실기기 결과</th><td><span class="ok">기기점검 버튼 1회 입력 후 5/7 → 7/7단계 이동</span> · 저장 결과 LIMITED · 미터 거리 안내와 음성 안내만 제한</td></tr>
+      <tr><th>현재 화면</th><td><span class="ok">7/7 안전교육·조작 연습 화면 정상 표시</span> · 앱이 최상위 Activity로 실행 중 · crash buffer 비어 있음</td></tr>
+      <tr><th>자동 검사</th><td>Android 단위·정적 테스트 1,501건 통과, 실패·오류·건너뜀 0 · Android Lint 오류 0건</td></tr>
+    </table>
+    <p class="note"><code>adb install -r</code>로 기존 앱 데이터와 권한을 보존했습니다. 현재 런타임 권한은 모두 허용 상태라 첫 권한 팝업은 다시 나오지 않을 수 있습니다. 일회성 최초 권한 요청부터 다시 시험하려면 앱 데이터 초기화가 필요하며, 기존 로그인·설정이 삭제되므로 별도 확인 후 진행해야 합니다.</p>
+  </section>
+
+  <section class="card">
+    <h2>원하는 동작 기준</h2>
+    <ol>
+      <li>최초 앱 진입 때 누락된 카메라·정확한 위치·마이크·신체활동·알림 권한을 한 번의 요청 흐름으로 시작합니다. Android가 권한 종류에 따라 시스템 창을 여러 개로 나눠 표시할 수 있습니다.</li>
+      <li>권한을 거부해도 앱 전체를 막지 않고, 거부한 권한과 직접 관련된 기능만 제한합니다.</li>
+      <li>회원가입은 이용약관·개인정보·위치 약관의 필수 3개 중 하나라도 동의하지 않으면 완료되지 않습니다. 원본 제공·자동 신고·학습 재사용 선택 3개는 거부해도 가입할 수 있습니다.</li>
+      <li>로그인과 안전 고지 뒤 <strong>기기점검 버튼을 한 번</strong> 누르면 휴대폰 사양·기능을 한 번 측정합니다.</li>
+      <li><strong>FULL</strong>이면 모든 지원 기능으로, <strong>LIMITED</strong>이면 미달 항목과 연결된 기능만 제한한 채 다음 단계로 넘어갑니다. 측정 자체가 실패한 <strong>FAIL</strong>만 재시도가 필요합니다.</li>
+      <li>완료된 FULL/LIMITED 결과는 같은 계정·기기에서 복원되어, 앱을 다시 열 때 불필요하게 재측정하지 않습니다.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>팀원 브랜치 검토 결과</h2>
+    <p><code>feature/tmap-live-chain-verification-20260831</code>을 현재 구조와 비교했고, 브랜치 전체를 그대로 병합하지 않고 화면 단위로 이식했습니다.</p>
+    <ul>
+      <li><strong>반영:</strong> 회원가입 동의/상세 2단계, 필수·선택 약관 카드, 뒤로가기 배치</li>
+      <li><strong>반영:</strong> 보행 화면 구역·구분선·2열 동작 버튼, 마지막 음성 결과</li>
+      <li><strong>반영:</strong> 목적지 입력 TalkBack 이름, 경로 이탈 시각 안내, 스크롤/전체 화면 채움, TTS 데이터 설치 복구</li>
+      <li><strong>남은 P2 시각 차이:</strong> 밝은 팔레트, Pretendard, 전역 버튼·입력칸·상태 카드 마감</li>
+      <li><strong>제외:</strong> 현재 안전고지·기기점검·결과 복원·보행 제어를 퇴행시키는 과거 구조와 기능 무관 기록/환경 변경</li>
+    </ul>
+    <p>독립 재검수에서 누락된 사용자 체감 P0/P1은 발견되지 않았습니다. 남은 항목은 기능 결함이 아닌 전역 외형 선택이며, 밝은 테마만 단독 적용하면 현재 어두운 프로그램식 화면과 대비가 깨질 수 있어 묶음 디자인 결정으로 남겼습니다.</p>
+  </section>
+
+  <section class="card">
+    <h2>지금 확인할 순서</h2>
+    <ol>
+      <li>위 아이디·비밀번호로 로그인</li>
+      <li>안전 고지를 읽고 확인</li>
+      <li>기기점검 화면에서 버튼을 한 번만 누르기</li>
+      <li>한국어 TTS, 호출어/마이크, GPS, 진동, CameraX·탐지, 배터리·저장공간·발열, 거리 측정 결과 확인</li>
+      <li>FULL 또는 LIMITED 결과 뒤 교육/보행 준비 단계로 넘어가는지 확인</li>
+      <li>LIMITED라면 제한 사유가 고지되고 해당 기능만 비활성화되는지 확인</li>
+      <li>목적지 입력 TalkBack 이름과 경로 이탈 시 화면 안내 확인</li>
+    </ol>
+    <p class="ok">자동 실기기 검증에서는 버튼 1회 입력, 카메라 파이프라인 종료, LIMITED 저장, 다음 단계 전환까지 확인했습니다. 실제 보행 체감과 음성·진동 품질은 사용자가 휴대폰을 들고 별도로 확인해야 합니다.</p>
+  </section>
+</main>
+</body>
+</html>

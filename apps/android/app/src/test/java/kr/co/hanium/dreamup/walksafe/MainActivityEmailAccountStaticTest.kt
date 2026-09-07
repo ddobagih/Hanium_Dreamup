@@ -173,8 +173,8 @@ class MainActivityEmailAccountStaticTest {
     fun existingAccountLoginIsPrimaryAndSignupDetailsAreProgressivelyDisclosed() {
         assertTrue(source.contains("private var accountSignupExpanded = false"))
         assertTrue(source.contains("private var accountConsentDisclosureExpanded = false"))
-        assertTrue(source.contains("label = \"새 계정 만들기\""))
-        assertTrue(source.contains("label = \"가입 동의 자세히 보기\""))
+        assertTrue(source.contains("label = \"회원가입\""))
+        assertTrue(source.contains("spokenLabel = \"새 계정 만들기, 가입 입력 펼치기\""))
 
         val controls = sourceBlock(
             "accountAccessControls = LinearLayout(this).apply",
@@ -182,8 +182,8 @@ class MainActivityEmailAccountStaticTest {
         )
         assertInOrder(
             controls,
-            "addView(accountEmailInput)",
-            "addView(accountPasswordInput)",
+            "addView(wsFieldGroup(accountEmailInput, \"이메일\"))",
+            "addView(wsFieldGroup(accountPasswordInput, \"비밀번호\"",
             "addView(accountLoginButton)",
             "addView(accountSignupToggleButton)",
             "addView(accountSignupControls)",
@@ -197,8 +197,9 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(update.contains("liveBinding?.actorId == expectedActorId"))
         assertTrue(update.contains("!reauthenticationRequired"))
         assertTrue(update.contains("accountSignupControls.visibility ="))
-        assertTrue(update.contains("accountConsentDisclosureExpanded"))
-        assertTrue(update.contains("accountConsentDisclosureText.visibility ="))
+        assertTrue(update.contains("accountConsentCards.values.forEach"))
+        assertTrue(update.contains("card.visibility = if (onConsentStep) View.VISIBLE else View.GONE"))
+        assertTrue(update.contains("accountConsentDisclosureText.visibility = View.GONE"))
         assertTrue(
             update.contains(
                 "accountLoginButton.visibility = if (signupVisible) View.GONE else View.VISIBLE",
@@ -224,7 +225,7 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(sessionChange.contains("reporterUserId = null"))
         assertFalse(sessionChange.contains("firstRunOnboardingSnapshot = FirstRunOnboardingPolicy.initialEmailAccount("))
         assertTrue(update.contains("currentPostLoginDeviceCheckSessionBinding()"))
-        assertTrue(update.contains("로그인 세션이 만료되었습니다"))
+        assertTrue(update.contains("다시 로그인해 주세요."))
         assertTrue(update.contains("val credentialFieldsVisible = !onConsentStep"))
         assertTrue(update.contains("if (credentialFieldsVisible) View.VISIBLE else View.GONE"))
         assertTrue(update.contains("accountLoginButton.visibility"))
@@ -280,6 +281,41 @@ class MainActivityEmailAccountStaticTest {
         )
         assertTrue(update.contains("계정 삭제 복구 전용 로그인이 진행 중입니다"))
         assertTrue(update.contains("로그인 저장소가 안전 차단 상태입니다"))
+    }
+
+    @Test
+    fun openingSignupClearsOnlyTheDisplayedPasswordLoginFailureNotice() {
+        val failure = functionBlock("private fun postAccountFailure(")
+        assertInOrder(
+            failure,
+            "accountRequestFence.completeIfCurrent(",
+            "showAccountMessage(message)",
+            "passwordLoginFailureNotice =",
+            "message.takeIf { token.action == AccountRemoteAction.PASSWORD_LOGIN }",
+        )
+        val message = functionBlock("private fun showAccountMessage(")
+        assertInOrder(message, "passwordLoginFailureNotice = null", "accountAccessNotice = message")
+
+        val toggle = sourceBlock(
+            "accountSignupToggleButton = accessiblePriorityUserButton(",
+            "accountConsentDisclosureToggleButton = accessiblePriorityUserButton(",
+        )
+        assertInOrder(
+            toggle,
+            "val opening = !accountSignupExpanded",
+            "if (opening && passwordLoginFailureNotice != null &&",
+            "accountAccessNotice == passwordLoginFailureNotice",
+            "accountAccessNotice = null",
+            "passwordLoginFailureNotice = null",
+            "accountSignupExpanded = opening",
+            "updateEmailAccountAccessUi(firstRunOnboardingSnapshot)",
+        )
+        assertFalse(toggle.contains("emailEnrollmentStorageBlocked ="))
+        assertFalse(toggle.contains("emailEnrollmentStore.clear()"))
+        assertFalse(toggle.contains("emailEnrollmentPartial ="))
+        assertFalse(toggle.contains("GatewaySessionProcessCoordinator."))
+        assertFalse(toggle.contains("accountRequestFence.cancel("))
+        assertFalse(toggle.contains("check.isChecked ="))
     }
 
     private fun assertInOrder(source: String, vararg markers: String) {

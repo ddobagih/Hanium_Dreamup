@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>WalkSafe 팀원 UI/UX 채택·미채택 분석</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #17202a;
+      background: #f3f5f7;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; }
+    main { max-width: 1040px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    h2 { margin: 0 0 14px; font-size: 21px; }
+    p, li { line-height: 1.62; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+    a { color: #075f9c; }
+    .muted { color: #60717f; }
+    .card {
+      margin: 16px 0;
+      padding: 20px;
+      border: 1px solid #d6dde3;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(23, 32, 42, 0.05);
+    }
+    .verdict { border: 2px solid #1769aa; background: #eef7ff; }
+    .warning { border-left: 5px solid #d68b00; background: #fff8df; }
+    .good { color: #087044; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 11px; border-bottom: 1px solid #e2e7eb; text-align: left; vertical-align: top; }
+    th { color: #415563; background: #f7f9fa; }
+    ul, ol { padding-left: 22px; }
+    .scroll { overflow-x: auto; }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .adopted { color: #075b32; background: #dff5e8; }
+    .remaining { color: #805000; background: #fff0c2; }
+    .excluded { color: #5b6470; background: #e9edf0; }
+    @media (max-width: 720px) {
+      body { padding: 12px; }
+      .card { padding: 15px; }
+      table { min-width: 720px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>팀원 UI/UX 채택·미채택 분석</h1>
+  <p class="muted">최종 갱신: 2026-09-01 KST · 비교 대상: <code>origin/feature/tmap-live-chain-verification-20260831@d1b353e</code></p>
+
+  <section class="card verdict">
+    <h2>최종 결론</h2>
+    <p><strong>팀원 UI/UX의 사용자 체감 P0/P1 누락은 없습니다.</strong> 브랜치를 통째로 병합하지 않고 현재의 안전고지·권한별 제한·1회 기기점검·결과 복원 구조 위에 화면별로 이식했습니다.</p>
+    <p>남은 차이는 밝은 색상 체계, Pretendard, 전역 버튼·입력칸·카드 마감 등 <strong>P2 시각 일치도</strong>입니다. 현재 앱은 어두운 네이티브 Android 화면으로 일관되어 있어 기능 장애나 즉시 수정해야 할 가독성 결함으로 판정하지 않았습니다.</p>
+  </section>
+
+  <section class="card">
+    <h2>현재 구조에 이식한 항목</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>화면</th><th>채택 내용</th><th>적용 방식</th></tr></thead>
+        <tbody>
+          <tr><td>회원가입</td><td>동의/상세 2단계, 필수 3개·선택 3개 약관 카드, 뒤로가기 배치, 내부/외부 스크롤</td><td><span class="badge adopted">이식 완료</span> 현재 가입·OTP 정책을 유지한 채 UI만 적용</td></tr>
+          <tr><td>보행</td><td>화면 구역과 구분선, 2열 동작 버튼, 마지막 음성 결과, 상태 낭독</td><td><span class="badge adopted">이식 완료</span> 현행 보행 세션·안전정지 수명주기에 연결</td></tr>
+          <tr><td>TMAP</td><td>목적지 입력 TalkBack 이름, 경로 이탈의 화면 안내와 동작</td><td><span class="badge adopted">이식 완료</span> 기존 TMAP 상태기계에 연결</td></tr>
+          <tr><td>접근성·복구</td><td>화면 전체 채움, 중첩 스크롤, 청취 햅틱, 한국어 TTS 데이터 설치 복구</td><td><span class="badge adopted">이식 완료</span> 기능별 제한과 충돌하지 않게 적용</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>최종적으로 채택하지 않은 항목</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>항목</th><th>판정</th><th>이유</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>밝은 팔레트와 <code>Theme.Material.Light.NoActionBar</code></td>
+            <td><span class="badge remaining">P2 디자인 결정</span></td>
+            <td>현재 프로그램식 UI는 어두운 배경·흰 글자로 구성됩니다. 테마만 단독 이식하면 기본 글자색과 기존 표면의 대비가 깨질 수 있어 색상·컴포넌트 스타일 전체를 한 묶음으로 결정해야 합니다.</td>
+          </tr>
+          <tr>
+            <td>Pretendard 400/500/700 폰트</td>
+            <td><span class="badge remaining">P2 디자인 결정</span></td>
+            <td>기능상 필요하지 않고 APK 용량과 저시력 가독성 확인이 필요합니다. 최종 밝은 디자인 체계를 선택할 때 함께 적용할 항목입니다.</td>
+          </tr>
+          <tr>
+            <td>전역 버튼·입력칸·상태 카드의 밝은 디자인 마감</td>
+            <td><span class="badge remaining">P2 시각 일치도</span></td>
+            <td>핵심 화면 구조와 동작은 이식됐지만 픽셀 단위 외형은 동일하지 않습니다. 현재 dark UI 안에서는 일관성과 조작 가능성을 유지합니다.</td>
+          </tr>
+          <tr>
+            <td>과거 MainActivity·최초실행·권한·기기점검 전체 교체</td>
+            <td><span class="badge excluded">영구 제외</span></td>
+            <td>통째로 가져오면 안전고지 우회, 권한 하나 거부 시 전체 실패, 기기점검 결과 미복원, 보행 중 터치 제어 숨김이 다시 생깁니다. UI 요소만 현행 구조에 옮긴 이유입니다.</td>
+          </tr>
+          <tr>
+            <td>DEBUG 단계 미리보기·대기 화면</td>
+            <td><span class="badge excluded">범위 제외</span></td>
+            <td>제품 기능이 아니며 현재 7단계 최초 실행 흐름과 맞지 않습니다. 기능 우선 원칙에 따라 별도 제어 도구를 늘리지 않았습니다.</td>
+          </tr>
+          <tr>
+            <td>중복 카메라/IMU 측정 구현</td>
+            <td><span class="badge excluded">대체 구현 사용</span></td>
+            <td>현재 CameraX 프레임, 거리 측정, 장착 센서 경로가 더 최신이며 회귀 테스트가 연결돼 있어 팀원 버전의 중복 클래스를 가져오지 않았습니다.</td>
+          </tr>
+          <tr>
+            <td>macOS aapt2 설정, Backend 테스트 DB migration, handoff/daylog</td>
+            <td><span class="badge excluded">앱 UI 범위 제외</span></td>
+            <td>현재 Android 기능과 무관한 로컬 환경·테스트 인프라·작업 기록입니다. 제품 UI 이식과 함께 병합할 이유가 없습니다.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card warning">
+    <h2>왜 브랜치 전체 병합을 하지 않았는가</h2>
+    <p>두 브랜치의 <code>MainActivity</code>와 최초 실행 상태 구조가 다릅니다. 전체 병합은 UI뿐 아니라 현재 고쳐 둔 기기점검·권한·안전 흐름까지 과거 구현으로 되돌립니다. 따라서 화면 단위 수동 이식이 가장 작은 안전한 변경이었습니다.</p>
+  </section>
+
+  <section class="card">
+    <h2>검증</h2>
+    <ul>
+      <li>독립 에이전트가 팀원 tip과 현재 Android manifest/resources/UI 구성을 재비교: 잔여 P0/P1 없음</li>
+      <li>Android 단위·정적 테스트: <strong>1,501건 통과</strong>, 실패·오류·건너뜀 0</li>
+      <li>Android Lint: 오류 0건</li>
+      <li>Samsung SM-G981N 실기기: 기기점검 1회 입력 후 5/7에서 7/7로 전환, 앱 crash 없음</li>
+    </ul>
+    <p class="good">현재 남은 선택은 기능 복구가 아니라 최종 전역 테마를 dark로 유지할지, 팀원 light/Pretendard 묶음으로 바꿀지입니다.</p>
+  </section>
+
+  <p class="muted">관련 문서: <a href="./walksafe-device-check-phone-test-20260831.html">WalkSafe 휴대폰 테스트 안내</a></p>
+</main>
+</body>
+</html>

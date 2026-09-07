@@ -28,7 +28,7 @@ class MainActivityGlRenderLifecycleStaticTest {
                 source.lastIndexOf("GLSurfaceView.RENDERMODE_CONTINUOUSLY"),
         )
         assertTrue(
-            source.contains("setContentView(buildContentView())\n                surfaceView.onPause()"),
+            source.contains("setContentView(insetNativeContent(buildContentView()))\n                surfaceView.onPause()"),
         )
     }
 

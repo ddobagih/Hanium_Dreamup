@@ -56,7 +56,7 @@ public final class AdminReportController {
         public String selectedReportId() { return selectedReportId; }
         public AdminReportModels.Detail detail() { return detail; }
         public String errorMessage() { return errorMessage; }
-        public boolean canLoadMore() { return nextCursor != null && phase != Phase.LOADING_MORE; }
+        public boolean canLoadMore() { return nextCursor != null && phase == Phase.CONTENT; }
     }
 
     public static final class Request {
@@ -108,7 +108,7 @@ public final class AdminReportController {
     }
 
     public synchronized Request beginNextPage() {
-        if (state.nextCursor == null) throw new IllegalStateException("next report page is unavailable");
+        if (!state.canLoadMore()) throw new IllegalStateException("next report page is unavailable");
         Request request = new Request(
             ++generation,
             Request.Kind.NEXT_PAGE,

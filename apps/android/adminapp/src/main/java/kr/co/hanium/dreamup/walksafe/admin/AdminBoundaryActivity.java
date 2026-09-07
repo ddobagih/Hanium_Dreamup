@@ -688,7 +688,10 @@ public final class AdminBoundaryActivity extends Activity {
         if (reportController != null) reportController.invalidate();
         if (reportRequestController != null) reportRequestController.invalidate();
         if (externalCopyDeletionController != null) externalCopyDeletionController.invalidate();
-        if (auditController != null) auditController.invalidate();
+        if (auditController != null) {
+            auditController.invalidate();
+            if (auditPanel != null) auditPanel.render(auditController.snapshot());
+        }
         if (incidentController != null) incidentController.invalidate();
         if (rawCollectionController != null) rawCollectionController.invalidate();
         if (!awaitingSafResult && reportWorkflowController != null) {
@@ -1000,6 +1003,16 @@ public final class AdminBoundaryActivity extends Activity {
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            scroll.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets safe = insets.getInsets(
+                    android.view.WindowInsets.Type.systemBars()
+                        | android.view.WindowInsets.Type.displayCutout()
+                );
+                view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+                return insets;
+            });
+        }
         scroll.addView(content, matchWrap());
         return scroll;
     }

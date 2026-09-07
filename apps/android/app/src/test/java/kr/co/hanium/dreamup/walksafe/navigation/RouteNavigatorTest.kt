@@ -1,5 +1,9 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.FilteredRoutePosition
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteHeadingEstimate
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteMatchQuality
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteMatchReason
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertEquals
@@ -7,6 +11,31 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RouteNavigatorTest {
+    @Test
+    fun preservesLegacyUpdateDefaultArgumentJvmBridge() {
+        val expectedParameterTypes = listOf(
+            RouteNavigator::class.java,
+            TrustedLocation::class.java,
+            java.lang.Long.TYPE,
+            java.lang.Boolean.TYPE,
+            java.lang.Double::class.java,
+            Integer.TYPE,
+            Any::class.java,
+        )
+
+        val legacyDefaultBridgeExists = RouteNavigator::class.java.declaredMethods.any { method ->
+            method.name == "update\$default" &&
+                method.parameterTypes.toList() == expectedParameterTypes
+        }
+
+        assertTrue(legacyDefaultBridgeExists)
+        val navigator = RouteNavigator().apply { setRoute(route()) }
+        assertEquals(
+            "route_guidance",
+            navigator.update(locationNearStart(), nowMs = 1_000L, requestInFlight = false).reason,
+        )
+    }
+
     @Test
     fun emitsFallbackInstructionWhenGuideInstructionMissing() {
         val navigator = RouteNavigator()
@@ -764,6 +793,174 @@ class RouteNavigatorTest {
         assertTrue(second.instruction?.contains("최종 접근") == true)
     }
 
+    @Test
+    fun crossingRouteDoesNotConsumeAConfirmedButLowConfidenceBranch() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        val crossingRoute = WalkingRoute(
+            priority = "STAIR_AVOID",
+            summary = WalkingRouteSummary(distanceM = 400, durationS = 300),
+            polyline = listOf(
+                RoutePoint(37.0, 126.999),
+                RoutePoint(37.0, 127.0),
+                RoutePoint(37.001, 127.0),
+                RoutePoint(37.0, 127.0),
+                RoutePoint(37.0, 127.001),
+            ),
+            guidePoints = emptyList(),
+        )
+        navigator.setRoute(crossingRoute)
+        val west = TrustedLocation(37.0, 126.9995, 3f, 1_000L)
+        navigator.update(
+            location = west,
+            nowMs = 1_000L,
+            requestInFlight = false,
+            filteredPosition = filteredPosition(west, headingDeg = 90.0),
+        )
+        val crossing = TrustedLocation(37.0, 127.0, 3f, 2_000L)
+
+        val pendingUpdate = navigator.update(
+            location = crossing,
+            nowMs = 2_000L,
+            requestInFlight = false,
+            filteredPosition = filteredPosition(crossing, headingDeg = 180.0),
+        )
+        val pending = requireNotNull(navigator.currentRouteMatch())
+        navigator.update(
+            location = crossing,
+            nowMs = 3_000L,
+            requestInFlight = false,
+            filteredPosition = filteredPosition(crossing, headingDeg = 180.0),
+        )
+        val confirmed = requireNotNull(navigator.currentRouteMatch())
+
+        assertEquals(RouteMatchReason.BRANCH_SWITCH_PENDING, pending.reason)
+        assertEquals(RouteMatchQuality.LOW, pending.quality)
+        assertEquals(null, pendingUpdate.instruction)
+        assertEquals("route_match_untrusted", pendingUpdate.reason)
+        assertEquals(2, confirmed.segmentIndex)
+        assertEquals(RouteMatchReason.LOW_CONFIDENCE, confirmed.reason)
+        assertEquals(RouteMatchQuality.LOW, confirmed.quality)
+        assertEquals(null, navigator.currentBearingDeg())
+    }
+
+    @Test
+    fun ambiguousParallelRouteDoesNotUseTheLowConfidenceSnapForGuidance() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        navigator.setRoute(
+            WalkingRoute(
+                priority = "STAIR_AVOID",
+                summary = WalkingRouteSummary(distanceM = 190, durationS = 180),
+                polyline = listOf(
+                    RoutePoint(37.0, 127.0),
+                    RoutePoint(37.0, 127.001),
+                    RoutePoint(37.00005, 127.001),
+                    RoutePoint(37.00005, 127.0),
+                ),
+                guidePoints = emptyList(),
+            ),
+        )
+        val midpoint = TrustedLocation(37.000025, 127.0005, 5f, 1_000L)
+
+        val update = navigator.update(midpoint, nowMs = 1_000L, requestInFlight = false)
+        val match = requireNotNull(navigator.currentRouteMatch())
+
+        assertFalse(update.offRoute)
+        assertEquals(null, update.instruction)
+        assertEquals("route_match_untrusted", update.reason)
+        assertEquals(RouteMatchQuality.LOW, match.quality)
+        assertEquals(RouteMatchReason.AMBIGUOUS_CANDIDATES, match.reason)
+        assertEquals(null, navigator.currentBearingDeg())
+    }
+
+    @Test
+    fun routeSnapAloneCannotCreateArrivalWithoutUnsnappedDistanceEvidence() {
+        val navigator = RouteNavigator(
+            RouteNavigatorConfig(arrivalConfirmSamples = 1, guidanceIntervalMs = 0),
+        )
+        val route = route().copy(guidePoints = emptyList())
+        val endpoint = route.polyline.last()
+        navigator.setRoute(route, destination = endpoint)
+        val unsnapped = TrustedLocation(endpoint.latitude + 0.000072, endpoint.longitude, 10f, 1_000L)
+
+        val update = navigator.update(unsnapped, nowMs = 1_000L, requestInFlight = false)
+        val match = requireNotNull(navigator.currentRouteMatch())
+
+        assertTrue(match.quality == RouteMatchQuality.HIGH || match.quality == RouteMatchQuality.MEDIUM)
+        assertEquals(endpoint.latitude, requireNotNull(match.matchedPoint).latitude, 0.000001)
+        assertFalse(update.arrivalCandidate)
+        assertFalse(update.arrived)
+        assertTrue(navigator.hasRoute())
+    }
+
+    @Test
+    fun duplicateAndOutOfOrderNowMsDoNotAdvanceArrivalConfirmation() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(arrivalConfirmSamples = 2, guidanceIntervalMs = 0))
+        navigator.setRoute(route())
+        val nearEnd = TrustedLocation(37.0009, 127.0, 5f, 1_000L)
+
+        val first = navigator.update(nearEnd, nowMs = 1_000L, requestInFlight = false)
+        val duplicate = navigator.update(nearEnd, nowMs = 1_000L, requestInFlight = false)
+        val outOfOrder = navigator.update(nearEnd, nowMs = 999L, requestInFlight = false)
+        val secondFresh = navigator.update(nearEnd, nowMs = 2_000L, requestInFlight = false)
+
+        assertFalse(first.arrivalCandidate)
+        assertEquals("location_sample_not_newer", duplicate.reason)
+        assertEquals("location_sample_not_newer", outOfOrder.reason)
+        assertFalse(duplicate.arrivalCandidate)
+        assertFalse(outOfOrder.arrivalCandidate)
+        assertTrue(secondFresh.arrivalCandidate)
+    }
+
+    @Test
+    fun duplicateAndOutOfOrderNowMsDoNotAdvanceOffRouteConfirmation() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 2))
+        navigator.setRoute(route())
+        val offRoute = offRouteLocation()
+
+        val first = navigator.update(offRoute, nowMs = 1_000L, requestInFlight = false)
+        val duplicate = navigator.update(offRoute, nowMs = 1_000L, requestInFlight = false)
+        val outOfOrder = navigator.update(offRoute, nowMs = 999L, requestInFlight = false)
+        val secondFresh = navigator.update(offRoute, nowMs = 2_000L, requestInFlight = false)
+
+        assertEquals("off_route_pending", first.reason)
+        assertEquals("location_sample_not_newer", duplicate.reason)
+        assertEquals("location_sample_not_newer", outOfOrder.reason)
+        assertFalse(duplicate.offRoute)
+        assertFalse(outOfOrder.offRoute)
+        assertTrue(secondFresh.offRoute)
+        assertEquals("off_route_user_decision_required", secondFresh.reason)
+    }
+
+    @Test
+    fun positioningInterruptionBreaksArrivalConfirmationEvidence() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(arrivalConfirmSamples = 2, guidanceIntervalMs = 0))
+        navigator.setRoute(route())
+        val nearEnd = TrustedLocation(37.0009, 127.0, 5f, 1_000L)
+
+        val beforeInterruption = navigator.update(
+            nearEnd,
+            nowMs = 1_000L,
+            requestInFlight = false,
+        )
+        navigator.onPositioningEvidenceInterrupted()
+        val firstRecovered = navigator.update(
+            nearEnd,
+            nowMs = 2_000L,
+            requestInFlight = false,
+        )
+        val secondRecovered = navigator.update(
+            nearEnd,
+            nowMs = 3_000L,
+            requestInFlight = false,
+        )
+
+        assertFalse(beforeInterruption.arrivalCandidate)
+        assertFalse(firstRecovered.arrivalCandidate)
+        assertFalse(firstRecovered.arrived)
+        assertTrue(navigator.hasRoute())
+        assertTrue(secondRecovered.arrivalCandidate)
+    }
+
     private fun route(guideInstruction: String? = "직진하세요.", bearingDeg: Float? = null): WalkingRoute {
         return WalkingRoute(
             priority = "STAIR_AVOID",
@@ -799,5 +996,14 @@ class RouteNavigatorTest {
 
     private fun slightlyOffRouteLocation(accuracyM: Float): TrustedLocation {
         return TrustedLocation(37.0, 127.00045, accuracyM, 1_000L)
+    }
+
+    private fun filteredPosition(location: TrustedLocation, headingDeg: Double): FilteredRoutePosition {
+        return FilteredRoutePosition(
+            point = RoutePoint(location.latitude, location.longitude),
+            horizontalAccuracyM = location.accuracyM.toDouble(),
+            elapsedRealtimeMs = location.elapsedRealtimeMs,
+            heading = RouteHeadingEstimate(headingDeg, standardDeviationDeg = 5.0),
+        )
     }
 }

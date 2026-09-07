@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="ws_control_min_height">72dp</dimen>
+    <dimen name="ws_control_min_width">64dp</dimen>
+    <dimen name="ws_control_padding_horizontal">20dp</dimen>
+    <dimen name="ws_control_padding_vertical">16dp</dimen>
+    <dimen name="ws_selection_min_height">64dp</dimen>
+    <dimen name="ws_action_text_size">20sp</dimen>
+    <dimen name="ws_body_text_size">18sp</dimen>
+    <dimen name="ws_button_min_height">144dp</dimen>
+</resources>

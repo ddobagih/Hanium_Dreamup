@@ -285,22 +285,32 @@ class CameraXFallbackCompositionStaticTest {
     }
 
     @Test
-    fun talkBackAdvisoryNeverPreemptsRiskOrNavigation() {
-        val advisory = source.substringAfter("private fun speakAdvisory(\n")
-            .substringBefore("private fun isScreenReaderActive()")
-        val talkBack = source.substringAfter("TalkBackAnnouncementPriority.ADVISORY -> {")
-            .substringBefore("TalkBackAnnouncementPriority.NAVIGATION -> {")
+    fun appTtsAdvisoryPreservesDeadlinesAndNeverPreemptsRiskOrNavigation() {
+        val advisory = ReportStaticSourceInspector.functionBlock(source, "private fun speakAdvisory")
+        val actuator = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
+        ).readText()
+        val dispatch = ReportStaticSourceInspector.functionBlock(actuator, "private fun speakReady")
+        val startValidation = ReportStaticSourceInspector.functionBlock(
+            actuator,
+            "private fun isUtteranceStillValidAtStart",
+        )
 
-        assertTrue(advisory.contains("TalkBackAnnouncementPriority.ADVISORY"))
-        assertTrue(advisory.contains("isAppSpeechIdleForExternalAdvisory()"))
+        assertFalse(advisory.contains("TalkBackAnnouncementPriority.ADVISORY"))
+        assertFalse(advisory.contains("isScreenReaderActive()"))
+        assertTrue(advisory.contains("ensureFeedbackActuator().speakAdvisory("))
+        assertTrue(advisory.contains("isFeedbackLifecycleCurrent(generation)"))
+        assertTrue(advisory.contains("shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)"))
         assertTrue(advisory.contains("validUntilMs = action.validUntilMs"))
         assertTrue(advisory.contains("isCameraFallbackAdvisoryStillDeliverable"))
         assertTrue(advisory.contains("nonMetricAdvisoryPolicy.isDeliveryCurrent(action)"))
-        assertTrue(advisory.contains("onDelivered = onDelivered"))
         assertTrue(advisory.contains("onCompleted = onDelivered"))
         assertTrue(advisory.contains("onFailed = onFailed"))
-        assertTrue(talkBack.contains("nowMs < riskAnnouncementHoldUntilMs"))
-        assertTrue(talkBack.contains("nowMs < navigationAnnouncementHoldUntilMs"))
-        assertTrue(talkBack.contains("TALKBACK_ADVISORY_DUP_WINDOW_MS"))
+        assertTrue(dispatch.contains("isAdvisory && synchronized(pendingUtterances) { pendingUtterances.isNotEmpty() }"))
+        assertTrue(dispatch.contains("SpeechPriority.ADVISORY -> TextToSpeech.QUEUE_ADD"))
+        assertTrue(dispatch.contains("return NavigationSpeechDispatchResult.SUPPRESSED"))
+        assertTrue(startValidation.contains("SystemClock.elapsedRealtime() <= deadlineAndValidator.first"))
+        assertTrue(startValidation.contains("runCatching(deadlineAndValidator.second).getOrDefault(false)"))
+        assertTrue(startValidation.contains("markUtteranceFinished(utteranceId, completed = false)"))
     }
 }

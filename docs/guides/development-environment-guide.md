@@ -153,6 +153,8 @@ INFERENCE_PROCESS_ISOLATION_ENABLED=false
 TMAP_POI_PROVIDER=mock
 ```
 
+통합 동의 bootstrap을 Android Gateway까지 이어서 확인할 때는 Backend와 Android Gateway 프로세스의 `WALKSAFE_GATEWAY_SESSION_SECRET`를 정확히 같은 비밀값으로 설정합니다. 두 값이 다르면 Gateway가 서명한 Backend actor assertion 검증이 실패하므로 bootstrap은 성공하지 않습니다.
+
 이 profile은 loopback 개발용이며 field·staging·production에 사용할 수 없습니다. 값을 저장한 뒤 실행합니다.
 
 ```bash

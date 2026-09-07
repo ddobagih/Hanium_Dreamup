@@ -133,7 +133,7 @@ class AndroidFeedbackActuatorStaticTest {
         val queueIndex = source.indexOf("private val pendingSpeechQueue = PendingSpeechQueue()")
         val stateIndex = source.indexOf("private var ttsState = TtsState.INITIALIZING")
         val handlerIndex = source.indexOf("private val mainHandler = Handler(Looper.getMainLooper())")
-        val constructorIndex = source.indexOf("private val textToSpeech = TextToSpeech(appContext, this)")
+        val constructorIndex = source.indexOf("textToSpeech = TextToSpeech(appContext) { status ->")
 
         assertTrue(queueIndex >= 0)
         assertTrue(stateIndex > queueIndex)
@@ -150,10 +150,10 @@ class AndroidFeedbackActuatorStaticTest {
         assertTrue(source.contains("onOfflineKoreanSpeechUnavailable"))
         assertTrue(source.contains("speechUnavailableNotified.compareAndSet(false, true)"))
         assertTrue(initialization.contains("notifyOfflineKoreanSpeechUnavailable()"))
-        assertTrue(initialization.contains("failRequiredSpeechRuntime(utteranceId)"))
+        assertTrue(initialization.contains("failRequiredSpeechRuntime(utteranceId, errorCode)"))
         val dispatch = source.substringAfter("val speakResult = textToSpeech.speak")
             .substringBefore("if (isRisk)")
-        assertTrue(dispatch.contains("failRequiredSpeechRuntime(utteranceId)"))
+        assertTrue(dispatch.contains("failRequiredSpeechRuntime(utteranceId, notifyFailure = false)"))
         val runtimeFailure = source.substringAfter("private fun failRequiredSpeechRuntime(")
             .substringBefore("fun emit(")
         assertTrue(runtimeFailure.contains("ready.set(false)"))
@@ -169,6 +169,42 @@ class AndroidFeedbackActuatorStaticTest {
         assertTrue(dispatch.contains("onCompleted = onSpeechCompleted"))
         assertTrue(dispatch.contains("onFailed = onSpeechFailed"))
         assertTrue(dispatch.contains("return RiskFeedbackDispatchResult(speech, vibrationAccepted)"))
+    }
+
+    @Test
+    fun explicitConsentRequiresAReadyOfflineVoiceAndTrackedCompletion() {
+        val consent = source.substringAfter("fun speakConsentClause(")
+            .substringBefore("fun speakPriorityUserTraining(")
+
+        assertTrue(consent.contains("if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED"))
+        assertTrue(consent.contains("if (ttsState != TtsState.READY) return NavigationSpeechDispatchResult.UNAVAILABLE"))
+        assertTrue(consent.indexOf("ttsState != TtsState.READY") < consent.indexOf("return speakReady("))
+        assertTrue(consent.contains("priority = SpeechPriority.INTERACTION"))
+        assertTrue(consent.contains("onCompleted = onCompleted"))
+        assertTrue(consent.contains("onFailed = onFailed"))
+        assertTrue(consent.contains("requiresExplicitTerminalCallback = true"))
+        assertFalse(consent.contains("speechAllowed()"))
+        assertFalse(consent.contains("pendingSpeechQueue.offer"))
+        assertFalse(consent.contains("onCompleted()"))
+        assertFalse(consent.contains("textToSpeech.speak("))
+    }
+
+    @Test
+    fun consentExceptionDoesNotBypassTheOrdinaryOrTrainingSpeechGate() {
+        val ordinarySpeech = source.substringAfter("private fun speak(\n")
+            .substringBefore("private fun flushPendingSpeech()")
+        val training = source.substringAfter("fun speakPriorityUserTraining(")
+            .substringBefore("fun speakAdvisory(")
+        val dispatch = source.substringAfter("private fun speakReady(\n")
+            .substringBefore("private fun vibrate(")
+
+        assertTrue(ordinarySpeech.contains("if (!speechAllowed()) return NavigationSpeechDispatchResult.UNAVAILABLE"))
+        assertTrue(training.contains("): NavigationSpeechDispatchResult = speak("))
+        assertFalse(training.contains("speakReady("))
+        assertTrue(dispatch.contains("if (!requestAudioFocus(isRisk))"))
+        assertTrue(dispatch.contains("textToSpeech.speak(message, queueMode, params, utteranceId)"))
+        assertTrue(dispatch.contains("if (!isRisk) return NavigationSpeechDispatchResult.SUPPRESSED"))
+        assertTrue(dispatch.contains("if (riskPending) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH"))
     }
 
     @Test
@@ -316,4 +352,75 @@ class AndroidFeedbackActuatorStaticTest {
         assertTrue(source.contains("val predecessors = pendingUtteranceOrder.takeWhile { it != utteranceId }"))
         assertTrue(source.contains("completed = true"))
     }
+
+    @Test
+    fun homeCommandResponsesRequireTerminalCallbacksButDoNotLockFollowingResults() {
+        val home = source.substringAfter("fun speakHomeCommandInteraction(")
+            .substringBefore("fun speakInteraction(message: String)")
+        val trackedInteraction = source.substringAfter("fun speakInteraction(\n")
+            .substringBefore("fun speakExplicitConfirmation(")
+        val dispatch = source.substringAfter("private fun speakReady(")
+            .substringBefore("private fun vibrate(")
+        val training = source.substringAfter("fun speakPriorityUserTraining(")
+            .substringBefore("fun speakAdvisory(")
+        val cancelTraining = source.substringAfter("fun cancelPriorityUserTrainingFeedback()")
+            .substringBefore("fun prepareForExternalRiskAnnouncement()")
+        assertTrue(home.contains("onCompleted = onCompleted"))
+        assertTrue(home.contains("requiresExplicitTerminalCallback = true"))
+        assertTrue(home.contains("protectsFromFollowingSpeech = false"))
+        assertTrue(trackedInteraction.contains("requiresExplicitTerminalCallback = true"))
+        assertTrue(trackedInteraction.contains("protectsFromFollowingSpeech = false"))
+        assertTrue(dispatch.contains("protectsFromFollowingSpeech: Boolean = requiresExplicitTerminalCallback"))
+        assertTrue(dispatch.contains("utteranceCallbacks.protectedUtteranceIds().firstOrNull()"))
+        assertFalse(dispatch.contains("explicitTerminalRequiredUtterances.firstOrNull()"))
+        assertTrue(training.contains("requiresExplicitTerminalCallback = true"))
+        assertFalse(training.contains("protectsFromFollowingSpeech = false"))
+        assertTrue(cancelTraining.contains("utteranceCallbacks.protectedUtteranceIds()"))
+        assertTrue(dispatch.contains("if (!isRisk) return NavigationSpeechDispatchResult.SUPPRESSED"))
+    }
+
+    @Test
+    fun commandCompletionIsStillOnlyRealDoneAndInterruptedSpeechIsNotSuccess() {
+        val start = source.substringAfter("override fun onStart(").substringBefore("override fun onDone(")
+        val done = source.substringAfter("override fun onDone(").substringBefore("@Deprecated")
+        val stopped = source.substringAfter("override fun onStop(").substringBefore("if (listenerResult")
+        val inferred = source.substringAfter("private fun armUtteranceTerminalWatchdog(")
+            .substringBefore("private fun scheduleUtteranceWatchdogLocked(")
+        assertFalse(start.contains("completed = true"))
+        assertTrue(done.contains("markUtteranceFinished(utteranceId, completed = true)"))
+        assertTrue(stopped.contains("markUtteranceFinished(utteranceId, completed = false)"))
+        assertTrue(inferred.contains("completed = false"))
+        assertFalse(inferred.contains("completed = true"))
+    }
+
+    @Test
+    fun commandCancellationStopsOnlyAnExclusivelyOwnedQueueAndNeverReportsCompletion() {
+        val cancellation = source.substringAfter("fun cancelCommandInteraction()")
+            .substringBefore("fun cancelPriorityUserTrainingFeedback()")
+        val ownership = cancellation.indexOf("utteranceCallbacks.exclusiveCommandUtteranceIds(")
+        val engineStop = cancellation.indexOf("textToSpeech.stop()")
+        assertTrue(cancellation.contains("synchronized(pendingUtterances)"))
+        assertTrue(cancellation.contains("ANNOUNCE_ASSERTIVE_PREFIX"))
+        assertTrue(ownership >= 0 && ownership < engineStop)
+        assertTrue(cancellation.indexOf("if (owned.isEmpty()) return") < engineStop)
+        assertTrue(cancellation.contains("explicitTerminalRequiredIds = explicitTerminalRequiredUtterances"))
+        assertTrue(cancellation.contains("markUtteranceFinished(it, completed = false)"))
+        assertFalse(cancellation.contains("completed = true"))
+        assertFalse(cancellation.contains("close()"))
+        assertFalse(cancellation.contains("pendingUtterances.clear()"))
+        assertFalse(cancellation.contains("cancelPriorityUserTrainingFeedback()"))
+    }
+
+    @Test
+    fun cancellableCommandsCannotShareTheRiskQueue() {
+        val dispatch = source.substringAfter("private fun speakReady(")
+            .substringBefore("private fun vibrate(")
+        val guard = "if (isCommandInteraction && riskPending) return NavigationSpeechDispatchResult.SUPPRESSED"
+        assertTrue(dispatch.contains("isInteraction && requiresExplicitTerminalCallback &&"))
+        assertTrue(dispatch.contains("!protectsFromFollowingSpeech"))
+        assertTrue(dispatch.indexOf(guard) >= 0)
+        assertTrue(dispatch.indexOf(guard) < dispatch.indexOf("val queueMode = when"))
+        assertTrue(dispatch.indexOf(guard) < dispatch.indexOf("markUtteranceStarted("))
+    }
+
 }

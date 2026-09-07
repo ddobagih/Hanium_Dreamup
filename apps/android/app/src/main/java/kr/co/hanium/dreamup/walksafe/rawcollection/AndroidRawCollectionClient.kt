@@ -214,6 +214,7 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
         val connection = opened as? HttpURLConnection ?: throw RawCollectionProtocolException()
         cancellation.attach(connection)
         try {
+            isCurrent()
             connection.apply {
                 requestMethod = method
                 connectTimeout = RAW_CONNECT_TIMEOUT_MS
@@ -248,23 +249,26 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
                     )
                 }
             }
+            isCurrent()
             if (body != null) {
                 connection.outputStream.use { output ->
                     cancellation.attach(output)
                     try {
                         var offset = 0
                         while (offset < body.size) {
-                            cancellation.throwIfCancelled()
+                            isCurrent()
                             val length = minOf(RAW_WRITE_BUFFER_BYTES, body.size - offset)
                             output.write(body, offset, length)
                             offset += length
                         }
+                        isCurrent()
                         output.flush()
                     } finally {
                         cancellation.detach(output)
                     }
                 }
             }
+            isCurrent()
             val response = connection.readBoundedResponse(RAW_RESPONSE_MAX_BYTES, cancellation)
             if (response.statusCode !in acceptedStatusCodes) {
                 throw RawCollectionHttpException(response.statusCode)

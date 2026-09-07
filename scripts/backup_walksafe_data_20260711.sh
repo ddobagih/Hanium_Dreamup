@@ -149,6 +149,7 @@ fi
   exit 2
 }
 command -v pg_dump >/dev/null
+command -v psql >/dev/null
 command -v sha256sum >/dev/null
 command -v gpg >/dev/null
 command -v flock >/dev/null
@@ -237,10 +238,20 @@ validate_private_path() {
     validate-private-restore-output --path "$1"
 }
 
-PG_DUMP_DATABASE_URL="$("${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" \
-  validate-backup-database-url --database-url "${DATABASE_URL}")"
-DATABASE_IDENTITY_SHA256="$("${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" \
-  database-identity --database-url "${PG_DUMP_DATABASE_URL}")"
+env -i PATH=/usr/bin:/bin DATABASE_URL="${DATABASE_URL}" \
+  "${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" \
+    validate-backup-database-url >/dev/null
+PG_DUMP_DATABASE_URL="${DATABASE_URL}"
+run_backup_postgres_client() {
+  local tool="$1"
+  shift
+  env -i PATH=/usr/bin:/bin DATABASE_URL="${PG_DUMP_DATABASE_URL}" \
+    "${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" \
+      exec-postgres-client --tool "${tool}" -- "$@"
+}
+DATABASE_IDENTITY_SHA256="$(env -i PATH=/usr/bin:/bin DATABASE_URL="${PG_DUMP_DATABASE_URL}" \
+  "${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" \
+    database-identity)"
 
 if [[ "${OPERATIONAL_SHARED_GROUPS}" != "true" ]]; then
   [[ "$(validate_private_path "${UPLOAD_DIR}/walksafe-upload-anchor")" == "${UPLOAD_DIR}/walksafe-upload-anchor" ]]
@@ -761,6 +772,15 @@ verify_upload_binding || { echo "upload directory changed before snapshot" >&2; 
 verify_output_binding || { echo "backup output root changed before snapshot" >&2; exit 2; }
 verify_lock_binding || { echo "maintenance lock changed before snapshot" >&2; exit 2; }
 SNAPSHOT_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+PG_DUMP_CLIENT_MAJOR="$(pg_dump --version | awk '{print $3}' | cut -d. -f1)"
+SOURCE_SERVER_VERSION_NUM="$(run_backup_postgres_client psql --no-psqlrc --tuples-only --no-align \
+  --command 'SHOW server_version_num')"
+[[ "${PG_DUMP_CLIENT_MAJOR}" =~ ^[0-9]+$ \
+  && "${SOURCE_SERVER_VERSION_NUM}" =~ ^[0-9]+$ \
+  && "${PG_DUMP_CLIENT_MAJOR}" -eq "$((SOURCE_SERVER_VERSION_NUM / 10000))" ]] || {
+  echo "pg_dump major version must match the source PostgreSQL server" >&2
+  exit 2
+}
 
 SOURCE_GROUP_ARGUMENTS=()
 if [[ "${OPERATIONAL_SHARED_GROUPS}" == "true" ]]; then
@@ -772,8 +792,7 @@ check_source_consistency() {
     --upload-dir-fd "${UPLOAD_FD}" "${SOURCE_GROUP_ARGUMENTS[@]}"
 }
 SOURCE_CONSISTENCY_JSON="$(check_source_consistency)"
-env -i PATH=/usr/bin:/bin PGDATABASE="${PG_DUMP_DATABASE_URL}" \
-  pg_dump --format=custom --no-owner --no-acl | \
+run_backup_postgres_client pg_dump --format=custom --no-owner --no-acl | \
   gpg --no-options --batch --yes --trust-model always --encrypt \
     --recipient "${RECIPIENT_FINGERPRINT}" --output "${TEMP_ANCHOR}/reports.dump.gpg"
 SOURCE_RESULT_TEMP="$(mktemp "${TEMP_ANCHOR}/.source-consistency.XXXXXX")"

@@ -3598,6 +3598,7 @@ def _seal_and_exec_restore(
             "PGSSLROOTCERT",
             "PGSSLCRL",
             "PGSSLCRLDIR",
+            "TARGET_DATABASE_URL",
             "WALKSAFE_ACTOR_ID",
             "WALKSAFE_BACKUP_TRUSTED_SIGNER_FINGERPRINT",
             "WALKSAFE_BACKUP_KEY_CONTROL_DOCUMENT",
@@ -3740,6 +3741,11 @@ def main() -> int:
     parser.add_argument("--future-skew-seconds", type=int)
     parser.add_argument("restore_arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    rekey_manifest_signer_fingerprint = (
+        args.trusted_signer_fingerprint
+        if args.before_rekey_root is not None or args.after_rekey_root is not None
+        else None
+    )
 
     mode_count = sum(
         int(value)
@@ -3811,7 +3817,7 @@ def main() -> int:
                 trusted_validation_signer_fingerprint=args.trusted_validation_signer_fingerprint,
                 before_rekey_root=args.before_rekey_root,
                 after_rekey_root=args.after_rekey_root,
-                trusted_rekey_manifest_signer_fingerprint=args.trusted_signer_fingerprint,
+                trusted_rekey_manifest_signer_fingerprint=rekey_manifest_signer_fingerprint,
             )
             require_backup_key_control_authority_lock(
                 key_control,
@@ -3897,7 +3903,7 @@ def main() -> int:
                 trusted_validation_signer_fingerprint=args.trusted_validation_signer_fingerprint,
                 before_rekey_root=args.before_rekey_root,
                 after_rekey_root=args.after_rekey_root,
-                trusted_rekey_manifest_signer_fingerprint=args.trusted_signer_fingerprint,
+                trusted_rekey_manifest_signer_fingerprint=rekey_manifest_signer_fingerprint,
             )
             require_backup_key_control_authority_lock(
                 key_control,
@@ -3971,7 +3977,7 @@ def main() -> int:
                 trusted_validation_signer_fingerprint=args.trusted_validation_signer_fingerprint,
                 before_rekey_root=args.before_rekey_root,
                 after_rekey_root=args.after_rekey_root,
-                trusted_rekey_manifest_signer_fingerprint=args.trusted_signer_fingerprint,
+                trusted_rekey_manifest_signer_fingerprint=rekey_manifest_signer_fingerprint,
                 max_age_seconds=args.max_age_seconds,
                 future_skew_seconds=args.future_skew_seconds,
                 restore_arguments=args.restore_arguments,
@@ -4056,7 +4062,7 @@ def main() -> int:
                     trusted_validation_signer_fingerprint=args.trusted_validation_signer_fingerprint,
                     before_rekey_root=args.before_rekey_root,
                     after_rekey_root=args.after_rekey_root,
-                    trusted_rekey_manifest_signer_fingerprint=args.trusted_signer_fingerprint,
+                    trusted_rekey_manifest_signer_fingerprint=rekey_manifest_signer_fingerprint,
                 )
             )
             require_backup_key_control_authority_lock(

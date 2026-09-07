@@ -168,7 +168,7 @@ class AndroidVoiceCommandTest {
         assertEquals(
             "서울역 목적지 후보가 2곳 있습니다. " +
                 "1번 서울역, 서울 중구 한강대로 405, 320m. " +
-                "2번 서울역 버스환승센터, 서울 중구 봉래동, 480m. 원하는 번호를 말씀해 주세요.",
+                "2번 서울역 버스환승센터, 서울 중구 봉래동, 480m. 원하는 번호나 다시 듣기라고 말씀해 주세요.",
             formatDestinationSearchVoicePrompt("서울역", results),
         )
     }
@@ -226,6 +226,32 @@ class AndroidVoiceCommandTest {
     }
 
     @Test
+    fun explicitReplayKeepsTheCurrentPageWhileHearMoreAdvances() {
+        val state = DestinationSearchVoiceState(
+            query = "후보",
+            results = (1..7).map { destinationResult("후보 $it") },
+            pageIndex = 1,
+        )
+        listOf("다시 듣기", "다시듣기").forEach { phrase ->
+            assertEquals(DestinationSearchVoiceCommand.RepeatPage, parseDestinationSearchVoiceCommand(phrase))
+            assertEquals(AndroidVoiceCommand.RepeatDestinationCandidates, parseAndroidVoiceCommand(phrase))
+        }
+        assertEquals(
+            AndroidVoiceAction.RepeatDestinationCandidates,
+            AndroidVoiceCommand.RepeatDestinationCandidates.toAction(),
+        )
+        val replay = state.onCommand(DestinationSearchVoiceCommand.RepeatPage)
+        assertTrue(replay.accepted)
+        assertTrue(replay.state === state)
+        assertEquals(1, replay.state.pageIndex)
+        assertNull(replay.selectedResult)
+        assertEquals(2, state.onCommand(DestinationSearchVoiceCommand.HearMore).state.pageIndex)
+        assertFalse(DestinationSearchVoiceState("후보", emptyList())
+            .onCommand(DestinationSearchVoiceCommand.RepeatPage).accepted)
+        assertNull(parseAndroidVoiceCommand("다시 듣지 마"))
+    }
+
+    @Test
     fun onlyExplicitHearMoreCommandAdvancesTheDestinationPage() {
         val state = DestinationSearchVoiceState(
             query = "도서관",
@@ -270,6 +296,182 @@ class AndroidVoiceCommandTest {
             formatDestinationSearchVoicePrompt("병원", listOf(destinationResult("병원")))
                 .contains("1번 병원, 주소 미상, 거리미상"),
         )
+    }
+
+    @Test
+    fun parsesStartRepeatAndHelpAsDistinctActions() {
+        val cases = mapOf(
+            "안내 시작" to (AndroidVoiceCommand.StartNavigation to AndroidVoiceAction.StartNavigation),
+            "길안내 시작" to (AndroidVoiceCommand.StartNavigation to AndroidVoiceAction.StartNavigation),
+            "다시 말해줘" to (AndroidVoiceCommand.RepeatGuidance to AndroidVoiceAction.SpeakCurrentGuidance),
+            "도움말" to (AndroidVoiceCommand.Help to AndroidVoiceAction.SpeakVoiceHelp),
+        )
+        cases.forEach { (phrase, expected) ->
+            assertEquals(expected.first, parseAndroidVoiceCommand(phrase))
+            assertEquals(expected.second, expected.first.toAction())
+            assertEquals(
+                expected.second,
+                selectAndroidVoiceAction(listOf(phrase), floatArrayOf(0.9f)),
+            )
+        }
+        listOf("안내 시작하지 마", "다시 말하지 마", "도움말 하지 마", "보행 시작").forEach {
+            assertNull(parseAndroidVoiceCommand(it))
+        }
+    }
+
+    @Test
+    fun bareNumericAndSpokenNumbersRequireDestinationSelectionContext() {
+        val cases = mapOf(
+            "1" to 1, "1번" to 1, "일 번" to 1, "하나" to 1, "한 번" to 1,
+            "첫 번째" to 1, "두 번째" to 2, "이 번" to 2, "둘" to 2,
+            "세 번" to 3, "사 번" to 4, "네 번" to 4, "넷" to 4,
+            "여섯 번째" to 6, "십 번" to 10, "십일 번" to 11, "이십 번" to 20,
+        )
+        cases.forEach { (phrase, index) ->
+            assertNull(parseAndroidVoiceCommand(phrase))
+            assertNull(parseDestinationSearchVoiceCommand(phrase))
+            assertEquals(
+                AndroidVoiceCommand.SelectDestinationCandidate(index),
+                parseAndroidVoiceCommand(phrase, allowBareDestinationIndex = true),
+            )
+            assertEquals(
+                DestinationSearchVoiceCommand.SelectCandidate(index),
+                parseDestinationSearchVoiceCommand(phrase, allowBareDestinationIndex = true),
+            )
+        }
+    }
+
+    @Test
+    fun destinationContextStillRejectsAmbiguousNegatedAndOutOfRangeNumbers() {
+        listOf(
+            "0", "0번", "21", "21번", "영번", "이십일번", "네", "예", "응",
+            "1번 아니야", "일번 선택하지 마", "1번 그리고 2번", "01번", "-1번",
+        ).forEach { phrase ->
+            assertNull(parseAndroidVoiceCommand(phrase, allowBareDestinationIndex = true))
+            assertNull(parseDestinationSearchVoiceCommand(phrase, allowBareDestinationIndex = true))
+        }
+    }
+
+    @Test
+    fun destinationContextDoesNotOverrideTheTopHypothesisOrConfidence() {
+        assertNull(selectAndroidVoiceAction(listOf("1번"), floatArrayOf(0.9f)))
+        assertEquals(
+            AndroidVoiceAction.SelectDestinationCandidate(1),
+            selectAndroidVoiceAction(
+                listOf("1번"), floatArrayOf(0.9f), allowBareDestinationIndex = true,
+            ),
+        )
+        listOf(0.3f, -1f, Float.NaN, Float.POSITIVE_INFINITY).forEach { confidence ->
+            assertNull(
+                selectAndroidVoiceAction(
+                    listOf("1번", "2번"), floatArrayOf(confidence, 0.99f),
+                    allowBareDestinationIndex = true,
+                ),
+            )
+        }
+        assertNull(
+            selectAndroidVoiceAction(
+                listOf("1번 선택하지 마", "2번"), floatArrayOf(0.9f, 0.99f),
+                allowBareDestinationIndex = true,
+            ),
+        )
+    }
+
+    @Test
+    fun spokenCandidateNumberStillHasToBelongToTheCurrentPage() {
+        val firstPage = DestinationSearchVoiceState(
+            query = "후보",
+            results = (1..7).map { destinationResult("후보 $it") },
+        )
+        val command = parseDestinationSearchVoiceCommand("사 번", allowBareDestinationIndex = true)
+        assertEquals(DestinationSearchVoiceCommand.SelectCandidate(4), command)
+        assertFalse(firstPage.onCommand(requireNotNull(command)).accepted)
+        val secondPage = firstPage.onCommand(DestinationSearchVoiceCommand.HearMore).state
+        val selection = secondPage.onCommand(command)
+        assertTrue(selection.accepted)
+        assertEquals("후보 4", selection.selectedResult?.name)
+    }
+
+    @Test
+    fun naturalDestinationRequestsKeepThePlaceQueryWithoutHardcodedAliases() {
+        val cases = mapOf(
+            "금오공대 목적지로 해줘" to "금오공대",
+            "금오공대 목적지로 해 줘" to "금오공대",
+            "금오공대목적지로해주세요" to "금오공대",
+            "금오공대 가고 싶어" to "금오공대",
+            "금오공대 가고싶어요" to "금오공대",
+            "시립 도서관 가고 싶습니다" to "시립 도서관",
+            "서울역으로 가고 싶어" to "서울역",
+            "편의점 찾아줘" to "편의점",
+            "편의점찾아 줘" to "편의점",
+            "CU 편의점 찾아 주세요" to "CU 편의점",
+            "금오공대 안내해줘" to "금오공대",
+            "편의점 안내해줘" to "편의점",
+            "시립 도서관 안내 해 주세요" to "시립 도서관",
+        )
+        cases.forEach { (phrase, query) ->
+            assertEquals(phrase, AndroidVoiceCommand.SetDestination(query), parseAndroidVoiceCommand(phrase))
+            assertEquals(
+                phrase, AndroidVoiceAction.SearchDestination(query),
+                selectAndroidVoiceAction(listOf(phrase), floatArrayOf(0.9f)),
+            )
+        }
+    }
+
+    @Test
+    fun newDestinationFormsPreserveRoNamesAndLegacyDirectionalFormsStillWork() {
+        val cases = mapOf(
+            "종로 찾아줘" to "종로",
+            "구로 가고 싶어" to "구로",
+            "낙성대로 목적지로 해줘" to "낙성대로",
+            "학교로 안내해줘" to "학교",
+            "금오공대로 안내해줘" to "금오공대",
+            "종로로 안내해줘" to "종로",
+        )
+        cases.forEach { (phrase, query) ->
+            assertEquals(phrase, AndroidVoiceCommand.SetDestination(query), parseAndroidVoiceCommand(phrase))
+        }
+    }
+
+    @Test
+    fun incompleteNegatedAndCombinedDestinationCommandsDoNotStartAnyAction() {
+        listOf(
+            "목적지로 해줘", "찾아줘", "가고 싶어", "안내해줘", "목적지 찾아줘",
+            "신고 찾아줘", "정지 찾아줘", "편의점 찾아주지 마",
+            "금오공대 목적지로 하지 마", "서울역 안내해줘 찾아줘",
+            "신고해줘 그리고 편의점 찾아줘", "길안내 종료하고 편의점 찾아줘",
+            "편의점 찾아줘 그리고 신고해줘",
+        ).forEach { phrase ->
+            assertNull(phrase, parseAndroidVoiceCommand(phrase))
+            assertNull(phrase, selectAndroidVoiceAction(listOf(phrase), floatArrayOf(0.9f)))
+        }
+    }
+
+    @Test
+    fun destinationNamesContainingControlWordsNeverBecomeRiskyActions() {
+        listOf("신고센터", "취소상담센터", "정지선 안내센터").forEach { place ->
+            assertEquals(
+                AndroidVoiceAction.SearchDestination(place),
+                selectAndroidVoiceAction(listOf("$place 찾아줘"), floatArrayOf(0.9f)),
+            )
+        }
+        listOf("편의점에서 신고해줘", "도서관에서 목적지 취소", "병원 앞에서 길안내 중지").forEach {
+            assertNull(parseAndroidVoiceCommand(it))
+        }
+    }
+
+    @Test
+    fun naturalDestinationRequestsStillRequireConfidenceAndExplicitCandidateSelection() {
+        assertNull(selectAndroidVoiceAction(listOf("금오공대 목적지로 해줘"), floatArrayOf(0.3f)))
+        assertNull(selectAndroidVoiceAction(listOf("신고하지 마", "금오공대 찾아줘"), floatArrayOf(0.9f, 0.99f)))
+        val action = selectAndroidVoiceAction(listOf("금오공대 목적지로 해줘"), floatArrayOf(0.9f))
+        assertEquals(AndroidVoiceAction.SearchDestination("금오공대"), action)
+        val state = DestinationSearchVoiceState(
+            query = "금오공대",
+            results = listOf(destinationResult("첫 후보"), destinationResult("다른 후보")),
+        )
+        assertNull(parseDestinationSearchVoiceCommand("첫 후보"))
+        assertEquals(2, state.onCommand(DestinationSearchVoiceCommand.SelectCandidate(2)).selectedOneBasedIndex)
     }
 
     private fun destinationResult(

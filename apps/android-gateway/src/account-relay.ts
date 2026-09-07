@@ -328,7 +328,11 @@ function projectedError(upstream: Response, payload: unknown): Response {
     return accountError(502, "gateway_account_upstream_invalid");
   }
   const response = accountError(upstream.status, code);
-  if (upstream.status !== 429 && upstream.status !== 503) return response;
+  if (
+    upstream.status !== 429 &&
+    upstream.status !== 503 &&
+    !(upstream.status === 409 && code === "account_enrollment_in_progress")
+  ) return response;
   const headers = new Headers(response.headers);
   for (const [key, value] of new Headers(retryAfterHeaders(upstream))) headers.set(key, value);
   return new Response(response.body, { status: response.status, headers });

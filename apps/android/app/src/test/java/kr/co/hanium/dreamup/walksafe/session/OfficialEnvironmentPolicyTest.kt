@@ -262,6 +262,108 @@ class OfficialEnvironmentPolicyTest {
         assertEquals(OfficialEnvironmentSupport.SUPPORTED, refreshedAssessment.support)
     }
 
+
+    @Test
+    fun educatedLimitsAllowFreshSensorsWithoutPromotingUnknownConditionsToPass() {
+        val assessment = educatedAssessment()
+        assertTrue(assessment.usageLimitsAcknowledged)
+        assertEquals(OfficialEnvironmentSupport.LIMITED, assessment.support)
+        assertTrue(assessment.conditionallyAllowed)
+        OfficialEnvironmentFactor.entries.filter {
+            it !in setOf(OfficialEnvironmentFactor.GPS_QUALITY, OfficialEnvironmentFactor.CAMERA_QUALITY)
+        }.forEach {
+            assertEquals(EnvironmentEvidenceStatus.UNKNOWN, assessment.factorStatuses.getValue(it))
+        }
+        val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(assessment, NOW_MS)
+        assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, decision.action)
+        assertFalse(decision.suppressAllWalkOutputs)
+    }
+
+    @Test
+    fun educationNeverReplacesRequiredMeasuredQualityOrItsFreshness() {
+        val failures = listOf(
+            educatedAssessment(gpsQuality = null),
+            educatedAssessment(cameraQuality = null),
+            educatedAssessment(gpsQuality = gpsEvidence().copy(
+                observedAtElapsedRealtimeMs = NOW_MS - MAX_AGE_MS - 1L,
+            )),
+            educatedAssessment(cameraQuality = cameraEvidence().copy(epoch = OTHER_EPOCH)),
+            educatedAssessment(cameraQuality = cameraEvidence().copy(measurementProfileId = "wrong")),
+            educatedAssessment(approvedProfile = null),
+        )
+        failures.forEach {
+            assertFalse(it.canStartWalk)
+            assertTrue(OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+                .onAssessment(it, NOW_MS).suppressAllWalkOutputs)
+        }
+        assertFalse(educatedAssessment().copy(usageLimitsAcknowledged = false).canStartWalk)
+    }
+
+    @Test
+    fun educationCannotOverrideObservedBadWeatherOrSensorFailure() {
+        val weather = educatedAssessment().copy(
+            factorStatuses = educatedAssessment().factorStatuses +
+                (OfficialEnvironmentFactor.DRY_WEATHER to EnvironmentEvidenceStatus.FAIL),
+        )
+        val camera = educatedAssessment(
+            cameraQuality = cameraEvidence().copy(status = EnvironmentEvidenceStatus.FAIL),
+        )
+        listOf(weather, camera).forEach {
+            assertEquals(OfficialEnvironmentSupport.UNSUPPORTED, it.support)
+            assertFalse(it.canStartWalk)
+            assertTrue(OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+                .onAssessment(it, NOW_MS).suppressAllWalkOutputs)
+        }
+    }
+
+    @Test
+    fun conditionalRuntimeKeepsFreshnessEpochAndProfileFences() {
+        val assessment = educatedAssessment()
+        val cases = listOf(
+            assessment.copy(epoch = OTHER_EPOCH) to NOW_MS,
+            assessment.copy(profileId = "wrong") to NOW_MS,
+            assessment to NOW_MS + MAX_AGE_MS + 1L,
+        )
+        cases.forEach { (candidate, now) ->
+            val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(candidate, now)
+            assertEquals(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY, decision.action)
+            assertTrue(decision.suppressAllWalkOutputs)
+        }
+    }
+
+    @Test
+    fun conditionalRuntimeStopsAfterRealDegradationAndDoesNotAutoResume() {
+        val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+        assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, guard.onAssessment(educatedAssessment(), NOW_MS).action)
+        val failed = educatedAssessment(cameraQuality = cameraEvidence().copy(status = EnvironmentEvidenceStatus.FAIL))
+        repeat(PROFILE.maximumRuntimeRetryAttempts + 1) { index ->
+            val now = NOW_MS + index + 1L
+            guard.onAssessment(failed.copy(assessedAtElapsedRealtimeMs = now), now)
+        }
+        assertEquals(OfficialEnvironmentRuntimeAction.SAFE_STOP, guard.decision().action)
+        assertTrue(guard.decision().suppressAllWalkOutputs)
+        val recovered = guard.onAssessment(
+            educatedAssessment().copy(assessedAtElapsedRealtimeMs = NOW_MS + 10L),
+            NOW_MS + 10L,
+        )
+        assertEquals(OfficialEnvironmentRuntimeAction.SAFE_STOP, recovered.action)
+        assertTrue(recovered.suppressAllWalkOutputs)
+    }
+
+    private fun educatedAssessment(
+        gpsQuality: MeasuredEnvironmentEvidence? = gpsEvidence(),
+        cameraQuality: MeasuredEnvironmentEvidence? = cameraEvidence(),
+        approvedProfile: ApprovedOfficialEnvironmentProfile? = PROFILE,
+    ) = OfficialEnvironmentPolicy.assess(
+        currentEpoch = EPOCH,
+        nowElapsedRealtimeMs = NOW_MS,
+        gpsQuality = gpsQuality,
+        cameraQuality = cameraQuality,
+        userConfirmation = null,
+        approvedProfile = approvedProfile,
+        usageLimitsAcknowledged = true,
+    )
+
     private fun supportedAssessment() = assess()
 
     private fun assess(

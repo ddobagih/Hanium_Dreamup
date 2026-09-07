@@ -6,10 +6,12 @@ from pathlib import Path
 import pytest
 
 from scripts.walksafe_environment_identity import (
+    _validated_psql_stdin,
     database_identity_sha256,
     explicit_backup_database_url,
     normalized_postgresql_url,
     path_identity_sha256,
+    postgres_client_invocation,
     postgresql_database_name,
     private_restore_output_path,
     sqlalchemy_psycopg_url,
@@ -52,6 +54,29 @@ def test_backup_database_url_rejects_remote_tls_downgrade() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "sslmode=verify-full&gssencmode=disable&ssl=true",
+        "ssl=true&gssencmode=disable&sslmode=verify-full",
+    ],
+)
+def test_backup_database_url_rejects_ambiguous_ssl_alias_in_any_order(query: str) -> None:
+    with pytest.raises(ValueError, match="selector overrides"):
+        explicit_backup_database_url(
+            f"postgresql://walksafe@db.example:5432/walksafe?{query}"
+        )
+
+
+@pytest.mark.parametrize("query_key", ["password", "passfile", "sslpassword"])
+def test_backup_database_url_rejects_secret_query_parameters(query_key: str) -> None:
+    with pytest.raises(ValueError, match="selector overrides"):
+        explicit_backup_database_url(
+            "postgresql://walksafe@127.0.0.1:5432/walksafe"
+            f"?sslmode=disable&{query_key}=p+ss"
+        )
+
+
 def test_sqlalchemy_postgresql_driver_is_removed_for_pg_tools() -> None:
     sqlalchemy_url = "postgresql+psycopg://walksafe:secret@db.example:5432/walksafe?sslmode=require"
 
@@ -82,6 +107,117 @@ def test_database_identity_excludes_password_but_tracks_database() -> None:
 
     assert first == rotated
     assert first != other_database
+
+
+def test_database_identity_preserves_rfc3986_plus_and_space_semantics() -> None:
+    encoded_space = database_identity_sha256(
+        "postgresql://walksafe@db.example:5432/walksafe?application_name=walk%20safe"
+    )
+    literal_plus = database_identity_sha256(
+        "postgresql://walksafe@db.example:5432/walksafe?application_name=walk+safe"
+    )
+
+    assert encoded_space != literal_plus
+
+
+def test_postgres_client_keeps_password_out_of_process_arguments() -> None:
+    executable, invocation, environment = postgres_client_invocation(
+        "postgresql://walksafe:p%40ss@127.0.0.1:55432/walksafe_test"
+        "?sslmode=disable&application_name=walk%20safe+backup",
+        tool="pg_dump",
+        arguments=["--format=custom", "--no-owner", "--no-acl"],
+    )
+
+    assert executable == "/usr/bin/pg_dump"
+    assert invocation[0] == executable
+    assert invocation[1] == (
+        "--dbname=postgresql://walksafe@127.0.0.1:55432/walksafe_test"
+        "?sslmode=disable&application_name=walk%20safe+backup"
+    )
+    assert "p@ss" not in " ".join(invocation)
+    assert environment == {
+        "PATH": "/usr/bin:/bin",
+        "PGPASSWORD": "p@ss",
+    }
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments"),
+    [
+        ("psql", ["-dpostgresql://attacker@127.0.0.1/other"]),
+        ("psql", ["-hattacker.example"]),
+        ("psql", ["-p1"]),
+        ("psql", ["-Uattacker"]),
+        ("psql", ["--db=postgresql://attacker@127.0.0.1/other"]),
+        ("psql", ["other_database"]),
+        ("psql", []),
+        ("psql", ["--no-psqlrc", "--command", "SELECT 1;"]),
+        ("pg_dump", []),
+        ("pg_dump", ["--format=custom", "--no-owner"]),
+        ("pg_dump", ["--dbname=postgresql://attacker@127.0.0.1/other"]),
+        ("pg_restore", ["/proc/self/fd/7"]),
+        ("pg_restore", ["--create", "/proc/self/fd/7"]),
+    ],
+)
+def test_postgres_client_rejects_connection_or_behavior_overrides(
+    tool: str, arguments: list[str]
+) -> None:
+    with pytest.raises(ValueError, match="not allowed for the bound target"):
+        postgres_client_invocation(
+            "postgresql://walksafe@127.0.0.1:55432/walksafe_test",
+            tool=tool,
+            arguments=arguments,
+        )
+
+
+def test_postgres_client_accepts_only_the_operational_psql_and_restore_grammar() -> None:
+    _executable, psql_invocation, _environment = postgres_client_invocation(
+        "postgresql://walksafe@127.0.0.1:55432/walksafe_test?sslmode=disable",
+        tool="psql",
+        arguments=[
+            "--no-psqlrc",
+            "--tuples-only",
+            "--no-align",
+            "--command",
+            "SHOW server_version_num",
+        ],
+    )
+    _executable, restore_invocation, _environment = postgres_client_invocation(
+        "postgresql://walksafe@127.0.0.1:55432/walksafe_test?sslmode=disable",
+        tool="pg_restore",
+        arguments=[
+            "--exit-on-error",
+            "--single-transaction",
+            "--no-owner",
+            "--no-acl",
+            "/proc/self/fd/7",
+        ],
+    )
+
+    assert psql_invocation[-2:] == ["--command", "SHOW server_version_num"]
+    assert restore_invocation[-1] == "/proc/self/fd/7"
+
+
+def test_postgres_client_stdin_rejects_psql_meta_commands() -> None:
+    arguments = [
+        "--no-psqlrc",
+        "--set",
+        "ON_ERROR_STOP=1",
+        "--tuples-only",
+        "--no-align",
+    ]
+
+    script = (
+        Path(__file__).parents[1] / "scripts" / "restore_walksafe_backup_drill_20260711.sh"
+    ).read_text(encoding="utf-8")
+    after_marker = script.split("<<'SQL'\n", 1)[1]
+    payload = after_marker.split("\nSQL\n", 1)[0].encode("utf-8") + b"\n"
+
+    assert _validated_psql_stdin(arguments, payload) == payload
+    with pytest.raises(ValueError, match="pinned empty-target proof"):
+        _validated_psql_stdin(arguments, b"SELECT 1;\n")
+    with pytest.raises(ValueError, match="meta-commands"):
+        _validated_psql_stdin(arguments, b"SELECT 1;\n\\connect attacker\n")
 
 
 def test_identity_rejects_non_postgresql_url() -> None:

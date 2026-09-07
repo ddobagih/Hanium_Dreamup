@@ -137,6 +137,55 @@ public final class AdminRecoveryMessagePolicyTest {
         assertFalse(lost.contains("private"));
     }
 
+    @Test
+    public void exactLocalLoginValidationReasonsGiveInputGuidanceOnlyInGeneralPhase() {
+        String[][] cases = {
+            {"invalid_admin_id", "관리자 ID를 입력하고 형식을 확인한 뒤 다시 로그인하세요."},
+            {"invalid_password", "비밀번호를 12자 이상 256자 이하로 입력한 뒤 다시 로그인하세요."},
+            {"invalid_totp_code", "6자리 숫자 추가 인증 코드를 입력한 뒤 다시 로그인하세요."}
+        };
+        for (String[] testCase : cases) {
+            assertEquals(testCase[1], AdminRecoveryMessagePolicy.failureMessage(
+                AdminRecoveryMessagePolicy.Phase.GENERAL,
+                new IOException(testCase[0])
+            ));
+            for (AdminRecoveryMessagePolicy.Phase phase : AdminRecoveryMessagePolicy.Phase.values()) {
+                if (phase == AdminRecoveryMessagePolicy.Phase.GENERAL) continue;
+                assertEquals(
+                    AdminRecoveryMessagePolicy.failureMessage(phase, new IOException("synthetic failure")),
+                    AdminRecoveryMessagePolicy.failureMessage(phase, new IOException(testCase[0]))
+                );
+            }
+            assertEquals(
+                "요청을 확인하지 못했습니다. 안전을 위해 관리자 업무를 잠갔습니다.",
+                AdminRecoveryMessagePolicy.failureMessage(
+                    AdminRecoveryMessagePolicy.Phase.GENERAL,
+                    new IllegalStateException(testCase[0])
+                )
+            );
+        }
+    }
+
+    @Test
+    public void partialReasonMatchesAndPrivateServerTextRemainGeneric() {
+        String generic = "요청을 확인하지 못했습니다. 안전을 위해 관리자 업무를 잠갔습니다.";
+        String[] reasons = {
+            " invalid_admin_id", "invalid_admin_id ", "server: invalid_password",
+            "invalid_totp_code: synthetic-private-data",
+            "{\"detail\":{\"code\":\"invalid_password\",\"message\":\"synthetic-private-data\"}}",
+            null
+        };
+        for (String reason : reasons) {
+            String shown = AdminRecoveryMessagePolicy.failureMessage(
+                AdminRecoveryMessagePolicy.Phase.GENERAL,
+                new IOException(reason)
+            );
+            assertEquals(generic, shown);
+            assertFalse(shown.contains("synthetic-private-data"));
+            assertFalse(shown.contains("invalid_password"));
+        }
+    }
+
     private static String message(
         AdminRecoveryMessagePolicy.Phase phase,
         AdminSecurityApiException.Code code

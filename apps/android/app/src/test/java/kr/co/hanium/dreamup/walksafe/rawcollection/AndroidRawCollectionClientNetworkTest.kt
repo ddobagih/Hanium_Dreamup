@@ -30,6 +30,77 @@ import org.junit.Test
 
 class AndroidRawCollectionClientNetworkTest {
     @Test
+    fun bindingChangesDuringConnectionAndBodyPreparationStopFurtherIo() {
+        listOf("connection", "output", "write").forEach { invalidationPoint ->
+            val local = localManifest()
+            val backend = requireNotNull(local.toBackendManifest())
+            var current = true
+            var staleBodyBytes = 0
+            var staleFlushes = 0
+            var responseReads = 0
+            var disconnected = false
+            val binding = IntegratedConsentNetworkBinding.forTest(
+                IntegratedConsentNetworkTransport.WIFI,
+            ) { url ->
+                if (invalidationPoint == "connection") current = false
+                object : java.net.HttpURLConnection(url) {
+                    override fun connect() = Unit
+                    override fun usingProxy(): Boolean = false
+                    override fun disconnect() { disconnected = true }
+                    override fun getOutputStream(): java.io.OutputStream {
+                        if (invalidationPoint == "output") current = false
+                        return object : java.io.OutputStream() {
+                            override fun write(value: Int) {
+                                write(byteArrayOf(value.toByte()), 0, 1)
+                            }
+
+                            override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                                if (!current) staleBodyBytes += length
+                                if (invalidationPoint == "write") current = false
+                            }
+
+                            override fun flush() {
+                                if (!current) staleFlushes += 1
+                            }
+                        }
+                    }
+
+                    override fun getResponseCode(): Int {
+                        responseReads += 1
+                        return 201
+                    }
+
+                    override fun getHeaderField(name: String): String? = when (name) {
+                        "Content-Type" -> "application/json"
+                        "Cache-Control" -> "no-store"
+                        else -> null
+                    }
+
+                    override fun getInputStream(): java.io.InputStream =
+                        java.io.ByteArrayInputStream("{}".toByteArray())
+                }
+            }
+
+            assertThrows(CancellationException::class.java) {
+                AndroidRawCollectionClient().uploadCall(
+                    session = v7Session("http://127.0.0.1:8081"),
+                    consent = confirmation(),
+                    networkBinding = binding,
+                    localManifest = local,
+                    backendManifest = backend,
+                    chunks = plaintextChunks(local),
+                    isCurrent = { current },
+                ).execute()
+            }
+
+            assertEquals(invalidationPoint, 0, staleBodyBytes)
+            assertEquals(invalidationPoint, 0, staleFlushes)
+            assertEquals(invalidationPoint, 0, responseReads)
+            assertTrue(invalidationPoint, disconnected)
+        }
+    }
+
+    @Test
     fun uploadsManifestThenGetsStatusAndBothMissingChunksBeforeCommit() {
         val local = localManifest()
         val backend = requireNotNull(local.toBackendManifest())

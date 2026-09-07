@@ -32,12 +32,15 @@
 | 기능 분담, 브랜치, 검토, 인수인계 | [팀 작업 흐름](team-workflow.md) |
 | 기여·PR / 보안 신고 | [CONTRIBUTING](../../CONTRIBUTING.md) · [SECURITY](../../SECURITY.md) |
 | 개발 도구, 로컬 실행, 기본 검사 | [개발 환경 가이드](development-environment-guide.md) |
+| 사용자·관리자·위치 평가 앱 빌드와 테스트 | [Android 앱별 테스트 가이드](android-apps-testing-guide.md) |
+| USB 없이 야외 테스트, 임시 서버 연결과 종료 | [Cloudflare 야외 테스트 가이드](outdoor-test-cloudflare-guide.md) |
 | 전체 기능과 세부 기능 분담 | [기능 구현·분담 목록](../planning/walksafe_feature_implementation_catalog.html) |
 
 ## 분야별 실제 안내
 
 - 애플리케이션 경계: [apps 안내](../../apps/README.md)
 - Android 사용자 앱: [현재 코드 지도](code/android-user.md) · [결속된 과거 Android README](../../apps/android/README.md)
+- 별도 시각화 테스트 앱: [격리 소스 안내](../../tools/visual-test/README.md). 원본 앱을 덮어쓰지 않고 커밋된 소스로 별도 작업 폴더를 구성합니다.
 - Android 관리자 앱: [관리자 앱 안내](../../apps/android/adminapp/README.md)
 - Android Gateway: [현재 코드 지도](code/android-gateway.md) · [결속된 과거 Gateway README](../../apps/android-gateway/README.md)
 - Backend: [Backend 안내](../../backend/README.md)

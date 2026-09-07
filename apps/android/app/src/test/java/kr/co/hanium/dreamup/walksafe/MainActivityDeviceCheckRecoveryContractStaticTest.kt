@@ -99,7 +99,7 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
     }
 
     @Test
-    fun enteringFp004RestoresTheActorProfileBeforeReconcilingCompletedTraining() {
+    fun enteringFp004RestoresTheActorProfileBeforeReconcilingEducationConsent() {
         val stateChange = functionBlock("private fun onFirstRunOnboardingStateChanged(")
         assertInOrder(
             stateChange,
@@ -123,8 +123,19 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         )
 
         val completion = functionBlock("private fun completeFirstRunFp004TrainingIfReady(")
+        val educationEvidence = source
+            .substringAfter("private fun currentFirstRunEducationEvidenceComplete()")
+            .substringBefore("private fun ")
         assertTrue(completion.contains("priorityUserOnboardingActorId != actorId"))
-        assertTrue(completion.contains("priorityUserOnboardingPolicy.snapshot().trainingComplete"))
+        assertTrue(completion.contains("firstRunOnboardingSnapshot.verifiedActorBinding?.value != actorId"))
+        assertTrue(completion.contains("if (!postLoginDeviceCheckPassesFeatureGate()) return false"))
+        assertTrue(completion.contains("if (!currentFirstRunEducationEvidenceComplete()) return false"))
+        assertTrue(educationEvidence.contains("FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4"))
+        assertTrue(educationEvidence.contains("priorityUserOnboardingPolicy.snapshot().nativeEducationComplete"))
+        assertTrue(binding.contains("restored.usageConditionsAcknowledged"))
+        assertTrue(binding.contains("restored.appUsageReviewed"))
+        assertTrue(binding.contains("restored.appUsageAccepted"))
+        assertTrue(binding.contains("preservePostLoginDeviceCheck = true"))
     }
 
     @Test
@@ -145,7 +156,11 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         assertTrue(bind.contains("metricDistanceCapabilityOverride ="))
         assertTrue(bind.contains("onDeviceSpeechRecognitionCapabilityOverride ="))
         assertTrue(bind.contains("offlineKoreanTextToSpeechCapabilityOverride ="))
-        assertTrue(bind.contains("METRIC_DISTANCE_GUIDANCE !in"))
+        assertTrue(bind.contains("postLoginMetricDepthState = restored.metricDepthState"))
+        assertTrue(bind.contains("else when (restored.metricDepthState)"))
+        assertTrue(bind.contains("PostLoginMetricDepthState.SUPPORTED -> true"))
+        assertTrue(bind.contains("PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED -> false"))
+        assertTrue(bind.contains("else -> null"))
         assertTrue(bind.contains("HANDS_FREE_VOICE in restored.disabledFeatures"))
         assertTrue(bind.contains("VOICE_GUIDANCE in restored.disabledFeatures"))
         assertFalse(bind.contains("startPostLoginDeviceCheckRuntime("))

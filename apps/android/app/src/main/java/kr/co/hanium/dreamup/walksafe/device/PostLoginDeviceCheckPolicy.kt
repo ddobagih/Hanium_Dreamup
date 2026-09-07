@@ -26,6 +26,7 @@ enum class PostLoginDeviceCheckFeature {
 
 enum class PostLoginMetricDepthState {
     PENDING,
+    SUPPORTED,
     AVAILABLE,
     EXPLICITLY_UNSUPPORTED,
     UNKNOWN,
@@ -71,7 +72,8 @@ data class PostLoginDeviceCheckObservation(
     val cameraPipeline: PostLoginDeviceCheckSignal,
     val koreanTextToSpeech: PostLoginDeviceCheckSignal,
     val wakePhraseRecognition: PostLoginDeviceCheckSignal,
-    val hapticFeedback: PostLoginDeviceCheckSignal,
+    // Kept for existing callers; vibration is no longer a device-check requirement.
+    val hapticFeedback: PostLoginDeviceCheckSignal = PostLoginDeviceCheckSignal.PENDING,
     val metricDepth: PostLoginMetricDepthState,
     // The runtime adapter classifies raw signals before evaluation. Raw UNAVAILABLE values are
     // progress details and must not silently become a whole-app failure.
@@ -187,6 +189,12 @@ object PostLoginDeviceCheckPolicy {
         if (!foreground) return fail(snapshot, PostLoginDeviceCheckFailure.BACKGROUNDED)
 
         observation.blockingFailure?.let { return fail(snapshot, it) }
+        if (observation.requiredPermissions == PostLoginDeviceCheckSignal.UNAVAILABLE) {
+            return fail(snapshot, PostLoginDeviceCheckFailure.REQUIRED_PERMISSION)
+        }
+        if (observation.wakePhraseRecognition == PostLoginDeviceCheckSignal.UNAVAILABLE) {
+            return fail(snapshot, PostLoginDeviceCheckFailure.WAKE_PHRASE_UNAVAILABLE)
+        }
         if (hasPendingAutomaticProbe(observation)) return snapshot
 
         val disabledFeatures = observation.unsupportedFeatures.toSet()
@@ -255,8 +263,8 @@ object PostLoginDeviceCheckPolicy {
             snapshot.sessionGeneration == binding.sessionGeneration &&
             snapshot.attemptGeneration == binding.attemptGeneration
 
-    // Location-fix quality, spoken wake-phrase confirmation, and felt-vibration confirmation are
-    // not gates. Their related feature support must be classified from passive capability probes.
+    // Wake-phrase recognition is explicit attempt evidence.
+    // Location quality is still measured again by the live prewalk environment gate.
     private fun hasPendingAutomaticProbe(
         observation: PostLoginDeviceCheckObservation,
     ): Boolean = listOf(
@@ -269,6 +277,7 @@ object PostLoginDeviceCheckPolicy {
         observation.detector,
         observation.cameraPipeline,
         observation.koreanTextToSpeech,
+        observation.wakePhraseRecognition,
     ).any { it == PostLoginDeviceCheckSignal.PENDING } ||
         observation.metricDepth == PostLoginMetricDepthState.PENDING
 

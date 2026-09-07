@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WalkSafe 위치 정답지</string>
+    <string name="title">위치 테스트 정답지</string>
+    <string name="intro">같은 테스트에서 저장한 WalkSafe 위치 기록과 GnssLogger 원시 기록을 선택하세요. 앱이 가까운 기준국 자료를 찾아 정답 위치를 계산할 준비를 합니다.</string>
+    <string name="key_label">국토지리정보원 다운로드 키</string>
+    <string name="key_hint">키는 이 기기의 보안 저장소로 보호되며 결과 JSON에는 들어가지 않습니다.</string>
+    <string name="save_key">키 안전하게 저장</string>
+    <string name="select_trace">1. WalkSafe trace v2 선택</string>
+    <string name="select_gnss">2. GnssLogger TXT 선택</string>
+    <string name="start_analysis">3. 자동 분석 시작</string>
+    <string name="export_result">진단·결과 JSON 저장</string>
+    <string name="clear_private_data">가져온 기록과 다운로드 키 삭제</string>
+    <string name="trace_empty">WalkSafe 기록: 선택 안 됨</string>
+    <string name="gnss_empty">GnssLogger 기록: 선택 안 됨</string>
+    <string name="status_ready">입력 파일을 선택해 주세요.</string>
+    <string name="truth_notice">정답이 부족하면 점수를 0으로 표시하지 않습니다. 충분한 PPK FIX가 없으면 ‘정답 부족’으로 끝납니다.</string>
+</resources>

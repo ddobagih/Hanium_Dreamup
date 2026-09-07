@@ -18,6 +18,13 @@ data class PhoneMountingUserConfirmation(
     val postFaultCorrectionConfirmed: Boolean,
 )
 
+/** Requests fresh sensor checks; never asserts a mounting method or changes observations. */
+data class PhoneMountingCheckRequest(
+    val epoch: WalkRuntimeEpoch,
+    val requestId: Long,
+    val requestedAtElapsedRealtimeMs: Long,
+)
+
 data class ApprovedPhoneMountingProfile(
     val profileId: String,
     val cameraFrameQualityProfileId: String,
@@ -90,6 +97,26 @@ enum class PhoneMountingReason(
         "휴대전화가 앞을 향하도록 고정되었고 카메라 상태가 확인되었습니다.",
         "보행을 시작하거나 다시 시작하기 전 주변 안전을 한 번 더 확인하세요.",
     ),
+    SENSOR_CHECK_PASSED(
+        "카메라 방향과 흔들림, 영상 품질이 실제 센서 점검 기준을 충족했습니다.",
+        "장착 방식을 자동 판별한 결과는 아닙니다. 휴대전화를 앞을 향하게 안정적으로 유지하세요.",
+    ),
+    CHECK_REQUEST_EPOCH_MISMATCH(
+        "이전 보행의 센서 점검 요청은 현재 보행에 사용할 수 없습니다.",
+        "현재 목적지에서 안내 시작을 다시 선택하세요.",
+    ),
+    CHECK_REQUEST_INVALID(
+        "센서 점검 요청 시각이나 요청 정보가 올바르지 않습니다.",
+        "안내 시작을 다시 선택해 새 센서 점검을 요청하세요.",
+    ),
+    POST_CHECK_CAMERA_EVIDENCE_REQUIRED(
+        "이번 안내 시작 요청 이후의 새 카메라 측정이 필요합니다.",
+        "휴대전화를 앞을 향하게 유지하고 새 센서 점검 결과를 기다리세요.",
+    ),
+    POST_FAULT_CHECK_REQUEST_REQUIRED(
+        "장착 문제가 발생한 뒤의 새 센서 점검 요청이 필요합니다.",
+        "안전한 곳에서 자세를 바로잡고 점검을 다시 요청하세요.",
+    ),
     PROFILE_NOT_APPROVED(
         "승인된 휴대전화 장착 기준이 없어 장착 상태를 확인할 수 없습니다.",
         "보행을 시작하지 말고 기존 보조수단을 계속 사용하세요.",
@@ -99,7 +126,7 @@ enum class PhoneMountingReason(
         "보행을 안전하게 멈춘 뒤 새 장착 확인을 시작하세요.",
     ),
     USER_CONFIRMATION_MISSING(
-        "가슴형 또는 목걸이형 정면 장착 확인이 필요합니다.",
+        "휴대전화 정면 고정 확인이 필요합니다.",
         "휴대전화를 앞을 향하도록 고정한 뒤 화면의 장착 확인을 선택하세요.",
     ),
     USER_CONFIRMATION_EPOCH_MISMATCH(
@@ -112,7 +139,7 @@ enum class PhoneMountingReason(
     ),
     PROHIBITED_MOUNTING_METHOD(
         "손에 들거나 주머니에 넣은 휴대전화는 안전한 장착으로 인정되지 않습니다.",
-        "가슴형 또는 목걸이형 거치대에 렌즈가 앞을 향하도록 고정하세요.",
+        "휴대전화를 몸 앞에 세로로 고정하고 후면 카메라가 바깥을 향하게 하세요.",
     ),
     CAMERA_EVIDENCE_MISSING(
         "카메라 방향과 가림, 흔들림, 영상 품질을 확인할 수 없습니다.",
@@ -210,6 +237,7 @@ object PhoneMountingPolicy {
         cameraFrameQuality: CameraFrameQualityAssessment?,
         previousState: PhoneMountingRuntimeState,
         runtimeRetryRequested: Boolean = false,
+        checkRequest: PhoneMountingCheckRequest? = null,
     ): PhoneMountingAssessment {
         require(
             phase == PhoneMountingAssessmentPhase.ACTIVE || !runtimeRetryRequested,
@@ -245,6 +273,7 @@ object PhoneMountingPolicy {
             userConfirmation = userConfirmation,
             cameraFrameQuality = cameraFrameQuality,
             profile = profile,
+            checkRequest = checkRequest,
         )
         if (failureReason != null) {
             if (phase == PhoneMountingAssessmentPhase.PREFLIGHT) {
@@ -274,19 +303,26 @@ object PhoneMountingPolicy {
                     runtimeRetryRequested = runtimeRetryRequested,
                 )
             }
-            if (
-                userConfirmation == null ||
-                !userConfirmation.postFaultCorrectionConfirmed ||
-                userConfirmation.confirmedAtElapsedRealtimeMs <= faultSince
-            ) {
+            val correctionRequestedAt = if (checkRequest != null) {
+                checkRequest.requestedAtElapsedRealtimeMs.takeIf { it > faultSince }
+            } else {
+                userConfirmation?.takeIf {
+                    it.postFaultCorrectionConfirmed && it.confirmedAtElapsedRealtimeMs > faultSince
+                }?.confirmedAtElapsedRealtimeMs
+            }
+            if (correctionRequestedAt == null) {
                 return correctionAfterFaultOrStop(
                     profile = profile,
                     previousState = state,
-                    reason = PhoneMountingReason.POST_FAULT_CONFIRMATION_REQUIRED,
+                    reason = if (checkRequest != null) {
+                        PhoneMountingReason.POST_FAULT_CHECK_REQUEST_REQUIRED
+                    } else {
+                        PhoneMountingReason.POST_FAULT_CONFIRMATION_REQUIRED
+                    },
                     runtimeRetryRequested = runtimeRetryRequested,
                 )
             }
-            if (cameraObservedAt <= userConfirmation.confirmedAtElapsedRealtimeMs) {
+            if (cameraObservedAt <= correctionRequestedAt) {
                 return correctionAfterFaultOrStop(
                     profile = profile,
                     previousState = state,
@@ -299,7 +335,7 @@ object PhoneMountingPolicy {
         return PhoneMountingAssessment(
             phase = phase,
             status = PhoneMountingStatus.SUITABLE,
-            reason = PhoneMountingReason.PASSED,
+            reason = if (checkRequest != null) PhoneMountingReason.SENSOR_CHECK_PASSED else PhoneMountingReason.PASSED,
             profileId = profile.profileId,
             nextState = state.copy(
                 correctionRequiredSinceElapsedRealtimeMs = null,
@@ -333,22 +369,33 @@ object PhoneMountingPolicy {
         userConfirmation: PhoneMountingUserConfirmation?,
         cameraFrameQuality: CameraFrameQualityAssessment?,
         profile: ApprovedPhoneMountingProfile,
+        checkRequest: PhoneMountingCheckRequest?,
     ): PhoneMountingReason? {
         val confirmation = userConfirmation
-            ?: return PhoneMountingReason.USER_CONFIRMATION_MISSING
-        if (confirmation.epoch != currentEpoch) {
-            return PhoneMountingReason.USER_CONFIRMATION_EPOCH_MISMATCH
-        }
-        if (!isFresh(
-                observedAtElapsedRealtimeMs = confirmation.confirmedAtElapsedRealtimeMs,
-                nowElapsedRealtimeMs = nowElapsedRealtimeMs,
-                maximumAgeMs = profile.maximumUserConfirmationAgeMs,
-            )
-        ) {
-            return PhoneMountingReason.USER_CONFIRMATION_STALE
-        }
-        if (confirmation.method !in allowedMethods) {
-            return PhoneMountingReason.PROHIBITED_MOUNTING_METHOD
+        if (checkRequest != null) {
+            if (checkRequest.epoch != currentEpoch) return PhoneMountingReason.CHECK_REQUEST_EPOCH_MISMATCH
+            if (checkRequest.requestId <= 0L || checkRequest.requestedAtElapsedRealtimeMs < 0L ||
+                checkRequest.requestedAtElapsedRealtimeMs > nowElapsedRealtimeMs
+            ) return PhoneMountingReason.CHECK_REQUEST_INVALID
+            if (confirmation?.epoch == currentEpoch &&
+                confirmation.method in setOf(PhoneMountingMethod.HANDHELD, PhoneMountingMethod.POCKET)
+            ) return PhoneMountingReason.PROHIBITED_MOUNTING_METHOD
+        } else {
+            if (confirmation == null) return PhoneMountingReason.USER_CONFIRMATION_MISSING
+            if (confirmation.epoch != currentEpoch) {
+                return PhoneMountingReason.USER_CONFIRMATION_EPOCH_MISMATCH
+            }
+            if (!isFresh(
+                    observedAtElapsedRealtimeMs = confirmation.confirmedAtElapsedRealtimeMs,
+                    nowElapsedRealtimeMs = nowElapsedRealtimeMs,
+                    maximumAgeMs = profile.maximumUserConfirmationAgeMs,
+                )
+            ) {
+                return PhoneMountingReason.USER_CONFIRMATION_STALE
+            }
+            if (confirmation.method !in allowedMethods) {
+                return PhoneMountingReason.PROHIBITED_MOUNTING_METHOD
+            }
         }
 
         val camera = cameraFrameQuality ?: return PhoneMountingReason.CAMERA_EVIDENCE_MISSING
@@ -370,9 +417,11 @@ object PhoneMountingPolicy {
         ) {
             return PhoneMountingReason.CAMERA_EVIDENCE_STALE
         }
-        if (
-            phase == PhoneMountingAssessmentPhase.PREFLIGHT &&
-            cameraObservedAt <= confirmation.confirmedAtElapsedRealtimeMs
+        if (checkRequest != null && cameraObservedAt <= checkRequest.requestedAtElapsedRealtimeMs) {
+            return PhoneMountingReason.POST_CHECK_CAMERA_EVIDENCE_REQUIRED
+        }
+        if (checkRequest == null && phase == PhoneMountingAssessmentPhase.PREFLIGHT &&
+            cameraObservedAt <= requireNotNull(confirmation).confirmedAtElapsedRealtimeMs
         ) {
             return PhoneMountingReason.POST_CONFIRMATION_CAMERA_EVIDENCE_REQUIRED
         }

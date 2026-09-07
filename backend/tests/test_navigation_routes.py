@@ -4,6 +4,7 @@ import asyncio
 import json
 from pathlib import Path
 import sys
+from urllib.parse import unquote
 
 import httpx
 import pytest
@@ -299,6 +300,9 @@ def test_tmap_poi_search_service_normalizes_provider_response(monkeypatch) -> No
         assert request.url.params["version"] == "1"
         assert request.url.params["searchKeyword"] == "판교역"
         assert request.url.params["searchType"] == "all"
+        assert request.url.params["searchtypCd"] == "A"
+        assert request.url.params["radius"] == "0"
+        assert request.url.params["reqCoordType"] == "WGS84GEO"
         assert request.url.params["resCoordType"] == "WGS84GEO"
         assert request.url.params["count"] == "2"
         return httpx.Response(
@@ -321,8 +325,8 @@ def test_tmap_poi_search_service_normalizes_provider_response(monkeypatch) -> No
                                 "roadName": "판교역로",
                                 "firstBuildNo": "160",
                                 "secondBuildNo": "0",
-                                "bizCatName": "교통",
-                                "radius": "120",
+                                "lowerBizName": "교통",
+                                "radius": "0.12",
                             },
                             {"id": "bad", "name": "좌표 없음"},
                         ]
@@ -342,13 +346,281 @@ def test_tmap_poi_search_service_normalizes_provider_response(monkeypatch) -> No
     assert result.provider == "tmap_poi"
     assert result.query == "판교역"
     assert len(result.results) == 1
-    assert result.results[0].id == "poi-1"
+    assert result.results[0].id.startswith("tmap-poi:v1:")
+    assert len(result.results[0].id) == 76
     assert result.results[0].point.latitude == 37.3947
     assert result.results[0].point.longitude == 127.1112
     assert result.results[0].address == "경기 성남시 분당구 백현동"
     assert result.results[0].road_address == "경기 성남시 분당구 판교역로 160"
     assert result.results[0].category == "교통"
-    assert result.results[0].distance_m == 120
+    assert result.results[0].distance_m is None
+
+
+@pytest.mark.parametrize("use_origin", [False, True])
+def test_destination_search_origin_prioritizes_nearby_matches(monkeypatch, use_origin: bool) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "tmap_app_key", "test-tmap-key")
+    monkeypatch.setattr(settings, "tmap_poi_provider", "live")
+    monkeypatch.setattr(settings, "tmap_poi_search_url", "https://example.test/tmap/pois")
+    candidates = [
+        {"id": "popular-far", "name": "Cafe", "noorLat": "35.1796", "noorLon": "129.0756", "radius": "325"},
+        {"id": "nearby", "name": "Cafe", "noorLat": "37.5666", "noorLon": "126.9781", "radius": "0.12"},
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["radius"] == "0"
+        assert request.url.params["searchtypCd"] == ("R" if use_origin else "A")
+        if use_origin:
+            assert request.url.params["centerLat"] == "37.5665"
+            assert request.url.params["centerLon"] == "126.978"
+        else:
+            assert "centerLat" not in request.url.params
+            assert "centerLon" not in request.url.params
+        ordered = sorted(candidates, key=lambda item: float(item["radius"])) if (
+            request.url.params["searchtypCd"] == "R"
+        ) else candidates
+        return httpx.Response(
+            200,
+            json={"searchPoiInfo": {"pois": {"poi": ordered[: int(request.url.params["count"])]}}},
+        )
+
+    async def run() -> DestinationSearchResponse:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+            return await fetch_tmap_poi_search(
+                "Cafe",
+                settings,
+                limit=1,
+                origin_lat=37.5665 if use_origin else None,
+                origin_lng=126.978 if use_origin else None,
+                http_client=http_client,
+            )
+
+    result = asyncio.run(run())
+    assert len(result.results) == 1
+    expected_candidate = candidates[1 if use_origin else 0]
+    assert result.results[0].name == expected_candidate["name"]
+    assert result.results[0].point.latitude == float(expected_candidate["noorLat"])
+    assert result.results[0].point.longitude == float(expected_candidate["noorLon"])
+    assert result.results[0].distance_m == (120 if use_origin else None)
+
+
+@pytest.mark.parametrize("use_origin", [False, True])
+@pytest.mark.parametrize(
+    ("query", "sort_with_origin"),
+    [
+        ("금오공대", "A"),
+        ("국립금오공과대학교", "A"),
+        ("국립 금오공과대학교", "A"),
+        ("한빛대학교", "A"),
+        ("한빛대학", "A"),
+        ("편의점", "R"),
+        ("카페", "R"),
+        ("금오공대 운동장", "R"),
+        ("국립금오공과대학교 정문", "R"),
+        ("국립금오공과대학교정문", "R"),
+        ("편의점 국립금오공과대학교", "R"),
+        ("금오공대 근처 편의점", "R"),
+        ("주변 대학교", "R"),
+        ("근처대학교", "R"),
+        ("국립대학교", "R"),
+        ("대학교", "R"),
+        ("대학", "R"),
+        ("공대", "R"),
+    ],
+)
+def test_tmap_poi_named_university_relevance_preserves_other_search_contracts(
+    monkeypatch, query: str, sort_with_origin: str, use_origin: bool,
+) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "tmap_app_key", "test-tmap-key")
+    monkeypatch.setattr(settings, "tmap_poi_provider", "live")
+    monkeypatch.setattr(settings, "tmap_poi_search_url", "https://example.test/tmap/pois")
+    expected_sort = sort_with_origin if use_origin else "A"
+    # Synthetic provider candidates isolate page ordering from physical location.
+    campus = {
+        "id": "campus", "name": "국립금오공과대학교", "lowerBizName": "대학교",
+        "noorLat": "37.55", "noorLon": "126.98", "radius": "0.4",
+    }
+    facility = {
+        "id": "facility", "name": "국립금오공과대학교 운동장", "lowerBizName": "학교내시설물",
+        "noorLat": "37.5666", "noorLon": "126.9781", "radius": "0.1",
+    }
+    provider_calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal provider_calls
+        provider_calls += 1
+        assert request.url.params["searchKeyword"] == query
+        assert request.url.params["searchtypCd"] == expected_sort
+        assert request.url.params["radius"] == "0"
+        assert request.url.params["page"] == "1"
+        assert request.url.params["count"] == "1"
+        if use_origin:
+            assert request.url.params["centerLat"] == "37.5665"
+            assert request.url.params["centerLon"] == "126.978"
+        else:
+            assert "centerLat" not in request.url.params
+            assert "centerLon" not in request.url.params
+        ordered = [campus, facility] if expected_sort == "A" else [facility, campus]
+        return httpx.Response(
+            200,
+            json={"searchPoiInfo": {"totalCount": "2", "pois": {"poi": ordered[:1]}}},
+        )
+
+    async def run() -> DestinationSearchResponse:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+            return await fetch_tmap_poi_search(
+                query, settings, limit=1,
+                origin_lat=37.5665 if use_origin else None,
+                origin_lng=126.978 if use_origin else None,
+                http_client=http_client,
+            )
+
+    result = asyncio.run(run())
+    assert provider_calls == 1
+    assert result.query == query
+    assert len(result.results) == 1
+    expected_candidate = campus if expected_sort == "A" else facility
+    assert result.results[0].name == expected_candidate["name"]
+    assert result.results[0].point.latitude == float(expected_candidate["noorLat"])
+    assert result.results[0].point.longitude == float(expected_candidate["noorLon"])
+    assert result.results[0].distance_m == (
+        (400 if expected_sort == "A" else 100) if use_origin else None
+    )
+
+
+@pytest.mark.parametrize("coordinates", [
+    {"origin_lat": "37.5665"},
+    {"origin_lng": "126.978"},
+    {"origin_lat": "nan", "origin_lng": "126.978"},
+    {"origin_lat": "inf", "origin_lng": "126.978"},
+    {"origin_lat": "91", "origin_lng": "126.978"},
+    {"origin_lat": "37.5665", "origin_lng": "181"},
+])
+def test_destination_search_rejects_invalid_origin_before_provider_io(monkeypatch, coordinates) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "tmap_poi_provider", "mock")
+    monkeypatch.setattr(settings, "tmap_app_key", "")
+
+    response = client().get(
+        "/navigation/destinations/search",
+        params={"query": "Cafe", **coordinates},
+    )
+
+    assert response.status_code == 422
+    if len(coordinates) == 1:
+        assert response.json()["detail"]["code"] == "origin_coordinates_incomplete"
+
+
+def test_destination_search_same_query_keeps_origin_after_provider_failure_and_retry(monkeypatch) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "tmap_app_key", "test-tmap-key")
+    monkeypatch.setattr(settings, "tmap_poi_provider", "live")
+    monkeypatch.setattr(settings, "tmap_poi_search_url", "https://example.test/tmap/pois")
+    origins = [(37.5665, 126.978), (35.1796, 129.0756)]
+    calls: list[tuple[float, float]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["searchKeyword"] == "Cafe"
+        assert request.url.params["searchtypCd"] == "R"
+        assert request.url.params["radius"] == "0"
+        origin = (float(request.url.params["centerLat"]), float(request.url.params["centerLon"]))
+        calls.append(origin)
+        if len(calls) == 2:
+            return httpx.Response(503, json={"error": {"message": "temporarily unavailable"}})
+        return httpx.Response(
+            200,
+            json={"searchPoiInfo": {"pois": {"poi": [{
+                "id": str(origins.index(origin)),
+                "name": "Cafe",
+                "noorLat": str(origin[0]),
+                "noorLon": str(origin[1]),
+                "radius": "0.12",
+            }]}}},
+        )
+
+    async def run() -> list[str]:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+            results = []
+            for index, origin in enumerate([origins[0], origins[1], origins[1], origins[0]]):
+                if index == 1:
+                    with pytest.raises(TmapPoiSearchError) as failure:
+                        await fetch_tmap_poi_search(
+                            "Cafe", settings, origin_lat=origin[0], origin_lng=origin[1],
+                            http_client=http_client,
+                        )
+                    assert failure.value.code == "tmap_provider_error"
+                    assert failure.value.provider_status == 503
+                    continue
+                response = await fetch_tmap_poi_search(
+                    "Cafe", settings, origin_lat=origin[0], origin_lng=origin[1],
+                    http_client=http_client,
+                )
+                assert response.results[0].point.latitude == origin[0]
+                assert response.results[0].point.longitude == origin[1]
+                results.append(response.results[0].id)
+            return results
+
+    returned_ids = asyncio.run(run())
+    assert len(returned_ids) == 3
+    assert returned_ids[0] == returned_ids[2]
+    assert returned_ids[0] != returned_ids[1]
+    assert calls == [origins[0], origins[1], origins[1], origins[0]]
+
+
+@pytest.mark.parametrize(
+    ("use_origin", "provider_radius", "expected_distance_m"),
+    [
+        (False, "0", None),
+        (False, "0.12", None),
+        (True, None, 1112),
+        (True, "", 1112),
+        (True, "NaN", 1112),
+        (True, "-1", 1112),
+        (True, "0", 0),
+        (True, "0.12", 120),
+    ],
+)
+def test_destination_search_distance_requires_a_known_origin(
+    monkeypatch, use_origin: bool, provider_radius: str | None, expected_distance_m: int | None,
+) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "tmap_poi_provider", "live")
+    monkeypatch.setattr(settings, "tmap_app_key", "test-tmap-key")
+    monkeypatch.setattr(settings, "tmap_poi_search_url", "https://example.test/tmap/pois")
+    provider_calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal provider_calls
+        provider_calls += 1
+        assert request.method == "GET"
+        assert request.url.params["searchKeyword"] == "Cafe"
+        assert request.url.params["searchtypCd"] == ("R" if use_origin else "A")
+        if use_origin:
+            assert float(request.url.params["centerLat"]) == 37.0
+            assert float(request.url.params["centerLon"]) == 127.0
+        else:
+            assert "centerLat" not in request.url.params
+            assert "centerLon" not in request.url.params
+        poi = {"id": "cafe", "name": "Cafe", "noorLat": "37.01", "noorLon": "127.0"}
+        if provider_radius is not None:
+            poi["radius"] = provider_radius
+        return httpx.Response(200, json={"searchPoiInfo": {"pois": {"poi": [poi]}}})
+
+    async def fetch_with_transport(query: str, current_settings, **kwargs) -> DestinationSearchResponse:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+            return await fetch_tmap_poi_search(query, current_settings, http_client=http_client, **kwargs)
+
+    monkeypatch.setattr(navigation_api, "fetch_tmap_poi_search", fetch_with_transport)
+    params = {"query": "Cafe"}
+    if use_origin:
+        params.update({"origin_lat": "37.0", "origin_lng": "127.0"})
+
+    response = client().get("/navigation/destinations/search", params=params)
+
+    assert response.status_code == 200, response.text
+    assert provider_calls == 1
+    assert response.json()["results"][0]["distance_m"] == expected_distance_m
 
 
 def test_walking_navigation_health_reports_missing_tmap_key(monkeypatch) -> None:
@@ -439,6 +711,8 @@ def test_tmap_pedestrian_route_service_normalizes_provider_response(monkeypatch)
         assert body["reqCoordType"] == "WGS84GEO"
         assert body["resCoordType"] == "WGS84GEO"
         assert body["speed"] == 4
+        assert unquote(body["startName"]) == "출발"
+        assert unquote(body["endName"]) == "테스트 목적지"
         return httpx.Response(
             200,
             json={
@@ -454,7 +728,7 @@ def test_tmap_pedestrian_route_service_normalizes_provider_response(monkeypatch)
                             "pointIndex": 1,
                             "name": "출발지",
                             "description": "출발",
-                            "turnType": 200,
+                            "turnType": "200",
                             "pointType": "S",
                         },
                     },
@@ -475,7 +749,7 @@ def test_tmap_pedestrian_route_service_normalizes_provider_response(monkeypatch)
                             "distance": 400,
                             "time": 360,
                             "roadType": 16,
-                            "facilityType": 0,
+                            "facilityType": "15",
                         },
                     },
                     {
@@ -529,6 +803,7 @@ def test_tmap_pedestrian_route_service_normalizes_provider_response(monkeypatch)
     assert result.summary.duration_s == 810
     assert len(result.steps) == 2
     assert result.steps[0].instruction == "테스트길, 400m"
+    assert result.steps[0].facility_type == 15
     assert result.steps[1].instruction is None
     assert len(result.guide_points) == 2
     assert result.guide_points[0].instruction == "출발"
@@ -893,3 +1168,94 @@ def test_tmap_route_rejects_post_json_string_explosion() -> None:
         _normalize_tmap_response(payload, request)
 
     assert exc_info.value.code == "invalid_tmap_response"
+
+
+@pytest.mark.parametrize("radius", ["0.001", "0.12", "1.25", "0"])
+def test_tmap_poi_distance_converts_provider_kilometers(radius: str) -> None:
+    result = _normalize_poi_search_response(
+        {"searchPoiInfo": {"pois": {"poi": [{
+            "name": "시청역", "noorLat": "37.5657", "noorLon": "126.9769", "radius": radius,
+        }]}}},
+        "시청역",
+    )
+    assert result.results[0].distance_m == round(float(radius) * 1000)
+
+
+@pytest.mark.parametrize("radius", ["NaN", "Infinity", "-0.2", "invalid", "1e308"])
+def test_tmap_poi_invalid_distance_remains_unknown(radius: str) -> None:
+    result = _normalize_poi_search_response(
+        {"searchPoiInfo": {"pois": {"poi": [{
+            "name": "시청역", "noorLat": "37.5657", "noorLon": "126.9769", "radius": radius,
+        }]}}},
+        "시청역",
+    )
+    assert result.results[0].distance_m is None
+
+
+@pytest.mark.parametrize("latitude", ["NaN", "Infinity", True])
+def test_tmap_poi_skips_invalid_coordinates(latitude: object) -> None:
+    result = _normalize_poi_search_response(
+        {"searchPoiInfo": {"pois": {"poi": [
+            {"name": "invalid", "noorLat": latitude, "noorLon": "126.9769"},
+            {"name": "시청역", "noorLat": "37.5657", "noorLon": "126.9769"},
+        ]}}},
+        "시청역",
+    )
+    assert [item.name for item in result.results] == ["시청역"]
+
+
+@pytest.mark.parametrize("stairs_source", ["line", "point", "turn", "combined_turn"])
+def test_stair_exclusion_rejects_provider_reported_stairs(stairs_source: str) -> None:
+    request = WalkingRouteRequest.model_validate(sample_route_request())
+    origin = [request.origin.longitude, request.origin.latitude]
+    destination = [request.destination.longitude, request.destination.latitude]
+    guide_properties = {"turnType": "200"}
+    line_properties = {"distance": 900, "time": 810, "facilityType": "11"}
+    if stairs_source == "line":
+        line_properties["facilityType"] = "17"
+    elif stairs_source == "point":
+        guide_properties["facilityType"] = "17"
+    else:
+        guide_properties["turnType"] = "127" if stairs_source == "turn" else "129"
+    payload = {
+        "type": "FeatureCollection",
+        "features": [
+            {"geometry": {"type": "Point", "coordinates": origin}, "properties": guide_properties},
+            {"geometry": {"type": "LineString", "coordinates": [origin, destination]}, "properties": line_properties},
+        ],
+    }
+    with pytest.raises(TmapPedestrianRouteError) as exc_info:
+        _normalize_tmap_response(payload, request)
+    assert exc_info.value.code == "route_stairs_present"
+    assert exc_info.value.http_status == 422
+    request.priority = "RECOMMEND"
+    result = _normalize_tmap_response(payload, request)
+    assert [(point.longitude, point.latitude) for point in result.polyline] == [tuple(origin), tuple(destination)]
+
+
+@pytest.mark.parametrize("dependency", ["poi", "route"])
+@pytest.mark.parametrize("provider_status", [403, 429, 500])
+def test_tmap_provider_errors_are_classified_without_echoing_details(monkeypatch, dependency: str, provider_status: int) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "tmap_app_key", "test-tmap-key")
+    monkeypatch.setattr(settings, "tmap_poi_provider", "live")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(provider_status, json={"error": {"message": "provider-private-request-details"}})
+
+    async def run() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+            if dependency == "poi":
+                await fetch_tmap_poi_search("시청역", settings, http_client=http_client)
+            else:
+                await fetch_tmap_pedestrian_route(
+                    WalkingRouteRequest.model_validate(sample_route_request()), settings, http_client=http_client,
+                )
+
+    with pytest.raises((TmapPoiSearchError, TmapPedestrianRouteError)) as exc_info:
+        asyncio.run(run())
+    error = exc_info.value
+    assert error.provider_status == provider_status
+    assert "provider-private-request-details" not in error.message
+    assert error.code == {403: "tmap_invalid_api_key", 429: "tmap_rate_limited", 500: "tmap_provider_error"}[provider_status]
+    assert error.http_status == (503 if provider_status == 429 else 502)

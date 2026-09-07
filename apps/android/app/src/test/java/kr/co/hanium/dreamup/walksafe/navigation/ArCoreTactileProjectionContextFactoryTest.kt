@@ -71,13 +71,14 @@ class ArCoreTactileProjectionContextFactoryTest {
         assertEquals(listOf("ldc2_w", "ldiv", "lstore"), timestampConversion.map(::opcode))
         assertTrue(timestampConversion[0].contains("long 1000000l"))
         val timestampStore = operation(timestampConversion[2])
-        val depthCall = "ArCoreFrameProvider.acquireDepthBundle:(Lcom/google/ar/core/Frame;)Lkr/co/hanium/dreamup/walksafe/depth/ArCoreDepthBundle;"
+        val depthCall = "ArCoreFrameProvider.acquireDepthBundle:(Lcom/google/ar/core/Frame;Z)Lkr/co/hanium/dreamup/walksafe/depth/ArCoreDepthBundle;"
         assertTrue(onDrawFrame.contains(depthCall))
-        val depthArguments = bytecodeInstructions(onDrawFrame.substringBefore(depthCall)).takeLast(3)
+        val depthArguments = bytecodeInstructions(onDrawFrame.substringBefore(depthCall)).takeLast(4)
         val providerLoad = operation(depthArguments[0])
         assertTrue(providerLoad.startsWith("aload"))
         assertEquals(frameLoad, operation(depthArguments[1]))
-        assertEquals("invokevirtual", opcode(depthArguments[2]))
+        assertTrue(operation(depthArguments[2]).startsWith("iload"))
+        assertEquals("invokevirtual", opcode(depthArguments[3]))
         val snapshotStore = bytecodeInstructions(onDrawFrame.substringAfter(depthCall))
             .first { opcode(it) == "astore" }
             .let(::operation)

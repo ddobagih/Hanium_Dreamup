@@ -1,7 +1,15 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.FilteredRoutePosition
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteCorridorMatchResult
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteCorridorMatcher
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteCorridorMatcherConfig
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteHeadingEstimate
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteMatchQuality
 import java.security.MessageDigest
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 data class RouteNavigatorConfig(
@@ -70,6 +78,11 @@ data class ActiveRouteProjection(
 class RouteNavigator(
     private val config: RouteNavigatorConfig = RouteNavigatorConfig(),
 ) {
+    private val routeCorridorMatcher = RouteCorridorMatcher(
+        RouteCorridorMatcherConfig(
+            progressSigmaM = config.maximumProgressAdvanceM.coerceAtLeast(1.0),
+        ),
+    )
     private var route: WalkingRoute? = null
     private var routeRevision = 0L
     private var decisionRevision = 0L
@@ -87,6 +100,14 @@ class RouteNavigator(
     private var locationRecheckAuthorized = false
     private var rerouteApprovedForCurrentDeviation = false
     private var progressDistanceM: Double? = null
+    private var matchedGeometricProgressM: Double? = null
+    private var latestRouteMatch: RouteCorridorMatchResult? = null
+    private var latestRouteMatchUsableForGuidance = false
+    private var latestRouteMatchInputElapsedRealtimeMs: Long? = null
+    private var latestRouteMatchRouteRevision: Long? = null
+    private var positioningEvidenceInterrupted = false
+    private var previousFilteredPosition: FilteredRoutePosition? = null
+    private var latestUpdateNowMs: Long? = null
     private var latestRouteBearingDeg: Float? = null
     private var announcedGuideIndex: Int? = null
     private var closestDistanceToAnnouncedGuideM: Double? = null
@@ -112,6 +133,13 @@ class RouteNavigator(
         locationRecheckAuthorized = false
         rerouteApprovedForCurrentDeviation = false
         progressDistanceM = null
+        matchedGeometricProgressM = null
+        latestRouteMatch = null
+        latestRouteMatchUsableForGuidance = false
+        positioningEvidenceInterrupted = false
+        previousFilteredPosition = null
+        latestUpdateNowMs = null
+        routeCorridorMatcher.reset()
         latestRouteBearingDeg = null
         announcedGuideIndex = null
         closestDistanceToAnnouncedGuideM = null
@@ -135,6 +163,13 @@ class RouteNavigator(
         locationRecheckAuthorized = false
         rerouteApprovedForCurrentDeviation = false
         progressDistanceM = null
+        matchedGeometricProgressM = null
+        latestRouteMatch = null
+        latestRouteMatchUsableForGuidance = false
+        positioningEvidenceInterrupted = false
+        previousFilteredPosition = null
+        latestUpdateNowMs = null
+        routeCorridorMatcher.reset()
         latestRouteBearingDeg = null
         announcedGuideIndex = null
         closestDistanceToAnnouncedGuideM = null
@@ -142,6 +177,12 @@ class RouteNavigator(
 
     @Synchronized
     fun currentBearingDeg(): Float? {
+        if (
+            positioningEvidenceInterrupted ||
+            (latestRouteMatch != null && !latestRouteMatchUsableForGuidance)
+        ) {
+            return null
+        }
         val currentRoute = route ?: return null
         return latestRouteBearingDeg
             ?: currentRoute.guidePoints.getOrNull(nextGuideIndex)?.bearingDeg
@@ -160,6 +201,12 @@ class RouteNavigator(
         offRouteSampleCount = 0
         lastOffRouteCandidateAtMs = null
         arrivalSampleCount = 0
+        matchedGeometricProgressM = null
+        latestRouteMatch = null
+        latestRouteMatchUsableForGuidance = false
+        positioningEvidenceInterrupted = true
+        previousFilteredPosition = null
+        routeCorridorMatcher.reset()
         if (route == null) return null
         offRouteGuidanceSuspended = true
         locationRecheckAuthorized = false
@@ -176,6 +223,24 @@ class RouteNavigator(
         )
     }
 
+    /**
+     * Breaks evidence that must be consecutive without changing the installed route, stable
+     * progress, or any suspected/confirmed deviation latch.
+     */
+    @Synchronized
+    fun onPositioningEvidenceInterrupted() {
+        offRouteSampleCount = 0
+        lastOffRouteCandidateAtMs = null
+        arrivalSampleCount = 0
+        if (pendingDecision == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
+            updatePendingDecision(null)
+        }
+        latestRouteMatchUsableForGuidance = false
+        positioningEvidenceInterrupted = true
+        previousFilteredPosition = null
+        routeCorridorMatcher.onPositioningEvidenceInterrupted()
+    }
+
     @Synchronized
     fun pendingDecisionToken(): RouteNavigatorDecisionToken? {
         val decision = pendingDecision ?: return null
@@ -186,8 +251,32 @@ class RouteNavigator(
     @Synchronized
     fun currentRouteId(): String? = activeRouteId
 
+    /** Latest route-corridor evidence. Its filtered and matched coordinates remain separate. */
+    @Synchronized
+    fun currentRouteMatch(): RouteCorridorMatchResult? = latestRouteMatch
+
+    @Synchronized
+    fun currentAcceptedRouteMatchFor(
+        inputElapsedRealtimeMs: Long,
+    ): RouteCorridorMatchResult? {
+        if (
+            inputElapsedRealtimeMs < 0L ||
+            positioningEvidenceInterrupted ||
+            !latestRouteMatchUsableForGuidance ||
+            latestRouteMatchInputElapsedRealtimeMs != inputElapsedRealtimeMs ||
+            latestRouteMatchRouteRevision != routeRevision
+        ) return null
+        return latestRouteMatch
+    }
+
     @Synchronized
     fun currentProjection(location: TrustedLocation): ActiveRouteProjection? {
+        if (
+            positioningEvidenceInterrupted ||
+            (latestRouteMatch != null && !latestRouteMatchUsableForGuidance)
+        ) {
+            return null
+        }
         val currentRoute = route ?: return null
         val routeId = activeRouteId ?: return null
         val projection = projectToRoute(
@@ -210,6 +299,12 @@ class RouteNavigator(
     @Synchronized
     fun currentInstruction(location: TrustedLocation): String? {
         val currentRoute = route ?: return null
+        if (
+            positioningEvidenceInterrupted ||
+            (latestRouteMatch != null && !latestRouteMatchUsableForGuidance)
+        ) {
+            return null
+        }
         if (offRouteGuidanceSuspended || pendingDecision != null) return null
         return instructionForCurrentGuide(currentRoute, location).text
     }
@@ -368,29 +463,125 @@ class RouteNavigator(
         requestInFlight: Boolean,
         stepProgressM: Double? = null,
     ): RouteNavigatorUpdate {
+        return updateInternal(
+            location = location,
+            nowMs = nowMs,
+            requestInFlight = requestInFlight,
+            stepProgressM = stepProgressM,
+            filteredPosition = null,
+        )
+    }
+
+    @Synchronized
+    fun update(
+        location: TrustedLocation,
+        nowMs: Long,
+        requestInFlight: Boolean,
+        filteredPosition: FilteredRoutePosition,
+        stepProgressM: Double? = null,
+    ): RouteNavigatorUpdate {
+        return updateInternal(
+            location = location,
+            nowMs = nowMs,
+            requestInFlight = requestInFlight,
+            stepProgressM = stepProgressM,
+            filteredPosition = filteredPosition,
+        )
+    }
+
+    private fun updateInternal(
+        location: TrustedLocation,
+        nowMs: Long,
+        requestInFlight: Boolean,
+        stepProgressM: Double?,
+        filteredPosition: FilteredRoutePosition?,
+    ): RouteNavigatorUpdate {
         val currentRoute = route ?: return RouteNavigatorUpdate(null, false, false, false, "route_missing")
         val routeEndpoint = currentRoute.polyline.lastOrNull()
             ?: return RouteNavigatorUpdate(null, false, false, false, "polyline_missing")
+        val latestUpdateTime = latestUpdateNowMs
+        if (latestUpdateTime != null && nowMs <= latestUpdateTime) {
+            latestRouteMatchUsableForGuidance = false
+            return RouteNavigatorUpdate(
+                instruction = null,
+                arrived = false,
+                offRoute = confirmedDeviationLatched,
+                shouldReroute = false,
+                reason = "location_sample_not_newer",
+                pendingUserDecision = pendingDecision,
+            )
+        }
+        latestUpdateNowMs = nowMs
         val destination = requestedDestination ?: routeEndpoint
-        val projection = projectToRoute(
-            location = location,
-            route = currentRoute,
-            previousDistanceFromStartM = progressDistanceM,
-            maximumBacktrackM = config.maximumProgressBacktrackM,
-            maximumAdvanceM = config.maximumProgressAdvanceM,
+        val unsnappedPosition = filteredPosition ?: FilteredRoutePosition(
+            point = RoutePoint(location.latitude, location.longitude),
+            horizontalAccuracyM = location.accuracyM.toDouble(),
+            elapsedRealtimeMs = location.elapsedRealtimeMs,
         )
-        val distanceToRouteM = projection?.distanceToRouteM ?: distanceToPolylineMeters(location, currentRoute.polyline)
-        if (projection != null) {
+        val matcherPosition = unsnappedPosition
+            .withMovementHeading(previousFilteredPosition)
+            .copy(elapsedRealtimeMs = nowMs)
+        previousFilteredPosition = unsnappedPosition
+        val routeMatch = routeCorridorMatcher.match(
+            routeId = activeRouteId ?: currentRoute.localRouteFingerprint(),
+            polyline = currentRoute.polyline,
+            position = matcherPosition,
+            previousProgressM = matchedGeometricProgressM,
+        )
+        latestRouteMatch = routeMatch
+        latestRouteMatchInputElapsedRealtimeMs = unsnappedPosition.elapsedRealtimeMs
+        latestRouteMatchRouteRevision = routeRevision
+        val acceptedMatch = routeMatch.takeIf {
+            it.quality == RouteMatchQuality.HIGH || it.quality == RouteMatchQuality.MEDIUM
+        }
+        latestRouteMatchUsableForGuidance = acceptedMatch != null
+        if (acceptedMatch != null) positioningEvidenceInterrupted = false
+        val fallbackProjection = if (routeMatch.crossTrackDistanceM == null) {
+            projectToRoute(
+                location = location,
+                route = currentRoute,
+                previousDistanceFromStartM = progressDistanceM,
+                maximumBacktrackM = config.maximumProgressBacktrackM,
+                maximumAdvanceM = config.maximumProgressAdvanceM,
+            )
+        } else {
+            null
+        }
+        val distanceToRouteM = routeMatch.crossTrackDistanceM
+            ?: fallbackProjection?.distanceToRouteM
+            ?: distanceToPolylineMeters(location, currentRoute.polyline)
+        val acceptedGeometricProgressM = acceptedMatch?.geometricProgressM
+        if (acceptedGeometricProgressM != null) {
+            matchedGeometricProgressM = acceptedGeometricProgressM
+            val matchedRouteProgressM = scaleGeometricProgressToRouteSummary(
+                route = currentRoute,
+                geometricProgressM = acceptedGeometricProgressM,
+            )
             val previousProgress = progressDistanceM
             val boundedProgress = if (previousProgress == null) {
-                projection.distanceFromStartM
+                matchedRouteProgressM
             } else {
-                projection.distanceFromStartM.coerceAtMost(previousProgress + config.maximumProgressAdvanceM)
+                matchedRouteProgressM.coerceAtMost(previousProgress + config.maximumProgressAdvanceM)
             }
             progressDistanceM = maxOf(previousProgress ?: 0.0, boundedProgress)
-            latestRouteBearingDeg = projection.bearingDeg
+            latestRouteBearingDeg = acceptedMatch.bearingDeg
         }
-        advanceAnnouncedPassedGuides(currentRoute, location, progressDistanceM)
+        val guidanceLocation = acceptedMatch?.matchedPoint?.let { matchedPoint ->
+            TrustedLocation(
+                latitude = matchedPoint.latitude,
+                longitude = matchedPoint.longitude,
+                accuracyM = unsnappedPosition.horizontalAccuracyM.toFloat(),
+                elapsedRealtimeMs = unsnappedPosition.elapsedRealtimeMs,
+            )
+        } ?: TrustedLocation(
+            latitude = unsnappedPosition.point.latitude,
+            longitude = unsnappedPosition.point.longitude,
+            accuracyM = unsnappedPosition.horizontalAccuracyM.toFloat(),
+            elapsedRealtimeMs = unsnappedPosition.elapsedRealtimeMs,
+        )
+        if (acceptedMatch != null) {
+            advanceAnnouncedPassedGuides(currentRoute, guidanceLocation, progressDistanceM)
+        }
         val remainingToDestinationM = haversineMeters(
             location.latitude,
             location.longitude,
@@ -413,8 +604,8 @@ class RouteNavigator(
                     )
                 } != false
         }
-        val arrivalEvidence = authoritativeArrivalEvidence
-        val offRouteCandidate = distanceToRouteM - location.accuracyM > config.offRouteDistanceM
+        val arrivalEvidence = authoritativeArrivalEvidence && acceptedMatch != null
+        val offRouteCandidate = distanceToRouteM - unsnappedPosition.horizontalAccuracyM > config.offRouteDistanceM
         if (confirmedDeviationLatched) {
             offRouteGuidanceSuspended = true
             if (rerouteApprovedForCurrentDeviation) {
@@ -476,12 +667,23 @@ class RouteNavigator(
             return suspectedDeviationUpdate("off_route_pending")
         }
 
+        if (acceptedMatch == null) {
+            return RouteNavigatorUpdate(
+                instruction = null,
+                arrived = false,
+                offRoute = false,
+                shouldReroute = false,
+                reason = "route_match_untrusted",
+                cancelStaleNavigationSpeech = true,
+            )
+        }
+
         val lastGuidance = lastGuidanceAtMs
         if (lastGuidance != null && nowMs - lastGuidance < config.guidanceIntervalMs) {
             return RouteNavigatorUpdate(null, false, offRoute, false, "guidance_rate_limited")
         }
 
-        val guideInstruction = instructionForCurrentGuide(currentRoute, location)
+        val guideInstruction = instructionForCurrentGuide(currentRoute, guidanceLocation)
         return RouteNavigatorUpdate(
             instruction = guideInstruction.text,
             arrived = false,
@@ -654,6 +856,46 @@ private data class RouteProjection(
     val segmentStart: RoutePoint,
     val segmentEnd: RoutePoint,
 )
+
+private fun scaleGeometricProgressToRouteSummary(
+    route: WalkingRoute,
+    geometricProgressM: Double,
+): Double {
+    val geometricTotalM = route.polyline.zipWithNext().sumOf { (start, end) ->
+        haversineMeters(start.latitude, start.longitude, end.latitude, end.longitude)
+    }
+    if (geometricTotalM <= 0.0 || !geometricTotalM.isFinite()) return geometricProgressM
+    val declaredDistanceM = route.summary.distanceM.toDouble()
+    val scale = if (declaredDistanceM > 0.0) declaredDistanceM / geometricTotalM else 1.0
+    return (geometricProgressM * scale).coerceIn(0.0, maxOf(declaredDistanceM, geometricTotalM * scale))
+}
+
+private fun FilteredRoutePosition.withMovementHeading(
+    previous: FilteredRoutePosition?,
+): FilteredRoutePosition {
+    if (heading != null || previous == null) return this
+    val movementDistanceM = haversineMeters(
+        previous.point.latitude,
+        previous.point.longitude,
+        point.latitude,
+        point.longitude,
+    )
+    val combinedAccuracyM = hypot(previous.horizontalAccuracyM, horizontalAccuracyM)
+    if (movementDistanceM <= combinedAccuracyM || movementDistanceM <= 0.0) return this
+    val headingStandardDeviationDeg = Math.toDegrees(atan2(combinedAccuracyM, movementDistanceM))
+    if (!headingStandardDeviationDeg.isFinite() || headingStandardDeviationDeg > 45.0) return this
+    return copy(
+        heading = RouteHeadingEstimate(
+            degrees = bearingDegrees(
+                previous.point.latitude,
+                previous.point.longitude,
+                point.latitude,
+                point.longitude,
+            ).toDouble(),
+            standardDeviationDeg = headingStandardDeviationDeg.coerceAtLeast(8.0),
+        ),
+    )
+}
 
 private fun projectToRoute(
     location: TrustedLocation,

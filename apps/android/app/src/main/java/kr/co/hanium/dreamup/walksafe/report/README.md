@@ -25,8 +25,8 @@ fail-closed 자료다. queue에 저장된 생성 시 receipt는 감사 provenanc
 ## 영속 대기열 활성화 경계
 
 신고 대기열은 승인된 capacity profile이 없는 기본 build에서 비활성이고 release build에서는
-설정값과 무관하게 열리지 않는다. debug 활성 build는 아래 7개 용량 값을 Gradle property 또는 같은
-이름의 environment variable로 모두 전달해야 한다.
+설정값과 무관하게 열리지 않는다. debug 수동 capacity 설정은 아래 7개 값을 Gradle property 또는
+같은 이름의 environment variable로 모두 전달해야 한다.
 
 - `WALKSAFE_REPORT_QUEUE_ENABLED=true`
 - `WALKSAFE_REPORT_QUEUE_MAX_ENTRIES`
@@ -35,6 +35,18 @@ fail-closed 자료다. queue에 저장된 생성 시 receipt는 감사 provenanc
 - `WALKSAFE_REPORT_QUEUE_MAX_TOTAL_BYTES`
 - `WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_ENTRIES`
 - `WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES`
+
+로컬 개발에는 `./gradlew :app:assembleDebug -PdevelopmentReportQueue=true`로 한정된
+시험 profile을 명시할 수 있다. 같은 property를 `:app:testDebugUnitTest`에도 전달한다.
+이 옵션은 debug에만 적용되고 로그인이나 최초 실행 절차 및 선택 동의를 우회하지 않는다.
+전체 8건 / 64 MiB, 자동 6건 / 48 MiB, payload 4 MiB, 암호화 저장 entry 12 MiB를 상한으로
+사용하며 전송 대상은 `http://127.0.0.1:8081`로 고정한다. 자동 용량 이후 남는 16 MiB에는
+최대 명시 신고 entry 1건(12 MiB)과 4 MiB 여유가 있다. payload 대비 3배 저장 한도는 중첩
+base64와 암호화 envelope 오버헤드를 위한 개발용 여유이며 지원 기기 실측 승인을 대신하지 않는다.
+기존 신고 JPEG 8 MiB 한도와 달리 이 개발 queue는 metadata와 JPEG 합이 4 MiB를 넘으면
+저장을 거부한다. 이미지를 임의로 자르거나 승인 상한을 확대하지 않는다. 더 큰 payload를 시험할
+경우 위 7개 값을 모두 명시한 기존 profile을 사용하며, 그 profile이 개발 옵션보다 우선한다.
+일반 debug build는 계속 기본 비활성이고 release의 queue 차단 조건도 유지한다.
 
 queue 전송 origin은 일반 debug 로그인 URL과 별도로
 `WALKSAFE_REPORT_QUEUE_TEST_ORIGIN`에 빌드 시 고정하며, 로그인 session origin이 이 값과 정확히
@@ -64,8 +76,8 @@ purge는 실행한다. 비활성 build에서는 신규 저장·조회·만료정
 purge는 key generation tombstone 뒤 향후 승인된 활성 build로 전환할 수 있도록 빈 fresh key를
 만들지만, terminal account 삭제 뒤에는 새 키를 만들지 않는다.
 
-실제 숫자는 지원 기기 저장공간과 암호화 오버헤드 실측 뒤 승인해야 한다. 저장소에는 승인값을
-기본값으로 넣지 않았으므로 현재 production profile은 계속 default-off다. MainActivity의
+production용 실제 숫자는 지원 기기 저장공간과 암호화 오버헤드 실측 뒤 승인해야 한다.
+production 승인값은 기본값으로 넣지 않았으므로 현재 production profile은 계속 default-off다. MainActivity의
 `PERSISTENT_REPORT_QUEUE_ENABLED=false`는 제거된 legacy queue를 purge하기 위한 별도 경계이며
 새 queue 활성 flag가 아니다. 활성화 전에는 지원 기기에서 포화·강제종료 복구와 별도 process의
 file-lock 경쟁을 포함한 계측 시험을 통과해야 한다. app-private storage를 바꿀 수 있는 비협조

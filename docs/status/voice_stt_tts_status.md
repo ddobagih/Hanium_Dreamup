@@ -2,6 +2,25 @@
 
 작성 기준일: 2026-07-13 KST
 
+## 2026-08-30 `길라잡이` 온디바이스 호출어 통합
+
+- Android 사용자 앱에 Vosk Android `0.3.75`와 공식 한국어 small 모델 `vosk-model-small-ko-0.22`를 연결했다. 하나의 16kHz mono PCM16 스트림과 같은 Vosk 모델이 `길라잡이` 호출어와 이어지는 명령을 모두 인식한다.
+- `길라잡이, 서울역으로 안내해줘`처럼 한 번에 말하는 방식과 `길라잡이` 뒤 6초 안에 명령을 말하는 방식을 지원한다. 추출한 명령은 새 실행기를 만들지 않고 기존 `AndroidVoiceCommand`·보행 음성 안전정책으로 전달한다.
+- 로그인·기기점검·안전교육 등 기존 시작 gate, 버전된 호출어 고지 확인, 마이크 권한과 Android 13 이상 알림 권한을 모두 통과한 전경 `ACTIVE` 보행에서만 microphone foreground service를 시작한다. 앱이 background로 가거나 보행이 일시정지·종료되고, 필수 권한이 철회되거나 생명주기 epoch가 바뀌면 즉시 중지한다. 화면이 꺼진 background에서 계속 듣는 기능은 현재 범위가 아니다.
+- Vosk final transcript의 유한한 평균 word confidence가 `0.60` 이상일 때만 호출어와 명령을 처리한다. 유사 호출어·저신뢰·신뢰도 누락·stale callback은 실행하지 않는다. 보행 종료는 기존 2단계 확인과 더 높은 `0.80` 기준을 그대로 사용한다.
+- PCM은 메모리에서만 처리하고 별도 pre-roll, 음성 파일 저장, 서버 전송, 인식 원문 상태 로그를 만들지 않는다. 앱 TTS나 TalkBack 발화 중에는 decoder를 reset·억제해 자기 음성 재인식을 막고, 기존 `SpeechRecognizer`·Gateway AAC 녹음과는 마이크를 직렬 전환한다.
+- 정적 화면·버튼·약관은 TalkBack 접근성 의미정보가 읽는다. 동적 길안내는 기존 오프라인 한국어 Android TTS를 우선 사용하고, 기존 위험·상호작용 경로는 TalkBack 활성 여부에 따라 한 발화 소유자만 사용한다. faster-whisper·Qwen3-TTS는 선택적 Gateway 경로이며 이번 상시 호출어에 넣지 않았다.
+- 모델 준비 스크립트는 공식 URL·archive SHA-256·라이선스·개별 파일 hash를 고정하며, APK asset 병합 전에 모델 manifest와 파일 존재를 확인한다. runtime 최초 준비에서도 모든 asset hash를 검증한 뒤 앱 전용 `noBackupFilesDir`에 원자적으로 게시한다.
+- JVM 전체 `:app:testDebugUnitTest`와 debug APK 빌드는 PASS했다. 최신 debug APK는 `213MB`, SHA-256 `09027b56400e191e09197585fc75d6b678d1eb868fb5ec2f809b0c4a220d2f6c`이다. 이 APK를 SM-G981N에 데이터 보존 업데이트 설치했고, 기기 `base.apk` hash 일치와 cold launch·252MB private 모델 준비를 확인했다. 해당 기기는 현재 로그아웃 상태이고 알림 권한도 미허용이어서 실제 발화 전이·오탐·미탐·장시간 발열/배터리는 아직 `NOT_RUN`이다.
+- 213MB 단일 APK는 개발 sideload 근거일 뿐 운영 배포 크기 승인이 아니다. 출시 후보에서는 Android App Bundle/asset delivery 또는 동등한 hash-pinned 모델 전달 방식을 확정하고 같은 binary로 재시험해야 한다.
+
+## 2026-08-30 Android Gateway 통합 보정
+
+- 현재 Android 제품 앱은 플랫폼 음성만 쓰는 이전 상태와 달리, 로그인된 Gateway session에서 `/api/speech/stt`와 `/api/speech/tts`를 선택적으로 호출하는 `GatewaySpeechClient`를 포함한다.
+- Gateway가 내부 Voice 서비스로 요청을 제한 중계하며 Android APK에는 Voice origin이나 service token을 넣지 않는다. 이 경로는 기본 OFF이고 Voice 장애 시 플랫폼 TTS·진동의 안전 fallback을 유지한다.
+- faster-whisper와 Qwen3-TTS의 실제 GPU load·샘플 추론은 직접 서비스에서 확인했다. 최신 Gateway relay, 실기기 microphone/speaker, 청취 품질과 TalkBack 충돌은 아직 `NOT_RUN`이다.
+- 아래 2026-07 기록의 Web/PWA·플랫폼 음성 설명은 당시 상태의 역사 기록이며 현재 Android 제품 경로의 정본으로 사용하지 않는다.
+
 ## 2026-07-13 안전 계약 보정
 
 - local voice API 입력은 transcript 200자, phrase ID 80자, 직접 TTS text 180자로 제한한다.
@@ -62,7 +81,7 @@
 - TTS: `Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice`
 - 유료/클라우드 API: 사용하지 않음
 - 파인튜닝: 수행하지 않음
-- Android native: `SpeechRecognizer` 버튼형 명시 신고·목적지 설정/변경·후보 번호 선택·취소·다음 안내·길안내 중지. raw audio/transcript 서버 저장 없음.
+- Android native: 전경 `ACTIVE` 보행에서는 Vosk 한국어 모델이 `길라잡이` 호출어와 명령을 연속 인식하며, 기존 `SpeechRecognizer` 버튼형·확인형 경로도 유지한다. 명시 신고·목적지 설정/변경·후보 번호 선택·취소·다음 안내·길안내 중지를 기존 안전 parser로 실행하고 raw audio/transcript를 서버에 저장하지 않는다.
 
 ## 최신 policy 요약
 
@@ -105,12 +124,12 @@
 
 ## 아직 남은 것
 
-1. Web/PWA 브라우저·실폰 mic E2E에서 신고·목적지·길안내 intent, GPS missing, duplicate와 성공/실패 안내를 확인한다.
-2. Web/PWA 또는 Android 실폰 mic E2E에서 transcript, intent, confidence, UI action 기록 정책을 결정한다.
-3. 실제 외출용 폰의 Cloudflare same-origin 경로에서 mic 권한, 녹음 upload와 응답 지연을 재검증한다.
-4. TTS HTTP 2회 cache header와 실제 스피커 청취 평가.
-5. TalkBack/음성 안내 충돌 평가.
-6. 보행 중 잡음, 바람, 휴대폰 마이크, 복수 화자 샘플 재평가.
+1. SM-G981N에서 로그인→기기점검→안전교육→전경 ACTIVE 보행으로 들어가 알림 권한을 직접 허용한 뒤, 한 문장 호출·분리 호출·6초 timeout·저신뢰 거부를 실제 음성으로 확인한다.
+2. 조용한 실내·도로 소음·바람·주머니/장착 위치·복수 화자에서 호출어 오탐·미탐과 명령 성공률을 반복 측정한다.
+3. 15분 이상 camera/GPS/TFLite/Vosk/TTS 동시 실행에서 cold start, command latency, RSS, 배터리, thermal throttling과 native crash를 확인한다.
+4. TalkBack을 켠 상태에서 버튼·약관·상태 초점과 앱 길안내/위험 안내가 겹치거나 자기 음성으로 재호출되지 않는지 청취 평가한다.
+5. 운영 배포용 모델 전달 방식과 APK/AAB 크기 정책을 확정하고 clean checkout·CI·서명 release에서 hash-pinned 모델을 재검증한다.
+6. 선택적 Gateway faster-whisper·Qwen3-TTS 실기기 mic/speaker E2E와 timeout/fallback을 별도로 확인한다.
 
 ## 판단
 

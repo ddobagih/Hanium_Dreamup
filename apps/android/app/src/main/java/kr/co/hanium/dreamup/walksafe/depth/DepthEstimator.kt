@@ -10,6 +10,7 @@ data class ObjectDepthInput(
     val mapper: CoordinateMapper,
     val rawDepth: DepthImage16? = null,
     val rawConfidence: ConfidenceImage8? = null,
+    val rawDepthFreshnessQuality: Float = 1f,
     val fullDepth: DepthImage16? = null,
     val motionContext: MotionContext = MotionContext(),
     val groundDistanceM: Float? = null,
@@ -72,6 +73,7 @@ class ObjectDepthEstimator(
             geometry = input.geometry,
             track = input.track,
             motionContext = input.motionContext,
+            depthFreshnessQuality = input.depthFreshnessQuality(source),
             hardGate = if (input.track.idSwitchSuspected) 0f else 1f,
         )
         tracker.recordDistance(
@@ -88,6 +90,7 @@ class ObjectDepthEstimator(
             geometry = input.geometry,
             track = input.track,
             motionContext = input.motionContext,
+            depthFreshnessQuality = input.depthFreshnessQuality(source),
             hardGate = if (input.track.idSwitchSuspected) 0f else 1f,
         )
         val userFacing = messagePolicy.buildUserFacing(
@@ -171,6 +174,7 @@ class ObjectDepthEstimator(
         geometry: ObjectGeometry,
         track: TrackState,
         motionContext: MotionContext,
+        depthFreshnessQuality: Float,
         hardGate: Float,
     ): DepthConfidenceBreakdown {
         val sampleCountScore = (stats.validSampleCount / TARGET_SAMPLES.toFloat()).coerceIn(0f, 1f)
@@ -192,18 +196,25 @@ class ObjectDepthEstimator(
             else -> 0.25f
         }
         val effectiveHardGate = if (stats.medianM == null || geometry.detectionConfidence < 0.10f) 0f else hardGate
+        val safeDepthFreshness = depthFreshnessQuality.coerceIn(0f, 1f)
         return DepthConfidenceBreakdown(
-            sourceQuality = source.sourceQuality,
+            sourceQuality = source.sourceQuality * safeDepthFreshness,
             sampleQuality = sampleQuality.coerceIn(0f, 1f),
             depthQuality = depthQuality.coerceIn(0f, 1f),
             detectionQuality = geometry.detectionConfidence.coerceIn(0f, 1f),
             trackingQuality = trackingQuality,
             motionQuality = motionContext.safeMotionQuality,
-            freshnessQuality = motionContext.freshnessQuality.coerceIn(0f, 1f),
+            freshnessQuality = minOf(
+                motionContext.freshnessQuality.coerceIn(0f, 1f),
+                safeDepthFreshness,
+            ),
             corridorQuality = corridorQuality(geometry),
             hardGate = effectiveHardGate,
         )
     }
+
+    private fun ObjectDepthInput.depthFreshnessQuality(source: DepthSource): Float =
+        if (source == DepthSource.ARCORE_RAW_DEPTH) rawDepthFreshnessQuality else 1f
 
     private fun chooseRiskDistance(className: String, stats: DepthStats, groundDistanceM: Float?): Float? {
         val median = stats.medianM ?: return null

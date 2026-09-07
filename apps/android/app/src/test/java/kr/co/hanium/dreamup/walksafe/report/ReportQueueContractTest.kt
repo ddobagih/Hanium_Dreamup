@@ -7,6 +7,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class ReportQueueContractTest {
@@ -37,7 +40,8 @@ class ReportQueueContractTest {
     }
 
     @Test
-    fun defaultBuildConfigKeepsProductionQueueDisabledAndZeroed() {
+    fun disabledBuildConfigKeepsProductionQueueCapacityZeroed() {
+        assumeFalse(BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED)
         assertFalse(BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED)
         assertEquals(0, BuildConfig.WALKSAFE_REPORT_QUEUE_MAX_ENTRIES)
         assertEquals(0, BuildConfig.WALKSAFE_REPORT_QUEUE_MAX_PAYLOAD_BYTES)
@@ -45,6 +49,21 @@ class ReportQueueContractTest {
         assertEquals(0L, BuildConfig.WALKSAFE_REPORT_QUEUE_MAX_TOTAL_BYTES)
         assertEquals(0, BuildConfig.WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_ENTRIES)
         assertEquals(0L, BuildConfig.WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES)
+    }
+
+    @Test
+    fun enabledDebugBuildConfigPreservesExplicitCapacityAndApprovedOrigin() {
+        assumeTrue(BuildConfig.DEBUG && BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED)
+        val profile = requireNotNull(PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE)
+
+        assertTrue(profile.maxEntries > profile.automaticMaxEntries)
+        assertTrue(
+            profile.maxTotalBytes - profile.automaticMaxTotalBytes >= profile.maxStoredEntryBytes,
+        )
+        assertEquals(
+            BuildConfig.WALKSAFE_REPORT_QUEUE_TEST_ORIGIN,
+            approvedReportQueueGatewayOriginOrNull(BuildConfig.WALKSAFE_REPORT_QUEUE_TEST_ORIGIN),
+        )
     }
 
     @Test

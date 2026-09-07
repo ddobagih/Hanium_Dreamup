@@ -57,6 +57,37 @@ class GatewayFieldSessionTest {
     }
 
     @Test
+    fun passwordLoginPreservesRateLimitAndRetryAfterWithoutFollowupRequests() {
+        val transport = FakeTransport(
+            loginResponse = GatewayHttpResponse(
+                statusCode = 429,
+                responseBody = """{"code":"gateway_login_rate_limited"}""",
+                headers = mapOf("Retry-After" to "25"),
+            ),
+        )
+
+        val error = assertThrows(GatewaySessionHttpException::class.java) {
+            GatewayFieldSessionClient(transport).loginWithPassword(
+                gatewayBaseUrl = "http://127.0.0.1:8081",
+                email = "walker@example.test",
+                password = "Valid-password-123!",
+                rememberMe = false,
+                deviceId = DEVICE_ID,
+                nowEpochMs = NOW,
+            )
+        }
+
+        assertEquals(429, error.statusCode)
+        assertEquals("account_password_login_failed", error.reason)
+        assertEquals(25_000L, error.retryAfterMs)
+        assertEquals("http://127.0.0.1:8081/api/field-session", transport.postedUrl)
+        assertEquals("password", JSONObject(transport.postedBody!!).getString("grant_type"))
+        assertEquals(1, transport.postedBodies.size)
+        assertEquals(0, transport.getCount)
+        assertEquals(0, transport.deleteCount)
+    }
+
+    @Test
     fun longLivedLoginSeparatesAccessAndRefreshCredentialsAndBindsTheDevice() {
         val transport = FakeTransport(
             loginResponse = longLivedResponse(

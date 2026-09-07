@@ -350,32 +350,21 @@ class MainActivityFirstRunRegistrationStaticTest {
     }
 
     @Test
-    fun deviceCheckAndTrainingCompletionMoveFocusToTheNewVisibleStage() {
+    fun deviceCheckMovesFocusToVisiblePostureOrEducationWithoutForcingHomeFocus() {
         val changed = functionBlock("private fun onFirstRunOnboardingStateChanged(")
         val focus = functionBlock("private fun focusCurrentFirstRunStage(")
         val update = functionBlock("private fun updateFirstRunOnboardingUi()")
-
-        assertInOrder(
-            changed,
-            "updateFirstRunOnboardingUi()",
-            "focusCurrentFirstRunStage(firstRunOnboardingSnapshot.stage)",
-        )
-        assertTrue(
-            focus.contains(
-                "FirstRunOnboardingStage.FP004_TRAINING -> priorityUserOnboardingStatusText",
-            ),
-        )
-        assertTrue(
-            focus.contains(
-                "FirstRunOnboardingStage.COMPLETE -> officialEnvironmentStatusText",
-            ),
-        )
+        assertInOrder(changed, "updateFirstRunOnboardingUi()", "focusCurrentFirstRunStage(firstRunOnboardingSnapshot.stage)")
+        assertTrue(focus.contains("FirstRunOnboardingStage.FP004_TRAINING ->"))
+        assertTrue(focus.contains("if (shouldShowFirstRunPhonePosture()) firstRunPhonePostureText"))
+        assertTrue(focus.contains("else priorityUserOnboardingStatusText"))
+        assertTrue(focus.contains("FirstRunOnboardingStage.COMPLETE -> return"))
         assertTrue(focus.contains("target.post"))
         assertTrue(focus.contains("firstRunOnboardingSnapshot.stage != stage"))
         assertTrue(focus.contains("!target.isShown"))
         assertTrue(focus.contains("target.requestRectangleOnScreen("))
         assertTrue(focus.contains("ACTION_ACCESSIBILITY_FOCUS"))
-        assertTrue(update.contains("val mayTrain = snapshot.stage == FirstRunOnboardingStage.FP004_TRAINING"))
+        assertTrue(update.contains("snapshot.stage == FirstRunOnboardingStage.FP004_TRAINING"))
         assertTrue(update.contains("val showWalkPreparation = snapshot.isComplete"))
     }
 
@@ -460,71 +449,25 @@ class MainActivityFirstRunRegistrationStaticTest {
     }
 
     @Test
-    fun firstRunStatusIsTalkBackAccessibleAndFirstOnTheStartupSurface() {
-        val status = sourceSection(
-            "firstRunOnboardingStatusText = TextView(this).apply",
-            "ViewCompat.setAccessibilityHeading(firstRunOnboardingStatusText, true)",
-        )
+    fun firstRunStatusAndAccountContentKeepTheVisibleNativeTraversalOrder() {
+        val status = sourceSection("firstRunOnboardingStatusText = TextView(this).apply", "ViewCompat.setAccessibilityHeading(firstRunOnboardingStatusText, true)")
         assertTrue(status.contains("contentDescription = text"))
-        assertTrue(
-            status.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"),
-        )
-        assertTrue(
-            status.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"),
-        )
-
-        val controls = sourceSection(
-            "firstRunOnboardingControls = LinearLayout(this).apply",
-            "priorityUserOnboardingStatusText = TextView(this).apply",
-        )
-        assertInOrder(
-            controls,
-            "addView(firstRunOnboardingStatusText)",
-            "addView(firstRunPurposeButton)",
-            "addView(firstRunAgeButtons.getValue(ageBand))",
-        )
-
-        val overlay = sourceSection(
-            "val overlay = LinearLayout(this).apply",
-            "controlsScroll = ScrollView(this).apply",
-        )
-        val readiness = sourceSection(
-            "walkReadinessControls = LinearLayout(this).apply",
-            "walkLastResultText = TextView(this).apply",
-        )
-        assertInOrder(
-            overlay,
-            "addView(productPurposeText)",
-            "addView(firstRunOnboardingControls)",
-            "addView(walkReadinessControls)",
-            "addView(runtimeControls)",
-        )
-        assertInOrder(
-            readiness,
-            "addView(priorityUserOnboardingControls)",
-            "addView(startupCapabilityText)",
-            "addView(startupMetricPreflightButton)",
-            "addView(startupCapabilityConfirmButton)",
-        )
-
+        assertTrue(status.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
+        assertTrue(status.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"))
+        val controls = sourceSection("firstRunOnboardingControls = LinearLayout(this).apply", "priorityUserOnboardingStatusText = TextView(this).apply")
+        assertInOrder(controls, "addView(firstRunOnboardingStatusText)", "addView(productPurposeText)", "addView(accountAccessControls)", "addView(firstRunPurposeButton)")
+        assertFalse(controls.contains("addView(firstRunAgeButtons.getValue(ageBand))"))
+        val overlay = sourceSection("val overlay = LinearLayout(this).apply", "controlsScroll = ScrollView(this).apply")
+        assertInOrder(overlay, "addView(firstRunOnboardingControls)", "addView(walkReadinessControls)", "addView(runtimeControls)")
+        val readiness = sourceSection("walkReadinessControls = LinearLayout(this).apply", "walkLastResultText = TextView(this).apply")
+        assertInOrder(readiness, "addView(priorityUserOnboardingControls)", "addView(startupCapabilityText)", "addView(nativeDeviceCheckPanel)", "addView(startupMetricPreflightButton)", "addView(startupCapabilityConfirmButton)")
         val traversal = functionBlock("private fun linkFirstRunAccessibilityTraversal()")
-        assertInOrder(
-            traversal,
-            "add(firstRunOnboardingStatusText)",
-            "add(firstRunPurposeButton)",
-            "add(firstRunAgeButtons.getValue(ageBand))",
-            "current.accessibilityTraversalAfter = previous.id",
-        )
+        assertInOrder(traversal, "add(firstRunOnboardingStatusText)", "add(accountAccessStatusText)", "add(accountEmailInput)", "add(accountPasswordInput)", "add(accountConsentClauseTexts.getValue(key))", "add(accountConsentListenButtons.getValue(key))", "current.accessibilityTraversalAfter = previous.id")
         assertTrue(traversal.contains("previous.nextFocusForwardId = current.id"))
         assertTrue(traversal.contains("previous.nextFocusDownId = current.id"))
         assertTrue(traversal.contains("current.nextFocusUpId = previous.id"))
-
         val update = functionBlock("private fun updateFirstRunOnboardingUi()")
-        assertInOrder(
-            update,
-            "firstRunOnboardingStatusText.text = message",
-            "firstRunOnboardingStatusText.contentDescription = message",
-        )
+        assertInOrder(update, "firstRunOnboardingStatusText.text = message", "firstRunOnboardingStatusText.contentDescription = message")
     }
 
     private fun sourceSection(startMarker: String, endMarker: String): String {

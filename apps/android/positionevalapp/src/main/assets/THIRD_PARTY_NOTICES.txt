@@ -1,0 +1,95 @@
+WalkSafe Position Evaluator - bundled components
+================================================
+
+Bundled dependency
+------------------
+
+Apache Commons Compress 1.27.1
+Upstream: https://commons.apache.org/proper/commons-compress/
+License: Apache License 2.0
+
+Used only to decode the traditional Unix compress `.Z` files published by the
+NGII hourly RINEX directory. The dependency JAR carries its upstream LICENSE
+and NOTICE metadata. The fixed `bla.tar.Z` byte fixture embedded in
+`ArchiveValidationTest` is from the same Apache Commons Compress project and is
+covered by the same Apache License 2.0.
+
+The components below are pinned, bundled into the application build, and
+executed by the analysis pipeline. Runtime version and validation gates remain
+fail-closed if a pin does not match.
+
+RTKLIB-EX (formerly demo5) v2.5.1
+Upstream: https://github.com/rtklibexplorer/RTKLIB
+Commit: 62d4677ed8425a4e2748c6d390b500d1afb493fc
+License: BSD-2-Clause
+
+The pinned RTKLIB-EX sources are compiled into the arm64-v8a JNI library. The
+application invokes postpos() for multi-hour base observation and navigation
+inputs and accepts only Q=1 FIX epochs for evaluation.
+
+The RTKLIB software package is distributed under the following BSD 2-clause
+license. Users are permitted to develop, produce or sell their own non-
+commercial or commercial products utilizing, linking or including RTKLIB as long
+as they comply with the license.
+
+Copyright (c) 2007-2020, T. Takasu, All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list
+of conditions and the following disclaimer. Redistributions in binary form must
+reproduce the above copyright notice, this list of conditions and the following
+disclaimer in the documentation and/or other materials provided with the
+distribution.
+
+The software package includes some companion executive binaries or shared
+libraries necessary to execute APs on Windows. These licenses succeed to the
+original ones of these software.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Notes: Previous versions of RTKLIB until ver. 2.4.1 had been distributed under
+GPLv3 license.
+
+android_rinex demo5 fork
+Upstream: https://github.com/rtklibexplorer/android_rinex
+Commit: b27fcd07bc085e5213ba29655ad6168b61d60b9e
+License: BSD-2-Clause
+
+The application includes a Kotlin GnssLogger TXT to RINEX3 converter derived
+from the pinned measurement equations and signal mapping. Its output is gated
+by Android GNSS regression tests and an RTKLIB readrnxt round-trip test.
+
+Copyright (c) 2017, Rokubun
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

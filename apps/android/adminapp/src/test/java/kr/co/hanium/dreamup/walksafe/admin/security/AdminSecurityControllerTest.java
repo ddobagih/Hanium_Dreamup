@@ -464,6 +464,68 @@ public final class AdminSecurityControllerTest {
     }
 
     @Test
+    public void originalEvidenceReauthenticationFailureBlocksReadsWipesCredentialsAndAllowsRetry()
+        throws Exception {
+        IOException[] failures = {
+            new IOException("administrator API request failed: status=401"),
+            new IOException("administrator API request failed: status=403"),
+            new java.net.SocketTimeoutException("synthetic timeout")
+        };
+        for (IOException failure : failures) {
+            FakeApi api = new FakeApi();
+            FakeOperations operations = new FakeOperations();
+            AdminSecurityController controller = new AdminSecurityController(api, operations);
+            controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+            var operation = AdminHighRiskActionGate.originalEvidence(REPORT_ID);
+            controller.reauthenticate(PASSWORD, "123456", operation, 10_000L);
+            assertEquals(20_000L, controller.snapshot().reauthenticatedUntilEpochMs());
+            String previousNonce = api.reconfirmationNonce;
+            api.reauthenticationFailure = failure;
+            char[] password = PASSWORD.toCharArray();
+            char[] totp = "123456".toCharArray();
+
+            assertThrows(IOException.class, () -> controller.loadAdminOriginalEvidence(
+                REPORT_ID, 0, "synthetic evidence review", password, totp, 10_001L, true
+            ));
+
+            String failedNonce = api.reconfirmationNonce;
+            assertFalse(previousNonce.equals(failedNonce));
+            assertEquals(2, api.reauthenticateCount);
+            assertEquals(0, operations.originalEvidenceCalls);
+            assertEquals(0L, controller.snapshot().reauthenticatedUntilEpochMs());
+            assertEquals(AdminSecurityState.NORMAL, controller.snapshot().securityState());
+            assertTrue(controller.snapshot().isAccessSessionActive());
+            assertEquals(CURRENT_SESSION_ID, controller.snapshot().currentSessionId());
+            assertAllCleared(password);
+            assertAllCleared(totp);
+            assertFalse(controller.consumeHighRiskAuthorization(operation, 10_002L, true).isAllowed());
+            assertEquals(0, operations.originalEvidenceCalls);
+
+            api.reauthenticationFailure = null;
+            char[] retriedPassword = PASSWORD.toCharArray();
+            char[] retriedTotp = "123456".toCharArray();
+            AdminOriginalEvidence evidence = controller.loadAdminOriginalEvidence(
+                REPORT_ID, 0, "synthetic evidence review", retriedPassword, retriedTotp, 10_003L, true
+            );
+            try {
+                assertEquals(3, api.reauthenticateCount);
+                assertEquals(1, operations.originalEvidenceCalls);
+                assertFalse(previousNonce.equals(api.reconfirmationNonce));
+                assertFalse(failedNonce.equals(api.reconfirmationNonce));
+                assertEquals(api.reconfirmationNonce,
+                    operations.reconfirmationHeaders.get(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER));
+                assertAllCleared(retriedPassword);
+                assertAllCleared(retriedTotp);
+                assertTrue(evidence.matches(REPORT_ID, 0, CURRENT_SESSION_ID, DEVICE_ID, 10_004L));
+                assertFalse(controller.consumeHighRiskAuthorization(operation, 10_005L, true).isAllowed());
+                assertEquals(1, operations.originalEvidenceCalls);
+            } finally {
+                evidence.close();
+            }
+        }
+    }
+
+    @Test
     public void rawReviewRequiresOperationalSessionAndConsumesExactStepUpWithWiping()
         throws Exception {
         FakeApi api = new FakeApi();
@@ -654,6 +716,7 @@ public final class AdminSecurityControllerTest {
         String reconfirmationPath;
         String echoPath;
         String stateFailureMessage = "state unavailable";
+        IOException reauthenticationFailure;
         AdminSecurityApiException completeRecoveryError;
         AdminRecoveryCustodyState custodyState = AdminRecoveryCustodyState.ATTESTED;
         String custodyAttestedAt = "2026-07-21T23:00:00Z";
@@ -756,12 +819,13 @@ public final class AdminSecurityControllerTest {
             String method,
             String path,
             String nonce
-        ) {
+        ) throws IOException {
             reauthenticateCount += 1;
             reconfirmationNonce = nonce;
             reconfirmationAction = action;
             reconfirmationMethod = method;
             reconfirmationPath = path;
+            if (reauthenticationFailure != null) throw reauthenticationFailure;
             return new ReauthenticationResult(20_000L, action, method, echoPath == null ? path : echoPath);
         }
 

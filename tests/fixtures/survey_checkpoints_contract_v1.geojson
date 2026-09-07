@@ -1,0 +1,19 @@
+{
+  "type": "FeatureCollection",
+  "schema_version": "walksafe.survey_checkpoints.v1",
+  "source_kind": "SYNTHETIC_CONTRACT",
+  "coordinate_reference_system": "WGS84",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "survey-point-01",
+      "properties": {
+        "checkpoint_id": "survey-point-01",
+        "route_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "ordinal": 1,
+        "uncertainty_m": 0.25
+      },
+      "geometry": {"type": "Point", "coordinates": [127.0, 37.5]}
+    }
+  ]
+}

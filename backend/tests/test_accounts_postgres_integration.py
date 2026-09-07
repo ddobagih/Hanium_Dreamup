@@ -4,11 +4,13 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 import importlib
 import os
+from threading import Event
 from types import SimpleNamespace
 import uuid
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+from fastapi import FastAPI
 import pytest
 from sqlalchemy import create_engine, func, inspect, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -19,14 +21,18 @@ from backend.app.account_schemas import (
     AccountCreateRequestV1,
     EmailOtpEnrollmentRequestV1,
 )
+from backend.app.api.accounts import create_router
+from backend.app.database import get_db
 from backend.app.main import settings
 from backend.app.models import AccountEnrollment, SignupConsentReceipt, UserAccount
+from backend.app.services import accounts as accounts_service
 from backend.app.services.accounts import (
     AccountAuthenticationRateLimiter,
     AccountService,
     AccountServiceError,
     utc_now,
 )
+from asgi_client import ASGITestClient
 from scripts.purge_account_enrollments import _candidate_ids
 
 
@@ -698,6 +704,170 @@ def test_new_and_concurrent_resends_leave_only_latest_email_handle_live() -> Non
         )
         assert created.account_generation == 1
     engine.dispose()
+
+
+def test_same_otp_request_concurrently_returns_delivery_lease_without_duplicate_send(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    started_at = utc_now()
+    monkeypatch.setattr(accounts_service, "utc_now", lambda: started_at)
+    suffix = uuid.uuid4().hex
+    payload = _request(
+        email=f"concurrent-delivery-{suffix}@example.com",
+        request_id=f"same_delivery_{suffix}",
+    )
+    delivery_started = Event()
+    release_delivery = Event()
+    send_count = 0
+
+    def send(**_kwargs) -> None:
+        nonlocal send_count
+        with SessionFactory() as db:
+            row = db.scalar(
+                select(AccountEnrollment).where(AccountEnrollment.request_id == payload.request_id)
+            )
+            assert row is not None
+            assert row.state == "PENDING_DELIVERY"
+        send_count += 1
+        delivery_started.set()
+        assert release_delivery.wait(timeout=5), "test delivery was not released"
+
+    def database():
+        with SessionFactory() as db:
+            yield db
+
+    app = FastAPI()
+    app.include_router(create_router(
+        settings,
+        sender=SimpleNamespace(send=send),
+        service=AccountService(settings),
+        rate_limiter=SimpleNamespace(check_source=lambda **_: None, check_email=lambda **_: None),
+    ))
+    app.dependency_overrides[get_db] = database
+
+    def issue():
+        return ASGITestClient(app).post(
+            "/account-enrollments/email-otp",
+            json=payload.model_dump(mode="json"),
+        )
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(issue)
+            try:
+                assert delivery_started.wait(timeout=5)
+                pending = pool.submit(issue).result(timeout=5)
+                assert pending.status_code == 409
+                assert pending.json()["detail"]["code"] == "account_enrollment_in_progress"
+                assert pending.headers["retry-after"] == str(settings.account_otp_delivery_lease_seconds)
+                assert not first.done()
+                assert send_count == 1
+            finally:
+                release_delivery.set()
+            delivered = first.result(timeout=5)
+        assert delivered.status_code == 202
+        replayed = issue()
+        assert replayed.status_code == 202
+        assert replayed.json() == delivered.json()
+        assert send_count == 1
+        with SessionFactory() as db:
+            rows = db.scalars(
+                select(AccountEnrollment).where(AccountEnrollment.request_id == payload.request_id)
+            ).all()
+            assert len(rows) == 1
+            assert rows[0].state == "ACTIVE"
+            assert rows[0].issue_count == 1
+    finally:
+        release_delivery.set()
+        engine.dispose()
+
+
+def test_otp_flush_failure_rolls_back_encrypted_row_and_same_request_can_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex
+    payload = _request(
+        email=f"rollback-delivery-{suffix}@example.com",
+        request_id=f"rollback_delivery_{suffix}",
+    )
+    failure_injected = False
+    send_count = 0
+
+    def send(**_kwargs) -> None:
+        nonlocal send_count
+        send_count += 1
+
+    def database():
+        with SessionFactory() as db:
+            original_commit = db.commit
+
+            def commit() -> None:
+                nonlocal failure_injected
+                if not failure_injected and any(
+                    isinstance(row, AccountEnrollment) for row in db.new
+                ):
+                    failure_injected = True
+                    db.flush()
+                    assert db.scalar(
+                        select(func.count(AccountEnrollment.id)).where(
+                            AccountEnrollment.request_id == payload.request_id
+                        )
+                    ) == 1
+                    db.execute(text("SELECT 1 / 0"))
+                original_commit()
+
+            monkeypatch.setattr(db, "commit", commit)
+            yield db
+
+    app = FastAPI()
+    app.include_router(create_router(
+        settings,
+        sender=SimpleNamespace(send=send),
+        service=AccountService(settings),
+        rate_limiter=SimpleNamespace(check_source=lambda **_: None, check_email=lambda **_: None),
+    ))
+    app.dependency_overrides[get_db] = database
+
+    def issue():
+        return ASGITestClient(app).post(
+            "/account-enrollments/email-otp",
+            json=payload.model_dump(mode="json"),
+        )
+
+    try:
+        failed = issue()
+        assert failure_injected
+        assert failed.status_code == 503
+        assert failed.json()["detail"]["code"] == "account_enrollment_unavailable"
+        assert failed.headers["retry-after"] == "5"
+        assert send_count == 0
+        with SessionFactory() as db:
+            assert db.scalar(
+                select(func.count(AccountEnrollment.id)).where(
+                    AccountEnrollment.request_id == payload.request_id
+                )
+            ) == 0
+
+        delivered = issue()
+        assert delivered.status_code == 202
+        assert send_count == 1
+        replayed = issue()
+        assert replayed.status_code == 202
+        assert replayed.json() == delivered.json()
+        assert send_count == 1
+        with SessionFactory() as db:
+            rows = db.scalars(
+                select(AccountEnrollment).where(AccountEnrollment.request_id == payload.request_id)
+            ).all()
+            assert len(rows) == 1
+            assert rows[0].state == "ACTIVE"
+            assert rows[0].issue_count == 1
+            assert payload.email.encode() not in rows[0].email_ciphertext
+            assert rows[0].enrollment_handle == delivered.json()["enrollment_handle"]
+    finally:
+        engine.dispose()
 
 
 def test_stale_pending_delivery_reissues_same_handle_with_new_code() -> None:

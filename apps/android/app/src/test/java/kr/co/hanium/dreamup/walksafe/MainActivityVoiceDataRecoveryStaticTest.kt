@@ -133,6 +133,85 @@ class MainActivityVoiceDataRecoveryStaticTest {
         )
     }
 
+    @Test
+    fun missingKoreanTtsBlocksDeviceCheckAndWalkStartOrResume() {
+        val observation = section(
+            source,
+            "private fun currentPostLoginDeviceCheckObservation()",
+            "private fun completePostLoginDeviceCheckPass(",
+        )
+        assertTrue(
+            observation.contains(
+                "koreanTextToSpeechAvailable == false ->\n" +
+                    "                    PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE",
+            ),
+        )
+
+        val restrictions = section(
+            source,
+            "private fun applyPostLoginDeviceFeatureRestrictions(",
+            "/** Active route/risk work",
+        )
+        assertTrue(
+            restrictions.contains(
+                "WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in unavailable",
+            ),
+        )
+        assertTrue(restrictions.contains("WalkSafeStartupCapabilityTier.BLOCKED"))
+        assertTrue(restrictions.contains("KOREAN_TTS_WALK_BLOCK_DETAIL"))
+
+        val readiness = section(
+            source,
+            "private fun walkSessionReadinessBlockReason(",
+            "private fun missingRequiredWalkSessionPermissions(",
+        )
+        assertTrue(readiness.contains("PostLoginDeviceCheckFeature.VOICE_GUIDANCE"))
+        assertTrue(readiness.contains("WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS"))
+        assertTrue(readiness.contains("return KOREAN_TTS_WALK_BLOCK_DETAIL"))
+
+        val confirmation = section(
+            source,
+            "private fun confirmStartupCapabilityDecision()",
+            "private fun deliverStartupCapabilityNotice(",
+        )
+        assertFalse(confirmation.contains("사용 가능한 기능으로 계속합니다"))
+    }
+
+    @Test
+    fun runtimeKoreanTtsFailureSafetyStopsActiveWalkAndRequiresRecheck() {
+        val failure = section(
+            source,
+            "private fun handleRuntimeSpeechCapabilityFailure(",
+            "private fun feedbackActuatorStatusText()",
+        )
+        assertTrue(failure.contains("walkSessionLifecycle.snapshot().state == WalkSessionState.ACTIVE"))
+        assertTrue(
+            failure.contains(
+                "enterWalkSessionSafetyStopAndCancelOutputs(\"offline_korean_tts_runtime_failure\")",
+            ),
+        )
+        assertTrue(failure.contains("한국어 음성 필요 · 보행 시작/재개 불가"))
+        assertTrue(failure.contains("기기 점검을 다시 실행"))
+        assertFalse(failure.contains("다른 기능은 계속"))
+    }
+
+    @Test
+    fun ttsFailureShowsOneInstallActionAndSuccessfulProbeExplainsRecheck() {
+        val settings = section(
+            source,
+            "postLoginDeviceCheckSettingsButton.apply",
+            "text = when {",
+        )
+        assertFalse(settings.contains("PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE"))
+        val recovery = section(
+            source,
+            "private fun completeVoiceDataInstallRecheckIfPossible()",
+            "private fun requireFirstRunOnboardingComplete(",
+        )
+        assertTrue(recovery.contains("한국어 음성 재점검 완료"))
+        assertTrue(recovery.contains("기기 점검 결과를 확인한 뒤 보행을 시작하거나 재개하세요"))
+    }
+
     private fun section(text: String, startMarker: String, endMarker: String): String {
         val start = text.indexOf(startMarker)
         check(start >= 0) { "Missing start marker: $startMarker" }

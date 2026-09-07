@@ -1,26 +1,49 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
 import android.content.Context
+import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.SystemClock
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.ChestMountedGeomagneticReference
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.ChestMountedHeading
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.ChestMountedHeadingResult
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.ChestMountedMagneticFieldSample
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.ChestMountedRotationSample
 
 /** Fresh, accuracy-bounded magnetic East-North-Up orientation from TYPE_ROTATION_VECTOR. */
 class AndroidEarthOrientationTracker(context: Context) {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+    private val magneticFieldSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
+    private val chestMountedHeading = ChestMountedHeading()
 
     @Volatile
     private var latestOrientation: DeviceEarthOrientation? = null
+    @Volatile
+    private var latestRotationSample: ChestMountedRotationSample? = null
+    @Volatile
+    private var latestMagneticFieldSample: ChestMountedMagneticFieldSample? = null
+    @Volatile
+    private var geomagneticReference: ChestMountedGeomagneticReference? = null
+    @Volatile
+    private var magneticSensorRegistered = false
     @Volatile
     private var started = false
     private var registrationGeneration = 0
     private var currentListener: SensorEventListener? = null
 
+    @Synchronized
     fun start(): Boolean {
         if (started) return true
         val sensor = rotationVectorSensor ?: return false
+        magneticSensorRegistered = false
+        latestOrientation = null
+        latestRotationSample = null
+        latestMagneticFieldSample = null
+        chestMountedHeading.reset()
         val generation = ++registrationGeneration
         lateinit var listener: SensorEventListener
         listener = object : SensorEventListener {
@@ -30,25 +53,56 @@ class AndroidEarthOrientationTracker(context: Context) {
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                if (
-                    isCurrentRegistration(listener, generation) &&
-                    sensor?.type == Sensor.TYPE_ROTATION_VECTOR &&
-                    accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE
-                ) {
-                    latestOrientation = null
+                if (!isCurrentRegistration(listener, generation)) return
+                val mappedAccuracy = accuracy.toEarthOrientationAccuracy()
+                when (sensor?.type) {
+                    Sensor.TYPE_ROTATION_VECTOR -> {
+                        latestRotationSample = latestRotationSample?.let { sample ->
+                            sample.copy(accuracy = sample.accuracy.downgradedTo(mappedAccuracy))
+                        }
+                        if (accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE) {
+                            latestOrientation = null
+                        } else {
+                            latestOrientation = latestOrientation?.let { orientation ->
+                                orientation.copy(
+                                    accuracy = orientation.accuracy.downgradedTo(mappedAccuracy),
+                                )
+                            }
+                        }
+                    }
+                    Sensor.TYPE_MAGNETIC_FIELD -> {
+                        latestMagneticFieldSample = latestMagneticFieldSample?.let { sample ->
+                            sample.copy(accuracy = sample.accuracy.downgradedTo(mappedAccuracy))
+                        }
+                    }
                 }
             }
         }
         currentListener = listener
-        started = sensorManager.registerListener(
+        val rotationRegistered = sensorManager.registerListener(
             listener,
             sensor,
             SensorManager.SENSOR_DELAY_GAME,
         )
-        if (!started && currentListener === listener) currentListener = null
-        return started
+        started = rotationRegistered
+        if (!rotationRegistered) {
+            if (currentListener === listener) currentListener = null
+            chestMountedHeading.reset()
+            return false
+        }
+        magneticSensorRegistered = magneticFieldSensor?.let { magneticSensor ->
+            runCatching {
+                sensorManager.registerListener(
+                    listener,
+                    magneticSensor,
+                    SensorManager.SENSOR_DELAY_GAME,
+                )
+            }.getOrDefault(false)
+        } ?: false
+        return true
     }
 
+    @Synchronized
     fun stop() {
         registrationGeneration += 1
         val listener = currentListener
@@ -56,9 +110,72 @@ class AndroidEarthOrientationTracker(context: Context) {
         started = false
         listener?.let(sensorManager::unregisterListener)
         latestOrientation = null
+        latestRotationSample = null
+        latestMagneticFieldSample = null
+        magneticSensorRegistered = false
+        chestMountedHeading.reset()
     }
 
     fun latest(): DeviceEarthOrientation? = latestOrientation
+
+    fun latestChestMountedHeading(
+        nowElapsedRealtimeMs: Long = SystemClock.elapsedRealtime(),
+    ): ChestMountedHeadingResult = chestMountedHeading.evaluate(
+        nowElapsedRealtimeMs = nowElapsedRealtimeMs,
+        rotation = latestRotationSample,
+        magneticField = latestMagneticFieldSample,
+        geomagneticReference = geomagneticReference,
+        magneticSensorAvailable = magneticSensorRegistered,
+    )
+
+    fun isMagneticFieldAvailable(): Boolean = magneticSensorRegistered
+
+    fun updateGeomagneticReference(
+        latitudeDegrees: Double,
+        longitudeDegrees: Double,
+        altitudeMeters: Double = 0.0,
+        timeMillis: Long = System.currentTimeMillis(),
+    ): Boolean {
+        if (
+            !latitudeDegrees.isFinite() || latitudeDegrees !in -90.0..90.0 ||
+            !longitudeDegrees.isFinite() || longitudeDegrees !in -180.0..180.0 ||
+            !altitudeMeters.isFinite()
+        ) {
+            geomagneticReference = null
+            return false
+        }
+        val field = runCatching {
+            GeomagneticField(
+                latitudeDegrees.toFloat(),
+                longitudeDegrees.toFloat(),
+                altitudeMeters.toFloat(),
+                timeMillis,
+            )
+        }.getOrNull() ?: run {
+            geomagneticReference = null
+            return false
+        }
+        val reference = ChestMountedGeomagneticReference(
+            declinationDegrees = field.declination.toDouble(),
+            inclinationDegrees = field.inclination.toDouble(),
+            expectedFieldStrengthMicrotesla =
+                field.fieldStrength.toDouble() / NANOTESLA_PER_MICROTESLA,
+        )
+        if (
+            !reference.declinationDegrees.isFinite() ||
+            !reference.expectedFieldStrengthMicrotesla.isFinite() ||
+            reference.expectedFieldStrengthMicrotesla <= 0.0
+        ) {
+            geomagneticReference = null
+            return false
+        }
+        geomagneticReference = reference
+        return true
+    }
+
+    fun clearGeomagneticReference() {
+        geomagneticReference = null
+    }
 
     // Kept as text so the frozen FP-017 trace can identify the superseded
     // listener contract while runtime code uses the stronger registration lease.
@@ -76,11 +193,18 @@ started = false
             currentListener === listener
 
     private fun handleSensorChanged(event: SensorEvent) {
-        if (event.sensor.type != Sensor.TYPE_ROTATION_VECTOR) return
+        when (event.sensor.type) {
+            Sensor.TYPE_ROTATION_VECTOR -> handleRotationVectorChanged(event)
+            Sensor.TYPE_MAGNETIC_FIELD -> handleMagneticFieldChanged(event)
+        }
+    }
+
+    private fun handleRotationVectorChanged(event: SensorEvent) {
         val headingErrorRad = event.values.getOrNull(4)
             ?.takeIf { it.isFinite() && it >= 0f }
             ?: run {
                 latestOrientation = null
+                latestRotationSample = null
                 return
             }
         val rowMajorRotation = FloatArray(9)
@@ -88,16 +212,37 @@ started = false
             SensorManager.getRotationMatrixFromVector(rowMajorRotation, event.values)
         } catch (_: RuntimeException) {
             latestOrientation = null
+            latestRotationSample = null
             return
         }
         val rotation = RotationMatrix3.fromRowMajor(rowMajorRotation) ?: run {
             latestOrientation = null
+            latestRotationSample = null
             return
         }
+        val observedAtMs = event.timestamp / NANOS_PER_MILLISECOND
+        val headingErrorDeg = Math.toDegrees(headingErrorRad.toDouble()).toFloat()
+        val accuracy = event.accuracy.toEarthOrientationAccuracy()
         latestOrientation = DeviceEarthOrientation(
             deviceToMagneticEnu = rotation,
-            observedAtElapsedRealtimeMs = event.timestamp / NANOS_PER_MILLISECOND,
-            headingErrorDeg = Math.toDegrees(headingErrorRad.toDouble()).toFloat(),
+            observedAtElapsedRealtimeMs = observedAtMs,
+            headingErrorDeg = headingErrorDeg,
+            accuracy = accuracy,
+        )
+        latestRotationSample = ChestMountedRotationSample(
+            deviceToMagneticEnu = rotation,
+            observedAtMs = observedAtMs,
+            headingAccuracyDegrees = headingErrorDeg.toDouble(),
+            accuracy = accuracy,
+        )
+    }
+
+    private fun handleMagneticFieldChanged(event: SensorEvent) {
+        latestMagneticFieldSample = ChestMountedMagneticFieldSample(
+            xMicrotesla = event.values.getOrNull(0)?.toDouble() ?: Double.NaN,
+            yMicrotesla = event.values.getOrNull(1)?.toDouble() ?: Double.NaN,
+            zMicrotesla = event.values.getOrNull(2)?.toDouble() ?: Double.NaN,
+            observedAtMs = event.timestamp / NANOS_PER_MILLISECOND,
             accuracy = event.accuracy.toEarthOrientationAccuracy(),
         )
     }
@@ -109,7 +254,12 @@ started = false
         else -> EarthOrientationAccuracy.UNRELIABLE
     }
 
+    private fun EarthOrientationAccuracy.downgradedTo(
+        reported: EarthOrientationAccuracy,
+    ): EarthOrientationAccuracy = if (reported < this) reported else this
+
     private companion object {
         const val NANOS_PER_MILLISECOND = 1_000_000L
+        const val NANOTESLA_PER_MICROTESLA = 1_000.0
     }
 }

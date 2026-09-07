@@ -14,6 +14,25 @@ class MainActivityPostLoginDeviceCheckStaticTest {
     ).readText()
 
     @Test
+    fun jitTransitionCreatesTheFreshRuntimeProbeBeforePublishingTheStageChange() {
+        val completion = source.substringAfter(
+            "private fun completePostLoginDeviceCheckPermissionObservation(",
+        ).substringBefore("private fun requiredPostLoginDeviceCheckPermissions()")
+        val freshProbe = completion.indexOf("startPostLoginDeviceCheckRuntime(binding)")
+        val stageChange = completion.indexOf("onFirstRunOnboardingStateChanged(")
+        val branchReturn = completion.indexOf("return", stageChange)
+        val nonJitStart = completion.indexOf(
+            "startPostLoginDeviceCheckRuntime(binding)",
+            freshProbe + 1,
+        )
+
+        assertTrue(freshProbe >= 0)
+        assertTrue(stageChange > freshProbe)
+        assertTrue(branchReturn > stageChange)
+        assertTrue(nonJitStart > branchReturn)
+    }
+
+    @Test
     fun loginDoesNotAutomaticallyStartAndOneTapBeginsTheDeviceCheck() {
         val login = source.substringAfter("private fun loginEmailAccount(")
             .substringBefore("private fun postAccountFailure(")
@@ -270,7 +289,7 @@ class MainActivityPostLoginDeviceCheckStaticTest {
     }
 
     @Test
-    fun automaticMeasurementDoesNotWaitForWakePhraseOrHapticUserActions() {
+    fun deviceCheckRequiresObservedWakePhraseAndExcludesHapticMeasurement() {
         val orchestration = source.substringAfter("private fun maybeContinuePostLoginDeviceCheck(")
             .substringBefore("private fun evaluatePostLoginDeviceCheck(")
         val observation = source.substringAfter("private fun currentPostLoginDeviceCheckObservation()")
@@ -283,16 +302,12 @@ class MainActivityPostLoginDeviceCheckStaticTest {
         assertFalse(orchestration.contains("maybeStartPostLoginWakePhraseProbe(binding)"))
         assertFalse(orchestration.contains("beginPostLoginWakePhraseProbeFromUserAction()"))
         assertFalse(orchestration.contains("confirmPostLoginDeviceCheckHaptic("))
-        assertTrue(
-            observation.contains(
-                "wakePhraseRecognition = speechRecognitionAvailable.toDeviceCheckSignal()",
-            ),
-        )
-        assertTrue(
-            observation.contains(
-                "hapticFeedback = startup.vibrationAvailable.toDeviceCheckSignal()",
-            ),
-        )
+        assertTrue(observation.contains("wakePhraseRecognition = when"))
+        assertTrue(observation.contains("!hasRecordAudioPermission()"))
+        assertTrue(observation.contains("handsFreeVoiceModelPreparationFailed"))
+        assertTrue(observation.contains("else -> postLoginWakePhraseSignal"))
+        assertFalse(observation.contains("hapticFeedback ="))
+        assertFalse(observation.contains("startup.vibrationAvailable"))
         assertTrue(evaluation.contains("PostLoginDeviceCheckState.FULL"))
         assertTrue(evaluation.contains("PostLoginDeviceCheckState.LIMITED"))
         assertTrue(evaluation.contains("completePostLoginDeviceCheckPass(next.state)"))
@@ -371,7 +386,7 @@ class MainActivityPostLoginDeviceCheckStaticTest {
     }
 
     @Test
-    fun longItemListIsNotLiveAndLegacyInteractivePromptsStayHidden() {
+    fun itemListIsNotLiveAndOnlyTheMeasuredWakePhrasePromptIsInteractive() {
         val capabilityText = source.substringAfter("startupCapabilityText = TextView(this).apply")
             .substringBefore("postLoginDeviceCheckLiveStatusText = TextView(this).apply")
         val liveStatus = source.substringAfter(
@@ -386,17 +401,23 @@ class MainActivityPostLoginDeviceCheckStaticTest {
         assertFalse(capabilityText.contains("accessibilityLiveRegion"))
         assertTrue(liveStatus.contains("View.ACCESSIBILITY_LIVE_REGION_POLITE"))
         listOf(
-            "postLoginDeviceCheckWakePhraseInstructionText",
-            "postLoginDeviceCheckWakePhraseStartButton",
             "postLoginDeviceCheckHapticQuestionText",
             "postLoginDeviceCheckHapticConfirmButton",
             "postLoginDeviceCheckHapticRejectButton",
         ).forEach { control ->
             assertTrue(refresh.contains("$control.visibility = View.GONE"))
         }
+        assertTrue(refresh.contains("val interactiveCheckRunning ="))
+        assertTrue(refresh.contains("postLoginDeviceCheckSnapshot.state == PostLoginDeviceCheckState.RUNNING"))
+        assertTrue(refresh.contains("postLoginWakePhraseSignal == PostLoginDeviceCheckSignal.PENDING"))
+        assertTrue(refresh.contains("if (interactiveCheckRunning) View.VISIBLE else View.GONE"))
+        assertTrue(refresh.contains("if (needsWakePhrase) View.VISIBLE else View.GONE"))
+        assertTrue(refresh.contains("postLoginDeviceCheckWakePhraseStartButton.isEnabled = needsWakePhrase &&"))
+        assertTrue(refresh.contains("handsFreeVoiceModelDirectory != null && postLoginWakePhraseProbe == null"))
         assertTrue(items.contains("startup.microphoneAvailable.toDeviceCheckSignal()"))
         assertTrue(items.contains("startup.gpsAvailable.toDeviceCheckSignal()"))
-        assertTrue(items.contains("startup.vibrationAvailable.toDeviceCheckSignal()"))
+        assertFalse(items.contains("startup.vibrationAvailable"))
+        assertFalse(items.contains("진동"))
         assertTrue(items.contains("startup.cameraAvailable.toDeviceCheckSignal()"))
     }
 }

@@ -1186,6 +1186,8 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
     raw_object_dir.mkdir(mode=0o700)
 
     class WorkerRawKeyManager:
+        keyring = SimpleNamespace(generation=1, manifest_sha256="e" * 64)
+
         def synchronize(self, _db) -> None:
             return None
 
@@ -2998,7 +3000,19 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
             "account_deletion_device_targets",
             "account_enrollments",
         }
-        assert len(app_table_privileges) == 61
+        assert set(app_table_privileges) == (
+            set(Base.metadata.tables) - {"walksafe_fp046_runtime_acl_baseline"}
+        ) | {
+            "actor_rate_limit_events",
+            "admin_report_mutation_claims",
+            "report_restore_reapply_authorizations",
+            "report_restore_reapply_authorized_actions",
+            "report_restore_reapply_effects",
+            "report_restore_reapply_postchecks",
+            "report_restore_reapply_receipts",
+            "walksafe_recovery_custody_capabilities",
+            "walksafe_recovery_custody_markers",
+        }
         assert {
             table_name
             for table_name, row in app_table_privileges.items()
@@ -3037,9 +3051,33 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
             "report_restore_reapply_postchecks",
             "report_restore_reapply_receipts",
             "report_review_decisions",
+            "report_user_requests",
             "walksafe_recovery_custody_capabilities",
             "walksafe_recovery_custody_markers",
         }
+        request_insert_columns = {
+            row["attname"]: row["runtime_insert"]
+            for row in connection.execute(
+                text(
+                    "SELECT attribute.attname, "
+                    "has_column_privilege('walksafe_backend_runtime', "
+                    "'public.report_user_requests', attribute.attname, 'INSERT') "
+                    "AS runtime_insert FROM pg_attribute AS attribute "
+                    "WHERE attribute.attrelid = 'public.report_user_requests'::regclass "
+                    "AND attribute.attnum > 0 AND NOT attribute.attisdropped"
+                )
+            ).mappings()
+        }
+        assert {
+            column_name
+            for column_name, allowed in request_insert_columns.items()
+            if allowed
+        } == {
+            "id", "report_id", "client_request_id", "request_type",
+            "request_text", "intent_sha256", "status", "status_version",
+            "public_response", "internal_note", "created_at", "updated_at",
+        }
+        assert not request_insert_columns["discovery_revision"]
         assert {
             table_name
             for table_name, row in app_table_privileges.items()

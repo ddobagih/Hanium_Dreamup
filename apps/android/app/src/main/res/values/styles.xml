@@ -2,7 +2,67 @@
 <resources>
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:colorAccent">#0b6b58</item>
+        <item name="android:windowLightStatusBar">@bool/walksafe_use_dark_status_bar_icons</item>
+        <item name="android:colorAccent">#1b4cd8</item>
         <item name="android:fontFamily">@font/pretendard</item>
+        <item name="android:windowBackground">#FAF9F7</item>
+        <item name="android:buttonStyle">@style/WalkSafeAccessibleButton</item>
+        <item name="android:buttonBarButtonStyle">@style/WalkSafeAccessibleDialogButton</item>
+        <item name="android:editTextStyle">@style/WalkSafeAccessibleField</item>
+        <item name="android:checkboxStyle">@style/WalkSafeAccessibleCheckBox</item>
+        <item name="android:radioButtonStyle">@style/WalkSafeAccessibleRadioButton</item>
+    </style>
+
+    <style name="WalkSafeAccessibleButton" parent="android:style/Widget.Material.Button">
+        <item name="android:minWidth">@dimen/ws_control_min_width</item>
+        <item name="android:minHeight">@dimen/ws_button_min_height</item>
+        <item name="android:paddingStart">@dimen/ws_control_padding_horizontal</item>
+        <item name="android:paddingEnd">@dimen/ws_control_padding_horizontal</item>
+        <item name="android:paddingTop">@dimen/ws_control_padding_vertical</item>
+        <item name="android:paddingBottom">@dimen/ws_control_padding_vertical</item>
+        <item name="android:textSize">@dimen/ws_action_text_size</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:singleLine">false</item>
+    </style>
+
+    <style name="WalkSafeAccessibleDialogButton" parent="android:style/Widget.Material.Button.Borderless">
+        <item name="android:minWidth">@dimen/ws_control_min_width</item>
+        <item name="android:minHeight">@dimen/ws_button_min_height</item>
+        <item name="android:paddingStart">@dimen/ws_control_padding_horizontal</item>
+        <item name="android:paddingEnd">@dimen/ws_control_padding_horizontal</item>
+        <item name="android:paddingTop">@dimen/ws_control_padding_vertical</item>
+        <item name="android:paddingBottom">@dimen/ws_control_padding_vertical</item>
+        <item name="android:textSize">@dimen/ws_action_text_size</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:singleLine">false</item>
+    </style>
+
+    <style name="WalkSafeAccessibleField" parent="android:style/Widget.Material.EditText">
+        <item name="android:minHeight">@dimen/ws_control_min_height</item>
+        <item name="android:paddingStart">@dimen/ws_control_padding_horizontal</item>
+        <item name="android:paddingEnd">@dimen/ws_control_padding_horizontal</item>
+        <item name="android:paddingTop">@dimen/ws_control_padding_vertical</item>
+        <item name="android:paddingBottom">@dimen/ws_control_padding_vertical</item>
+        <item name="android:textSize">@dimen/ws_action_text_size</item>
+    </style>
+
+    <style name="WalkSafeAccessibleCheckBox" parent="android:style/Widget.Material.CompoundButton.CheckBox">
+        <item name="android:minWidth">@dimen/ws_control_min_width</item>
+        <item name="android:minHeight">@dimen/ws_selection_min_height</item>
+        <item name="android:paddingStart">@dimen/ws_control_padding_horizontal</item>
+        <item name="android:paddingEnd">@dimen/ws_control_padding_horizontal</item>
+        <item name="android:paddingTop">@dimen/ws_control_padding_vertical</item>
+        <item name="android:paddingBottom">@dimen/ws_control_padding_vertical</item>
+        <item name="android:textSize">@dimen/ws_body_text_size</item>
+    </style>
+
+    <style name="WalkSafeAccessibleRadioButton" parent="android:style/Widget.Material.CompoundButton.RadioButton">
+        <item name="android:minWidth">@dimen/ws_control_min_width</item>
+        <item name="android:minHeight">@dimen/ws_selection_min_height</item>
+        <item name="android:paddingStart">@dimen/ws_control_padding_horizontal</item>
+        <item name="android:paddingEnd">@dimen/ws_control_padding_horizontal</item>
+        <item name="android:paddingTop">@dimen/ws_control_padding_vertical</item>
+        <item name="android:paddingBottom">@dimen/ws_control_padding_vertical</item>
+        <item name="android:textSize">@dimen/ws_body_text_size</item>
     </style>
 </resources>

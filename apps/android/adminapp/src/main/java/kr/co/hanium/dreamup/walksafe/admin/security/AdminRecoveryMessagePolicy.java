@@ -19,6 +19,19 @@ public final class AdminRecoveryMessagePolicy {
     private AdminRecoveryMessagePolicy() {}
 
     public static String failureMessage(Phase phase, Throwable error) {
+        if (phase == Phase.GENERAL && error instanceof java.io.IOException
+            && !(error instanceof AdminSecurityApiException)) {
+            String reason = error.getMessage();
+            if ("invalid_admin_id".equals(reason)) {
+                return "관리자 ID를 입력하고 형식을 확인한 뒤 다시 로그인하세요.";
+            }
+            if ("invalid_password".equals(reason)) {
+                return "비밀번호를 12자 이상 256자 이하로 입력한 뒤 다시 로그인하세요.";
+            }
+            if ("invalid_totp_code".equals(reason)) {
+                return "6자리 숫자 추가 인증 코드를 입력한 뒤 다시 로그인하세요.";
+            }
+        }
         if (!(error instanceof AdminSecurityApiException apiError)) return genericMessage(phase);
 
         if (apiError.code() == AdminSecurityApiException.Code.RATE_LIMITED) {

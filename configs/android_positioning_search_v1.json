@@ -1,0 +1,28 @@
+{
+  "schema_version": "walksafe.android_positioning_search.v1",
+  "expected_device_model": "SM-S931N",
+  "expected_mount": "PORTRAIT_BACK_OUT_TOP_UP_CHEST_CENTER",
+  "bounds": {
+    "max_sample_age_ms": [100, 5000],
+    "max_accuracy_m": [0.5, 25.0]
+  },
+  "candidates": [
+    {"id": "fresh_strict", "max_sample_age_ms": 750, "max_accuracy_m": 5.0},
+    {"id": "balanced", "max_sample_age_ms": 1500, "max_accuracy_m": 10.0},
+    {"id": "continuity_guarded", "max_sample_age_ms": 2500, "max_accuracy_m": 15.0}
+  ],
+  "safety_constraints": {
+    "max_checkpoint_uncertainty_m": 0.5,
+    "min_train_sessions": 2,
+    "min_train_checkpoint_marks": 12,
+    "min_train_availability": 0.8,
+    "min_holdout_sessions": 2,
+    "min_holdout_checkpoint_marks": 12
+  },
+  "target_thresholds": {
+    "p50_max_m": 2.0,
+    "p95_max_m": 5.0,
+    "within_2m_coverage_min": 0.8,
+    "availability_min": 0.8
+  }
+}

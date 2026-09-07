@@ -10,7 +10,7 @@ class MainActivityPhoneMountingStaticTest {
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
 
     @Test
-    fun chestAndNecklaceChoicesAreAccessibleAndPlacedInTheStartupOverlay() {
+    fun fixedFrontMountingGuidanceStaysInTheMinimalStartupGate() {
         val content = functionBlock("private fun buildContentView(): FrameLayout")
         val statusView = blockStartingAt(
             content,
@@ -20,25 +20,57 @@ class MainActivityPhoneMountingStaticTest {
             content,
             "walkReadinessControls = LinearLayout(this).apply",
         )
+        val nativePanel = functionBlock("private fun buildNativeDeviceCheckPanel()")
+        val nativePresentation = functionBlock("private fun applyNativePreviewPresentation(")
 
         assertTrue(statusView.contains("contentDescription = text"))
         assertTrue(statusView.contains("View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
         assertTrue(statusView.contains("View.ACCESSIBILITY_LIVE_REGION_NONE"))
         assertTrue(content.contains("ViewCompat.setAccessibilityHeading(phoneMountingStatusText"))
         assertTrue(content.contains("phoneMountingChestConfirmButton ="))
-        assertTrue(content.contains("confirmPhoneMounting(PhoneMountingMethod.CHEST_FORWARD)"))
-        assertTrue(content.contains("phoneMountingNecklaceConfirmButton ="))
+        assertTrue(content.contains("label = \"휴대전화 정면 고정 확인\""))
+        assertTrue(content.contains("val previousMethod = phoneMountingUserConfirmation?.method"))
         assertTrue(
-            content.contains("confirmPhoneMounting(PhoneMountingMethod.NECKLACE_FORWARD)"),
+            content.contains(
+                "it == PhoneMountingMethod.CHEST_FORWARD || it == PhoneMountingMethod.NECKLACE_FORWARD",
+            ),
         )
-        assertInOrder(
-            overlay,
-            "addView(officialEnvironmentConfirmButton)",
-            "addView(phoneMountingStatusText)",
-            "addView(phoneMountingChestConfirmButton)",
-            "addView(phoneMountingNecklaceConfirmButton)",
-            "addView(startupCapabilityText)",
-        )
+        assertTrue(content.contains("confirmPhoneMounting(method)"))
+        assertTrue(content.contains("phoneMountingNecklaceConfirmButton ="))
+        assertTrue(overlay.contains("addView(officialEnvironmentStatusText)"))
+        assertTrue(overlay.contains("addView(officialEnvironmentConfirmButton)"))
+        assertTrue(overlay.contains("addView(phoneMountingStatusText)"))
+        assertTrue(overlay.contains("addView(phoneMountingChestConfirmButton)"))
+        assertTrue(overlay.contains("addView(phoneMountingNecklaceConfirmButton)"))
+        assertTrue(content.contains("addView(walkReadinessControls)"))
+        assertTrue(nativePresentation.contains("val guidanceVisible = homeAvailable && nativeUiPage == NativeUiPage.GUIDANCE"))
+        assertTrue(nativePresentation.contains("val showPhysicalPreparation = !guidanceVisible && homeAvailable && preparing"))
+        assertTrue(nativePresentation.contains("val showMountingPreparation = showPhysicalPreparation && cameraAnalysisFeaturesEnabled()"))
+        assertTrue(nativePresentation.contains("show(officialEnvironmentStatusText, showPhysicalPreparation)"))
+        assertTrue(nativePresentation.contains("show(phoneMountingChestConfirmButton, showMountingPreparation)"))
+        assertTrue(nativePresentation.contains("show(phoneMountingNecklaceConfirmButton, false)"))
+        val guidanceAssessment = functionBlock("private fun currentNativeGuidancePresentation()")
+        assertTrue(guidanceAssessment.contains("currentPhoneMountingAssessment("))
+        assertTrue(guidanceAssessment.contains("mounting.accessibleReasonKo"))
+        assertTrue(guidanceAssessment.contains("mounting.accessibleActionKo"))
+        assertTrue(guidanceAssessment.contains("cameraOutputAvailable = cameraEngineStarted && currentFeedbackDeviceGateAllowsAlerts()"))
+        assertFalse(guidanceAssessment.contains("PhoneMountingUserConfirmation("))
+        assertFalse(guidanceAssessment.contains("phoneMountingOutputsAllowed = true"))
+        assertTrue(nativePanel.contains("ARCore Depth"))
+        assertFalse(nativePanel.contains("진동"))
+        assertTrue(nativePresentation.contains("firstRunPhonePostureText.text = nativePhonePostureNotice"))
+        val scopeNotice = source.substringAfter("private val nativePhonePostureNotice: String")
+            .substringBefore("private fun ")
+        assertTrue(scopeNotice.contains("몸 앞에 세로로 흔들리지 않게 고정"))
+        assertTrue(scopeNotice.contains("카메라 앞 시야를 가리지 마세요"))
+        assertFalse(scopeNotice.contains("가슴"))
+        assertFalse(scopeNotice.contains("목걸이"))
+        assertTrue(scopeNotice.contains("현재 장소가 안전하다는 증명이 아닙니다"))
+        val acknowledge = functionBlock("private fun acknowledgeNativePhonePosture()")
+        assertFalse(acknowledge.contains("PhoneMountingUserConfirmation("))
+        assertFalse(acknowledge.contains("SystemClock.elapsedRealtime()"))
+        assertTrue(nativePresentation.contains("show(postLoginDeviceCheckHapticQuestionText, false)"))
+        assertTrue(nativePresentation.contains("show(postLoginDeviceCheckHapticConfirmButton, false)"))
     }
 
     @Test
@@ -46,6 +78,8 @@ class MainActivityPhoneMountingStaticTest {
         val confirmation = functionBlock("private fun confirmPhoneMounting(")
 
         assertTrue(confirmation.contains("PhoneMountingUserConfirmation("))
+        assertTrue(confirmation.contains("officialEnvironmentReadiness(snapshot.epoch).first !="))
+        assertFalse(confirmation.contains("officialEnvironmentUserConfirmation?.epoch"))
         assertTrue(confirmation.contains("epoch = snapshot.epoch"))
         assertTrue(confirmation.contains("confirmedAtElapsedRealtimeMs ="))
         assertTrue(confirmation.contains("method = method"))
@@ -247,13 +281,27 @@ class MainActivityPhoneMountingStaticTest {
         assertTrue(correction.contains("cancelDestinationSearch()"))
         assertTrue(correction.contains("phoneMountingWatchdogGeneration += 1L"))
         assertTrue(correction.contains("playPhoneMountingCorrectionVibration()"))
-        assertTrue(correction.contains("speakInteraction("))
+        assertInOrder(
+            correction,
+            "phoneMountingOutputsAllowed = false",
+            "cancelVoiceCommandRecognition()",
+            "speakStatusExplanation(",
+        )
+        assertFalse(correction.contains("phoneMountingOutputsAllowed = true"))
+        assertFalse(correction.contains("speakInteraction("))
         assertFalse(correction.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertFalse(correction.contains("stopCameraFallbackSession("))
         assertFalse(correction.contains("stopDepthSession("))
         assertTrue(unusable.contains("phoneMountingOutputsAllowed = false"))
         assertTrue(unusable.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertTrue(unusable.contains("playPhoneMountingSafetyStopVibration()"))
+        assertInOrder(
+            unusable,
+            "phoneMountingOutputsAllowed = false",
+            "enterWalkSessionSafetyStopAndCancelOutputs(",
+            "speakStatusExplanation(",
+        )
+        assertFalse(unusable.contains("phoneMountingOutputsAllowed = true"))
         assertFalse(unusable.contains("playPhoneMountingCorrectionVibration()"))
         assertTrue(watchdog.contains("phoneMountingWatchdogGeneration"))
         assertTrue(watchdog.contains("walkSessionLifecycle.isRuntimeEpochCurrent(epoch)"))
@@ -336,7 +384,6 @@ class MainActivityPhoneMountingStaticTest {
             "private fun isCameraFallbackAdvisoryStillDeliverable(",
             "private fun currentFeedbackDeviceGateAllowsAlerts()",
             "private fun speakNavigation(",
-            "private fun dispatchNavigationTalkBackFallback(",
             "private fun maybePlayProgressBeep(",
             "private fun isDestinationSearchLeaseCurrent(",
             "private fun isRouteRequestLeaseCurrent(",

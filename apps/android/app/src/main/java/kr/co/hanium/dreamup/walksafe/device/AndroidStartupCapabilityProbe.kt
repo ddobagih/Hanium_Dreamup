@@ -120,25 +120,7 @@ class AndroidStartupCapabilityProbe(
     }
 
     private fun distanceAvailableOrNull(availability: ArCoreApk.Availability?): Boolean? {
-        return when (availability) {
-            ArCoreApk.Availability.SUPPORTED_INSTALLED,
-            ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD,
-            ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED,
-            -> if (packageManager.hasSystemFeature(ARCORE_DEPTH_FEATURE)) {
-                // A hardware declaration identifies only a candidate. FULL stays blocked until a
-                // live session proves stable metric frames on this device.
-                null
-            } else {
-                false
-            }
-
-            ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE -> false
-            ArCoreApk.Availability.UNKNOWN_CHECKING,
-            ArCoreApk.Availability.UNKNOWN_ERROR,
-            ArCoreApk.Availability.UNKNOWN_TIMED_OUT,
-            null,
-            -> null
-        }
+        return resolveRuntimeMetricDistanceAvailability(availability)
     }
 
     private fun probeOfflineKoreanTextToSpeech(
@@ -215,9 +197,23 @@ class AndroidStartupCapabilityProbe(
         previousProbe?.close()
     }
 
-    private companion object {
-        const val ARCORE_DEPTH_FEATURE = "com.google.ar.core.depth"
-    }
+}
+
+/** Only a live ARCore Session may turn a supported ARCore candidate into metric-depth evidence. */
+internal fun resolveRuntimeMetricDistanceAvailability(
+    availability: ArCoreApk.Availability?,
+): Boolean? = when (availability) {
+    ArCoreApk.Availability.SUPPORTED_INSTALLED,
+    ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD,
+    ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED,
+    -> null
+
+    ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE -> false
+    ArCoreApk.Availability.UNKNOWN_CHECKING,
+    ArCoreApk.Availability.UNKNOWN_ERROR,
+    ArCoreApk.Availability.UNKNOWN_TIMED_OUT,
+    null,
+    -> null
 }
 
 internal class OfflineKoreanTextToSpeechProbeState {

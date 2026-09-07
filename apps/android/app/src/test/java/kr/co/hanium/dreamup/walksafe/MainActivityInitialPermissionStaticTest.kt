@@ -37,19 +37,23 @@ class MainActivityInitialPermissionStaticTest {
     }
 
     @Test
-    fun initialDenialIsRememberedAndExplainsOnlyRelatedFeatureLimits() {
+    fun initialDenialIsRememberedAndRequiresExitWhenAnyRequiredPermissionIsMissing() {
         val result = functionBlock("private fun handleInitialAppEntryPermissionResult()")
         val limitations = functionBlock("private fun showInitialAppPermissionLimitations(")
+        val exit = functionBlock("private fun showRequiredAppPermissionExit(")
         val postLoginRequest = functionBlock("private fun requestedPostLoginDeviceCheckPermissions()")
 
         assertTrue(result.contains("PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED"))
         assertTrue(result.contains(".remove(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED)"))
         assertTrue(result.contains("showInitialAppPermissionLimitations"))
-        assertTrue(limitations.contains("거부한 권한과 관련된 기능만 제한됩니다"))
-        assertTrue(limitations.contains("나머지 기능은 계속 사용할 수 있습니다"))
-        assertTrue(limitations.contains("걸음 수 추적·정지 확인 후 대기 신고 자동 전송"))
-        assertTrue(limitations.contains("permissionDenialSettingsButton.visibility = View.GONE"))
-        assertFalse(limitations.contains("enterPermissionRecoveryBarrier("))
+        assertTrue(result.contains("if (missingAtResult.isNotEmpty())"))
+        assertTrue(limitations.contains("showRequiredAppPermissionExit(missing)"))
+        assertTrue(exit.contains("initialAppPermissionExitRequired = true"))
+        assertTrue(exit.contains("cancelNativePrewalkPreparation(cancelFeatureEntry = true)"))
+        assertTrue(exit.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertTrue(exit.contains("필수 권한이 부족하여 앱을 실행할 수 없습니다"))
+        assertTrue(exit.contains(".setCancelable(false)"))
+        assertTrue(exit.contains("finishAndRemoveTask()"))
         assertTrue(postLoginRequest.contains("emptyList()"))
         assertTrue(postLoginRequest.contains("PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED"))
     }

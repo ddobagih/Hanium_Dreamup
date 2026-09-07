@@ -371,6 +371,64 @@ def test_backup_key_control_separates_boundaries_and_allows_only_active_backup_k
         )
 
 
+def test_initial_backup_cli_does_not_invent_rekey_signer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, object] = {}
+    control = _key_control()
+    authority_descriptor = os.open("/dev/null", os.O_RDONLY)
+
+    monkeypatch.setattr(integrity, "require_backup_runtime_capabilities", lambda: None)
+    monkeypatch.setattr(
+        integrity,
+        "acquire_backup_key_control_authority_lock",
+        lambda *_args, **_kwargs: (authority_descriptor, AUTHORITY_LOCK_SHA256),
+    )
+
+    def verify(*_args, **kwargs):
+        observed.update(kwargs)
+        return control, CONTROL_SHA256
+
+    monkeypatch.setattr(integrity, "verify_operational_backup_key_control", verify)
+    monkeypatch.setattr(
+        integrity,
+        "require_backup_key_control_authority_lock",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        integrity,
+        "verify_backup_key_control_authority_lock_binding",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "walksafe_backup_integrity.py",
+            "--authorize-backup-key",
+            "--trusted-signer-fingerprint",
+            TRUSTED_SIGNER,
+            "--key-control-document",
+            "/authority/key-control.json",
+            "--key-control-signature",
+            "/authority/key-control.json.sig",
+            "--key-control-authority-lock",
+            "/authority/key-control.lock",
+            "--trusted-key-control-signer-fingerprint",
+            CONTROL_SIGNER,
+            "--expected-key-control-sha256",
+            CONTROL_SHA256,
+            "--recipient-fingerprint",
+            "b" * 40,
+        ],
+    )
+
+    assert integrity.main() == 0
+    assert observed["before_rekey_root"] is None
+    assert observed["after_rekey_root"] is None
+    assert observed["trusted_rekey_manifest_signer_fingerprint"] is None
+
+
 def test_key_control_authority_lock_is_identity_bound_and_exclusive(
     tmp_path: Path,
 ) -> None:
@@ -1524,6 +1582,8 @@ def test_restore_handoff_scrubs_shell_injection_and_seals_all_inputs(
     )
     for name in ("BASH_ENV", "TAR_OPTIONS", "PYTHONPATH", "PGHOST", "PGSERVICE"):
         monkeypatch.setenv(name, f"attacker-{name}")
+    target_database_url = "postgresql://user:secret@127.0.0.1:5432/walksafe_drill"
+    monkeypatch.setenv("TARGET_DATABASE_URL", target_database_url)
 
     class ExecObserved(RuntimeError):
         pass
@@ -1579,7 +1639,9 @@ def test_restore_handoff_scrubs_shell_injection_and_seals_all_inputs(
 
     assert observed["path"] == "/bin/bash"
     assert observed["argv"][1] == "-p"
+    assert target_database_url not in "\0".join(observed["argv"])
     environment = observed["environment"]
+    assert environment["TARGET_DATABASE_URL"] == target_database_url
     for name in ("BASH_ENV", "TAR_OPTIONS", "PYTHONPATH", "PGHOST", "PGSERVICE"):
         assert name not in environment
 
@@ -2133,6 +2195,12 @@ def test_restore_drill_uses_signed_hashes_and_signs_its_receipt() -> None:
     assert "--receipt-gpg-signer" in script
     assert 'detach-sign --local-user "${RECEIPT_SIGNER_FINGERPRINT}"' in script
     assert "validate-private-restore-output" in script
+    assert "--target-database-url" not in script
+    assert 'TARGET_DATABASE_URL="${TARGET_DATABASE_URL:-}"' in script
+    assert "validate-restore-database-url --database-url" not in script
+    assert "database-name --database-url" not in script
+    assert "database-identity --database-url" not in script
+    assert 'env -i PATH=/usr/bin:/bin DATABASE_URL="${TARGET_DATABASE_URL}"' in script
     assert 'TARGET_UPLOAD_PARENT_ANCHOR="/proc/self/fd/${TARGET_UPLOAD_PARENT_FD}"' in script
     assert 'RESTORE_TREE_ANCHOR="/proc/self/fd/${RESTORE_TREE_FD}"' in script
     assert "verify_target_upload_binding" in script
@@ -2152,7 +2220,7 @@ def test_restore_drill_uses_signed_hashes_and_signs_its_receipt() -> None:
     assert "renameat2" in script
     assert "os.link(" in script
     first_verification = script.index('VERIFIED_BACKUP_FIELDS="$(verify_inherited_backup)"')
-    restore = script.index('pg_restore --exit-on-error')
+    restore = script.index('run_restore_postgres_client pg_restore --exit-on-error')
     receipt = script.index('cat > "${RECEIPT_TEMP}"')
     successful_completion = script.rindex("trap - EXIT")
     assert first_verification < restore < receipt < successful_completion
@@ -2207,8 +2275,8 @@ def test_restore_drill_uses_signed_hashes_and_signs_its_receipt() -> None:
     assert "object.rulename <> '_RETURN'" in script
     assert "TARGET_USER_OBJECT_COUNT" in script
     assert "DROP SCHEMA public CASCADE" not in script
-    empty_proof = script.index('TARGET_USER_OBJECT_COUNT="$(psql')
-    restore = script.index("pg_restore --exit-on-error")
+    empty_proof = script.index('TARGET_USER_OBJECT_COUNT="$(run_restore_postgres_client psql')
+    restore = script.index("run_restore_postgres_client pg_restore --exit-on-error")
     assert empty_proof < restore
 
 
@@ -2599,7 +2667,12 @@ def test_backup_script_rejects_nested_output_and_fsyncs_completed_artifacts() ->
     assert "--runtime-capability-preflight" in script
     assert "python3 -I -S -B" not in script
     assert "validate-backup-database-url" in script
-    assert 'env -i PATH=/usr/bin:/bin PGDATABASE="${PG_DUMP_DATABASE_URL}"' in script
+    assert "validate-backup-database-url --database-url" not in script
+    assert "database-identity --database-url" not in script
+    assert 'env -i PATH=/usr/bin:/bin DATABASE_URL="${PG_DUMP_DATABASE_URL}"' in script
+    assert 'run_backup_postgres_client pg_dump --format=custom' in script
+    assert "PG_DUMP_CLIENT_MAJOR" in script
+    assert "SOURCE_SERVER_VERSION_NUM" in script
     assert '--upload-dir-fd "${UPLOAD_FD}"' in script
     assert '--archive-output --result-fd "${SOURCE_RESULT_FD}"' in script
     assert 'tar --create' not in script

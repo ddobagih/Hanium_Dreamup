@@ -4,7 +4,8 @@ import android.content.SharedPreferences
 import java.security.MessageDigest
 
 const val POST_LOGIN_DEVICE_CHECK_RESULT_POLICY_VERSION = "4"
-const val POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION = "20260901-r001"
+const val POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION = "20260905-interactive-v1"
+const val POST_LOGIN_METRIC_DEPTH_PROBE_POLICY_VERSION = "20260905-support-only-v1"
 
 data class PostLoginDeviceCheckResultBinding(
     val actorId: String,
@@ -36,6 +37,8 @@ data class PersistedPostLoginDeviceCheckResult(
     val state: PostLoginDeviceCheckState,
     val disabledFeatures: Set<PostLoginDeviceCheckFeature>,
     val cameraDependentChecksDeferred: Boolean,
+    val metricDepthProbePolicyCurrent: Boolean,
+    val metricDepthState: PostLoginMetricDepthState = PostLoginMetricDepthState.PENDING,
 )
 
 class AndroidDeviceCheckResultStore(
@@ -57,6 +60,7 @@ class AndroidDeviceCheckResultStore(
         snapshot: PostLoginDeviceCheckSnapshot,
         binding: PostLoginDeviceCheckResultBinding,
         cameraDependentChecksDeferred: Boolean = false,
+        metricDepthState: PostLoginMetricDepthState = PostLoginMetricDepthState.PENDING,
     ): Boolean {
         val state = snapshot.state
         val disabledFeatures = snapshot.disabledFeatures
@@ -83,6 +87,11 @@ class AndroidDeviceCheckResultStore(
                     CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY,
                     cameraDependentChecksDeferred,
                 )
+                .putString(
+                    METRIC_DEPTH_PROBE_POLICY_VERSION_KEY,
+                    POST_LOGIN_METRIC_DEPTH_PROBE_POLICY_VERSION,
+                )
+                .putString(METRIC_DEPTH_SUPPORT_STATE_KEY, metricDepthState.name)
                 .commit()
         }.getOrDefault(false)
         saveFailedInProcess = !saved
@@ -101,6 +110,20 @@ class AndroidDeviceCheckResultStore(
         val disabledFeaturesCsv = stored[DISABLED_FEATURES_KEY] as? String ?: return null
         val cameraDependentChecksDeferred =
             stored[CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY] as? Boolean ?: return null
+        val metricDepthState = when (stored[METRIC_DEPTH_SUPPORT_STATE_KEY]) {
+            PostLoginMetricDepthState.SUPPORTED.name -> PostLoginMetricDepthState.SUPPORTED
+            PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED.name ->
+                PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED
+            PostLoginMetricDepthState.UNKNOWN.name -> PostLoginMetricDepthState.UNKNOWN
+            else -> PostLoginMetricDepthState.PENDING
+        }
+        val metricDepthProbePolicyCurrent =
+            stored[METRIC_DEPTH_PROBE_POLICY_VERSION_KEY] ==
+                POST_LOGIN_METRIC_DEPTH_PROBE_POLICY_VERSION &&
+                metricDepthState in setOf(
+                    PostLoginMetricDepthState.SUPPORTED,
+                    PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED,
+                )
         if (
             policyVersion != POST_LOGIN_DEVICE_CHECK_RESULT_POLICY_VERSION ||
             bindingSha256 != expectedBindingSha256
@@ -117,6 +140,8 @@ class AndroidDeviceCheckResultStore(
             state = state,
             disabledFeatures = disabledFeatures,
             cameraDependentChecksDeferred = cameraDependentChecksDeferred,
+            metricDepthProbePolicyCurrent = metricDepthProbePolicyCurrent,
+            metricDepthState = metricDepthState,
         )
     }
 
@@ -209,5 +234,9 @@ class AndroidDeviceCheckResultStore(
         const val DISABLED_FEATURES_KEY = "device_check_result_disabled_features_v1"
         const val CAMERA_DEPENDENT_CHECKS_DEFERRED_KEY =
             "device_check_result_camera_dependent_checks_deferred_v2"
+        const val METRIC_DEPTH_PROBE_POLICY_VERSION_KEY =
+            "device_check_result_metric_depth_probe_policy_v1"
+        const val METRIC_DEPTH_SUPPORT_STATE_KEY =
+            "device_check_result_metric_depth_support_state_v1"
     }
 }

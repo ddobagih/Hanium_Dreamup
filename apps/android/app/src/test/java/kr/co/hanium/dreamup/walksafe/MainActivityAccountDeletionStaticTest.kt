@@ -742,6 +742,7 @@ class MainActivityAccountDeletionStaticTest {
         assertTrue(privacy.contains("privacySettingsControls = LinearLayout(this@MainActivity).apply"))
         assertTrue(privacy.contains("accountDeletionControls = LinearLayout(this@MainActivity).apply"))
         assertTrue(privacy.contains("gatewaySessionControls = LinearLayout(this@MainActivity).apply"))
+        assertTrue(privacy.contains("addView(gatewaySessionControls)"))
         assertFalse(runtime.contains("addView(accountDeletionRequestButton)"))
         assertTrue(
             appearsInOrder(
@@ -755,10 +756,21 @@ class MainActivityAccountDeletionStaticTest {
             source,
             "private fun updatePrivacySectionVisibility",
         )
-        assertTrue(visibility.contains("GatewaySessionProcessCoordinator.snapshot()"))
-        assertTrue(visibility.contains("deletionRecoveryOnly"))
-        assertTrue(visibility.contains("firstRunOnboardingSnapshot.isComplete"))
-        assertTrue(visibility.contains("accountDeletionStateMachine.processingBlocked()"))
+        assertTrue(visibility.contains("renderMainUi()"))
+        val render = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun renderMainUi",
+        )
+        assertTrue(render.contains("GatewaySessionProcessCoordinator.snapshot().deletionRecoveryOnly"))
+        assertTrue(render.contains("accountDeletionRecoveryLoginRequired()"))
+        assertTrue(render.contains("forceSettings = deletionRecovery || accountDeletionStateMachine.processingBlocked()"))
+        assertTrue(render.contains("gatewaySessionControls.visibility = if (deletionRecovery) View.VISIBLE else View.GONE"))
+        assertTrue(render.contains("privacyConsentStatusText.visibility = privacySettingsControls.visibility"))
+        val settingsGate = render.substringAfter("val settingsVisible =")
+            .substringBefore("val homeVisible =")
+        assertTrue(settingsGate.contains("forceSettings ||"))
+        assertTrue(settingsGate.contains("homeAvailable && nativeUiPage == NativeUiPage.SETTINGS"))
+        assertFalse(settingsGate.contains("isWalkSessionRuntimeActive()"))
         assertTrue(
             ReportStaticSourceInspector.functionBlock(
                 source,

@@ -18,7 +18,7 @@ val WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO = """
     1. 카메라로 가까운 위험을 안내합니다.
     2. TMAP으로 큰 이동 방향을 안내합니다.
     3. 손상된 점자블록 신고를 돕습니다.
-    기기점검은 카메라·위치·마이크·음성·진동 지원 여부를 확인하며 실제 보행이나 신고를 시작하지 않습니다.
+    기기점검은 카메라·위치·마이크·음성 지원 여부를 확인하며 실제 보행이나 신고를 시작하지 않습니다.
     호출어 음성은 휴대폰 안에서 처리하고 원본을 저장하거나 서버로 보내지 않습니다.
     안전 제한: $WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO
     고지 기준: $WALKSAFE_PRODUCT_NOTICE_BASELINE
@@ -87,7 +87,6 @@ object WalkSafeStartupCapabilityResolver {
                 input.gpsAvailable,
             ),
             WalkSafeStartupRequirement.MICROPHONE to input.microphoneAvailable,
-            WalkSafeStartupRequirement.VIBRATION to input.vibrationAvailable,
             WalkSafeStartupRequirement.ON_DEVICE_STT to input.onDeviceSpeechRecognitionAvailable,
             WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS to input.offlineKoreanTextToSpeechAvailable,
             WalkSafeStartupRequirement.METRIC_DISTANCE to input.metricDistanceAvailable,
@@ -105,6 +104,21 @@ object WalkSafeStartupCapabilityResolver {
                 pendingRequirements = pending,
                 noticeKo = "지원 Android 버전이 아니어서 WalkSafe를 시작할 수 없습니다. " +
                     "사용할 수 없는 기능: ${unavailable.labelsKo()}",
+            )
+        }
+        if (WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in unavailable) {
+            val pendingNotice = if (pending.isEmpty()) {
+                ""
+            } else {
+                " 확인 중인 기능: ${pending.labelsKo()}."
+            }
+            return WalkSafeStartupCapabilityDecision(
+                tier = WalkSafeStartupCapabilityTier.BLOCKED,
+                unavailableRequirements = unavailable,
+                pendingRequirements = pending,
+                noticeKo = "오프라인 한국어 음성 안내를 사용할 수 없어 WalkSafe를 시작할 수 없습니다. " +
+                    "사용할 수 없는 기능: ${unavailable.labelsKo()}." +
+                    pendingNotice,
             )
         }
         if (pending.isNotEmpty()) {

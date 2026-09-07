@@ -23,9 +23,18 @@ class MainActivitySignupUiStaticTest {
         assertTrue(composition.contains("val consentClauseStops ="))
         assertTrue(composition.contains("documentClauseOrNull("))
         assertTrue(composition.contains("applyWsClauseBox(this)"))
-        assertTrue(composition.contains("addView(accountConsentAllCheck)"))
+        assertFalse(composition.contains("addView(accountConsentAllCheck)"))
+        listOf(
+            "terms_of_service",
+            "privacy_notice",
+            "location_terms",
+            "raw_original",
+            "automatic_reporting",
+            "training_reuse",
+        ).forEach { key -> assertTrue(composition.contains("\"$key\" to")) }
         assertTrue(composition.contains("addView(accountConsentCards.getValue(key))"))
-        assertTrue(composition.contains("addView(accountConsentSummaryText)"))
+        assertTrue(composition.contains("showMissingRequiredConsentError()"))
+        assertTrue(composition.contains("addView(listenButton)"))
         assertTrue(composition.contains("addView(accountConsentContinueButton)"))
         assertTrue(composition.contains("addView(accountConsentStepControls)"))
         assertTrue(composition.contains("addView(accountDetailsStepControls)"))
@@ -33,13 +42,13 @@ class MainActivitySignupUiStaticTest {
     }
 
     @Test
-    fun inlineClausesHandScrollBackToTheOuterAndroidScrollViewAtTheirEdges() {
+    fun inlineClausesUseTheOuterScrollViewWithoutInterceptingTouches() {
         val clauseBox = functionBlock("private fun applyWsClauseBox(")
-        assertTrue(clauseBox.contains("ScrollingMovementMethod()"))
-        assertTrue(clauseBox.contains("MotionEvent.ACTION_MOVE"))
-        assertTrue(clauseBox.contains("child.canScrollVertically(direction)"))
-        assertTrue(clauseBox.contains("MotionEvent.ACTION_CANCEL"))
-        assertTrue(clauseBox.contains("requestDisallowInterceptTouchEvent(false)"))
+        assertTrue(clauseBox.contains("view.maxHeight = Int.MAX_VALUE"))
+        assertTrue(clauseBox.contains("view.isVerticalScrollBarEnabled = false"))
+        assertTrue(clauseBox.contains("view.movementMethod = null"))
+        assertTrue(clauseBox.contains("view.setOnTouchListener(null)"))
+        assertFalse(clauseBox.contains("ScrollingMovementMethod()"))
         assertTrue(clauseBox.contains("view.isClickable = false"))
         assertTrue(clauseBox.contains("view.isLongClickable = false"))
     }
@@ -156,6 +165,70 @@ class MainActivitySignupUiStaticTest {
         assertTrue(update.contains("accountSignupBackButton.visibility ="))
         assertTrue(update.contains("accountSignupStep == AccountSignupStep.CONSENT"))
         assertTrue(update.contains("accountSignupStep == AccountSignupStep.DETAILS"))
+    }
+
+    @Test
+    fun selectedVisualPatternsKeepTheExistingTwoStepFlowAccessible() {
+        assertTrue(source.contains("private enum class AccountSignupStep { CONSENT, DETAILS }"))
+        val home = functionBlock("private fun buildHomeCardGrid()")
+        assertTrue(home.contains("orientation = LinearLayout.VERTICAL"))
+        assertTrue(home.contains("title = \"목적지 검색\""))
+        assertTrue(home.contains("title = \"음성 명령\""))
+        assertTrue(home.contains("title = \"설정\""))
+        assertFalse(home.contains("title = \"손상 점자블록 신고\""))
+        assertFalse(home.contains("설정 화면은 준비 중입니다"))
+        val settingsCard = home.substringAfter("title = \"설정\"")
+        assertTrue(settingsCard.contains("unlocked = { true }"))
+        assertTrue(settingsCard.contains("showNativeUiPage(NativeUiPage.SETTINGS)"))
+        assertTrue(home.contains("nativeFeatureAvailable(NativeUiPage.VOICE_COMMAND)"))
+        assertTrue(home.contains("nativeFeatureAvailable(NativeUiPage.DESTINATION_SEARCH)"))
+        assertTrue(home.contains("requestNativeFeature(NativeUiPage.VOICE_COMMAND)"))
+        assertTrue(home.contains("requestNativeFeature(NativeUiPage.DESTINATION_SEARCH)"))
+
+        val card = functionBlock("private fun wsHomeCard(")
+        assertTrue(card.contains("val card = Button(this).apply"))
+        assertTrue(card.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
+        assertTrue(card.contains("잠김. \$lockTitle. \$lockDetail"))
+        assertTrue(card.contains("setOnClickListener { onOpen() }"))
+        assertTrue(card.contains("card.isEnabled = !isWalkSessionRuntimeActive() || unlocked()"))
+        val refresh = functionBlock("private fun refreshHomeCards()")
+        assertTrue(refresh.contains("renderMainUi()"))
+        assertFalse(refresh.contains("WalkSessionState.ACTIVE"))
+
+        val fields = functionBlock("private fun wsFieldGroup(")
+        assertTrue(fields.contains("text = label"))
+        assertTrue(fields.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
+        val composition = sourceBlock(
+            "accountDetailsStepControls = LinearLayout(this).apply",
+            "emailEnrollmentPartial?.selections?.let(::applyAccountConsentSelections)",
+        )
+        assertTrue(composition.contains("wsFieldGroup(accountDateOfBirthInput"))
+        assertTrue(composition.contains("wsFieldGroup(accountEmailInput"))
+        assertTrue(composition.contains("wsFieldGroup(accountPasswordInput"))
+
+        assertTrue(
+            source.contains(
+                "importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS",
+            ),
+        )
+        val safetyNotice = functionBlock("private fun refreshFirstRunNoticeUi(")
+        assertTrue(safetyNotice.contains("FirstRunOnboardingStage.PURPOSE_AND_SAFETY"))
+        assertTrue(safetyNotice.contains("firstRunNoticeToggleButton.visibility = View.GONE"))
+        assertTrue(safetyNotice.contains("productPurposeText.visibility = if (visible) View.VISIBLE else View.GONE"))
+        val accountControls = sourceBlock(
+            "accountAccessControls = LinearLayout(this).apply",
+            "emailEnrollmentPartial?.selections?.let(::applyAccountConsentSelections)",
+        )
+        assertFalse(accountControls.contains("addView(accountLandingHeader)"))
+
+        val reportDisclosure = functionBlock(
+            "private fun renderExplicitReportConfirmationDisclosure(",
+        )
+        val reportIdle = functionBlock("private fun renderExplicitReportConfirmationIdle(")
+        val voiceButton = functionBlock("private fun updateVoiceCommandButton(")
+        assertTrue(reportDisclosure.contains("refreshHomeCards()"))
+        assertTrue(reportIdle.contains("refreshHomeCards()"))
+        assertTrue(voiceButton.contains("refreshHomeCards()"))
     }
 
     private fun assertInOrder(source: String, vararg markers: String) {

@@ -11,10 +11,34 @@ class MainActivityWalkVoiceControlStaticTest {
 
     @Test
     fun walkCommandsAreReducedBeforeNavigationAndReportCommands() {
-        val walkPolicy = source.indexOf("walkSessionVoiceControlPolicy.evaluate(")
-        val legacyPolicy = source.indexOf("selectAndroidVoiceAction(phrases, confidenceScores)")
-        assertTrue(walkPolicy >= 0)
-        assertTrue(legacyPolicy > walkPolicy)
+        val commands = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun handleVoiceCommandPhrases",
+        )
+        assertTrue(
+            ReportStaticSourceInspector.appearsInOrder(
+                commands,
+                "walkSessionVoiceControlPolicy.evaluate(",
+                "if (walkDecision.action != WalkSessionVoiceAction.NO_OP)",
+                "executeWalkSessionVoiceAction(walkDecision.action, snapshot.epoch)",
+                "return",
+                "val destinationDialogState = currentVoiceDestinationDialogState()",
+                "val allowBareDestinationIndex = destinationDialogState != null ||",
+                "selectAndroidVoiceAction(",
+                "assessPlatformVoiceCandidate(",
+                "destinationDialogState = destinationDialogState,",
+                "val action = scoredAction ?: platformCandidate?.previewAction",
+            ),
+        )
+        assertTrue(
+            Regex(
+                "destinationDialogState != null \\|\\|\\s*" +
+                    "\\(!nativeHomeFeatureContextAvailable\\(\\) &&\\s*" +
+                    "destinationSearchVoiceState != null &&",
+            ).containsMatchIn(commands),
+        )
+        assertTrue(commands.contains("destinationSearchVoiceState?.query == destinationSearchQuery"))
+        assertTrue(commands.contains("!destinationSearchInFlight && currentDestinationSearchAllowsWork()"))
     }
 
     @Test

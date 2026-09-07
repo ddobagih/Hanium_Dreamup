@@ -18,7 +18,7 @@ class MainActivityStartupCapabilityStaticTest {
     ).readText()
 
     @Test
-    fun launcherAndFirstScreenUseTheApprovedProductIdentityAndOrdering() {
+    fun launcherKeepsProductIdentityAndOnboardingPrecedesReadinessAndRuntime() {
         assertTrue(manifest.contains("android:label=\"@string/app_name\""))
         assertTrue(strings.contains("WalkSafe(워크세이프)"))
         assertTrue(capability.contains("시각장애인의 도심 보행"))
@@ -29,13 +29,13 @@ class MainActivityStartupCapabilityStaticTest {
         val readiness = activity
             .substringAfter("walkReadinessControls = LinearLayout(this).apply")
             .substringBefore("walkLastResultText = TextView(this).apply")
-        val purpose = overlay.indexOf("addView(productPurposeText)")
+        val onboarding = overlay.indexOf("addView(firstRunOnboardingControls)")
         val readinessGroup = overlay.indexOf("addView(walkReadinessControls)")
         val runtime = overlay.indexOf("addView(runtimeControls)")
         val capability = readiness.indexOf("addView(startupCapabilityText)")
         val confirmation = readiness.indexOf("addView(startupCapabilityConfirmButton)")
-        assertTrue(purpose >= 0)
-        assertTrue(purpose < readinessGroup)
+        assertTrue(onboarding >= 0)
+        assertTrue(onboarding < readinessGroup)
         assertTrue(readinessGroup < runtime)
         assertTrue(capability >= 0)
         assertTrue(capability < confirmation)
@@ -52,9 +52,9 @@ class MainActivityStartupCapabilityStaticTest {
         assertTrue(probe.contains("AndroidKoreanTextToSpeechSynthesisProbe"))
         assertFalse(probe.contains("SpeechRecognizer.isOnDeviceRecognitionAvailable"))
         assertFalse(probe.contains("voice.isNetworkConnectionRequired"))
-        assertTrue(probe.contains("ARCORE_DEPTH_FEATURE"))
-        assertFalse(probe.contains("-> packageManager.hasSystemFeature(ARCORE_DEPTH_FEATURE)"))
-        assertTrue(probe.contains("live session proves stable metric frames on this device"))
+        assertFalse(probe.contains("ARCORE_DEPTH_FEATURE"))
+        assertTrue(probe.contains("resolveRuntimeMetricDistanceAvailability"))
+        assertTrue(probe.contains("Only a live ARCore Session"))
         assertTrue(probe.contains("ApprovedDeviceProfileMatcher.match"))
         assertTrue(probe.contains("approvedDesignatedDeviceProfile = approvedDeviceProfileMatch.approved"))
         assertTrue(probe.contains("designatedDeviceProfileVersion = approvedDeviceProfileMatch.profileVersion"))
@@ -102,14 +102,33 @@ class MainActivityStartupCapabilityStaticTest {
     }
 
     @Test
-    fun voiceCommandsUseOnlyTheCapabilityCheckedOnDeviceRecognizer() {
+    fun homeCommandsPreferInstalledKoreanPlatformAndWalkFlowsRequireVosk() {
         val voiceStart = ReportStaticSourceInspector.functionBlock(
             activity,
             "private fun startVoiceCommandRecognition",
         )
+        val preferred = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/voice/PreferredOfflineSpeechRecognizer.kt",
+        ).readText()
 
-        assertTrue(activity.contains("SpeechRecognizer.isOnDeviceRecognitionAvailable"))
-        assertTrue(activity.contains("SpeechRecognizer.createOnDeviceSpeechRecognizer"))
+        assertTrue(
+            voiceStart.contains(
+                "val preferPlatform = purpose == VoiceRecognitionPurpose.COMMAND &&",
+            ),
+        )
+        assertTrue(voiceStart.contains("nativeHomeFeatureContextAvailable()"))
+        assertTrue(
+            voiceStart.contains(
+                "if (handsFreeVoiceModelDirectory == null && !preferPlatform)",
+            ),
+        )
+        assertTrue(
+            voiceStart.contains(
+                "PreferredOfflineSpeechRecognizer(this) { handsFreeVoiceModelDirectory }",
+            ),
+        )
+        assertFalse(activity.contains("SpeechRecognizer.isOnDeviceRecognitionAvailable"))
+        assertFalse(activity.contains("SpeechRecognizer.createOnDeviceSpeechRecognizer"))
         assertFalse(activity.contains("SpeechRecognizer.createSpeechRecognizer"))
         assertFalse(voiceStart.contains("postLoginDeviceFeatureEnabled"))
         assertFalse(voiceStart.contains("WalkSafeStartupRequirement.ON_DEVICE_STT"))
@@ -117,10 +136,21 @@ class MainActivityStartupCapabilityStaticTest {
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 voiceStart,
-                "SpeechRecognizer.isOnDeviceRecognitionAvailable",
+                "if (handsFreeVoiceModelDirectory == null) prepareHandsFreeVoiceModel()",
+                "if (handsFreeVoiceModelDirectory == null && !preferPlatform)",
                 "stopHandsFreeVoiceService()",
+                "PreferredOfflineSpeechRecognizer(this) { handsFreeVoiceModelDirectory }",
+                "recognizer.setRecognitionListener",
+                "recognizer.startListening(",
+                "preferPlatform = preferPlatform",
+                "isRequestCurrent = {",
             ),
         )
+        assertTrue(preferred.contains("SpeechRecognizer.createOnDeviceSpeechRecognizer(context)"))
+        assertTrue(preferred.contains("recognitionSupport.installedOnDeviceLanguages.any"))
+        assertTrue(preferred.contains("tag == \"ko\" || tag.startsWith(\"ko-\")"))
+        assertTrue(preferred.contains("OfflineSpeechSelection.VOSK ->"))
+        assertFalse(preferred.contains("SpeechRecognizer.createSpeechRecognizer("))
     }
 
     @Test
@@ -149,7 +179,7 @@ class MainActivityStartupCapabilityStaticTest {
     }
 
     @Test
-    fun runtimeSpeechFailureRestrictsOnlyTheRelatedVoiceFeature() {
+    fun runtimeTtsFailureBlocksWalkAndSafetyStopsOnlyTheActiveSession() {
         val failure = activity.substringAfter("private fun handleRuntimeSpeechCapabilityFailure(")
             .substringBefore("private fun feedbackActuatorStatusText()")
         val oneShotFailure = ReportStaticSourceInspector.functionBlock(
@@ -160,8 +190,11 @@ class MainActivityStartupCapabilityStaticTest {
         assertTrue(failure.contains("offlineKoreanTextToSpeechCapabilityOverride = false"))
         assertFalse(failure.contains("onDeviceSpeechRecognitionCapabilityOverride = false"))
         assertFalse(failure.contains("WalkSafeStartupRequirement.ON_DEVICE_STT"))
-        assertTrue(failure.contains("화면과 사용 가능한 다른 기능은 계속 사용할 수 있습니다."))
-        assertFalse(failure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertTrue(failure.contains("한국어 음성 필요 · 보행 시작/재개 불가"))
+        assertTrue(failure.contains("기기 점검을 다시 실행"))
+        assertFalse(failure.contains("다른 기능은 계속"))
+        assertTrue(failure.contains("WalkSessionState.ACTIVE"))
+        assertTrue(failure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertFalse(failure.contains("stopDepthSession("))
         assertFalse(failure.contains("stopLocationUpdates()"))
         assertTrue(failure.contains("refreshStartupCapabilityUi()"))
@@ -207,16 +240,13 @@ class MainActivityStartupCapabilityStaticTest {
                     "                        handleWalkSessionResumeRecognizerNotStarted()",
             ),
         )
-        assertTrue(
-            listener.contains(
-                "permanentlyLimit = " +
-                    "shouldPermanentlyLimitOneShotSpeechRecognition(error)",
-            ),
-        )
+        assertTrue(listener.contains("permanentlyLimit = false"))
+        assertFalse(listener.contains("permanentlyLimit = true"))
+        assertFalse(listener.contains("shouldPermanentlyLimitOneShotSpeechRecognition(error)"))
     }
 
     @Test
-    fun onlyARecognizerLanguageContractFailureIsSticky() {
+    fun standaloneBackendFailuresRemainRetryableEvenThoughLegacyLanguagePolicyIsSticky() {
         assertTrue(
             shouldPermanentlyLimitOneShotSpeechRecognition(
                 SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
@@ -239,12 +269,16 @@ class MainActivityStartupCapabilityStaticTest {
             activity,
             "private fun startVoiceCommandRecognition",
         )
-        assertTrue(voiceStart.contains("permanentlyLimit = true"))
+        assertFalse(voiceStart.contains("permanentlyLimit = true"))
         assertTrue(voiceStart.contains("permanentlyLimit = false"))
-        assertFalse(
-            voiceStart.substringAfter("SpeechRecognizer.createOnDeviceSpeechRecognizer")
-                .substringBefore("recognizer.setRecognitionListener")
-                .contains("permanentlyLimit = true"),
+        assertTrue(
+            ReportStaticSourceInspector.appearsInOrder(
+                voiceStart,
+                "if (handsFreeVoiceModelDirectory == null) prepareHandsFreeVoiceModel()",
+                "if (handsFreeVoiceModelDirectory == null && !preferPlatform)",
+                "oneShotSpeechRecognitionLimited = false",
+                "PreferredOfflineSpeechRecognizer(this) { handsFreeVoiceModelDirectory }",
+            ),
         )
     }
 }

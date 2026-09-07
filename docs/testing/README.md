@@ -4,6 +4,8 @@
 
 이 폴더는 코드가 존재한다는 정적 판정과 실제 기기·현장 동작 판정을 분리하기 위한 실행 체크리스트와 테스트 절차를 관리한다.
 
+- `walksafe-real-environment-function-checklist-20260829.md`: 현재 사용자·관리자 앱, Gateway, Backend, 음성·복원 기능의 실환경 실행 절차와 예상 결과
+- `walksafe-real-environment-execution-report-20260830.md`: 로컬 PostGIS·Mailpit·GPU 모델·연결된 Android 기기에서 실제 실행한 범위와 남은 외부 입력
 - `android_stationary_and_field_test_checklist_20260710.md`: 연결된 Android 폰의 정지 테스트, 다른 폰의 원거리 현장 테스트, 앱 전용 로그 회수 절차
 - `phone_field_test_master_checklist_20260710.md`: Web/PWA와 Android 연구 보조 경로를 구분한 통합 실행 순서와 현재 connected-phone 상태
 - `web_remote_field_test_20260711.md`: 2026-07-11 Web/PWA 원거리 접속의 역사 실행 기록(현재 실행 금지)

@@ -6,8 +6,12 @@ sealed interface AndroidVoiceCommand {
     data object CreateReport : AndroidVoiceCommand
     data class SetDestination(val placeName: String) : AndroidVoiceCommand
     data class SelectDestinationCandidate(val oneBasedIndex: Int) : AndroidVoiceCommand
+    data object RepeatDestinationCandidates : AndroidVoiceCommand
     data object HearMoreDestinationCandidates : AndroidVoiceCommand
     data object CancelDestination : AndroidVoiceCommand
+    data object StartNavigation : AndroidVoiceCommand
+    data object RepeatGuidance : AndroidVoiceCommand
+    data object Help : AndroidVoiceCommand
     data object NextNavigationInstruction : AndroidVoiceCommand
     data object RequestReroute : AndroidVoiceCommand
     data object RecheckLocation : AndroidVoiceCommand
@@ -20,8 +24,12 @@ sealed interface AndroidVoiceAction {
     data object CreateReport : AndroidVoiceAction
     data class SearchDestination(val query: String) : AndroidVoiceAction
     data class SelectDestinationCandidate(val oneBasedIndex: Int) : AndroidVoiceAction
+    data object RepeatDestinationCandidates : AndroidVoiceAction
     data object HearMoreDestinationCandidates : AndroidVoiceAction
     data object CancelDestination : AndroidVoiceAction
+    data object StartNavigation : AndroidVoiceAction
+    data object SpeakCurrentGuidance : AndroidVoiceAction
+    data object SpeakVoiceHelp : AndroidVoiceAction
     data object SpeakNextNavigationInstruction : AndroidVoiceAction
     data object RequestReroute : AndroidVoiceAction
     data object RecheckLocation : AndroidVoiceAction
@@ -31,6 +39,7 @@ sealed interface AndroidVoiceAction {
 }
 
 sealed interface DestinationSearchVoiceCommand {
+    data object RepeatPage : DestinationSearchVoiceCommand
     data object HearMore : DestinationSearchVoiceCommand
     data class SelectCandidate(val oneBasedIndex: Int) : DestinationSearchVoiceCommand
 }
@@ -81,11 +90,13 @@ data class DestinationSearchVoiceState(
             ""
         }
         return "${safeQuery} 목적지 후보가 ${results.size}곳 있습니다. " +
-            "${candidates}.${moreInstruction} 원하는 번호를 말씀해 주세요."
+            "${candidates}.${moreInstruction} 원하는 번호나 다시 듣기라고 말씀해 주세요."
     }
 
     fun onCommand(command: DestinationSearchVoiceCommand): DestinationSearchVoiceTransition {
         return when (command) {
+            DestinationSearchVoiceCommand.RepeatPage ->
+                DestinationSearchVoiceTransition(this, accepted = currentPageResults.isNotEmpty())
             DestinationSearchVoiceCommand.HearMore -> {
                 if (hasMoreResults) {
                     DestinationSearchVoiceTransition(copy(pageIndex = pageIndex + 1), accepted = true)
@@ -116,8 +127,12 @@ fun AndroidVoiceCommand.toAction(): AndroidVoiceAction {
         AndroidVoiceCommand.CreateReport -> AndroidVoiceAction.CreateReport
         is AndroidVoiceCommand.SetDestination -> AndroidVoiceAction.SearchDestination(placeName)
         is AndroidVoiceCommand.SelectDestinationCandidate -> AndroidVoiceAction.SelectDestinationCandidate(oneBasedIndex)
+        AndroidVoiceCommand.RepeatDestinationCandidates -> AndroidVoiceAction.RepeatDestinationCandidates
         AndroidVoiceCommand.HearMoreDestinationCandidates -> AndroidVoiceAction.HearMoreDestinationCandidates
         AndroidVoiceCommand.CancelDestination -> AndroidVoiceAction.CancelDestination
+        AndroidVoiceCommand.StartNavigation -> AndroidVoiceAction.StartNavigation
+        AndroidVoiceCommand.RepeatGuidance -> AndroidVoiceAction.SpeakCurrentGuidance
+        AndroidVoiceCommand.Help -> AndroidVoiceAction.SpeakVoiceHelp
         AndroidVoiceCommand.NextNavigationInstruction -> AndroidVoiceAction.SpeakNextNavigationInstruction
         AndroidVoiceCommand.RequestReroute -> AndroidVoiceAction.RequestReroute
         AndroidVoiceCommand.RecheckLocation -> AndroidVoiceAction.RecheckLocation
@@ -132,11 +147,12 @@ fun selectAndroidVoiceAction(
     phrases: List<String>,
     confidenceScores: FloatArray? = null,
     minimumConfidence: Float = MIN_VOICE_CONFIDENCE,
+    allowBareDestinationIndex: Boolean = false,
 ): AndroidVoiceAction? {
     val topPhrase = phrases.firstOrNull()?.takeIf { it.isNotBlank() } ?: return null
     val topConfidence = confidenceScores?.getOrNull(0)
     if (topConfidence != null && (!topConfidence.isFinite() || topConfidence < minimumConfidence)) return null
-    return parseAndroidVoiceCommand(topPhrase)?.toAction()
+    return parseAndroidVoiceCommand(topPhrase, allowBareDestinationIndex)?.toAction()
 }
 
 /** Reads enough context for a voice-only user to choose a numbered TMAP result safely. */
@@ -145,33 +161,44 @@ fun formatDestinationSearchVoicePrompt(
     results: List<DestinationSearchResult>,
 ): String = DestinationSearchVoiceState(query = query, results = results).voicePrompt()
 
-fun parseDestinationSearchVoiceCommand(text: String): DestinationSearchVoiceCommand? {
+fun parseDestinationSearchVoiceCommand(
+    text: String,
+    allowBareDestinationIndex: Boolean = false,
+): DestinationSearchVoiceCommand? {
     val compact = text
         .trim()
         .lowercase(Locale.KOREAN)
         .replace(PUNCTUATION, "")
         .replace(WHITESPACE, "")
     if (compact.isBlank() || NEGATION_MARKERS.any(compact::contains)) return null
+    if (compact == "다시듣기") return DestinationSearchVoiceCommand.RepeatPage
     if (compact == "더듣기") return DestinationSearchVoiceCommand.HearMore
     val oneBasedIndex = DESTINATION_PAGE_SELECTION_NUMBER.matchEntire(compact)
         ?.groupValues
         ?.get(1)
         ?.toIntOrNull()
+        ?: (if (allowBareDestinationIndex) bareDestinationCandidateIndex(compact) else null)
         ?: return null
     return DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex)
 }
 
-fun parseAndroidVoiceCommand(text: String): AndroidVoiceCommand? {
+fun parseAndroidVoiceCommand(
+    text: String,
+    allowBareDestinationIndex: Boolean = false,
+): AndroidVoiceCommand? {
     val normalized = text
         .trim()
-        .lowercase(Locale.KOREAN)
         .replace(PUNCTUATION, "")
         .replace(WHITESPACE, " ")
-    val compact = normalized.replace(" ", "")
+    val compact = normalized.lowercase(Locale.KOREAN).replace(" ", "")
     if (compact.isBlank() || NEGATION_MARKERS.any(compact::contains)) return null
 
     if (compact in DESTINATION_CANCEL_COMMANDS) return AndroidVoiceCommand.CancelDestination
+    if (compact == "다시듣기") return AndroidVoiceCommand.RepeatDestinationCandidates
     if (compact == "더듣기") return AndroidVoiceCommand.HearMoreDestinationCandidates
+    if (compact in START_NAVIGATION_COMMANDS) return AndroidVoiceCommand.StartNavigation
+    if (compact == "다시말해줘") return AndroidVoiceCommand.RepeatGuidance
+    if (compact == "도움말") return AndroidVoiceCommand.Help
     if (compact in NEXT_NAVIGATION_COMMANDS) return AndroidVoiceCommand.NextNavigationInstruction
     if (compact in REROUTE_COMMANDS) return AndroidVoiceCommand.RequestReroute
     if (compact in LOCATION_RECHECK_COMMANDS) return AndroidVoiceCommand.RecheckLocation
@@ -180,9 +207,16 @@ fun parseAndroidVoiceCommand(text: String): AndroidVoiceCommand? {
     if (compact in STOP_NAVIGATION_COMMANDS) return AndroidVoiceCommand.StopNavigation
     if (isReportCommand(compact)) return AndroidVoiceCommand.CreateReport
     destinationCandidateIndex(compact)?.let { return AndroidVoiceCommand.SelectDestinationCandidate(it) }
+    if (allowBareDestinationIndex) {
+        bareDestinationCandidateIndex(compact)?.let {
+            return AndroidVoiceCommand.SelectDestinationCandidate(it)
+        }
+    }
 
     destinationFromPrefixCommand(normalized)?.let { return AndroidVoiceCommand.SetDestination(it) }
+    destinationFromMarkedCommand(normalized)?.let { return AndroidVoiceCommand.SetDestination(it) }
     destinationFromSuffixCommand(normalized)?.let { return AndroidVoiceCommand.SetDestination(it) }
+    destinationFromNaturalCommand(normalized)?.let { return AndroidVoiceCommand.SetDestination(it) }
     return null
 }
 
@@ -196,6 +230,16 @@ private fun destinationFromSuffixCommand(text: String): String? {
     return normalizeDestination(match.groupValues[1], removeFinalParticle = true)
 }
 
+private fun destinationFromMarkedCommand(text: String): String? {
+    val match = DESTINATION_MARKED_SUFFIX.matchEntire(text) ?: return null
+    return normalizeDestination(match.groupValues[1])
+}
+
+private fun destinationFromNaturalCommand(text: String): String? {
+    val match = DESTINATION_NATURAL_SUFFIX.matchEntire(text) ?: return null
+    return normalizeDestination(match.groupValues[1])
+}
+
 private fun normalizeDestination(value: String, removeFinalParticle: Boolean = false): String? {
     var destination = value.trim()
     destination = when {
@@ -204,6 +248,11 @@ private fun normalizeDestination(value: String, removeFinalParticle: Boolean = f
         removeFinalParticle && destination.endsWith("로") -> destination.dropLast(1).trim()
         else -> destination
     }
+    val compact = destination.lowercase(Locale.KOREAN).replace(" ", "")
+    if (compact in DESTINATION_CONTROL_WORDS ||
+        isReportCommand(compact) ||
+        DESTINATION_COMMAND_FRAGMENT.containsMatchIn(destination)
+    ) return null
     return canonicalDestinationSearchQueryOrNull(destination)
 }
 
@@ -226,6 +275,21 @@ private fun destinationCandidateIndex(compact: String): Int? {
     }?.value
 }
 
+private fun bareDestinationCandidateIndex(compact: String): Int? {
+    val numeric = DESTINATION_BARE_CANDIDATE_NUMBER.matchEntire(compact)
+        ?.groupValues?.get(1)?.toIntOrNull()
+    if (numeric != null) return numeric.takeIf { it in 1..MAX_DESTINATION_CANDIDATES }
+    DESTINATION_ORDINALS[compact]?.let { return it }
+    val spokenNumber = compact.removeSuffix("번").removeSuffix("번째")
+    return DESTINATION_SPOKEN_NUMBERS[spokenNumber] ?: when (compact) {
+        "한번" -> 1
+        "두번" -> 2
+        "세번" -> 3
+        "네번" -> 4
+        else -> null
+    }
+}
+
 private val WHITESPACE = Regex("\\s+")
 private val PUNCTUATION = Regex("[.,!?~。？！]+")
 private val REPORT_COMMAND = Regex("(?:(?:이거|여기|위험)(?:을|를)?)?(?:신고|싱고)(?:해|해줘|해주세요|접수)?")
@@ -234,6 +298,15 @@ private val DESTINATION_CANDIDATE_NUMBER = Regex(
 )
 private val DESTINATION_PAGE_SELECTION_NUMBER = Regex(
     "(?:목적지)?([1-9]\\d*)번(?:목적지)?(?:을|를)?선택(?:해|해줘|해주세요)?",
+)
+private val DESTINATION_BARE_CANDIDATE_NUMBER = Regex("([1-9]\\d*)(?:번)?")
+private val DESTINATION_SPOKEN_NUMBERS = mapOf(
+    "일" to 1, "이" to 2, "삼" to 3, "사" to 4, "오" to 5,
+    "육" to 6, "칠" to 7, "팔" to 8, "구" to 9, "십" to 10,
+    "십일" to 11, "십이" to 12, "십삼" to 13, "십사" to 14, "십오" to 15,
+    "십육" to 16, "십칠" to 17, "십팔" to 18, "십구" to 19, "이십" to 20,
+    "하나" to 1, "둘" to 2, "셋" to 3, "넷" to 4, "다섯" to 5,
+    "여섯" to 6, "일곱" to 7, "여덟" to 8, "아홉" to 9, "열" to 10,
 )
 private val DESTINATION_ORDINALS = mapOf(
     "첫번째" to 1,
@@ -251,6 +324,19 @@ private val DESTINATION_PREFIX = Regex(
 )
 private val DESTINATION_SUFFIX = Regex(
     "(.+?(?:으로|로))\\s*(?:목적지(?:를|을)?\\s*)?(?:설정(?:해|해줘|해주세요)?|지정(?:해|해줘|해주세요)?|변경(?:해|해줘|해주세요)?|바꿔(?:줘|주세요)?|안내(?:해|해줘|해주세요)?|가자)",
+)
+private val DESTINATION_MARKED_SUFFIX = Regex(
+    "(.+?)\\s*목적지로\\s*해\\s*(?:줘|주세요)",
+)
+private val DESTINATION_NATURAL_SUFFIX = Regex(
+    "(.+?)\\s*(?:찾아\\s*(?:줘|주세요)|가고\\s*싶(?:어|어요|습니다)|안내\\s*해\\s*(?:줘|주세요))",
+)
+private val DESTINATION_CONTROL_WORDS = setOf(
+    "목적지", "장소", "경로", "길안내", "안내", "취소", "정지", "중지", "신고", "싱고",
+)
+private val DESTINATION_COMMAND_FRAGMENT = Regex(
+    "(?:신고|싱고|취소|중지|정지|종료|설정|지정|변경|안내)\\s*(?:해\\s*(?:줘|주세요)?|하(?:고|지)|해주고)" +
+        "|찾아\\s*(?:줘|주세요)|가고\\s*싶",
 )
 private val NEGATION_MARKERS = listOf(
     "하지마",
@@ -278,6 +364,7 @@ private val DESTINATION_CANCEL_COMMANDS = setOf(
     "목적지지워",
     "목적지없애",
 )
+private val START_NAVIGATION_COMMANDS = setOf("안내시작", "길안내시작")
 private val NEXT_NAVIGATION_COMMANDS = setOf(
     "다음경로뭐야",
     "다음길뭐야",

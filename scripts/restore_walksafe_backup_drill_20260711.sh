@@ -17,11 +17,11 @@ export WALKSAFE_BACKUP_RUNTIME_PYTHON="${BACKUP_RUNTIME_PYTHON}"
 ORIGINAL_ARGUMENTS=("$@")
 
 usage() {
-  echo "Usage: $0 --backup-dir DIR --target-database-url URL --target-upload-dir DIR --receipt FILE --trusted-signer-fingerprint FINGERPRINT --key-control-document ABSOLUTE_FILE --key-control-signature ABSOLUTE_FILE --key-control-authority-lock ABSOLUTE_FILE --trusted-key-control-signer-fingerprint FINGERPRINT --expected-key-control-sha256 SHA256 --receipt-gpg-signer SECRET_KEY --max-backup-age-seconds SECONDS --backup-future-skew-seconds SECONDS --confirm RESTORE-TO-EMPTY-TARGET [--actor-id ID]" >&2
+  echo "Usage: TARGET_DATABASE_URL=... $0 --backup-dir DIR --target-upload-dir DIR --receipt FILE --trusted-signer-fingerprint FINGERPRINT --key-control-document ABSOLUTE_FILE --key-control-signature ABSOLUTE_FILE --key-control-authority-lock ABSOLUTE_FILE --trusted-key-control-signer-fingerprint FINGERPRINT --expected-key-control-sha256 SHA256 --receipt-gpg-signer SECRET_KEY --max-backup-age-seconds SECONDS --backup-future-skew-seconds SECONDS --confirm RESTORE-TO-EMPTY-TARGET [--actor-id ID]" >&2
 }
 
 BACKUP_DIR=""
-TARGET_DATABASE_URL=""
+TARGET_DATABASE_URL="${TARGET_DATABASE_URL:-}"
 TARGET_UPLOAD_DIR=""
 RECEIPT=""
 CONFIRM=""
@@ -46,7 +46,6 @@ BACKUP_FUTURE_SKEW_SECONDS=""
 while (($#)); do
   case "$1" in
     --backup-dir) BACKUP_DIR="${2:-}"; shift 2 ;;
-    --target-database-url) TARGET_DATABASE_URL="${2:-}"; shift 2 ;;
     --target-upload-dir) TARGET_UPLOAD_DIR="${2:-}"; shift 2 ;;
     --receipt) RECEIPT="${2:-}"; shift 2 ;;
     --confirm) CONFIRM="${2:-}"; shift 2 ;;
@@ -117,13 +116,25 @@ command -v psql >/dev/null
   exit 2
 }
 
-PG_RESTORE_DATABASE_URL="$("${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" validate-restore-database-url --database-url "${TARGET_DATABASE_URL}")"
-TARGET_DATABASE_NAME="$("${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" database-name --database-url "${TARGET_DATABASE_URL}")"
+env -i PATH=/usr/bin:/bin DATABASE_URL="${TARGET_DATABASE_URL}" \
+  "${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" \
+    validate-restore-database-url >/dev/null
+PG_RESTORE_DATABASE_URL="${TARGET_DATABASE_URL}"
+run_restore_postgres_client() {
+  local tool="$1"
+  shift
+  env -i PATH=/usr/bin:/bin DATABASE_URL="${PG_RESTORE_DATABASE_URL}" \
+    "${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" \
+      exec-postgres-client --tool "${tool}" -- "$@"
+}
+TARGET_DATABASE_NAME="$(env -i PATH=/usr/bin:/bin DATABASE_URL="${TARGET_DATABASE_URL}" \
+  "${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" database-name)"
 [[ "${TARGET_DATABASE_NAME,,}" =~ (^|[-_])(test|drill)([-_]|$) ]] || {
   echo "restore drill database name must contain a distinct test or drill segment" >&2
   exit 2
 }
-TARGET_DATABASE_IDENTITY_SHA256="$("${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" database-identity --database-url "${TARGET_DATABASE_URL}")"
+TARGET_DATABASE_IDENTITY_SHA256="$(env -i PATH=/usr/bin:/bin DATABASE_URL="${TARGET_DATABASE_URL}" \
+  "${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" database-identity)"
 TARGET_UPLOAD_ROOT_IDENTITY_SHA256="$("${BACKUP_RUNTIME_PYTHON}" -I -S -B "${SCRIPT_DIR}/walksafe_environment_identity.py" path-identity --path "${TARGET_UPLOAD_DIR}")"
 
 [[ "${TRUSTED_SIGNER_FINGERPRINT}" =~ ^[A-Fa-f0-9]{40}$ ]] || { echo "trusted backup signer fingerprint is invalid" >&2; exit 2; }
@@ -339,7 +350,19 @@ RECEIPT_SIGNER_FINGERPRINT="${RECEIPT_SIGNER_FINGERPRINTS[0]}"
   echo "restore drill target database must differ from the backed-up source database" >&2
   exit 2
 }
-TARGET_USER_OBJECT_COUNT="$(psql "${PG_RESTORE_DATABASE_URL}" --no-psqlrc --set ON_ERROR_STOP=1 --tuples-only --no-align <<'SQL'
+PG_RESTORE_CLIENT_MAJOR="$(pg_restore --version | awk '{print $3}' | cut -d. -f1)"
+PSQL_CLIENT_MAJOR="$(psql --version | awk '{print $3}' | cut -d. -f1)"
+TARGET_SERVER_VERSION_NUM="$(run_restore_postgres_client psql --no-psqlrc --tuples-only --no-align \
+  --command 'SHOW server_version_num')"
+[[ "${PG_RESTORE_CLIENT_MAJOR}" =~ ^[0-9]+$ \
+  && "${PSQL_CLIENT_MAJOR}" =~ ^[0-9]+$ \
+  && "${TARGET_SERVER_VERSION_NUM}" =~ ^[0-9]+$ \
+  && "${PG_RESTORE_CLIENT_MAJOR}" -eq "$((TARGET_SERVER_VERSION_NUM / 10000))" \
+  && "${PSQL_CLIENT_MAJOR}" -eq "$((TARGET_SERVER_VERSION_NUM / 10000))" ]] || {
+  echo "PostgreSQL restore client majors must match the target server" >&2
+  exit 2
+}
+TARGET_USER_OBJECT_COUNT="$(run_restore_postgres_client psql --no-psqlrc --set ON_ERROR_STOP=1 --tuples-only --no-align <<'SQL'
 WITH canonical_context AS MATERIALIZED (
   SELECT pg_catalog.set_config('search_path', 'pg_catalog, public', true)
 ), postgis_direct(classid, objid) AS (
@@ -858,8 +881,8 @@ verify_inherited_authority_lock_binding || {
   echo "inherited backup authority lock changed before database restore" >&2
   exit 2
 }
-pg_restore --exit-on-error --single-transaction --no-owner --no-acl \
-  --dbname="${PG_RESTORE_DATABASE_URL}" "${REPORTS_RESTORE_PATH}"
+run_restore_postgres_client pg_restore --exit-on-error --single-transaction --no-owner --no-acl \
+  "${REPORTS_RESTORE_PATH}"
 DATABASE_RESTORE_COMPLETED=true
 tar --extract --gzip --file="${UPLOADS_RESTORE_PATH}" --directory="${RESTORE_TREE_ANCHOR}" \
   --no-same-owner --no-same-permissions
@@ -938,9 +961,9 @@ REPORT_IMAGE_ROWS="$(mktemp)"
 exec {REPORT_IMAGE_ROWS_FD}<>"${REPORT_IMAGE_ROWS}"
 rm -f "${REPORT_IMAGE_ROWS}"
 REPORT_IMAGE_ROWS=""
-RESTORED_REPORT_COUNT="$(psql "${PG_RESTORE_DATABASE_URL}" --no-psqlrc --set ON_ERROR_STOP=1 --tuples-only --no-align \
+RESTORED_REPORT_COUNT="$(run_restore_postgres_client psql --no-psqlrc --set ON_ERROR_STOP=1 --tuples-only --no-align \
   --command "SELECT count(*) FROM reports;")"
-psql "${PG_RESTORE_DATABASE_URL}" --no-psqlrc --set ON_ERROR_STOP=1 --tuples-only --no-align --field-separator=$'\t' \
+run_restore_postgres_client psql --no-psqlrc --set ON_ERROR_STOP=1 --tuples-only --no-align --field-separator=$'\t' \
   --csv --command "SELECT reports.id::text, COALESCE(objects.storage_name, ''), COALESCE(objects.envelope_sha256, ''), COALESCE(objects.envelope_size::text, '') FROM reports LEFT JOIN report_image_objects AS objects ON objects.report_id = reports.id ORDER BY reports.id;" \
   >&"${REPORT_IMAGE_ROWS_FD}"
 

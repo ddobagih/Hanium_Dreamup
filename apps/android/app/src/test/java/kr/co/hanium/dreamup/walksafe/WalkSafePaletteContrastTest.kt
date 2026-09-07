@@ -96,16 +96,28 @@ class WalkSafePaletteContrastTest {
             "WS_COLOR_PRIMARY_ACTION_PRESSED_FILL",
             4.5,
         )
-        assertRatio(
-            "WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT",
-            "WS_COLOR_PRIMARY_ACTION_DISABLED_FILL",
-            4.5,
-        )
+        // Enabled secondary controls render blue labels on these actual surfaces.
+        assertRatio("WS_COLOR_PRIMARY_ACTION_FILL", "WS_COLOR_BUTTON_FILL", 4.5)
+        assertRatio("WS_COLOR_PRIMARY_ACTION_FILL", "WS_COLOR_BUTTON_PRESSED_FILL", 4.5)
         assertRatio("WS_COLOR_BUTTON_BORDER", "WS_COLOR_OVERLAY_FILL", 3.0)
         assertRatio("WS_COLOR_FOCUS", "WS_COLOR_OVERLAY_FILL", 3.0)
         assertTrue(
             ratio("WS_COLOR_BUTTON_DISABLED_TEXT", "WS_COLOR_BUTTON_DISABLED_FILL") >= 2.7,
         )
+    }
+
+    @Test
+    fun safetyBannerAndHomeCardsMeetTheirSemanticContrastThresholds() {
+        assertRatio("WS_COLOR_SAFETY_BANNER_TEXT", "WS_COLOR_SAFETY_BANNER_FILL", 4.5)
+        assertRatio("WS_COLOR_SAFETY_BANNER_BORDER", "WS_COLOR_SAFETY_BANNER_FILL", 3.0)
+        listOf(
+            "WS_COLOR_CARD_NAV",
+            "WS_COLOR_CARD_VOICE",
+            "WS_COLOR_CARD_REPORT",
+        ).forEach { cardFill ->
+            assertRatio("WS_COLOR_CARD_TEXT", cardFill, 4.5)
+            assertRatio("WS_COLOR_CARD_FOCUS", cardFill, 3.0)
+        }
     }
 
     @Test

@@ -203,9 +203,10 @@ class MainActivityWalkSessionLifecycleStaticTest {
 
         assertTrue(metricInvalidation.contains("WalkSessionEvent.SafetyStopRequested"))
         assertTrue(metricInvalidation.contains("runtimeFailureRequiresSafetyStop"))
-        assertTrue(speechFailure.contains("기능 제한"))
-        assertTrue(speechFailure.contains("다른 기능은 계속 사용할 수 있습니다."))
-        assertFalse(speechFailure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertTrue(speechFailure.contains("보행 시작/재개 불가"))
+        assertTrue(speechFailure.contains("기기 점검을 다시 실행"))
+        assertFalse(speechFailure.contains("다른 기능은 계속"))
+        assertTrue(speechFailure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertTrue(safetyStop.contains("cancelWalkSessionOutputs(reason)"))
         assertTrue(foregroundRecheck.contains("WalkSessionEvent.RecheckRequested"))
         assertTrue(foregroundRecheck.contains("cancelWalkSessionOutputs(reason)"))

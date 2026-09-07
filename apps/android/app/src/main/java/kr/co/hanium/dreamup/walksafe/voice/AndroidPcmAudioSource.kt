@@ -20,6 +20,7 @@ internal class AndroidPcmAudioSource(
     private val onPcm16: (ShortArray) -> Unit,
     private val onReadError: (Int) -> Unit,
     private val audioRecordFactory: (() -> AudioRecord)? = null,
+    private val microphoneLease: VoiceMicrophoneLease = VoiceMicrophoneLease.process,
 ) {
     private enum class State {
         IDLE,
@@ -30,6 +31,7 @@ internal class AndroidPcmAudioSource(
     private class CaptureSession(
         val generation: Long,
         val record: AudioRecord,
+        val releaseMicrophone: () -> Unit,
     ) {
         val running = AtomicBoolean(true)
         val released = AtomicBoolean(false)
@@ -37,7 +39,11 @@ internal class AndroidPcmAudioSource(
 
         fun releaseOnce() {
             if (released.compareAndSet(false, true)) {
-                record.release()
+                try {
+                    record.release()
+                } finally {
+                    releaseMicrophone()
+                }
             }
         }
     }
@@ -53,9 +59,20 @@ internal class AndroidPcmAudioSource(
         synchronized(stateLock) {
             if (state != State.IDLE) return
 
-            val record = audioRecordFactory?.invoke() ?: createAudioRecord(context)
+            val leaseOwner = Any()
+            check(microphoneLease.acquire(leaseOwner)) { "Microphone is already in use" }
+            val record = try {
+                audioRecordFactory?.invoke() ?: createAudioRecord(context)
+            } catch (failure: Throwable) {
+                microphoneLease.release(leaseOwner)
+                throw failure
+            }
             if (record.state != AudioRecord.STATE_INITIALIZED) {
-                record.release()
+                try {
+                    record.release()
+                } finally {
+                    microphoneLease.release(leaseOwner)
+                }
                 error("AudioRecord failed to initialize")
             }
 
@@ -67,6 +84,7 @@ internal class AndroidPcmAudioSource(
                 val session = CaptureSession(
                     generation = nextGeneration++,
                     record = record,
+                    releaseMicrophone = { microphoneLease.release(leaseOwner) },
                 )
                 session.worker = Thread(
                     { capture(session) },
@@ -80,6 +98,7 @@ internal class AndroidPcmAudioSource(
                 state = State.IDLE
                 activeSession = null
                 runCatching { record.release() }
+                microphoneLease.release(leaseOwner)
                 throw failure
             }
         }

@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.admin.security;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -37,12 +38,53 @@ public final class AdminReportControllerTest {
         assertEquals(REPORT_A, controller.snapshot().detail().summary().id());
     }
 
+    @Test
+    public void paginationWaitsForDetailAndRejectsDuplicateInFlightRequests() {
+        JsonLoader loader = new JsonLoader();
+        loader.paginate = true;
+        AdminReportController controller = new AdminReportController(loader);
+        assertTrue(controller.execute(controller.beginFirstPage(filters("new"))));
+        assertTrue(controller.snapshot().canLoadMore());
+
+        var detailRequest = controller.beginDetail(REPORT_A);
+        assertFalse(controller.snapshot().canLoadMore());
+        assertThrows(IllegalStateException.class, controller::beginNextPage);
+        assertTrue(controller.execute(detailRequest));
+        assertEquals(REPORT_A, controller.snapshot().detail().summary().id());
+        assertTrue(controller.snapshot().canLoadMore());
+
+        var nextPage = controller.beginNextPage();
+        assertFalse(controller.snapshot().canLoadMore());
+        assertThrows(IllegalStateException.class, controller::beginNextPage);
+        assertTrue(controller.execute(nextPage));
+        assertEquals(2, controller.snapshot().items().size());
+        assertFalse(controller.snapshot().canLoadMore());
+    }
+
+    @Test
+    public void failedDetailMustBeRetriedBeforeLoadingMore() {
+        JsonLoader loader = new JsonLoader();
+        loader.paginate = true;
+        AdminReportController controller = new AdminReportController(loader);
+        assertTrue(controller.execute(controller.beginFirstPage(filters("new"))));
+
+        loader.fail = true;
+        assertTrue(controller.execute(controller.beginDetail(REPORT_A)));
+        assertFalse(controller.snapshot().canLoadMore());
+        assertThrows(IllegalStateException.class, controller::beginNextPage);
+        loader.fail = false;
+        assertTrue(controller.execute(controller.beginRetry()));
+        assertEquals(REPORT_A, controller.snapshot().detail().summary().id());
+        assertTrue(controller.snapshot().canLoadMore());
+    }
+
     private static AdminReportModels.Filters filters(String status) {
         return new AdminReportModels.Filters(null, status, null, null, null);
     }
 
     private static final class JsonLoader implements AdminReportController.Loader {
         boolean fail;
+        boolean paginate;
 
         @Override
         public AdminReportModels.Page loadPage(AdminReportModels.Filters filters, String cursor) throws Exception {
@@ -53,7 +95,12 @@ public final class AdminReportControllerTest {
                     """);
             }
             String id = "new".equals(filters.status()) ? REPORT_A : REPORT_B;
-            return AdminReportModels.parsePage(summaryPage(id, filters.status()));
+            if (cursor != null) id = REPORT_B;
+            String page = summaryPage(id, filters.status());
+            if (paginate && cursor == null) {
+                page = page.replace("\"next_cursor\":null", "\"next_cursor\":\"cursor_A\"");
+            }
+            return AdminReportModels.parsePage(page);
         }
 
         @Override

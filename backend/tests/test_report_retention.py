@@ -798,6 +798,7 @@ def test_manifest_publisher_rejects_non_private_parent(tmp_path: Path) -> None:
     upload_dir.mkdir(mode=0o700)
     manifest_dir = tmp_path / "retention-audit"
     manifest_dir.mkdir(mode=0o755)
+    manifest_dir.chmod(0o755)
     backup = tmp_path / "backup.json"
     restore = tmp_path / "restore.json"
     lock = tmp_path / "maintenance.lock"

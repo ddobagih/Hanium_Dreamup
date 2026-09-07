@@ -253,19 +253,22 @@ class MainActivityNavigationCompositionTest {
     }
 
     @Test
-    fun untrustedGpsBreaksDeviationEvidenceAndPauseKeepsTheEncryptedSnapshot() {
+    fun positionQualityLossDoesNotMasqueradeAsRouteDeviationAndPauseKeepsTheEncryptedSnapshot() {
         val location = functionBlock("private fun handleLocationUpdate(")
         val clearLocation = functionBlock("private fun clearTrustedLocation(")
-        val untrusted = functionBlock("private fun handleRouteLocationUntrusted(")
+        val confidence = functionBlock("private fun applyPositionConfidenceDecision(")
         val foregroundPause = functionBlock("private fun enterWalkSessionForegroundRecheckAndCancelOutputs(")
         val cancelOutputs = functionBlock("private fun cancelWalkSessionOutputs(")
         val reset = functionBlock("private fun resetRouteState(")
         val purge = functionBlock("private fun purgeEncryptedRouteSnapshot(")
 
-        assertTrue(location.contains("handleRouteLocationUntrusted()"))
-        assertTrue(clearLocation.contains("handleRouteLocationUntrusted()"))
-        assertTrue(untrusted.contains("routeNavigator.onUntrustedLocation()"))
-        assertTrue(untrusted.contains("applyRouteDeviationSafetyUpdate(update)"))
+        assertTrue(location.contains("positioningCoordinator.observeGnss("))
+        assertFalse(location.contains("handleRouteLocationUntrusted()"))
+        assertFalse(clearLocation.contains("handleRouteLocationUntrusted()"))
+        assertTrue(confidence.contains("feedbackActuator?.cancelNavigationSpeech()"))
+        assertTrue(confidence.contains("positionGuidancePaused = decision.guidancePaused"))
+        assertFalse(confidence.contains("directionGuidancePauseReason = pauseReason"))
+        assertTrue(confidence.contains("commitAnnouncementDelivered("))
         assertTrue(foregroundPause.contains("cancelWalkSessionOutputs(reason)"))
         assertTrue(cancelOutputs.contains("WalkSessionState.PAUSED"))
         assertTrue(cancelOutputs.contains("resetRouteState(purgeRouteSnapshot = false)"))
@@ -274,36 +277,148 @@ class MainActivityNavigationCompositionTest {
     }
 
     @Test
-    fun distrustedGpsStopsDirectionGuidanceInsteadOfSubstitutingStepLength() {
+    fun poorGpsUsesCoordinatorSoftGateAndFilteredLocation() {
         val handler = functionBlock("private fun handleLocationUpdate(")
-        val untrusted = handler.substringAfter("if (freshTrusted == null)")
-            .substringBefore("latestTrustedLocation = freshTrusted")
 
-        assertTrue(handler.contains("val mock = isMockLocationCompat(location)"))
-        assertTrue(handler.contains("if (mock) latestTrustedLocation = null"))
-        assertTrue(handler.contains("mock = mock"))
-        assertTrue(handler.contains("val untrustedReason = if (mock) \"gps_mock_rejected\" else \"gps_untrusted\""))
-        assertTrue(handler.contains("reason = untrustedReason"))
-        assertTrue(
-            handler.indexOf("if (mock) latestTrustedLocation = null") <
-                handler.indexOf("LocationTrustPolicy.trustedOrNull("),
-        )
-        assertTrue(handler.contains("pauseDirectionGuidance("))
-        assertFalse(untrusted.contains("stepLengthEstimator"))
-        assertFalse(untrusted.contains("latestStepCount"))
-        assertFalse(untrusted.contains("routeStepProgressMOrNull"))
+        assertTrue(handler.contains("positioningCoordinator.observeGnss("))
+        assertTrue(handler.contains("GnssObservationDisposition.HARD_REJECTED"))
+        assertFalse(handler.contains("LocationTrustPolicy.trustedOrNull("))
+        assertTrue(handler.contains("latestTrustedLocation = filteredTrusted"))
+        assertTrue(handler.contains("updateRouteGuidance(filteredTrusted, rawRouteLocation)"))
+        assertTrue(handler.contains("measurementNoiseMultiplier"))
     }
 
     @Test
-    fun actualTravelDirectionIsDerivedFromLocationOnly() {
-        assertTrue(source.contains("latestHeadingDeg = updateHeadingFromLocation("))
-        assertFalse(source.contains("latestHeadingDeg = earthOrientationTracker"))
-        assertFalse(source.contains("latestHeadingDeg = routeNavigator"))
+    fun pdrMagneticHeadingRequiresAValidExplicitChestMountContract() {
+        val step = functionBlock("private fun handlePositioningStepEvent(")
+        val chest = functionBlock("private fun chestMountedHeadingForStep(")
+        val motion = functionBlock("private fun applyPositioningMotionSnapshot(")
+        val heading = functionBlock("private fun updatePositioningHeadingInputs(")
+        val route = functionBlock("private fun updateRouteGuidance(")
 
-        val heading = functionBlock("private fun updateHeadingFromLocation(")
-        assertFalse(heading.contains("earthOrientationTracker"))
-        assertFalse(heading.contains("stepLengthEstimator"))
-        assertFalse(heading.contains("routeNavigator"))
+        assertTrue(
+            step.indexOf("pedestrianMotionTracker?.recordStep(event.timestampMs)") <
+                step.indexOf("positioningCoordinator.observeStep("),
+        )
+        assertTrue(step.contains("positioningCoordinator.observeStep("))
+        assertTrue(step.contains("gpsCourse = latestGpsCourseObservation"))
+        assertTrue(step.contains("magneticTrueHeading = chestHeading"))
+        assertTrue(step.contains("phoneForwardMounted = chestHeading != null"))
+        assertTrue(chest.contains("positionFieldExplicitChestConfirmed"))
+        assertTrue(chest.contains("PhoneMountingMethod.CHEST_FORWARD"))
+        assertTrue(chest.contains("phoneMountingOutputsAllowed"))
+        assertTrue(chest.contains("latestChestMountedHeading(timestampMs)"))
+        assertTrue(chest.contains("if (!result.isValid) return null"))
+        assertFalse(motion.contains("updateRouteGuidance("))
+        assertFalse(heading.contains("location.speed > 0.5f"))
+        assertTrue(heading.contains("bearingAccuracy != null"))
+        assertTrue(route.contains("filteredPosition = FilteredRoutePosition("))
+        assertTrue(route.contains("latestWalkingSpeedObservation?.speedMps"))
+        assertTrue(route.contains("standardDeviationDeg = requireNotNull(heading.accuracyDegrees)"))
+        assertFalse(route.contains("standardDeviationDeg = 35.0"))
+    }
+
+    @Test
+    fun fusedAndOptionalSensorsShareTheWalkingSessionLifecycle() {
+        val start = functionBlock("private fun startLocationUpdatesIfAllowed(")
+        val stop = functionBlock("private fun stopLocationUpdates(")
+        val sources = functionBlock("private fun startPositioningObservationSources(")
+
+        assertTrue(start.contains("Priority.PRIORITY_HIGH_ACCURACY"))
+        assertTrue(start.contains("Granularity.GRANULARITY_FINE"))
+        assertTrue(start.contains("setMaxUpdateAgeMillis(0L)"))
+        assertTrue(start.contains("startPositioningObservationSources()"))
+        assertTrue(start.contains("catch (_: SecurityException)"))
+        assertTrue(sources.contains("Manifest.permission.ACCESS_FINE_LOCATION"))
+        assertTrue(sources.contains("AndroidGnssObservationSource("))
+        assertTrue(sources.contains("AndroidPedestrianMotionTracker("))
+        assertTrue(sources.contains("positioningCoordinator.observeZupt("))
+        assertTrue(sources.contains("ensureEarthOrientationForLocation()"))
+        assertTrue(stop.contains("gnssQualityObserver?.stop()"))
+        assertTrue(stop.contains("pedestrianMotionTracker?.stop()"))
+        assertTrue(stop.contains("stopActivePositionFieldSession()"))
+        assertTrue(stop.contains("positioningCoordinator.reset()"))
+    }
+
+    @Test
+    fun gnssQualityIsRefreshedPerFixAndHeadingChangesOnlyAfterHardAcceptance() {
+        val handler = functionBlock("private fun handleLocationUpdate(")
+        val snapshot = "gnssQualityObserver?.snapshot(SystemClock.elapsedRealtimeNanos())"
+        val acceptedHeading = "updatePositioningHeadingInputs(location, elapsedMs)"
+        val hardReject = "if (hardRejected || filtered == null)"
+
+        assertTrue(handler.contains(snapshot))
+        assertTrue(handler.indexOf(acceptedHeading) > handler.indexOf(hardReject))
+        assertTrue(handler.indexOf(acceptedHeading) > handler.indexOf("return", handler.indexOf(hardReject)))
+    }
+
+    @Test
+    fun positionQualityPauseIsIndependentFromProviderPause() {
+        val confidence = functionBlock("private fun applyPositionConfidenceDecision(")
+        val route = functionBlock("private fun updateRouteGuidance(")
+
+        assertTrue(confidence.contains("positionGuidancePaused = decision.guidancePaused"))
+        assertFalse(confidence.contains("directionGuidancePauseReason ="))
+        assertTrue(route.contains("positionGuidancePaused || directionGuidancePauseReason == \"tmap_unavailable\""))
+    }
+
+    @Test
+    fun actorSwitchClearsAllCalibrationBaselines() {
+        val profile = functionBlock("private fun ensurePositioningProfileForCurrentActor(")
+
+        assertTrue(profile.contains("lastCalibrationLocation = null"))
+        assertTrue(profile.contains("lastCalibrationStepCount = 0"))
+        assertTrue(profile.contains("lastCalibrationAtMs = 0L"))
+    }
+
+    @Test
+    fun debugPositionRecorderDoesNotDependOnNavigationOutputEligibility() {
+        val step = functionBlock("private fun handlePositioningStepEvent(")
+        val location = functionBlock("private fun handleLocationUpdate(")
+        val motionSources = functionBlock("private fun startPositioningObservationSources(")
+        val locationGate = functionBlock("private fun currentLocationCollectionAllowsWork()")
+        val stepGate = functionBlock("private fun currentStepTrackingCollectionAllowsWork()")
+        val fieldGate = functionBlock("private fun currentPositionFieldCollectionAllowsWork()")
+
+        assertTrue(step.contains("currentPositionFieldLeaseOrNull() == null"))
+        assertTrue(location.contains("if (!currentNavigationCollectionAllowsWork())"))
+        assertTrue(location.contains("appendPositionFieldGnssTrace("))
+        assertTrue(location.contains("matchedEvidenceCurrent = false"))
+        assertTrue(motionSources.contains("currentPositionFieldLeaseOrNull() != null"))
+        assertTrue(locationGate.contains("currentPositionFieldCollectionAllowsWork()"))
+        assertTrue(stepGate.contains("currentPositionFieldCollectionAllowsWork()"))
+        assertTrue(fieldGate.contains("BuildConfig.DEBUG"))
+        assertTrue(fieldGate.contains("!isActivityForeground"))
+        assertTrue(fieldGate.contains("!isWalkSessionRuntimeActive()"))
+        assertTrue(fieldGate.contains("!hasLocationPermission()"))
+        assertTrue(fieldGate.contains("currentRuntimeEpochOrNull()"))
+        assertTrue(fieldGate.contains("GatewaySessionProcessCoordinator.snapshot().generation"))
+        assertTrue(fieldGate.contains("positionFieldLocalScopeId == positionFieldLeaseScopeId"))
+    }
+
+    @Test
+    fun calibrationRequiresAContinuousHighQualitySegment() {
+        val calibration = functionBlock("private fun attemptStepCalibration(")
+        val qualityGuard = calibration.indexOf("if (!trustedPositionSegment)")
+        val baseline = calibration.indexOf("if (lastCalibrationLocation == null")
+        val learn = calibration.indexOf("positioningCoordinator.calibrateProfile(")
+
+        assertTrue(qualityGuard >= 0)
+        assertTrue(qualityGuard < baseline)
+        assertTrue(baseline < learn)
+        assertTrue(calibration.contains("lastCalibrationLocation = null"))
+        assertTrue(calibration.contains("lastCalibrationStepCount = 0"))
+        assertTrue(calibration.contains("lastCalibrationAtMs = 0L"))
+    }
+
+    @Test
+    fun degradedPositionQualityInterruptsMapMatchingEvidenceWithoutProviderPauseMutation() {
+        val confidence = functionBlock("private fun applyPositionConfidenceDecision(")
+
+        assertTrue(confidence.contains("PositionQuality.LOW, PositionQuality.UNAVAILABLE"))
+        assertTrue(confidence.contains("decision.previousQuality != decision.quality"))
+        assertTrue(confidence.contains("routeNavigator.onPositioningEvidenceInterrupted()"))
+        assertFalse(confidence.contains("directionGuidancePauseReason ="))
     }
 
     @Test

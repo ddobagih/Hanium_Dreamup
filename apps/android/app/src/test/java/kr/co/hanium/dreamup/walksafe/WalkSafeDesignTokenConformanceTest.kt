@@ -25,41 +25,41 @@ class WalkSafeDesignTokenConformanceTest {
     }
 
     @Test
-    fun colorsMatchTheTeammateDesignTokens() {
+    fun colorsMatchTheApprovedMinimalNativePalette() {
         val expected = mapOf(
-            "WS_COLOR_OVERLAY_FILL" to "#FAFFF9F0",
-            "WS_COLOR_WALK_OVERLAY_FILL" to "#F2FFF9F0",
+            "WS_COLOR_OVERLAY_FILL" to "#FAFAF9F7",
+            "WS_COLOR_WALK_OVERLAY_FILL" to "#F2FAF9F7",
             "WS_COLOR_NOTICE_FILL" to "#FFFFFFFF",
-            "WS_COLOR_LINE" to "#FFC8BFB0",
-            "WS_COLOR_BUTTON_TEXT" to "#FF1A1916",
-            "WS_COLOR_NOTICE_TEXT" to "#FF5C5853",
-            "WS_COLOR_EMPHASIS" to "#FF0A0906",
+            "WS_COLOR_LINE" to "#FFDEDBD5",
+            "WS_COLOR_BUTTON_TEXT" to "#FF1B1B1D",
+            "WS_COLOR_NOTICE_TEXT" to "#FF5C5C64",
+            "WS_COLOR_EMPHASIS" to "#FF1B1B1D",
             "WS_COLOR_WARNING" to "#FFC0340E",
             "WS_COLOR_BUTTON_FILL" to "#FFFFFFFF",
-            "WS_COLOR_BUTTON_BORDER" to "#FF7A7570",
-            "WS_COLOR_BUTTON_PRESSED_FILL" to "#FFE8E5DF",
-            "WS_COLOR_BUTTON_FOCUSED_FILL" to "#FF765D00",
-            "WS_COLOR_BUTTON_DISABLED_FILL" to "#FFE4E1DB",
-            "WS_COLOR_BUTTON_DISABLED_TEXT" to "#FF8C8782",
-            "WS_COLOR_GROUND" to "#FFFFF9F0",
-            "WS_COLOR_PRIMARY_ACTION_FILL" to "#FF1C1A17",
-            "WS_COLOR_PRIMARY_ACTION_TEXT" to "#FFFFF9F0",
-            "WS_COLOR_PRIMARY_ACTION_PRESSED_FILL" to "#FF3A3730",
-            "WS_COLOR_PRIMARY_ACTION_DISABLED_FILL" to "#FF6B6761",
-            "WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT" to "#FFFFF9F0",
-            "WS_COLOR_FOCUS" to "#FF1A4FBF",
+            "WS_COLOR_BUTTON_BORDER" to "#FF77747A",
+            "WS_COLOR_BUTTON_PRESSED_FILL" to "#FFEEF2FF",
+            "WS_COLOR_BUTTON_FOCUSED_FILL" to "#FF1B4CD8",
+            "WS_COLOR_BUTTON_DISABLED_FILL" to "#FFE6E5E3",
+            "WS_COLOR_BUTTON_DISABLED_TEXT" to "#FF747477",
+            "WS_COLOR_GROUND" to "#FFFAF9F7",
+            "WS_COLOR_PRIMARY_ACTION_FILL" to "#FF1B4CD8",
+            "WS_COLOR_PRIMARY_ACTION_TEXT" to "#FFFFFFFF",
+            "WS_COLOR_PRIMARY_ACTION_PRESSED_FILL" to "#FF153BA8",
+            "WS_COLOR_PRIMARY_ACTION_DISABLED_FILL" to "#FFD8DDED",
+            "WS_COLOR_PRIMARY_ACTION_DISABLED_TEXT" to "#FF656A7A",
+            "WS_COLOR_FOCUS" to "#FF1B4CD8",
         )
         expected.forEach { (name, value) -> assertEquals(name, value, argb(name)) }
     }
 
     @Test
-    fun dimensionsMatchTheTeammateDesignTokens() {
-        assertEquals("48dp", dimension("WS_TOUCH_MIN_DP"))
-        assertEquals("56dp", dimension("WS_TOUCH_WALK_ACTION_DP"))
-        assertEquals("80dp", dimension("WS_TOUCH_WALK_PRIMARY_DP"))
-        assertEquals("10dp", dimension("WS_CORNER_RADIUS_DP"))
+    fun dimensionsMatchTheApprovedLargeNativeControls() {
+        assertEquals("64dp", dimension("WS_TOUCH_MIN_DP"))
+        assertEquals("72dp", dimension("WS_TOUCH_WALK_ACTION_DP"))
+        assertEquals("88dp", dimension("WS_TOUCH_WALK_PRIMARY_DP"))
+        assertEquals("16dp", dimension("WS_CORNER_RADIUS_DP"))
         assertEquals("24dp", dimension("WS_SECTION_GAP_DP"))
-        assertEquals("8dp", dimension("WS_GROUP_GAP_DP"))
+        assertEquals("12dp", dimension("WS_GROUP_GAP_DP"))
     }
 
     @Test
@@ -115,97 +115,70 @@ class WalkSafeDesignTokenConformanceTest {
     }
 
     @Test
-    fun componentStylesAreAppliedToTheActualScreenControls() {
+    fun componentStylesAreAppliedToTheCurrentVisibleControls() {
         val build = functionBlock("private fun buildContentView()")
-        val userReports = functionBlock("private fun renderUserReportList(")
-        val destinations = functionBlock("private fun updateDestinationSearchUi()")
-
         assertTrue(build.contains("setBackgroundColor(WS_COLOR_OVERLAY_FILL)"))
         assertTrue(build.contains("setBackgroundColor(WS_COLOR_WALK_OVERLAY_FILL)"))
         assertTrue(build.contains("applyAccessibleControlDefaults(overlay)"))
         assertTrue(build.contains("applyAccessibleControlDefaults(walkSafetyOverlay)"))
-        assertTrue(
-            Regex(
-                """applyWsButtonStyle\(\s*startupCapabilityConfirmButton,\s*""" +
-                    """WS_TOUCH_WALK_PRIMARY_DP,\s*primary = true,\s*\)""",
-            ).containsMatchIn(build),
-        )
-        assertTrue(
-            Regex(
-                """listOf\(\s*officialEnvironmentStatusText,\s*""" +
-                    """phoneMountingStatusText,\s*startupCapabilityText,\s*""" +
-                    """postLoginDeviceCheckLiveStatusText,\s*\)""" +
-                    """\.forEach\(::applyWsStatusCard\)""",
-            ).containsMatchIn(build),
-        )
-        assertTrue(
-            Regex(
-                """listOf\(\s*firstRunNoticeToggleButton,[\s\S]*?""" +
-                    """accountSignupBackButton,[\s\S]*?\)""" +
-                    """\.forEach\(::applyWsSecondaryButtonStyle\)""",
-            ).containsMatchIn(build),
-        )
-        assertTrue(userReports.contains("applyWsButtonStyle(detailButton, WS_TOUCH_WALK_ACTION_DP)"))
-        assertTrue(
-            destinations.contains(
-                ".also { applyWsButtonStyle(it, WS_TOUCH_WALK_ACTION_DP) }",
-            ),
-        )
+        assertTrue(Regex("""applyWsButtonStyle\(\s*startupCapabilityConfirmButton,\s*WS_TOUCH_WALK_PRIMARY_DP,\s*primary = true,\s*\)""").containsMatchIn(build))
+        assertTrue(Regex("""listOf\(\s*firstRunPhonePostureText,\s*startupCapabilityText,\s*postLoginDeviceCheckLiveStatusText,\s*nativeDestinationConfirmationText,\s*\)\.forEach\(::applyWsStatusCard\)""").containsMatchIn(build))
+        assertTrue(build.contains("wsEmphasisButtons.forEach"))
+        assertTrue(build.contains("applyWsButtonStyle(it, WS_TOUCH_PRIMARY_DP, primary = true)"))
+        assertTrue(functionBlock("private fun renderUserReportList(").contains("applyWsButtonStyle(detailButton, WS_TOUCH_WALK_ACTION_DP)"))
+        assertTrue(functionBlock("private fun updateDestinationSearchUi()").contains("applyWsButtonStyle(this, WS_TOUCH_WALK_ACTION_DP)"))
     }
 
     @Test
-    fun controlStatesAndMixedStackSpacingKeepTheNativeUiFixes() {
+    fun sharedControlStylesKeepVisibleFocusDisabledStateAndStackSpacing() {
         val defaults = functionBlock("private fun applyAccessibleControlDefaults(")
         val spacing = functionBlock("private fun applyWsStackSpacing(")
         val secondary = functionBlock("private fun applyWsSecondaryButtonStyle(")
-
+        val button = functionBlock("private fun applyWsButtonStyle(")
+        val face = functionBlock("private fun wsButtonFace(")
         assertTrue(defaults.contains("applyWsButtonStyle(root, WS_TOUCH_WALK_ACTION_DP)"))
         assertTrue(defaults.contains("if (root is EditText) applyWsFieldStyle(root)"))
-        assertTrue(
-            defaults.contains("intArrayOf(WS_COLOR_EMPHASIS, WS_COLOR_BUTTON_BORDER)"),
-        )
-        assertFalse(defaults.contains("intArrayOf(WS_COLOR_EMPHASIS, WS_COLOR_LINE)"))
+        assertTrue(defaults.contains("intArrayOf(WS_COLOR_PRIMARY_ACTION_FILL, WS_COLOR_BUTTON_BORDER)"))
         assertTrue(spacing.contains("children.dropLast(1).forEach"))
         assertTrue(spacing.contains("if (params.bottomMargin == 0) params.bottomMargin = gap"))
         assertFalse(spacing.contains("children.any"))
-        assertTrue(secondary.contains("button.background = StateListDrawable().apply"))
-        assertTrue(secondary.contains("intArrayOf(-android.R.attr.state_enabled)"))
-        assertTrue(secondary.contains("WS_COLOR_BUTTON_DISABLED_FILL"))
-        assertTrue(secondary.contains("intArrayOf(android.R.attr.state_pressed)"))
-        assertTrue(secondary.contains("WS_COLOR_BUTTON_PRESSED_FILL"))
-        assertTrue(secondary.contains("intArrayOf(android.R.attr.state_focused)"))
-        assertTrue(secondary.contains("wsButtonFace(0x00000000, density, focused = true)"))
-        assertTrue(secondary.contains("button.setTextColor("))
-        assertTrue(secondary.contains("WS_COLOR_BUTTON_DISABLED_TEXT"))
+        assertTrue(secondary.contains("applyWsButtonStyle(button, 144f)"))
+        assertTrue(button.contains("button.background = StateListDrawable().apply"))
+        assertTrue(button.contains("intArrayOf(-android.R.attr.state_enabled)"))
+        assertTrue(button.contains("face(restingFill, faded = true)"))
+        assertTrue(button.contains("intArrayOf(android.R.attr.state_pressed)"))
+        assertTrue(button.contains("intArrayOf(android.R.attr.state_focused)"))
+        assertTrue(button.contains("face(restingFill, focused = true)"))
+        assertTrue(button.contains("button.setTextColor("))
+        assertTrue(face.contains("WS_FOCUS_BORDER_DP"))
+        assertTrue(face.contains("WS_COLOR_FOCUS"))
     }
 
     @Test
-    fun clausesAndShortScreensKeepTheFinalLightDesignFixes() {
+    fun consentBodiesUseTheFullScrollablePageWithIndependentListeningControls() {
         val clause = functionBlock("private fun applyWsClauseBox(")
-        val firstRunConsent = sourceBlock(
-            "firstRunIntegratedConsentButtons.clear()",
-            "firstRunIntegratedConsentSaveButton =",
-        )
         val build = functionBlock("private fun buildContentView()")
-        val firstRunUpdate = functionBlock("private fun updateFirstRunOnboardingUi(")
-
-        assertTrue(clause.contains("setColor(WS_COLOR_GROUND)"))
+        assertTrue(clause.contains("view.background = null"))
         assertTrue(clause.contains("view.textSize = 18f"))
-        assertTrue(clause.contains("view.setLineSpacing(0f, 1.75f)"))
-        assertTrue(
-            firstRunConsent.contains(
-                "IntegratedConsentItem.RAW_SOURCE_COLLECTION -> \"원본·진단수집 raw v2\"",
-            ),
-        )
-        assertTrue(firstRunConsent.contains("applyWsClauseBox(this)"))
-        assertTrue(firstRunConsent.contains("firstRunConsentAllButton ="))
-        assertTrue(build.contains("addView(firstRunConsentAllButton)"))
-        assertTrue(firstRunUpdate.contains("firstRunConsentAllButton.visibility ="))
+        assertTrue(clause.contains("view.setLineSpacing(0f, 1.65f)"))
+        assertTrue(clause.contains("view.maxHeight = Int.MAX_VALUE"))
+        assertTrue(clause.contains("view.movementMethod = null"))
+        assertTrue(clause.contains("view.isClickable = false"))
+        assertTrue(build.contains("accountConsentClauseTexts[key] = clauseText"))
+        assertTrue(build.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
+        assertTrue(build.contains("addView(clauseText)"))
+        assertTrue(build.contains("addView(listenButton)"))
+        assertFalse(build.contains("addView(firstRunConsentAllButton)"))
         assertTrue(source.contains("controlsScroll = ScrollView(this).apply {\n            isFillViewport = true"))
+        val listening = functionBlock("private fun playAccountConsentClause(")
+        assertFalse(listening.contains("isChecked ="))
+        assertFalse(listening.contains("acceptEducationConsent"))
+        assertTrue(listening.contains("onCompleted = {"))
+        assertTrue(listening.contains("onFailed ="))
     }
 
     @Test
-    fun waitingCardKeepsTheTeammateAnimationAndOnlyShowsForActiveEmailRequests() {
+    fun emailWaitingStateDoesNotReattachTheRemovedProgressCard() {
         val build = functionBlock("private fun buildContentView()")
         val waiting = functionBlock("private fun firstRunWaitingTextOrNull(")
         val emailWaiting = waiting.substringBefore("return when (snapshot.stage)")
@@ -219,7 +192,7 @@ class WalkSafeDesignTokenConformanceTest {
         assertTrue(build.contains("GradientDrawable.OVAL"))
         assertTrue(build.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
         assertTrue(build.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"))
-        assertTrue(build.contains("addView(firstRunWaitingCard)"))
+        assertFalse(build.contains("addView(firstRunWaitingCard)"))
         assertTrue(waiting.contains("FirstRunOnboardingStage.VERIFIED_SMS"))
         assertTrue(waiting.contains("FirstRunOnboardingStage.GUARDIAN_APPROVAL"))
         assertTrue(waiting.contains("FirstRunOnboardingStage.ACCOUNT_ACTIVATION"))

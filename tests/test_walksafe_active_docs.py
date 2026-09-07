@@ -102,6 +102,10 @@ def test_current_operational_docs_keep_exact_environment_and_source_facts() -> N
     development = (
         ROOT / "docs/guides/development-environment-guide.md"
     ).read_text(encoding="utf-8")
+    backend_deployment = (
+        ROOT / "deploy/config/walksafe-backend.env.example"
+    ).read_text(encoding="utf-8")
+    backend_example = (ROOT / "backend/.env.example").read_text(encoding="utf-8")
     tests_readme = (ROOT / "tests/README.md").read_text(encoding="utf-8")
     workflow = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
     for token in (
@@ -123,6 +127,17 @@ def test_current_operational_docs_keep_exact_environment_and_source_facts() -> N
         assert token in development
     assert 'test -x "${WALKSAFE_NODE_BIN_DIR:?}/node"' in tests_readme
     assert 'node_executable="$(command -v node)"' not in tests_readme
+    assert (
+        "Backend와 Android Gateway 프로세스의 `WALKSAFE_GATEWAY_SESSION_SECRET`를 "
+        "정확히 같은 비밀값으로 설정"
+    ) in development
+    for assignment in (
+        "WALKSAFE_SIGNUP_RAW_ORIGINAL_VERSION=FP-013-RAW-1.1.0",
+        "WALKSAFE_SIGNUP_AUTOMATIC_REPORTING_VERSION=FP-013-AUTO-1.1.0",
+        "WALKSAFE_SIGNUP_TRAINING_REUSE_VERSION=FP-013-TRAINING-1.1.0",
+    ):
+        assert assignment in backend_deployment
+        assert assignment in backend_example
 
     package_readme = (
         ROOT

@@ -70,7 +70,7 @@ public final class AdminIncidentController {
         public int historySnapshotRevision() { return historySnapshotRevision; }
         public int historyTotalCount() { return historyTotalCount; }
         public String errorMessage() { return errorMessage; }
-        public boolean canLoadMore() { return nextCursor != null && phase != Phase.LOADING_MORE; }
+        public boolean canLoadMore() { return nextCursor != null && phase == Phase.CONTENT; }
         public boolean canLoadMoreHistory() {
             return detail != null && historyNextCursor != null
                 && phase == Phase.CONTENT;
@@ -123,7 +123,7 @@ public final class AdminIncidentController {
     }
 
     public synchronized Request beginNextPage() {
-        if (state.nextCursor == null) throw new IllegalStateException("next incident page is unavailable");
+        if (!state.canLoadMore()) throw new IllegalStateException("next incident page is unavailable");
         Request request = new Request(
             ++generation, Request.Kind.NEXT_PAGE, state.filters, state.nextCursor,
             state.selectedIncidentId

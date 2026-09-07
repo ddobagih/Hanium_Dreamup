@@ -35,7 +35,7 @@ class PostLoginDeviceCheckPolicyTest {
     }
 
     @Test
-    fun onlyUserActionStartsAnAttemptAndStableMetricDepthYieldsFull() {
+    fun onlyUserActionStartsAnAttemptAndSupportedMetricDepthYieldsFull() {
         val bound = boundSnapshot()
 
         assertEquals(PostLoginDeviceCheckState.NOT_RUN, bound.state)
@@ -56,7 +56,7 @@ class PostLoginDeviceCheckPolicyTest {
             binding,
             foreground = true,
             observation = readyObservation(
-                metricDepth = PostLoginMetricDepthState.AVAILABLE,
+                metricDepth = PostLoginMetricDepthState.SUPPORTED,
             ),
         )
 
@@ -90,10 +90,10 @@ class PostLoginDeviceCheckPolicyTest {
     }
 
     @Test
-    fun deniedRuntimePermissionDoesNotPersistAFeatureLimitOrFailTheHardwareCheck() {
+    fun deniedRuntimePermissionFailsWithoutPersistingAHardwareFeatureLimit() {
         val (running, binding) = runningAttempt()
 
-        val full = PostLoginDeviceCheckPolicy.evaluate(
+        val failed = PostLoginDeviceCheckPolicy.evaluate(
             running,
             binding,
             foreground = true,
@@ -103,10 +103,10 @@ class PostLoginDeviceCheckPolicyTest {
             ).copy(requiredPermissions = PostLoginDeviceCheckSignal.UNAVAILABLE),
         )
 
-        assertEquals(PostLoginDeviceCheckState.FULL, full.state)
-        assertTrue(full.disabledFeatures.isEmpty())
-        assertEquals(null, full.failure)
-        assertTrue(full.passesFeatureGate)
+        assertEquals(PostLoginDeviceCheckState.FAIL, failed.state)
+        assertTrue(failed.disabledFeatures.isEmpty())
+        assertEquals(PostLoginDeviceCheckFailure.REQUIRED_PERMISSION, failed.failure)
+        assertFalse(failed.passesFeatureGate)
     }
 
     @Test
@@ -185,6 +185,7 @@ class PostLoginDeviceCheckPolicyTest {
             readyObservation().copy(detector = PostLoginDeviceCheckSignal.PENDING),
             readyObservation().copy(cameraPipeline = PostLoginDeviceCheckSignal.PENDING),
             readyObservation().copy(koreanTextToSpeech = PostLoginDeviceCheckSignal.PENDING),
+            readyObservation().copy(wakePhraseRecognition = PostLoginDeviceCheckSignal.PENDING),
             readyObservation(metricDepth = PostLoginMetricDepthState.PENDING),
         ).forEach { observation ->
             val (running, binding) = runningAttempt()
@@ -202,12 +203,10 @@ class PostLoginDeviceCheckPolicyTest {
     }
 
     @Test
-    fun locationFixWakePhraseAndHapticConfirmationAreNotBlockingGates() {
+    fun locationFixAndHapticConfirmationDoNotBlockAfterWakePhraseRecognition() {
         val (running, binding) = runningAttempt()
         val unsupported = setOf(
             PostLoginDeviceCheckFeature.LOCATION_GUIDANCE,
-            PostLoginDeviceCheckFeature.HANDS_FREE_VOICE,
-            PostLoginDeviceCheckFeature.HAPTIC_FEEDBACK,
         )
 
         val limited = PostLoginDeviceCheckPolicy.evaluate(
@@ -216,7 +215,6 @@ class PostLoginDeviceCheckPolicyTest {
             foreground = true,
             observation = readyObservation(unsupportedFeatures = unsupported).copy(
                 locationFix = PostLoginDeviceCheckSignal.PENDING,
-                wakePhraseRecognition = PostLoginDeviceCheckSignal.PENDING,
                 hapticFeedback = PostLoginDeviceCheckSignal.PENDING,
             ),
         )
@@ -224,6 +222,40 @@ class PostLoginDeviceCheckPolicyTest {
         assertEquals(PostLoginDeviceCheckState.LIMITED, limited.state)
         assertEquals(unsupported, limited.disabledFeatures)
         assertTrue(limited.passesFeatureGate)
+    }
+
+    @Test
+    fun unavailableWakePhraseRecognitionCannotUseCapabilitySupportAsAttemptEvidence() {
+        val (running, binding) = runningAttempt()
+        val failed = PostLoginDeviceCheckPolicy.evaluate(
+            running,
+            binding,
+            foreground = true,
+            observation = readyObservation().copy(
+                wakePhraseRecognition = PostLoginDeviceCheckSignal.UNAVAILABLE,
+            ),
+        )
+
+        assertEquals(PostLoginDeviceCheckState.FAIL, failed.state)
+        assertEquals(PostLoginDeviceCheckFailure.WAKE_PHRASE_UNAVAILABLE, failed.failure)
+        assertFalse(failed.passesFeatureGate)
+    }
+
+    @Test
+    fun vibrationProbeStateDoesNotChangeTheCompletedDeviceCheck() {
+        PostLoginDeviceCheckSignal.entries.forEach { hapticSignal ->
+            val (running, binding) = runningAttempt()
+            val result = PostLoginDeviceCheckPolicy.evaluate(
+                running,
+                binding,
+                foreground = true,
+                observation = readyObservation().copy(hapticFeedback = hapticSignal),
+            )
+
+            assertEquals(PostLoginDeviceCheckState.FULL, result.state)
+            assertTrue(result.disabledFeatures.isEmpty())
+            assertTrue(result.passesFeatureGate)
+        }
     }
 
     @Test
@@ -632,7 +664,7 @@ class PostLoginDeviceCheckPolicyTest {
     )
 
     private fun readyObservation(
-        metricDepth: PostLoginMetricDepthState = PostLoginMetricDepthState.AVAILABLE,
+        metricDepth: PostLoginMetricDepthState = PostLoginMetricDepthState.SUPPORTED,
         cameraPipeline: PostLoginDeviceCheckSignal = PostLoginDeviceCheckSignal.READY,
         unsupportedFeatures: Set<PostLoginDeviceCheckFeature> = emptySet(),
         blockingFailure: PostLoginDeviceCheckFailure? = null,

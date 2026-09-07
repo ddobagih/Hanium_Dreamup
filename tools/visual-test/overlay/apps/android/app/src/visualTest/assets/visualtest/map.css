@@ -1,0 +1,32 @@
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; }
+body { display: flex; flex-direction: column; background: #fff; color: #102b37; font-family: sans-serif; }
+header { padding: 12px 12px 8px; border-bottom: 1px solid #cbd9df; }
+p { margin: 0; }
+#destination { font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+#instruction { margin-top: 6px; font-size: 16px; line-height: 1.4; }
+#position-status { margin-top: 5px; font-size: 13px; color: #405b65; }
+main { position: relative; flex: 1; min-height: 160px; }
+#map { height: 100%; width: 100%; background: #e9eff2; }
+#tile-status { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 500; padding: 9px 10px; border: 1px solid #bdcbd1; border-radius: 8px; background: rgba(255,255,255,.96); font-size: 14px; line-height: 1.4; pointer-events: none; }
+#tile-status[hidden] { display: none; }
+#tile-status.error { border-color: #a66312; color: #6b3900; background: #fff6df; }
+footer { padding: 9px 10px 10px; border-top: 1px solid #cbd9df; }
+.legend { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 12px; margin-bottom: 9px; flex-wrap: wrap; }
+.start, .end { color: #fff; display: inline-flex; justify-content: center; align-items: center; border-radius: 50%; width: 22px; height: 22px; font-weight: bold; }
+.start { background: #17643c; }
+.end { background: #963620; }
+.position-dot { width: 13px; height: 13px; border-radius: 50%; background: #0963cb; border: 2px solid #fff; box-shadow: 0 0 0 1px #0963cb; }
+.guide-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 2px solid #146c83; }
+.buttons { display: grid; grid-template-columns: 48px 48px 1fr 1fr; gap: 7px; }
+button { min-height: 48px; padding: 5px; border: 1px solid #607b88; border-radius: 8px; background: #fff; color: #102b37; font-size: 15px; font-weight: 700; }
+button:focus-visible { outline: 3px solid #e29800; outline-offset: 1px; }
+button:active { background: #e1edf4; }
+button:disabled { color: #7a868b; border-color: #bdcbd1; background: #edf0f2; }
+#zoom-in, #zoom-out { font-size: 26px; }
+.route-pin { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #fff; color: #fff; text-align: center; line-height: 28px; font-size: 18px; font-weight: 700; box-shadow: 0 1px 5px #344b5d; }
+.route-pin.start-pin { background: #17643c; }
+.route-pin.end-pin { background: #963620; }
+
+.current-pin { width: 20px; height: 20px; border: 3px solid #fff; border-radius: 50%; background: #0963cb; box-shadow: 0 0 0 1px #0963cb; }
+.guide-pin { width: 10px; height: 10px; border: 2px solid #146c83; border-radius: 50%; background: #fff; }

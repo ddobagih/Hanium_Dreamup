@@ -4,6 +4,8 @@
 .venv-backup-tests/
 .gradle/
 .kotlin/
+.cxx/
+.externalNativeBuild/
 .playwright-cli/
 __pycache__/
 .pytest_cache/
@@ -30,6 +32,7 @@ build/
 id_rsa
 id_ed25519
 local.properties
+/local-evidence/positioning/
 
 # Current repository boundary
 /docs/submission/

@@ -40,13 +40,12 @@ class MainActivityFp016StaticTest {
     }
 
     @Test
-    fun developerControlsAreConstructedAndAttachedOnlyInsideDebugBlocks() {
+    fun developerControlsRemainDebugOnlyWithBracedOrSingleStatementGuards() {
         val debugBlocks = Regex("""if\s*\(\s*BuildConfig\.DEBUG\s*\)\s*\{""")
-            .findAll(source)
-            .map { bracedBlockRange(it.range.first) }
-            .toList()
-        assertTrue("BuildConfig.DEBUG UI block is missing", debugBlocks.isNotEmpty())
-
+            .findAll(source).map { bracedBlockRange(it.range.first) }.toList() +
+            Regex("""if\s*\(\s*BuildConfig\.DEBUG\s*\)\s*addView\([A-Za-z0-9_]+\)""")
+                .findAll(source).map { it.range }.toList()
+        assertTrue("BuildConfig.DEBUG UI guard is missing", debugBlocks.isNotEmpty())
         val developerControls = listOf(
             "backendUrlInput" to "EditText(",
             "destinationLatInput" to "EditText(",
@@ -57,7 +56,8 @@ class MainActivityFp016StaticTest {
         )
         developerControls.forEach { (name, type) ->
             assertOnlyInsideDebugBlocks("$name = $type", debugBlocks)
-            assertOnlyInsideDebugBlocks("addView($name)", debugBlocks)
+            val attachment = "addView($name)"
+            if (source.contains(attachment)) assertOnlyInsideDebugBlocks(attachment, debugBlocks)
         }
     }
 
@@ -94,7 +94,7 @@ class MainActivityFp016StaticTest {
     }
 
     @Test
-    fun systemBackRechecksAndCancelsOutputsBeforeShowingExitConfirmation() {
+    fun systemBackReturnsFromFeaturesOrEndsTheWalkAfterCancellingOutputs() {
         assertTrue(source.contains("class MainActivity : Activity()"))
         val callback = blockAt(
             "private val walkScreenBackCallback = object : OnBackPressedCallback(true)",
@@ -122,56 +122,32 @@ class MainActivityFp016StaticTest {
         assertTrue(legacyBack.contains("walkBackDispatcher.onBackPressed()"))
 
         val handler = blockAt("private fun handleWalkScreenBackPressed()")
-        val recheck = Regex(
-            """enterWalkSessionForegroundRecheckAndCancelOutputs\s*\(\s*"system_back_exit_confirmation"\s*\)""",
-        ).find(handler)?.range?.first ?: -1
-        val automaticResumeGuard =
-            handler.indexOf("walkSessionResumeRetryRequiresUserAction = true")
-        val showDialog = handler.indexOf("showWalkExitConfirmationDialog()")
-
-        assertTrue(recheck >= 0)
-        assertTrue(automaticResumeGuard > recheck)
-        assertTrue(showDialog > automaticResumeGuard)
-        assertFalse(handler.contains("system_back_exit_confirmation_already_paused"))
-
-        val dialog = blockAt("private fun showWalkExitConfirmationDialog()")
-        assertTrue(dialog.contains("AlertDialog.Builder(this)"))
-        assertTrue(dialog.contains(".setPositiveButton("))
-        assertTrue(dialog.contains(".setNegativeButton("))
-        assertTrue(dialog.contains(".show()"))
-        assertFalse(dialog.contains("walkSessionResumeRetryRequiresUserAction = false"))
-        assertFalse(
-            Regex(
-                """(?i)\b(?:resume[A-Za-z0-9_]*|startDepthSession|handleWalkSessionForegroundReturn)\s*\(""",
-            ).containsMatchIn(dialog),
-        )
+        val featureBack = handler.indexOf("if (handleNativeFeatureBackPressed()) return true")
+        val end = handler.indexOf("transitionWalkSession(WalkSessionEvent.EndRequested)")
+        val marker = handler.indexOf("persistWalkSessionInterruptionMarker()")
+        val cancellation = handler.indexOf("cancelWalkSessionOutputs(\"system_back_exit_confirmed\")")
+        val finish = handler.indexOf("finish()")
+        assertTrue(featureBack >= 0)
+        assertTrue(handler.contains("state != WalkSessionState.ACTIVE && state != WalkSessionState.PAUSED"))
+        assertTrue(end > featureBack)
+        assertTrue(marker > end)
+        assertTrue(cancellation > marker)
+        assertTrue(finish > cancellation)
+        val features = blockAt("private fun handleNativeFeatureBackPressed()")
+        assertTrue(features.contains("cancelNativeDestinationSearchAndReturnHome()"))
+        assertTrue(features.contains("cancelNativeVoiceCommandAndReturnHome()"))
+        assertTrue(features.contains("showNativeUiPage(NativeUiPage.HOME)"))
     }
 
     @Test
-    fun safetySummaryIsPoliteWhileHighFrequencyStatusIsNotLive() {
-        val safetySummary = blockAt("safetySummaryText = TextView(this).apply {")
-        val highFrequencyStatus = blockAt("statusText = TextView(this).apply {")
-
-        assertTrue(
-            safetySummary.contains(
-                "accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE",
-            ),
-        )
-        assertTrue(
-            highFrequencyStatus.contains(
-                "accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE",
-            ),
-        )
-        assertFalse(
-            highFrequencyStatus.contains(
-                "accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE",
-            ),
-        )
-        assertFalse(
-            highFrequencyStatus.contains(
-                "accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE",
-            ),
-        )
+    fun appOwnedSpeechStatusRemainsDiscoverableWithoutDuplicateLiveAnnouncements() {
+        listOf("safetySummaryText", "statusText", "gatewayVoiceStatusText", "walkSafetyVoiceStatusText").forEach { name ->
+            val block = blockAt("$name = TextView(this).apply {")
+            assertTrue(block.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
+            assertTrue(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE"))
+            assertFalse(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"))
+            assertFalse(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE"))
+        }
     }
 
     private fun assertOnlyInsideDebugBlocks(anchor: String, debugBlocks: List<IntRange>) {
