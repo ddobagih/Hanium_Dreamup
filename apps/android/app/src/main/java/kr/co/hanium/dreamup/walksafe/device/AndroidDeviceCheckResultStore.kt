@@ -4,7 +4,10 @@ import android.content.SharedPreferences
 import java.security.MessageDigest
 
 const val POST_LOGIN_DEVICE_CHECK_RESULT_POLICY_VERSION = "4"
-const val POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION = "20260905-interactive-v1"
+// Moves whenever a probe's pass criteria change, so results earned under the old rules stop
+// restoring. 20260908: GPS 100 m to 15 m, camera one-of-five to ten frames at eighty percent,
+// TTS output existence to utterance duration, thermal CRITICAL to SEVERE.
+const val POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION = "20260908-tightened-v1"
 const val POST_LOGIN_METRIC_DEPTH_PROBE_POLICY_VERSION = "20260905-support-only-v1"
 
 data class PostLoginDeviceCheckResultBinding(
