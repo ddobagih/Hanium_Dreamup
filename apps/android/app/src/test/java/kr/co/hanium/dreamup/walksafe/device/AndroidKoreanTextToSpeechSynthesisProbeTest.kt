@@ -30,10 +30,11 @@ class AndroidKoreanTextToSpeechSynthesisProbeTest {
     }
 
     @Test
-    fun nonEmptyCompletedSynthesisIsTheOnlyAvailableResult() {
+    fun aCompletedSynthesisCarryingTheWholeUtteranceIsTheOnlyAvailableResult() {
         val engine = FakeEngine(
             onSynthesize = { file, utteranceId, listener ->
-                file.writeBytes(byteArrayOf(1, 2, 3))
+                // Was three arbitrary bytes, which is a non-empty file and not speech.
+                file.writeBytes(wavBytes(durationMs = 1_694))
                 listener.onDone(utteranceId)
             },
         )
@@ -183,6 +184,56 @@ class AndroidKoreanTextToSpeechSynthesisProbeTest {
         assertTrue(fixture.results.isEmpty())
         fixture.scheduler.fire()
         assertEquals(listOf(KoreanTextToSpeechSynthesisProbeResult.TIMED_OUT), fixture.results)
+    }
+
+    @Test
+    fun audioTooShortForTheProbeSentenceIsItsOwnResult() {
+        val engine = FakeEngine(
+            onSynthesize = { file, utteranceId, listener ->
+                file.writeBytes(wavBytes(durationMs = 300))
+                listener.onDone(utteranceId)
+            },
+        )
+        val fixture = fixture(engine)
+
+        fixture.session.start()
+
+        assertEquals(
+            listOf(KoreanTextToSpeechSynthesisProbeResult.OUTPUT_TOO_SHORT),
+            fixture.results,
+        )
+        assertFalse(fixture.results.single().available)
+    }
+
+    /** Minimal 24 kHz mono 16-bit WAV, the format both measured engines emit. */
+    private fun wavBytes(durationMs: Int): ByteArray {
+        val sampleRate = 24_000
+        val byteRate = sampleRate * 2
+        val dataBytes = (byteRate.toLong() * durationMs / 1_000L).toInt()
+        val out = java.io.ByteArrayOutputStream()
+        fun le16(value: Int) {
+            out.write(value and 0xff)
+            out.write((value ushr 8) and 0xff)
+        }
+        fun le32(value: Int) {
+            le16(value and 0xffff)
+            le16((value ushr 16) and 0xffff)
+        }
+        out.write("RIFF".toByteArray())
+        le32(36 + dataBytes)
+        out.write("WAVE".toByteArray())
+        out.write("fmt ".toByteArray())
+        le32(16)
+        le16(1)
+        le16(1)
+        le32(sampleRate)
+        le32(byteRate)
+        le16(2)
+        le16(16)
+        out.write("data".toByteArray())
+        le32(dataBytes)
+        out.write(ByteArray(dataBytes))
+        return out.toByteArray()
     }
 
     private fun fixture(engine: FakeEngine): Fixture {

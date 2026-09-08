@@ -21,6 +21,9 @@ enum class KoreanTextToSpeechSynthesisProbeResult {
     SYNTHESIS_ERROR,
     SYNTHESIS_STOPPED,
     EMPTY_OUTPUT,
+
+    /** The file carried audio, but less of it than the fixed probe sentence takes to say. */
+    OUTPUT_TOO_SHORT,
     TIMEOUT_SCHEDULING_FAILED,
     TIMED_OUT,
     CANCELLED,
@@ -222,14 +225,24 @@ internal class KoreanTextToSpeechSynthesisProbeSession(
                                 state == ProbeState.RUNNING && engine === initializedEngine
                             }
                         } ?: return
-                        val hasAudio = runCatching {
-                            completedOutput.isFile && completedOutput.length() > 0L
-                        }.getOrDefault(false)
-                        finish(
-                            if (hasAudio) {
-                                KoreanTextToSpeechSynthesisProbeResult.AVAILABLE
+                        // A header with no samples behind it is a non-empty file. Only the
+                        // utterance's own length shows the engine actually spoke it.
+                        val verdict = runCatching {
+                            if (!completedOutput.isFile) {
+                                KoreanTtsOutputDurationVerdict.EMPTY
                             } else {
-                                KoreanTextToSpeechSynthesisProbeResult.EMPTY_OUTPUT
+                                KoreanTtsOutputDurationPolicy.verify(completedOutput.readBytes())
+                            }
+                        }.getOrDefault(KoreanTtsOutputDurationVerdict.UNREADABLE)
+                        finish(
+                            when (verdict) {
+                                KoreanTtsOutputDurationVerdict.SUFFICIENT ->
+                                    KoreanTextToSpeechSynthesisProbeResult.AVAILABLE
+                                KoreanTtsOutputDurationVerdict.TOO_SHORT ->
+                                    KoreanTextToSpeechSynthesisProbeResult.OUTPUT_TOO_SHORT
+                                KoreanTtsOutputDurationVerdict.EMPTY,
+                                KoreanTtsOutputDurationVerdict.UNREADABLE,
+                                -> KoreanTextToSpeechSynthesisProbeResult.EMPTY_OUTPUT
                             },
                         )
                     }
