@@ -166,6 +166,7 @@ import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixDecision
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixObservation
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixPolicy
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixReason
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixUnavailability
 import kr.co.hanium.dreamup.walksafe.device.RuntimeMetricDepthSupport
 import kr.co.hanium.dreamup.walksafe.device.RuntimeMetricFrameEvidence
 import kr.co.hanium.dreamup.walksafe.device.RuntimeMetricPreflightPolicy
@@ -18076,6 +18077,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             -> "수신한 위치값이 유효하지 않았습니다. 위치 서비스를 껐다 켠 뒤 다시 점검하세요."
             DeviceCheckLocationFixReason.PASS ->
                 "위치 수신 뒤 점검 상태가 변경되었습니다. 기기 점검을 다시 실행하세요."
+            // No sample arrived. Naming the switch beats naming the symptom: a disabled network
+            // provider makes an indoor fix impossible at any accuracy, and the user can turn it on.
+            DeviceCheckLocationFixReason.LOCATION_SERVICE_OFF,
+            DeviceCheckLocationFixReason.PROVIDER_DISABLED,
+            DeviceCheckLocationFixReason.NO_FIX_RECEIVED,
+            -> DeviceCheckLocationFixUnavailability.entries
+                .first { it.reason == postLoginLocationFixDecision?.reason }
+                .userActionKo
             null ->
                 "점검 시간 안에 새 위치를 받지 못했습니다. 정확한 위치를 켜고 창가나 실외에서 다시 점검하세요."
         }

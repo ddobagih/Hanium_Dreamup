@@ -39,7 +39,8 @@ class DeviceCheckLocationFixPolicyTest {
     @Test
     fun freshAccurateRealFixPassesWithoutADeviceModelList() {
         val decision = DeviceCheckLocationFixPolicy.evaluate(
-            observation(accuracyMeters = 25f, ageMs = 2_000L),
+            // Was 25 m, which the gate accepted while it stood at 100 m.
+            observation(accuracyMeters = 12f, ageMs = 2_000L),
         )
 
         assertTrue(decision.passed)
@@ -89,7 +90,8 @@ class DeviceCheckLocationFixPolicyTest {
     private fun observation(
         latitude: Double = 37.5665,
         longitude: Double = 126.978,
-        accuracyMeters: Float? = 20f,
+        // Inside the 15 m gate, so cases that vary another field still reach the reason they test.
+        accuracyMeters: Float? = 12f,
         ageMs: Long = 1_000L,
         mock: Boolean = false,
     ) = DeviceCheckLocationFixObservation(
