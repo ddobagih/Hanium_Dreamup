@@ -112,7 +112,10 @@ class MainActivityPostLoginDeviceCheckStaticTest {
         assertTrue(preflight.contains("ProcessCameraProvider.getInstance(this)"))
         assertTrue(preflight.contains("frameClaimed.compareAndSet(false, true)"))
         assertTrue(preflight.contains("attemptedFrames.incrementAndGet()"))
-        assertTrue(preflight.contains("POST_LOGIN_CAMERA_PIPELINE_MAX_FRAMES"))
+        // The sample runs on a pass rate now; a lone good frame used to end the check.
+        assertTrue(preflight.contains("passedFrames.incrementAndGet()"))
+        assertTrue(preflight.contains("DeviceCheckCameraSamplingPolicy.evaluate("))
+        assertTrue(preflight.contains("DeviceCheckCameraSampleVerdict.CONTINUE"))
         assertTrue(preflight.contains("frameClaimed.set(false)"))
         assertTrue(preflight.contains("POST_LOGIN_CAMERA_PIPELINE_TIMEOUT_MS"))
         assertTrue(preflight.contains("frameDetector.detect("))

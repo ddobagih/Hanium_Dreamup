@@ -161,6 +161,8 @@ import kr.co.hanium.dreamup.walksafe.device.OfficialEnvironmentGpsPreflightPolic
 import kr.co.hanium.dreamup.walksafe.device.OfficialEnvironmentGpsSample
 import kr.co.hanium.dreamup.walksafe.device.ApprovedDeviceProfileMatch
 import kr.co.hanium.dreamup.walksafe.device.DeviceGateState
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckCameraSampleVerdict
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckCameraSamplingPolicy
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckDetectorExecutionPolicy
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixDecision
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixObservation
@@ -18183,6 +18185,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         .build()
                     val frameClaimed = AtomicBoolean(false)
                     val attemptedFrames = AtomicInteger(0)
+                    val passedFrames = AtomicInteger(0)
                     analysis.setAnalyzer(detectorExecutor) { imageProxy ->
                         if (!isPostLoginCameraPipelinePreflightCurrent(binding, generation)) {
                             imageProxy.close()
@@ -18215,15 +18218,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         } finally {
                             imageProxy.close()
                         }
-                        val terminal = detectorSucceeded ||
-                            attemptedFrames.incrementAndGet() >=
-                            POST_LOGIN_CAMERA_PIPELINE_MAX_FRAMES
-                        if (terminal) {
-                            if (BuildConfig.DEBUG && !detectorSucceeded) {
+                        // A single good frame proves the camera opened, not that this phone keeps
+                        // recognising while someone walks. The sample runs until the pass rate
+                        // settles the question either way.
+                        val attempts = attemptedFrames.incrementAndGet()
+                        val passes = if (detectorSucceeded) {
+                            passedFrames.incrementAndGet()
+                        } else {
+                            passedFrames.get()
+                        }
+                        val verdict = DeviceCheckCameraSamplingPolicy.evaluate(attempts, passes)
+                        if (verdict != DeviceCheckCameraSampleVerdict.CONTINUE) {
+                            val sampleSucceeded =
+                                verdict == DeviceCheckCameraSampleVerdict.PASSED
+                            if (BuildConfig.DEBUG && !sampleSucceeded) {
                                 android.util.Log.d(
                                     CAMERA_PREFLIGHT_LOG_TAG,
-                                    "postLogin generation=$generation attempts=" +
-                                        "${attemptedFrames.get()} reason=$frameFailure",
+                                    "postLogin generation=$generation attempts=$attempts " +
+                                        "passes=$passes reason=$frameFailure",
                                 )
                             }
                             if (terminalClaim.compareAndSet(false, true)) {
@@ -18231,8 +18243,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                     finishPostLoginCameraPipelinePreflight(
                                         binding = binding,
                                         generation = generation,
-                                        detectorSucceeded = detectorSucceeded,
-                                        failure = if (detectorSucceeded) null else frameFailure,
+                                        detectorSucceeded = sampleSucceeded,
+                                        failure = if (sampleSucceeded) null else frameFailure,
                                     )
                                 }
                             }
@@ -36773,7 +36785,6 @@ generation != cameraFallbackGeneration
         const val POST_LOGIN_LOCATION_FIX_INTERVAL_MS = 1_000L
         const val POST_LOGIN_LOCATION_FIX_MIN_INTERVAL_MS = 500L
         const val POST_LOGIN_CAMERA_PIPELINE_TIMEOUT_MS = 15_000L
-        const val POST_LOGIN_CAMERA_PIPELINE_MAX_FRAMES = 5
         const val CAMERA_ANALYZER_RELEASE_BARRIER_TIMEOUT_MS = 2_000L
         const val CAMERA_X_RELEASE_POLL_INTERVAL_MS = 50L
         const val CAMERA_X_RELEASE_TIMEOUT_MS = 10_000L
