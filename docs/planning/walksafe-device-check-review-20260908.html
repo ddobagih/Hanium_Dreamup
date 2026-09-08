@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>기기점검 진단서</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f6f7f8;
+    --surface: #ffffff;
+    --surface-2: #edf1f3;
+    --ink: #17222c;
+    --muted: #5c6b78;
+    --line: #dde4e8;
+    --accent: #1f6f78;
+    --ok: #2c7a51;
+    --warn: #a1660f;
+    --stop: #b0342d;
+    --ok-bg: #e8f4ed;
+    --warn-bg: #fbf1e0;
+    --stop-bg: #fbeae8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #11171c;
+      --surface: #192128;
+      --surface-2: #212b33;
+      --ink: #e5ecf1;
+      --muted: #94a4b1;
+      --line: #2b373f;
+      --accent: #55b6c0;
+      --ok: #63bd8d;
+      --warn: #d9a552;
+      --stop: #e2776f;
+      --ok-bg: #162a20;
+      --warn-bg: #2b2317;
+      --stop-bg: #2c1c1b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #11171c;
+    --surface: #192128;
+    --surface-2: #212b33;
+    --ink: #e5ecf1;
+    --muted: #94a4b1;
+    --line: #2b373f;
+    --accent: #55b6c0;
+    --ok: #63bd8d;
+    --warn: #d9a552;
+    --stop: #e2776f;
+    --ok-bg: #162a20;
+    --warn-bg: #2b2317;
+    --stop-bg: #2c1c1b;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 52px;
+  }
+  h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.3; }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  h3 { font-size: 17px; font-weight: 600; }
+  p { margin: 0; max-width: 66ch; }
+  section { display: flex; flex-direction: column; gap: 18px; }
+
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-family: "IBM Plex Mono", monospace;
+  }
+  .lede { font-size: 18px; color: var(--muted); max-width: 62ch; }
+
+  header { display: flex; flex-direction: column; gap: 14px; }
+  .meta {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .thesis {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    border-radius: 4px;
+    padding: 22px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .thesis strong { font-size: 19px; font-weight: 600; }
+
+  .item {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 18px 22px 18px 20px;
+    border-left: 4px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .item.ok { border-left-color: var(--ok); }
+  .item.warn { border-left-color: var(--warn); }
+  .item.stop { border-left-color: var(--stop); }
+  .item-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .item-head h3 { flex: 1 1 auto; }
+  .item p { font-size: 15px; color: var(--muted); }
+  .item .now { color: var(--ink); }
+
+  .tag {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 100px;
+    white-space: nowrap;
+    font-family: "IBM Plex Sans KR", sans-serif;
+  }
+  .tag.ok { background: var(--ok-bg); color: var(--ok); }
+  .tag.warn { background: var(--warn-bg); color: var(--warn); }
+  .tag.stop { background: var(--stop-bg); color: var(--stop); }
+
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; min-width: 560px; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--ink);
+  }
+  td.num { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .arrow { color: var(--accent); font-weight: 600; }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .pair { grid-template-columns: 1fr; } }
+  .quote {
+    background: var(--surface-2);
+    border-radius: 4px;
+    padding: 16px 18px;
+    font-size: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .quote .says { color: var(--muted); }
+  .quote .truth { font-weight: 600; }
+
+  .status { display: flex; flex-direction: column; gap: 2px; }
+  .status-row {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 11px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .status-row:last-child { border-bottom: none; }
+  .box {
+    flex: 0 0 auto;
+    width: 15px; height: 15px;
+    border-radius: 3px;
+    border: 1.5px solid var(--muted);
+    position: relative;
+    top: 3px;
+  }
+  .box.done { background: var(--ok); border-color: var(--ok); }
+  .status-row span { flex: 1 1 auto; }
+  .status-row .who { color: var(--muted); font-size: 13.5px; flex: 0 0 auto; }
+
+  .ask {
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .ask ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  .ask li { color: var(--muted); }
+
+  code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.88em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); padding-top: 20px; }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">WalkSafe · 기기점검</div>
+    <h1>기기점검을 점검했습니다</h1>
+    <p class="lede">
+      로그인 직후 한 번 도는 기기점검이 실제로 무엇을 확인하는지 코드와 실기기로 확인했습니다.
+      결론부터 말하면 <strong>지금은 웬만한 폰이 다 통과합니다.</strong>
+    </p>
+    <div class="meta">
+      <span>2026-09-08</span>
+      <span>실기기 SM-A716S / Android 13</span>
+      <span>기준 코드 37dd42c</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="thesis">
+      <strong>폰이 하는 말을 믿으면 안 됩니다. 실제로 시켜봐야 합니다.</strong>
+      <p>
+        이번에 실기기에서 확인한 두 가지가 정확히 이걸 보여줬습니다. 폰이 "된다"고 답했는데 실제로는
+        안 되는 경우, "안 된다"고 답했는데 실제로는 되는 경우가 각각 하나씩 나왔습니다.
+        기기점검 설계 전체가 이 원칙 위에 서야 합니다.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>기기점검이 뭔가요</h2>
+    <p>
+      로그인을 마치면 사용자가 <strong>기기 점검 시작</strong> 버튼을 한 번 누릅니다. 그때 앱이 이 폰으로
+      WalkSafe를 쓸 수 있는지 확인합니다. 통과하기 전에는 보행·길안내·탐지·신고가 전부 잠깁니다.
+    </p>
+    <p>
+      즉 <strong>기기점검은 "이 폰으로 걸어도 되는가"에 답하는 마지막 관문</strong>입니다. 여기를 통과하면
+      시각장애인 사용자가 이 앱을 믿고 길을 나섭니다.
+    </p>
+  </section>
+
+  <section>
+    <h2>점검 항목 5개가 실제로 확인하는 것</h2>
+    <p class="lede" style="font-size:16px">
+      "무엇을 재는가"가 아니라 "제대로 재는가"를 기준으로 봤습니다.
+    </p>
+
+    <div class="stack">
+      <div class="item ok">
+        <div class="item-head">
+          <h3>호출어</h3>
+          <span class="tag ok">확실함</span>
+        </div>
+        <p class="now">사용자가 실제로 "길라잡이"라고 말해야 통과합니다.</p>
+        <p>
+          다섯 중 유일하게 속일 수 없는 검사입니다. 마이크가 되는지, 한국어 인식 모델이 있는지,
+          실제로 알아듣는지가 한 번에 증명됩니다. 자동화로는 통과시킬 수 없어서 이번 시험에서도
+          사람이 직접 말해야 했습니다.
+        </p>
+      </div>
+
+      <div class="item warn">
+        <div class="item-head">
+          <h3>한국어 음성</h3>
+          <span class="tag warn">거의 확실함</span>
+        </div>
+        <p class="now">실제로 음성 파일을 만들어봅니다. "폰이 한국어를 지원한다"는 답만으로는 통과시키지 않습니다.</p>
+        <p>
+          설계가 좋습니다. 다만 만들어진 파일이 <strong>1바이트만 돼도 통과</strong>합니다.
+          소리가 실제로 들어 있는지, 몇 초짜리인지는 보지 않습니다.
+        </p>
+      </div>
+
+      <div class="item stop">
+        <div class="item-head">
+          <h3>GPS 위치</h3>
+          <span class="tag stop">기준이 무의미함</span>
+        </div>
+        <p class="now">오차 <strong>100m</strong>까지 통과시킵니다.</p>
+        <p>
+          100m는 횡단보도 하나, 건물 한 채를 구분하지 못하는 정확도입니다. 실내에서 Wi-Fi로 잡은
+          위치로도 통과합니다. 같은 앱이 <strong>보행을 시작할 때는 15m를 요구</strong>합니다.
+          게다가 이 항목은 지금 통과 여부에 아예 반영되지 않아서, 화면에 "제한"이라고 떠도 결과는
+          정상 통과로 나옵니다.
+        </p>
+      </div>
+
+      <div class="item stop">
+        <div class="item-head">
+          <h3>카메라</h3>
+          <span class="tag stop">표본이 너무 적음</span>
+        </div>
+        <p class="now">사진 5장 중 <strong>1장만</strong> 인식되면 통과합니다. 얼마나 느린지는 보지 않습니다.</p>
+        <p>
+          한 장 성공은 "카메라가 한 번 켜졌다"는 뜻입니다. 보행 중 실시간으로 위험을 알려야 하는데
+          <strong>속도 기준이 아예 없어서</strong>, 한 장에 3초가 걸려도 통과합니다.
+          밝기·가림·흔들림을 보는 검사는 따로 있지만 기기점검에는 연결돼 있지 않아, 주머니 속
+          캄캄한 사진으로도 통과할 수 있습니다.
+        </p>
+      </div>
+
+      <div class="item stop">
+        <div class="item-head">
+          <h3>배터리 · 저장공간 · 발열</h3>
+          <span class="tag stop">사실상 자동 통과</span>
+        </div>
+        <p class="now">폰이 <strong>강제 종료되기 직전</strong>까지 통과시킵니다.</p>
+        <p>
+          안드로이드 발열 단계는 7단계인데, 지금 기준은 위에서 세 번째(강제 종료 직전)입니다.
+          이미 성능이 크게 떨어지는 단계에서도 통과합니다. 정상 상태의 폰이라면 무조건 통과한다고
+          보면 됩니다.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>실기기에서 나온 두 가지</h2>
+    <p>
+      정반대 방향으로 폰이 스스로를 배신했습니다. 이 둘이 이 문서의 결론을 만들었습니다.
+    </p>
+
+    <div class="pair">
+      <div class="quote">
+        <div class="says">거리 측정 기능을 물었더니</div>
+        <div class="truth">폰: "그런 기능 없습니다"</div>
+        <div class="says">실제로 켜봤더니</div>
+        <div class="truth" style="color:var(--ok)">잘 됩니다</div>
+      </div>
+      <div class="quote">
+        <div class="says">한국어 음성을 물었더니</div>
+        <div class="truth">폰: "지원합니다"</div>
+        <div class="says">실제로 시켜봤더니</div>
+        <div class="truth" style="color:var(--stop)">하나도 못 만듭니다</div>
+      </div>
+    </div>
+
+    <p>
+      두 번째는 실제로 기기점검을 실패시켰습니다. 원인을 찾아보니 폰의 기본 음성 엔진(삼성)이
+      한국어를 "지원한다"고 답하면서 실제 음성은 하나도 갖고 있지 않았습니다.
+      같은 폰에 설치된 구글 음성 엔진에는 한국어 음성이 5개나 있었는데,
+      <strong>앱이 기본 엔진만 보기 때문에</strong> 쓸 수 있는 음성을 두고도 막힌 것입니다.
+      이건 판정 기준과는 별개의 문제라 따로 기록해뒀습니다.
+    </p>
+  </section>
+
+  <section>
+    <h2>바꾸기로 한 것</h2>
+    <p>
+      새 숫자를 지어낸 게 아니라, <strong>같은 앱이 이미 다른 곳에서 쓰고 있는 값</strong>을 가져왔습니다.
+      그래서 근거를 설명할 수 있습니다.
+    </p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>항목</th><th>지금</th><th></th><th>바꿀 값</th><th>어디서 가져왔나</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GPS 정확도</td>
+            <td class="num">100m</td>
+            <td class="arrow">→</td>
+            <td class="num">15m</td>
+            <td>보행 시작 때 쓰는 기준</td>
+          </tr>
+          <tr>
+            <td>GPS 반영 여부</td>
+            <td>반영 안 됨</td>
+            <td class="arrow">→</td>
+            <td>통과 조건에 포함</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>카메라 표본</td>
+            <td class="num">5장 중 1장</td>
+            <td class="arrow">→</td>
+            <td class="num">10장 중 8장</td>
+            <td>거리 측정 검사 방식</td>
+          </tr>
+          <tr>
+            <td>발열 기준</td>
+            <td>종료 직전까지 허용</td>
+            <td class="arrow">→</td>
+            <td>성능 저하 시 측정 보류</td>
+            <td>이미 계산해둔 값</td>
+          </tr>
+          <tr>
+            <td>음성 파일</td>
+            <td>있기만 하면 통과</td>
+            <td class="arrow">→</td>
+            <td>최소 길이 확인</td>
+            <td>측정 후 확정</td>
+          </tr>
+          <tr>
+            <td>호출어</td>
+            <td colspan="3">변경 없음</td>
+            <td>이미 타당함</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      발열은 "이 폰은 부적합"이 아니라 <strong>"지금은 측정할 수 없으니 식은 뒤에 다시"</strong>로
+      안내합니다. 발열은 폰의 성능이 아니라 그 순간의 상태이기 때문입니다.
+    </p>
+  </section>
+
+  <section>
+    <h2>지금까지 한 것과 남은 것</h2>
+    <div class="status">
+      <div class="status-row"><span class="box done"></span><span>어디가 느슨한지 코드로 확인</span><span class="who">완료</span></div>
+      <div class="status-row"><span class="box done"></span><span>실기기에서 기기점검 끝까지 실행</span><span class="who">완료</span></div>
+      <div class="status-row"><span class="box done"></span><span>바꿀 값과 근거 확정, 설계 문서 작성</span><span class="who">완료</span></div>
+      <div class="status-row"><span class="box done"></span><span>안전장치 미설정 상태로 출시되지 않도록 차단</span><span class="who">완료</span></div>
+      <div class="status-row"><span class="box"></span><span>표의 값들을 실제로 코드에 반영</span><span class="who">실기기 연결 시</span></div>
+      <div class="status-row"><span class="box"></span><span>승인된 폰 목록 만들고 게이트 켜기</span><span class="who">미착수</span></div>
+      <div class="status-row"><span class="box"></span><span>AI 판단 속도 기준 정하기</span><span class="who">팀 논의 필요</span></div>
+    </div>
+    <p>
+      값 변경을 미룬 이유는, 기준만 조이고 실기기로 확인하지 못하면
+      <strong>그 기준이 멀쩡한 폰까지 막는지 알 수 없기</strong> 때문입니다. 폰이 연결됐을 때 한 번에
+      바꾸고 바로 확인하는 편이 안전합니다.
+    </p>
+  </section>
+
+  <section>
+    <h2>이번에 코드에 반영한 것 하나</h2>
+    <p>
+      보행 중 위험하면 자동으로 멈추는 장치가 12가지 있는데, 그중 <strong>2가지가 꺼져 있습니다.</strong>
+      둘 다 "너무 느릴 때" 멈추는 장치입니다. 몇 초까지 괜찮은지를 아직 아무도 정하지 않았기
+      때문인데, 아무 숫자나 넣는 것보다는 나은 판단이라고 봅니다.
+    </p>
+    <p>
+      문제는 <strong>꺼져 있다는 걸 아무도 알 수 없었다는 점</strong>입니다. 그래서
+      <strong>기준이 비어 있으면 출시용 앱이 만들어지지 않도록</strong> 막아뒀습니다.
+      개발·테스트에는 영향이 없고, 출시를 시도하는 순간에만 막힙니다.
+      이 앱은 이미 서버 주소가 없으면 출시 빌드를 막고 있어서, 같은 방식을 적용한 것뿐입니다.
+    </p>
+  </section>
+
+  <section>
+    <div class="ask">
+      <div class="eyebrow">팀에서 정해야 할 것</div>
+      <h2 style="font-size:20px">AI가 위험을 판단하는 데 몇 초까지 괜찮을까요?</h2>
+      <p>
+        이건 측정으로 나오는 숫자가 아닙니다. "이 폰은 0.3초 걸린다"는 재면 알 수 있지만,
+        "0.3초면 안전한가"는 사람이 정해야 합니다. 정하려면 이런 게 필요합니다.
+      </p>
+      <ul>
+        <li>사람이 보통 얼마나 빨리 걷는가</li>
+        <li>위험을 몇 미터 앞에서 알려줘야 하는가</li>
+        <li>안내를 듣고 반응하는 데 몇 초 걸리는가</li>
+      </ul>
+      <p>
+        인식 속도는 상황에 따라 달라지니 지금 당장 정하기는 어렵다고 판단해서, 우선
+        <strong>출시만 막아두고</strong> 이 논의는 따로 하기로 했습니다.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    상세 설계는 저장소의
+    <code>docs/superpowers/specs/2026-09-08-device-check-threshold-tightening-design.md</code>에
+    있습니다. 이 문서의 어떤 값도 아직 실기기로 검증하지 않았습니다 —
+    목표 수치이지 시험 결과가 아닙니다.
+  </footer>
+
+</div>
+
+</body>
+</html>
