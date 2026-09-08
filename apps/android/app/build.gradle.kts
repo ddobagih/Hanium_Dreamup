@@ -168,6 +168,31 @@ val validateWalkSafeSourceCommit by tasks.registering {
     }
 }
 
+// FRAME_AGE_EXCEEDED and INFERENCE_LATENCY_EXCEEDED cannot fire while the approved timing profile
+// is null, so a release built in that state ships ten of its twelve safe-stop causes. The other
+// ten are threshold-independent and still latch. Debug builds keep running unconfigured because
+// the thresholds are a safety decision that field testing has to precede.
+val walkSafeRuntimeSafetyCoordinatorSource =
+    file("src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkRuntimeSafetyCoordinator.kt")
+val walkSafeRuntimeSafetyThresholdApproved = providers.provider {
+    val declaration = walkSafeRuntimeSafetyCoordinatorSource.readText()
+        .substringAfter("val productionThresholdProfile", "")
+        .substringBefore('\n')
+    declaration.isNotEmpty() && !declaration.contains("= null")
+}
+val validateWalkSafeRuntimeSafetyThresholds by tasks.registering {
+    inputs.file(walkSafeRuntimeSafetyCoordinatorSource)
+    doLast {
+        check(walkSafeRuntimeSafetyThresholdApproved.get()) {
+            "Release builds require an approved ApprovedWalkRuntimeSafetyThresholdProfile. " +
+                "WalkRuntimeSafetyCoordinator.productionThresholdProfile is null, so the frame-age " +
+                "and inference-latency safe stops cannot fire. Decide the thresholds " +
+                "(see docs/superpowers/specs/2026-09-08-device-check-threshold-tightening-design.md) " +
+                "before building a release."
+        }
+    }
+}
+
 val bundledVoskModelAssetDirectory =
     file("src/main/assets/voice-models/vosk-model-small-ko-0.22")
 val verifyBundledVoskModelAssets by tasks.registering {
@@ -202,7 +227,10 @@ val verifyBundledVoskModelAssets by tasks.registering {
 }
 
 tasks.configureEach {
-    if (name == "preReleaseBuild") dependsOn(validateWalkSafeSourceCommit)
+    if (name == "preReleaseBuild") {
+        dependsOn(validateWalkSafeSourceCommit)
+        dependsOn(validateWalkSafeRuntimeSafetyThresholds)
+    }
     if (name == "mergeDebugAssets" || name == "mergeReleaseAssets") {
         dependsOn(verifyBundledVoskModelAssets)
     }
