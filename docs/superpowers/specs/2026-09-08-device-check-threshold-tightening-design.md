@@ -181,6 +181,48 @@ if (timing.totalMs == null || timing.totalMs < 0L) return false
 안전 설계값이다. 기기가 300ms를 내는 것은 사실이지만 300ms로 충분한지는 판단이다.
 
 `[NOT_APPROVED: 추론 지연 상한]`으로 남기고, 정해지기 전에는 이 항목을 통과 조건으로 넣지 않는다.
+같은 profile의 `maximumFrameAgeMs`도 함께 비어 있으며 같은 시점에 정한다.
+
+### 5.1 비어 있음을 조용하지 않게 만든다 — 2026-09-08 구현됨
+
+임계값이 `null`이면 `WalkRuntimeSafetyCoordinator`는 `NOT_CONFIGURED`를 반환하고,
+`safetyOutputsAllowed`가 `true`가 되어 출력을 허용한다. 이 fail-open은 의도된 동작이며
+시험이 잠그고 있다.
+
+```kotlin
+// WalkRuntimeSafetyCoordinatorTest.kt:30
+fun productionProfileAllowsSafeTestFlowWithoutApprovedTimingThresholds()
+    inferenceLatencyMs = Long.MAX_VALUE  →  safetyOutputsAllowed == true
+```
+
+승인하지 않은 숫자를 임의로 강제하지 않겠다는 판단이므로 이 동작 자체는 바꾸지 않는다.
+12개 정지 사유 중 나머지 10개는 profile과 무관하게 계속 latch된다
+(`unconfiguredProfileStillLatchesThresholdIndependentUnsafeCauses`).
+
+문제는 fail-open이 아니라 **그 상태가 아무 신호도 내지 않는다**는 점이었다. `configured`
+속성이 있으나 제품 코드에서 아무도 읽지 않고, 빌드도 경고하지 않는다. 같은 "승인 전" 상태를
+저장소가 세 곳에서 다르게 처리하고 있었다.
+
+| 대상 | 승인 전 동작 | release 차단 |
+|---|---|---|
+| Gateway origin | — | 빌드 실패 |
+| 환경 profile | `BuildConfig.DEBUG`일 때만 test candidate | 자동 |
+| 안전 임계값 | 조용히 통과 | **없었음** |
+
+세 번째를 앞의 둘과 같은 규칙으로 맞췄다. `validateWalkSafeRuntimeSafetyThresholds`가
+`preReleaseBuild`에 걸려, `productionThresholdProfile`이 `null`인 동안 release 빌드가 실패한다.
+가드는 런타임이 읽는 바로 그 선언을 읽으므로 값이 채워지면 자동으로 풀린다. debug 빌드는
+영향받지 않는다 — 임계값을 정하려면 현장 시험이 선행해야 하기 때문이다.
+
+## 5.2 구현 순서
+
+절 4의 값 변경은 실기기가 연결된 시점에 한 번에 수행한다. 판정 로직만 고치고 실제 기기에서
+확인하지 못하면, 조인 기준이 정상 기기를 배제하는지 알 수 없기 때문이다. GPS 15m와 카메라
+10프레임은 특히 실내 점검 가능 여부를 함께 봐야 한다.
+
+2026-09-08 시점에 구현한 것은 절 5.1의 release 차단뿐이다. 이것만 먼저 넣은 이유는 값에
+의존하지 않고, debug 흐름을 건드리지 않으며, 값을 정하기 전에 넣어두는 편이 나중에 출시를
+시도하는 사람에게 이 논의를 강제하기 때문이다.
 
 ## 6. 승인 게이트를 켜는 순서
 
