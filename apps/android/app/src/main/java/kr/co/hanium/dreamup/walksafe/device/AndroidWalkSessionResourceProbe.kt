@@ -24,6 +24,10 @@ data class WalkSessionDeviceResourceSnapshot(
             batteryNotLow == null ||
                 privateStorageAboveSystemLow == null ||
                 thermalBelowCritical == null -> WalkSessionReadinessStatus.PENDING
+            // From SEVERE up the phone has cut its own clocks, so camera and inference readings
+            // taken now describe the throttling. That is this moment's state, not the device's
+            // capability, so the measurement waits instead of the phone failing.
+            thermalThrottled != false -> WalkSessionReadinessStatus.PENDING
             else -> WalkSessionReadinessStatus.READY
         }
 
@@ -35,6 +39,9 @@ data class WalkSessionDeviceResourceSnapshot(
             if (batteryNotLow == null) add("battery_state_pending")
             if (privateStorageAboveSystemLow == null) add("private_storage_state_pending")
             if (thermalBelowCritical == null) add("thermal_state_pending")
+            if (thermalBelowCritical != false && thermalThrottled != false) {
+                add(if (thermalThrottled == null) "thermal_throttle_state_pending" else "thermal_throttled")
+            }
         }.joinToString(",")
 }
 

@@ -18,12 +18,13 @@ class WalkSessionDeviceResourceSnapshotTest {
             batteryNotLow = true,
             privateStorageAboveSystemLow = true,
             thermalBelowCritical = true,
-            thermalThrottled = true,
+            // Was true, which is a throttled phone; readiness now waits for that to clear.
+            thermalThrottled = false,
         )
 
         assertEquals(WalkSessionReadinessStatus.READY, snapshot.readinessStatus)
         assertEquals("", snapshot.reason)
-        assertEquals(true, snapshot.thermalThrottled)
+        assertEquals(false, snapshot.thermalThrottled)
     }
 
     @Test
@@ -35,7 +36,11 @@ class WalkSessionDeviceResourceSnapshotTest {
         )
 
         assertEquals(WalkSessionReadinessStatus.PENDING, snapshot.readinessStatus)
-        assertEquals("battery_state_pending", snapshot.reason)
+        // thermalThrottled defaults to null, which is its own unread signal rather than "cool".
+        assertEquals(
+            "battery_state_pending,thermal_throttle_state_pending",
+            snapshot.reason,
+        )
     }
 
     @Test
