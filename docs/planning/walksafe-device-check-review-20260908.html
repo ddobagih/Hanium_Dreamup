@@ -225,12 +225,12 @@
     <h1>기기점검을 점검했습니다</h1>
     <p class="lede">
       로그인 직후 한 번 도는 기기점검이 실제로 무엇을 확인하는지 코드와 실기기로 확인했습니다.
-      결론부터 말하면 <strong>지금은 웬만한 폰이 다 통과합니다.</strong>
+      <strong>웬만한 폰이 다 통과하던 상태였고, 기준을 조여 반영했습니다.</strong>
     </p>
     <div class="meta">
       <span>2026-09-08</span>
       <span>실기기 SM-A716S / Android 13</span>
-      <span>기준 코드 37dd42c</span>
+      <span>브랜치 feature/device-check-20260907</span>
     </div>
   </header>
 
@@ -258,9 +258,10 @@
   </section>
 
   <section>
-    <h2>점검 항목 5개가 실제로 확인하는 것</h2>
+    <h2>점검 항목 5개가 실제로 확인하던 것</h2>
     <p class="lede" style="font-size:16px">
       "무엇을 재는가"가 아니라 "제대로 재는가"를 기준으로 봤습니다.
+      아래는 <strong>고치기 전</strong> 상태이고, 바꾼 내용은 다음 절에 있습니다.
     </p>
 
     <div class="stack">
@@ -363,15 +364,16 @@
   </section>
 
   <section>
-    <h2>바꾸기로 한 것</h2>
+    <h2>바꾼 것과, 실제로 재본 값</h2>
     <p>
-      새 숫자를 지어낸 게 아니라, <strong>같은 앱이 이미 다른 곳에서 쓰고 있는 값</strong>을 가져왔습니다.
-      그래서 근거를 설명할 수 있습니다.
+      새 숫자를 지어낸 게 아니라 <strong>같은 앱이 이미 다른 곳에서 쓰고 있는 값</strong>을
+      가져왔습니다. 그리고 그 기준이 <strong>멀쩡한 폰을 막지 않는지</strong> 실기기로 확인한
+      뒤에 반영했습니다.
     </p>
     <div class="scroll">
       <table>
         <thead>
-          <tr><th>항목</th><th>지금</th><th></th><th>바꿀 값</th><th>어디서 가져왔나</th></tr>
+          <tr><th>항목</th><th>전</th><th></th><th>후</th><th>실기기 측정</th><th></th></tr>
         </thead>
         <tbody>
           <tr>
@@ -379,7 +381,8 @@
             <td class="num">100m</td>
             <td class="arrow">→</td>
             <td class="num">15m</td>
-            <td>보행 시작 때 쓰는 기준</td>
+            <td class="num">11.5m</td>
+            <td><span class="tag ok">반영됨</span></td>
           </tr>
           <tr>
             <td>GPS 반영 여부</td>
@@ -387,40 +390,99 @@
             <td class="arrow">→</td>
             <td>통과 조건에 포함</td>
             <td>—</td>
+            <td><span class="tag ok">반영됨</span></td>
           </tr>
           <tr>
             <td>카메라 표본</td>
             <td class="num">5장 중 1장</td>
             <td class="arrow">→</td>
             <td class="num">10장 중 8장</td>
-            <td>거리 측정 검사 방식</td>
+            <td class="num">30장 중 30장</td>
+            <td><span class="tag ok">반영됨</span></td>
           </tr>
           <tr>
             <td>발열 기준</td>
             <td>종료 직전까지 허용</td>
             <td class="arrow">→</td>
             <td>성능 저하 시 측정 보류</td>
-            <td>이미 계산해둔 값</td>
+            <td>—</td>
+            <td><span class="tag ok">반영됨</span></td>
           </tr>
           <tr>
             <td>음성 파일</td>
             <td>있기만 하면 통과</td>
             <td class="arrow">→</td>
-            <td>최소 길이 확인</td>
-            <td>측정 후 확정</td>
+            <td class="num">1.0초 이상</td>
+            <td class="num">1.7초 · 2.1초</td>
+            <td><span class="tag ok">반영됨</span></td>
           </tr>
           <tr>
             <td>호출어</td>
             <td colspan="3">변경 없음</td>
-            <td>이미 타당함</td>
+            <td>—</td>
+            <td><span class="tag ok">이미 타당</span></td>
           </tr>
         </tbody>
       </table>
     </div>
     <p>
+      조인 기준으로 <strong>같은 폰이 다시 전체 통과했습니다.</strong> 이 폰은 2020년에 나온
+      중급기라, 더 약한 기기로 재서 통과했다는 뜻입니다. 기준을 조여도 정상 사용자를 막지 않습니다.
+    </p>
+    <p>
       발열은 "이 폰은 부적합"이 아니라 <strong>"지금은 측정할 수 없으니 식은 뒤에 다시"</strong>로
       안내합니다. 발열은 폰의 성능이 아니라 그 순간의 상태이기 때문입니다.
     </p>
+    <p>
+      음성은 유일하게 빌려올 값이 없어서 직접 쟀습니다. 같은 문장인데 엔진에 따라 파일 크기가
+      23% 차이 나서, 크기 대신 <strong>재생 시간</strong>으로 봅니다.
+    </p>
+  </section>
+
+  <section>
+    <h2>고치는 과정에서 새로 나온 것 두 가지</h2>
+
+    <div class="stack">
+      <div class="item stop">
+        <div class="item-head">
+          <h3>기준을 조여도 이미 통과한 폰은 그대로였습니다</h3>
+          <span class="tag stop">고침</span>
+        </div>
+        <p class="now">
+          기준을 다 조이고 폰에 설치했는데, <strong>어제 통과한 기록이 그대로 복원</strong>됐습니다.
+          새 기준 검사는 아예 돌지 않았습니다.
+        </p>
+        <p>
+          한 번 통과하면 결과를 저장해두고 다음부터는 재사용하는데, 그 결과가 "어떤 기준으로
+          통과했는지"를 갱신하지 않고 있었습니다. 그대로 뒀다면 <strong>기존 사용자는 조인 기준을
+          영영 만나지 않았을 겁니다.</strong>
+        </p>
+        <p>
+          자동 검사는 전부 통과하고 있었습니다. <strong>실기기에 설치해봤기 때문에 발견한
+          문제</strong>입니다.
+        </p>
+      </div>
+
+      <div class="item warn">
+        <div class="item-head">
+          <h3>위치가 안 잡히던 진짜 원인은 설정 하나였습니다</h3>
+          <span class="tag warn">안내 추가</span>
+        </div>
+        <p class="now">
+          측정 중 위치가 <strong>세 번 연속 하나도 안 잡혔습니다.</strong> 위치는 켜져 있고,
+          Wi-Fi도 연결돼 있고, 앱 권한도 다 허용된 상태였는데요.
+        </p>
+        <p>
+          원인은 <strong>"Google 위치 정확도"</strong> 토글이 꺼져 있던 것이었습니다. 이게 꺼지면
+          실내에서는 위치를 잡을 방법이 없습니다. 켜자마자 11.5m가 나왔습니다.
+        </p>
+        <p>
+          문제는 앱이 <strong>"위치를 사용할 수 없습니다"만 말했다는 점</strong>입니다. 어느 설정을
+          켜야 하는지 알려주지 않으니 사용자는 빠져나올 수 없습니다. 기준을 조이면 이 상황이 더
+          자주 생기므로, 이제 <strong>원인별로 무엇을 켜야 하는지 안내</strong>합니다.
+        </p>
+      </div>
+    </div>
   </section>
 
   <section>
@@ -430,19 +492,22 @@
       <div class="status-row"><span class="box done"></span><span>실기기에서 기기점검 끝까지 실행</span><span class="who">완료</span></div>
       <div class="status-row"><span class="box done"></span><span>바꿀 값과 근거 확정, 설계 문서 작성</span><span class="who">완료</span></div>
       <div class="status-row"><span class="box done"></span><span>안전장치 미설정 상태로 출시되지 않도록 차단</span><span class="who">완료</span></div>
-      <div class="status-row"><span class="box"></span><span>표의 값들을 실제로 코드에 반영</span><span class="who">실기기 연결 시</span></div>
-      <div class="status-row"><span class="box"></span><span>승인된 폰 목록 만들고 게이트 켜기</span><span class="who">미착수</span></div>
+      <div class="status-row"><span class="box done"></span><span>기준이 멀쩡한 폰을 막지 않는지 실기기로 측정</span><span class="who">완료</span></div>
+      <div class="status-row"><span class="box done"></span><span>다섯 가지 기준을 코드에 반영</span><span class="who">완료</span></div>
+      <div class="status-row"><span class="box done"></span><span>조인 기준으로 실기기 재통과 확인</span><span class="who">완료</span></div>
+      <div class="status-row"><span class="box"></span><span>다른 기종·실외에서 다시 재보기</span><span class="who">표본 1대뿐</span></div>
+      <div class="status-row"><span class="box"></span><span>승인된 폰 목록 만들고 게이트 켜기</span><span class="who">다음 순서</span></div>
       <div class="status-row"><span class="box"></span><span>AI 판단 속도 기준 정하기</span><span class="who">팀 논의 필요</span></div>
     </div>
     <p>
-      값 변경을 미룬 이유는, 기준만 조이고 실기기로 확인하지 못하면
-      <strong>그 기준이 멀쩡한 폰까지 막는지 알 수 없기</strong> 때문입니다. 폰이 연결됐을 때 한 번에
-      바꾸고 바로 확인하는 편이 안전합니다.
+      아직 <strong>폰 한 대, 실내 한 지점</strong>에서만 재봤습니다. 확인한 것은 "이 기준이 멀쩡한
+      폰을 막지 않는다"이지 "이 기준이면 보행이 안전하다"가 아닙니다. 값을 확정하기 전에 다른
+      기종과 실외에서 다시 재야 합니다.
     </p>
   </section>
 
   <section>
-    <h2>이번에 코드에 반영한 것 하나</h2>
+    <h2>아직 꺼져 있는 안전장치 2가지</h2>
     <p>
       보행 중 위험하면 자동으로 멈추는 장치가 12가지 있는데, 그중 <strong>2가지가 꺼져 있습니다.</strong>
       둘 다 "너무 느릴 때" 멈추는 장치입니다. 몇 초까지 괜찮은지를 아직 아무도 정하지 않았기
@@ -473,14 +538,19 @@
         인식 속도는 상황에 따라 달라지니 지금 당장 정하기는 어렵다고 판단해서, 우선
         <strong>출시만 막아두고</strong> 이 논의는 따로 하기로 했습니다.
       </p>
+      <p>
+        참고할 실측이 하나 생겼습니다. 이 폰은 <strong>한 장면을 판단하는 데 0.65초</strong>가
+        걸립니다. 사람이 보통 걷는 속도로 그동안 약 0.8m를 나아갑니다. 참고로 코드에 시험용으로
+        적혀 있던 0.2초를 그대로 기준 삼았다면 <strong>이 폰은 탈락</strong>이었습니다.
+      </p>
     </div>
   </section>
 
   <footer>
     상세 설계는 저장소의
-    <code>docs/superpowers/specs/2026-09-08-device-check-threshold-tightening-design.md</code>에
-    있습니다. 이 문서의 어떤 값도 아직 실기기로 검증하지 않았습니다 —
-    목표 수치이지 시험 결과가 아닙니다.
+    <code>docs/superpowers/specs/2026-09-08-device-check-threshold-tightening-design.md</code>,
+    변경 내역은 브랜치 <code>feature/device-check-20260907</code>에 있습니다.
+    측정은 폰 1대·실내 1지점 기준이며, 값 확정 전에 다른 기종과 실외에서 재현이 필요합니다.
   </footer>
 
 </div>
