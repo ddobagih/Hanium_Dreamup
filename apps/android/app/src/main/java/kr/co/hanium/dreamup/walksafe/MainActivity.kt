@@ -32401,7 +32401,7 @@ generation != cameraFallbackGeneration
         pendingVoiceDestinationPageIndex = null
         destinationSearchVoiceState = null
         updateNavigationStatus("voice=destination_candidate_selected index=$oneBasedIndex")
-        speakInteraction("${selected.name} 목적지를 선택했습니다. TMAP 경로를 확인합니다.")
+        speakInteraction("${selected.name} 목적지를 선택했습니다. 경로를 확인합니다.")
     }
 
     private fun requestRerouteFromVoice() {
@@ -32548,7 +32548,7 @@ generation != cameraFallbackGeneration
         }
         val message = when {
             !isRouteActive -> "진행 중인 길안내가 없습니다."
-            !latestTmapOnRoute -> "현재 TMAP 경로를 다시 확인하고 있습니다. 안전한 위치에서 잠시 기다려 주세요."
+            !latestTmapOnRoute -> "현재 경로를 다시 확인하고 있습니다. 안전한 위치에서 잠시 기다려 주세요."
             location == null -> "현재 위치를 확인한 뒤 다음 경로를 안내합니다."
             else -> routeInstruction ?: "다음 경로 안내를 확인할 수 없습니다."
         }
@@ -34399,7 +34399,7 @@ generation != cameraFallbackGeneration
                                 routeRequestInFlight.set(false)
                                 latestTmapOnRoute = false
                                 retainRouteAfterRerouteFailure(
-                                    "Gateway가 새 TMAP 경로를 아직 확인하지 못해 방향 안내를 중지했습니다.",
+                                    "새 TMAP 경로를 아직 확인하지 못해 방향 안내를 중지했습니다.",
                                 )
                                 updateRouteButtonText()
                             } else {

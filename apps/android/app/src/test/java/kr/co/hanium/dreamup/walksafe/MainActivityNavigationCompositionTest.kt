@@ -97,7 +97,7 @@ class MainActivityNavigationCompositionTest {
         assertTrue(selection.contains("if (!onDestinationSelected(selected)) {"))
         assertTrue(
             selection.indexOf("if (!onDestinationSelected(selected)) {") <
-                selection.indexOf("TMAP 경로를 확인합니다"),
+                selection.indexOf("경로를 확인합니다"),
         )
     }
 

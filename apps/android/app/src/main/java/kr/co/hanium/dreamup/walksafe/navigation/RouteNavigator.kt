@@ -807,13 +807,15 @@ class RouteNavigator(
                     (guideProgressM - progressM).coerceAtLeast(0.0).roundToInt()
                 }
             }
+            // Guidance repeats the whole walk and the provider is fixed, so its name carries no
+            // choice for the walker. Only the distance and the turn do.
             val instruction = guide.instruction?.takeIf { it.isNotBlank() }
             val text = instruction ?: routeDistanceToGuideM?.let { distanceM ->
-                "TMAP 경로 기준 전방 ${distanceM}m 안내 지점까지 이동하세요."
-            } ?: "다음 TMAP 안내 지점까지 이동하세요."
+                "전방 ${distanceM}m 안내 지점까지 이동하세요."
+            } ?: "다음 안내 지점까지 이동하세요."
             return RouteInstruction(
                 text = if (routeDistanceToGuideM != null && routeDistanceToGuideM > 0 && instruction != null) {
-                    "TMAP 경로 기준 ${routeDistanceToGuideM}m 앞, $text"
+                    "${routeDistanceToGuideM}m 앞, $text"
                 } else {
                     text
                 },
@@ -828,16 +830,16 @@ class RouteNavigator(
         }
         val text = if (endpointGapM > config.arrivalRadiusM) {
             if (routeRemainingM == null) {
-                "저장된 TMAP 경로 기준 남은 거리를 확인 중입니다."
+                "남은 거리를 확인 중입니다."
             } else if (routeRemainingM <= maxOf(20, location.accuracyM.roundToInt())) {
-                "TMAP 경로 종점입니다. 요청한 목적지의 최종 접근을 확인하세요."
+                "경로 종점입니다. 요청한 목적지의 최종 접근을 확인하세요."
             } else {
-                "저장된 TMAP 경로 기준 종점까지 약 ${routeRemainingM}m 남았습니다."
+                "종점까지 약 ${routeRemainingM}m 남았습니다."
             }
         } else {
             routeRemainingM?.let { remainingM ->
-                "저장된 TMAP 경로 기준 목적지까지 약 ${remainingM}m 남았습니다."
-            } ?: "저장된 TMAP 경로 기준 남은 거리를 확인 중입니다."
+                "목적지까지 약 ${remainingM}m 남았습니다."
+            } ?: "남은 거리를 확인 중입니다."
         }
         return RouteInstruction(text = text, guideIndex = null)
     }
