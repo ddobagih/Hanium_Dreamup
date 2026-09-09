@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WalkSafe 음성 대본</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f7f7f6;
+    --surface: #ffffff;
+    --surface-2: #eeefec;
+    --ink: #1c211c;
+    --muted: #5f6b60;
+    --line: #dfe3dd;
+    --accent: #4a6b3f;
+    --walk: #b0342d;
+    --prep: #a1660f;
+    --calm: #3b6b8f;
+    --walk-bg: #fbeae8;
+    --prep-bg: #fbf2e2;
+    --calm-bg: #e9f0f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #14170f;
+      --surface: #1c2018;
+      --surface-2: #252a20;
+      --ink: #e8ece4;
+      --muted: #9aa895;
+      --line: #313a2c;
+      --accent: #9ec48b;
+      --walk: #e2776f;
+      --prep: #d9a552;
+      --calm: #7db0d4;
+      --walk-bg: #2c1c1b;
+      --prep-bg: #2b2417;
+      --calm-bg: #1a242c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #14170f;
+    --surface: #1c2018;
+    --surface-2: #252a20;
+    --ink: #e8ece4;
+    --muted: #9aa895;
+    --line: #313a2c;
+    --accent: #9ec48b;
+    --walk: #e2776f;
+    --prep: #d9a552;
+    --calm: #7db0d4;
+    --walk-bg: #2c1c1b;
+    --prep-bg: #2b2417;
+    --calm-bg: #1a242c;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 22px 90px; display: flex; flex-direction: column; gap: 44px; }
+  h1, h2, h3 { margin: 0; text-wrap: balance; line-height: 1.3; }
+  h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 21px; font-weight: 600; }
+  h3 { font-size: 15px; font-weight: 600; }
+  p { margin: 0; max-width: 68ch; }
+  section { display: flex; flex-direction: column; gap: 16px; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); font-weight: 500;
+  }
+  .lede { color: var(--muted); font-size: 16.5px; max-width: 64ch; }
+  header { display: flex; flex-direction: column; gap: 12px; }
+  .meta {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 5px 18px;
+    border-top: 1px solid var(--line); padding-top: 13px;
+  }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    font-size: 12.5px; font-weight: 600; padding: 4px 12px; border-radius: 100px;
+  }
+  .chip.walk { background: var(--walk-bg); color: var(--walk); }
+  .chip.prep { background: var(--prep-bg); color: var(--prep); }
+  .chip.calm { background: var(--calm-bg); color: var(--calm); }
+
+  .group {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 4px solid var(--line); border-radius: 4px;
+    padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .group.walk { border-left-color: var(--walk); }
+  .group.prep { border-left-color: var(--prep); }
+  .group.calm { border-left-color: var(--calm); }
+  .group-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .group-head h3 { flex: 1 1 auto; }
+  .src {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted);
+  }
+  .note { font-size: 13.5px; color: var(--muted); }
+
+  ul.lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  ul.lines li {
+    display: flex; gap: 12px; align-items: baseline;
+    padding: 7px 0; border-top: 1px solid var(--line);
+  }
+  ul.lines li:first-child { border-top: none; }
+  .ln {
+    flex: 0 0 auto; width: 46px; text-align: right;
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .txt { flex: 1 1 auto; }
+  .var { color: var(--accent); font-family: "IBM Plex Mono", monospace; font-size: 0.88em; }
+
+  .callout {
+    background: var(--surface-2); border-radius: 4px; padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  code {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.87em;
+    background: var(--surface-2); padding: 1px 5px; border-radius: 3px;
+  }
+  footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 18px; }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">WalkSafe · 음성 안내</div>
+  <h1>앱이 말하는 모든 문장</h1>
+  <p class="lede">
+    소스에서 뽑은 전체 대본입니다. <strong>사용자가 언제 듣는지</strong>로 묶었습니다 —
+    걸으면서 듣는 말과 서서 듣는 말은 요구되는 것이 다르기 때문입니다.
+  </p>
+  <div class="meta">
+    <span>2026-09-09</span>
+    <span>총 230여 문장</span>
+    <span>번호는 소스 줄 번호</span>
+    <span>위험 경고 거리 표현 제거 반영</span>
+  </div>
+</header>
+
+<section>
+  <div class="legend">
+    <span class="chip walk">보행 중 — 걸으면서 듣는다</span>
+    <span class="chip prep">보행 직전 — 서서 준비 중</span>
+    <span class="chip calm">그 외 — 계정·설정·신고</span>
+  </div>
+  <div class="callout">
+    <strong>보행 중 문장은 길이가 곧 위험입니다.</strong>
+    <p class="note">
+      사람이 보통 초당 1.2m를 걷습니다. 3초짜리 안내면 말이 끝날 때 이미 3.6m를 더 갔습니다.
+      "멈추세요"가 끝나기 전에 도착할 수도 있습니다. 아래에서 빨간 표시가 붙은 것들이 그 대상입니다.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>보행 중 · 위험 경고</h2>
+  <p class="note">가장 짧아야 하는 문장들. 앞 절반이 상황, 뒤 절반이 행동입니다.</p>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>거리를 아는 기기</h3>
+      <span class="src">depth/MessagePolicy.kt</span>
+    </div>
+    <p class="note">
+      <strong>2026-09-09 변경.</strong> 거리 표현을 없앴습니다.
+      대상 이름 + 행동 두 부분으로만 구성됩니다.
+    </p>
+    <ul class="lines">
+      <li><span class="ln">102</span><span class="txt">전방 <span class="var">{대상}</span>. <strong>멈추세요. 주변을 확인하세요.</strong></span></li>
+      <li><span class="ln">102</span><span class="txt">전방 <span class="var">{대상}</span>. <strong>멈출 준비를 하세요.</strong></span></li>
+      <li><span class="ln">145</span><span class="txt">전방 <span class="var">{대상}</span>와의 거리가 줄어드는 것 같습니다. 속도를 늦추고 주변을 확인하세요.</span></li>
+      <li><span class="ln">155</span><span class="txt">전방 가까운 <span class="var">{대상}</span> 가능성. 속도를 늦추고 주변을 확인하세요.</span></li>
+    </ul>
+    <div class="callout" style="margin-top:4px">
+      <strong>없앤 것</strong>
+      <p class="note">
+        <code>전방 바로 앞 {대상}</code> · <code>전방 약 {n}보 이내 {대상}</code> ·
+        <code>전방 약 {n}보 앞 {대상}</code>
+      </p>
+      <p class="note">
+        대상이 움직이면 거리를 말할 수 없습니다. 인식에 걸리는 시간, 그동안 내가 이동한 거리,
+        상대가 다가온 거리가 동시에 겹칩니다. 실측으로 <strong>인식 651ms 동안 0.78m</strong>를
+        이동하고 문장을 말하는 동안 더 갑니다 — <strong>"약 2보"(약 1.4m)는 말이 끝나기 전에
+        이미 틀립니다.</strong>
+      </p>
+      <p class="note">
+        거리는 여전히 <strong>판단에</strong> 씁니다. <code>멈추세요</code>와
+        <code>멈출 준비를 하세요</code>를 가르는 것이 실제 거리이고, 말하지만 않습니다.
+        <code>바로 앞</code>도 숫자가 아닐 뿐 같은 주장이라 함께 없앴습니다.
+      </p>
+      <p class="note">
+        길안내의 <code>50m 앞 안내 지점</code>은 <strong>유지</strong>합니다.
+        우회전 지점은 가만히 있고 내가 다가가는 것뿐이라 예측이 됩니다.
+      </p>
+    </div>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>거리를 모르는 기기</h3>
+      <span class="src">feedback/AndroidNonMetricObstacleAdvisoryPolicy.kt</span>
+    </div>
+    <p class="note">거리 대신 방향만 말합니다. 미터·보를 쓰지 않는 것이 의도된 설계입니다.</p>
+    <ul class="lines">
+      <li><span class="ln">265</span><span class="txt">카메라 보조 경고. <span class="var">{왼쪽|가운데|오른쪽}</span>에 <span class="var">{대상}</span> 후보가 보입니다. 주변을 확인하세요.</span></li>
+    </ul>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>대상 이름</h3>
+      <span class="src">inference/ObstacleLabels.kt</span>
+    </div>
+    <p class="note">
+      <strong>2026-09-09 변경.</strong> 두 파일이 각자 갖고 있던 이름표를 하나로 합쳤습니다.
+    </p>
+    <ul class="lines">
+      <li><span class="ln">—</span><span class="txt">사람 · 자전거 · <strong>차량</strong> · <strong>킥보드</strong> · <strong>턱</strong> · 고르지 않은 보도 · 횡단보도 · 점자블록 · <strong>물체</strong></span></li>
+    </ul>
+    <div class="callout" style="margin-top:4px">
+      <strong>합치기 전에는 폰마다 이름이 달랐습니다</strong>
+      <p class="note">
+        같은 킥보드가 거리를 재는 폰에서는 <code>방치 킥보드</code>, 못 재는 폰에서는
+        <code>전동 킥보드</code>였습니다. 버스도 한쪽은 <code>차량</code>, 다른 쪽은
+        <code>버스</code>였습니다. <strong>사용자는 자기 폰이 어느 쪽인지 모릅니다.</strong>
+      </p>
+      <p class="note">
+        <strong>차량은 묶고</strong>(승용차·버스·트럭·오토바이) — 트럭을 승용차라 하면 신뢰만
+        깎이고 할 행동은 똑같이 "멈추기"입니다.
+        <strong>정적 장애물은 개별 유지</strong> — 볼라드는 비켜 가고 공사펜스는 길이 막혔을 수
+        있어 우회해야 하니, 이름이 행동을 바꿉니다.
+      </p>
+      <p class="note">
+        <code>방치</code>도 뺐습니다. 세워둔 건지 타고 오는 건지는 현재 모델이 구분하지 못합니다.
+        <code>벤치</code>는 <strong>주 모델 13종에 없어</strong> <code>물체</code>로 갑니다.
+      </p>
+    </div>
+    <div class="callout" style="margin-top:4px">
+      <strong>21종 모델 대비</strong>
+      <p class="note">
+        모델이 21종으로 바뀌면 새 위험물 8종이 <strong>전부 조용히 <code>물체</code></strong>가
+        됩니다. 그래서 모델 설정의 클래스 목록과 이름표를 대조하는 시험을 붙였습니다 —
+        이름 없는 클래스가 생기면 시험이 깨져 이름을 정하게 됩니다.
+      </p>
+      <p class="note">
+        21종 이름은 이미 정했습니다. <strong>움직이는 킥보드</strong>는 따로 구분하고,
+        <strong>공사펜스·바리게이드·라바콘</strong>은 개별 유지합니다.
+        <strong>점형블록 안내 여부</strong>는 별도 논의입니다.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>보행 중 · 길안내</h2>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>진행 안내</h3>
+      <span class="src">navigation/RouteNavigator.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">812</span><span class="txt">전방 <span class="var">{n}</span>m 안내 지점까지 이동하세요.</span></li>
+      <li><span class="ln">813</span><span class="txt">다음 안내 지점까지 이동하세요.</span></li>
+      <li><span class="ln">816</span><span class="txt"><span class="var">{n}</span>m 앞, <span class="var">{안내문}</span></span></li>
+      <li><span class="ln">835</span><span class="txt">종점까지 약 <span class="var">{n}</span>m 남았습니다.</span></li>
+      <li><span class="ln">839</span><span class="txt">목적지까지 약 <span class="var">{n}</span>m 남았습니다.</span></li>
+      <li><span class="ln">831</span><span class="txt">남은 거리를 확인 중입니다.</span></li>
+      <li><span class="ln">833</span><span class="txt">경로 종점입니다. 요청한 목적지의 최종 접근을 확인하세요.</span></li>
+    </ul>
+    <div class="callout" style="margin-top:4px">
+      <strong>2026-09-09 변경 — <code>TMAP 경로 기준</code>을 뺐습니다</strong>
+      <p class="note">
+        지도는 TMAP으로 고정이라 매번 말해도 사용자가 고를 게 없습니다. 우회전은 누가 준
+        경로든 우회전입니다. <code>저장된</code>·<code>경로 기준</code>도 함께 뺐습니다 —
+        앱이 경로를 어떻게 보관하는지에 대한 설명이지 사용자 위치 정보가 아닙니다.
+      </p>
+      <p class="note">
+        <strong>오류 문구는 유지</strong>합니다. 자주 나오지 않고, 어떤 서비스가 응답하지
+        않는지 아는 게 기다릴 근거가 됩니다. 다만 <code>Gateway</code>는 뺐습니다 — 시스템이
+        자기를 부르는 말이라 사용자에게는 개념 자체가 없습니다.
+      </p>
+    </div>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>경로 이탈</h3>
+      <span class="src">navigation/RouteNavigator.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">712</span><span class="txt">경로를 벗어나 현재 방향 안내를 중지했습니다. 사용자 선택이 필요합니다. 새 경로 요청, 위치 다시 확인, 길안내 종료 중에서 선택해 주세요.</span></li>
+      <li><span class="ln">726</span><span class="txt">경로 이탈이 의심되어 오래된 방향 안내를 중지했습니다. 위치 다시 확인이라고 말씀해 주세요.</span></li>
+      <li><span class="ln">221</span><span class="txt">현재 위치 정확도를 신뢰할 수 없어 오래된 방향 안내를 중지했습니다. 위치 다시 확인을 선택할 때까지 다음 방향 안내를 하지 않습니다.</span></li>
+      <li><span class="ln">350</span><span class="txt">사용자 선택으로 새 경로를 찾습니다.</span></li>
+      <li><span class="ln">367</span><span class="txt">현재 위치를 다시 확인합니다. 새 위치가 정상일 때만 방향 안내를 재개합니다.</span></li>
+      <li><span class="ln">380</span><span class="txt">현재 위치를 다시 확인합니다. 기존 경로는 자동으로 재개하지 않습니다.</span></li>
+      <li><span class="ln">394</span><span class="txt">사용자 선택으로 길안내를 종료합니다.</span></li>
+    </ul>
+    <p class="note">
+      712번이 가장 깁니다. 길을 잃은 순간에 선택지 3개를 말로 나열합니다.
+    </p>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>도착</h3>
+      <span class="src">navigation/RouteNavigator.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">700</span><span class="txt">도착 후보입니다. 실제로 도착했다면 확인하고, 아니면 거절해 주세요.</span></li>
+      <li><span class="ln">419</span><span class="txt">도착을 확인했습니다. 길안내를 종료합니다.</span></li>
+      <li><span class="ln">443</span><span class="txt">도착하지 않은 것으로 확인했습니다. 현재 경로를 유지합니다.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>보행 중 · 조작 응답</h2>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>보행 제어</h3>
+      <span class="src">MainActivity.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">31977</span><span class="txt">보행 안내를 일시정지했습니다.</span></li>
+      <li><span class="ln">31987</span><span class="txt">필수 기능을 다시 확인한 뒤 보행 재개를 확인합니다.</span></li>
+      <li><span class="ln">32001</span><span class="txt">보행을 종료했습니다.</span></li>
+      <li><span class="ln">32006</span><span class="txt">보행 종료를 취소했습니다.</span></li>
+      <li><span class="ln">31817</span><span class="txt">보행 종료를 확인하지 못했습니다. 종료하려면 다시 요청해 주세요.</span></li>
+      <li><span class="ln">31928</span><span class="txt">일시정지 중에는 보행 재개 또는 보행 종료라고 말씀해 주세요.</span></li>
+      <li><span class="ln">23390</span><span class="txt">보행 기능을 안전 중지했습니다. <span class="var">{사유}</span></span></li>
+    </ul>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>음성 인식 실패</h3>
+      <span class="src">MainActivity.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">31940</span><span class="txt">명령을 이해하지 못했습니다. 다시 말씀해 주세요.</span></li>
+      <li><span class="ln">31676</span><span class="txt">음성 명령을 인식하지 못했습니다.</span></li>
+      <li><span class="ln">31169</span><span class="txt">음성을 녹음하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요.</span></li>
+      <li><span class="ln">31141</span><span class="txt">음성 녹음을 시작하지 못했습니다.</span></li>
+      <li><span class="ln">30336</span><span class="txt"><span class="var">{상세}</span> 음성 명령을 다시 눌러 주세요.</span></li>
+      <li><span class="ln">31488</span><span class="txt">음성 모델 준비에 실패했습니다. 다시 시도해 주세요.</span></li>
+      <li><span class="ln">31187</span><span class="txt">서버 음성 인식을 시작하지 못했습니다. 잠시 뒤 다시 시도해 주세요.</span></li>
+      <li><span class="ln">31206</span><span class="txt">서버 음성 인식을 사용할 수 없습니다. 잠시 뒤 다시 시도해 주세요.</span></li>
+      <li><span class="ln">31956</span><span class="txt">경로 상태가 바뀌어 이전 음성 결정을 적용하지 않았습니다. 다시 확인해 주세요.</span></li>
+    </ul>
+    <p class="note">
+      "인식하지 못했습니다"가 표현만 다르게 4번 있습니다. 사용자에게는 같은 상황일 수 있습니다.
+    </p>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>목적지 검색·선택</h3>
+      <span class="src">MainActivity.kt · navigation/AndroidVoiceCommand.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">32261</span><span class="txt"><span class="var">{검색어}</span> 목적지를 검색합니다.</span></li>
+      <li><span class="ln">92</span><span class="txt"><span class="var">{검색어}</span> 목적지 후보가 <span class="var">{n}</span>곳 있습니다. <span class="var">{후보 목록}</span>. 원하는 번호나 다시 듣기라고 말씀해 주세요.</span></li>
+      <li><span class="ln">85</span><span class="txt"><span class="var">{번호}</span>번 <span class="var">{이름}</span>, <span class="var">{주소}</span>, <span class="var">{거리}</span></span></li>
+      <li><span class="ln">88</span><span class="txt">더 들으려면 더 듣기라고 말씀해 주세요.</span></li>
+      <li><span class="ln">79</span><span class="txt"><span class="var">{검색어}</span> 목적지 검색 결과가 없습니다.</span></li>
+      <li><span class="ln">32381</span><span class="txt"><span class="var">{목적지}</span> 목적지를 선택했습니다. 길안내 시작을 선택하면 …</span></li>
+      <li><span class="ln">32400</span><span class="txt"><span class="var">{목적지}</span> 목적지를 선택했습니다. TMAP 경로를 확인합니다.</span></li>
+      <li><span class="ln">33762</span><span class="txt">현재 위치를 확인하고 있습니다. 최대 10초 동안 기다려 주세요.</span></li>
+      <li><span class="ln">34612</span><span class="txt">TMAP 경로를 확인할 수 없어 길안내를 시작하지 않았습니다.</span></li>
+    </ul>
+    <p class="note">
+      후보 목록은 곳마다 "번호 + 이름 + 주소 + 거리"를 읽습니다. 5곳이면 상당히 길어집니다.
+    </p>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>지금 할 수 없는 조작</h3>
+      <span class="src">MainActivity.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">32078</span><span class="txt">보행을 시작한 뒤 사용할 수 있는 명령입니다. 목적지를 먼저 검색해 주세요.</span></li>
+      <li><span class="ln">32084</span><span class="txt">이미 길안내 중입니다.</span></li>
+      <li><span class="ln">32091</span><span class="txt">진행 중인 길안내가 없습니다. 목적지를 먼저 선택해 주세요.</span></li>
+      <li><span class="ln">32276</span><span class="txt">먼저 목적지를 검색해 주세요.</span></li>
+      <li><span class="ln">34775</span><span class="txt">음성 명령으로 현재 경로 상태를 먼저 확인해 주세요.</span></li>
+    </ul>
+    <div class="callout" style="margin-top:4px">
+      <strong>2026-09-09 변경 — 거절 5종을 상태 안내로</strong>
+      <p class="note">
+        <code>지금은 …할 이탈 상태가 아닙니다</code> 가 5번 반복됐습니다. 거의 다 껍데기이고
+        내용은 <strong>지금 어떤 상태인가</strong> 하나뿐인데, 화면을 못 보는 사용자에게는
+        그게 유일하게 알 방법이 없는 정보였습니다. 거절하면서 그것만 빼놓고 말한 셈입니다.
+      </p>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>상황</th><th>전</th><th>후</th></tr></thead>
+        <tbody>
+          <tr><td>정상 주행 중</td><td>지금은 새 경로를 요청할 이탈 상태가 아닙니다. <span class="src">25자</span></td><td><strong>경로를 따라가는 중입니다.</strong> <span class="src">13자</span></td></tr>
+          <tr><td>길안내 안 함</td><td>(구분 없음)</td><td><strong>길안내 중이 아닙니다.</strong> <span class="src">11자</span></td></tr>
+          <tr><td>경로 이탈 중</td><td>지금은 종료 선택을 기다리는 경로 이탈 상태가 아닙니다. <span class="src">27자</span></td><td><strong>경로를 벗어난 상태입니다.</strong> <span class="src">13자</span></td></tr>
+          <tr><td>도착 전</td><td>지금은 확인할 도착 후보가 없습니다. <span class="src">18자</span></td><td><strong>아직 도착 안내가 없습니다.</strong> <span class="src">13자</span></td></tr>
+          <tr><td>위치 확인만 가능</td><td>(구분 없음)</td><td><strong>위치 다시 확인만 할 수 있습니다.</strong> <span class="src">17자</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">
+      <strong>전부 짧아졌는데 구분은 늘었습니다.</strong> 왜 안 되는지는 설명하지 않습니다 —
+      "경로를 따라가는 중"이면 새 경로가 왜 안 되는지는 사용자가 압니다.
+      선택지가 하나만 남았을 때만 그 명령 이름을 말합니다. 세 개 중 고르는 경우는
+      이탈 안내에서 이미 읽어줬으니 반복하지 않습니다.
+    </p>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>신고</h3>
+      <span class="src">MainActivity.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">30682</span><span class="txt">신고 후보를 안전하게 저장했습니다.</span></li>
+      <li><span class="ln">30845</span><span class="txt">방금 확인한 신고 후보를 안전하게 저장했습니다.</span></li>
+      <li><span class="ln">30733</span><span class="txt">신고할 손상 점자블록이 없습니다.</span></li>
+      <li><span class="ln">30742</span><span class="txt">카메라와 정확한 위치 권한을 확인한 뒤 다시 신고해 주세요.</span></li>
+      <li><span class="ln">30696</span><span class="txt">현재 계정의 테스트 서버 로그인 상태를 확인한 뒤 다시 신고해 주세요.</span></li>
+      <li><span class="ln">30759</span><span class="txt">현재 계정의 신고 처리 확인을 서버에서 확인해야 직접 신고할 수 있습니다.</span></li>
+      <li><span class="ln">30847</span><span class="txt">신고 확인 중 상태가 바뀌어 저장하지 않았습니다. 다시 신고해 주세요.</span></li>
+      <li><span class="ln">30522</span><span class="txt">위치 정보가 필요합니다.</span></li>
+    </ul>
+    <p class="note">
+      30696번에 <strong>"테스트 서버"</strong>가 그대로 들어 있습니다.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>보행 직전 · 장착과 준비</h2>
+
+  <div class="group prep">
+    <div class="group-head">
+      <h3>휴대폰 장착 — 통과</h3>
+      <span class="src">device/PhoneMountingPolicy.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">97</span><span class="txt">휴대전화가 앞을 향하도록 고정되었고 카메라 상태가 확인되었습니다. 보행을 시작하거나 다시 시작하기 전 주변 안전을 한 번 더 확인하세요.</span></li>
+      <li><span class="ln">101</span><span class="txt">카메라 방향과 흔들림, 영상 품질이 실제 센서 점검 기준을 충족했습니다. 장착 방식을 자동 판별한 결과는 아닙니다. 휴대전화를 앞을 향하게 안정적으로 유지하세요.</span></li>
+    </ul>
+  </div>
+
+  <div class="group prep">
+    <div class="group-head">
+      <h3>휴대폰 장착 — 실패 사유 16종</h3>
+      <span class="src">device/PhoneMountingPolicy.kt</span>
+    </div>
+    <p class="note">각 사유가 "무엇이 문제인가" + "무엇을 하라" 두 문장으로 되어 있습니다.</p>
+    <ul class="lines">
+      <li><span class="ln">129</span><span class="txt">휴대전화 정면 고정 확인이 필요합니다. / 휴대전화를 앞을 향하도록 고정한 뒤 화면의 장착 확인을 선택하세요.</span></li>
+      <li><span class="ln">141</span><span class="txt">손에 들거나 주머니에 넣은 휴대전화는 안전한 장착으로 인정되지 않습니다. / 휴대전화를 몸 앞에 세로로 고정하고 후면 카메라가 바깥을 향하게 하세요.</span></li>
+      <li><span class="ln">145</span><span class="txt">카메라 방향과 가림, 흔들림, 영상 품질을 확인할 수 없습니다. / 렌즈가 앞을 향하고 가리지 않았는지 확인한 뒤 다시 검사하세요.</span></li>
+      <li><span class="ln">169</span><span class="txt">카메라 방향, 가림, 흔들림 또는 영상 품질이 장착 기준에 맞지 않습니다. / 휴대전화 위치와 렌즈 가림을 바로잡은 뒤 다시 검사하세요.</span></li>
+      <li><span class="ln">165</span><span class="txt">카메라 장착 품질을 신뢰할 수 있는 근거가 부족합니다. / 렌즈 방향과 가림, 흔들림을 확인한 뒤 다시 검사하세요.</span></li>
+      <li><span class="ln">121</span><span class="txt">승인된 휴대전화 장착 기준이 없어 장착 상태를 확인할 수 없습니다. / 보행을 시작하지 말고 기존 보조수단을 계속 사용하세요.</span></li>
+      <li><span class="ln">153</span><span class="txt">승인된 카메라 검사 기준과 현재 검사 기준이 일치하지 않습니다. / 보행을 시작하지 말고 공식 지원 설정에서 다시 검사하세요.</span></li>
+      <li><span class="ln">181</span><span class="txt">제한된 장착 재검사에서 상태가 회복되지 않았습니다. / 위험 안내를 신뢰하지 말고 전체 보행을 안전하게 멈추세요.</span></li>
+      <li><span class="ln">185</span><span class="txt">장착 문제로 안전정지가 필요하며 자동으로 보행을 다시 시작할 수 없습니다. / 안전한 곳에서 멈춘 뒤 새 보행으로 장착 확인을 다시 시작하세요.</span></li>
+      <li><span class="ln">105·109·113·117·125·133·137·149·157·161·173·177</span><span class="txt">이전 보행 결과 무효, 재검사 요청 필요 등 <strong>시점·순서 관련 12종</strong></span></li>
+    </ul>
+    <p class="note">
+      16종 중 12종이 "이전 것은 못 쓴다, 다시 하라" 계열입니다. 사용자 입장에서는 구분이 어려울 수 있습니다.
+    </p>
+  </div>
+
+  <div class="group prep">
+    <div class="group-head">
+      <h3>안내 시작 준비</h3>
+      <span class="src">MainActivity.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">20893</span><span class="txt">안내를 준비합니다. 휴대전화를 앞을 향하게 유지해 주세요. 실제 센서 점검 후 자동으로 안내를 시작합니다.</span></li>
+      <li><span class="ln">20895</span><span class="txt">사용범위 교육은 현재 환경의 안전을 증명하지 않습니다. 활성화된 기능의 실제 센서 품질과 장착 상태를 점검합니다.</span></li>
+      <li><span class="ln">21951</span><span class="txt">장착 교정을 확인했습니다. 새 카메라 검사를 진행합니다.</span></li>
+      <li><span class="ln">21973</span><span class="txt">휴대전화가 앞을 향하도록 고정된 상태를 기록했습니다.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>첫 실행 · 안전 교육</h2>
+
+  <div class="group prep">
+    <div class="group-head">
+      <h3>네 가지 연습 — 실제로 들려주는 소리</h3>
+      <span class="src">session/PriorityUserOnboardingPolicy.kt</span>
+    </div>
+    <p class="note">
+      <strong>2026-09-09 변경.</strong> 네 가지 모두 실제 발화와 일치시켰습니다.
+      연습은 <strong>실제로 들릴 소리를 가르치는 것</strong>이므로 다르면 의미가 없습니다.
+    </p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>연습</th><th>들려주는 문장</th><th>실제 발화</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>위험 안내</td>
+            <td>전방 장애물. 멈추세요. 주변을 확인하세요.</td>
+            <td>전방 <span class="var">{대상}</span>. 멈추세요. 주변을 확인하세요.</td>
+          </tr>
+          <tr>
+            <td>일시정지</td>
+            <td>보행 안내를 일시정지했습니다.</td>
+            <td>동일</td>
+          </tr>
+          <tr>
+            <td>재개</td>
+            <td>주변을 확인했습니다. 보행 안내를 다시 시작합니다.</td>
+            <td>동일 <strong>(발화 신규 추가)</strong></td>
+          </tr>
+          <tr>
+            <td>안전정지</td>
+            <td>보행 기능을 안전 중지했습니다. <span class="var">{사유}</span></td>
+            <td>동일</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout" style="margin-top:4px">
+      <strong>고친 것 세 가지</strong>
+      <p class="note">
+        <strong>위험 안내</strong> — 연습만 <code>위험 안내입니다…</code>라고 했습니다.
+        실제는 대상 이름으로 시작하므로 연습도 같은 형태로 바꿨습니다. 대상은
+        <code>장애물</code>로 두었습니다 — 실제로는 그때 본 사물 이름이 들어갑니다.
+      </p>
+      <p class="note">
+        <strong>안전정지</strong> — <code>안전정지</code>라는 말은 <strong>연습 화면에만
+        있던 단어</strong>였습니다. 앱은 <code>안전 중지</code>라고 말하고 사유를 덧붙입니다.
+        연습도 그 형태로 맞췄습니다.
+      </p>
+      <p class="note">
+        <strong>재개</strong> — 연습에서는 소리를 들려주는데 <strong>실제로는 아무 소리도
+        나지 않았습니다.</strong> 화면에만 표시됐습니다. 화면을 못 보는 사용자는 재개됐는지
+        알 방법이 없었습니다. 음성 명령·버튼 두 경로 모두에 발화를 추가했고, 실제로 재개된
+        것을 확인한 뒤에만 말합니다.
+      </p>
+    </div>
+  </div>
+
+  <div class="group prep">
+    <div class="group-head">
+      <h3>시작을 막는 사유</h3>
+      <span class="src">session/PriorityUserOnboardingPolicy.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">57</span><span class="txt">먼저 연령대를 선택하세요.</span></li>
+      <li><span class="ln">58</span><span class="txt">만 14세 미만은 계정을 활성화하거나 보행을 시작할 수 없습니다.</span></li>
+      <li><span class="ln">60</span><span class="txt">만 18세 미만 계정은 보호자 확인이 끝날 때까지 활성화할 수 없습니다.</span></li>
+      <li><span class="ln">63</span><span class="txt">오프라인 한국어 음성 안내를 사용할 수 없어 보행을 시작할 수 없습니다.</span></li>
+      <li><span class="ln">65</span><span class="txt">진동 안내를 사용할 수 없어 보행을 시작할 수 없습니다.</span></li>
+      <li><span class="ln">66</span><span class="txt">사용환경 확인과 앱 사용교육을 완료하세요.</span></li>
+      <li><span class="ln">67</span><span class="txt">안전 제한 안내를 먼저 확인하세요.</span></li>
+      <li><span class="ln">68</span><span class="txt">실제 도로가 아닌 안전한 연습 장소를 먼저 확인하세요.</span></li>
+      <li><span class="ln">69</span><span class="txt">위험 안내·일시정지·재개·안전정지 연습을 모두 완료하세요.</span></li>
+    </ul>
+    <p class="note">
+      65번 <strong>진동</strong>은 기기점검 요구항목에서 이미 빠졌습니다. 이 문구만 남아 있습니다.
+    </p>
+  </div>
+
+  <div class="group prep">
+    <div class="group-head">
+      <h3>제품 고지</h3>
+      <span class="src">device/WalkSafeStartupCapability.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">8</span><span class="txt">워크세이프는 시각장애인의 도심 보행 중 가까운 위험과 이동 방향을 알려 주고 손상 점자블록 신고를 돕는 안드로이드 보행 보조 서비스입니다.</span></li>
+      <li><span class="ln">10</span><span class="txt">워크세이프는 보행 안전을 보장하지 않으며 흰지팡이·안내견·보호자를 대신하지 않습니다.</span></li>
+      <li><span class="ln">20360</span><span class="txt">WalkSafe는 흰지팡이와 안내견을 대신하지 않습니다.</span></li>
+      <li><span class="ln">13</span><span class="txt">이 휴대폰은 거리를 잴 수 없어 물체 종류만 알려드립니다. 거리와 안전 여부는 판단하지 않습니다</span></li>
+    </ul>
+    <p class="note">
+      같은 안전 고지가 <code>워크세이프</code>와 <code>WalkSafe</code> 두 표기로 나옵니다.
+      전자는 읽히고 후자는 엔진에 따라 "워크세이프" 또는 영어로 읽힙니다.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>기기점검</h2>
+
+  <div class="group prep">
+    <div class="group-head">
+      <h3>능력 판정</h3>
+      <span class="src">device/WalkSafeStartupCapability.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">159</span><span class="txt">필수 기기 기능 확인을 통과했습니다. 이 결과는 기능 시작 가능 여부만 뜻하며 보행 안전을 보장하지 않습니다.</span></li>
+      <li><span class="ln">105</span><span class="txt">지원 Android 버전이 아니어서 WalkSafe를 시작할 수 없습니다. 사용할 수 없는 기능: <span class="var">{목록}</span></span></li>
+      <li><span class="ln">119</span><span class="txt">오프라인 한국어 음성 안내를 사용할 수 없어 WalkSafe를 시작할 수 없습니다. 사용할 수 없는 기능: <span class="var">{목록}</span></span></li>
+      <li><span class="ln">134</span><span class="txt">기기 기능을 확인하는 중입니다: <span class="var">{목록}</span></span></li>
+      <li><span class="ln">144</span><span class="txt">일부 기기 기능을 사용할 수 없습니다. 사용할 수 없는 기능: <span class="var">{목록}</span>. 해당 기능과 관련된 기능만 제한됩니다.</span></li>
+    </ul>
+  </div>
+
+  <div class="group prep">
+    <div class="group-head">
+      <h3>위치 실패 — 2026-09-08 추가</h3>
+      <span class="src">device/DeviceCheckLocationFixPolicy.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">42</span><span class="txt">휴대전화 설정에서 위치를 켠 뒤 다시 점검하세요.</span></li>
+      <li><span class="ln">46</span><span class="txt">설정 &gt; 위치 &gt; 위치 서비스에서 Google 위치 정확도를 켠 뒤 다시 점검하세요. 실내에서는 이 기능이 꺼져 있으면 위치를 찾을 수 없습니다.</span></li>
+      <li><span class="ln">51</span><span class="txt">실내에서는 위치를 찾지 못할 수 있습니다. 창가나 실외에서 다시 점검하세요.</span></li>
+    </ul>
+    <p class="note">
+      46번은 <code>&gt;</code> 기호를 씁니다. 화면으로는 읽히지만 음성으로는 어떻게 읽힐지 확인이 필요합니다.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>그 외 · 계정 · 동의 · 설정</h2>
+  <p class="note">
+    서서 듣는 문장들이라 길이는 문제가 아닙니다. 다만 <strong>전체 115개 중 절반 이상</strong>이
+    여기 속하고, 대부분 기술 용어를 그대로 씁니다.
+  </p>
+
+  <div class="group calm">
+    <div class="group-head">
+      <h3>대표 사례</h3>
+      <span class="src">MainActivity.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">8284</span><span class="txt">동의 제어 비밀을 안전하게 저장하지 못해 선택을 전송하지 않습니다.</span></li>
+      <li><span class="ln">8277</span><span class="txt">기기 식별 상태를 안전하게 저장하지 못해 동의를 진행하지 않습니다.</span></li>
+      <li><span class="ln">8360</span><span class="txt">철회 상태를 안전하게 저장하지 못해 개인정보 기능을 잠갔습니다.</span></li>
+      <li><span class="ln">3426</span><span class="txt">삭제 복구 저장소를 신뢰할 수 없어 개인정보 기능을 잠갔습니다.</span></li>
+      <li><span class="ln">9867</span><span class="txt">게이트웨이 주소, 로그인 아이디와 계정 토큰을 확인하세요.</span></li>
+      <li><span class="ln">10165</span><span class="txt">기기 로그인 재사용이 감지되어 다시 로그인해야 합니다.</span></li>
+      <li><span class="ln">35424</span><span class="txt">위치 평가용 opaque route UUID를 입력하세요.</span></li>
+      <li><span class="ln">35418</span><span class="txt">가슴 장착과 figure-8 자력계 보정 완료를 먼저 확인하세요.</span></li>
+    </ul>
+    <p class="note">
+      마지막 둘은 개발용 화면 문구입니다. 일반 사용자에게 들릴 수 있는지 확인이 필요합니다.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>훑어보시면서 눈여겨볼 만한 것</h2>
+  <div class="group">
+    <ul class="lines">
+      <li><span class="ln">1</span><span class="txt"><s>연습과 실제가 다릅니다.</s> <strong>2026-09-09 반영</strong> — 네 가지 모두 일치시켰고, 소리가 없던 재개에는 발화를 추가했습니다.</span></li>
+      <li><span class="ln">2</span><span class="txt"><s>TMAP이 계속 들립니다.</s> <strong>2026-09-09 반영</strong> — 보행 중 안내에서 제거, 오류 문구는 유지.</span></li>
+      <li><span class="ln">3</span><span class="txt"><s>이름이 두 가지입니다.</s> <strong>2026-09-09 반영</strong> — 사물 이름표를 한 곳으로 통합. 제품명(워크세이프/WalkSafe)은 남음.</span></li>
+      <li><span class="ln">4</span><span class="txt"><s>개발용 문구가 섞여 있습니다.</s> <strong>확인 결과 문제 없음</strong> — 전부 debug 빌드 전용이거나 신고 대기열 게이트 뒤라 정식 배포에서 닿지 않습니다.</span></li>
+      <li><span class="ln">5</span><span class="txt"><s>진동 문구가 남아 있습니다.</s> <strong>2026-09-09 반영</strong> — 아무도 만들지 않던 차단 사유를 제거. <strong>진동을 필수로 볼지는 별도 논의.</strong></span></li>
+      <li><span class="ln">6</span><span class="txt"><s>"지금은 …가 아닙니다"가 5번.</s> <strong>2026-09-09 반영</strong> — 상태 안내로 바꾸고 전부 더 짧아졌습니다.</span></li>
+      <li><span class="ln">7</span><span class="txt"><strong>장착 실패 16종 중 12종</strong>이 "이전 것은 못 쓴다" 계열입니다.</span></li>
+    </ul>
+  </div>
+  <p class="note">
+    <strong>2026-09-09 반영:</strong> 위험 경고 거리 표현 제거 · 1번 · 2번 · 3번 · 5번 · 6번.
+    <strong>확인 후 무결:</strong> 4번.
+    <strong>남은 것:</strong> 7번(장착 실패 중복) · 점형블록 안내 여부 · 진동 필수 여부.
+  </p>
+</section>
+
+<footer>
+  소스에서 자동 추출했습니다. 줄 번호는 브랜치 <code>feature/device-check-20260907</code> 기준이며,
+  음성 인식용 명령어 패턴(사용자가 말하는 쪽)은 제외했습니다.
+</footer>
+
+</div>
+
+</body>
+</html>
