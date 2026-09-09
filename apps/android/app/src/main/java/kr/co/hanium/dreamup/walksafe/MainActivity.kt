@@ -32403,6 +32403,33 @@ generation != cameraFallbackGeneration
         speakInteraction("${selected.name} 목적지를 선택했습니다. 경로를 확인합니다.")
     }
 
+    /**
+     * Says what the walk is doing rather than why the command was refused.
+     *
+     * The walker cannot see the screen, so the state is the one thing they need and the one thing
+     * the old wording buried. It only names a command where exactly one is left; the three-way
+     * choice was already read out when the deviation was announced, and repeating it costs seconds
+     * mid-walk.
+     */
+    private fun explainRouteCommandUnavailable(
+        onRouteKo: String = "경로를 따라가는 중입니다.",
+    ) {
+        speakInteraction(
+            when {
+                !isRouteActive -> "길안내 중이 아닙니다."
+                routeNavigator.pendingUserDecision() ==
+                    RouteNavigatorUserDecision.LOCATION_RECHECK ->
+                    "위치 다시 확인만 할 수 있습니다."
+                routeNavigator.pendingUserDecision() ==
+                    RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION ->
+                    "도착 확인을 기다리고 있습니다."
+                routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.REROUTE ->
+                    "경로를 벗어난 상태입니다."
+                else -> onRouteKo
+            },
+        )
+    }
+
     private fun requestRerouteFromVoice() {
         if (!currentNavigationCollectionAllowsWork()) {
             explainNavigationFeatureUnavailable()
@@ -32414,7 +32441,7 @@ generation != cameraFallbackGeneration
             !isRouteActive ||
             routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE
         ) {
-            speakInteraction("지금은 새 경로를 요청할 이탈 상태가 아닙니다.")
+            explainRouteCommandUnavailable()
             return
         }
         val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.NEW_ROUTE)
@@ -32439,7 +32466,7 @@ generation != cameraFallbackGeneration
                 RouteNavigatorUserDecision.REROUTE,
             )
         ) {
-            speakInteraction("지금은 위치를 다시 확인할 이탈 상태가 아닙니다.")
+            explainRouteCommandUnavailable()
             return
         }
         val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
@@ -32456,7 +32483,7 @@ generation != cameraFallbackGeneration
             !isRouteActive ||
             routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE
         ) {
-            speakInteraction("지금은 종료 선택을 기다리는 경로 이탈 상태가 아닙니다.")
+            explainRouteCommandUnavailable()
             return
         }
         val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.END_NAVIGATION)
@@ -32480,7 +32507,7 @@ generation != cameraFallbackGeneration
     private fun confirmArrivalFromVoice() {
         val decision = routeNavigator.confirmArrival()
         if (!decision.arrived) {
-            speakInteraction("지금은 확인할 도착 후보가 없습니다.")
+            explainRouteCommandUnavailable("아직 도착 안내가 없습니다.")
             return
         }
         resetRouteState()
@@ -32508,7 +32535,7 @@ generation != cameraFallbackGeneration
     private fun rejectArrivalFromVoice() {
         val decision = routeNavigator.rejectArrival()
         if (decision.reason != "arrival_rejected_route_retained") {
-            speakInteraction("지금은 거절할 도착 후보가 없습니다.")
+            explainRouteCommandUnavailable("아직 도착 안내가 없습니다.")
             return
         }
         updateRouteDeviationActions(decision.pendingUserDecision)
