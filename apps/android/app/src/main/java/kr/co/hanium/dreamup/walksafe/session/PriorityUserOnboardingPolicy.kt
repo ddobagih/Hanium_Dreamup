@@ -68,19 +68,21 @@ enum class PriorityUserBlockReason(val noticeKo: String) {
     OFFLINE_KOREAN_VOICE_UNAVAILABLE(
         "오프라인 한국어 음성 안내를 사용할 수 없어 보행을 시작할 수 없습니다.",
     ),
-    VIBRATION_UNAVAILABLE("진동 안내를 사용할 수 없어 보행을 시작할 수 없습니다."),
     APP_USAGE_EDUCATION_INCOMPLETE("사용환경 확인과 앱 사용교육을 완료하세요."),
     SAFETY_EDUCATION_NOT_REVIEWED("안전 제한 안내를 먼저 확인하세요."),
     SAFE_PRACTICE_PLACE_NOT_CONFIRMED("실제 도로가 아닌 안전한 연습 장소를 먼저 확인하세요."),
     REQUIRED_PRACTICE_INCOMPLETE("위험 안내·일시정지·재개·안전정지 연습을 모두 완료하세요."),
 }
 
+/**
+ * Signals that decide whether onboarding may proceed. Vibration is not among them: it restricts
+ * HAPTIC_FEEDBACK when absent, while speech remains the primary channel and still works.
+ */
 data class PriorityUserSupportEnvironment(
     val screenReaderActive: Boolean,
     val largeTextEnabled: Boolean,
     val highContrastEnabled: Boolean,
     val offlineKoreanVoiceAvailable: Boolean,
-    val vibrationAvailable: Boolean,
 )
 
 data class PriorityUserOnboardingSnapshot(

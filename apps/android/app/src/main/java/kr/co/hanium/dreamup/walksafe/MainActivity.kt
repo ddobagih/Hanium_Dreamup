@@ -20083,7 +20083,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             offlineKoreanVoiceAvailable = isAvailable(
                 WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS,
             ),
-            vibrationAvailable = startupCapabilityProbe.snapshot().vibrationAvailable == true,
         )
     }
 
