@@ -18,9 +18,12 @@ enum class PriorityUserPractice(
     val actionLabelKo: String,
     val instructionKo: String,
 ) {
+    // The rehearsal has to be the sentence the walker will actually meet, or it teaches a cue the
+    // app never gives. A live warning names whatever it saw, so this names nothing and keeps the
+    // opening and the action identical.
     HAZARD_ALERT(
         actionLabelKo = "위험 안내 연습",
-        instructionKo = "위험 안내입니다. 멈추고 주변을 확인하세요.",
+        instructionKo = "전방 장애물. 멈추세요. 주변을 확인하세요.",
     ),
     PAUSE(
         actionLabelKo = "일시정지 연습",
@@ -30,9 +33,12 @@ enum class PriorityUserPractice(
         actionLabelKo = "재개 연습",
         instructionKo = "주변을 확인했습니다. 보행 안내를 다시 시작합니다.",
     ),
+    // MainActivity speaks "보행 기능을 안전 중지했습니다. $reason", so the rehearsal carries the
+    // same opening and the fallback reason; "안전정지" existed only here.
     SAFE_STOP(
         actionLabelKo = "안전정지 연습",
-        instructionKo = "필수 기능을 사용할 수 없어 보행 안내를 안전정지했습니다.",
+        instructionKo = "보행 기능을 안전 중지했습니다. " +
+            "필수 기능 상태가 바뀌어 새 보행 준비가 필요합니다.",
     ),
 }
 
