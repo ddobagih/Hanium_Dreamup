@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.ObstacleLabels
 import kr.co.hanium.dreamup.walksafe.navigation.CROSSWALK_REFERENCE_NOTICE_KO
 import kr.co.hanium.dreamup.walksafe.navigation.CrosswalkReferencePolicy
 
@@ -252,19 +253,8 @@ class MessagePolicy(
         return className.lowercase() in tactileClassNames || isTactileBlockClass(className)
     }
 
-    private fun labelForClass(className: String): String {
-        return when (className.lowercase()) {
-            "person" -> "사람"
-            "bicycle" -> "자전거"
-            "car", "bus", "truck", "motorcycle" -> "차량"
-            "normal_tactile_block" -> "점자블록"
-            "crosswalk" -> "횡단보도"
-            "curb_step" -> "보도 턱"
-            "uneven_sidewalk" -> "고르지 않은 보도"
-            "e_scooter_obstruction" -> "방치 킥보드"
-            else -> "물체"
-        }
-    }
+    private fun labelForClass(className: String): String =
+        ObstacleLabels.labelFor(className)
 
     private companion object {
         val tactileClassNames = setOf(

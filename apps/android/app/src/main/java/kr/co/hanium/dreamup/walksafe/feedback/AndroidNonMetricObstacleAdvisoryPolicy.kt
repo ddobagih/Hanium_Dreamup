@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.feedback
 
 import java.util.Locale
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
+import kr.co.hanium.dreamup.walksafe.inference.ObstacleLabels
 
 enum class NonMetricObstacleDirection(val labelKo: String) {
     LEFT("왼쪽"),
@@ -244,7 +245,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
         return Observation(
             key = "$className|${direction.name}",
             direction = direction,
-            categoryLabelKo = requireNotNull(NON_METRIC_OBSTACLE_CLASSES[className]),
+            categoryLabelKo = ObstacleLabels.labelFor(className),
             candidate = candidate,
         )
     }
@@ -268,18 +269,23 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
     private companion object {
         const val LEFT_ZONE_END = 0.38f
         const val RIGHT_ZONE_START = 0.62f
-        val NON_METRIC_OBSTACLE_CLASSES = mapOf(
-            "person" to "사람",
-            "bicycle" to "자전거",
-            "car" to "자동차",
-            "motorcycle" to "오토바이",
-            "bus" to "버스",
-            "truck" to "트럭",
-            "bench" to "벤치",
-            "normal_tactile_block" to "점자블록",
-            "curb_step" to "턱",
-            "uneven_sidewalk" to "고르지 않은 보도",
-            "e_scooter_obstruction" to "전동 킥보드",
+        /**
+         * Which classes may raise a direction-only warning. Wording comes from [ObstacleLabels];
+         * this set decides only whether a class is admitted, since a phone without distance still
+         * must not announce tactile damage or a traffic light.
+         */
+        val NON_METRIC_OBSTACLE_CLASSES = setOf(
+            "person",
+            "bicycle",
+            "car",
+            "motorcycle",
+            "bus",
+            "truck",
+            "bench",
+            "normal_tactile_block",
+            "curb_step",
+            "uneven_sidewalk",
+            "e_scooter_obstruction",
         )
     }
 }
