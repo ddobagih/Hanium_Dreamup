@@ -25535,6 +25535,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (isWalkSessionRuntimeActive()) {
             activateWalkSessionRuntime()
             updateStatus("보행 안내 재개", "필수 기능 재검사와 사용자 확인을 마쳐 새 판단으로 재개했습니다.")
+            // A walker who cannot see the screen has no other way to know guidance is back, and
+            // this is the sentence the practice screen rehearsed.
+            speakInteraction(PriorityUserPractice.RESUME.instructionKo)
         } else {
             val detail = when (response) {
                 WalkSessionResumeConfirmation.CANCEL -> "사용자가 취소해 일시중지를 유지합니다."
@@ -25584,6 +25587,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "보행 안내 재개",
                 "화면의 재개 버튼 확인으로 보행 안내를 다시 시작했습니다.",
             )
+            speakInteraction(PriorityUserPractice.RESUME.instructionKo)
         }
     }
 
