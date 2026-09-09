@@ -27,7 +27,6 @@ class MessagePolicyTest {
 
         assertEquals(MessagePurpose.NONE, decision.purpose)
         assertEquals(MessageLevel.NONE, decision.userFacing.messageLevel)
-        assertNull(decision.userFacing.stepsAhead)
         assertNull(decision.userFacing.message)
     }
 
@@ -70,7 +69,6 @@ class MessagePolicyTest {
 
         assertEquals(MessagePurpose.APPROACH_CAUTION, decision.purpose)
         assertEquals(MessageLevel.CAUTION, decision.userFacing.messageLevel)
-        assertNull(decision.userFacing.stepsAhead)
         assertTrue(
             decision.userFacing.message?.endsWith("속도를 늦추고 주변을 확인하세요.") == true,
         )
@@ -94,7 +92,6 @@ class MessagePolicyTest {
 
         assertEquals(MessagePurpose.APPROACH_CAUTION, decision.purpose)
         assertEquals(MessageLevel.CAUTION, decision.userFacing.messageLevel)
-        assertNull(decision.userFacing.stepsAhead)
         assertTrue(
             decision.userFacing.message?.endsWith("속도를 늦추고 주변을 확인하세요.") == true,
         )
@@ -117,7 +114,6 @@ class MessagePolicyTest {
         )
 
         assertEquals(MessageLevel.NONE, decision.userFacing.messageLevel)
-        assertNull(decision.userFacing.stepsAhead)
         assertNull(decision.userFacing.message)
     }
 
@@ -140,7 +136,6 @@ class MessagePolicyTest {
         assertFalse(DepthSource.MONOCULAR_METRIC_DEPTH.trustedForStepGuidance)
         assertEquals(MessagePurpose.NONE, decision.purpose)
         assertEquals(MessageLevel.NONE, decision.userFacing.messageLevel)
-        assertNull(decision.userFacing.stepsAhead)
         assertNull(decision.userFacing.message)
     }
 
@@ -184,7 +179,6 @@ class MessagePolicyTest {
         assertEquals(MessagePurpose.PATH_GUIDANCE, decision.purpose)
         assertEquals(MessageLevel.INFO, decision.userFacing.messageLevel)
         assertEquals(CROSSWALK_REFERENCE_NOTICE_KO, decision.userFacing.message)
-        assertNull(decision.userFacing.stepsAhead)
         assertFalse(decision.userFacing.message!!.contains("멈추세요"))
     }
 
@@ -207,7 +201,6 @@ class MessagePolicyTest {
         assertEquals(MessagePurpose.PATH_GUIDANCE, decision.purpose)
         assertEquals(MessageLevel.INFO, decision.userFacing.messageLevel)
         assertEquals(CROSSWALK_REFERENCE_NOTICE_KO, decision.userFacing.message)
-        assertNull(decision.userFacing.stepsAhead)
     }
 
     @Test

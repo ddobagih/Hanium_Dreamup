@@ -8,6 +8,6 @@ package kr.co.hanium.dreamup.walksafe.depth
 class TactilePathPolicy {
     @Suppress("UNUSED_PARAMETER")
     fun buildGuidance(geometry: ObjectGeometry, stepLengthM: Float = 0.65f): UserFacingDepth {
-        return UserFacingDepth(stepsAhead = null, messageLevel = MessageLevel.NONE, message = null)
+        return UserFacingDepth(messageLevel = MessageLevel.NONE, message = null)
     }
 }

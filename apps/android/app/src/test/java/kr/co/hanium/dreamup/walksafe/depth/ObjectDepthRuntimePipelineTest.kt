@@ -83,7 +83,6 @@ class ObjectDepthRuntimePipelineTest {
 
         assertEquals(DepthSource.POLYGON_TREND_PSEUDO_DEPTH, output.source)
         assertNull(output.riskDistanceM)
-        assertNull(output.userFacing.stepsAhead)
     }
 
     @Test

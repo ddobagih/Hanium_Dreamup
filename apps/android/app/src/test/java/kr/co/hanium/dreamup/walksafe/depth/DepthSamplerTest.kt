@@ -109,7 +109,7 @@ class DepthSamplerTest {
     }
 
     @Test
-    fun messagePolicyUsesStepsOnlyForMetricSources() {
+    fun messagePolicySeparatesTrustedDistanceFromAGuessAtOne() {
         val policy = MessagePolicy(stepLengthM = 0.6f)
         val metric = policy.buildUserFacing(
             MetricDepthDecision(
@@ -129,10 +129,8 @@ class DepthSamplerTest {
                 confidenceFinal = 0.5f,
             ),
         )
-
-        assertEquals(2, metric.stepsAhead)
-        assertTrue(metric.message!!.contains("2보"))
-        assertNull(pseudo.stepsAhead)
+        // A trusted distance still earns a stop instruction; it just is not quoted any more.
+        assertTrue(metric.message!!, metric.message!!.endsWith("멈추세요. 주변을 확인하세요."))
         assertTrue(pseudo.message!!.contains("줄어드는 것"))
     }
 }

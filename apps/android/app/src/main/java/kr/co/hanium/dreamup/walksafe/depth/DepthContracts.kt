@@ -140,17 +140,15 @@ data class TrackedObjectDepth(
     val trackStableMs: Long = 0L,
 )
 
+/**
+ * What the walker is told about one object. Deliberately carries no distance: a hazard's distance
+ * cannot be stated usefully while the walker, the hazard and the recogniser are all in motion, so
+ * it decides the [messageLevel] and stops there.
+ */
 data class UserFacingDepth(
-    val stepsAhead: Int?,
     val messageLevel: MessageLevel,
     val message: String?,
 )
-
-fun distanceMetersToSteps(distanceM: Float?, userStepLengthM: Float): Int? {
-    if (distanceM == null || distanceM <= 0f || !distanceM.isFinite()) return null
-    val safeStep = if (userStepLengthM in 0.3f..1.2f) userStepLengthM else 0.65f
-    return max(1, ceil((distanceM / safeStep).toDouble()).toInt())
-}
 
 fun isTactileBlockClass(className: String): Boolean {
     return className.lowercase().contains("tactile") || className.contains("점자")

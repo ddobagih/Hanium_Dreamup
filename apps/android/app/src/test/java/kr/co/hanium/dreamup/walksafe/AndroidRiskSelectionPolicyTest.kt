@@ -139,7 +139,7 @@ class AndroidRiskSelectionPolicyTest {
                 freshnessQuality = 1f,
                 corridorQuality = 1f,
             ),
-            userFacing = UserFacingDepth(null, messageLevel, message),
+            userFacing = UserFacingDepth(messageLevel, message),
             trackAgeFrames = trackAgeFrames,
             trackStableMs = trackStableMs,
         )

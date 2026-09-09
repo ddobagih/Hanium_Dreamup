@@ -410,7 +410,6 @@ class AndroidTactileRouteGuidanceTest {
             trackId = "person-1",
             className = "person",
             userFacing = UserFacingDepth(
-                stepsAhead = 2,
                 messageLevel = MessageLevel.WARNING,
                 message = "앞에 사람 후보가 있습니다.",
             ),
@@ -856,7 +855,7 @@ class AndroidTactileRouteGuidanceTest {
                 corridorQuality = 1f,
                 hardGate = 1f,
             ),
-            userFacing = UserFacingDepth(stepsAhead = 3, messageLevel = MessageLevel.NONE, message = null),
+            userFacing = UserFacingDepth(messageLevel = MessageLevel.NONE, message = null),
             trackAgeFrames = 4,
             trackStableMs = 900L,
         )

@@ -110,8 +110,7 @@ class ObjectDepthRuntimePipeline(
 
 fun TrackedObjectDepth.debugSummaryText(): String {
     val distance = riskDistanceM?.let { String.format(Locale.US, "%.2fm", it) } ?: "거리 없음"
-    val steps = userFacing.stepsAhead?.let { " · ${it}보" } ?: ""
     val confidence = String.format(Locale.US, "%.0f%%", confidence.finalScore * 100f)
     val message = userFacing.message?.let { " · $it" } ?: ""
-    return "$trackId $className · ${source.name} · $distance$steps · conf $confidence$message"
+    return "$trackId $className · ${source.name} · $distance · conf $confidence$message"
 }

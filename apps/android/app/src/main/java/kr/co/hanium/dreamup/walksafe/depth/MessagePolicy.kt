@@ -85,25 +85,21 @@ class MessagePolicy(
             return none("outside obstacle warning threshold")
         }
         activeObstacleLevelByKey[stateKey] = level
-        val steps = distanceMetersToSteps(result.riskDistanceM, stepLengthM)
         if (level == MessageLevel.AWARE) {
             return MessagePolicyDecision(
-                userFacing = UserFacingDepth(stepsAhead = steps, messageLevel = MessageLevel.AWARE, message = null),
+                userFacing = UserFacingDepth(messageLevel = MessageLevel.AWARE, message = null),
                 purpose = MessagePurpose.NONE,
                 reason = "approaching object aware",
             )
         }
+        // Distance chooses the urgency and is never spoken. A turn stays put while the walker
+        // closes on it, so route guidance can quote metres; a hazard cannot, because recognition
+        // takes time, the walker keeps moving through it, and the hazard may be closing too. Any
+        // figure is stale before the sentence ends. The action carries the urgency instead.
         val target = labelForClass(result.className)
-        val phrase = when {
-            steps == null -> "전방 $target"
-            steps <= 1 -> "전방 바로 앞 $target"
-            steps <= 2 -> "전방 약 ${steps}보 이내 $target"
-            steps <= 4 -> "전방 약 ${steps}보 앞 $target"
-            else -> "전방 $target"
-        }
         val action = if (level == MessageLevel.STOP) "멈추세요. 주변을 확인하세요." else "멈출 준비를 하세요."
         return MessagePolicyDecision(
-            userFacing = UserFacingDepth(stepsAhead = steps, messageLevel = level, message = "$phrase. $action"),
+            userFacing = UserFacingDepth(messageLevel = level, message = "전방 $target. $action"),
             purpose = MessagePurpose.OBSTACLE_WARNING,
             reason = if (level == MessageLevel.STOP) "near metric obstacle" else "metric obstacle warning",
         )
@@ -117,7 +113,7 @@ class MessagePolicy(
             // Damage is captured by the report pipeline; announcing every detection would overload
             // the user and conflict with the current silent-auto-report policy.
             "damaged_tactile_block" -> MessagePolicyDecision(
-                userFacing = UserFacingDepth(stepsAhead = null, messageLevel = MessageLevel.NONE, message = null),
+                userFacing = UserFacingDepth(messageLevel = MessageLevel.NONE, message = null),
                 purpose = MessagePurpose.REPORT_ONLY,
                 reason = "damaged tactile block is report-only",
             )
@@ -132,7 +128,6 @@ class MessagePolicy(
         }
         return MessagePolicyDecision(
             userFacing = UserFacingDepth(
-                stepsAhead = null,
                 messageLevel = MessageLevel.INFO,
                 message = CROSSWALK_REFERENCE_NOTICE_KO,
             ),
@@ -146,7 +141,6 @@ class MessagePolicy(
         if (!result.source.metric && result.trend == Trend.APPROACHING && result.confidenceFinal >= config.pseudoApproachMinConfidence) {
             return MessagePolicyDecision(
                 userFacing = UserFacingDepth(
-                    stepsAhead = null,
                     messageLevel = MessageLevel.CAUTION,
                     message = "전방 ${target}와의 거리가 줄어드는 것 같습니다. 속도를 늦추고 주변을 확인하세요.",
                 ),
@@ -157,7 +151,6 @@ class MessagePolicy(
         if (isWeakMetricCandidate(result)) {
             return MessagePolicyDecision(
                 userFacing = UserFacingDepth(
-                    stepsAhead = null,
                     messageLevel = MessageLevel.CAUTION,
                     message = "전방 가까운 $target 가능성. 속도를 늦추고 주변을 확인하세요.",
                 ),
@@ -241,7 +234,7 @@ class MessagePolicy(
 
     private fun none(reason: String): MessagePolicyDecision {
         return MessagePolicyDecision(
-            userFacing = UserFacingDepth(stepsAhead = null, messageLevel = MessageLevel.NONE, message = null),
+            userFacing = UserFacingDepth(messageLevel = MessageLevel.NONE, message = null),
             purpose = MessagePurpose.NONE,
             reason = reason,
         )

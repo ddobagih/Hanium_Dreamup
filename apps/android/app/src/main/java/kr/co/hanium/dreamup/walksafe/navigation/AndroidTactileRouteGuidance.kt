@@ -494,12 +494,11 @@ class AndroidTactileRouteGuidance(
             output.copy(
                 userFacing = if (useAsLocalPath) {
                     UserFacingDepth(
-                        stepsAhead = output.userFacing.stepsAhead,
                         messageLevel = MessageLevel.INFO,
                         message = decision.instruction,
                     )
                 } else {
-                    UserFacingDepth(stepsAhead = null, messageLevel = MessageLevel.NONE, message = null)
+                    UserFacingDepth(messageLevel = MessageLevel.NONE, message = null)
                 },
             )
         }

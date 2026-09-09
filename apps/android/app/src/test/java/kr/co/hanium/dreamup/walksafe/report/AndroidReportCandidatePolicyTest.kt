@@ -209,7 +209,7 @@ class AndroidReportCandidatePolicyTest {
                 freshnessQuality = 1f,
                 corridorQuality = 1f,
             ),
-            userFacing = UserFacingDepth(null, MessageLevel.NONE, null),
+            userFacing = UserFacingDepth(MessageLevel.NONE, null),
             trackAgeFrames = trackAgeFrames,
             trackStableMs = trackStableMs,
         )

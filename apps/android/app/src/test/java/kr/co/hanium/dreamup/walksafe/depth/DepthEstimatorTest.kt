@@ -133,7 +133,6 @@ class DepthEstimatorTest {
 
         assertEquals(DepthSource.POLYGON_TREND_PSEUDO_DEPTH, result.source)
         assertNull(result.riskDistanceM)
-        assertNull(result.userFacing.stepsAhead)
     }
 
     @Test
