@@ -31947,7 +31947,7 @@ generation != cameraFallbackGeneration
                 },
             )
             if (!retryHomeDestinationVoiceDialog("명령을 이해하지 못했습니다.")) {
-                speakInteraction("명령을 이해하지 못했습니다. 다시 말씀해 주세요.")
+                speakInteraction("못 알아들었습니다. ${unrecognizedCommandHintKo()}")
             }
             return
         }
@@ -32128,6 +32128,23 @@ generation != cameraFallbackGeneration
             AndroidVoiceAction.RejectArrival -> rejectArrivalFromVoice()
             AndroidVoiceAction.StopNavigation -> stopNavigationFromVoice()
         }
+    }
+
+    /**
+     * "다시 말씀해 주세요" asks a walker who cannot read the screen to guess. The destination
+     * dialog already re-offers its numbers instead; everywhere else ended in a dead end. Each
+     * hint names commands the parser accepts in the state the walk is actually in.
+     */
+    private fun unrecognizedCommandHintKo(): String = when {
+        routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION ->
+            "도착했어 또는 아직 도착 아니야라고 말씀해 주세요."
+        routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.REROUTE ->
+            "새 경로 요청, 위치 다시 확인, 길안내 종료 중에서 말씀해 주세요."
+        routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.LOCATION_RECHECK ->
+            "위치 다시 확인이라고 말씀해 주세요."
+        isRouteActive -> "다음 안내 알려줘 또는 길안내 종료라고 말씀해 주세요."
+        pendingUiDestination != null -> "안내 시작 또는 목적지 취소라고 말씀해 주세요."
+        else -> "목적지를 말하거나 도움말이라고 말씀해 주세요."
     }
 
     private var homeDestinationVoiceDialogLease: HomeDestinationVoiceDialogLease? = null

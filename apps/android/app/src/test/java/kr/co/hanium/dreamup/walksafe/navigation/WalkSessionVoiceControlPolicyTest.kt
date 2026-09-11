@@ -104,9 +104,6 @@ class WalkSessionVoiceControlPolicyTest {
         val policy = WalkSessionVoiceControlPolicy()
         listOf(
             "보행 종료하지 마" to 0.99f,
-            " 보행 종료" to 0.99f,
-            "보행 종료 " to 0.99f,
-            "보행종료" to 0.99f,
             "보행 종료" to 0.79f,
             "보행 종료" to Float.NaN,
             "보행 종료" to 1.01f,
@@ -118,6 +115,20 @@ class WalkSessionVoiceControlPolicyTest {
             WalkSessionVoiceAction.REQUEST_END,
             policy.evaluate("보행 종료", 0.80f, WalkSessionState.ACTIVE, EPOCH_1),
         )
+    }
+
+    @Test
+    fun surroundingSpaceIsNotAUserDecision() {
+        // These three were asserted NO_OP while the navigation commands stripped spacing before
+        // matching, so one command set answered to the recognizer's formatting and the other did
+        // not. See WalkSessionVoicePhraseNormalizationTest.
+        listOf(" 보행 종료", "보행 종료 ", "보행종료").forEach { phrase ->
+            val policy = WalkSessionVoiceControlPolicy()
+            assertAction(
+                WalkSessionVoiceAction.REQUEST_END,
+                policy.evaluate(phrase, 0.99f, WalkSessionState.ACTIVE, EPOCH_1),
+            )
+        }
     }
 
     @Test

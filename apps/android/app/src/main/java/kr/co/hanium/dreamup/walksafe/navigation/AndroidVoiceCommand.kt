@@ -182,6 +182,17 @@ fun parseDestinationSearchVoiceCommand(
     return DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex)
 }
 
+/**
+ * One normalization for every spoken command. Whether a recognizer hands back "보행 일시정지",
+ * "보행 일시 정지" or "보행 일시정지." is not a decision the speaker made, so it must not be one
+ * the app acts on.
+ */
+internal fun compactVoicePhrase(text: String): String = text
+    .trim()
+    .replace(PUNCTUATION, "")
+    .replace(WHITESPACE, "")
+    .lowercase(Locale.KOREAN)
+
 fun parseAndroidVoiceCommand(
     text: String,
     allowBareDestinationIndex: Boolean = false,
@@ -190,7 +201,7 @@ fun parseAndroidVoiceCommand(
         .trim()
         .replace(PUNCTUATION, "")
         .replace(WHITESPACE, " ")
-    val compact = normalized.lowercase(Locale.KOREAN).replace(" ", "")
+    val compact = compactVoicePhrase(text)
     if (compact.isBlank() || NEGATION_MARKERS.any(compact::contains)) return null
 
     if (compact in DESTINATION_CANCEL_COMMANDS) return AndroidVoiceCommand.CancelDestination
@@ -376,6 +387,9 @@ private val NEXT_NAVIGATION_COMMANDS = setOf(
     "다음안내알려줘",
 )
 private val REROUTE_COMMANDS = setOf(
+    // The off-route prompt reads "새 경로 요청" out loud, so that is the phrase most walkers say.
+    "새경로요청",
+    "새경로요청해줘",
     "새경로찾아줘",
     "경로다시찾아줘",
     "재탐색해줘",
