@@ -92,6 +92,13 @@
   .chip.prep { background: var(--prep-bg); color: var(--prep); }
   .chip.calm { background: var(--calm-bg); color: var(--calm); }
 
+  .fixed {
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 100px; white-space: nowrap;
+    background: var(--calm-bg); color: var(--calm); vertical-align: 2px;
+  }
+  ul.lines li s { color: var(--muted); text-decoration-thickness: 1px; }
+
   .group {
     background: var(--surface); border: 1px solid var(--line);
     border-left: 4px solid var(--line); border-radius: 4px;
@@ -144,10 +151,10 @@
     걸으면서 듣는 말과 서서 듣는 말은 요구되는 것이 다르기 때문입니다.
   </p>
   <div class="meta">
-    <span>2026-09-09</span>
+    <span>2026-09-11 갱신</span>
     <span>총 230여 문장</span>
     <span>번호는 소스 줄 번호</span>
-    <span>위험 경고 거리 표현 제거 반영</span>
+    <span>검토 7항목 + 음성 명령 3건 반영</span>
   </div>
 </header>
 
@@ -354,7 +361,7 @@
       <span class="src">MainActivity.kt</span>
     </div>
     <ul class="lines">
-      <li><span class="ln">31940</span><span class="txt">명령을 이해하지 못했습니다. 다시 말씀해 주세요.</span></li>
+      <li><span class="ln">31940</span><span class="txt"><s>명령을 이해하지 못했습니다. 다시 말씀해 주세요.</s> → 아래 <strong>상태별 안내</strong>로 교체</span></li>
       <li><span class="ln">31676</span><span class="txt">음성 명령을 인식하지 못했습니다.</span></li>
       <li><span class="ln">31169</span><span class="txt">음성을 녹음하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요.</span></li>
       <li><span class="ln">31141</span><span class="txt">음성 녹음을 시작하지 못했습니다.</span></li>
@@ -367,6 +374,67 @@
     <p class="note">
       "인식하지 못했습니다"가 표현만 다르게 4번 있습니다. 사용자에게는 같은 상황일 수 있습니다.
     </p>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>인식 실패 — 무엇을 말하면 되는지 <span class="fixed">2026-09-11 반영</span></h3>
+      <span class="src">MainActivity.kt · unrecognizedCommandHintKo()</span>
+    </div>
+    <p class="note">
+      "다시 말씀해 주세요"는 화면을 못 보는 사람에게 알아맞히라는 말입니다. 바로 옆의 목적지 후보
+      대화는 이미 번호를 다시 읽어주고 있었는데, 일반 경로만 막다른 길이었습니다. 이제 보행이
+      실제로 어떤 상태인지 보고 고릅니다 — 6번 항목과 같은 모양입니다.
+    </p>
+    <ul class="lines">
+      <li><span class="ln">이탈</span><span class="txt">못 알아들었습니다. 새 경로 요청, 위치 다시 확인, 길안내 종료 중에서 말씀해 주세요.</span></li>
+      <li><span class="ln">도착</span><span class="txt">못 알아들었습니다. 도착했어 또는 아직 도착 아니야라고 말씀해 주세요.</span></li>
+      <li><span class="ln">재확인</span><span class="txt">못 알아들었습니다. 위치 다시 확인이라고 말씀해 주세요.</span></li>
+      <li><span class="ln">보행중</span><span class="txt">못 알아들었습니다. 다음 안내 알려줘 또는 길안내 종료라고 말씀해 주세요.</span></li>
+      <li><span class="ln">선택됨</span><span class="txt">못 알아들었습니다. 안내 시작 또는 목적지 취소라고 말씀해 주세요.</span></li>
+      <li><span class="ln">그 외</span><span class="txt">못 알아들었습니다. 목적지를 말하거나 도움말이라고 말씀해 주세요.</span></li>
+    </ul>
+    <p class="note">
+      앞머리도 <s>명령을 이해하지 못했습니다</s>(14자) → <strong>못 알아들었습니다</strong>(9자)로 줄였습니다.
+      실패 보고보다 선택지가 들을 값어치가 있습니다.
+    </p>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>앱이 시키는데 못 알아듣던 명령 <span class="fixed">2026-09-11 반영</span></h3>
+      <span class="src">navigation/RouteNavigator.kt · navigation/AndroidVoiceCommand.kt</span>
+    </div>
+    <p class="note">경로를 벗어나면 앱이 세 가지를 읽어줍니다. 그중 둘만 동작했습니다.</p>
+    <ul class="lines">
+      <li><span class="ln">713</span><span class="txt">경로를 벗어나 현재 방향 안내를 중지했습니다. 사용자 선택이 필요합니다. <strong>새 경로 요청, 위치 다시 확인, 길안내 종료</strong> 중에서 선택해 주세요.</span></li>
+      <li><span class="ln">✅</span><span class="txt">위치 다시 확인 → <code>위치다시확인</code> 인식됨</span></li>
+      <li><span class="ln">✅</span><span class="txt">길안내 종료 → <code>길안내종료</code> 인식됨</span></li>
+      <li><span class="ln">❌</span><span class="txt"><strong>새 경로 요청</strong> — 인식 목록은 <code>새경로찾아줘 / 경로다시찾아줘 / 재탐색해줘</code> 뿐이었습니다. 시키는 대로 말하면 "명령을 이해하지 못했습니다"가 돌아왔습니다.</span></li>
+    </ul>
+    <p class="note">
+      경로를 벗어나 앞이 보이지 않는 사람에게 가장 필요한 선택지가 이것입니다. 어휘에
+      <code>새경로요청</code>을 추가했고, 재발 방지는 문구를 또 적는 대신
+      <strong>안내문에서 선택지를 뽑아 파서에 넣는 시험</strong>으로 걸었습니다. 앞으로 안내 문구만
+      바꾸고 파서를 안 고치면 보도가 아니라 시험에서 먼저 깨집니다.
+    </p>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>보행 제어 5개만 잣대가 달랐던 것 <span class="fixed">2026-09-11 반영</span></h3>
+      <span class="src">navigation/WalkSessionVoiceControlPolicy.kt</span>
+    </div>
+    <p class="note">
+      길안내 명령 15개는 구두점·띄어쓰기를 지우고 맞추는데, 보행 제어 5개는 인식기가 준 원문을
+      그대로 비교했습니다. <code>보행 일시정지</code>는 보행을 멈추고 <code>보행 일시 정지</code>는
+      아무 일도 없었습니다 — 말하는 사람은 자기가 어느 쪽으로 말했는지 들을 수 없습니다.
+    </p>
+    <ul class="lines">
+      <li><span class="ln">전</span><span class="txt"><code>phrase == "보행 일시정지"</code> — 원문 그대로 비교</span></li>
+      <li><span class="ln">후</span><span class="txt"><code>compactVoicePhrase(phrase)</code> — 명령 20개가 전부 같은 함수를 지나갑니다</span></li>
+      <li><span class="ln">유지</span><span class="txt">신뢰도 기준 <strong>0.80</strong>(다른 명령은 0.55) — 잘못 들은 일시정지는 보행 하나를 날립니다. 부정형(<code>보행 종료하지 마</code>) 방어도 그대로입니다.</span></li>
+    </ul>
   </div>
 
   <div class="group walk">
@@ -467,24 +535,57 @@
 
   <div class="group prep">
     <div class="group-head">
-      <h3>휴대폰 장착 — 실패 사유 16종</h3>
+      <h3>휴대폰 장착 — 실패 사유 21종</h3>
       <span class="src">device/PhoneMountingPolicy.kt</span>
     </div>
-    <p class="note">각 사유가 "무엇이 문제인가" + "무엇을 하라" 두 문장으로 되어 있습니다.</p>
+    <p class="note">
+      발화는 <code>"휴대전화 장착을 교정하세요. "</code> + 사유 + 행동으로 조립됩니다. 원래 평균 84자,
+      약 17초였습니다. <strong>2026-09-11</strong>에 9종의 사유를 발화에서 뺐습니다 — 화면에는 그대로 남습니다.
+    </p>
     <ul class="lines">
-      <li><span class="ln">129</span><span class="txt">휴대전화 정면 고정 확인이 필요합니다. / 휴대전화를 앞을 향하도록 고정한 뒤 화면의 장착 확인을 선택하세요.</span></li>
       <li><span class="ln">141</span><span class="txt">손에 들거나 주머니에 넣은 휴대전화는 안전한 장착으로 인정되지 않습니다. / 휴대전화를 몸 앞에 세로로 고정하고 후면 카메라가 바깥을 향하게 하세요.</span></li>
       <li><span class="ln">145</span><span class="txt">카메라 방향과 가림, 흔들림, 영상 품질을 확인할 수 없습니다. / 렌즈가 앞을 향하고 가리지 않았는지 확인한 뒤 다시 검사하세요.</span></li>
       <li><span class="ln">169</span><span class="txt">카메라 방향, 가림, 흔들림 또는 영상 품질이 장착 기준에 맞지 않습니다. / 휴대전화 위치와 렌즈 가림을 바로잡은 뒤 다시 검사하세요.</span></li>
       <li><span class="ln">165</span><span class="txt">카메라 장착 품질을 신뢰할 수 있는 근거가 부족합니다. / 렌즈 방향과 가림, 흔들림을 확인한 뒤 다시 검사하세요.</span></li>
+      <li><span class="ln">129</span><span class="txt">휴대전화 정면 고정 확인이 필요합니다. / 휴대전화를 앞을 향하도록 고정한 뒤 화면의 장착 확인을 선택하세요.</span></li>
+      <li><span class="ln">177</span><span class="txt">장착 문제를 바로잡았다는 새 확인 없이는 보행을 다시 시작할 수 없습니다. / 현재 장착 상태를 확인하고 교정 완료를 명시적으로 선택하세요.</span></li>
+      <li><span class="ln">113</span><span class="txt">센서 점검 요청 시각이나 요청 정보가 올바르지 않습니다. / 안내 시작을 다시 선택해 새 센서 점검을 요청하세요.</span></li>
+      <li><span class="ln">117</span><span class="txt">장착 문제가 발생한 뒤의 새 센서 점검 요청이 필요합니다. / 안전한 곳에서 자세를 바로잡고 점검을 다시 요청하세요.</span></li>
       <li><span class="ln">121</span><span class="txt">승인된 휴대전화 장착 기준이 없어 장착 상태를 확인할 수 없습니다. / 보행을 시작하지 말고 기존 보조수단을 계속 사용하세요.</span></li>
       <li><span class="ln">153</span><span class="txt">승인된 카메라 검사 기준과 현재 검사 기준이 일치하지 않습니다. / 보행을 시작하지 말고 공식 지원 설정에서 다시 검사하세요.</span></li>
       <li><span class="ln">181</span><span class="txt">제한된 장착 재검사에서 상태가 회복되지 않았습니다. / 위험 안내를 신뢰하지 말고 전체 보행을 안전하게 멈추세요.</span></li>
-      <li><span class="ln">185</span><span class="txt">장착 문제로 안전정지가 필요하며 자동으로 보행을 다시 시작할 수 없습니다. / 안전한 곳에서 멈춘 뒤 새 보행으로 장착 확인을 다시 시작하세요.</span></li>
-      <li><span class="ln">105·109·113·117·125·133·137·149·157·161·173·177</span><span class="txt">이전 보행 결과 무효, 재검사 요청 필요 등 <strong>시점·순서 관련 12종</strong></span></li>
+    </ul>
+  </div>
+
+  <div class="group prep">
+    <div class="group-head">
+      <h3>장착 실패 — 사유를 말하지 않는 9종 <span class="fixed">2026-09-11 반영</span></h3>
+      <span class="src">device/PhoneMountingPolicy.kt</span>
+    </div>
+    <p class="note">
+      <strong>카메라 프레임이 들어올 때마다 판정이 다시 돕니다</strong>(<code>MainActivity.kt:22683</code>).
+      아래 위쪽 4종은 사용자가 아무것도 하지 않아도 다음 정상 프레임에서 풀립니다. 그걸 말하려고
+      92자를 쓰고 있었습니다. 아래쪽 5종은 저장된 근거가 이전 보행 것이라, 카메라든 확인이든 요청이든
+      안전정지든 할 일이 하나였습니다.
+    </p>
+    <ul class="lines">
+      <li><span class="ln">저절로</span><span class="txt"><s>카메라 장착 검사가 오래되었거나 측정 시간이 올바르지 않습니다. 현재 장착 상태에서 카메라 검사를 다시 실행하세요.</s></span></li>
+      <li><span class="ln">풀리는</span><span class="txt"><s>이번 안내 시작 요청 이후의 새 카메라 측정이 필요합니다. 휴대전화를 앞을 향하게 유지하고 새 센서 점검 결과를 기다리세요.</s></span></li>
+      <li><span class="ln">4종</span><span class="txt"><s>현재 장착을 확인하기 전에 측정한 카메라 결과는 사용할 수 없습니다. 장착 확인 뒤 새 카메라 검사가 끝날 때까지 기다리세요.</s></span></li>
+      <li><span class="ln"></span><span class="txt"><s>장착 문제가 발생하기 전에 측정한 카메라 결과로는 보행을 다시 시작할 수 없습니다. 장착을 바로잡은 뒤 새로운 카메라 검사를 실행하세요.</s></span></li>
+      <li><span class="ln">→</span><span class="txt"><strong>휴대전화 장착을 교정하세요. 자세를 유지하면 다시 확인합니다.</strong> <span class="var">34자</span></span></li>
+      <li><span class="ln">이전</span><span class="txt"><s>이전 보행의 장착 상태가 남아 있어 현재 보행에 사용할 수 없습니다. 보행을 안전하게 멈춘 뒤 새 장착 확인을 시작하세요.</s></span></li>
+      <li><span class="ln">보행</span><span class="txt"><s>이전 보행의 센서 점검 요청은 현재 보행에 사용할 수 없습니다. 현재 목적지에서 안내 시작을 다시 선택하세요.</s></span></li>
+      <li><span class="ln">자료</span><span class="txt"><s>이전 보행에서 확인한 장착 정보는 현재 보행에 사용할 수 없습니다. 현재 보행 화면에서 장착 상태를 다시 확인하세요.</s></span></li>
+      <li><span class="ln">5종</span><span class="txt"><s>이전 보행에서 측정한 카메라 상태는 현재 보행에 사용할 수 없습니다. 현재 장착 상태에서 카메라 검사를 다시 실행하세요.</s></span></li>
+      <li><span class="ln"></span><span class="txt"><s>장착 문제로 안전정지가 필요하며 자동으로 보행을 다시 시작할 수 없습니다. 안전한 곳에서 멈춘 뒤 새 보행으로 장착 확인을 다시 시작하세요.</s></span></li>
+      <li><span class="ln">→</span><span class="txt"><strong>휴대전화 장착을 교정하세요. 새 보행으로 다시 시작하세요.</strong> <span class="var">32자</span></span></li>
     </ul>
     <p class="note">
-      16종 중 12종이 "이전 것은 못 쓴다, 다시 하라" 계열입니다. 사용자 입장에서는 구분이 어려울 수 있습니다.
+      안전정지 계열은 뒤에 "전체 상태를 다시 확인하고 새 보행을 시작하세요."가 한 번 더 붙어
+      <strong>최대 119자</strong>였습니다. 축약 문구가 같은 말을 하므로 그 꼬리도 발화에서 뺐습니다.
+      <code>RQ-FP-006-001-RULE-04</code>는 "먼저 <strong>교정 방법</strong>을 알리고"라고 정하고 있습니다 —
+      사유 21종 열거는 요구가 아닙니다.
     </p>
   </div>
 
@@ -672,19 +773,37 @@
       <li><span class="ln">4</span><span class="txt"><s>개발용 문구가 섞여 있습니다.</s> <strong>확인 결과 문제 없음</strong> — 전부 debug 빌드 전용이거나 신고 대기열 게이트 뒤라 정식 배포에서 닿지 않습니다.</span></li>
       <li><span class="ln">5</span><span class="txt"><s>진동 문구가 남아 있습니다.</s> <strong>2026-09-09 반영</strong> — 아무도 만들지 않던 차단 사유를 제거. <strong>진동을 필수로 볼지는 별도 논의.</strong></span></li>
       <li><span class="ln">6</span><span class="txt"><s>"지금은 …가 아닙니다"가 5번.</s> <strong>2026-09-09 반영</strong> — 상태 안내로 바꾸고 전부 더 짧아졌습니다.</span></li>
-      <li><span class="ln">7</span><span class="txt"><strong>장착 실패 16종 중 12종</strong>이 "이전 것은 못 쓴다" 계열입니다.</span></li>
+      <li><span class="ln">7</span><span class="txt"><s>장착 실패 중 다수가 "이전 것은 못 쓴다" 계열입니다.</s> <strong>2026-09-11 반영</strong> — 16종이 아니라 <strong>21종</strong>이었고, 그중 9종의 사유를 발화에서 뺐습니다. 평균 84자 → 33자.</span></li>
     </ul>
   </div>
   <p class="note">
     <strong>2026-09-09 반영:</strong> 위험 경고 거리 표현 제거 · 1번 · 2번 · 3번 · 5번 · 6번.
+    <strong>2026-09-11 반영:</strong> 7번 · 음성 명령 3건.
     <strong>확인 후 무결:</strong> 4번.
-    <strong>남은 것:</strong> 7번(장착 실패 중복) · 점형블록 안내 여부 · 진동 필수 여부.
+  </p>
+</section>
+
+<section>
+  <h2>대본을 훑다가 따로 나온 것</h2>
+  <div class="group">
+    <ul class="lines">
+      <li><span class="ln">A</span><span class="txt"><s>앱이 읽어주는 <strong>새 경로 요청</strong>을 앱이 못 알아듣습니다.</s> <strong>2026-09-11 반영</strong></span></li>
+      <li><span class="ln">B</span><span class="txt"><s>보행 제어 5개만 띄어쓰기에 따라 되기도 안 되기도 합니다.</s> <strong>2026-09-11 반영</strong></span></li>
+      <li><span class="ln">C</span><span class="txt"><s>인식 실패가 아무것도 알려주지 않습니다.</s> <strong>2026-09-11 반영</strong></span></li>
+      <li><span class="ln">D</span><span class="txt"><strong>신고 확인 문구 126자(약 26초)</strong>에 "운영 문안 승인 전 빌드에서 승인한"이라는 산출물 관리 상태가 들어 있습니다. 정식 배포에는 닿지 않습니다(<code>DEBUG &amp;&amp; WALKSAFE_REPORT_QUEUE_ENABLED</code> 게이트 확인). 다만 개인정보 고지 문안이라 <code>RQ-FP-046-001</code>과 동의 문안 대조가 먼저입니다.</span></li>
+    </ul>
+  </div>
+  <p class="note">
+    <strong>남은 것:</strong> D(신고 고지 문안) · 점형블록 안내 여부 · 진동 필수 여부.
+    진동은 <code>RQ-FP-027-001</code>에서 답이 나왔습니다 — 보행 시작을 막는 조건은 오프라인 한국어 음성
+    하나뿐이고, 진동은 중대 위험의 <strong>보조</strong> 수단으로만 요구됩니다.
   </p>
 </section>
 
 <footer>
-  소스에서 자동 추출했습니다. 줄 번호는 브랜치 <code>feature/device-check-20260907</code> 기준이며,
-  음성 인식용 명령어 패턴(사용자가 말하는 쪽)은 제외했습니다.
+  소스에서 자동 추출했습니다. 줄 번호는 브랜치 <code>feature/device-check-20260907</code> 기준입니다.
+  사용자가 말하는 쪽(명령어 어휘)은 원래 제외했는데, 앱이 읽어주는 문구와 어긋난 곳이 나와
+  2026-09-11에 그 부분만 넣었습니다.
 </footer>
 
 </div>
