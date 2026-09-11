@@ -89,9 +89,22 @@ enum class PhoneMountingAssessmentPhase {
     ACTIVE,
 }
 
+/** The camera keeps measuring, so the walker's whole job is to stop moving the phone. */
+private const val HOLD_STILL_ACTION_KO = "자세를 유지하면 다시 확인합니다."
+
+/** Evidence from a finished walk is never repaired in place; only a new walk clears it. */
+private const val NEW_WALK_ACTION_KO = "새 보행으로 다시 시작하세요."
+
 enum class PhoneMountingReason(
     val accessibleReasonKo: String,
     val accessibleActionKo: String,
+    /**
+     * Whether the cause is worth the seconds it costs to say it out loud. It is not when the
+     * walker answers every cause in the group the same way: evidence that the next camera frame
+     * replaces, or evidence bound to a finished walk. The reason still reaches the screen, which
+     * is read on demand rather than mid-stride.
+     */
+    val speakReason: Boolean = true,
 ) {
     PASSED(
         "휴대전화가 앞을 향하도록 고정되었고 카메라 상태가 확인되었습니다.",
@@ -103,7 +116,8 @@ enum class PhoneMountingReason(
     ),
     CHECK_REQUEST_EPOCH_MISMATCH(
         "이전 보행의 센서 점검 요청은 현재 보행에 사용할 수 없습니다.",
-        "현재 목적지에서 안내 시작을 다시 선택하세요.",
+        NEW_WALK_ACTION_KO,
+        speakReason = false,
     ),
     CHECK_REQUEST_INVALID(
         "센서 점검 요청 시각이나 요청 정보가 올바르지 않습니다.",
@@ -111,7 +125,8 @@ enum class PhoneMountingReason(
     ),
     POST_CHECK_CAMERA_EVIDENCE_REQUIRED(
         "이번 안내 시작 요청 이후의 새 카메라 측정이 필요합니다.",
-        "휴대전화를 앞을 향하게 유지하고 새 센서 점검 결과를 기다리세요.",
+        HOLD_STILL_ACTION_KO,
+        speakReason = false,
     ),
     POST_FAULT_CHECK_REQUEST_REQUIRED(
         "장착 문제가 발생한 뒤의 새 센서 점검 요청이 필요합니다.",
@@ -123,7 +138,8 @@ enum class PhoneMountingReason(
     ),
     STATE_EPOCH_MISMATCH(
         "이전 보행의 장착 상태가 남아 있어 현재 보행에 사용할 수 없습니다.",
-        "보행을 안전하게 멈춘 뒤 새 장착 확인을 시작하세요.",
+        NEW_WALK_ACTION_KO,
+        speakReason = false,
     ),
     USER_CONFIRMATION_MISSING(
         "휴대전화 정면 고정 확인이 필요합니다.",
@@ -131,7 +147,8 @@ enum class PhoneMountingReason(
     ),
     USER_CONFIRMATION_EPOCH_MISMATCH(
         "이전 보행에서 확인한 장착 정보는 현재 보행에 사용할 수 없습니다.",
-        "현재 보행 화면에서 장착 상태를 다시 확인하세요.",
+        NEW_WALK_ACTION_KO,
+        speakReason = false,
     ),
     USER_CONFIRMATION_STALE(
         "장착 확인 시간이 오래되었거나 올바르지 않습니다.",
@@ -147,7 +164,8 @@ enum class PhoneMountingReason(
     ),
     CAMERA_EPOCH_MISMATCH(
         "이전 보행에서 측정한 카메라 상태는 현재 보행에 사용할 수 없습니다.",
-        "현재 장착 상태에서 카메라 검사를 다시 실행하세요.",
+        NEW_WALK_ACTION_KO,
+        speakReason = false,
     ),
     CAMERA_PROFILE_MISMATCH(
         "승인된 카메라 검사 기준과 현재 검사 기준이 일치하지 않습니다.",
@@ -155,11 +173,13 @@ enum class PhoneMountingReason(
     ),
     CAMERA_EVIDENCE_STALE(
         "카메라 장착 검사가 오래되었거나 측정 시간이 올바르지 않습니다.",
-        "현재 장착 상태에서 카메라 검사를 다시 실행하세요.",
+        HOLD_STILL_ACTION_KO,
+        speakReason = false,
     ),
     POST_CONFIRMATION_CAMERA_EVIDENCE_REQUIRED(
         "현재 장착을 확인하기 전에 측정한 카메라 결과는 사용할 수 없습니다.",
-        "장착 확인 뒤 새 카메라 검사가 끝날 때까지 기다리세요.",
+        HOLD_STILL_ACTION_KO,
+        speakReason = false,
     ),
     CAMERA_QUALITY_UNKNOWN(
         "카메라 장착 품질을 신뢰할 수 있는 근거가 부족합니다.",
@@ -171,7 +191,8 @@ enum class PhoneMountingReason(
     ),
     POST_FAULT_CAMERA_EVIDENCE_REQUIRED(
         "장착 문제가 발생하기 전에 측정한 카메라 결과로는 보행을 다시 시작할 수 없습니다.",
-        "장착을 바로잡은 뒤 새로운 카메라 검사를 실행하세요.",
+        HOLD_STILL_ACTION_KO,
+        speakReason = false,
     ),
     POST_FAULT_CONFIRMATION_REQUIRED(
         "장착 문제를 바로잡았다는 새 확인 없이는 보행을 다시 시작할 수 없습니다.",
@@ -183,8 +204,14 @@ enum class PhoneMountingReason(
     ),
     SAFETY_STOP_LATCHED(
         "장착 문제로 안전정지가 필요하며 자동으로 보행을 다시 시작할 수 없습니다.",
-        "안전한 곳에서 멈춘 뒤 새 보행으로 장착 확인을 다시 시작하세요.",
+        NEW_WALK_ACTION_KO,
+        speakReason = false,
     ),
+    ;
+
+    /** What the walker hears; the cause is dropped where every member answers to one action. */
+    val spokenGuidanceKo: String
+        get() = if (speakReason) "$accessibleReasonKo $accessibleActionKo" else accessibleActionKo
 }
 
 data class PhoneMountingAssessment(
@@ -211,6 +238,9 @@ data class PhoneMountingAssessment(
 
     val accessibleActionKo: String
         get() = reason.accessibleActionKo
+
+    val spokenGuidanceKo: String
+        get() = reason.spokenGuidanceKo
 }
 
 object PhoneMountingPolicy {

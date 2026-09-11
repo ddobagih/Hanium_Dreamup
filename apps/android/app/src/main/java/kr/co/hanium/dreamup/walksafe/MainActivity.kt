@@ -22767,8 +22767,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     )
                     ensureFeedbackActuator().playPhoneMountingCorrectionVibration()
                     speakStatusExplanation(
-                        "휴대전화 장착을 교정하세요. " +
-                            "${assessment.accessibleReasonKo} ${assessment.accessibleActionKo}",
+                        "휴대전화 장착을 교정하세요. ${assessment.spokenGuidanceKo}",
                     )
                 }
                 updatePhoneMountingUi()
@@ -22783,7 +22782,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         "전체 상태를 다시 확인하고 새 보행을 시작하세요."
                 updateStatus("휴대전화 장착 · 안전 중지", detail)
                 ensureFeedbackActuator().playPhoneMountingSafetyStopVibration()
-                speakStatusExplanation(detail)
+                // The screen keeps the cause and the closing instruction; where the action has
+                // already been shortened to "start a new walk", the tail only repeats it.
+                speakStatusExplanation(
+                    if (assessment.reason.speakReason) {
+                        detail
+                    } else {
+                        "휴대전화 장착을 교정하세요. ${assessment.spokenGuidanceKo}"
+                    },
+                )
             }
         }
     }
