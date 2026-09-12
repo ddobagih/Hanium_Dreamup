@@ -151,10 +151,10 @@
     걸으면서 듣는 말과 서서 듣는 말은 요구되는 것이 다르기 때문입니다.
   </p>
   <div class="meta">
-    <span>2026-09-11 갱신</span>
+    <span>2026-09-12 갱신</span>
     <span>총 230여 문장</span>
     <span>번호는 소스 줄 번호</span>
-    <span>검토 7항목 + 음성 명령 3건 반영</span>
+    <span>SM-A716S 실기기 실행 결과 반영</span>
   </div>
 </header>
 
@@ -798,6 +798,95 @@
     진동은 <code>RQ-FP-027-001</code>에서 답이 나왔습니다 — 보행 시작을 막는 조건은 오프라인 한국어 음성
     하나뿐이고, 진동은 중대 위험의 <strong>보조</strong> 수단으로만 요구됩니다.
   </p>
+</section>
+
+<section>
+  <h2>실기기에서만 드러난 것 <span class="fixed">2026-09-12</span></h2>
+  <div class="callout">
+    <strong>단위 시험 2,120개가 통과하는 동안, 이 폰에서는 음성 명령이 전부 죽어 있었습니다.</strong>
+    <p class="note">
+      SM-A716S에서 위 대본을 직접 실행했습니다. 기기점검은 5/5 통과했고 — 강화한 15m 위치 기준 포함 —
+      그 다음부터 아래가 나왔습니다. 셋 다 <strong>앱이 시키는 행동을 앱이 받아주지 않는</strong> 같은 모양입니다.
+    </p>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>도움말이라고 말해도 안 됨 <span class="fixed">수정</span></h3>
+      <span class="src">voice/PlatformVoiceCandidatePolicy.kt</span>
+    </div>
+    <p class="note">
+      이 기기의 구글 인식기는 <strong>신뢰도를 0으로</strong> 돌려줍니다. 그러면 점수 경로가 전부 막히고
+      대체 정책만 남는데, 그 정책이 후보를 <strong>1~3개</strong>만 받았습니다.
+      <code>EXTRA_MAX_RESULTS=3</code>은 안드로이드가 <strong>지킨다고 약속한 적 없는 값</strong>이고,
+      이 기기는 4개를 줍니다.
+    </p>
+    <ul class="lines">
+      <li><span class="ln">전</span><span class="txt"><code>FINAL_RECEIVED result_count=4</code> · <code>CANDIDATE_PARSED matched=true</code> · <code>disposition=INVALID_FINAL</code> — <strong>제대로 인식하고 버렸습니다</strong></span></li>
+      <li><span class="ln">후</span><span class="txt"><code>disposition=PREVIEW_ONLY matched=true</code> — 도움말 재생</span></li>
+    </ul>
+    <p class="note">
+      개수 상한을 없앴습니다. 지켜야 할 규칙은 "후보를 버리면서 합의했다고 하지 마라"인데,
+      만장일치 검사가 <strong>돌려받은 전부</strong>에 걸리므로 4개가 오면 문턱이 높아집니다.
+      상한은 더 엄격해질 수 있는 상황을 거절로 처리하고 있었습니다.
+    </p>
+  </div>
+
+  <div class="group walk">
+    <div class="group-head">
+      <h3>김치찌개에게 "후보를 확정 못 했다" <span class="fixed">수정</span></h3>
+      <span class="src">voice/PlatformVoiceCandidatePolicy.kt · MainActivity.kt</span>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">전</span><span class="txt">음성 후보를 하나로 확정하지 못했습니다. 다시 말씀해 주세요.</span></li>
+      <li><span class="ln">후</span><span class="txt">못 알아들었습니다. 목적지를 말하거나 도움말이라고 말씀해 주세요.</span></li>
+    </ul>
+    <p class="note">
+      "후보를 확정 못 했다"는 후보끼리 엇갈릴 때 하는 말입니다. 실제로는 <strong>엇갈린 게 없고 파싱된 게
+      없었습니다.</strong> 그래서 또박또박 다시 말하면 될 줄 알고 같은 말을 반복하게 됩니다 — 실제로 그랬습니다.
+      <code>UNRECOGNIZED</code>로 갈라서 C번에서 만든 안내로 합류시켰습니다.
+      <strong>C번 수정이 절반이었던 셈입니다</strong> — 고친 쪽은 이 기기가 밟지 않는 분기였습니다.
+    </p>
+  </div>
+
+  <div class="group prep">
+    <div class="group-head">
+      <h3>"이번만 허용" 한 번이면 앱에 못 들어감 <span class="fixed">수정</span></h3>
+      <span class="src">MainActivity.kt</span>
+    </div>
+    <p class="note">
+      ONE_TIME 권한은 프로세스가 끝나면 안드로이드가 회수합니다. 그런데 완료 플래그가 이미 저장돼 있어서
+      <strong>다시 묻지 않습니다.</strong> 플래그가 담으려던 뜻은 "물어봤다"인데 실제로 기록된 건
+      "허용됐었다"입니다.
+    </p>
+    <ul class="lines">
+      <li><span class="ln">전</span><span class="txt">필수 권한이 부족하여 앱을 실행할 수 없습니다. <s>앱을 다시 실행한 뒤 모든 필수 권한에 동의해 주세요.</s> <strong>[종료]</strong></span></li>
+      <li><span class="ln">후</span><span class="txt">필수 권한이 없어 보행을 시작할 수 없습니다. 설정에서 카메라, 위치, 마이크를 허용해 주세요. <strong>[설정 열기] [종료]</strong></span></li>
+    </ul>
+    <p class="note">
+      다시 실행하는 것이 바로 승인 기회를 없애는 동작이었습니다. ONE_TIME 만료는 <strong>거부가 아니라</strong>
+      안드로이드가 다시 물어보는 상태라, 실행당 한 번 더 요청하는 것으로 풀립니다. 그래도 안 되는 진짜 거부에는
+      설정을 직접 열어줍니다 — 화면을 못 보는 사용자가 <code>종료</code> 하나만 있는 창에서 안드로이드 설정을
+      찾아갈 수는 없습니다.
+    </p>
+  </div>
+
+  <div class="group">
+    <div class="group-head">
+      <h3>시험 다섯 개가 결함을 정답으로 갖고 있었습니다</h3>
+    </div>
+    <ul class="lines">
+      <li><span class="ln">1</span><span class="txt">장착 실패 문구 — 92자를 요구</span></li>
+      <li><span class="ln">2</span><span class="txt">보행 제어 — <code>" 보행 종료"</code>는 무시되어야 한다</span></li>
+      <li><span class="ln">3</span><span class="txt">후보 정책 — <code>List(4) { "도움말" }</code>은 INVALID_FINAL이어야 한다</span></li>
+      <li><span class="ln">4·5</span><span class="txt">권한 — 옛 안내 문구와 한 함수 본문 구조를 요구</span></li>
+    </ul>
+    <p class="note">
+      전부 <strong>"코드가 이렇게 동작한다"를 "이렇게 동작해야 한다"로</strong> 적어둔 것이었습니다.
+      우리 소스를 읽는 시험은 문구와 구조를 지키는 데는 쓸모가 있지만,
+      <strong>기기가 우리 가정대로 움직인다는 근거는 될 수 없습니다.</strong>
+    </p>
+  </div>
 </section>
 
 <footer>
