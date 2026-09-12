@@ -24,6 +24,31 @@ class UnrecognizedCommandNamesAWayOutTest {
     }
 
     @Test
+    fun noPathTellsAWalkerToSayItAgainWithoutSayingWhat() {
+        // The first fix reached one of the two misses. On a device whose recogniser returns zero
+        // confidence the other one is the path users actually walk, and it was left saying
+        // "다시 말씀해 주세요" with nothing after it. Both now converge on the same hint.
+        val deadEnds = Regex("\"([^\"]*못했습니다\\. 다시 말씀해 주세요\\.[^\"]*)\"")
+            .findAll(source)
+            .map { it.groupValues[1] }
+            .filterNot { it.startsWith("음성 후보를 하나로") }
+            .toList()
+
+        assertTrue("막다른 문구: $deadEnds", deadEnds.isEmpty())
+    }
+
+    @Test
+    fun theCandidateDisagreementWordingIsNotUsedForAPlainMiss() {
+        // "could not settle on one candidate" is true only when hypotheses disagree; it was also
+        // read to someone who just named a dish.
+        val unrecognized = source.indexOf("PlatformVoiceCandidateDisposition.UNRECOGNIZED")
+        val ambiguous = source.indexOf("음성 후보를 하나로 확정하지 못했습니다")
+
+        assertTrue("UNRECOGNIZED 분기가 없습니다", unrecognized >= 0)
+        assertTrue("UNRECOGNIZED 는 AMBIGUOUS 보다 먼저 판정해야 합니다", unrecognized < ambiguous)
+    }
+
+    @Test
     fun theFailureItselfIsStatedInFewWords() {
         // The walker learns nothing from a long report of not being understood; the hint is the
         // part worth the seconds. Only the destination dialog keeps the fuller wording, because

@@ -7,7 +7,16 @@ import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState
 import kr.co.hanium.dreamup.walksafe.navigation.parseAndroidVoiceCommand
 
 internal enum class PlatformVoiceCandidateDisposition {
-    NOT_APPLICABLE, INVALID_FINAL, AMBIGUOUS, PREVIEW_ONLY, CONFIRMATION_REQUIRED,
+    NOT_APPLICABLE,
+    INVALID_FINAL,
+
+    /** Hypotheses were understood but disagree; saying it again more clearly can help. */
+    AMBIGUOUS,
+
+    /** Nothing said was a command. Repeating it cannot help, so the walker is told what is. */
+    UNRECOGNIZED,
+    PREVIEW_ONLY,
+    CONFIRMATION_REQUIRED,
 }
 
 internal data class PlatformVoiceCandidateDecision(
@@ -44,8 +53,11 @@ internal fun assessPlatformVoiceCandidate(
     if (scores.firstOrNull() != 0f) {
         return decision(PlatformVoiceCandidateDisposition.NOT_APPLICABLE)
     }
-    // The HOME intent requests at most three candidates. Never silently discard extras.
-    if (phrases.size !in 1..3 || scores.size != phrases.size ||
+    // The HOME intent asks for three candidates, but EXTRA_MAX_RESULTS is a hint the platform
+    // never promised to honour: SM-A716S answers with four. Never silently discard extras — which
+    // the agreement check below enforces over however many arrive, so a fourth hypothesis makes
+    // the bar higher rather than the final invalid. Only a malformed answer is rejected here.
+    if (phrases.isEmpty() || scores.size != phrases.size ||
         phrases.any { it.isBlank() } ||
         scores.any { !it.isFinite() || (it != -1f && it !in 0f..1f) }
     ) {
@@ -55,6 +67,11 @@ internal fun assessPlatformVoiceCandidate(
         return decision(PlatformVoiceCandidateDisposition.AMBIGUOUS)
     }
     val candidates = phrases.map { parseAndroidVoiceCommand(it, allowBareDestinationIndex) }
+    // Nothing understood at all is not the same as hypotheses that disagree, and telling the
+    // walker to say it again is only useful in the second case.
+    if (candidates.all { it == null }) {
+        return decision(PlatformVoiceCandidateDisposition.UNRECOGNIZED)
+    }
     val candidate = candidates.firstOrNull()
         ?: return decision(PlatformVoiceCandidateDisposition.AMBIGUOUS)
     if (candidates.any { it == null || it != candidate }) {

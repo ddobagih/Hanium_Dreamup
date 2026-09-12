@@ -31910,6 +31910,16 @@ generation != cameraFallbackGeneration
             }
             return
         }
+        if (platformCandidate?.disposition == PlatformVoiceCandidateDisposition.UNRECOGNIZED) {
+            // Saying it again cannot help; nothing said was a command. Same wording as the scored
+            // path's miss below, so one dead end does not survive in a second place.
+            val message = "못 알아들었습니다. ${unrecognizedCommandHintKo()}"
+            updateGatewayVoiceStatus(message)
+            if (!retryHomeDestinationVoiceDialog(message)) {
+                speakInteraction(message)
+            }
+            return
+        }
         if (platformCandidate?.disposition in setOf(
                 PlatformVoiceCandidateDisposition.AMBIGUOUS,
                 PlatformVoiceCandidateDisposition.INVALID_FINAL,
