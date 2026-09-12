@@ -13413,7 +13413,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ).apply { bottomMargin = (24 * density).toInt() }
         })
         content.addView(TextView(this).apply {
-            text = "필수 권한이 부족하여 앱을 실행할 수 없습니다. 앱을 다시 실행한 뒤 모든 필수 권한에 동의해 주세요."
+            // Restarting is what revoked a one-time grant, so it is the one instruction that
+            // cannot work here. Name the permissions and the place they are granted instead.
+            text = "필수 권한이 없어 보행을 시작할 수 없습니다. 설정에서 카메라, 위치, 마이크를 허용해 주세요."
             textSize = 18f
             setTextColor(0xff1b1b1d.toInt())
             setLineSpacing(0f, 1.65f)
@@ -13421,6 +13423,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply { bottomMargin = (24 * density).toInt() }
+        })
+        // A walker who cannot read the screen will not find Android settings on their own, so
+        // the dialog that demands them has to open them.
+        content.addView(Button(this).apply {
+            text = "설정 열기"
+            applyWsButtonStyle(this, 144f, primary = true)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = (12 * density).toInt() }
+            setOnClickListener { openAppSettings() }
         })
         content.addView(Button(this).apply {
             text = "종료"
@@ -18642,11 +18655,33 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             requiredPostLoginDeviceCheckPermissions()
         }
 
+    /**
+     * Not persisted. This runs on every resume, so a stored flag would either loop the system
+     * dialog or outlive the launch that earned it.
+     */
+    private var initialAppPermissionReRequestedThisLaunch = false
+
     private fun requestInitialAppEntryPermissionsIfNeeded() {
         if (!::stepLengthPrefs.isInitialized) return
         if (stepLengthPrefs.getBoolean(PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED, false)) {
             val missing = requiredPostLoginDeviceCheckPermissions()
-            if (missing.isNotEmpty()) showInitialAppPermissionLimitations(missing.toSet())
+            if (missing.isEmpty()) return
+            // The flag records that the permissions were once granted, which a one-time grant
+            // undoes the moment the process ends. That is not a denial, so Android will still
+            // show the dialog; asking once more per launch is the whole difference between a
+            // walker tapping 허용 and never getting into the app again.
+            if (!initialAppPermissionReRequestedThisLaunch) {
+                initialAppPermissionReRequestedThisLaunch = true
+                if (
+                    permissionRequestLeases.values.none {
+                        it.purpose == PermissionRequestPurpose.INITIAL_APP_ENTRY
+                    }
+                ) {
+                    launchInitialAppEntryPermissionRequest(missing)
+                    return
+                }
+            }
+            showInitialAppPermissionLimitations(missing.toSet())
             return
         }
         if (
@@ -18673,6 +18708,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 .commit()
             return
         }
+        launchInitialAppEntryPermissionRequest(missing)
+    }
+
+    private fun launchInitialAppEntryPermissionRequest(missing: List<String>) {
         val attemptSaved = stepLengthPrefs.edit()
             .putBoolean(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED, true)
             .commit()

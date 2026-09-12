@@ -13,7 +13,10 @@ class MainActivityInitialPermissionStaticTest {
     @Test
     fun firstEntryRequestsEveryMissingRuntimePermissionInOneBatchOnlyOnce() {
         val resume = functionBlock("private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()")
-        val request = functionBlock("private fun requestInitialAppEntryPermissionsIfNeeded()")
+        // The decision to ask and the asking itself are now separate functions, because an
+        // expired one-time grant has to reach the request without re-entering the decision.
+        val request = functionBlock("private fun requestInitialAppEntryPermissionsIfNeeded()") +
+            functionBlock("private fun launchInitialAppEntryPermissionRequest(")
         val required = functionBlock("private fun requiredPostLoginDeviceCheckPermissions()")
 
         assertTrue(resume.contains("requestInitialAppEntryPermissionsIfNeeded()"))
@@ -51,7 +54,9 @@ class MainActivityInitialPermissionStaticTest {
         assertTrue(exit.contains("initialAppPermissionExitRequired = true"))
         assertTrue(exit.contains("cancelNativePrewalkPreparation(cancelFeatureEntry = true)"))
         assertTrue(exit.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
-        assertTrue(exit.contains("필수 권한이 부족하여 앱을 실행할 수 없습니다"))
+        // The old wording told the walker to restart, which is what revoked a one-time grant.
+        // See RequiredPermissionExitIsRecoverableTest.
+        assertTrue(exit.contains("필수 권한이 없어 보행을 시작할 수 없습니다"))
         assertTrue(exit.contains(".setCancelable(false)"))
         assertTrue(exit.contains("finishAndRemoveTask()"))
         assertTrue(postLoginRequest.contains("emptyList()"))
