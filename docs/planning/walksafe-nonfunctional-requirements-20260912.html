@@ -1,0 +1,382 @@
+<title>WalkSafe 비기능 요구사항</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ink: #17191c; --ground: #f4f5f2; --surface: #ffffff;
+    --line: #dde0da; --line-soft: #eceee9; --muted: #6c7268;
+    --accent: #8f5510; --accent-soft: #f6efe3;
+    --slate: #2f4858; --slate-soft: #eaeef1;
+    --measured: #2d6a4f; --measured-soft: #e6f0ea;
+    --open: #9a3412; --open-soft: #fbeae4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e7e9e4; --ground: #16181a; --surface: #1d2023;
+      --line: #33383a; --line-soft: #262a2c; --muted: #9aa197;
+      --accent: #d9a05b; --accent-soft: #2e2519;
+      --slate: #9dbcd0; --slate-soft: #1e272d;
+      --measured: #7cc3a0; --measured-soft: #1a2a22;
+      --open: #e2926b; --open-soft: #2d1d17;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #e7e9e4; --ground: #16181a; --surface: #1d2023;
+    --line: #33383a; --line-soft: #262a2c; --muted: #9aa197;
+    --accent: #d9a05b; --accent-soft: #2e2519;
+    --slate: #9dbcd0; --slate-soft: #1e272d;
+    --measured: #7cc3a0; --measured-soft: #1a2a22;
+    --open: #e2926b; --open-soft: #2d1d17;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: "IBM Plex Sans KR", system-ui, -apple-system, sans-serif;
+    font-size: 15px; line-height: 1.75; word-break: keep-all;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 56px 24px 96px; }
+
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 26px; margin-bottom: 32px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+  }
+  h1 { font-size: 33px; line-height: 1.28; margin: 0 0 14px; font-weight: 600; text-wrap: balance; }
+  .lede { font-size: 16px; color: var(--muted); margin: 0; max-width: 64ch; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 20px;
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted);
+  }
+
+  h2 {
+    font-size: 22px; font-weight: 600; margin: 54px 0 6px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--line);
+  }
+  h2 .num {
+    font-family: "IBM Plex Mono", monospace; font-size: 15px; color: var(--accent);
+    margin-right: 10px;
+  }
+  .sec-note { font-size: 13.5px; color: var(--muted); margin: 0 0 20px; max-width: 72ch; }
+
+  table { width: 100%; border-collapse: collapse; margin-bottom: 26px; font-size: 14px; }
+  thead th {
+    text-align: left; font-weight: 600; font-size: 12.5px; color: var(--muted);
+    padding: 9px 12px; background: var(--surface); border-bottom: 2px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 12px; border-bottom: 1px solid var(--line-soft);
+    vertical-align: top; background: var(--surface);
+  }
+  tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+  .id {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent);
+    white-space: nowrap; font-weight: 500;
+  }
+  .scroll { overflow-x: auto; }
+
+  .pill {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px;
+    border-radius: 100px; white-space: nowrap;
+  }
+  .pill.m { background: var(--measured-soft); color: var(--measured); }
+  .pill.o { background: var(--open-soft); color: var(--open); }
+  .pill.s { background: var(--slate-soft); color: var(--slate); }
+
+  .callout {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--accent); border-radius: 3px;
+    padding: 18px 20px; margin: 0 0 28px;
+  }
+  .callout p { margin: 0 0 10px; }
+  .callout p:last-child { margin-bottom: 0; }
+  code {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.86em;
+    background: var(--ground); padding: 1px 5px; border-radius: 2px;
+  }
+  .shot {
+    background: var(--ground); border: 1px dashed var(--line);
+    border-radius: 3px; padding: 8px 10px; font-size: 12px; color: var(--muted);
+    font-family: "IBM Plex Mono", monospace; text-align: center; white-space: nowrap;
+  }
+  footer {
+    margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+  }
+  @media (max-width: 700px) { thead th, tbody td { padding: 8px; font-size: 13px; } }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">창의융합종합설계 · 요구 명세서 3장</div>
+  <h1>비기능 요구사항</h1>
+  <p class="lede">
+    2장에서 유스케이스로 다루지 않은 스물한 개 기능이 여기로 옵니다.
+    수치는 대부분 저장소의 요구 정본과 실제 코드 상수에서 그대로 가져왔고,
+    실기기에서 잰 값에는 측정 조건을 함께 적었습니다.
+  </p>
+  <div class="meta">
+    <span>2026-09-12</span>
+    <span>PFR 8 · HWR 5 · EXP 12 · UI 9</span>
+    <span>실측 기기: SM-A716S / Android 13</span>
+  </div>
+</header>
+
+<div class="callout">
+  <p><strong>측정치와 목표치를 섞지 않았습니다.</strong>
+  요구 정본 <code>REQ-12</code>가 <q>목표 수치는 실제 결과를 본 뒤 유리하게 정하지 않고
+  기기·망·부하·표본·허용오차와 함께 실행 전에 동결한다</q>고 못박아 두었습니다.
+  그래서 <span class="pill m">실측</span>은 근거로만 적고,
+  아직 동결하지 않은 목표는 <span class="pill o">미확정</span>으로 남겼습니다.
+  측정했으니 그 값을 목표로 삼는 것은 이 원칙을 어깁니다.</p>
+  <p><span class="pill s">적용중</span>은 코드에 이미 상수로 박혀 동작 중인 값입니다.
+  현장시험 전 후보 기준이라는 뜻이지 승인된 기준선은 아닙니다.</p>
+</div>
+
+<h2><span class="num">3.1</span>성능 요구</h2>
+<p class="sec-note">
+  반응시간과 처리소요시간입니다. 보행 안전이 걸린 제품이라 평균보다 <strong>늦었을 때 무엇을 하는가</strong>가
+  더 중요합니다. 그래서 각 항목에 열화 시 동작을 함께 적었습니다.
+</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>식별자</th><th>요구사항</th><th>정의</th><th>기준과 근거</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="id">PFR-01</td>
+      <td>객체 탐지 추론 시간</td>
+      <td>카메라 프레임 입력부터 탐지 결과 산출까지 걸리는 시간</td>
+      <td><span class="pill o">미확정</span> 기기·조건별 목표를 시험 전에 동결한다.
+        <span class="pill m">실측</span> SM-A716S 중앙값 651 ms.
+        초과가 지속되면 <code>INFERENCE_LATENCY_EXCEEDED</code>로 안전 중지한다.</td>
+    </tr>
+    <tr>
+      <td class="id">PFR-02</td>
+      <td>위험 감지 → 음성·진동 전달</td>
+      <td>위험 단계 확정부터 사용자가 듣기 시작할 때까지의 시간</td>
+      <td><span class="pill o">미확정</span> 지원 기기별 p50·p95·p99를 동결 대상으로 한다.
+        평균이 좋아도 누락되거나 오래된 위험 안내가 하나 있으면 실패로 판정한다.</td>
+    </tr>
+    <tr>
+      <td class="id">PFR-03</td>
+      <td>카메라 프레임 신선도</td>
+      <td>화면에 반영된 프레임이 얼마나 오래된 것인지</td>
+      <td><span class="pill o">미확정</span> 허용 한도 동결 대상.
+        초과 시 <code>FRAME_AGE_EXCEEDED</code>로 안전 중지한다.
+        오래된 프레임으로 만든 판단은 쓰지 않는다.</td>
+    </tr>
+    <tr>
+      <td class="id">PFR-04</td>
+      <td>위치 정확도</td>
+      <td>보행 시작과 경로 판정에 사용할 GPS 수평 정확도</td>
+      <td><span class="pill s">적용중</span> 15 m 이내
+        (<code>maximumGpsHorizontalAccuracyMeters</code>).
+        <span class="pill m">실측</span> 실내에서 11.5 m 확보.
+        측정값이 10초보다 오래되면 다시 잰다.</td>
+    </tr>
+    <tr>
+      <td class="id">PFR-05</td>
+      <td>위험 안내 반복 간격</td>
+      <td>같은 위험을 다시 말하기까지 최소로 두는 간격</td>
+      <td><span class="pill s">적용중</span> 장애물 경고 2,500 ms, 접근 주의 2,500 ms,
+        경로 안내 8,000 ms. 더 급해졌거나 위치가 크게 달라졌을 때만 앞당긴다.</td>
+    </tr>
+    <tr>
+      <td class="id">PFR-06</td>
+      <td>음성 명령 인식 신뢰도</td>
+      <td>인식 결과를 명령으로 실행하기 위한 최소 확신도</td>
+      <td><span class="pill s">적용중</span> 일반 명령 0.55, 호출어·명령 0.60,
+        보행 일시정지·재개·종료 0.80. 되돌리기 어려운 조작일수록 높인다.</td>
+    </tr>
+    <tr>
+      <td class="id">PFR-07</td>
+      <td>한국어 음성 출력 응답</td>
+      <td>합성 요청부터 소리가 나오기까지</td>
+      <td><span class="pill s">적용중</span> 합성 결과가 1,000 ms 미만이면 실패로 본다
+        (<code>KoreanTtsOutputDurationPolicy</code>). 반복 실패 시
+        <code>TTS_TRUST_LOST</code>로 전체 보행을 안전 중지한다.</td>
+    </tr>
+    <tr>
+      <td class="id">PFR-08</td>
+      <td>경로·신고 서버 응답</td>
+      <td>목적지 검색과 신고 전송의 왕복 시간</td>
+      <td><span class="pill o">미확정</span> Wi-Fi·이동통신 조건별 p50·p95·p99와
+        타임아웃·재시도·중복률을 동결 대상으로 한다.
+        타임아웃에서 성공을 추정해 표시하지 않고 제한 상태로 전환한다.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2><span class="num">3.2</span>H/W 요구</h2>
+<p class="sec-note">
+  기기 이름으로 지원 여부를 정하지 않습니다. 요구 정본 <code>FP-009</code>가
+  <q>기기 이름만 보지 않고 필요한 기능을 실제로 검사한다</q>고 정하고 있어,
+  앱이 실행 시점에 재서 <strong>전체 기능·거리 제한·사용 불가</strong> 중 하나로 분류합니다.
+</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>식별자</th><th>구분</th><th>정의</th><th>세부 내용</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="id">HWR-001</td>
+      <td>사용자 휴대전화<br>(전체 기능)</td>
+      <td>모든 안내를 제공하는 기준 사양</td>
+      <td>
+        OS Android 10 이상 · 후면 카메라 · GPS · 마이크 · 진동<br>
+        ARCore Depth 지원 · 오프라인 한국어 TTS 음성 설치<br>
+        가슴 또는 목걸이형 거치대 고정 가능<br>
+        <span class="pill m">실측</span> SM-A716S(2020년 중급기)에서 5개 항목 전부 통과
+      </td>
+    </tr>
+    <tr>
+      <td class="id">HWR-002</td>
+      <td>사용자 휴대전화<br>(거리 제한)</td>
+      <td>거리를 잴 수 없을 때 허용하는 축소 사양</td>
+      <td>
+        ARCore Depth 미지원 기기<br>
+        물체 종류만 알리고 거리·충돌 예상·위험 해제·정지·신고 판단은 하지 않는다<br>
+        제한 상태를 먼저 알린 뒤에만 시작한다
+      </td>
+    </tr>
+    <tr>
+      <td class="id">HWR-003</td>
+      <td>사용자 휴대전화<br>(사용 불가)</td>
+      <td>보행을 시작시키지 않는 조건</td>
+      <td>
+        오프라인 한국어 음성이 없는 기기 · 카메라 또는 마이크 부재<br>
+        필수 Depth·센서·음성 기능이 없는데 같은 안전 기능을 제공한다고 가장하지 않는다
+      </td>
+    </tr>
+    <tr>
+      <td class="id">HWR-004</td>
+      <td>거치대</td>
+      <td>휴대전화를 몸에 고정하는 장비</td>
+      <td>
+        가슴 또는 목걸이형 · 렌즈가 앞을 향하도록 세로 고정<br>
+        <span class="pill s">적용중</span> 상하 기울기 ±45°, 흔들림 45°/s 이하,
+        가림 10% 이하, 밝기 0.20 이상<br>
+        <span class="pill o">미확정</span> 허용 높이·각도 범위는 여러 사용자·기기 현장 측정으로 확정
+      </td>
+    </tr>
+    <tr>
+      <td class="id">HWR-005</td>
+      <td>서버</td>
+      <td>계정·경로 중계·신고·원본 보관</td>
+      <td>
+        PostgreSQL + PostGIS · 암호화된 별도 파일 저장소<br>
+        주 원본 300 GiB + 백업 300 GiB (설계 목표)<br>
+        <span class="pill o">미확정</span> 실제 사용량·저장비는 측정 전
+      </td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2><span class="num">3.3</span>예외 조건 및 처리</h2>
+<p class="sec-note">
+  이 제품의 예외 처리에는 다른 앱과 다른 원칙이 하나 있습니다.
+  <strong>자료가 밀리는 것은 사용자에게 알리지 않고, 안전 판단을 못 하게 되면 반드시 알리고 멈춥니다.</strong>
+  요구 정본이 이 둘을 명확히 갈라 놓았습니다.
+</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>식별자</th><th>예외 조건</th><th>정의</th><th>처리</th></tr></thead>
+  <tbody>
+    <tr><td class="id">EXP-001</td><td>카메라 신뢰 상실</td>
+      <td>영상이 오래되거나 품질이 기준에 못 미치는 상태가 지속</td>
+      <td>즉시 안전 중지하고 이유를 음성·화면·진동으로 알린다</td></tr>
+    <tr><td class="id">EXP-002</td><td>거리 측정 신뢰 상실</td>
+      <td>Depth 결과를 믿을 수 없음</td>
+      <td>거리·충돌 예상·위험 해제 판단을 중단한다. 안전하다고 말하지 않는다</td></tr>
+    <tr><td class="id">EXP-003</td><td>위치 신뢰 상실</td>
+      <td>GPS 정확도가 기준을 넘거나 위치가 갱신되지 않음</td>
+      <td>보폭으로 대신 판단하지 않고 방향 안내를 일시중지한다</td></tr>
+    <tr><td class="id">EXP-004</td><td>음성 출력 장애</td>
+      <td>한국어 음성 재생이 반복 실패</td>
+      <td>무한 재시도하지 않고 진동·화면으로 알린 뒤 모든 보행 기능을 안전 중지한다</td></tr>
+    <tr><td class="id">EXP-005</td><td>음성 인식 장애</td>
+      <td>호출어나 명령 인식이 계속 실패</td>
+      <td>낮은 확신도는 실행하지 않고 한 번에 하나씩 다시 묻는다. 계속 실패하면 장애 종류를 알리고 멈춘다</td></tr>
+    <tr><td class="id">EXP-006</td><td>장착 이상</td>
+      <td>렌즈 가림·흔들림·각도가 기준을 벗어남</td>
+      <td>먼저 교정 방법을 알린다. 제한된 재검사에서 회복되지 않으면 안전 중지한다</td></tr>
+    <tr><td class="id">EXP-007</td><td>발열·배터리·저장공간 임계</td>
+      <td>온도·잔량·여유공간이 위험 수준</td>
+      <td>보행에 직접 필요하지 않은 작업부터 줄인다. 안전 안내가 늦어지면 안전 중지한다</td></tr>
+    <tr><td class="id">EXP-008</td><td>경로 이탈</td>
+      <td>저장 경로와의 거리·정확도·연속 관측이 이탈을 가리킴</td>
+      <td>오래된 회전 안내를 멈추고 새 경로 요청·위치 다시 확인·길안내 종료 중 사용자가 고른다</td></tr>
+    <tr><td class="id">EXP-009</td><td>지도 서비스 장애</td>
+      <td>TMAP 응답이 없거나 오류</td>
+      <td>저장된 오래된 회전 안내를 계속하지 않는다. 복구 신호만으로 자동 재개하지 않는다</td></tr>
+    <tr><td class="id">EXP-010</td><td>네트워크 단절</td>
+      <td>Wi-Fi나 허용 네트워크가 없음</td>
+      <td><strong>사용자에게 알리지 않는다.</strong> 암호화 대기열에 보관하고 실시간 안전 기능은 유지한다</td></tr>
+    <tr><td class="id">EXP-011</td><td>대기열 용량 부족</td>
+      <td>휴대전화 저장 여유가 부족해 새 자료 생성 보류</td>
+      <td><strong>사용자에게 알리지 않는다.</strong> 정해진 순서로 만료 자료를 정리하고 내부 기록에만 남긴다</td></tr>
+    <tr><td class="id">EXP-012</td><td>필수 권한 거부·철회</td>
+      <td>카메라·위치·마이크 중 하나가 없음</td>
+      <td>그 권한이 필요한 기능만 멈춘다. 남은 기능으로 안전하지 않으면 이유를 알리고 안전 중지한다</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="callout">
+  <p><strong>EXP-010·011이 침묵하는 이유.</strong>
+  요구 정본은 자료 전송이 밀리는 것을 사용자에게 알리지 말라고 명시합니다.
+  걷고 있는 사람에게 지금 할 수 있는 일이 없는 알림을 주면, 정작 멈춰야 할 안내가 묻히기 때문입니다.
+  같은 문서가 안전 기능을 믿을 수 없게 된 경우에는 <strong>반드시 알리라</strong>고 정합니다.</p>
+</div>
+
+<h2><span class="num">3.4</span>사용자 인터페이스</h2>
+<p class="sec-note">
+  보행 중에는 화면을 보지 않아도 되도록 음성 중심으로 설계하고,
+  가입·동의·권한·장애·계정 관리 같은 <strong>조작 화면은 TalkBack만으로 완료</strong>할 수 있어야 합니다
+  (<code>FP-028</code>, <code>FP-030</code>). 화면 캡처는 실기기에서 촬영해 넣습니다.
+</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>식별자</th><th>인터페이스명</th><th>화면</th><th>설명</th></tr></thead>
+  <tbody>
+    <tr><td class="id">UI-01</td><td>로그인</td><td><span class="shot">캡처 예정</span></td>
+      <td>이메일·비밀번호로 로그인한다. 입력칸·오류·버튼 모두 TalkBack 읽기 순서와 이름을 갖는다</td></tr>
+    <tr><td class="id">UI-02</td><td>회원가입</td><td><span class="shot">캡처 예정</span></td>
+      <td>만 14세 이상 확인, 가입 정보 입력, 휴대전화 확인을 순서대로 진행한다</td></tr>
+    <tr><td class="id">UI-03</td><td>최초 동의</td><td><span class="shot">캡처 예정</span></td>
+      <td>수집 항목·목적·보관·철회 방법을 한 화면에서 항목별로 확인하고 선택한다</td></tr>
+    <tr><td class="id">UI-04</td><td>안전 교육</td><td><span class="shot">캡처 예정</span></td>
+      <td>안전 제한 안내와 사전 연습을 듣는다. 끝까지 들어야 다음 단계가 열린다</td></tr>
+    <tr><td class="id">UI-05</td><td>기기 점검</td><td><span class="shot">캡처 예정</span></td>
+      <td>ARCore Depth·카메라·위치·한국어 음성·호출어 다섯 항목의 판정을 표시한다</td></tr>
+    <tr><td class="id">UI-06</td><td>홈</td><td><span class="shot">캡처 예정</span></td>
+      <td>음성 명령·목적지 검색·설정 세 개의 큰 버튼만 둔다</td></tr>
+    <tr><td class="id">UI-07</td><td>목적지 검색·확인</td><td><span class="shot">캡처 예정</span></td>
+      <td>검색 결과를 세 개씩 음성으로 읽고 번호로 선택한다</td></tr>
+    <tr><td class="id">UI-08</td><td>보행 안내</td><td><span class="shot">캡처 예정</span></td>
+      <td>조작 버튼 없이 카메라 영상과 읽기 전용 상태만 표시한다. 조작은 음성으로 한다</td></tr>
+    <tr><td class="id">UI-09</td><td>설정</td><td><span class="shot">캡처 예정</span></td>
+      <td>로그아웃·동의 철회·자동신고 설정·신고 상태·개인정보 권리 요청 경로를 제공한다</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="callout">
+  <p><strong>접근성은 화면마다 붙는 조건입니다.</strong>
+  큰 글자, 충분한 색 대비, 화면 확대, 큰 터치 영역, TalkBack, 키보드·스위치 조작이
+  공식 지원 범위입니다(<code>FP-030</code>). 요구 정본은 이 범위를
+  <strong>실제 기기와 목표 사용자로 검증하기 전에는 출시하지 않는다</strong>고 정하고 있습니다.</p>
+  <p>보행 중 화면(UI-08)만 예외로, 화면을 보거나 누르지 않아도 되게 설계합니다.
+  다만 그 화면에서도 TalkBack이 상태를 읽을 수 있어야 합니다.</p>
+</div>
+
+<footer>
+  근거: <code>docs/deliverables/03-requirements</code>의 REQ-11·12·13·14와 FP-004~009·027·043~045,
+  그리고 <code>apps/android</code>의 <code>WalkSafeEnvironmentProfiles</code>,
+  <code>MessagePolicyConfig</code>, <code>WalkRuntimeSafetyStopCause</code> 상수.
+  실측값은 2026-09-11~12 SM-A716S(Android 13) 실행 기록입니다.
+  해당 요구 문서는 <code>DRAFT / NOT_APPROVED</code>이고 인수조건 279건이 모두 <code>NOT_RUN</code>이므로,
+  이 장을 시험 통과의 근거로 읽히게 쓰면 사실과 어긋납니다.
+</footer>
+
+</div>
