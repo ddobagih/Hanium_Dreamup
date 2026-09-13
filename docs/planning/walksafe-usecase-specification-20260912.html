@@ -152,9 +152,9 @@
     내용은 저장소의 요구 정본에서 가져왔고, 각 유스케이스 오른쪽 위 회색 글씨가 그 출처입니다.
   </p>
   <div class="meta">
-    <span>2026-09-12</span>
-    <span>9 UCD · 31 UC</span>
-    <span>근거: docs/deliverables/03-requirements</span>
+    <span>2026-09-13 갱신</span>
+    <span>10 UCD · 35 UC</span>
+    <span>근거: 요구 정본 + SW 개발 설계서(2026-09-07)</span>
   </div>
 </header>
 
@@ -169,6 +169,30 @@
   <p><strong>여기 없는 기능이 스물한 개 있습니다.</strong>
   FP-034~054(자료 수집·모델 학습·서버 구조·보안·배포·운영)는 사용자가 조작하지 않아 유스케이스가
   아닙니다. 3장 비기능적 요구사항으로 갑니다.</p>
+</div>
+
+<h2>대응표</h2>
+<p class="ucd-name">SW 개발 설계서의 R 번호와 이 문서의 UC 번호</p>
+<p class="ucd-note">
+  총괄이 배포한 설계서는 요구를 <code>R-01~R-12</code>로, 화면을 <code>SC-01~SC-06</code>으로 부릅니다.
+  학교 양식은 유스케이스 번호를 요구하므로 두 체계를 모두 유지하고 여기서 잇습니다.
+  같은 것을 두 번 부르는 것이지 서로 다른 요구가 아닙니다.
+</p>
+<div class="uc">
+  <table>
+    <tr><th>R-01</th><td>기기·권한 준비 → <code>UC-07</code> <code>UC-12</code> <code>UC-13</code> <code>UC-14</code></td></tr>
+    <tr><th>R-02</th><td>단말 객체 인식 → <code>UC-19</code></td></tr>
+    <tr><th>R-03</th><td>거리 정보 연결 → <code>UC-19</code> <code>UC-20</code></td></tr>
+    <tr><th>R-04</th><td>위험 후보 선택 → <code>UC-20</code></td></tr>
+    <tr><th>R-05</th><td>음성·진동 안내 → <code>UC-20</code> <code>UC-28</code></td></tr>
+    <tr><th>R-06</th><td>목적지 길안내 → <code>UC-22</code> <code>UC-23</code> <code>UC-24</code> <code>UC-25</code> <code>UC-26</code></td></tr>
+    <tr><th>R-07</th><td>손상 점자블록 신고 → <code>UC-29</code></td></tr>
+    <tr><th>R-08</th><td>신고 전송·재시도 → <code>UC-29</code></td></tr>
+    <tr><th>R-09</th><td>내 신고 조회 → <code>UC-30</code> <span class="tag">후속 과제</span></td></tr>
+    <tr><th>R-10</th><td>관리자 검토 → <code>UC-32</code> <code>UC-33</code></td></tr>
+    <tr><th>R-11</th><td>기관 전달 이력 → <code>UC-34</code></td></tr>
+    <tr><th>R-12</th><td>개인정보·보존 → <code>UC-08</code> <code>UC-09</code> <code>UC-31</code> <code>UC-35</code></td></tr>
+  </table>
 </div>
 
 <h2>UCD-01</h2>
@@ -318,7 +342,7 @@
     <tr><th>사후조건</th><td>사용자·문서 버전·선택 항목·시각이 포함된 동의 증거가 서버에 저장된다.</td></tr>
     <tr><th>시나리오</th><td>
       <div class="scene">
-        <div><div class="scene-h">행위자</div><ol><li>필수 처리와 추가 목적을 항목별로 듣는다.</li><li>항목마다 동의 여부를 선택한다.</li></ol></div>
+        <div><div class="scene-h">행위자</div><ol><li>서비스 이용약관, 개인정보 수집·이용 안내, 위치기반서비스 이용약관을 항목별로 듣는다.</li><li>약관별 확인 후 동의 여부를 선택한다.</li></ol></div>
         <div><div class="scene-h">시스템</div><ol start="3"><li>각 항목에서 수집자료·목적·보관·제공·철회 방법을 같은 화면에 보여준다.</li><li>톡백으로 모든 항목과 선택 결과를 확인할 수 있게 한다.</li><li>동의 증거를 서버에 저장하고 확인한다.</li></ol></div>
       </div>
     </td></tr>
@@ -856,7 +880,11 @@
 
 <h2>UCD-08</h2>
 <p class="ucd-name">음성 상호작용</p>
-<p class="ucd-note">화면을 보지 않고 조작하는 통로입니다. 요구 정본이 서버 없이 휴대전화 안에서 동작할 것을 요구합니다.</p>
+<p class="ucd-note">
+  화면을 보지 않고 조작하는 통로입니다. 단말 인식과 서버 음성 연계를 <strong>기능별로 나눠</strong> 씁니다
+  — 안전에 직결되는 호출어와 위험·길안내 음성은 네트워크 없이 휴대전화 안에서 처리하고,
+  목적지 검색처럼 어차피 서버가 필요한 기능은 서버 음성 서비스를 함께 쓸 수 있습니다.
+</p>
 
 <div class="uc">
   <div class="uc-head">
@@ -896,7 +924,7 @@
     <tr><th>시나리오</th><td>
       <div class="scene">
         <div><div class="scene-h">행위자</div><ol><li>등록된 명령을 말한다.</li><li>결과 안내를 듣는다.</li></ol></div>
-        <div><div class="scene-h">시스템</div><ol start="3"><li>등록되지 않은 명령은 실행하지 않는다.</li><li>위험 안내, 확인 대화, 길안내, 부가 안내 순으로 말하기 순서를 정한다.</li><li>일시정지·재개·종료는 현재 상태에서 가능한 경우에만 실행하고 결과를 말한다.</li></ol></div>
+        <div><div class="scene-h">시스템</div><ol start="3"><li>등록되지 않은 명령은 실행하지 않는다.</li><li>위험 안내, 상호작용 응답, 길안내 순으로 말하기 순서를 정한다.</li><li>일시정지·재개·종료는 현재 상태에서 가능한 경우에만 실행하고 결과를 말한다.</li><li>기능에 따라 단말 인식과 서버 음성 연계를 나눠 쓴다.</li></ol></div>
       </div>
     </td></tr>
     <tr><th>예외사항</th><td>
@@ -943,11 +971,12 @@
 <div class="uc">
   <div class="uc-head">
     <span class="uc-id">UC-30</span><span class="uc-name">신고 처리 상태 확인</span>
-    <span class="tag">사용자</span><span class="src">FP-033</span>
+    <span class="tag">사용자</span><span class="tag">후속 과제</span><span class="src">FP-033 · R-09</span>
   </div>
   <table>
     <tr><th>목표</th><td>자신이 남긴 신고가 어떻게 처리됐는지 확인한다.</td></tr>
-    <tr><th>선행조건</th><td>신고 이력이 있고 권리요청 경로에 접근할 수 있다.</td></tr>
+    <tr><th>선행조건</th><td>신고 이력이 있고 권리요청 경로에 접근할 수 있다.
+      설계서 <code>R-09</code>는 API와 화면 제어까지를 범위로 두고 <strong>일반 메뉴 연결은 후속 과제</strong>로 둔다.</td></tr>
     <tr><th>사후조건</th><td>접수·기각·기관 제출·해결 상태와 기각 이유를 확인할 수 있다.</td></tr>
     <tr><th>시나리오</th><td>
       <div class="scene">
@@ -988,18 +1017,114 @@
   </table>
 </div>
 
-<h2>참고</h2>
-<p class="ucd-name">관리자 앱을 넣기로 하면</p>
+<h2>UCD-10</h2>
+<p class="ucd-name">관리자</p>
 <p class="ucd-note">
-  UC-01~31은 그대로 두고 뒤에 붙습니다. 기존 번호는 바뀌지 않습니다.
+  사용자 앱과 분리된 비공개 Android 앱입니다. 지정 관리자 한 명이 추가 인증을 거쳐 사용하며,
+  모든 조회와 변경에 이유와 이력을 남깁니다. 설계서의 <code>R-10~R-12</code>에 대응합니다.
 </p>
-<div class="callout">
-  <p><code>UCD-10 관리자</code> · UC-32 신고 검수·기관 전달 (FP-033) · UC-33 모델 등록·교체 (FP-039) ·
-  UC-34 운영 상태 확인 (FP-052)</p>
-  <p class="ucd-note" style="margin:0">
-    관리자 앱은 사용자 앱과 분리된 비공개 앱이고 지정 관리자 한 명이 추가 인증으로 사용합니다.
-    범위에 넣지 않더라도 1.1 개요와 3장에서 존재를 밝히면 시스템 전체는 드러납니다.
-  </p>
+
+<div class="uc">
+  <div class="uc-head">
+    <span class="uc-id">UC-32</span><span class="uc-name">관리자 인증</span>
+    <span class="tag">관리자</span><span class="src">FP-047 · R-10</span>
+  </div>
+  <table>
+    <tr><th>목표</th><td>지정 관리자 한 명이 추가 인증을 거쳐 관리자 기능에 접근한다.</td></tr>
+    <tr><th>선행조건</th><td>관리자 계정과 등록된 기기가 있다.</td></tr>
+    <tr><th>사후조건</th><td>관리자 세션이 열리고 접근 이력이 남는다.</td></tr>
+    <tr><th>시나리오</th><td>
+      <div class="scene">
+        <div><div class="scene-h">행위자</div><ol><li>비밀번호를 입력한다.</li><li>TOTP 코드를 입력한다.</li></ol></div>
+        <div><div class="scene-h">시스템</div><ol start="3"><li>비밀번호와 TOTP를 함께 확인한다.</li><li>기기와 세션 상태를 검사한다.</li><li>접근 사실을 감사기록에 남긴다.</li></ol></div>
+      </div>
+    </td></tr>
+    <tr><th>예외사항</th><td>
+      <ul>
+        <li>[E1] 공용 비밀번호로 우회하지 않는다.</li>
+        <li>[E2] 복구코드·보안키는 관리자 휴대전화와 분리해 보관한다.</li>
+        <li>[E3] 관리자 접근을 잃으면 우회 운영하지 않고 복구까지 고위험 작업을 동결한다.</li>
+        <li>[E4] 인증·버전·검토 조건이 맞지 않으면 변경을 거부한다.</li>
+      </ul>
+    </td></tr>
+  </table>
+</div>
+
+<div class="uc">
+  <div class="uc-head">
+    <span class="uc-id">UC-33</span><span class="uc-name">신고 검토</span>
+    <span class="tag">관리자</span><span class="src">FP-033 · R-10</span>
+  </div>
+  <table>
+    <tr><th>목표</th><td>접수된 신고를 검토해 승인·거절·중복을 결정한다.</td></tr>
+    <tr><th>선행조건</th><td>서버에 검토할 신고가 있고 관리자 인증을 마쳤다.</td></tr>
+    <tr><th>사후조건</th><td>결정과 사유, 검토 차수가 기록된다.</td></tr>
+    <tr><th>시나리오</th><td>
+      <div class="scene">
+        <div><div class="scene-h">행위자</div><ol><li>신고를 선택한다.</li><li>위치·사진·개인정보·중복 여부를 검토한다.</li><li>승인·거절·중복 중 하나를 결정한다.</li></ol></div>
+        <div><div class="scene-h">시스템</div><ol start="4"><li>필요한 신고만 보고 변경할 수 있게 제한한다.</li><li>상태·내용·검토 차수를 비교해 버전 충돌을 확인한다.</li><li>결정과 변경 이력을 남긴다.</li></ol></div>
+      </div>
+    </td></tr>
+    <tr><th>예외사항</th><td>
+      <ul>
+        <li>[E1] 기각할 때는 정해진 사유와 구체적인 메모를 반드시 남긴다.</li>
+        <li>[E2] 이유 없이 신고를 기각하거나 기록을 지울 수 없다.</li>
+        <li>[E3] 결과가 불확실하면 최신 상태를 다시 조회하고 자동 재제출하지 않는다.</li>
+        <li>[E4] 관리자 검토 장애만으로 정상 작동 중인 사용자 보행을 멈추지 않는다.</li>
+      </ul>
+    </td></tr>
+  </table>
+</div>
+
+<div class="uc">
+  <div class="uc-head">
+    <span class="uc-id">UC-34</span><span class="uc-name">기관 전달 이력 기록</span>
+    <span class="tag">관리자</span><span class="src">FP-033 · R-11</span>
+  </div>
+  <table>
+    <tr><th>목표</th><td>승인된 신고를 책임 기관에 전달하고 그 사실을 남긴다.</td></tr>
+    <tr><th>선행조건</th><td>승인된 신고와 확정된 내용 차수가 있다.</td></tr>
+    <tr><th>사후조건</th><td>전달 자료, 전달한 사람과 시각, 기관 수신 증거와 결과가 기록된다.</td></tr>
+    <tr><th>시나리오</th><td>
+      <div class="scene">
+        <div><div class="scene-h">행위자</div><ol><li>승인된 내용 차수로 제출 자료를 만든다.</li><li>기관에 <strong>수동으로</strong> 제출한다.</li><li>전달 사실과 접수 상태를 입력한다.</li></ol></div>
+        <div><div class="scene-h">시스템</div><ol start="4"><li>시설 조치에 필요한 최소 정보만 자료에 담는다.</li><li>전달 사실·수신 증거·후속 처리 상태를 기록한다.</li></ol></div>
+      </div>
+    </td></tr>
+    <tr><th>예외사항</th><td>
+      <ul>
+        <li>[E1] <strong>기관 접수 API 자동 호출은 지원하지 않는다.</strong> 전달은 관리자의 수동 작업이다.</li>
+        <li>[E2] 기관 수신 증거가 없으면 제출 완료나 해결로 표시하지 않는다.</li>
+        <li>[E3] 전달 실패를 완료로 표시하지 않고 내부 상태·증거·재시도 기록을 분리해 남긴다.</li>
+        <li>[E4] 시연 단계에서 협의되지 않은 실제 기관으로 개인정보를 보내지 않는다.</li>
+      </ul>
+    </td></tr>
+  </table>
+</div>
+
+<div class="uc">
+  <div class="uc-head">
+    <span class="uc-id">UC-35</span><span class="uc-name">감사·원본 접근 확인</span>
+    <span class="tag">관리자</span><span class="src">FP-048 · R-12</span>
+  </div>
+  <table>
+    <tr><th>목표</th><td>누가 언제 무엇을 보고 바꿨는지 확인하고, 원본 접근을 목적 범위로 제한한다.</td></tr>
+    <tr><th>선행조건</th><td>관리자 인증을 마쳤고 감사기록이 쌓여 있다.</td></tr>
+    <tr><th>사후조건</th><td>조회 사실 자체도 감사기록에 남는다.</td></tr>
+    <tr><th>시나리오</th><td>
+      <div class="scene">
+        <div><div class="scene-h">행위자</div><ol><li>세션·감사 기록을 조회한다.</li><li>권리 요청에 따라 원본 처리를 확인한다.</li></ol></div>
+        <div><div class="scene-h">시스템</div><ol start="3"><li>계정·동의·신고 상태와 원본 접근을 목적별로 분리해 통제한다.</li><li>원본 접근·복사·삭제와 복구 작업을 감사기록에 남긴다.</li></ol></div>
+      </div>
+    </td></tr>
+    <tr><th>예외사항</th><td>
+      <ul>
+        <li>[E1] 동의 철회나 권한 상실 시 관련 자료 사용을 제한한다.</li>
+        <li>[E2] 원본 전체를 기본으로 열람할 수 있게 두지 않는다.</li>
+        <li>[E3] 신고 업무는 내부 debug 범위에서 열리며 기본·release 잠금 해제와 사설 배포는 별도 검증을 거친다.</li>
+      </ul>
+    </td></tr>
+  </table>
 </div>
 
 <footer>
