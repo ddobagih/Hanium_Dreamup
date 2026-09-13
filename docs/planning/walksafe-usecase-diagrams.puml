@@ -136,7 +136,7 @@ User --> UC05
 UC01 ..> Mail : 가입 인증번호
 
 note right of UC04
-  UC-15 보행 시작의 확장
+  UC-16 보행 시작의 확장
   계정당 한 기기만 보행 활성
 end note
 @enduml
@@ -177,12 +177,14 @@ rectangle "WalkSafe 사용자 앱" {
   usecase "권한 허용·거부 처리" as UC07
   usecase "동의 철회" as UC08
   usecase "개인정보 열람·삭제 요청" as UC09
+  usecase "자동신고 설정 변경" as UC10
 }
 
 User --> UC06
 User --> UC07
 User --> UC08
 User --> UC09
+User --> UC10
 
 note bottom of UC06
   약관 3종
@@ -223,17 +225,17 @@ title UCD-03 기기 점검
 actor "시각장애인 사용자" as User
 
 rectangle "WalkSafe 사용자 앱" {
-  usecase "기기 점검 실행" as UC10
-  usecase "기기 점검 재측정" as UC11
+  usecase "기기 점검 실행" as UC11
+  usecase "기기 점검 재측정" as UC12
 }
 
-User --> UC10
 User --> UC11
-UC10 -[hidden]right-> UC11
+User --> UC12
+UC11 -[hidden]right-> UC12
 
-UC10 <.. UC11 : <<extend>>
+UC11 <.. UC12 : <<extend>>
 
-note bottom of UC10
+note bottom of UC11
   카메라 · 위치 · 한국어 음성
   거리(ARCore) · 호출어
   전체 기능 / 거리 제한 / 사용 불가
@@ -272,16 +274,16 @@ title UCD-04 안전 교육
 actor "시각장애인 사용자" as User
 
 rectangle "WalkSafe 사용자 앱" {
-  usecase "안전 제한 안내 청취" as UC12
-  usecase "사전 연습 청취" as UC13
+  usecase "안전 제한 안내 청취" as UC13
+  usecase "사전 연습 청취" as UC14
 }
 
-User --> UC12
 User --> UC13
+User --> UC14
 
-UC13 ..> UC12 : <<include>>
+UC14 ..> UC13 : <<include>>
 
-note bottom of UC13
+note bottom of UC14
   위험 경고 · 안전 중지
   일시정지 · 재개
   실제와 같은 문장으로 재생
@@ -321,28 +323,28 @@ actor "시각장애인 사용자" as User
 actor "시스템" as System
 
 rectangle "WalkSafe 사용자 앱" {
-  usecase "휴대폰 장착 확인" as UC14
-  usecase "보행 시작" as UC15
-  usecase "보행 일시정지·재개" as UC16
-  usecase "보행 종료" as UC17
-  usecase "안전 중지" as UC18
-  usecase "(UCD-03)\n기기 점검 실행" as UC10
+  usecase "휴대폰 장착 확인" as UC15
+  usecase "보행 시작" as UC16
+  usecase "보행 일시정지·재개" as UC17
+  usecase "보행 종료" as UC18
+  usecase "안전 중지" as UC19
+  usecase "(UCD-03)\n기기 점검 실행" as UC11
   usecase "(UCD-01)\n다기기 보행 전환" as UC04
 }
 
-User --> UC14
 User --> UC15
 User --> UC16
 User --> UC17
-System --> UC18
+User --> UC18
+System --> UC19
 
-UC15 ..> UC14 : <<include>>
-UC15 ..> UC10 : <<include>>
-UC04 ..> UC15 : <<extend>>
-UC18 ..> UC15 : <<extend>>
-UC18 ..> UC16 : <<extend>>
+UC16 ..> UC15 : <<include>>
+UC16 ..> UC11 : <<include>>
+UC04 ..> UC16 : <<extend>>
+UC19 ..> UC16 : <<extend>>
+UC19 ..> UC17 : <<extend>>
 
-note right of UC18
+note right of UC19
   사용자가 부르지 않아도 일어남
   안전 입력을 믿을 수 없으면 즉시 중지
   사용자 확인 전 재개 금지
@@ -382,19 +384,19 @@ actor "시스템" as System
 actor "시각장애인 사용자" as User
 
 rectangle "WalkSafe 사용자 앱" {
-  usecase "물체 탐지" as UC19
-  usecase "위험 등급·행동 안내" as UC20
-  usecase "(UCD-05)\n안전 중지" as UC18
+  usecase "물체 탐지" as UC20
+  usecase "위험 등급·행동 안내" as UC21
+  usecase "(UCD-05)\n안전 중지" as UC19
 }
 
-System --> UC19
 System --> UC20
-UC20 --> User : 음성·진동
+System --> UC21
+UC21 --> User : 음성·진동
 
-UC20 ..> UC19 : <<include>>
-UC18 ..> UC20 : <<extend>>
+UC21 ..> UC20 : <<include>>
+UC19 ..> UC21 : <<extend>>
 
-note bottom of UC20
+note bottom of UC21
   주의 / 경고 / 즉시 행동
   거리 · 충돌 예상 시간 · 경로 관련성
   탐지와 판정은 책임이 분리됨
@@ -435,28 +437,28 @@ actor "시스템" as System
 actor "TMAP" as Tmap
 
 rectangle "WalkSafe 사용자 앱" {
-  usecase "목적지 검색" as UC21
-  usecase "목적지 선택·경로 시작" as UC22
-  usecase "경로 진행 안내" as UC23
-  usecase "경로 이탈 대응" as UC24
-  usecase "도착 확인" as UC25
+  usecase "목적지 검색" as UC22
+  usecase "목적지 선택·경로 시작" as UC23
+  usecase "경로 진행 안내" as UC24
+  usecase "경로 이탈 대응" as UC25
+  usecase "도착 확인" as UC26
 }
 
-User --> UC21
 User --> UC22
-User --> UC24
+User --> UC23
 User --> UC25
-System --> UC23
+User --> UC26
+System --> UC24
 
-UC21 ..> Tmap : 장소 검색
-UC22 ..> Tmap : 보행 경로
-UC24 ..> Tmap : 새 경로 요청
+UC22 ..> Tmap : 장소 검색
+UC23 ..> Tmap : 보행 경로
+UC25 ..> Tmap : 새 경로 요청
 
-UC22 ..> UC21 : <<include>>
-UC24 ..> UC23 : <<extend>>
-UC25 ..> UC23 : <<extend>>
+UC23 ..> UC22 : <<include>>
+UC25 ..> UC24 : <<extend>>
+UC26 ..> UC24 : <<extend>>
 
-note bottom of UC24
+note bottom of UC25
   새 경로 요청 / 위치 다시 확인 / 길안내 종료
   사용자가 고른 경우에만 TMAP 재호출
 end note
@@ -494,21 +496,21 @@ title UCD-08 음성 상호작용
 actor "시각장애인 사용자" as User
 
 rectangle "WalkSafe 사용자 앱" {
-  usecase "호출어 사용" as UC26
-  usecase "음성 명령 실행" as UC27
+  usecase "호출어 사용" as UC27
+  usecase "음성 명령 실행" as UC28
 }
 
 rectangle "서버 음성 서비스" {
   usecase "서버 STT·TTS 연계" as SRV
 }
 
-User --> UC26
 User --> UC27
+User --> UC28
 
-UC27 ..> UC26 : <<include>>
-UC27 ..> SRV : 기능별 연계
+UC28 ..> UC27 : <<include>>
+UC28 ..> SRV : 기능별 연계
 
-note bottom of UC26
+note bottom of UC27
   호출어 "길라잡이"
   네트워크 없이 단말에서 인식
 end note
@@ -546,25 +548,23 @@ title UCD-09 신고
 actor "시각장애인 사용자" as User
 
 rectangle "WalkSafe 사용자 앱" {
-  usecase "손상 점자블록 신고" as UC28
-  usecase "신고 처리 상태 확인" as UC29
-  usecase "동의·권한 관리 변경" as UC30
-  usecase "(UCD-06)\n물체 탐지" as UC19
+  usecase "손상 점자블록 신고" as UC29
+  usecase "신고 처리 상태 확인" as UC30
+  usecase "(UCD-06)\n물체 탐지" as UC20
 }
 
 rectangle "WalkSafe 관리자 앱" {
   usecase "(UCD-10)\n신고 검토" as UC32
 }
 
-User --> UC28
 User --> UC29
 User --> UC30
 
-UC28 ..> UC19 : <<include>>
-UC28 ..> UC32 : 접수
-UC29 ..> UC32 : 상태 조회
+UC29 ..> UC20 : <<include>>
+UC29 ..> UC32 : 접수
+UC30 ..> UC32 : 상태 조회
 
-note bottom of UC29
+note bottom of UC30
   R-09 : 일반 메뉴 연결은 후속 과제
 end note
 @enduml
