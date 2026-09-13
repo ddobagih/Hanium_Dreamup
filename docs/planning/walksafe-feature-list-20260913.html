@@ -1,0 +1,277 @@
+<title>WalkSafe 기능 리스트</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ink: #17191c; --ground: #f4f5f2; --surface: #ffffff;
+    --line: #dde0da; --line-soft: #eceee9; --muted: #6c7268;
+    --accent: #8f5510; --accent-soft: #f6efe3;
+    --slate: #2f4858; --slate-soft: #eaeef1;
+    --sys: #6b5a8a; --sys-soft: #efecf5;
+    --adm: #1f6f6b; --adm-soft: #e4f1f0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e7e9e4; --ground: #16181a; --surface: #1d2023;
+      --line: #33383a; --line-soft: #262a2c; --muted: #9aa197;
+      --accent: #d9a05b; --accent-soft: #2e2519;
+      --slate: #9dbcd0; --slate-soft: #1e272d;
+      --sys: #b3a3d0; --sys-soft: #252132;
+      --adm: #6fbdb7; --adm-soft: #162726;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #e7e9e4; --ground: #16181a; --surface: #1d2023;
+    --line: #33383a; --line-soft: #262a2c; --muted: #9aa197;
+    --accent: #d9a05b; --accent-soft: #2e2519;
+    --slate: #9dbcd0; --slate-soft: #1e272d;
+    --sys: #b3a3d0; --sys-soft: #252132;
+    --adm: #6fbdb7; --adm-soft: #162726;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: "IBM Plex Sans KR", system-ui, -apple-system, sans-serif;
+    font-size: 15px; line-height: 1.75; word-break: keep-all;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 56px 24px 96px; }
+
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 26px; margin-bottom: 32px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+  }
+  h1 { font-size: 33px; line-height: 1.28; margin: 0 0 14px; font-weight: 600; text-wrap: balance; }
+  .lede { font-size: 16px; color: var(--muted); margin: 0; max-width: 62ch; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 20px;
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted);
+  }
+
+  h2 {
+    font-size: 20px; font-weight: 600; margin: 48px 0 6px;
+    padding-bottom: 9px; border-bottom: 1px solid var(--line);
+  }
+  .sec-note { font-size: 13.5px; color: var(--muted); margin: 0 0 18px; max-width: 72ch; }
+
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px; }
+  thead th {
+    text-align: left; font-weight: 600; font-size: 12.5px; color: var(--muted);
+    padding: 9px 11px; background: var(--surface); border-bottom: 2px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 9px 11px; border-bottom: 1px solid var(--line-soft);
+    vertical-align: top; background: var(--surface);
+  }
+  tbody tr.group-start td { border-top: 2px solid var(--line); }
+  tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+  .ucd { font-weight: 600; white-space: nowrap; }
+  .id {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent);
+    white-space: nowrap; font-weight: 500;
+  }
+  .ref { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .tag {
+    display: inline-block; font-size: 10.5px; font-weight: 600; padding: 1px 8px;
+    border-radius: 100px; background: var(--slate-soft); color: var(--slate); white-space: nowrap;
+  }
+  .tag.sys { background: var(--sys-soft); color: var(--sys); }
+  .tag.adm { background: var(--adm-soft); color: var(--adm); }
+  .tag.later { background: var(--accent-soft); color: var(--accent); }
+
+  .callout {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--accent); border-radius: 3px;
+    padding: 18px 20px; margin: 0 0 26px;
+  }
+  .callout p { margin: 0 0 10px; }
+  .callout p:last-child { margin-bottom: 0; }
+  code {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.86em;
+    background: var(--ground); padding: 1px 5px; border-radius: 2px;
+  }
+  .counts {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin-bottom: 26px;
+  }
+  .count {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 3px;
+    padding: 14px 16px;
+  }
+  .count .n {
+    font-family: "IBM Plex Mono", monospace; font-size: 26px; font-weight: 500;
+    color: var(--accent); line-height: 1.2;
+  }
+  .count .l { font-size: 12.5px; color: var(--muted); }
+  footer {
+    margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+  }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">창의융합종합설계 · 요구 명세서 2.1</div>
+  <h1>기능 리스트</h1>
+  <p class="lede">
+    학교 양식의 네 칸은 <strong>유스케이스 다이어그램 명 · UCD 식별자 · 유스케이스 명 · UC 식별자</strong>입니다.
+    오른쪽 두 칸(액터·근거)은 검토용이라 HWP로 옮길 때 빼셔도 됩니다.
+  </p>
+  <div class="meta">
+    <span>2026-09-13</span>
+    <span>10 UCD · 35 UC</span>
+    <span>사용자 26 · 시스템 5 · 관리자 4</span>
+  </div>
+</header>
+
+<div class="counts">
+  <div class="count"><div class="n">35</div><div class="l">유스케이스</div></div>
+  <div class="count"><div class="n">10</div><div class="l">유스케이스 다이어그램</div></div>
+  <div class="count"><div class="n">5</div><div class="l">액터가 시스템인 것</div></div>
+  <div class="count"><div class="n">21</div><div class="l">3장으로 보낸 기능</div></div>
+</div>
+
+<h2>기능 리스트</h2>
+<div class="scroll">
+<table>
+  <thead>
+    <tr>
+      <th>유스케이스 다이어그램 명</th><th>UCD 식별자</th>
+      <th>유스케이스 명</th><th>UC 식별자</th>
+      <th>액터</th><th>근거</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="group-start"><td class="ucd" rowspan="5">계정·세션 관리</td><td class="id" rowspan="5">UCD-01</td>
+      <td>회원가입</td><td class="id">UC-01</td><td><span class="tag">사용자</span></td><td class="ref">FP-010</td></tr>
+    <tr><td>로그인</td><td class="id">UC-02</td><td><span class="tag">사용자</span></td><td class="ref">FP-011</td></tr>
+    <tr><td>로그아웃</td><td class="id">UC-03</td><td><span class="tag">사용자</span></td><td class="ref">FP-011 · FP-015</td></tr>
+    <tr><td>다기기 보행 전환</td><td class="id">UC-04</td><td><span class="tag">사용자</span></td><td class="ref">FP-012</td></tr>
+    <tr><td>회원탈퇴</td><td class="id">UC-05</td><td><span class="tag">사용자</span></td><td class="ref">FP-015 · R-12</td></tr>
+
+    <tr class="group-start"><td class="ucd" rowspan="4">동의·권한·권리</td><td class="id" rowspan="4">UCD-02</td>
+      <td>최초 실행 통합 동의</td><td class="id">UC-06</td><td><span class="tag">사용자</span></td><td class="ref">FP-013</td></tr>
+    <tr><td>권한 허용·거부 처리</td><td class="id">UC-07</td><td><span class="tag">사용자</span></td><td class="ref">FP-014 · R-01</td></tr>
+    <tr><td>동의 철회</td><td class="id">UC-08</td><td><span class="tag">사용자</span></td><td class="ref">FP-015 · R-12</td></tr>
+    <tr><td>개인정보 열람·삭제 요청</td><td class="id">UC-09</td><td><span class="tag">사용자</span></td><td class="ref">FP-046 · R-12</td></tr>
+
+    <tr class="group-start"><td class="ucd" rowspan="2">안전 교육</td><td class="id" rowspan="2">UCD-03</td>
+      <td>안전 제한 안내 청취</td><td class="id">UC-10</td><td><span class="tag">사용자</span></td><td class="ref">FP-004</td></tr>
+    <tr><td>사전 연습 청취</td><td class="id">UC-11</td><td><span class="tag">사용자</span></td><td class="ref">FP-004</td></tr>
+
+    <tr class="group-start"><td class="ucd" rowspan="3">기기 점검·장착</td><td class="id" rowspan="3">UCD-04</td>
+      <td>기기 점검 실행</td><td class="id">UC-12</td><td><span class="tag">사용자</span></td><td class="ref">FP-009 · R-01</td></tr>
+    <tr><td>기기 점검 재측정</td><td class="id">UC-13</td><td><span class="tag">사용자</span></td><td class="ref">FP-009 · R-01</td></tr>
+    <tr><td>휴대폰 장착 확인</td><td class="id">UC-14</td><td><span class="tag">사용자</span></td><td class="ref">FP-006 · R-01</td></tr>
+
+    <tr class="group-start"><td class="ucd" rowspan="4">보행 세션</td><td class="id" rowspan="4">UCD-05</td>
+      <td>보행 시작</td><td class="id">UC-15</td><td><span class="tag">사용자</span></td><td class="ref">FP-017</td></tr>
+    <tr><td>보행 일시정지·재개</td><td class="id">UC-16</td><td><span class="tag">사용자</span></td><td class="ref">FP-017 · FP-026</td></tr>
+    <tr><td>보행 종료</td><td class="id">UC-17</td><td><span class="tag">사용자</span></td><td class="ref">FP-018 · FP-026</td></tr>
+    <tr><td>안전 중지</td><td class="id">UC-18</td><td><span class="tag sys">시스템</span></td><td class="ref">FP-043 · FP-045</td></tr>
+
+    <tr class="group-start"><td class="ucd" rowspan="3">위험 안내</td><td class="id" rowspan="3">UCD-06</td>
+      <td>물체 탐지</td><td class="id">UC-19</td><td><span class="tag sys">시스템</span></td><td class="ref">FP-019 · R-02 · R-03</td></tr>
+    <tr><td>위험 등급·행동 안내</td><td class="id">UC-20</td><td><span class="tag sys">시스템</span></td><td class="ref">FP-020 · R-04 · R-05</td></tr>
+    <tr><td>점자블록 경로 보조</td><td class="id">UC-21</td><td><span class="tag sys">시스템</span></td><td class="ref">FP-024</td></tr>
+
+    <tr class="group-start"><td class="ucd" rowspan="5">길안내</td><td class="id" rowspan="5">UCD-07</td>
+      <td>목적지 검색</td><td class="id">UC-22</td><td><span class="tag">사용자</span></td><td class="ref">FP-022 · R-06</td></tr>
+    <tr><td>목적지 선택·경로 시작</td><td class="id">UC-23</td><td><span class="tag">사용자</span></td><td class="ref">FP-022 · R-06</td></tr>
+    <tr><td>경로 진행 안내</td><td class="id">UC-24</td><td><span class="tag sys">시스템</span></td><td class="ref">FP-022 · R-06</td></tr>
+    <tr><td>경로 이탈 대응</td><td class="id">UC-25</td><td><span class="tag">사용자</span></td><td class="ref">FP-023 · R-06</td></tr>
+    <tr><td>도착 확인</td><td class="id">UC-26</td><td><span class="tag">사용자</span></td><td class="ref">FP-022 · R-06</td></tr>
+
+    <tr class="group-start"><td class="ucd" rowspan="2">음성 상호작용</td><td class="id" rowspan="2">UCD-08</td>
+      <td>호출어 사용</td><td class="id">UC-27</td><td><span class="tag">사용자</span></td><td class="ref">FP-025</td></tr>
+    <tr><td>음성 명령 실행</td><td class="id">UC-28</td><td><span class="tag">사용자</span></td><td class="ref">FP-026 · R-05</td></tr>
+
+    <tr class="group-start"><td class="ucd" rowspan="3">신고</td><td class="id" rowspan="3">UCD-09</td>
+      <td>손상 점자블록 신고</td><td class="id">UC-29</td><td><span class="tag">사용자</span></td><td class="ref">FP-031 · R-07 · R-08</td></tr>
+    <tr><td>신고 처리 상태 확인</td><td class="id">UC-30</td><td><span class="tag">사용자</span> <span class="tag later">후속 과제</span></td><td class="ref">FP-033 · R-09</td></tr>
+    <tr><td>자동신고 설정 변경</td><td class="id">UC-31</td><td><span class="tag">사용자</span></td><td class="ref">FP-031 · R-12</td></tr>
+
+    <tr class="group-start"><td class="ucd" rowspan="4">관리자</td><td class="id" rowspan="4">UCD-10</td>
+      <td>관리자 인증</td><td class="id">UC-32</td><td><span class="tag adm">관리자</span></td><td class="ref">FP-047 · R-10</td></tr>
+    <tr><td>신고 검토</td><td class="id">UC-33</td><td><span class="tag adm">관리자</span></td><td class="ref">FP-033 · R-10</td></tr>
+    <tr><td>기관 전달 이력 기록</td><td class="id">UC-34</td><td><span class="tag adm">관리자</span></td><td class="ref">FP-033 · R-11</td></tr>
+    <tr><td>감사·원본 접근 확인</td><td class="id">UC-35</td><td><span class="tag adm">관리자</span></td><td class="ref">FP-048 · R-12</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>이렇게 나눈 기준</h2>
+<div class="callout">
+  <p><strong>한 화면에서 사용자가 한 번에 끝내는 일을 하나로 묶었습니다.</strong>
+  기기 점검은 내부적으로 카메라·위치·음성·호출어·ARCore 다섯 가지를 재지만, 사용자에게는
+  "점검을 누르고 기다리는 일" 하나입니다. 반대로 보행은 시작·일시정지·종료·안전중지의
+  선행조건과 사후조건이 모두 달라 넷으로 나눴습니다. 하나로 묶으면 명세 표의 선행·사후 칸에
+  여러 상황을 욱여넣게 되어 명세서로서 쓸모가 떨어집니다.</p>
+
+  <p><strong>액터가 시스템인 유스케이스가 다섯 개입니다.</strong>
+  위험 탐지와 안전 중지는 사용자가 부르지 않아도 일어납니다. 사용자 액터로 적으면 사실과 다르고,
+  빼면 제품의 핵심이 명세서에서 사라집니다.</p>
+
+  <p><strong>스물한 개 기능은 여기 없습니다.</strong>
+  FP-034~054(자료 수집·모델 학습·서버 구조·보안·배포·운영)는 사용자가 조작하지 않으므로
+  유스케이스가 아니라 3장 비기능적 요구사항으로 보냈습니다.</p>
+
+  <p><strong>UC-30은 후속 과제입니다.</strong>
+  SW 개발 설계서의 <code>R-09</code>가 API와 화면 제어까지를 범위로 두고 일반 메뉴 연결은
+  후속 과제로 명시했습니다. 명세서에는 넣되 이번 범위가 아님을 표시했습니다.</p>
+</div>
+
+<h2>설계서의 R 번호와의 대응</h2>
+<p class="sec-note">
+  총괄이 배포한 SW 개발 설계서(2026-09-07)는 요구를 <code>R-01~R-12</code>로 부릅니다.
+  학교 양식이 유스케이스 번호를 요구하므로 두 체계를 모두 두고 여기서 잇습니다.
+  같은 것을 두 번 부르는 것이지 서로 다른 요구가 아닙니다.
+</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>R</th><th>요구사항</th><th>대응 UC</th></tr></thead>
+  <tbody>
+    <tr><td class="id">R-01</td><td>기기·권한 준비</td><td class="ref">UC-07 · UC-12 · UC-13 · UC-14</td></tr>
+    <tr><td class="id">R-02</td><td>단말 객체 인식</td><td class="ref">UC-19</td></tr>
+    <tr><td class="id">R-03</td><td>거리 정보 연결</td><td class="ref">UC-19 · UC-20</td></tr>
+    <tr><td class="id">R-04</td><td>위험 후보 선택</td><td class="ref">UC-20</td></tr>
+    <tr><td class="id">R-05</td><td>음성·진동 안내</td><td class="ref">UC-20 · UC-28</td></tr>
+    <tr><td class="id">R-06</td><td>목적지 길안내</td><td class="ref">UC-22 · UC-23 · UC-24 · UC-25 · UC-26</td></tr>
+    <tr><td class="id">R-07</td><td>손상 점자블록 신고</td><td class="ref">UC-29</td></tr>
+    <tr><td class="id">R-08</td><td>신고 전송·재시도</td><td class="ref">UC-29</td></tr>
+    <tr><td class="id">R-09</td><td>내 신고 조회</td><td class="ref">UC-30 <span class="tag later">후속 과제</span></td></tr>
+    <tr><td class="id">R-10</td><td>관리자 검토</td><td class="ref">UC-32 · UC-33</td></tr>
+    <tr><td class="id">R-11</td><td>기관 전달 이력</td><td class="ref">UC-34</td></tr>
+    <tr><td class="id">R-12</td><td>개인정보·보존</td><td class="ref">UC-05 · UC-08 · UC-09 · UC-31 · UC-35</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>2.2 다이어그램을 그릴 때</h2>
+<p class="sec-note">
+  UCD 열 장을 그리게 됩니다. 각 장에 무엇이 들어가야 하는지만 적어 둡니다.
+</p>
+<div class="callout">
+  <p><strong>액터는 셋입니다.</strong> 시각장애인 사용자, 지정 관리자, 그리고 시스템.
+  외부 시스템으로 TMAP과 SMTP 메일이 붙습니다(UCD-07·UCD-01).</p>
+  <p><strong>포함 관계를 그릴 곳.</strong>
+  UC-15 보행 시작은 UC-12 기기 점검과 UC-14 장착 확인을 포함합니다.
+  UC-23 경로 시작은 UC-22 목적지 검색을 포함합니다.
+  UC-29 신고는 UC-19 물체 탐지를 포함합니다.</p>
+  <p><strong>확장 관계를 그릴 곳.</strong>
+  UC-18 안전 중지는 UCD-05·UCD-06의 어느 유스케이스에서든 확장될 수 있습니다.
+  UC-25 경로 이탈 대응은 UC-24 경로 진행 안내의 확장입니다.
+  UC-04 다기기 보행 전환은 UC-15 보행 시작의 확장입니다.</p>
+</div>
+
+<footer>
+  근거: <code>docs/deliverables/03-requirements</code>의 요구 68종과
+  SW 개발 설계서(2026-09-07)의 <code>R-01~R-12</code>.
+  각 UC의 선행조건·시나리오·예외사항은 2.3 유스케이스 명세에 있습니다.
+  요구 문서는 <code>DRAFT / NOT_APPROVED</code>이고 인수조건 279건이 모두 <code>NOT_RUN</code>입니다.
+</footer>
+
+</div>
