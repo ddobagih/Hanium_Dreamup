@@ -1,0 +1,628 @@
+' ============================================================
+' WalkSafe 유스케이스 다이어그램  (요구 명세서 2.2)
+' 2026-09-13 · 10 UCD · 35 UC + 전체 구성 1장
+'
+' 렌더링
+'   java -jar plantuml.jar -tpng walksafe-usecase-diagrams.puml
+'   @startuml 이름마다 PNG 한 장씩 나옵니다. Graphviz가 없어도
+'   !pragma layout smetana 가 대신 배치합니다.
+'
+' 한글 글꼴
+'   macOS "Apple SD Gothic Neo" / Windows "Malgun Gothic"
+'   글꼴이 없으면 네모로 깨지니 환경에 맞게 바꿔 주세요.
+'   (각 다이어그램의 skinparam defaultFontName 줄)
+' ============================================================
+
+
+' ============================================================
+@startuml UCD-00-overview
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title WalkSafe 전체 구성
+
+actor "시각장애인\n사용자" as User
+actor "지정 관리자" as Admin
+actor "시스템" as System
+actor "TMAP" as Tmap
+actor "SMTP 메일" as Mail
+
+rectangle "WalkSafe 사용자 앱" {
+  usecase "UCD-01\n계정·세션 관리" as D1
+  usecase "UCD-02\n동의·권한·권리" as D2
+  usecase "UCD-03\n기기 점검" as D3
+  usecase "UCD-04\n안전 교육" as D4
+  usecase "UCD-05\n보행 준비·세션" as D5
+  usecase "UCD-06\n위험 안내" as D6
+  usecase "UCD-07\n길안내" as D7
+  usecase "UCD-08\n음성 상호작용" as D8
+  usecase "UCD-09\n신고" as D9
+}
+
+rectangle "WalkSafe 관리자 앱" {
+  usecase "UCD-10\n관리자" as D10
+}
+
+User --> D1
+User --> D2
+User --> D3
+User --> D4
+User --> D5
+User --> D7
+User --> D8
+User --> D9
+System --> D5
+System --> D6
+Admin --> D10
+
+D1 ..> Mail : 가입 인증번호
+D7 ..> Tmap : 검색·경로
+D9 ..> D10 : 접수
+
+note bottom of D3
+  첫 실행 순서
+  UCD-01 → 02 → 03 → 04 → 05
+  기기 점검이 안전 교육보다 먼저
+end note
+@enduml
+
+
+' ============================================================
+@startuml UCD-01
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title UCD-01 계정·세션 관리
+
+actor "시각장애인 사용자" as User
+actor "SMTP 메일" as Mail
+
+rectangle "WalkSafe 사용자 앱" {
+  usecase "회원가입" as UC01
+  usecase "로그인" as UC02
+  usecase "로그아웃" as UC03
+  usecase "다기기 보행 전환" as UC04
+  usecase "회원탈퇴" as UC05
+}
+
+User --> UC01
+User --> UC02
+User --> UC03
+User --> UC04
+User --> UC05
+
+UC01 ..> Mail : 가입 인증번호
+
+note right of UC04
+  UC-15 보행 시작의 확장
+  계정당 한 기기만 보행 활성
+end note
+@enduml
+
+
+' ============================================================
+@startuml UCD-02
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title UCD-02 동의·권한·권리
+
+actor "시각장애인 사용자" as User
+
+rectangle "WalkSafe 사용자 앱" {
+  usecase "최초 실행 통합 동의" as UC06
+  usecase "권한 허용·거부 처리" as UC07
+  usecase "동의 철회" as UC08
+  usecase "개인정보 열람·삭제 요청" as UC09
+}
+
+User --> UC06
+User --> UC07
+User --> UC08
+User --> UC09
+
+note bottom of UC06
+  약관 3종
+  서비스 이용 · 개인정보 수집이용
+  위치기반서비스
+end note
+@enduml
+
+
+' ============================================================
+@startuml UCD-03
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title UCD-03 기기 점검
+
+actor "시각장애인 사용자" as User
+
+rectangle "WalkSafe 사용자 앱" {
+  usecase "기기 점검 실행" as UC10
+  usecase "기기 점검 재측정" as UC11
+}
+
+User --> UC10
+User --> UC11
+
+UC11 ..> UC10 : <<extend>>
+
+note bottom of UC10
+  카메라 · 위치 · 한국어 음성
+  거리(ARCore) · 호출어
+  전체 기능 / 거리 제한 / 사용 불가
+end note
+@enduml
+
+
+' ============================================================
+@startuml UCD-04
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title UCD-04 안전 교육
+
+actor "시각장애인 사용자" as User
+
+rectangle "WalkSafe 사용자 앱" {
+  usecase "안전 제한 안내 청취" as UC12
+  usecase "사전 연습 청취" as UC13
+}
+
+User --> UC12
+User --> UC13
+
+UC13 ..> UC12 : <<include>>
+
+note bottom of UC13
+  위험 경고 · 안전 중지
+  일시정지 · 재개
+  실제와 같은 문장으로 재생
+end note
+@enduml
+
+
+' ============================================================
+@startuml UCD-05
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title UCD-05 보행 준비·세션
+
+actor "시각장애인 사용자" as User
+actor "시스템" as System
+
+rectangle "WalkSafe 사용자 앱" {
+  usecase "휴대폰 장착 확인" as UC14
+  usecase "보행 시작" as UC15
+  usecase "보행 일시정지·재개" as UC16
+  usecase "보행 종료" as UC17
+  usecase "안전 중지" as UC18
+  usecase "(UCD-03)\n기기 점검 실행" as UC10
+  usecase "(UCD-01)\n다기기 보행 전환" as UC04
+}
+
+User --> UC14
+User --> UC15
+User --> UC16
+User --> UC17
+System --> UC18
+
+UC15 ..> UC14 : <<include>>
+UC15 ..> UC10 : <<include>>
+UC04 ..> UC15 : <<extend>>
+UC18 ..> UC15 : <<extend>>
+UC18 ..> UC16 : <<extend>>
+
+note right of UC18
+  사용자가 부르지 않아도 일어남
+  안전 입력을 믿을 수 없으면 즉시 중지
+  사용자 확인 전 재개 금지
+end note
+@enduml
+
+
+' ============================================================
+@startuml UCD-06
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title UCD-06 위험 안내
+
+actor "시스템" as System
+actor "시각장애인 사용자" as User
+
+rectangle "WalkSafe 사용자 앱" {
+  usecase "물체 탐지" as UC19
+  usecase "위험 등급·행동 안내" as UC20
+  usecase "점자블록 경로 보조" as UC21
+  usecase "(UCD-05)\n안전 중지" as UC18
+}
+
+System --> UC19
+System --> UC20
+System --> UC21
+UC20 --> User : 음성·진동
+
+UC20 ..> UC19 : <<include>>
+UC21 ..> UC19 : <<include>>
+UC18 ..> UC20 : <<extend>>
+
+note bottom of UC20
+  주의 / 경고 / 즉시 행동
+  거리 · 충돌 예상 시간 · 경로 관련성
+  탐지와 판정은 책임이 분리됨
+end note
+@enduml
+
+
+' ============================================================
+@startuml UCD-07
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title UCD-07 길안내
+
+actor "시각장애인 사용자" as User
+actor "시스템" as System
+actor "TMAP" as Tmap
+
+rectangle "WalkSafe 사용자 앱" {
+  usecase "목적지 검색" as UC22
+  usecase "목적지 선택·경로 시작" as UC23
+  usecase "경로 진행 안내" as UC24
+  usecase "경로 이탈 대응" as UC25
+  usecase "도착 확인" as UC26
+}
+
+User --> UC22
+User --> UC23
+User --> UC25
+User --> UC26
+System --> UC24
+
+UC22 ..> Tmap : 장소 검색
+UC23 ..> Tmap : 보행 경로
+UC25 ..> Tmap : 새 경로 요청
+
+UC23 ..> UC22 : <<include>>
+UC25 ..> UC24 : <<extend>>
+UC26 ..> UC24 : <<extend>>
+
+note bottom of UC25
+  새 경로 요청 / 위치 다시 확인 / 길안내 종료
+  사용자가 고른 경우에만 TMAP 재호출
+end note
+@enduml
+
+
+' ============================================================
+@startuml UCD-08
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title UCD-08 음성 상호작용
+
+actor "시각장애인 사용자" as User
+
+rectangle "WalkSafe 사용자 앱" {
+  usecase "호출어 사용" as UC27
+  usecase "음성 명령 실행" as UC28
+}
+
+rectangle "서버 음성 서비스" {
+  usecase "서버 STT·TTS 연계" as SRV
+}
+
+User --> UC27
+User --> UC28
+
+UC28 ..> UC27 : <<include>>
+UC28 ..> SRV : 기능별 연계
+
+note bottom of UC27
+  호출어 "길라잡이"
+  네트워크 없이 단말에서 인식
+end note
+@enduml
+
+
+' ============================================================
+@startuml UCD-09
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title UCD-09 신고
+
+actor "시각장애인 사용자" as User
+
+rectangle "WalkSafe 사용자 앱" {
+  usecase "손상 점자블록 신고" as UC29
+  usecase "신고 처리 상태 확인" as UC30
+  usecase "자동신고 설정 변경" as UC31
+  usecase "(UCD-06)\n물체 탐지" as UC19
+}
+
+rectangle "WalkSafe 관리자 앱" {
+  usecase "(UCD-10)\n신고 검토" as UC33
+}
+
+User --> UC29
+User --> UC30
+User --> UC31
+
+UC29 ..> UC19 : <<include>>
+UC29 ..> UC33 : 접수
+UC30 ..> UC33 : 상태 조회
+
+note bottom of UC30
+  R-09 : 일반 메뉴 연결은 후속 과제
+end note
+@enduml
+
+
+' ============================================================
+@startuml UCD-10
+!pragma layout smetana
+left to right direction
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #5b6159
+skinparam usecase {
+  BackgroundColor #ffffff
+  BorderColor #8f5510
+  FontColor #17191c
+}
+skinparam actor {
+  BackgroundColor #f6efe3
+  BorderColor #8f5510
+}
+skinparam rectangle {
+  BackgroundColor #fbfbf9
+  BorderColor #c9cec6
+}
+skinparam note {
+  BackgroundColor #f4f5f2
+  BorderColor #c9cec6
+}
+
+title UCD-10 관리자
+
+actor "지정 관리자" as Admin
+actor "책임 기관" as Agency
+
+rectangle "WalkSafe 관리자 앱" {
+  usecase "관리자 인증" as UC32
+  usecase "신고 검토" as UC33
+  usecase "기관 전달 이력 기록" as UC34
+  usecase "감사·원본 접근 확인" as UC35
+}
+
+Admin --> UC32
+Admin --> UC33
+Admin --> UC34
+Admin --> UC35
+
+UC33 ..> UC32 : <<include>>
+UC34 ..> UC32 : <<include>>
+UC35 ..> UC32 : <<include>>
+UC34 ..> UC33 : <<include>>
+UC34 ..> Agency : 수동 전달
+
+note bottom of UC34
+  기관 접수 API 자동 호출은 지원하지 않음
+  수신 증거 없이 제출 완료로 표시 금지
+end note
+@enduml
