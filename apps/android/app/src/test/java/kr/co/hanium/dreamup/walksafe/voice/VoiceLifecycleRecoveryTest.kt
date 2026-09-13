@@ -79,12 +79,14 @@ class VoiceLifecycleRecoveryTest {
     @Test
     fun silentAndUnknownCommandsDoNotConsumeTheFollowingValidCommand() {
         val machine = machineAt(Phase.WAKE)
-        val silentWindow = machine.onWakeWordDetected(machine.snapshot().generation)
+        val silentWake = machine.onWakeWordDetected(machine.snapshot().generation)
+        val silentWindow = machine.onWakeAcknowledgementFinished(silentWake.state.generation)
         assertFalse(machine.onCommandRecognized(silentWindow.state.generation, "  ").accepted)
         assertEquals(silentWindow.state, machine.snapshot())
         assertTrue(machine.onCommandWindowTimedOut(silentWindow.state.generation).accepted)
 
-        val nextWindow = machine.onWakeWordDetected(machine.snapshot().generation)
+        val nextWake = machine.onWakeWordDetected(machine.snapshot().generation)
+        val nextWindow = machine.onWakeAcknowledgementFinished(nextWake.state.generation)
         assertFalse(machine.onCommandWindowTimedOut(silentWindow.state.generation).accepted)
         val unknown = machine.onCommandRecognized(nextWindow.state.generation, "바나나 소나타")
         assertNull(selectAndroidVoiceAction(listOf("바나나 소나타"), floatArrayOf(0.95f)))
@@ -149,6 +151,7 @@ class VoiceLifecycleRecoveryTest {
         for (retired in 0L..generation) {
             val callbacks = listOf(
                 machine.onWakeWordDetected(retired),
+                machine.onWakeAcknowledgementFinished(retired),
                 machine.onCommandRecognized(retired, "도움말"),
                 machine.onCommandResponseReady(retired, "이전 응답"),
                 machine.onCommandDispatched(retired),
@@ -169,7 +172,8 @@ class VoiceLifecycleRecoveryTest {
     private fun completeCommandCycle(machine: HandsFreeVoiceStateMachine) {
         val waiting = machine.snapshot()
         assertTrue(waiting is HandsFreeVoiceState.WaitingForWakeWord)
-        val command = machine.onWakeWordDetected(waiting.generation)
+        val acknowledging = machine.onWakeWordDetected(waiting.generation)
+        val command = machine.onWakeAcknowledgementFinished(acknowledging.state.generation)
         assertTrue(command.accepted)
         val processing = machine.onCommandRecognized(command.state.generation, "도움말")
         assertTrue(processing.accepted)
@@ -193,6 +197,8 @@ class VoiceLifecycleRecoveryTest {
         startEligible(machine)
         if (phase == Phase.WAKE) return machine
         machine.onWakeWordDetected(machine.snapshot().generation)
+        if (phase == Phase.ACKNOWLEDGING) return machine
+        machine.onWakeAcknowledgementFinished(machine.snapshot().generation)
         if (phase == Phase.COMMAND) return machine
         machine.onCommandRecognized(machine.snapshot().generation, "도움말")
         if (phase == Phase.PROCESSING) return machine
@@ -200,5 +206,5 @@ class VoiceLifecycleRecoveryTest {
         return machine
     }
 
-    private enum class Phase { WAKE, COMMAND, PROCESSING, SPEAKING }
+    private enum class Phase { WAKE, ACKNOWLEDGING, COMMAND, PROCESSING, SPEAKING }
 }

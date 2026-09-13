@@ -18,6 +18,19 @@ class AndroidStartupCapabilityProbe(
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private val packageManager = appContext.packageManager
+    private val hasCameraHardware by lazy {
+        packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
+    }
+    private val hasGpsHardware by lazy {
+        packageManager.hasSystemFeature(PackageManager.FEATURE_LOCATION_GPS)
+    }
+    private val hasMicrophoneHardware by lazy {
+        packageManager.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)
+    }
+    private val hasVibrationHardware by lazy { vibrator()?.hasVibrator() == true }
+    private val bundledOfflineRecognitionAvailable by lazy {
+        BundledVoskModelInstaller.bundledModelAvailable(appContext)
+    }
     private val approvedDeviceProfileMatch = ApprovedDeviceProfileMatcher.match(
         WalkSafeDeviceIdentity(
             manufacturer = Build.MANUFACTURER,
@@ -54,11 +67,11 @@ class AndroidStartupCapabilityProbe(
     fun snapshot(): WalkSafeStartupCapabilityInput {
         return WalkSafeStartupCapabilityInput(
             androidVersionSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
-            cameraAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY),
-            gpsAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_LOCATION_GPS),
-            microphoneAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_MICROPHONE),
-            vibrationAvailable = vibrator()?.hasVibrator() == true,
-            onDeviceSpeechRecognitionAvailable = onDeviceSpeechRecognitionAvailable(),
+            cameraAvailable = hasCameraHardware,
+            gpsAvailable = hasGpsHardware,
+            microphoneAvailable = hasMicrophoneHardware,
+            vibrationAvailable = hasVibrationHardware,
+            onDeviceSpeechRecognitionAvailable = bundledOfflineRecognitionAvailable,
             offlineKoreanTextToSpeechAvailable = offlineKoreanTextToSpeechProbeState.available,
             metricDistanceAvailable = metricDistanceAvailable,
             approvedDesignatedDeviceProfile = approvedDeviceProfileMatch.approved,
@@ -86,10 +99,6 @@ class AndroidStartupCapabilityProbe(
             effectiveInput,
             approvedDeviceProfileRequired = approvedDeviceProfileRequired,
         )
-    }
-
-    private fun onDeviceSpeechRecognitionAvailable(): Boolean {
-        return BundledVoskModelInstaller.bundledModelAvailable(appContext)
     }
 
     private fun vibrator(): Vibrator? {

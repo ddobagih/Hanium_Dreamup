@@ -301,14 +301,14 @@ class MainActivityNavigationCompositionTest {
                 step.indexOf("positioningCoordinator.observeStep("),
         )
         assertTrue(step.contains("positioningCoordinator.observeStep("))
-        assertTrue(step.contains("gpsCourse = latestGpsCourseObservation"))
+        assertTrue(step.contains("gpsCourse = courseAtStep"))
         assertTrue(step.contains("magneticTrueHeading = chestHeading"))
         assertTrue(step.contains("phoneForwardMounted = chestHeading != null"))
         assertTrue(chest.contains("positionFieldExplicitChestConfirmed"))
         assertTrue(chest.contains("PhoneMountingMethod.CHEST_FORWARD"))
         assertTrue(chest.contains("phoneMountingOutputsAllowed"))
-        assertTrue(chest.contains("latestChestMountedHeading(timestampMs)"))
-        assertTrue(chest.contains("if (!result.isValid) return null"))
+        assertTrue(chest.contains("chestMountedHeadingAt(timestampMs, maximumAgeMs)"))
+        assertTrue(step.contains("magneticTrueHeadingAtGpsCourse = chestAtCourse"))
         assertFalse(motion.contains("updateRouteGuidance("))
         assertFalse(heading.contains("location.speed > 0.5f"))
         assertTrue(heading.contains("bearingAccuracy != null"))
@@ -319,7 +319,7 @@ class MainActivityNavigationCompositionTest {
     }
 
     @Test
-    fun fusedAndOptionalSensorsShareTheWalkingSessionLifecycle() {
+    fun fusedAndOptionalSensorsReleaseTheirSessionBoundCallbacksTogether() {
         val start = functionBlock("private fun startLocationUpdatesIfAllowed(")
         val stop = functionBlock("private fun stopLocationUpdates(")
         val sources = functionBlock("private fun startPositioningObservationSources(")
@@ -334,8 +334,10 @@ class MainActivityNavigationCompositionTest {
         assertTrue(sources.contains("AndroidPedestrianMotionTracker("))
         assertTrue(sources.contains("positioningCoordinator.observeZupt("))
         assertTrue(sources.contains("ensureEarthOrientationForLocation()"))
-        assertTrue(stop.contains("gnssQualityObserver?.stop()"))
-        assertTrue(stop.contains("pedestrianMotionTracker?.stop()"))
+        assertTrue(stop.contains("gnssQualityObserver?.close()"))
+        assertTrue(stop.contains("pedestrianMotionTracker?.close()"))
+        assertTrue(stop.contains("gnssQualityObserver = null"))
+        assertTrue(stop.contains("pedestrianMotionTracker = null"))
         assertTrue(stop.contains("stopActivePositionFieldSession()"))
         assertTrue(stop.contains("positioningCoordinator.reset()"))
     }
@@ -366,9 +368,8 @@ class MainActivityNavigationCompositionTest {
     fun actorSwitchClearsAllCalibrationBaselines() {
         val profile = functionBlock("private fun ensurePositioningProfileForCurrentActor(")
 
-        assertTrue(profile.contains("lastCalibrationLocation = null"))
-        assertTrue(profile.contains("lastCalibrationStepCount = 0"))
-        assertTrue(profile.contains("lastCalibrationAtMs = 0L"))
+        assertTrue(profile.contains("walkingCalibrationSegments.reset()"))
+        assertTrue(functionBlock("private fun clearLocationDerivedState(").contains("walkingCalibrationSegments.reset()"))
     }
 
     @Test
@@ -376,7 +377,7 @@ class MainActivityNavigationCompositionTest {
         val step = functionBlock("private fun handlePositioningStepEvent(")
         val location = functionBlock("private fun handleLocationUpdate(")
         val motionSources = functionBlock("private fun startPositioningObservationSources(")
-        val locationGate = functionBlock("private fun currentLocationCollectionAllowsWork()")
+        val locationGate = functionBlock("private fun currentLocationCollectionOwnerOrNull()")
         val stepGate = functionBlock("private fun currentStepTrackingCollectionAllowsWork()")
         val fieldGate = functionBlock("private fun currentPositionFieldCollectionAllowsWork()")
 
@@ -397,18 +398,23 @@ class MainActivityNavigationCompositionTest {
     }
 
     @Test
-    fun calibrationRequiresAContinuousHighQualitySegment() {
+    fun calibrationLearnsOnlyFromOriginalFixWithFreshMotionEvidence() {
         val calibration = functionBlock("private fun attemptStepCalibration(")
-        val qualityGuard = calibration.indexOf("if (!trustedPositionSegment)")
-        val baseline = calibration.indexOf("if (lastCalibrationLocation == null")
-        val learn = calibration.indexOf("positioningCoordinator.calibrateProfile(")
+        val learning = functionBlock("private fun applyWalkingCalibrationSample(")
+        val step = functionBlock("private fun handlePositioningStepEvent(")
 
-        assertTrue(qualityGuard >= 0)
-        assertTrue(qualityGuard < baseline)
-        assertTrue(baseline < learn)
-        assertTrue(calibration.contains("lastCalibrationLocation = null"))
-        assertTrue(calibration.contains("lastCalibrationStepCount = 0"))
-        assertTrue(calibration.contains("lastCalibrationAtMs = 0L"))
+        assertTrue(calibration.contains("walkingCalibrationSegments.onFix("))
+        assertTrue(calibration.contains("::applyWalkingCalibrationSample"))
+        assertTrue(learning.contains("positioningCoordinator.calibrateProfile("))
+        assertTrue(step.contains("walkingCalibrationSegments.onStep("))
+        assertTrue(step.contains("StepEventSource.STEP_DETECTOR"))
+        assertTrue(step.contains("::applyWalkingCalibrationSample"))
+        assertTrue(calibration.contains("RawWalkingCalibrationFix("))
+        assertTrue(calibration.contains("latitude = location.latitude"))
+        assertTrue(calibration.contains("longitude = location.longitude"))
+        assertTrue(calibration.contains("freshMovingEvidence"))
+        assertTrue(calibration.contains("!isMockLocationCompat(location)"))
+        assertFalse(calibration.contains("filteredTrusted"))
     }
 
     @Test

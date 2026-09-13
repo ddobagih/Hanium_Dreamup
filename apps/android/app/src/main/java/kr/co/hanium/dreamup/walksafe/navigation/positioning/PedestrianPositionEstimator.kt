@@ -63,6 +63,7 @@ enum class GnssHardRejectReason {
     INVALID_TIME,
     STALE,
     OUT_OF_ORDER,
+    REPLAY_WINDOW_EXCEEDED,
     INVALID_ACCURACY,
     CORRUPT_JUMP,
     NUMERICAL_FAILURE,
@@ -98,6 +99,11 @@ data class PedestrianPositionEstimatorUpdate(
     val disposition: GnssObservationDisposition,
     val gateWeight: Double? = null,
     val hardRejectReason: GnssHardRejectReason? = null,
+    /** Posterior at the actual GNSS measurement time, before any later motion is replayed. */
+    val estimateAtGnssMeasurement: EstimatedLocation? = null,
+    val replayedMotionEventCount: Int = 0,
+    /** Measurement lag behind the pre-update committed state, independent of callback age. */
+    val measurementLagMs: Long = 0L,
 )
 
 data class PedestrianMotionEstimatorUpdate(
@@ -130,6 +136,8 @@ data class PedestrianPositionEstimatorConfig(
     val maximumAverageWalkingSpeedMps: Double = 5.0,
     val minimumWalkingSpeedProcessNoiseScale: Double = 0.5,
     val maximumWalkingSpeedProcessNoiseScale: Double = 2.0,
+    val maximumGnssReplayLagMs: Long = 5_000L,
+    val maximumRetainedMotionEvents: Int = 128,
 ) {
     init {
         require(processAccelerationSigmaMps2 > 0.0)
@@ -158,6 +166,8 @@ data class PedestrianPositionEstimatorConfig(
         require(maximumAverageWalkingSpeedMps >= minimumAverageWalkingSpeedMps)
         require(minimumWalkingSpeedProcessNoiseScale > 0.0)
         require(maximumWalkingSpeedProcessNoiseScale >= minimumWalkingSpeedProcessNoiseScale)
+        require(maximumGnssReplayLagMs >= 0L)
+        require(maximumRetainedMotionEvents > 0)
     }
 }
 
@@ -178,6 +188,8 @@ class PedestrianPositionEstimator(
     private var lastInformativeGnssElapsedRealtimeMs: Long? = null
     private var lastPdrStepElapsedRealtimeMs: Long? = null
     private var lastZuptElapsedRealtimeMs: Long? = null
+    private var lastAcceptedGnssElapsedRealtimeMs: Long? = null
+    private val motionHistory = mutableListOf<RetainedMotion>()
     private var activeProcessAccelerationSigmaMps2 = config.processAccelerationSigmaMps2
     private var activeAverageWalkingSpeedMps = config.referenceWalkingSpeedMps
 
@@ -189,6 +201,8 @@ class PedestrianPositionEstimator(
         lastInformativeGnssElapsedRealtimeMs = null
         lastPdrStepElapsedRealtimeMs = null
         lastZuptElapsedRealtimeMs = null
+        lastAcceptedGnssElapsedRealtimeMs = null
+        motionHistory.clear()
     }
 
     /** Updates the walking process noise without resetting the current position state. */
@@ -215,11 +229,22 @@ class PedestrianPositionEstimator(
             return rejected(reason)
         }
 
-        val currentTime = stateElapsedRealtimeMs
-        if (currentTime != null && observation.elapsedRealtimeMs <= currentTime) {
+        if (lastAcceptedGnssElapsedRealtimeMs?.let { observation.elapsedRealtimeMs <= it } == true) {
             return rejected(GnssHardRejectReason.OUT_OF_ORDER)
         }
+        val currentTime = stateElapsedRealtimeMs
+        if (currentTime != null && observation.elapsedRealtimeMs <= currentTime) {
+            return replayWithGnss(observation, currentTime)
+        }
+        val update = applyGnssInOrder(observation)
+        if (update.disposition == GnssObservationDisposition.HARD_REJECTED) return update
+        lastAcceptedGnssElapsedRealtimeMs = observation.elapsedRealtimeMs
+        motionHistory.clear()
+        return update.copy(estimateAtGnssMeasurement = update.estimate)
+    }
 
+    private fun applyGnssInOrder(observation: GnssPositionObservation): PedestrianPositionEstimatorUpdate {
+        val currentTime = stateElapsedRealtimeMs
         val gnssSigmaM = max(
             observation.horizontalAccuracyM ?: config.missingAccuracySigmaM,
             config.minimumGnssSigmaM,
@@ -340,6 +365,7 @@ class PedestrianPositionEstimator(
             !observation.stepLengthSigmaM.isFinite() || observation.stepLengthSigmaM < 0.0
         ) return motionRejected(PedestrianMotionHardRejectReason.INVALID_STEP)
 
+        val before = captureState()
         val predicted = predictMotionControlledInterval(
             requireNotNull(state),
             requireNotNull(covariance),
@@ -372,6 +398,7 @@ class PedestrianPositionEstimator(
         covariance = updated.covariance
         stateElapsedRealtimeMs = observation.elapsedRealtimeMs
         lastPdrStepElapsedRealtimeMs = observation.elapsedRealtimeMs
+        retainMotion(MotionObservation.Step(observation), before)
         return PedestrianMotionEstimatorUpdate(
             estimate = buildEstimate(updated.state, updated.covariance, observation.elapsedRealtimeMs),
             disposition = if (directionUsable) {
@@ -393,6 +420,7 @@ class PedestrianPositionEstimator(
         if (!observation.velocitySigmaMps.isFinite() || observation.velocitySigmaMps <= 0.0) {
             return motionRejected(PedestrianMotionHardRejectReason.INVALID_ZUPT)
         }
+        val before = captureState()
         val predicted = predictMotionControlledInterval(
             requireNotNull(state),
             requireNotNull(covariance),
@@ -409,6 +437,7 @@ class PedestrianPositionEstimator(
         covariance = corrected.covariance
         stateElapsedRealtimeMs = observation.elapsedRealtimeMs
         lastZuptElapsedRealtimeMs = observation.elapsedRealtimeMs
+        retainMotion(MotionObservation.Zupt(observation), before)
         return PedestrianMotionEstimatorUpdate(
             estimate = buildEstimate(corrected.state, corrected.covariance, observation.elapsedRealtimeMs),
             disposition = PedestrianMotionUpdateDisposition.APPLIED,
@@ -416,6 +445,127 @@ class PedestrianPositionEstimator(
     }
 
     internal fun covarianceSnapshot(): DoubleArray = covariance?.copyOf() ?: DoubleArray(0)
+
+    /**
+     * GNSS remains monotonic relative to accepted GNSS, while motion may arrive ahead of a fix.
+     * Rewind only retained motion; a GNSS sharing a timestamp is applied before that motion.
+     * The provisional replay is rolled back in full if either correction or replay fails.
+     */
+    private fun replayWithGnss(
+        observation: GnssPositionObservation,
+        currentTime: Long,
+    ): PedestrianPositionEstimatorUpdate {
+        val lagMs = currentTime - observation.elapsedRealtimeMs
+        val replayIndex = motionHistory.indexOfFirst {
+            it.observation.elapsedRealtimeMs >= observation.elapsedRealtimeMs
+        }
+        if (
+            lagMs > config.maximumGnssReplayLagMs || replayIndex < 0 ||
+            motionHistory[replayIndex].before.elapsedRealtimeMs >= observation.elapsedRealtimeMs
+        ) {
+            return rejected(GnssHardRejectReason.REPLAY_WINDOW_EXCEEDED)
+                .copy(measurementLagMs = lagMs)
+        }
+        val retainedState = captureState()
+        val retainedHistory = motionHistory.toList()
+        val replay = retainedHistory.drop(replayIndex)
+        restoreState(replay.first().before)
+        val update = applyGnssInOrder(observation)
+        if (update.disposition == GnssObservationDisposition.HARD_REJECTED) {
+            restoreState(retainedState)
+            return rejected(requireNotNull(update.hardRejectReason)).copy(measurementLagMs = lagMs)
+        }
+        lastAcceptedGnssElapsedRealtimeMs = observation.elapsedRealtimeMs
+        motionHistory.clear()
+        for (entry in replay) {
+            // Profile changes have no sensor timestamp. Preserve the dynamics that originally
+            // governed each retained motion interval rather than using the latest profile.
+            activeProcessAccelerationSigmaMps2 = entry.before.processAccelerationSigmaMps2
+            activeAverageWalkingSpeedMps = entry.before.averageWalkingSpeedMps
+            val motionUpdate = when (val motion = entry.observation) {
+                is MotionObservation.Step -> observePdrStep(motion.value)
+                is MotionObservation.Zupt -> observeZupt(motion.value)
+            }
+            if (motionUpdate.disposition == PedestrianMotionUpdateDisposition.HARD_REJECTED) {
+                restoreState(retainedState)
+                motionHistory.clear()
+                motionHistory.addAll(retainedHistory)
+                return rejected(GnssHardRejectReason.NUMERICAL_FAILURE).copy(measurementLagMs = lagMs)
+            }
+        }
+        activeProcessAccelerationSigmaMps2 = retainedState.processAccelerationSigmaMps2
+        activeAverageWalkingSpeedMps = retainedState.averageWalkingSpeedMps
+        return update.copy(
+            estimate = buildEstimate(requireNotNull(state), requireNotNull(covariance), currentTime),
+            estimateAtGnssMeasurement = update.estimate,
+            replayedMotionEventCount = replay.size,
+            measurementLagMs = lagMs,
+        )
+    }
+
+    private fun retainMotion(observation: MotionObservation, before: StateCheckpoint) {
+        motionHistory.add(RetainedMotion(observation, before))
+        val oldestTime = observation.elapsedRealtimeMs - config.maximumGnssReplayLagMs
+        while (
+            motionHistory.size > config.maximumRetainedMotionEvents ||
+            motionHistory.firstOrNull()?.let { it.observation.elapsedRealtimeMs < oldestTime } == true
+        ) {
+            motionHistory.removeAt(0)
+        }
+    }
+
+    private fun captureState() = StateCheckpoint(
+        plane = requireNotNull(tangentPlane),
+        state = requireNotNull(state).copyOf(),
+        covariance = requireNotNull(covariance).copyOf(),
+        elapsedRealtimeMs = requireNotNull(stateElapsedRealtimeMs),
+        lastInformativeGnssElapsedRealtimeMs = lastInformativeGnssElapsedRealtimeMs,
+        lastAcceptedGnssElapsedRealtimeMs = lastAcceptedGnssElapsedRealtimeMs,
+        lastPdrStepElapsedRealtimeMs = lastPdrStepElapsedRealtimeMs,
+        lastZuptElapsedRealtimeMs = lastZuptElapsedRealtimeMs,
+        processAccelerationSigmaMps2 = activeProcessAccelerationSigmaMps2,
+        averageWalkingSpeedMps = activeAverageWalkingSpeedMps,
+    )
+
+    private fun restoreState(checkpoint: StateCheckpoint) {
+        tangentPlane = checkpoint.plane
+        state = checkpoint.state.copyOf()
+        covariance = checkpoint.covariance.copyOf()
+        stateElapsedRealtimeMs = checkpoint.elapsedRealtimeMs
+        lastInformativeGnssElapsedRealtimeMs = checkpoint.lastInformativeGnssElapsedRealtimeMs
+        lastAcceptedGnssElapsedRealtimeMs = checkpoint.lastAcceptedGnssElapsedRealtimeMs
+        lastPdrStepElapsedRealtimeMs = checkpoint.lastPdrStepElapsedRealtimeMs
+        lastZuptElapsedRealtimeMs = checkpoint.lastZuptElapsedRealtimeMs
+        activeProcessAccelerationSigmaMps2 = checkpoint.processAccelerationSigmaMps2
+        activeAverageWalkingSpeedMps = checkpoint.averageWalkingSpeedMps
+    }
+
+    private data class StateCheckpoint(
+        val plane: LocalTangentPlane,
+        val state: DoubleArray,
+        val covariance: DoubleArray,
+        val elapsedRealtimeMs: Long,
+        val lastInformativeGnssElapsedRealtimeMs: Long?,
+        val lastAcceptedGnssElapsedRealtimeMs: Long?,
+        val lastPdrStepElapsedRealtimeMs: Long?,
+        val lastZuptElapsedRealtimeMs: Long?,
+        val processAccelerationSigmaMps2: Double,
+        val averageWalkingSpeedMps: Double,
+    )
+
+    private sealed interface MotionObservation {
+        val elapsedRealtimeMs: Long
+
+        data class Step(val value: PdrStepObservation) : MotionObservation {
+            override val elapsedRealtimeMs: Long get() = value.elapsedRealtimeMs
+        }
+
+        data class Zupt(val value: ZuptObservation) : MotionObservation {
+            override val elapsedRealtimeMs: Long get() = value.elapsedRealtimeMs
+        }
+    }
+
+    private data class RetainedMotion(val observation: MotionObservation, val before: StateCheckpoint)
 
     private fun motionRejected(reason: PedestrianMotionHardRejectReason) =
         PedestrianMotionEstimatorUpdate(

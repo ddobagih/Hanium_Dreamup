@@ -9,6 +9,123 @@ import org.junit.Test
 
 class ObjectTrackerTest {
     @Test
+    fun synchronizedEgoMotionSeparatesWalkingTowardStationaryObstacleFromIncomingObject() {
+        assertEquals(ObjectMotion.USER_APPROACHING_STATIONARY, motionTrack(egoSpeedMps = 1f).second.objectMotion)
+        assertEquals(ObjectMotion.OBJECT_APPROACHING, motionTrack(egoSpeedMps = 0f).second.objectMotion)
+        assertEquals(ObjectMotion.OBJECT_APPROACHING, motionTrack(egoSpeedMps = 0.5f).second.objectMotion)
+    }
+
+    @Test
+    fun relativeClosingWithoutEgoEvidenceNeverClaimsTheObjectIsMovingOrStationary() {
+        val (_, kinematics) = motionTrack(egoSpeedMps = null)
+
+        assertEquals(Trend.APPROACHING, kinematics.trend)
+        assertNotNull(kinematics.timeToCollisionMs)
+        assertEquals(ObjectMotion.UNKNOWN, kinematics.objectMotion)
+    }
+
+    @Test
+    fun sidewaysMovingObjectIsNotCalledStationaryWhenItsAxialSpeedMatchesTheUser() {
+        val depths = listOf(3.25f, 3f, 2.75f, 2.5f)
+        val centers = depths.mapIndexed { index, z -> 0.5f + 0.7f * (0.32f * index * 0.25f) / z }
+        val (_, motion) = motionTrack(1f, intervalMs = 250L, distances = depths, centersX = centers)
+
+        assertEquals(Trend.APPROACHING, motion.trend)
+        assertEquals(ObjectMotion.UNKNOWN, motion.objectMotion)
+    }
+
+    @Test
+    fun motionAttributionRequiresFourUniqueObservationsSpanningAtLeastSixHundredMilliseconds() {
+        val distances = listOf(4f, 3.8f, 3.6f, 3.4f)
+        assertEquals(ObjectMotion.USER_APPROACHING_STATIONARY,
+            motionTrack(1f, distances = distances, timestamps = listOf(0L, 200L, 400L, 600L)).second.objectMotion)
+        assertEquals(ObjectMotion.UNKNOWN,
+            motionTrack(1f, distances = distances, timestamps = listOf(0L, 200L, 400L, 599L)).second.objectMotion)
+        assertEquals(ObjectMotion.UNKNOWN,
+            motionTrack(1f, distances = listOf(4f, 3.7f, 3.4f), timestamps = listOf(0L, 300L, 600L)).second.objectMotion)
+    }
+
+    @Test
+    fun motionClassificationRejectsShortNoisyMixedSourceOrMissingEvidence() {
+        val rejected = listOf(
+            motionTrack(egoSpeedMps = 1f, intervalMs = 100L),
+            motionTrack(egoSpeedMps = 1f, distances = listOf(4f, 3.8f, 3.0f, 2.5f)),
+            motionTrack(egoSpeedMps = Float.NaN),
+            motionTrack(egoSpeedMps = 1f, lastSource = DepthSource.ARCORE_FULL_DEPTH),
+            motionTrack(egoSpeedMps = 1f, poseTransform = { index, pose -> if (index == 3) null else pose }),
+            motionTrack(egoSpeedMps = 1f, centerX = 0.2f),
+            motionTrack(egoSpeedMps = 1f, poseTransform = { index, pose -> pose.copy(referenceId = index.toLong()) }),
+            motionTrack(egoSpeedMps = 1f, poseTransform = { _, pose -> pose.copy(timestampMs = pose.timestampMs + 1L) }),
+            motionTrack(egoSpeedMps = 1f, poseTransform = { index, pose ->
+                if (index == 3) pose.copy(forwardX = 0.6f, forwardZ = -0.8f) else pose
+            }),
+            motionTrack(egoSpeedMps = 1f, poseTransform = { index, pose -> pose.copy(positionX = index.toFloat()) }),
+            motionTrack(egoSpeedMps = 1f, poseTransform = { _, pose -> pose.copy(imageProjection = null) }),
+            motionTrack(egoSpeedMps = 1f, poseTransform = { _, pose ->
+                pose.copy(imageProjection = requireNotNull(pose.imageProjection).copy(fx = 0f))
+            }),
+        )
+
+        rejected.forEach { (_, kinematics) -> assertEquals(ObjectMotion.UNKNOWN, kinematics.objectMotion) }
+    }
+
+    @Test
+    fun repeatedOrOutOfOrderFrozenFramesDoNotCreateMetricMotionHistory() {
+        val tracker = ObjectTracker()
+        val shape = geometry(x = 0.40f, width = 0.20f)
+        val track = tracker.update(listOf(shape), 1_000L).single()
+        tracker.update(listOf(shape), 1_500L)
+        tracker.update(listOf(shape), 2_000L)
+        listOf(2_000L, 2_000L, 1_500L, 2_000L).forEachIndexed { index, at ->
+            tracker.recordDistance(track, 4f - index * 0.5f, DepthSource.ARCORE_RAW_DEPTH, 0.9f, at, pose(at, 1f))
+        }
+
+        assertEquals(1, track.distanceHistory.size)
+        assertEquals(4f, track.distanceHistory.single().distanceM, 0f)
+        assertEquals(Trend.UNKNOWN, tracker.approachKinematics(track, 4f, DepthSource.ARCORE_RAW_DEPTH).trend)
+    }
+
+    private fun motionTrack(
+        egoSpeedMps: Float?,
+        intervalMs: Long = 500L,
+        distances: List<Float> = listOf(4f, 3.5f, 3f, 2.5f),
+        lastSource: DepthSource = DepthSource.ARCORE_RAW_DEPTH,
+        centerX: Float = 0.5f,
+        poseTransform: (Int, CameraPoseEvidence) -> CameraPoseEvidence? = { _, pose -> pose },
+        timestamps: List<Long> = distances.indices.map { it * intervalMs },
+        centersX: List<Float> = distances.indices.map { centerX },
+    ): Pair<TrackState, ApproachKinematics> {
+        val tracker = ObjectTracker()
+        var latest: TrackState? = null
+        distances.forEachIndexed { index, distance ->
+            val at = timestamps[index]
+            val track = tracker.update(listOf(geometry(x = centersX[index] - 0.1f, width = 0.2f)), at).single()
+            val cameraPose = egoSpeedMps?.let { poseTransform(index, pose(at, it)) }
+            tracker.recordDistance(
+                track, distance,
+                if (index == distances.lastIndex) lastSource else DepthSource.ARCORE_RAW_DEPTH,
+                0.9f, at,
+                cameraPose,
+                cameraPose?.objectCenterInAnchor(Point2(centersX[index], 0.5f), distance),
+                depthObservationTimestampNs = 9_000_000_000L + at * 1_000_000L,
+            )
+            latest = track
+        }
+        val track = requireNotNull(latest)
+        return track to tracker.approachKinematics(track, distances.last(), lastSource)
+    }
+
+    private fun pose(at: Long, forwardSpeedMps: Float) = CameraPoseEvidence(
+        referenceId = 1L, timestampMs = at,
+        positionX = 0f, positionY = 0f, positionZ = -forwardSpeedMps * at / 1_000f,
+        forwardX = 0f, forwardY = 0f, forwardZ = -1f,
+        imageProjection = CameraImageProjection(
+            imageWidth = 1_000, imageHeight = 1_000, fx = 700f, fy = 700f, cx = 500f, cy = 500f,
+            rightX = 1f, rightY = 0f, rightZ = 0f, upX = 0f, upY = 1f, upZ = 0f,
+        ),
+    )
+
+    @Test
     fun metricDistanceHistoryProducesApproachSpeedAndTtc() {
         val history = listOf(
             distance(at = 0L, meters = 4.0f),

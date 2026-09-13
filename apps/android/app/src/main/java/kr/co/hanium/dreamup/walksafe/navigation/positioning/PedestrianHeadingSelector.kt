@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.navigation.positioning
 
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.sqrt
 
 enum class PedestrianHeadingSource {
     GPS_COURSE,
@@ -26,6 +28,8 @@ data class PedestrianHeadingInput(
     /** Heading already corrected to true north by the Android integration layer. */
     val magneticTrueHeading: HeadingObservation?,
     val phoneForwardMounted: Boolean,
+    /** Gated chest heading sampled at or immediately before this GPS course measurement. */
+    val magneticTrueHeadingAtGpsCourse: HeadingObservation? = null,
 )
 
 data class SelectedPedestrianHeading(
@@ -33,6 +37,9 @@ data class SelectedPedestrianHeading(
     val source: PedestrianHeadingSource,
     val selectedAtElapsedRealtimeMs: Long,
     val sourceObservationAtElapsedRealtimeMs: Long,
+    val accuracyDegrees: Double? = null,
+    /** Newer chest rotation evidence; the absolute GPS observation timestamp stays unchanged. */
+    val rotationObservationAtElapsedRealtimeMs: Long? = null,
 )
 
 data class PedestrianHeadingSelectorConfig(
@@ -47,6 +54,10 @@ data class PedestrianHeadingSelectorConfig(
     val minimumSourceHoldMs: Long = 1_500L,
     val consecutivePreferredObservationsRequired: Int = 2,
     val headingSmoothingAlpha: Double = 0.35,
+    val turnHeadingSmoothingAlpha: Double = 0.85,
+    val minimumAdaptiveTurnDegrees: Double = 30.0,
+    val maximumGpsTurnBaselineSkewMs: Long = 100L,
+    val maximumGpsTurnTransportMs: Long = 2_000L,
 ) {
     init {
         require(magneticPreferredMaximumSpeedMps >= 0.0)
@@ -60,6 +71,10 @@ data class PedestrianHeadingSelectorConfig(
         require(minimumSourceHoldMs >= 0L)
         require(consecutivePreferredObservationsRequired > 0)
         require(headingSmoothingAlpha > 0.0 && headingSmoothingAlpha <= 1.0)
+        require(turnHeadingSmoothingAlpha > 0.0 && turnHeadingSmoothingAlpha <= 1.0)
+        require(minimumAdaptiveTurnDegrees > 0.0 && minimumAdaptiveTurnDegrees <= 180.0)
+        require(maximumGpsTurnBaselineSkewMs >= 0L)
+        require(maximumGpsTurnTransportMs >= 0L)
     }
 }
 
@@ -78,24 +93,28 @@ class PedestrianHeadingSelector(
     private var pendingSource: PedestrianHeadingSource? = null
     private var pendingObservationCount: Int = 0
     private var pendingLastObservationAtElapsedRealtimeMs: Long? = null
-    private var lastOutputHeadingDegrees: Double? = null
+    private var lastOutput: SelectedPedestrianHeading? = null
+    private var lastSelectionAtElapsedRealtimeMs: Long? = null
 
     fun reset() {
         currentSource = null
         sourceSelectedAtElapsedRealtimeMs = null
         clearPending()
-        lastOutputHeadingDegrees = null
+        lastOutput = null
+        lastSelectionAtElapsedRealtimeMs = null
     }
 
     fun select(input: PedestrianHeadingInput): SelectedPedestrianHeading? {
         val now = input.nowElapsedRealtimeMs
+        if (now < 0L || lastSelectionAtElapsedRealtimeMs?.let { now < it } == true) return null
+        lastSelectionAtElapsedRealtimeMs = now
         val speed = input.speed?.takeIf {
             validAge(now, it.elapsedRealtimeMs, config.maximumSpeedAgeMs) &&
                 it.speedMps.isFinite() && it.speedMps >= 0.0 &&
                 validAccuracy(it.accuracyMps, config.maximumSpeedAccuracyMps)
         } ?: return unavailable(clearPending = true)
 
-        val gps = input.gpsCourse?.takeIf {
+        val gpsObservation = input.gpsCourse?.takeIf {
             validHeading(it, now, config.maximumGpsCourseAgeMs, config.maximumGpsCourseAccuracyDegrees)
         }
         val magnetic = input.magneticTrueHeading?.takeIf {
@@ -107,6 +126,10 @@ class PedestrianHeadingSelector(
                     config.maximumMagneticHeadingAccuracyDegrees,
                 )
         }
+        val gps = gpsObservation?.let { gpsCandidate(it, magnetic, input) }
+        val magneticCandidate = magnetic?.let {
+            HeadingCandidate(it, it.headingDegreesTrueNorth, requireNotNull(it.accuracyDegrees))
+        }
         val preferredSource = when {
             speed.speedMps <= config.magneticPreferredMaximumSpeedMps ->
                 PedestrianHeadingSource.MAGNETIC_TRUE
@@ -114,7 +137,7 @@ class PedestrianHeadingSelector(
                 PedestrianHeadingSource.GPS_COURSE
             else -> currentSource ?: return unavailable(clearPending = true)
         }
-        val preferredObservation = observationFor(preferredSource, gps, magnetic)
+        val preferredObservation = observationFor(preferredSource, gps, magneticCandidate)
         val activeSource = currentSource
 
         if (activeSource == null) {
@@ -125,17 +148,20 @@ class PedestrianHeadingSelector(
 
         if (preferredSource == activeSource) {
             clearPending()
-            val observation = observationFor(activeSource, gps, magnetic)
+            val observation = observationFor(activeSource, gps, magneticCandidate)
                 ?: return unavailable(clearPending = false)
             return output(activeSource, observation, now)
         }
 
         if (preferredObservation != null) {
-            recordPending(preferredSource, preferredObservation.elapsedRealtimeMs)
+            val preferredAtMs = preferredObservation.observation.elapsedRealtimeMs
+            val pendingIsCurrent = pendingSource != preferredSource ||
+                pendingLastObservationAtElapsedRealtimeMs?.let { preferredAtMs >= it } != false
+            if (pendingIsCurrent) recordPending(preferredSource, preferredAtMs)
             val heldLongEnough = now - requireNotNull(sourceSelectedAtElapsedRealtimeMs) >=
                 config.minimumSourceHoldMs
             if (
-                heldLongEnough &&
+                pendingIsCurrent && heldLongEnough &&
                 pendingObservationCount >= config.consecutivePreferredObservationsRequired
             ) {
                 commitSource(preferredSource, now)
@@ -145,7 +171,7 @@ class PedestrianHeadingSelector(
             clearPending()
         }
 
-        val activeObservation = observationFor(activeSource, gps, magnetic)
+        val activeObservation = observationFor(activeSource, gps, magneticCandidate)
             ?: return unavailable(clearPending = false)
         return output(activeSource, activeObservation, now)
     }
@@ -176,33 +202,108 @@ class PedestrianHeadingSelector(
 
     private fun output(
         source: PedestrianHeadingSource,
-        observation: HeadingObservation,
+        candidate: HeadingCandidate,
         now: Long,
-    ): SelectedPedestrianHeading {
-        val normalized = normalizeDegrees(observation.headingDegreesTrueNorth)
-        val heading = lastOutputHeadingDegrees?.let {
-            circularBlendDegrees(it, normalized, config.headingSmoothingAlpha)
-        } ?: normalized
-        lastOutputHeadingDegrees = heading
+    ): SelectedPedestrianHeading? {
+        val observation = candidate.observation
+        val previous = lastOutput?.takeIf { it.source == source }
+        if (previous != null) {
+            if (observation.elapsedRealtimeMs < previous.sourceObservationAtElapsedRealtimeMs) return null
+            val previousRotationAt = previous.rotationObservationAtElapsedRealtimeMs
+            val rotationAt = candidate.rotationAtMs
+            if (previousRotationAt != null && rotationAt != null && rotationAt < previousRotationAt) return null
+            if (
+                observation.elapsedRealtimeMs == previous.sourceObservationAtElapsedRealtimeMs &&
+                rotationAt == previousRotationAt
+            ) return previous.copy(selectedAtElapsedRealtimeMs = now)
+        }
+        val normalized = normalizeDegrees(candidate.headingDegrees)
+        val currentEvidenceAt = candidate.rotationAtMs ?: observation.elapsedRealtimeMs
+        val previousEvidenceAt = previous?.rotationObservationAtElapsedRealtimeMs
+            ?: previous?.sourceObservationAtElapsedRealtimeMs
+        val maximumGapMs = if (source == PedestrianHeadingSource.GPS_COURSE) {
+            config.maximumGpsCourseAgeMs
+        } else {
+            config.maximumMagneticHeadingAgeMs
+        }
+        val sameCorrectionMode = (candidate.rotationAtMs != null) ==
+            (previous?.rotationObservationAtElapsedRealtimeMs != null)
+        val heading = if (
+            previous != null && previousEvidenceAt != null && sameCorrectionMode &&
+            currentEvidenceAt - previousEvidenceAt in 0L..maximumGapMs
+        ) {
+            val delta = abs(shortestDeltaDegrees(previous.headingDegreesTrueNorth, normalized))
+            val significantTurn = delta >= max(
+                config.minimumAdaptiveTurnDegrees,
+                2.0 * candidate.accuracyDegrees,
+            )
+            val alpha = if (significantTurn) {
+                max(config.headingSmoothingAlpha, config.turnHeadingSmoothingAlpha)
+            } else {
+                config.headingSmoothingAlpha
+            }
+            circularBlendDegrees(previous.headingDegreesTrueNorth, normalized, alpha)
+        } else {
+            normalized
+        }
         return SelectedPedestrianHeading(
             headingDegreesTrueNorth = heading,
             source = source,
             selectedAtElapsedRealtimeMs = now,
             sourceObservationAtElapsedRealtimeMs = observation.elapsedRealtimeMs,
+            accuracyDegrees = candidate.accuracyDegrees,
+            rotationObservationAtElapsedRealtimeMs = candidate.rotationAtMs,
+        ).also { lastOutput = it }
+    }
+
+    /** Transport a still-fresh absolute GPS course using a bounded pair of gated chest headings. */
+    private fun gpsCandidate(
+        gps: HeadingObservation,
+        magnetic: HeadingObservation?,
+        input: PedestrianHeadingInput,
+    ): HeadingCandidate {
+        val raw = HeadingCandidate(gps, gps.headingDegreesTrueNorth, requireNotNull(gps.accuracyDegrees))
+        if (!input.phoneForwardMounted || magnetic == null) return raw
+        val baseline = input.magneticTrueHeadingAtGpsCourse?.takeIf {
+            validHeading(
+                it,
+                gps.elapsedRealtimeMs,
+                config.maximumGpsTurnBaselineSkewMs,
+                config.maximumMagneticHeadingAccuracyDegrees,
+            )
+        } ?: return raw
+        if (
+            magnetic.elapsedRealtimeMs < gps.elapsedRealtimeMs ||
+            magnetic.elapsedRealtimeMs - baseline.elapsedRealtimeMs !in 0L..config.maximumGpsTurnTransportMs
+        ) return raw
+        val accuracy = sqrt(
+            raw.accuracyDegrees * raw.accuracyDegrees +
+                requireNotNull(baseline.accuracyDegrees).let { it * it } +
+                requireNotNull(magnetic.accuracyDegrees).let { it * it },
         )
+        if (accuracy > config.maximumGpsCourseAccuracyDegrees) return raw
+        val delta = shortestDeltaDegrees(baseline.headingDegreesTrueNorth, magnetic.headingDegreesTrueNorth)
+        return HeadingCandidate(gps, gps.headingDegreesTrueNorth + delta, accuracy, magnetic.elapsedRealtimeMs)
     }
 
     private fun unavailable(clearPending: Boolean): SelectedPedestrianHeading? {
         if (clearPending) clearPending()
-        lastOutputHeadingDegrees = null
+        // Missing evidence produces no heading, but cannot make a reused sample smooth twice.
         return null
     }
 
+    private data class HeadingCandidate(
+        val observation: HeadingObservation,
+        val headingDegrees: Double,
+        val accuracyDegrees: Double,
+        val rotationAtMs: Long? = null,
+    )
+
     private fun observationFor(
         source: PedestrianHeadingSource,
-        gps: HeadingObservation?,
-        magnetic: HeadingObservation?,
-    ): HeadingObservation? = when (source) {
+        gps: HeadingCandidate?,
+        magnetic: HeadingCandidate?,
+    ): HeadingCandidate? = when (source) {
         PedestrianHeadingSource.GPS_COURSE -> gps
         PedestrianHeadingSource.MAGNETIC_TRUE -> magnetic
     }
@@ -229,12 +330,14 @@ class PedestrianHeadingSelector(
     }
 
     private fun circularBlendDegrees(from: Double, to: Double, alpha: Double): Double {
-        val delta = ((to - from + HALF_CIRCLE_DEGREES) % FULL_CIRCLE_DEGREES +
-            FULL_CIRCLE_DEGREES) % FULL_CIRCLE_DEGREES - HALF_CIRCLE_DEGREES
-        return normalizeDegrees(from + delta * alpha).let {
+        return normalizeDegrees(from + shortestDeltaDegrees(from, to) * alpha).let {
             if (abs(it - FULL_CIRCLE_DEGREES) < DEGREES_EPSILON) 0.0 else it
         }
     }
+
+    private fun shortestDeltaDegrees(from: Double, to: Double): Double =
+        ((normalizeDegrees(to) - normalizeDegrees(from) + HALF_CIRCLE_DEGREES) % FULL_CIRCLE_DEGREES +
+            FULL_CIRCLE_DEGREES) % FULL_CIRCLE_DEGREES - HALF_CIRCLE_DEGREES
 
     private companion object {
         const val FULL_CIRCLE_DEGREES = 360.0

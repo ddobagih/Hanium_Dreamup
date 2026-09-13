@@ -58,7 +58,7 @@ class PriorityUserOnboardingPolicyTest {
     }
 
     @Test
-    fun matchingAttemptCompletesOnlyAfterBothTerminalSignalsInEitherOrder() {
+    fun matchingHazardAttemptNeedsBothTerminalSignalsInEitherOrderAndThenAUserResponse() {
         val speechFirst = readyForPractice()
         val firstToken = speechFirst.beginPractice(PriorityUserPractice.HAZARD_ALERT)!!
         speechFirst.recordPracticeDelivery(
@@ -80,6 +80,11 @@ class PriorityUserOnboardingPolicyTest {
             secondToken,
             PriorityUserPracticeDeliverySignal.SPEECH_PLAYBACK_COMPLETED,
         )
+
+        assertTrue(speechFirst.snapshot().completedPractices.isEmpty())
+        assertTrue(vibrationFirst.snapshot().completedPractices.isEmpty())
+        speechFirst.confirmHazardResponse(firstToken)
+        vibrationFirst.confirmHazardResponse(secondToken)
 
         assertEquals(
             setOf(PriorityUserPractice.HAZARD_ALERT),
@@ -111,6 +116,9 @@ class PriorityUserOnboardingPolicyTest {
             current,
             PriorityUserPracticeDeliverySignal.VIBRATION_REQUEST_WINDOW_ELAPSED,
         )
+        policy.confirmHazardResponse(stale)
+        assertTrue(policy.snapshot().completedPractices.isEmpty())
+        policy.confirmHazardResponse(current)
         assertEquals(
             setOf(PriorityUserPractice.HAZARD_ALERT),
             policy.snapshot().completedPractices,
@@ -333,7 +341,7 @@ class PriorityUserOnboardingPolicyTest {
     }
 
     @Test
-    fun usageRequiresAcknowledgmentTerminalPlaybackAndSeparateAcceptance() {
+    fun usageRequiresAcknowledgmentTerminalPlaybackInteractivePracticeAndSeparateAcceptance() {
         val policy = safetyConsentPolicy()
         policy.acknowledgeUsageConditions()
         policy.acceptAppUsageEducation()
@@ -341,6 +349,10 @@ class PriorityUserOnboardingPolicyTest {
         val token = policy.beginAppUsageEducationPlayback()!!
         assertFalse(policy.snapshot().appUsageReviewed)
         policy.finishAppUsageEducationPlayback(token, completed = true)
+        assertFalse(policy.snapshot().nativeEducationComplete)
+        policy.acceptAppUsageEducation()
+        assertFalse(policy.snapshot().appUsageAccepted)
+        completeAllPractices(policy)
         assertFalse(policy.snapshot().nativeEducationComplete)
         policy.acceptAppUsageEducation()
 
@@ -366,6 +378,7 @@ class PriorityUserOnboardingPolicyTest {
     fun failedCancelledAndStaleUsageCallbacksCannotCompleteAndRetryCan() {
         val policy = safetyConsentPolicy()
         policy.acknowledgeUsageConditions()
+        completeAllPractices(policy)
         val failed = policy.beginAppUsageEducationPlayback()!!
         policy.finishAppUsageEducationPlayback(failed, completed = false)
         val cancelled = policy.beginAppUsageEducationPlayback()!!
@@ -391,12 +404,13 @@ class PriorityUserOnboardingPolicyTest {
         restored.finishAppUsageEducationPlayback(old, completed = true)
         assertFalse(restored.snapshot().appUsageReviewed)
         restored.finishAppUsageEducationPlayback(current, completed = true)
+        completeAllPractices(restored)
         restored.acceptAppUsageEducation()
 
         val relogged = PriorityUserOnboardingPolicy(restored.snapshot())
         assertTrue(relogged.snapshot().nativeEducationComplete)
         assertEquals(PriorityUserNativeEducationStep.COMPLETE, relogged.snapshot().nativeEducationStep)
-        assertEquals(WalkSessionState.ACTIVE, relogged.practiceLifecycleSnapshot().state)
+        assertEquals(WalkSessionState.SAFE_STOP, relogged.practiceLifecycleSnapshot().state)
     }
 
     @Test
@@ -404,6 +418,7 @@ class PriorityUserOnboardingPolicyTest {
         val policy = safetyConsentPolicy()
         policy.acknowledgeUsageConditions()
         policy.finishAppUsageEducationPlayback(policy.beginAppUsageEducationPlayback()!!, completed = true)
+        completeAllPractices(policy)
         policy.acceptAppUsageEducation()
         val replay = policy.beginAppUsageEducationPlayback()!!
         policy.finishAppUsageEducationPlayback(replay, completed = false)
@@ -496,8 +511,13 @@ class PriorityUserOnboardingPolicyTest {
     }
 
     private fun completedPolicy() = readyForPractice().apply {
+        completeAllPractices(this)
+    }
+
+    private fun completeAllPractices(policy: PriorityUserOnboardingPolicy) {
+        policy.confirmSafePracticePlace()
         PriorityUserPractice.entries.forEach { practice ->
-            completePractice(this, practice)
+            completePractice(policy, practice)
         }
     }
 
@@ -515,5 +535,6 @@ class PriorityUserOnboardingPolicyTest {
         PriorityUserPracticeDeliverySignal.entries.forEach { signal ->
             policy.recordPracticeDelivery(token, signal)
         }
+        policy.confirmHazardResponse(token)
     }
 }

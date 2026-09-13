@@ -14,6 +14,29 @@ Android 사용자 앱과 별도 Android 관리자 앱에 FastAPI 및 PostgreSQL/
 - `POST /account-enrollments/email-otp`, `POST /accounts`, `POST /accounts/authenticate`는 Gateway 전용 일반 테스트 이메일 가입·로그인 경로다. 이메일 OTP는 휴대전화 본인확인이나 정식 연령 증명을 대체하지 않는다. 생년월일은 만 14세 경계 판정에만 사용하고 저장하지 않으며, ASCII 이메일만 받아 domain을 소문자로 canonicalize한 뒤 AES-GCM 암호문과 별도 keyed lookup HMAC으로만 저장한다. 인증은 계정 존재 여부와 무관하게 PostgreSQL 전역·lookup-HMAC별 입장 제한을 먼저 적용하고, 프로세스별 scrypt 동시 실행 상한이 차면 no-store 503으로 닫는다. 제한은 429, 저장소 장애는 503이며 둘 다 민감정보를 반환하지 않는다. OTP의 IP 제한은 Gateway가 신뢰 프록시에서 검증해 새로 설정한 canonical 단일 `X-WalkSafe-Client-IP`만 사용하고, 헤더가 없으면 Backend peer IP를 사용한다. 원래 클라이언트가 보낸 동명 헤더는 전달하지 않는다.
 - 사용자 계정의 `auth_epoch`는 현재 생성 시 1인 Backend 정본이다. 비밀번호 변경·계정 잠금 기능을 추가할 때는 같은 transaction에서 epoch를 증가시키고 Gateway가 기존 세션을 재검증하도록 별도 계약을 추가해야 한다.
 
+## 회원가입 인증 메일 발송
+
+실제 이메일 주소로 인증번호를 보내려면 Backend 실행 환경의 `WALKSAFE_ACCOUNT_SMTP_HOST`, `WALKSAFE_ACCOUNT_SMTP_PORT`, `WALKSAFE_ACCOUNT_SMTP_SECURITY`, `WALKSAFE_ACCOUNT_SMTP_FROM`을 발신 서비스 값으로 설정한다. 인증을 요구하는 서비스는 `WALKSAFE_ACCOUNT_SMTP_USERNAME`과 `WALKSAFE_ACCOUNT_SMTP_PASSWORD`도 함께 설정한다. 발신 주소는 서비스에서 발송 권한을 확인한 주소를 사용하고, SMTP 전용 비밀번호나 자격 증명은 저장소·Android 앱에 넣지 않는다. 환경 변수 예시는 [개발 설정](.env.example)과 [Backend 배포 설정](../deploy/config/walksafe-backend.env.example)에 있다.
+
+암호화 방식은 서비스가 안내한 조합을 사용한다. 보통 `465`는 `implicit_tls`, `587`은 `starttls`이며 인증서 검증을 끄거나 평문 SMTP로 전환하지 않는다. 계정 이메일 암호화·lookup HMAC·OTP HMAC 키는 기존 DB와 결속되므로 SMTP 전환 때 교체하지 않는다. 환경 변수는 프로세스 시작 때 읽으므로 실행 중인 Backend에는 재기동 이후 반영된다.
+
+Mailpit은 로컬 수집용이다. 외부 SMTP relay를 별도로 설정하지 않은 Mailpit에 연결하면 앱의 요청이 성공해도 실제 수신함에는 도착하지 않는다. 새 OTP 요청의 `202`는 SMTP 서버 수락과 OTP 활성화를 의미하며, 수신함 도착까지 보장하지 않는다. `/ready`는 실제 메일을 보내지 않는다. 개발·테스트 환경에서는 계정 SMTP 설정을 선택사항으로 취급하며, 배포 환경의 SMTP 항목도 설정 존재 여부만 확인한다.
+
+SMTP 오류는 OTP를 사용할 수 없게 만들고 `503 account_enrollment_unavailable`을 반환한다. 재요청은 `Retry-After`와 재전송 대기시간을 따른다. 실제 수신 검증은 지정한 시험용 이메일로 앱에서 인증번호를 요청하고, 수신한 번호로 가입까지 완료해 확인한다. 서버 로그에는 이메일 주소·인증번호·SMTP 비밀번호를 남기지 않는다.
+
+로컬 개발 서버가 NUL 구분 `runtime.env0` 파일을 사용하면 [`configure_walksafe_account_smtp.py`](../scripts/configure_walksafe_account_smtp.py)로 SMTP 값 6개만 갱신할 수 있다. 이 파일은 일반 `.env` 문법이 아니므로 `source`하거나 줄 단위로 덮어쓰지 않는다. 기존 파일은 저장소 밖의 사용자 소유 `0600` 파일이어야 한다. 도구는 다른 모든 환경값과 기존 계정 키를 보존하고, 같은 비공개 폴더에 `0600` 원본 백업을 만든 뒤 원자적으로 교체한다. 로컬 터미널에서 가려진 입력만 받으며 네트워크 접속·메일 발송·서버 재시작은 하지 않는다. `--dry-run`을 붙이면 입력 형식만 확인하고 파일을 바꾸지 않는다.
+
+갱신 구간은 대상 파일 옆의 고정된 `<파일명>.smtp.lock`에 배타잠금을 걸고, 잠금 후 원본을 다시 확인한다. 동시에 실행한 이 도구끼리는 갱신을 겹쳐 수행하지 않으며 잠금 파일은 삭제하지 않는다. 이 잠금을 사용하지 않는 다른 편집기나 프로세스의 동시 쓰기까지 원자적 비교·교체로 보호하는 것은 아니므로 설정하는 동안 해당 파일을 다른 방식으로 편집하지 않는다.
+
+```bash
+python3 scripts/configure_walksafe_account_smtp.py \
+  --env0 /absolute/private/path/runtime.env0 --preset kakao
+```
+
+Kakao 사용자는 [공식 서버 설정 안내](https://www.dktechin.com/inquiry/1721?service=131&tag=136&tab=143)에 따라 카카오메일의 `설정 > IMAP/POP3`에서 사용을 켠다. [공식 외부 메일 연동 안내](https://www.dktechin.com/inquiry/1715?service=131&tag=136&tab=143)는 `smtp.kakao.com`, `465`, SSL과 별도 앱 비밀번호를 요구한다. 카카오톡의 `설정 > 카카오계정 > 2단계 인증 > 앱 비밀번호` 또는 카카오계정 웹의 `계정 보안 > 2단계 인증 > 앱 비밀번호`에서 전용 비밀번호를 발급하고, 도구의 비밀번호 입력란에 입력한다. 일반 계정 비밀번호를 사용하지 않는다.
+
+`--preset kakao`는 위 서버·TLS 값을 채운다. 발신 주소와 SMTP ID를 입력하되, ID에서 Enter를 누르면 발신 주소의 `@` 앞부분을 사용한다. 공식 도움말은 ID를 '카카오메일 아이디'로 표기하므로 메일 설정 화면에 안내된 값이 다르면 그 값을 직접 입력한다. 선택적으로 `--identity-file /absolute/private/path/kakao-sender.txt`를 지정하면 저장소 밖의 사용자 소유 `0600` 파일에서 한 줄 발신 주소를 읽는다. 이 파일에는 앱 비밀번호를 넣지 않는다. 저장 후 담당자가 Backend를 재시작하고, 사용자가 앱에서 직접 수신 및 가입을 확인한다. 설정 도구의 성공은 발신 서비스 인증이나 실제 수신 성공을 뜻하지 않는다.
+
 ## 관리자 보안 초기 등록과 복구
 
 마이그레이션 후 신뢰할 수 있는 로컬 관리 절차에서 `backend.app.services.admin_security.provision_admin_security`를 한 번 호출해 관리자 비밀번호, TOTP seed, 생성된 고엔트로피 복구코드(각 24자 이상), 별도 issuer key를 함께 등록한다. PostgreSQL provisioning은 일반 runtime 역할이 아닌 DB owner 절차여야 하며 control과 issuer key SHA-256 지문을 같은 transaction에서 결속한다. `admin_security_controls.singleton_scope`의 check·unique 제약은 전체 데이터베이스를 최대 한 행으로 제한하고, provisioning과 보호 작업은 정확히 한 행이 아니면 fail-closed 한다. 이전 migration은 여러 행을 허용했으므로 upgrade 전에 기존 행 수가 0 또는 1인지 확인하고, 여러 행이면 운영자가 먼저 정리해야 한다. 데이터베이스에는 scrypt 인코딩 또는 SHA-256 지문만 남고 평문 비밀번호·TOTP·복구코드·세션 토큰·issuer key는 저장하지 않는다.

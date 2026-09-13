@@ -1,11 +1,64 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.navigation.UserMotionEstimate
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.HeadingObservation
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.WalkingSpeedObservation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ObjectDepthRuntimePipelineTest {
+    @Test
+    fun synchronizedDepthPublishesWorldAndRelativeMotionWithoutMixingGpsAndArClocks() {
+        val userMotion = UserMotionEstimate(
+            speed = WalkingSpeedObservation(1.0, 0.1, 90_000L),
+            course = HeadingObservation(90.0, 10.0, 90_000L),
+            phoneHeading = HeadingObservation(180.0, 10.0, 90_000L),
+        )
+        listOf(255, 0).forEach { rawConfidence ->
+            val pipeline = ObjectDepthRuntimePipeline()
+            val outputs = (0..3).map { index ->
+                val atMs = 1_000L + index * 500L
+                val frameNs = atMs * 1_000_000L
+                val cameraNs = frameNs + 400_000L
+                val depthMm = 4_000 - index * 500
+                pipeline.process(
+                    snapshot = snapshot(depthMm, rawConfidence, depthMm).copy(
+                        frameTimestampNs = frameNs,
+                        rawDepthTimestampNs = cameraNs,
+                        fullDepthTimestampNs = cameraNs,
+                        cameraImageTimestampNs = cameraNs,
+                        cameraPoseEvidence = CameraPoseEvidence(
+                            referenceId = 7L, timestampMs = atMs,
+                            positionX = 0f, positionY = 0f, positionZ = -index * 0.5f,
+                            forwardX = 0f, forwardY = 0f, forwardZ = -1f,
+                            imageProjection = CameraImageProjection(
+                                1_000, 1_000, 700f, 700f, 500f, 500f,
+                                1f, 0f, 0f, 0f, 1f, 0f,
+                            ),
+                        ),
+                    ),
+                    frameId = frameNs,
+                    timestampMs = atMs,
+                    detections = listOf(DetectionCandidate("person", 0.9f, RectNorm(0.35f, 0.35f, 0.30f, 0.30f))),
+                    motionContext = MotionContext(userMotion = userMotion),
+                ).single()
+            }
+            assertNull(outputs.first().motionEstimate.objectSpeedMps)
+            val result = outputs.last()
+            assertEquals(userMotion, result.userMotion)
+            assertEquals(2_500L, result.motionEstimate.observedAtMs)
+            assertEquals(7L, result.motionEstimate.referenceId)
+            assertEquals(ObjectMovementDirection.STATIONARY, result.motionEstimate.direction)
+            assertEquals(0f, result.motionEstimate.objectSpeedMps!!, 0.001f)
+            assertEquals(1f, result.motionEstimate.relativeClosingSpeedMps!!, 0.001f)
+            assertEquals(ObjectMotion.USER_APPROACHING_STATIONARY, result.objectMotion)
+            assertEquals(1f, result.approachSpeedMps!!, 0.001f)
+            assertEquals(2_500L, result.timeToCollisionMs)
+        }
+    }
+
     @Test
     fun defaultPipelineDoesNotEmitDebugObjectsWithoutDetector() {
         val pipeline = ObjectDepthRuntimePipeline()
@@ -56,6 +109,133 @@ class ObjectDepthRuntimePipelineTest {
 
         assertEquals(DepthSource.ARCORE_FULL_DEPTH, output.source)
         assertEquals(1.8f, output.depthMedianM!!, 0.01f)
+    }
+
+    @Test
+    fun fullDepthFromAnotherCaptureCannotCreateCurrentDistanceOrMotionHistory() {
+        val frameTimestamp = 1_000_000_000L
+        val cameraTimestamp = frameTimestamp + 400_000L
+        listOf(null, 0L, frameTimestamp, cameraTimestamp - 1L, cameraTimestamp + 1L).forEach { fullTimestamp ->
+            val tracker = ObjectTracker()
+            val pipeline = ObjectDepthRuntimePipeline(
+                detectionProvider = onePersonProvider(),
+                tracker = tracker,
+            )
+            val snapshot = snapshot(rawMm = 1_200, rawConfidence = 0, fullMm = 1_800).copy(
+                frameTimestampNs = frameTimestamp,
+                fullDepthTimestampNs = fullTimestamp,
+                cameraImageTimestampNs = cameraTimestamp,
+            )
+
+            val output = pipeline.process(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
+
+            assertEquals(DepthSource.POLYGON_TREND_PSEUDO_DEPTH, output.source)
+            assertNull(output.riskDistanceM)
+            assertNull(output.userFacing.stepsAhead)
+            assertEquals(ObjectMotion.UNKNOWN, output.objectMotion)
+            assertTrue(tracker.activeTracks().single().distanceHistory.isEmpty())
+        }
+    }
+
+    @Test
+    fun currentRawDepthRemainsUsableWhenFullDepthComesFromAnOlderCapture() {
+        val pipeline = ObjectDepthRuntimePipeline(detectionProvider = onePersonProvider())
+        val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 1_800).copy(
+            frameTimestampNs = 1_000_000_000L,
+            rawDepthTimestampNs = 1_000_400_000L,
+            fullDepthTimestampNs = 1_000_399_999L,
+            cameraImageTimestampNs = 1_000_400_000L,
+        )
+
+        val output = pipeline.process(snapshot, frameId = 1_000_000_000L, timestampMs = 1_000L).single()
+
+        assertEquals(DepthSource.ARCORE_RAW_DEPTH, output.source)
+        assertEquals(1.2f, output.riskDistanceM!!, 0.01f)
+    }
+
+    @Test
+    fun rawDepthWithAnUnknownOrDifferentTimestampCannotAcquireCurrentCameraPose() {
+        val frameTimestamp = 1_000_000_000L
+        val cameraTimestamp = frameTimestamp + 400_000L
+        listOf(null, 0L, frameTimestamp, cameraTimestamp - 1L, cameraTimestamp + 1L).forEach { rawTimestamp ->
+            val tracker = ObjectTracker()
+            val pipeline = ObjectDepthRuntimePipeline(detectionProvider = onePersonProvider(), tracker = tracker)
+            val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 1_800).copy(
+                frameTimestampNs = frameTimestamp,
+                rawDepthTimestampNs = rawTimestamp,
+                cameraPoseEvidence = CameraPoseEvidence(1L, 1_000L, 0f, 0f, 0f, 0f, 0f, -1f),
+                cameraImageTimestampNs = cameraTimestamp,
+            )
+
+            val output = pipeline.process(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
+
+            assertEquals(DepthSource.ARCORE_RAW_DEPTH, output.source)
+            assertEquals(ObjectMotion.UNKNOWN, output.objectMotion)
+            assertNull(tracker.activeTracks().single().distanceHistory.single().cameraPoseEvidence)
+        }
+    }
+
+    @Test
+    fun cameraAlignedRawAndFullDepthRetainPoseAndObservationTimeFromTheArFrame() {
+        val frameTimestamp = 1_000_900_000L
+        val cameraTimestamp = 1_001_300_000L
+        val pose = CameraPoseEvidence(1L, 1_000L, 0f, 0f, 0f, 0f, 0f, -1f)
+        listOf(255, 0).forEach { rawConfidence ->
+            val tracker = ObjectTracker()
+            val pipeline = ObjectDepthRuntimePipeline(detectionProvider = onePersonProvider(), tracker = tracker)
+            val snapshot = snapshot(rawMm = 1_200, rawConfidence = rawConfidence, fullMm = 1_800).copy(
+                frameTimestampNs = frameTimestamp,
+                rawDepthTimestampNs = cameraTimestamp,
+                fullDepthTimestampNs = cameraTimestamp,
+                cameraPoseEvidence = pose,
+                cameraImageTimestampNs = cameraTimestamp,
+            )
+
+            val output = pipeline.process(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
+
+            assertEquals(
+                if (rawConfidence == 255) DepthSource.ARCORE_RAW_DEPTH else DepthSource.ARCORE_FULL_DEPTH,
+                output.source,
+            )
+            assertEquals(if (rawConfidence == 255) 1.2f else 1.8f, output.riskDistanceM!!, 0.01f)
+            val observation = tracker.activeTracks().single().distanceHistory.single()
+            assertEquals(pose, observation.cameraPoseEvidence)
+            assertEquals(1_000L, observation.timestampMs)
+            assertEquals(frameTimestamp, snapshot.frameTimestampNs)
+        }
+    }
+
+    @Test
+    fun missingOrZeroCameraTimestampCannotQualifyFullDepthOrAttachPoseToRawDepth() {
+        val frameTimestamp = 1_000_000_000L
+        listOf(null, 0L).forEach { cameraTimestamp ->
+            listOf(255, 0).forEach { rawConfidence ->
+                val tracker = ObjectTracker()
+                val pipeline = ObjectDepthRuntimePipeline(detectionProvider = onePersonProvider(), tracker = tracker)
+                val snapshot = snapshot(rawMm = 1_200, rawConfidence = rawConfidence, fullMm = 1_800).copy(
+                    frameTimestampNs = frameTimestamp,
+                    rawDepthTimestampNs = frameTimestamp,
+                    fullDepthTimestampNs = frameTimestamp,
+                    cameraPoseEvidence = CameraPoseEvidence(1L, 1_000L, 0f, 0f, 0f, 0f, 0f, -1f),
+                    cameraImageTimestampNs = cameraTimestamp,
+                )
+
+                val output = pipeline.process(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
+
+                assertEquals(ObjectMotion.UNKNOWN, output.objectMotion)
+                val history = tracker.activeTracks().single().distanceHistory
+                if (rawConfidence == 255) {
+                    assertEquals(DepthSource.ARCORE_RAW_DEPTH, output.source)
+                    assertEquals(1.2f, output.riskDistanceM!!, 0.01f)
+                    assertNull(history.single().cameraPoseEvidence)
+                } else {
+                    assertEquals(DepthSource.POLYGON_TREND_PSEUDO_DEPTH, output.source)
+                    assertNull(output.riskDistanceM)
+                    assertNull(output.userFacing.stepsAhead)
+                    assertTrue(history.isEmpty())
+                }
+            }
+        }
     }
 
     @Test
@@ -242,6 +422,9 @@ class ObjectDepthRuntimePipelineTest {
             rawDepth = depthImage(rawMm),
             rawConfidence = ConfidenceImage8(40, 40, ByteArray(40 * 40) { rawConfidence.toByte() }),
             fullDepth = depthImage(fullMm),
+            rawDepthTimestampNs = 1L,
+            fullDepthTimestampNs = 1L,
+            cameraImageTimestampNs = 1L,
         )
     }
 

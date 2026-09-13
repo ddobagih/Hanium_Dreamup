@@ -6,6 +6,26 @@ import org.junit.Test
 /** Exercises the production callback owner and wait decision, not Android TTS or Activity lifecycle. */
 class CommandSpeechReadinessTest {
     @Test
+    fun currentRequestCanDispatchAfterAFullEngineInitializationRetry() {
+        val registry = UtteranceCallbackRegistry()
+        registry.registerLatest("response", {}, {})
+        val deadline = AndroidFeedbackActuator.INITIALIZATION_READINESS_TIMEOUT_MS
+
+        assertEquals(
+            CommandSpeechReadiness.WAITING,
+            registry.commandSpeechReadiness("response", true, true, 20_000L, deadline),
+        )
+        assertEquals(
+            CommandSpeechReadiness.DISPATCH,
+            registry.commandSpeechReadiness("response", true, false, 20_250L, deadline),
+        )
+        assertEquals(
+            CommandSpeechReadiness.TIMED_OUT,
+            registry.commandSpeechReadiness("response", true, true, deadline, deadline),
+        )
+    }
+
+    @Test
     fun coldStartWaitsUntilInitializationFinishesWithoutClaimingCompletion() {
         val registry = UtteranceCallbackRegistry()
         var completed = 0

@@ -34,7 +34,12 @@ object SafeRinexFileExtractor {
     private const val RATIO_SLACK_BYTES = 1024L * 1024L
     private const val Z_MEMORY_LIMIT_KIB = 64 * 1024
 
-    fun extract(source: File, sourceName: String, stagingDirectory: File, outputIndex: Int = 0): ExtractedEntry {
+    fun extract(
+        source: File, sourceName: String, stagingDirectory: File, outputIndex: Int = 0,
+        cancellation: AnalysisCancellation? = null, maxOutputBytes: Long = MAX_OUTPUT_BYTES,
+    ): ExtractedEntry {
+        require(maxOutputBytes in 1..MAX_OUTPUT_BYTES)
+        cancellation?.throwIfCancelled()
         require(source.isFile && source.length() > 0L) { "빈 RINEX 원본 파일입니다." }
         if (!stagingDirectory.exists() && !stagingDirectory.mkdirs()) {
             throw IllegalArgumentException("RINEX 압축 해제 폴더를 만들 수 없습니다.")
@@ -64,12 +69,13 @@ object SafeRinexFileExtractor {
                 source.length() * MAX_COMPRESSION_RATIO + RATIO_SLACK_BYTES
             },
         )
-        val limit = min(MAX_OUTPUT_BYTES, ratioLimit)
+        val limit = min(maxOutputBytes, ratioLimit)
         try {
             openDecoded(source, format).use { input ->
                 FileOutputStream(part).use { target ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                     while (true) {
+                        cancellation?.throwIfCancelled()
                         val read = input.read(buffer)
                         if (read < 0) break
                         count += read
@@ -131,7 +137,12 @@ object SafeZipExtractor {
     private const val MAX_COMPRESSION_RATIO = 200L
     private const val RATIO_SLACK_BYTES = 1024L * 1024L
 
-    fun extract(archive: File, stagingDirectory: File): List<ExtractedEntry> {
+    fun extract(
+        archive: File, stagingDirectory: File, cancellation: AnalysisCancellation? = null,
+        maxTotalBytes: Long = MAX_TOTAL_BYTES,
+    ): List<ExtractedEntry> {
+        require(maxTotalBytes in 1..MAX_TOTAL_BYTES)
+        cancellation?.throwIfCancelled()
         require(archive.isFile && archive.length() > 0L) { "빈 ZIP 파일입니다." }
         if (stagingDirectory.exists() || !stagingDirectory.mkdirs()) {
             throw IllegalArgumentException("새 압축 해제 폴더가 필요합니다.")
@@ -144,6 +155,7 @@ object SafeZipExtractor {
         try {
             ZipInputStream(FileInputStream(archive)).use { zip ->
                 while (true) {
+                    cancellation?.throwIfCancelled()
                     val entry = zip.nextEntry ?: break
                     entryCount++
                     if (entryCount > MAX_ENTRIES) throw IllegalArgumentException("ZIP 항목이 너무 많습니다.")
@@ -156,11 +168,12 @@ object SafeZipExtractor {
                     FileOutputStream(packedFile).use { output ->
                         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                         while (true) {
+                            cancellation?.throwIfCancelled()
                             val read = zip.read(buffer)
                             if (read < 0) break
                             entryBytes += read
                             packedTotal += read
-                            if (entryBytes > MAX_ENTRY_BYTES || packedTotal > MAX_TOTAL_BYTES) {
+                            if (entryBytes > MAX_ENTRY_BYTES || packedTotal > maxTotalBytes) {
                                 throw IllegalArgumentException("ZIP 해제 크기가 제한을 넘습니다.")
                             }
                             output.write(buffer, 0, read)
@@ -169,7 +182,12 @@ object SafeZipExtractor {
                         output.fd.sync()
                     }
                     if (entryBytes == 0L) throw IllegalArgumentException("ZIP에 빈 파일이 있습니다.")
-                    val materialized = SafeRinexFileExtractor.extract(packedFile, entry.name, stagingDirectory, results.size)
+                    val remaining = maxTotalBytes - finalTotal
+                    require(remaining > 0L) { "ZIP 전체 해제 크기가 제한을 넘습니다." }
+                    val materialized = SafeRinexFileExtractor.extract(
+                        packedFile, entry.name, stagingDirectory, results.size, cancellation,
+                        min(SafeRinexFileExtractor.MAX_OUTPUT_BYTES, remaining),
+                    )
                     if (!packedFile.delete()) throw IllegalArgumentException("ZIP 임시 파일을 지우지 못했습니다.")
                     finalTotal += materialized.byteCount
                     val ratioLimit = max(
@@ -180,7 +198,7 @@ object SafeZipExtractor {
                             archive.length() * MAX_COMPRESSION_RATIO + RATIO_SLACK_BYTES
                         },
                     )
-                    if (finalTotal > MAX_TOTAL_BYTES || finalTotal > ratioLimit) {
+                    if (finalTotal > maxTotalBytes || finalTotal > ratioLimit) {
                         throw IllegalArgumentException("ZIP 최종 해제 크기 또는 압축률이 제한을 넘습니다.")
                     }
                     results += materialized
@@ -211,7 +229,10 @@ object SafeZipExtractor {
 object RinexHeaderValidator {
     private const val MAX_HEADER_LINES = 10_000
 
-    fun validate(file: File, sessionStartUtcMs: Long, sessionEndUtcMs: Long): RinexHeader {
+    fun validate(
+        file: File, sessionStartUtcMs: Long, sessionEndUtcMs: Long, cancellation: AnalysisCancellation? = null,
+    ): RinexHeader {
+        cancellation?.throwIfCancelled()
         require(sessionEndUtcMs >= sessionStartUtcMs) { "테스트 시간 범위가 잘못되었습니다." }
         BufferedReader(InputStreamReader(FileInputStream(file), Charsets.US_ASCII)).use { reader ->
             val first = reader.readLine() ?: throw IllegalArgumentException("빈 RINEX 파일입니다.")
@@ -233,6 +254,7 @@ object RinexHeaderValidator {
             var ended = false
             var headerLines = 0
             while (headerLines < MAX_HEADER_LINES) {
+                cancellation?.throwIfCancelled()
                 val line = reader.readLine() ?: break
                 headerLines++
                 if (line.length > 4096) throw IllegalArgumentException("RINEX 헤더 줄이 너무 깁니다.")
@@ -268,6 +290,7 @@ object RinexHeaderValidator {
             var lastDataObservation: Long? = null
             var maxObservationGapMs: Long? = null
             while (true) {
+                cancellation?.throwIfCancelled()
                 val line = reader.readLine() ?: break
                 if (line.isBlank()) continue
                 hasData = true

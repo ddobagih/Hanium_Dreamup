@@ -22,11 +22,11 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(risk.contains("onSpeechFailed = {"))
         assertFalse(risk.contains("announceForTalkBack("))
         assertFalse(risk.contains("isScreenReaderActive()"))
-        val navigation = functionBlock("private fun speakNavigation(")
+        val navigation = functionBlock("private fun dispatchNavigationSpeech(")
         assertTrue(navigation.contains("val mainThreadCompletion = onCompleted?.let"))
-        assertTrue(navigation.contains("if (isFeedbackLifecycleCurrent(generation)) completion()"))
+        assertTrue(navigation.contains("isWalkSessionRuntimeActive() && navigationEnvironmentOutputsAllowed()"))
         assertTrue(navigation.contains("onCompleted = mainThreadCompletion"))
-        assertTrue(navigation.contains("return ensureFeedbackActuator().speakNavigation("))
+        assertTrue(navigation.contains("ensureFeedbackActuator().speakNavigation("))
         assertFalse(navigation.contains("announceForTalkBack("))
         assertFalse(source.contains("private fun dispatchNavigationTalkBackFallback("))
         val interaction = functionBlock("private fun speakInteraction(")
@@ -330,9 +330,9 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(lifecycle.contains("isActivityForeground = false\n        feedbackLifecycleGeneration += 1"))
         assertTrue(gatewayLogin.contains("val feedbackGeneration = feedbackLifecycleGeneration"))
         assertTrue(gatewayLogin.contains("if (isFeedbackLifecycleCurrent(feedbackGeneration))"))
-        assertTrue(navigation.contains("if (!isFeedbackLifecycleCurrent(generation)) return false"))
+        assertTrue(navigation.contains("if (!isFeedbackLifecycleCurrent(generation) ||"))
         assertTrue(navigation.contains("shouldSuppressFeedbackDuringVoiceRecognition"))
-        assertTrue(navigation.contains("if (isFeedbackLifecycleCurrent(generation)) completion()"))
+        assertTrue(navigation.contains("isWalkSessionRuntimeActive() && navigationEnvironmentOutputsAllowed()"))
         assertTrue(interaction.contains("speakCommandResponse(message)"))
         assertTrue(commandResponse.contains("val lifecycleGeneration = feedbackLifecycleGeneration"))
         assertTrue(
@@ -350,20 +350,20 @@ class MainActivityAccessibilityStaticTest {
         ).substringBefore("private fun freshTrustedLocationOrNull(")
         assertTrue(
             locationCallback.contains(
-                "isLocationCallbackCurrent(walkEpoch, generation, callback)",
+                "isLocationCallbackCurrent(owner, generation, callback)",
             ),
         )
         assertTrue(locationCallback.contains("locationCallback === callback"))
         assertTrue(locationCallback.contains("generation == locationCallbackGeneration"))
-        assertTrue(locationCallback.contains("isRuntimeEpochCurrent(walkEpoch)"))
-        assertTrue(locationCallback.contains("currentLocationCollectionAllowsWork()"))
+        assertTrue(locationCallback.contains("locationCollectionOwner == owner"))
+        assertTrue(locationCallback.contains("currentLocationCollectionOwnerOrNull() == owner"))
     }
 
     @Test
     fun safetyCooldownsUseMonotonicTimeInsteadOfWallClock() {
         val drawFrame = source.substringAfter("override fun onDrawFrame(gl: GL10?)")
             .substringBefore("private fun buildContentView()")
-        val routeGuidance = source.substringAfter("private fun updateRouteGuidance(location: TrustedLocation)")
+        val routeGuidance = source.substringAfter("private fun updateRouteGuidance(")
             .substringBefore("private fun updateNavigationStatus(text: String)")
         val accessibility = source.substringAfter(
             "private fun announceForTalkBack(",
@@ -380,14 +380,16 @@ class MainActivityAccessibilityStaticTest {
     fun explicitVoiceResponsesUseInteractionSpeechWhileAutomaticGuidanceUsesNavigationSpeech() {
         val voice = source.substringAfter("private fun handleVoiceCommandPhrases(")
             .substringBefore("private fun startLocationUpdatesIfAllowed")
-        val route = source.substringAfter("private fun updateRouteGuidance(location: TrustedLocation)")
+        val route = source.substringAfter("private fun updateRouteGuidance(")
             .substringBefore("private fun updateNavigationStatus(text: String)")
 
         assertTrue(source.contains("private fun speakInteraction(message: String)"))
         assertTrue(voice.contains("speakInteraction(message)"))
         assertTrue(voice.contains("speakNavigation(message)"))
         assertTrue(voice.contains("routeNavigator.acknowledgeCurrentInstruction"))
-        assertTrue(route.contains("speakNavigation(instruction)"))
+        assertTrue(route.contains("dispatchNavigationSpeech("))
+        assertTrue(route.contains("routeNavigator.reserveInstruction(update)"))
+        assertTrue(route.contains("routeNavigator.releaseInstruction(update, SystemClock.elapsedRealtime())"))
         assertTrue(route.contains("routeNavigator.acknowledgeInstruction(update, SystemClock.elapsedRealtime())"))
     }
 

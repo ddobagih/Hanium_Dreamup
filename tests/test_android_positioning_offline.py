@@ -180,6 +180,25 @@ def attestation(inventory: dict, loaded_truth: dict, loaded_search: dict) -> dic
     }
 
 
+def test_replayed_match_evaluation_flag_is_optional_but_strictly_boolean(tmp_path: Path) -> None:
+    sample = position()
+    sample["source"] = "sensor_gnss_anchored"
+    sample["route_match_evaluated"] = True
+    sample.pop("raw_position")
+    sample.pop("matched_position")
+    path = tmp_path / "replayed.jsonl"
+    write_session(path, "11111111-1111-4111-8111-111111111111", [sample, checkpoint()])
+    MODULE.load_session_trace(path)
+    for invalid in (1, "true", None):
+        sample["route_match_evaluated"] = invalid
+        write_session(path, "11111111-1111-4111-8111-111111111111", [sample, checkpoint()])
+        try:
+            MODULE.load_session_trace(path)
+        except MODULE.ContractError:
+            continue
+        raise AssertionError("route_match_evaluated must be a Boolean when present")
+
+
 def test_android_contract_fixture_and_footer_validate() -> None:
     inventory, loaded_truth = MODULE._load_inputs(TRACE_FIXTURE, TRUTH_FIXTURE)
     session = next(iter(inventory["sessions"].values()))

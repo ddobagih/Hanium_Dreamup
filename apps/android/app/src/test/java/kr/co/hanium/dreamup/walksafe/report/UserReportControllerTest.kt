@@ -5,9 +5,12 @@ import java.util.ArrayDeque
 import java.util.Base64
 import java.util.concurrent.Executor
 import java.util.concurrent.RejectedExecutionException
+import kr.co.hanium.dreamup.walksafe.network.ActiveNetworkTransport
+import kr.co.hanium.dreamup.walksafe.network.AndroidNetworkTransferPolicy
 import kr.co.hanium.dreamup.walksafe.network.BackendAccountDeviceCookieBinding
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
 import kr.co.hanium.dreamup.walksafe.network.GatewayFieldSession
+import kr.co.hanium.dreamup.walksafe.network.MobileNetworkPreference
 import kr.co.hanium.dreamup.walksafe.network.UserReportHttpException
 import kr.co.hanium.dreamup.walksafe.network.UserReportNetworkClient
 import kr.co.hanium.dreamup.walksafe.network.UserReportProtocolException
@@ -18,6 +21,251 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UserReportControllerTest {
+    @Test
+    fun cellularNeedsConfirmedPreferenceAndRecoveryRequiresUserRetry() {
+        val worker = QueuedExecutor()
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+        }
+        val stableAuthority = authority(session())
+        var confirmedPreference = MobileNetworkPreference.WIFI_ONLY
+        val controller = UserReportController(
+            client = client,
+            workerExecutor = worker,
+            callbackExecutor = DIRECT_EXECUTOR,
+            authorityProvider = { stableAuthority },
+            observer = {},
+            networkAllowedProvider = {
+                AndroidNetworkTransferPolicy.isAllowed(
+                    confirmedPreference,
+                    ActiveNetworkTransport.CELLULAR,
+                )
+            },
+        )
+        controller.onAuthorityChanged()
+
+        assertFalse(controller.loadReports())
+        assertEquals(UserReportFailure.NETWORK_RESTRICTED, controller.snapshot().failure)
+        assertEquals(UserReportUiPhase.ERROR, controller.snapshot().phase)
+        assertTrue(controller.snapshot().retryAvailable)
+        assertTrue(client.listBindings.isEmpty())
+
+        // An open confirmation dialog has not changed the persisted preference.
+        controller.onNetworkPolicyChanged()
+        assertFalse(controller.retry())
+        assertTrue(client.listBindings.isEmpty())
+
+        confirmedPreference = MobileNetworkPreference.ALLOW_CELLULAR
+        controller.onNetworkPolicyChanged()
+        assertTrue(client.listBindings.isEmpty())
+        assertTrue(controller.retry())
+        worker.runNext()
+        assertEquals(listOf(REPORT_ID), controller.snapshot().reports.map { it.reportId })
+        assertNull(controller.snapshot().failure)
+    }
+
+    @Test
+    fun queuedCallRechecksTransportBeforeExecutingWithoutWaitingForChangeHook() {
+        val worker = QueuedExecutor()
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+        }
+        val stableAuthority = authority(session())
+        var transport = ActiveNetworkTransport.WIFI
+        val controller = UserReportController(
+            client = client,
+            workerExecutor = worker,
+            callbackExecutor = DIRECT_EXECUTOR,
+            authorityProvider = { stableAuthority },
+            observer = {},
+            networkAllowedProvider = {
+                AndroidNetworkTransferPolicy.isAllowed(MobileNetworkPreference.WIFI_ONLY, transport)
+            },
+        )
+        controller.onAuthorityChanged()
+        assertTrue(controller.loadReports())
+
+        transport = ActiveNetworkTransport.CELLULAR
+        worker.runNext()
+
+        assertEquals(0, client.listExecuteCalls)
+        assertEquals(1, client.listCancelCalls)
+        assertEquals(UserReportFailure.NETWORK_RESTRICTED, controller.snapshot().failure)
+        assertTrue(controller.snapshot().retryAvailable)
+    }
+
+    @Test
+    fun revokedInFlightOrCompletedCallRestoresCacheAndDropsLateResult() {
+        listOf(true, false).forEach { notifyChange ->
+            val worker = QueuedExecutor()
+            val client = FakeClient().apply {
+                listResults += Result.success(page(REPORT_ID, null))
+                listResults += Result.success(page(SECOND_REPORT_ID, null))
+                detailResults += Result.success(detail(REPORT_ID))
+                contentResults += Result.success(content(revision = 1))
+            }
+            val stableAuthority = authority(session())
+            var networkAllowed = true
+            val controller = UserReportController(
+                client = client,
+                workerExecutor = worker,
+                callbackExecutor = DIRECT_EXECUTOR,
+                authorityProvider = { stableAuthority },
+                observer = {},
+                networkAllowedProvider = { networkAllowed },
+            )
+            controller.onAuthorityChanged()
+            selectReport(controller, worker)
+            assertTrue(controller.loadContent(REPORT_ID))
+            worker.runNext()
+            val cached = controller.snapshot()
+            client.onListExecute = {
+                networkAllowed = false
+                if (notifyChange) controller.onNetworkPolicyChanged()
+            }
+            assertTrue(controller.loadReports())
+            worker.runNext()
+
+            val restricted = controller.snapshot()
+            assertEquals(1, client.listCancelCalls)
+            assertEquals(UserReportFailure.NETWORK_RESTRICTED, restricted.failure)
+            assertEquals(cached.reports, restricted.reports)
+            assertEquals(cached.selectedDetail, restricted.selectedDetail)
+            assertEquals(cached.selectedContent, restricted.selectedContent)
+            assertEquals(cached.requestHistoryRefreshSequence, restricted.requestHistoryRefreshSequence)
+            assertTrue(restricted.retryAvailable)
+            assertFalse(controller.loadReports())
+            assertEquals(cached.selectedContent, controller.snapshot().selectedContent)
+            assertEquals(2, client.listBindings.size)
+        }
+    }
+
+    @Test
+    fun allowedTransportChangeCancelsQueuedCallWithoutAutomaticRetry() {
+        val worker = QueuedExecutor()
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+            listResults += Result.success(page(SECOND_REPORT_ID, null))
+        }
+        val stableAuthority = authority(session())
+        val controller = controller(client, worker) { stableAuthority }
+        controller.onAuthorityChanged()
+        assertTrue(controller.loadReports())
+
+        controller.onNetworkPolicyChanged()
+        worker.runNext()
+        controller.onNetworkPolicyChanged()
+
+        assertEquals(0, client.listExecuteCalls)
+        assertEquals(1, client.listCancelCalls)
+        assertEquals(1, client.listBindings.size)
+        assertEquals(UserReportFailure.TEMPORARY, controller.snapshot().failure)
+        assertTrue(controller.snapshot().retryAvailable)
+        assertTrue(controller.retry())
+        worker.runNext()
+        assertEquals(listOf(SECOND_REPORT_ID), controller.snapshot().reports.map { it.reportId })
+    }
+
+    @Test
+    fun revokedRequestKeepsTheExactIntentForExplicitRetry() {
+        val worker = QueuedExecutor()
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+            detailResults += Result.success(detail(REPORT_ID))
+            requestResults += Result.success(requestSummary())
+            requestResults += Result.success(requestSummary())
+        }
+        val stableAuthority = authority(session())
+        var networkAllowed = true
+        var generatedIds = 0
+        val controller = UserReportController(
+            client = client,
+            workerExecutor = worker,
+            callbackExecutor = DIRECT_EXECUTOR,
+            authorityProvider = { stableAuthority },
+            observer = {},
+            requestIdFactory = {
+                generatedIds += 1
+                CLIENT_REQUEST_ID
+            },
+            networkAllowedProvider = { networkAllowed },
+        )
+        controller.onAuthorityChanged()
+        selectReport(controller, worker)
+        assertTrue(controller.submitRequest(REPORT_ID, UserReportRequestType.CORRECTION, REQUEST_TEXT))
+
+        networkAllowed = false
+        controller.onNetworkPolicyChanged()
+        worker.runNext()
+        assertNull(controller.snapshot().latestCreatedRequest)
+        assertEquals(REPORT_ID, controller.snapshot().selectedDetail?.reportId)
+        assertFalse(controller.retry())
+        assertEquals(1, client.requestIntents.size)
+
+        networkAllowed = true
+        controller.onNetworkPolicyChanged()
+        assertEquals(1, client.requestIntents.size)
+        assertTrue(controller.retry())
+        worker.runNext()
+
+        assertEquals(1, generatedIds)
+        assertEquals(2, client.requestIntents.size)
+        assertEquals(client.requestIntents[0], client.requestIntents[1])
+        assertEquals(REQUEST_ID, controller.snapshot().latestCreatedRequest?.requestId)
+    }
+
+    @Test
+    fun blockedCorrectionKeepsTheExactRevisionAndPatchForExplicitRetry() {
+        val worker = QueuedExecutor()
+        val client = FakeClient().apply {
+            listResults += Result.success(page(REPORT_ID, null))
+            detailResults += Result.success(detail(REPORT_ID))
+            contentResults += Result.success(content(revision = 3))
+            correctionResults += Result.success(contentRevision(expectedRevision = 3))
+        }
+        val stableAuthority = authority(session())
+        var networkAllowed = true
+        var generatedIds = 0
+        val controller = UserReportController(
+            client = client,
+            workerExecutor = worker,
+            callbackExecutor = DIRECT_EXECUTOR,
+            authorityProvider = { stableAuthority },
+            observer = {},
+            correctionIdFactory = {
+                generatedIds += 1
+                CORRECTION_ID
+            },
+            networkAllowedProvider = { networkAllowed },
+        )
+        controller.onAuthorityChanged()
+        selectReport(controller, worker)
+        assertTrue(controller.loadContent(REPORT_ID))
+        worker.runNext()
+        val cachedContent = controller.snapshot().selectedContent
+        val patch = UserReportCorrectionPatch.Value("보행로 파손 범위")
+
+        networkAllowed = false
+        controller.onNetworkPolicyChanged()
+        assertFalse(controller.submitCorrection(REPORT_ID, patch, UserReportCorrectionPatch.Omitted))
+        assertTrue(client.correctionIntents.isEmpty())
+        assertEquals(cachedContent, controller.snapshot().selectedContent)
+        assertTrue(controller.snapshot().retryAvailable)
+
+        networkAllowed = true
+        controller.onNetworkPolicyChanged()
+        assertTrue(client.correctionIntents.isEmpty())
+        assertTrue(controller.retry())
+        worker.runNext()
+
+        assertEquals(1, generatedIds)
+        val retried = client.correctionIntents.single()
+        assertEquals(CORRECTION_ID, retried.idempotencyKey)
+        assertEquals(3L, retried.expectedRevision)
+        assertEquals(patch, retried.userDescription)
+        assertEquals(4L, controller.snapshot().selectedContent?.revision)
+    }
+
     @Test
     fun deletionTombstoneScrubsStaleCrossEndpointReportStateAndStatusActions() {
         val worker = QueuedExecutor()
@@ -1693,6 +1941,8 @@ class UserReportControllerTest {
         val deletionStatusRequestIds = mutableListOf<String>()
         var listCancelFailure: Throwable? = null
         var listCancelCalls: Int = 0
+        var listExecuteCalls: Int = 0
+        var onListExecute: (() -> Unit)? = null
 
         override fun listReportsCall(
             session: GatewayFieldSession,
@@ -1703,7 +1953,11 @@ class UserReportControllerTest {
             listBindings += cursor to userStatus
             val result = listResults.removeFirst()
             return CancellableNetworkCall(
-                executeBlock = { result.getOrThrow() },
+                executeBlock = {
+                    listExecuteCalls += 1
+                    onListExecute?.invoke()
+                    result.getOrThrow()
+                },
                 cancelBlock = {
                     listCancelCalls += 1
                     listCancelFailure?.let { throw it }

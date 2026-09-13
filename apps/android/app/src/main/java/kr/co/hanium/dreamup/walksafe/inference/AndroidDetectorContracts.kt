@@ -4,6 +4,14 @@ import android.media.Image
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
 
 interface AndroidFrameDetector {
+    /** Output boxes remain in original sensor coordinates, regardless of model input rotation. */
+    fun detectOriented(
+        cameraImage: Image,
+        timestampMs: Long,
+        quarterTurns: Int,
+        onPartialResult: (AndroidDetectionResult) -> Unit = {},
+    ): AndroidDetectionResult = detect(cameraImage, timestampMs, onPartialResult)
+
     fun detect(
         cameraImage: Image,
         timestampMs: Long,
@@ -29,6 +37,12 @@ data class AndroidDetectionResult(
     }
 }
 
+/** Calibration owns the optional raw copy; normal inference never allocates this snapshot. */
+data class AndroidCalibrationDetectionResult(
+    val result: AndroidDetectionResult,
+    val rawOutput: FloatArray? = null,
+)
+
 data class AndroidDetectorTiming(
     val yuvDecodeMs: Long? = null,
     val modelKey: String? = null,
@@ -47,6 +61,8 @@ data class AndroidDetectorTiming(
     val modelRuntime: AndroidDetectorRuntime? = null,
     val cocoRuntime: AndroidDetectorRuntime? = null,
     val customRuntime: AndroidDetectorRuntime? = null,
+    val preprocessingStrategy: String? = null,
+    val ownedTensorCopyMs: Long? = null,
 )
 
 data class AndroidDetectorRuntime(
@@ -54,6 +70,13 @@ data class AndroidDetectorRuntime(
     val activeDelegate: String,
     val numThreads: Int,
     val fallbackUsed: Boolean = false,
+    val fallbackReason: String? = null,
+    // A GPU delegate being attached does not imply that every graph operation ran on the GPU.
+    val gpuPrecisionLossAllowed: Boolean? = null,
+    // "configured" records serialization parameters being supplied, not a native cache hit.
+    val gpuSerializationCacheStatus: String? = null,
+    val gpuSerializationCacheToken: String? = null,
+    val gpuSerializationCacheFailureReason: String? = null,
 )
 
 fun AndroidDetectorTiming.totalModelMs(): Long? {

@@ -9,6 +9,8 @@ internal sealed interface HandsFreeVoiceState {
 
     data class WaitingForWakeWord(override val generation: Long) : HandsFreeVoiceState
 
+    data class AcknowledgingWake(override val generation: Long) : HandsFreeVoiceState
+
     data class WaitingForCommand(override val generation: Long) : HandsFreeVoiceState
 
     data class ProcessingCommand(
@@ -21,6 +23,8 @@ internal sealed interface HandsFreeVoiceState {
 
 internal sealed interface HandsFreeVoiceEffect {
     data class StartWakeWordListening(val generation: Long) : HandsFreeVoiceEffect
+
+    data class AcknowledgeWake(val generation: Long) : HandsFreeVoiceEffect
 
     data class StartCommandWindow(val generation: Long) : HandsFreeVoiceEffect
 
@@ -71,6 +75,16 @@ internal class HandsFreeVoiceStateMachine {
     @Synchronized
     fun onWakeWordDetected(callbackGeneration: Long): HandsFreeVoiceTransition {
         if (!isCurrent<HandsFreeVoiceState.WaitingForWakeWord>(callbackGeneration)) {
+            return unchanged()
+        }
+        val nextGeneration = nextGeneration()
+        current = HandsFreeVoiceState.AcknowledgingWake(nextGeneration)
+        return changed(HandsFreeVoiceEffect.AcknowledgeWake(nextGeneration))
+    }
+
+    @Synchronized
+    fun onWakeAcknowledgementFinished(callbackGeneration: Long): HandsFreeVoiceTransition {
+        if (!isCurrent<HandsFreeVoiceState.AcknowledgingWake>(callbackGeneration)) {
             return unchanged()
         }
         val nextGeneration = nextGeneration()

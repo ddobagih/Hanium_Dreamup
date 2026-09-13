@@ -152,6 +152,17 @@ class MainActivityVoiceIntegrationStaticTest {
         assertFalse(more.contains("DestinationSearchVoiceCommand.RepeatPage"))
     }
 
+    @Test fun candidateFollowUpKeepsDestinationResultsAndRetryControlsVisible() {
+        val start = method("startVoiceCommandRecognition")
+        val handsFree = method("handleHandsFreeVoiceCommandListeningStarted")
+        assertFalse(start.contains("showNativeUiPage(NativeUiPage.VOICE_COMMAND"))
+        assertTrue(handsFree.contains("nativeUiPage != NativeUiPage.DESTINATION_SEARCH"))
+        assertTrue(source.contains(
+            "if (featureVisible && nativeUiPage.isVoiceInteractionPage()) View.VISIBLE else View.GONE",
+        ))
+        assertTrue(method("speakHomeDestinationVoicePrompt").contains("!nativeUiPage.isVoiceInteractionPage()"))
+    }
+
     @Test fun bareCandidateSelectionRequiresCurrentSearchContext() {
         val handler = method("handleVoiceCommandPhrases")
         val compactHandler = handler.replace(Regex("\\s+"), "")
@@ -183,7 +194,7 @@ class MainActivityVoiceIntegrationStaticTest {
             "query = destinationSearchQuery,",
             "state = destinationSearchVoiceState,",
             "homeContextAvailable = nativeHomeFeatureContextAvailable(),",
-            "voicePage = nativeUiPage == NativeUiPage.VOICE_COMMAND,",
+            "voicePage = nativeUiPage.isVoiceInteractionPage(),",
         ).forEach { binding ->
             assertTrue("Missing live destination dialogue binding: $binding", liveContext.contains(binding))
         }

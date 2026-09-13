@@ -138,7 +138,7 @@ object GnssLoggerRinex3Converter {
             val epoch = currentBatchEpoch
             if (epoch != null && currentBatchHasAccepted) {
                 val previous = previousAcceptedEpoch
-                if (previous != null && epoch.totalGpsSeconds <= previous.totalGpsSeconds + 5e-8) {
+                if (previous != null && epoch.secondsSince(previous) <= 5e-8) {
                     fail("NON_MONOTONIC_CORRECTED_EPOCH", "보정된 GNSS epoch 시각이 증가하지 않습니다.")
                 }
                 if (firstEpoch == null) firstEpoch = epoch
@@ -215,7 +215,7 @@ object GnssLoggerRinex3Converter {
         if (schema == null) fail("RAW_HEADER_MISSING", "GnssLogger TXT에 '# Raw,...' 헤더가 없습니다.")
         if (rawCount < 4) fail("INSUFFICIENT_RAW_MEASUREMENTS", "GnssLogger Raw 측정값이 4개 미만입니다.")
         if (acceptedCount < 8 || usableEpochCount < 2 || satellites.size < 4 || carrierPhaseCount < 4 || firstEpoch == null || lastEpoch == null || effectiveLeapSecond == null) {
-            fail("INSUFFICIENT_VALID_MEASUREMENTS", "PPK에 필요한 2 epoch, 4 위성, 8 코드, 4 반송파 관측값을 충족하지 못했습니다. 제외: ${excludedByReason.toSortedMap()}")
+            fail("INSUFFICIENT_VALID_MEASUREMENTS", "PPK에 필요한 2 epoch, 4 위성, 8 코드, 4 반송파 관측값을 충족하지 못했습니다. 확인: ${usableEpochCount} epoch, ${satellites.size} 위성, ${acceptedCount} 코드, ${carrierPhaseCount} 반송파. 제외: ${excludedByReason.toSortedMap()}")
         }
         return ScanResult(
             schema!!,
@@ -288,7 +288,7 @@ object GnssLoggerRinex3Converter {
             val epoch = currentEpoch
             if (epoch != null && observations.isNotEmpty()) {
                 val previous = previousWrittenEpoch
-                if (previous != null && epoch.totalGpsSeconds <= previous.totalGpsSeconds + 5e-8) fail("NON_MONOTONIC_CORRECTED_EPOCH", "보정된 GNSS epoch 시각이 증가하지 않습니다.")
+                if (previous != null && epoch.secondsSince(previous) <= 5e-8) fail("NON_MONOTONIC_CORRECTED_EPOCH", "보정된 GNSS epoch 시각이 증가하지 않습니다.")
                 writeEpoch(writer, epoch, observations, scan.observationCodes)
                 previousWrittenEpoch = epoch
                 epochs++
@@ -320,8 +320,8 @@ object GnssLoggerRinex3Converter {
         return BodySummary(epochs, accepted, satellitesSeen.size, carrierPhases)
     }
 
-    private fun process(measurement: RawMeasurement, signal: Signal, stabilizedFullBiasNanos: Long, suppressCarrierPhase: Boolean, lossOfLock: Int): ProcessedMeasurement? {
-        val receiverTime = receiverTime(measurement, stabilizedFullBiasNanos)
+    private fun process(measurement: RawMeasurement, signal: Signal, fullBiasNanos: Long, suppressCarrierPhase: Boolean, lossOfLock: Int): ProcessedMeasurement? {
+        val receiverTime = receiverTime(measurement, fullBiasNanos)
         val transmitSeconds = when (measurement.constellationType) {
             3 -> glonassToGpsSeconds(
                 receiverTime.epoch.dateTime,
@@ -362,20 +362,24 @@ object GnssLoggerRinex3Converter {
         )
     }
 
-    private fun receiverTime(measurement: RawMeasurement, stabilizedFullBiasNanos: Long): ReceiverTime {
-        val gpsWeek = Math.floorDiv(Math.negateExact(stabilizedFullBiasNanos), GPS_WEEK_NANOS)
-        if (gpsWeek !in 1L..10_000L) fail("INVALID_GNSS_CLOCK", "FullBiasNanos에서 유효한 GPS week를 계산할 수 없습니다. (${measurement.lineNumber} 행)")
-        val integerSecondsOfWeekNanos = try {
-            Math.subtractExact(
-                Math.subtractExact(measurement.timeNanos, stabilizedFullBiasNanos),
-                Math.multiplyExact(gpsWeek, GPS_WEEK_NANOS),
-            )
+    private fun receiverTime(measurement: RawMeasurement, fullBiasNanos: Long): ReceiverTime {
+        // TimeNanos may contain many weeks of receiver uptime. GnssClock defines GPS time as
+        // TimeNanos - (FullBiasNanos + BiasNanos), not -FullBiasNanos alone.
+        val integerGpsNanos = try {
+            Math.subtractExact(measurement.timeNanos, fullBiasNanos)
         } catch (error: ArithmeticException) {
             fail("INVALID_GNSS_CLOCK", "GnssClock 계산 중 정수 범위를 벗어났습니다. (${measurement.lineNumber} 행)")
         }
+        var gpsWeek = Math.floorDiv(integerGpsNanos, GPS_WEEK_NANOS)
+        val integerSecondsOfWeekNanos = Math.floorMod(integerGpsNanos, GPS_WEEK_NANOS)
         val fractionalNanos = measurement.timeOffsetNanos - measurement.biasNanos
-        val secondsOfWeek = integerSecondsOfWeekNanos * NS_TO_SECONDS + fractionalNanos * NS_TO_SECONDS
-        if (!secondsOfWeek.isFinite() || secondsOfWeek !in -1.0..(GPS_WEEK_SECONDS + 1.0)) fail("INVALID_GNSS_CLOCK", "GnssClock 수신 시각이 GPS week 범위를 벗어납니다. (${measurement.lineNumber} 행)")
+        var secondsOfWeek = integerSecondsOfWeekNanos * NS_TO_SECONDS + fractionalNanos * NS_TO_SECONDS
+        if (!secondsOfWeek.isFinite()) fail("INVALID_GNSS_CLOCK", "GnssClock 수신 시각이 유한수가 아닙니다. (${measurement.lineNumber} 행)")
+        val weekAdjustment = floor(secondsOfWeek / GPS_WEEK_SECONDS)
+        if (weekAdjustment !in -10_000.0..10_000.0) fail("INVALID_GNSS_CLOCK", "GnssClock 시계 편향이 GPS week 범위를 벗어납니다. (${measurement.lineNumber} 행)")
+        gpsWeek += weekAdjustment.toLong()
+        secondsOfWeek -= weekAdjustment * GPS_WEEK_SECONDS
+        if (gpsWeek !in 1L..10_000L || secondsOfWeek !in 0.0..GPS_WEEK_SECONDS) fail("INVALID_GNSS_CLOCK", "GnssClock 수신 시각이 GPS week 범위를 벗어납니다. (${measurement.lineNumber} 행)")
         val correction = (secondsOfWeek / TIME_ADJUSTMENT_SECONDS - floor(secondsOfWeek / TIME_ADJUSTMENT_SECONDS + 0.5)) * TIME_ADJUSTMENT_SECONDS
         return ReceiverTime(secondsOfWeek, correction, GpsEpoch(gpsWeek, secondsOfWeek - correction))
     }
@@ -412,7 +416,7 @@ object GnssLoggerRinex3Converter {
     }
 
     private fun validateBatchEpoch(expected: GpsEpoch?, actual: GpsEpoch, lineNumber: Int) {
-        if (expected != null && abs(expected.totalGpsSeconds - actual.totalGpsSeconds) > 5e-8) fail("INCONSISTENT_EPOCH", "한 GnssLogger epoch 안의 측정 시각이 100ns 정렬 후에도 서로 다릅니다. ($lineNumber 행)")
+        if (expected != null && abs(expected.secondsSince(actual)) > 5e-8) fail("INCONSISTENT_EPOCH", "한 GnssLogger epoch 안의 측정 시각이 100ns 정렬 후에도 서로 다릅니다. ($lineNumber 행)")
     }
 
     private fun RawMeasurement.qualityExclusionReason(): String? {
@@ -566,6 +570,7 @@ object GnssLoggerRinex3Converter {
     private class ClockTracker {
         private var discontinuity: Int? = null
         private var fullBiasNanos: Long? = null
+        private var biasNanos = 0.0
         private var lastTimeNanos: Long? = null
 
         fun resolve(measurement: RawMeasurement): ClockContext {
@@ -574,15 +579,34 @@ object GnssLoggerRinex3Converter {
                 val isDiscontinuity = current != null
                 discontinuity = measurement.hardwareClockDiscontinuityCount
                 fullBiasNanos = measurement.fullBiasNanos
+                biasNanos = measurement.biasNanos
                 lastTimeNanos = measurement.timeNanos
                 return ClockContext(measurement.fullBiasNanos, isDiscontinuity)
             }
             if (measurement.hardwareClockDiscontinuityCount < current) fail("CLOCK_DISCONTINUITY_REGRESSION", "hardware clock discontinuity count가 감소했습니다. (${measurement.lineNumber} 행)")
-            if (measurement.fullBiasNanos != fullBiasNanos) fail("CLOCK_BIAS_CHANGED_WITHOUT_DISCONTINUITY", "동일 clock segment에서 FullBiasNanos가 바뀌었습니다. (${measurement.lineNumber} 행)")
             val previousTime = lastTimeNanos!!
             if (measurement.timeNanos < previousTime) fail("RAW_TIME_REGRESSION_IN_SEGMENT", "동일 clock segment에서 TimeNanos가 감소했습니다. (${measurement.lineNumber} 행)")
-            if (measurement.timeNanos > previousTime) lastTimeNanos = measurement.timeNanos
-            return ClockContext(fullBiasNanos!!, false)
+            val fullBiasDelta = try {
+                Math.subtractExact(measurement.fullBiasNanos, fullBiasNanos!!)
+            } catch (error: ArithmeticException) {
+                fail("INVALID_GNSS_CLOCK", "GnssClock 편향 변화가 정수 범위를 벗어났습니다. (${measurement.lineNumber} 행)")
+            }
+            // Android permits a smoothly changing FullBiasNanos + BiasNanos in one hardware
+            // segment. Keep each observed value; equality is required only within one epoch.
+            // https://developer.android.com/reference/android/location/GnssClock#getHardwareClockDiscontinuityCount()
+            val biasDelta = fullBiasDelta.toDouble() + (measurement.biasNanos - biasNanos)
+            val sameEpochClockChanged = measurement.timeNanos == previousTime &&
+                (fullBiasDelta != 0L || measurement.biasNanos != biasNanos)
+            // Reuse the converter's UTC consistency tolerance as its maximum unannounced
+            // per-epoch clock jump. This is an input-validation limit, not an Android guarantee.
+            val clockJump = abs(biasDelta) > LEAP_VALIDATION_TOLERANCE_MS * 1_000_000.0
+            val correctedTimeRegressed = measurement.timeNanos > previousTime &&
+                (measurement.timeNanos - previousTime).toDouble() - biasDelta <= 0.0
+            if (sameEpochClockChanged || clockJump || correctedTimeRegressed) fail("CLOCK_BIAS_CHANGED_WITHOUT_DISCONTINUITY", "동일 clock segment에서 일관되지 않은 epoch 시계값 또는 큰 시계 편향 점프가 발생했습니다. (${measurement.lineNumber} 행)")
+            fullBiasNanos = measurement.fullBiasNanos
+            biasNanos = measurement.biasNanos
+            lastTimeNanos = measurement.timeNanos
+            return ClockContext(measurement.fullBiasNanos, false)
         }
     }
 
@@ -610,17 +634,16 @@ object GnssLoggerRinex3Converter {
     private data class ProcessedMeasurement(val epoch: GpsEpoch, val observations: Map<String, ObservationValue>)
 
     private data class GpsEpoch(val week: Long, val secondsOfWeek: Double) {
-        val totalGpsSeconds: Double get() = week * GPS_WEEK_SECONDS + secondsOfWeek
+        // Combining a modern GPS week and its fraction into one Double loses ~238 ns.
+        // Subtract within the week first so the 100 ns epoch alignment remains observable.
+        fun secondsSince(other: GpsEpoch): Double =
+            (week - other.week) * GPS_WEEK_SECONDS + (secondsOfWeek - other.secondsOfWeek)
+
         val dateTime: LocalDateTime
             get() {
-                val wholeSeconds = floor(totalGpsSeconds).toLong()
-                var nanos = round((totalGpsSeconds - wholeSeconds) * 1e9).toLong()
-                var normalizedSeconds = wholeSeconds
-                if (nanos >= 1_000_000_000L) {
-                    normalizedSeconds++
-                    nanos -= 1_000_000_000L
-                }
-                return gpsEpoch.plusSeconds(normalizedSeconds).plusNanos(nanos)
+                val wholeSeconds = floor(secondsOfWeek).toLong()
+                val nanos = round((secondsOfWeek - wholeSeconds) * 1e9).toLong()
+                return gpsEpoch.plusWeeks(week).plusSeconds(wholeSeconds).plusNanos(nanos)
             }
     }
 

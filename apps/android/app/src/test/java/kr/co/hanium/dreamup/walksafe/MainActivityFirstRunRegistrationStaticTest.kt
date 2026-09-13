@@ -336,7 +336,7 @@ class MainActivityFirstRunRegistrationStaticTest {
         }
 
         val frame = functionBlock("private fun handleRuntimeMetricPreflightFrame(")
-        assertTrue(frame.contains("val validSamples = snapshot.runtimeMetricValidSampleCount()"))
+        assertTrue(frame.contains("val validSamples = snapshot.runtimeMetricValidSampleCount(requireFreshRaw = true)"))
         assertFalse(frame.contains("observeOfficialEnvironmentCameraFrame("))
 
         val failure = functionBlock("private fun handleRuntimeMetricFrameFailure(")
@@ -356,7 +356,7 @@ class MainActivityFirstRunRegistrationStaticTest {
         val update = functionBlock("private fun updateFirstRunOnboardingUi()")
         assertInOrder(changed, "updateFirstRunOnboardingUi()", "focusCurrentFirstRunStage(firstRunOnboardingSnapshot.stage)")
         assertTrue(focus.contains("FirstRunOnboardingStage.FP004_TRAINING ->"))
-        assertTrue(focus.contains("if (shouldShowFirstRunPhonePosture()) firstRunPhonePostureText"))
+        assertTrue(focus.contains("if (shouldShowFirstRunPhonePosture()) priorityUserEducationProgressText"))
         assertTrue(focus.contains("else priorityUserOnboardingStatusText"))
         assertTrue(focus.contains("FirstRunOnboardingStage.COMPLETE -> return"))
         assertTrue(focus.contains("target.post"))
@@ -401,7 +401,6 @@ class MainActivityFirstRunRegistrationStaticTest {
             )
         }
         listOf(
-            "private fun currentLocationCollectionAllowsWork()",
             "private fun currentStepTrackingCollectionAllowsWork()",
             "private fun currentFeedbackDeviceGateAllowsAlerts()",
         ).forEach { marker ->
@@ -419,7 +418,7 @@ class MainActivityFirstRunRegistrationStaticTest {
         )
         assertTrue(
             functionBlock("private fun startLocationUpdatesIfAllowed(")
-                .contains("currentLocationCollectionAllowsWork()"),
+                .contains("currentLocationCollectionOwnerOrNull()"),
         )
         assertTrue(
             functionBlock("private fun startStepTrackingIfAllowed()")
@@ -436,7 +435,7 @@ class MainActivityFirstRunRegistrationStaticTest {
         assertInOrder(
             functionBlock("private fun processReportCandidate("),
             "walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch)",
-            "!officialEnvironmentOutputsAllowed || !phoneMountingOutputsAllowed",
+            "!walkSafetyOutputsAllowed()",
             "reportQueueStore.enqueue(",
         )
         assertInOrder(

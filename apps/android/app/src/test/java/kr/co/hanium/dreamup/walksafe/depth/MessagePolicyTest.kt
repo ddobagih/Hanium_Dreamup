@@ -10,6 +10,53 @@ import org.junit.Test
 
 class MessagePolicyTest {
     @Test
+    fun oldSpatialMotionCannotDescribeANewFrameAsAnApproachingObject() {
+        val result = MetricDepthDecision(
+            className = "person", source = DepthSource.ARCORE_RAW_DEPTH, riskDistanceM = 1f,
+            trend = Trend.APPROACHING, confidenceFinal = 0.9f,
+            objectMotion = ObjectMotion.OBJECT_APPROACHING,
+            motionEstimate = measuredMotion(ObjectMovementDirection.TOWARD_USER),
+        )
+        val stale = MessagePolicy().buildUserFacing(result, nowMs = 1L)
+        assertEquals(MessageLevel.STOP, stale.messageLevel)
+        assertTrue(stale.message!!.contains("멈추세요"))
+        assertFalse(stale.message!!.contains("다가오는"))
+    }
+
+    @Test
+    fun stationaryObstacleAndIncomingObjectUseDifferentGuidance() {
+        val approaching = MetricDepthDecision(
+            className = "car",
+            source = DepthSource.ARCORE_RAW_DEPTH,
+            riskDistanceM = 2f,
+            trend = Trend.APPROACHING,
+            confidenceFinal = 0.9f,
+        )
+        val stationary = MessagePolicy().buildUserFacing(
+            approaching.copy(
+                objectMotion = ObjectMotion.USER_APPROACHING_STATIONARY,
+                motionEstimate = measuredMotion(ObjectMovementDirection.STATIONARY),
+            ), 0L,
+        )
+        val incoming = MessagePolicy().buildUserFacing(
+            approaching.copy(
+                objectMotion = ObjectMotion.OBJECT_APPROACHING,
+                motionEstimate = measuredMotion(ObjectMovementDirection.TOWARD_USER),
+            ), 0L,
+        )
+        val unknown = MessagePolicy().buildUserFacing(approaching, 0L)
+
+        assertTrue(stationary.message!!.contains("정지해 있는 것으로 보이며"))
+        assertTrue(stationary.message!!.contains("현재 이 물체에 가까워지고 있습니다"))
+        assertTrue(incoming.message!!.contains("이 물체가 사용자 쪽으로 다가오는 것으로 보입니다"))
+        assertTrue(unknown.message!!.contains("거리가 줄어들고 있습니다"))
+        assertFalse(unknown.message!!.contains("정지해"))
+        assertFalse(unknown.message!!.contains("다가오"))
+        assertEquals(stationary.messageLevel, incoming.messageLevel)
+        assertEquals(stationary.stepsAhead, incoming.stepsAhead)
+    }
+
+    @Test
     fun normalTactileBlockWaitsForTmapAlignedRoutePolicy() {
         val policy = MessagePolicy(stepLengthM = 0.6f)
 
@@ -373,4 +420,17 @@ class MessagePolicyTest {
         assertEquals(MessageLevel.AWARE, decision.userFacing.messageLevel)
         assertNull(decision.userFacing.message)
     }
+    private fun measuredMotion(direction: ObjectMovementDirection) = ObjectMotionEstimate(
+        referenceId = 1L,
+        observedAtMs = 0L,
+        elapsedMs = 1_000L,
+        objectVelocityInAnchorMps = Vec3(0f, 0f, -0.6f),
+        relativeVelocityInAnchorMps = Vec3(0f, 0f, -0.6f),
+        cameraVelocityInAnchorMps = Vec3(0f, 0f, 0f),
+        objectSpeedMps = 0.6f,
+        relativeClosingSpeedMps = 0.6f,
+        direction = direction,
+        confidence = 0.9f,
+    )
+
 }

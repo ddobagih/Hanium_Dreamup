@@ -27,7 +27,11 @@ import javax.crypto.spec.GCMParameterSpec
 class PrivateFileImporter(private val context: Context) {
     companion object { const val MAX_INPUT_BYTES = 128L * 1024L * 1024L }
 
-    fun import(uri: Uri): ImportedArtifact {
+    fun import(
+        uri: Uri, maxBytes: Long = MAX_INPUT_BYTES, cancellation: AnalysisCancellation? = null,
+    ): ImportedArtifact {
+        require(maxBytes in 1..MAX_INPUT_BYTES)
+        cancellation?.throwIfCancelled()
         val root = File(context.noBackupFilesDir, "position_evaluator/imports").apply { mkdirs() }
         val displayName = safeDisplayName(context.contentResolver, uri)
         val id = UUID.randomUUID().toString()
@@ -42,10 +46,11 @@ class PrivateFileImporter(private val context: Context) {
                 FileOutputStream(part).use { target ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                     while (true) {
+                        cancellation?.throwIfCancelled()
                         val read = source.read(buffer)
                         if (read < 0) break
                         count += read
-                        if (count > MAX_INPUT_BYTES) throw IllegalArgumentException("파일이 128MB를 넘습니다.")
+                        if (count > maxBytes) throw IllegalArgumentException("파일이 128MB를 넘습니다.")
                         digest.update(buffer, 0, read)
                         target.write(buffer, 0, read)
                     }

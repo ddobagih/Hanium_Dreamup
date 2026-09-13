@@ -44,6 +44,7 @@ internal enum class UserReportUiPhase {
 
 internal enum class UserReportFailure {
     NOT_FOUND_OR_SIGNED_OUT,
+    NETWORK_RESTRICTED,
     INVALID_REQUEST,
     LOCAL_TRACKING,
     TEMPORARY,
@@ -83,6 +84,7 @@ internal class UserReportController(
     private val deletionTracker: UserReportDeletionTracker? = null,
     private val requestIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val correctionIdFactory: () -> String = { UUID.randomUUID().toString() },
+    private val networkAllowedProvider: () -> Boolean = { true },
 ) {
     private val lock = Any()
     private var generation = 0L
@@ -96,6 +98,16 @@ internal class UserReportController(
     private var pendingCorrectionIntent: UserReportCorrectionIntent? = null
 
     fun snapshot(): UserReportUiState = synchronized(lock) { state }
+
+    fun onNetworkPolicyChanged() {
+        val nextState = synchronized(lock) {
+            if (destroyed || boundAuthority == null) return
+            val networkAllowed = networkAllowedProvider()
+            if (networkAllowed && active == null) return
+            interruptForNetworkChangeLocked(active?.action ?: retryAction, networkAllowed)
+        }
+        publish(nextState)
+    }
 
     fun onAuthorityChanged() {
         val sequence = synchronized(lock) {
@@ -775,6 +787,10 @@ internal class UserReportController(
                 return false
             }
             if (!precondition(state)) return false
+            if (!networkAllowedProvider()) {
+                publish(interruptForNetworkChangeLocked(action, networkAllowed = false))
+                return false
+            }
             call = runCatching { createCall(authority) }.getOrElse {
                 state = state.copy(
                     phase = UserReportUiPhase.ERROR,
@@ -790,6 +806,7 @@ internal class UserReportController(
                 authority = authority,
                 action = action,
                 call = call,
+                previousState = state,
             )
             active = operation
             retryAction = null
@@ -803,6 +820,7 @@ internal class UserReportController(
         publish(loading)
         return try {
             workerExecutor.execute {
+                if (!canExecute(operation)) return@execute
                 val result = runCatching { call.execute() }
                 try {
                     callbackExecutor.execute {
@@ -819,6 +837,39 @@ internal class UserReportController(
             failToSchedule(operation)
             false
         }
+    }
+
+    private fun canExecute(operation: ActiveOperation): Boolean {
+        val blocked = synchronized(lock) {
+            if (destroyed || active !== operation || operation.generation != generation) {
+                return false
+            }
+            if (networkAllowedProvider()) return true
+            interruptForNetworkChangeLocked(operation.action, networkAllowed = false)
+        }
+        publish(blocked)
+        return false
+    }
+
+    private fun interruptForNetworkChangeLocked(
+        action: Action?,
+        networkAllowed: Boolean,
+    ): UserReportUiState {
+        val interrupted = active
+        generation += 1L
+        active = null
+        retryAction = action
+        state = (interrupted?.previousState ?: state).copy(
+            phase = UserReportUiPhase.ERROR,
+            failure = if (networkAllowed) {
+                UserReportFailure.TEMPORARY
+            } else {
+                UserReportFailure.NETWORK_RESTRICTED
+            },
+            retryAvailable = action != null,
+        )
+        runCatching { interrupted?.call?.cancel() }
+        return state
     }
 
     private fun <T> complete(
@@ -863,6 +914,13 @@ internal class UserReportController(
                     },
                 )
                 nextState = state
+                return@synchronized
+            }
+            if (!networkAllowedProvider()) {
+                nextState = interruptForNetworkChangeLocked(
+                    operation.action,
+                    networkAllowed = false,
+                )
                 return@synchronized
             }
             active = null
@@ -1024,6 +1082,7 @@ internal class UserReportController(
         val authority: UserReportAuthority,
         val action: Action,
         val call: CancellableNetworkCall<*>,
+        val previousState: UserReportUiState,
     )
 
     private sealed interface Action {

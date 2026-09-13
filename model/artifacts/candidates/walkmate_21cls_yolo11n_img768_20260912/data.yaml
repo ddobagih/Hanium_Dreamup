@@ -1,0 +1,27 @@
+path: D:/인도보행 영상/yolo_dataset_v1
+train: train.txt
+val: val.txt
+test: test.txt
+
+names:
+  0: linear_tactile_paving
+  1: damaged_linear_tactile_paving
+  2: dot_tactile_paving
+  3: damaged_dot_tactile_paving
+  4: passenger_car
+  5: bus
+  6: truck
+  7: motorcycle
+  8: bicycle
+  9: abandoned_e_scooter
+  10: moving_e_scooter
+  11: traffic_light
+  12: crosswalk
+  13: construction_fence
+  14: barricade
+  15: traffic_cone
+  16: bollard
+  17: utility_or_streetlight_pole
+  18: trash_bin
+  19: portable_sign
+  20: person

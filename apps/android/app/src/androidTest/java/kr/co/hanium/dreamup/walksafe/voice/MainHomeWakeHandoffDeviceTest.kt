@@ -87,8 +87,11 @@ assertTrue("A current HOME ready callback is required: $handoff", handoff.homeRe
             assertEquals("One actual recognizer ready is required: $handoff", 1, handoff.ready)
             assertTrue("Synthetic final must follow actual HOME ready: $handoff", handoff.syntheticAt > handoff.homeReadyAt)
             assertTrue("Handoff must follow the fixture: $handoff", handoff.handoffAt > handoff.syntheticAt)
-            assertTrue("The real preparation speech must finish after handoff: $handoff", handoff.doneAt > handoff.handoffAt)
-            assertTrue("Recognition may start only after real speech completion: $handoff", handoff.requestAt > handoff.doneAt)
+            assertEquals("Exactly one wake cue must be requested: $handoff", 1, handoff.acknowledgements)
+            assertEquals("The actual cue API must complete its bounded interval: $handoff", "COMPLETED", handoff.acknowledgementResult)
+            assertEquals("Exactly one cue terminal callback is required: $handoff", 1, handoff.acknowledgementTerminals)
+            assertTrue("The cue must finish after handoff: $handoff", handoff.acknowledgementTerminalAt > handoff.handoffAt)
+            assertTrue("Recognition may start only after the cue releases its output: $handoff", handoff.requestAt > handoff.acknowledgementTerminalAt)
             assertTrue("Actual recognition ready must follow its request: $handoff", handoff.readyAt > handoff.requestAt)
             assertTrue("Current Main ready must follow actual backend ready: $handoff", handoff.uiReadyAt > handoff.readyAt)
             assertTrue("An actual offline backend must be identified: $handoff", handoff.backend != null)
@@ -110,8 +113,8 @@ assertTrue("HOME re-entry needs a new actual ready: $returned", returned.homeRea
                 putString(
                     "stream",
                     "HOME_WAKE_HANDOFF actual_home_ready=true synthetic_final=true " +
-                        "actual_tts_done=true actual_command_ready=true home_reentry_ready=true " +
-                        "backend=" + handoff.backend + " human_accuracy=NOT_TESTED\n",
+                        "actual_cue_terminal=true actual_command_ready=true home_reentry_ready=true " +
+                        "backend=" + handoff.backend + " human_audibility=NOT_TESTED human_accuracy=NOT_TESTED\n",
                 )
             })
         } finally {
@@ -206,6 +209,12 @@ assertTrue("HOME re-entry needs a new actual ready: $returned", returned.homeRea
                             "HOME_WAKE_READY" -> { events.homeReady++; events.homeReadyAt = position }
                             "HOME_WAKE_TEST_SYNTHETIC_FINAL" -> events.syntheticAt = position
                             "HOME_WAKE_HANDOFF" -> { events.handoffs++; events.handoffAt = position }
+                            "HOME_WAKE_ACK_REQUESTED" -> events.acknowledgements++
+                            "HOME_WAKE_ACK_TERMINAL" -> {
+                                events.acknowledgementTerminals++
+                                events.acknowledgementTerminalAt = position
+                                events.acknowledgementResult = line.substringAfter("result=", "").substringBefore(' ')
+                            }
                             "OUTPUT_DONE" -> if (events.handoffAt > 0) events.doneAt = position
                             "ONE_SHOT_REQUESTED" -> { events.requests++; events.requestAt = position }
                             "READY" -> {
@@ -294,6 +303,10 @@ assertTrue("HOME re-entry needs a new actual ready: $returned", returned.homeRea
         var syntheticAt: Int = 0,
         var handoffs: Int = 0,
         var handoffAt: Int = 0,
+        var acknowledgements: Int = 0,
+        var acknowledgementTerminals: Int = 0,
+        var acknowledgementTerminalAt: Int = 0,
+        var acknowledgementResult: String? = null,
         var doneAt: Int = 0,
         var requests: Int = 0,
         var requestAt: Int = 0,

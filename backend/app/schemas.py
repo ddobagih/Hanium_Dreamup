@@ -45,6 +45,7 @@ ReportDemoFilter = Literal["all", "only_fake", "exclude_fake"]
 LocationQuality = Literal["missing", "low", "medium", "high"]
 ModelStatus = Literal["unavailable", "ready"]
 DetectV2ModelKey = Literal["custom_tactile", "coco_general", "unified_walksafe"]
+ReportV2ModelKey = Literal[DetectV2ModelKey, "walkmate_21cls"]
 DetectV2DistanceSource = Literal["sensor_depth", "manual_fixture", "model_estimate", "unknown"]
 DetectV2ApproachState = Literal["approaching", "stable", "receding", "unknown"]
 ReportV2Trigger = Literal["auto", "on_screen", "voice"]
@@ -1473,6 +1474,7 @@ class DetectV2Response(BaseModel):
 
 
 class ReportV2Metadata(DetectV2Detection):
+    model_key: ReportV2ModelKey
     source: Optional[Literal["android"]] = None
     trigger: ReportV2Trigger
     auto_reported: bool

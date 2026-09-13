@@ -106,7 +106,7 @@ class MainActivityPositionFieldSessionStaticTest {
         assertTrue(location.contains("updateGeomagneticReference("))
         assertTrue(chest.contains("PhoneMountingMethod.CHEST_FORWARD"))
         assertTrue(chest.contains("phoneMountingOutputsAllowed"))
-        assertTrue(chest.contains("if (!result.isValid) return null"))
+        assertTrue(chest.contains("chestMountedHeadingAt(timestampMs, maximumAgeMs)"))
     }
 
     @Test

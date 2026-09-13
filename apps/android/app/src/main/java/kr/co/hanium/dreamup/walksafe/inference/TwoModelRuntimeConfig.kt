@@ -18,9 +18,29 @@ data class TwoModelRuntimeConfig(
     val customTactile: ModelRuntimeConfig?,
     val cocoGeneral: ModelRuntimeConfig?,
 ) {
+    // Legacy pair loading can create its models even when their enabled flags are false.
+    internal val requiresGpuThreadOwner: Boolean
+        get() = listOfNotNull(unifiedWalksafe, customTactile, cocoGeneral)
+            .any { it.runtime.delegate == "gpu" }
+
+    /** Report identity preserves raw WalkMate class IDs while runtime selection keeps its logical key. */
+    fun modelKeyForReportClass(className: String): String? {
+        val name = className.lowercase()
+        val model = unifiedWalksafe
+        if (primaryModelKey == UNIFIED_MODEL_KEY && model?.enabled == true && name in model.classes) {
+            return if (model.outputFormat.isRaw &&
+                name in setOf("damaged_linear_tactile_paving", "damaged_dot_tactile_paving")) {
+                WALKMATE_REPORT_MODEL_KEY
+            } else primaryModelKey
+        }
+        val legacySelected = primaryModelKey == LEGACY_TWO_MODEL_KEY || fallbackModelKey == LEGACY_TWO_MODEL_KEY
+        return if (legacySelected && (customTactile?.classes?.contains(name) == true ||
+            cocoGeneral?.classes?.contains(name) == true)) LEGACY_TWO_MODEL_KEY else null
+    }
+
     fun sourceModelForReportModel(modelKey: String?): String? {
         val config = when (modelKey?.trim()?.lowercase()) {
-            UNIFIED_MODEL_KEY -> unifiedWalksafe
+            UNIFIED_MODEL_KEY, WALKMATE_REPORT_MODEL_KEY -> unifiedWalksafe
             LEGACY_TWO_MODEL_KEY,
             "custom_tactile" -> customTactile
             else -> null
@@ -30,7 +50,7 @@ data class TwoModelRuntimeConfig(
 
     fun thresholdForReportClass(modelKey: String?, className: String): Float? {
         val config = when (modelKey?.trim()?.lowercase()) {
-            UNIFIED_MODEL_KEY -> unifiedWalksafe
+            UNIFIED_MODEL_KEY, WALKMATE_REPORT_MODEL_KEY -> unifiedWalksafe
             LEGACY_TWO_MODEL_KEY,
             "custom_tactile" -> customTactile
             else -> null
@@ -42,6 +62,7 @@ data class TwoModelRuntimeConfig(
         private const val CONFIG_ASSET = "model-config/two_model_runtime.json"
         const val LEGACY_TWO_MODEL_KEY = "legacy_two_model"
         const val UNIFIED_MODEL_KEY = "unified_walksafe"
+        const val WALKMATE_REPORT_MODEL_KEY = "walkmate_21cls"
 
         fun load(context: Context): TwoModelRuntimeConfig {
             val json = context.assets.open(CONFIG_ASSET).bufferedReader().use { it.readText() }
@@ -109,6 +130,17 @@ data class TwoModelRuntimeConfig(
             val artifactSha256 = json.optString("artifact_sha256").ifBlank { null }
             val sourceModelSha256 = json.optString("source_model_sha256").ifBlank { null }
             val enabled = json.optBoolean("enabled", true)
+            val outputFormat = YoloOutputFormat.fromConfig(json.optString("output_format", YoloOutputFormat.END_TO_END_XYXY.configValue))
+            if (modelKey == UNIFIED_MODEL_KEY && outputFormat.isRaw) {
+                require(classes == TwoModelClassMap.unifiedWalksafeClasses) { "WalkMate class order must match the exported checkpoint" }
+            }
+            val maxDetections = if (json.has("max_detections")) {
+                val value = json.get("max_detections")
+                require((value is Int || value is Long) && (value as Number).toLong() in 1L..300L) {
+                    "max_detections must be an integer between 1 and 300"
+                }
+                (value as Number).toInt()
+            } else 300
             require(asset.startsWith("models/") && ".." !in asset) { "asset must be a relative models/ path" }
             require(inputSize > 0) { "input_size must be positive" }
             require(classes.isNotEmpty()) { "classes must not be empty" }
@@ -140,6 +172,9 @@ data class TwoModelRuntimeConfig(
                 artifactSha256 = artifactSha256,
                 sourceModelSha256 = sourceModelSha256,
                 runtime = parseRuntime(json.optJSONObject("runtime")),
+                outputFormat = outputFormat,
+                nmsIouThreshold = json.optDouble("nms_iou_threshold", 0.7).toFloat(),
+                maxDetections = maxDetections,
                 enabled = enabled,
             )
         }
@@ -172,16 +207,33 @@ data class TwoModelRuntimeConfig(
         private fun parseRuntime(json: JSONObject?): ModelRuntimeOptions {
             if (json == null) return ModelRuntimeOptions()
             val delegate = json.optString("delegate", ModelRuntimeOptions.DEFAULT_DELEGATE).lowercase()
-            val numThreads = json.optInt("num_threads", ModelRuntimeOptions.DEFAULT_NUM_THREADS)
+            val numThreads = if (!json.has("num_threads")) {
+                ModelRuntimeOptions.DEFAULT_NUM_THREADS
+            } else {
+                // optInt truncates fractions and wraps overflowing Long values on Android.
+                val rawThreads = json.get("num_threads")
+                require(rawThreads is Int || rawThreads is Long) {
+                    "runtime.num_threads must be a positive integer"
+                }
+                val exactThreads = (rawThreads as Number).toLong()
+                require(exactThreads in 1L..Int.MAX_VALUE.toLong()) {
+                    "runtime.num_threads must be a positive integer within Int range"
+                }
+                exactThreads.toInt()
+            }
             val fallbackToCpu = json.optBoolean("fallback_to_cpu", true)
+            val gpuPrecisionLossAllowed = json.optBoolean("gpu_precision_loss_allowed", false)
+            val gpuSerializationCacheEnabled = json.optBoolean("gpu_serialization_cache_enabled", true)
             require(delegate in ModelRuntimeOptions.SUPPORTED_DELEGATES) {
                 "runtime.delegate must be one of ${ModelRuntimeOptions.SUPPORTED_DELEGATES}"
             }
-            require(numThreads in 1..8) { "runtime.num_threads must be between 1 and 8" }
+            require(numThreads > 0) { "runtime.num_threads must be positive" }
             return ModelRuntimeOptions(
                 delegate = delegate,
                 numThreads = numThreads,
                 fallbackToCpu = fallbackToCpu,
+                gpuPrecisionLossAllowed = gpuPrecisionLossAllowed,
+                gpuSerializationCacheEnabled = gpuSerializationCacheEnabled,
             )
         }
 
@@ -219,7 +271,24 @@ data class ModelRuntimeConfig(
     val sourceModelSha256: String? = null,
     val runtime: ModelRuntimeOptions = ModelRuntimeOptions(),
     val enabled: Boolean = true,
+    val outputFormat: YoloOutputFormat = YoloOutputFormat.END_TO_END_XYXY,
+    val nmsIouThreshold: Float = 0.7f,
+    val maxDetections: Int = 300,
 ) {
+    init {
+        require(nmsIouThreshold.isFinite() && nmsIouThreshold in 0f..1f) { "nms_iou_threshold must be between 0 and 1" }
+        require(maxDetections in 1..300) { "max_detections must be between 1 and 300" }
+        if (outputFormat.isRaw) {
+            require(inputSize in 32..2048 && inputSize % 32 == 0) { "raw YOLO input size must be a multiple of 32" }
+        }
+    }
+
+    fun outputTensorShape(): IntArray = when (outputFormat) {
+        YoloOutputFormat.END_TO_END_XYXY -> intArrayOf(1, 300, 6)
+        YoloOutputFormat.RAW_XYWH_PIXELS, YoloOutputFormat.RAW_XYWH_NORMALIZED -> intArrayOf(1, 4 + classes.size,
+            listOf(8, 16, 32).sumOf { stride -> (inputSize / stride) * (inputSize / stride) })
+    }
+
     fun classNameForId(classId: Int): String? = classes.getOrNull(classId)
 
     fun isAllowedClass(className: String): Boolean {
@@ -243,10 +312,31 @@ data class ModelRuntimeOptions(
     val delegate: String = DEFAULT_DELEGATE,
     val numThreads: Int = DEFAULT_NUM_THREADS,
     val fallbackToCpu: Boolean = true,
+    val gpuPrecisionLossAllowed: Boolean = false,
+    val gpuSerializationCacheEnabled: Boolean = true,
 ) {
+    init {
+        require(delegate in SUPPORTED_DELEGATES) { "unsupported runtime delegate: $delegate" }
+        require(numThreads > 0) { "runtime.num_threads must be positive" }
+    }
+
     companion object {
         const val DEFAULT_DELEGATE = "cpu"
         const val DEFAULT_NUM_THREADS = 4
-        val SUPPORTED_DELEGATES = setOf("cpu", "nnapi")
+        val SUPPORTED_DELEGATES = setOf("cpu", "gpu", "nnapi")
+    }
+}
+
+/** Output layouts are explicit; a different model must never be guessed from tensor values. */
+enum class YoloOutputFormat(val configValue: String) {
+    END_TO_END_XYXY("yolo_end_to_end_xyxy"),
+    RAW_XYWH_PIXELS("yolo_raw_xywh_pixels"),
+    RAW_XYWH_NORMALIZED("yolo_raw_xywh_normalized");
+
+    val isRaw: Boolean get() = this != END_TO_END_XYXY
+
+    companion object {
+        fun fromConfig(value: String): YoloOutputFormat = values().firstOrNull { it.configValue == value }
+            ?: throw IllegalArgumentException("unsupported YOLO output_format: $value")
     }
 }

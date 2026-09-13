@@ -209,10 +209,19 @@ object PositionEvaluator {
     private fun metricsFor(channel: PositionChannel, samples: List<TraceSample>, truth: Map<Long, GeoPoint>): ChannelMetrics {
         val errors = mutableListOf<Double>()
         var cursor = -1
+        var latestChannelSample: TraceSample? = null
         for ((time, truthPoint) in truth) {
-            while (cursor + 1 < samples.size && samples[cursor + 1].utcEpochMs <= time) cursor += 1
-            if (cursor < 0) continue
-            val sample = samples[cursor]
+            while (cursor + 1 < samples.size && samples[cursor + 1].utcEpochMs <= time) {
+                cursor += 1
+                val candidate = samples[cursor]
+                if (candidate.point(channel) != null) {
+                    latestChannelSample = candidate
+                } else if (channel == PositionChannel.MATCHED && candidate.routeMatchEvaluated) {
+                    // Explicit re-evaluation without a match invalidates even a replayed sensor state.
+                    latestChannelSample = null
+                }
+            }
+            val sample = latestChannelSample ?: continue
             if (time - sample.utcEpochMs > MAX_ESTIMATE_AGE_MS) continue
             val estimate = sample.point(channel) ?: continue
             errors += haversineMeters(estimate, truthPoint)

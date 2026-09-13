@@ -20,6 +20,8 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
+import kr.co.hanium.dreamup.walksafe.voice.selectInstalledOfflineKoreanVoice
+import kr.co.hanium.dreamup.walksafe.voice.KoreanOfflineVoiceSelection
 
 const val PRIORITY_USER_TRAINING_VIBRATION_DURATION_MS = 370L
 
@@ -113,6 +115,9 @@ class AndroidFeedbackActuator(
         private const val UTTERANCE_START_TIMEOUT_MS = 8_000L
         private const val TTS_INITIALIZATION_TIMEOUT_MS = 10_000L
         private const val TTS_RECOVERY_DELAY_MS = 250L
+        // Initial attempt, one recovery attempt, and room for the caller's readiness poll.
+        const val INITIALIZATION_READINESS_TIMEOUT_MS =
+            2 * TTS_INITIALIZATION_TIMEOUT_MS + TTS_RECOVERY_DELAY_MS + 250L
     }
 
     private fun initializeTextToSpeech() {
@@ -163,20 +168,16 @@ class AndroidFeedbackActuator(
             failOfflineKoreanLanguage()
             return
         }
-        val offlineKoreanVoice = runCatching { textToSpeech.voices }.getOrNull().orEmpty()
-            .filter { voice ->
-                voice.locale.language.equals(Locale.KOREAN.language, ignoreCase = true) &&
-                    !voice.isNetworkConnectionRequired
+        when (selectInstalledOfflineKoreanVoice(textToSpeech)) {
+            KoreanOfflineVoiceSelection.SELECTED -> Unit
+            KoreanOfflineVoiceSelection.UNAVAILABLE -> {
+                failOfflineKoreanLanguage()
+                return
             }
-            .sortedBy { it.name }
-            .firstOrNull()
-        if (offlineKoreanVoice == null) {
-            failOfflineKoreanLanguage()
-            return
-        }
-        if (runCatching { textToSpeech.setVoice(offlineKoreanVoice) }.getOrDefault(TextToSpeech.ERROR) == TextToSpeech.ERROR) {
-            recoverTextToSpeechOrFail()
-            return
+            KoreanOfflineVoiceSelection.REJECTED -> {
+                recoverTextToSpeechOrFail()
+                return
+            }
         }
         textToSpeech.setAudioAttributes(
             AudioAttributes.Builder()
@@ -314,13 +315,21 @@ class AndroidFeedbackActuator(
         action: FeedbackAction,
         onSpeechCompleted: (() -> Unit)?,
         onSpeechFailed: (() -> Unit)?,
+        isStillValidAtStart: () -> Boolean = { true },
     ): RiskFeedbackDispatchResult {
+        if (SystemClock.elapsedRealtime() > action.validUntilMs ||
+            !runCatching(isStillValidAtStart).getOrDefault(false)
+        ) return RiskFeedbackDispatchResult(NavigationSpeechDispatchResult.SUPPRESSED, false)
         val speech = speak(
             message = action.message,
             priority = SpeechPriority.RISK,
             onCompleted = onSpeechCompleted,
             onFailed = onSpeechFailed,
             riskRank = action.level.ordinal,
+            advisoryStartDeadlineMs = action.validUntilMs,
+            advisoryStartValidator = isStillValidAtStart,
+            requiresExplicitTerminalCallback = true,
+            protectsFromFollowingSpeech = false,
         )
         val vibrationAccepted = vibrate(action.vibrationPatternMs)
         return RiskFeedbackDispatchResult(speech, vibrationAccepted)
@@ -379,7 +388,7 @@ class AndroidFeedbackActuator(
 
     fun cancelCommandInteraction() {
         val commandUtterances = synchronized(pendingUtterances) {
-            if (pendingUtterances.any { it.startsWith("$ANNOUNCE_ASSERTIVE_PREFIX-") }) return
+            if (pendingUtterances.any { !it.startsWith("$ANNOUNCE_INTERACTION_PREFIX-") }) return
             val owned = utteranceCallbacks.exclusiveCommandUtteranceIds(
                 pendingUtteranceIds = pendingUtterances,
                 explicitTerminalRequiredIds = explicitTerminalRequiredUtterances,
@@ -450,11 +459,14 @@ class AndroidFeedbackActuator(
         message: String,
         onCompleted: (() -> Unit)? = null,
         onFailed: (() -> Unit)? = null,
+        requiresExplicitTerminalCallback: Boolean = false,
     ): NavigationSpeechDispatchResult = speak(
         message = message,
         priority = SpeechPriority.NAVIGATION,
         onCompleted = onCompleted,
         onFailed = onFailed,
+        requiresExplicitTerminalCallback = requiresExplicitTerminalCallback,
+        protectsFromFollowingSpeech = false,
     )
 
     /** Cancels every stale route utterance; dispatch rules prevent navigation/risk coexistence. */
@@ -465,7 +477,10 @@ class AndroidFeedbackActuator(
         if (navigation.isEmpty()) return queuedNavigationRemoved
         if (ttsState == TtsState.READY) textToSpeech.stop()
         navigation.forEach {
-            markUtteranceFinished(it, completed = false, notifyFailure = false)
+            val notifyFailure = synchronized(pendingUtterances) {
+                it in explicitTerminalRequiredUtterances
+            }
+            markUtteranceFinished(it, completed = false, notifyFailure = notifyFailure)
         }
         lastNavMessage = ""
         lastNavMessageAtMs = 0L

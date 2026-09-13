@@ -1,0 +1,68 @@
+{
+  "sequence": {
+    "annotations": {
+      "checksum": "d6ea70a3d4e6fb63b0024edd8fb86d38aa05f81a",
+      "compressed": 13093,
+      "uid": "b6db058be7571ad1c4a3e78f2a993408778858a3bd408a937014cacac5905c654a784bba591896278bbf027e718f7ff1cd5948d6476be80ae70ed7144279aee7",
+      "uncompressed": 12429,
+      "url": "bag.zip"
+    },
+    "channels": {
+      "color": {
+        "checksum": "0041a1425cf0a7da0aeefccd8f6d90f77ba851a8",
+        "compressed": 3085182,
+        "pattern": "%08d.jpg",
+        "uid": "28b56d282ad4abeaaca820b1bebcab2f2aeb7a9a8b0da71f1103f7853a0add7e80ea7d6030892616d0ca0a639366418d3587c5e55bf759be91c4cfb514d53751",
+        "uncompressed": 3076950,
+        "url": "../../sequences/28b56d282ad4abeaaca820b1bebcab2f2aeb7a9a8b0da71f1103f7853a0add7e80ea7d6030892616d0ca0a639366418d3587c5e55bf759be91c4cfb514d53751.zip"
+      }
+    },
+    "fps": 30,
+    "height": 360,
+    "length": 196,
+    "name": "bag",
+    "preview": "bag.gif",
+    "thumbnail": "bag.png",
+    "width": 480
+  },
+  "description_url": "https://data.votchallenge.net/vot2016/main/description.json",
+  "downloads": [
+    {
+      "kind": "annotations",
+      "url": "https://data.votchallenge.net/vot2016/main/bag.zip",
+      "bytes": 13093,
+      "sha256": "0a732d120c03ce8c4d68603d221febed9d2fc7f51deebf3bc1ff58177d6f81f6",
+      "sha1": "d6ea70a3d4e6fb63b0024edd8fb86d38aa05f81a",
+      "upstream_sha1": "d6ea70a3d4e6fb63b0024edd8fb86d38aa05f81a",
+      "upstream_sha1_match": true,
+      "upstream_bytes": 13093,
+      "upstream_bytes_match": true
+    },
+    {
+      "kind": "color",
+      "url": "https://data.votchallenge.net/sequences/28b56d282ad4abeaaca820b1bebcab2f2aeb7a9a8b0da71f1103f7853a0add7e80ea7d6030892616d0ca0a639366418d3587c5e55bf759be91c4cfb514d53751.zip",
+      "bytes": 3096572,
+      "sha256": "0ed8f2c650d159f85e8cbc6ea330568198281905d2018c504ff808ea9782368f",
+      "sha1": "0041a1425cf0a7da0aeefccd8f6d90f77ba851a8",
+      "upstream_sha1": "0041a1425cf0a7da0aeefccd8f6d90f77ba851a8",
+      "upstream_sha1_match": true,
+      "upstream_bytes": 3085182,
+      "upstream_bytes_match": false
+    }
+  ],
+  "timestamp_basis": "Relative timestamps derived from official fps=30; no sensor clock supplied",
+  "track_id_basis": "bag:1 is a local stable ID for the single VOT target, not an upstream numeric ID",
+  "scope": "2D tracking only. No depth, IMU, physical distance, YOLO inference or Android device evidence.",
+  "license_status": "No explicit dataset license found; VOT support states old raw sequences have no specific license. Local evaluation only; redistribution/commercial rights unverified.",
+  "license_evidence_url": "https://groups.google.com/g/votchallenge-help/c/Qc1ZDl7pPuU",
+  "tag_lengths": {
+    "camera_motion": 157,
+    "motion_change": 157,
+    "illum_change": 157,
+    "size_change": 157,
+    "occlusion": 196
+  },
+  "tag_padding": "Missing trailing tags are unknown (empty), not zero; original files preserved",
+  "packaging": "Local instrumentation test APK assets only; never production APK assets",
+  "pixels": "196 original JPEGs; no private camera images"
+}

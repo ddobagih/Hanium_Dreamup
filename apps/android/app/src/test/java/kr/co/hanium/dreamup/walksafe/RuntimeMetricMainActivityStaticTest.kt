@@ -182,7 +182,7 @@ class RuntimeMetricMainActivityStaticTest {
         val failClosedGate = draw.indexOf("if (!runtimeMetricOutputAllowed)")
         val detector = draw.indexOf("scheduleDetectionIfDue(")
         val report = draw.indexOf("publishCurrentFrameReportState(")
-        val feedback = draw.indexOf("dispatchFeedback(")
+        val feedback = draw.indexOf("dispatchTactileFrameFeedback(")
 
         assertTrue("onDrawFrame needs an explicit fail-closed runtime metric gate", failClosedGate >= 0)
         assertTrue(detector >= 0)
@@ -242,7 +242,8 @@ class RuntimeMetricMainActivityStaticTest {
 
         val gate = functionBlock("private fun updateRuntimeMetricOutputGate(")
         assertTrue(gate.contains("synchronized(runtimeMetricStateLock)"))
-        assertTrue(gate.contains("frame.timestamp > runtimeMetricLastFrameTimestampNanos"))
+        assertTrue(gate.contains("assessRuntimeDepthFrame("))
+        assertTrue(gate.contains("previousFrameTimestampNanos = runtimeMetricLastFrameTimestampNanos"))
     }
 
     @Test
@@ -283,8 +284,11 @@ class RuntimeMetricMainActivityStaticTest {
         assertFalse(persistence.contains("fullDepth"))
         assertFalse(persistence.contains("ByteArray"))
 
-        val sampleCount = functionBlock("private fun DepthFrameSnapshot.runtimeMetricValidSampleCount()")
-        assertTrue(sampleCount.contains("maxOf(rawCount, fullCount)"))
+        val sampleCount = functionBlock("private fun DepthFrameSnapshot.runtimeMetricValidSampleCount(")
+        assertTrue(sampleCount.contains("validMetricSampleCount("))
+        assertTrue(sampleCount.contains("requireFreshRaw = requireFreshRaw"))
+        val preflight = functionBlock("private fun handleRuntimeMetricPreflightFrame(")
+        assertTrue(preflight.contains("runtimeMetricValidSampleCount(requireFreshRaw = true)"))
     }
 
     @Test
@@ -320,18 +324,19 @@ class RuntimeMetricMainActivityStaticTest {
         assertTrue(activationEnd > currentFrameCheck)
 
         val steadyState = gate.substringAfter("runtimeMetricActivationSession == null")
-        val orderCheck = steadyState.indexOf("if (frameOrderValid)")
+        val orderCheck = steadyState.indexOf("if (assessment.isNewFrame)")
         val timestampUpdate = steadyState.indexOf("runtimeMetricLastFrameTimestampNanos = frame.timestamp")
-        val validFrameBranch = steadyState.indexOf("if (currentFrameValid)")
+        val validFrameBranch = steadyState.indexOf("if (assessment.refreshesLastValidTime)")
         assertTrue(orderCheck >= 0)
         assertTrue(timestampUpdate > orderCheck)
         assertTrue("all increasing observations must advance the monotonic timestamp", timestampUpdate < validFrameBranch)
         assertTrue(
             steadyState.contains(
-                "shouldStartNavigation = currentFrameValid && runtimeMetricInitialNavigationStartPending",
+                "shouldStartNavigation = assessment.outputAllowed && runtimeMetricInitialNavigationStartPending",
             ),
         )
-        assertFalse(steadyState.contains("currentFrameValid && !runtimeMetricOutputAllowed"))
+        assertTrue(steadyState.contains("assessRuntimeDepthFrame("))
+        assertTrue(steadyState.contains("shouldHandleLoss = assessment.shouldHandleLoss"))
         assertTrue(steadyState.contains("startInitialNavigationServicesIfCurrent("))
         val navigationStart = functionBlock("private fun startInitialNavigationServicesIfCurrent(")
         val actualStart = navigationStart.indexOf("startNavigationServicesIfNeeded()")
@@ -402,7 +407,7 @@ class RuntimeMetricMainActivityStaticTest {
         assertFalse(collectionGate.contains("currentRuntimeMetricOutputAllowsWork()"))
         assertTrue(
             functionBlock("private fun startLocationUpdatesIfAllowed(")
-                .contains("currentLocationCollectionAllowsWork()"),
+                .contains("currentLocationCollectionOwnerOrNull()"),
         )
         assertTrue(
             functionBlock("private fun startStepTrackingIfAllowed()")

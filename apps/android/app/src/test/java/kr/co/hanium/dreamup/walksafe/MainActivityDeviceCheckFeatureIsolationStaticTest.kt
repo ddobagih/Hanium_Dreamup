@@ -45,6 +45,11 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         val mounting = functionBlock("private fun phoneMountingReadiness(")
         val runtimeMounting = functionBlock("private fun activatePhoneMountingRuntime()")
         val outputGate = functionBlock("private fun walkSafetyOutputsAllowed()")
+            .substringBefore("\n    private fun ")
+        val navigationGate = functionBlock("private fun navigationEnvironmentOutputsAllowed()")
+            .substringBefore("\n    private fun ")
+        val cameraGate = functionBlock("private fun cameraEnvironmentOutputsAllowed()")
+            .substringBefore("\n    private fun ")
         val watchdog = functionBlock("private fun scheduleOfficialEnvironmentRuntimeWatchdog(")
 
         assertTrue(confirm.contains("val requireLocation = postLoginDeviceFeatureEnabled("))
@@ -55,10 +60,24 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         assertTrue(gps.contains("(cameraRequired && !officialEnvironmentCameraPreflightActive)"))
         assertTrue(assessment.contains("OfficialEnvironmentFactor.GPS_QUALITY"))
         assertTrue(assessment.contains("OfficialEnvironmentFactor.CAMERA_QUALITY"))
+        assertTrue(assessment.contains("val enabledMeasuredFactors = buildSet"))
+        assertTrue(assessment.contains("if (postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE))"))
+        assertTrue(assessment.contains("if (cameraAnalysisFeaturesEnabled())"))
+        assertTrue(assessment.contains("enabledMeasuredFactors = enabledMeasuredFactors,"))
+        assertTrue(assessment.contains("runtimeUnavailableMeasuredFactors = runtimeUnavailableMeasuredFactors,"))
+        assertFalse(assessment.contains("status = EnvironmentEvidenceStatus.PASS"))
         assertTrue(mounting.contains("if (!cameraAnalysisFeaturesEnabled())"))
         assertTrue(mounting.contains("WalkSessionReadinessStatus.READY to \"\""))
         assertTrue(runtimeMounting.contains("phoneMountingOutputsAllowed = true"))
-        assertTrue(outputGate.contains("!cameraAnalysisFeaturesEnabled()"))
+        assertTrue(outputGate.contains("navigationEnvironmentOutputsAllowed() && cameraEnvironmentOutputsAllowed()"))
+        assertTrue(navigationGate.contains("postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)"))
+        assertTrue(navigationGate.contains("navigationOutputsAllowed == true"))
+        assertFalse(navigationGate.contains("phoneMountingOutputsAllowed"))
+        assertTrue(cameraGate.contains("cameraAnalysisFeaturesEnabled()"))
+        assertTrue(cameraGate.contains("hasCameraPermission()"))
+        assertTrue(cameraGate.contains("cameraOutputsAllowed == true"))
+        assertTrue(cameraGate.contains("phoneMountingOutputsAllowed"))
+        assertFalse(cameraGate.contains("!cameraAnalysisFeaturesEnabled()"))
         assertTrue(watchdog.contains("if (!locationRequired && !cameraRequired) return"))
     }
 
@@ -82,9 +101,11 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         assertTrue(confirmed.contains("if (!cameraAnalysisFeaturesEnabled())"))
         assertTrue(
             stepTracking.contains(
-                "if (cameraAnalysisFeaturesEnabled() && !phoneMountingOutputsAllowed) return false",
+                "if (!navigationEnvironmentOutputsAllowed()) return false",
             ),
         )
+        assertFalse(stepTracking.contains("phoneMountingOutputsAllowed"))
+        assertFalse(stepTracking.contains("cameraEnvironmentOutputsAllowed()"))
     }
 
     @Test

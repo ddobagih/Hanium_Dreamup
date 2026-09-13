@@ -23,6 +23,7 @@ internal data class VoskWakePhraseProbeResult(
     val availability: VoskWakePhraseProbeAvailability,
     val failure: VoskWakePhraseProbeFailure? = null,
     val streamingError: VoskStreamingError? = null,
+    val commandTranscript: VoskTranscript? = null,
 ) {
     init {
         require(
@@ -31,11 +32,19 @@ internal data class VoskWakePhraseProbeResult(
         require(
             (failure == VoskWakePhraseProbeFailure.STREAM_ERROR) == (streamingError != null),
         )
+        require(commandTranscript == null || (
+            availability == VoskWakePhraseProbeAvailability.AVAILABLE &&
+                commandTranscript.isFinal && commandTranscript.isTrustedForCommand() &&
+                commandTranscript.text.isNotBlank()
+            ))
     }
 
     companion object {
-        fun available(): VoskWakePhraseProbeResult = VoskWakePhraseProbeResult(
+        fun available(
+            commandTranscript: VoskTranscript? = null,
+        ): VoskWakePhraseProbeResult = VoskWakePhraseProbeResult(
             availability = VoskWakePhraseProbeAvailability.AVAILABLE,
+            commandTranscript = commandTranscript,
         )
 
         fun unavailable(
@@ -292,12 +301,11 @@ internal class VoskWakePhraseProbe internal constructor(
             return
         }
 
-        val addressed = when (
-            WakePhraseCommandExtractor.extractFinalTranscript(
-                transcript = transcript.text,
-                mode = WakePhraseCommandMode.WAKE_PHRASE_REQUIRED,
-            )
-        ) {
+        val extraction = WakePhraseCommandExtractor.extractFinalTranscript(
+            transcript = transcript.text,
+            mode = WakePhraseCommandMode.WAKE_PHRASE_REQUIRED,
+        )
+        val addressed = when (extraction) {
             WakePhraseCommandExtraction.NotAddressed -> false
             WakePhraseCommandExtraction.AwaitingCommand,
             is WakePhraseCommandExtraction.Command,
@@ -308,7 +316,13 @@ internal class VoskWakePhraseProbe internal constructor(
             else VoiceInputDiagnosticEvent.WAKE_NOT_ADDRESSED,
             transcript.confidence,
         )
-        if (addressed) finish(VoskWakePhraseProbeResult.available())
+        if (addressed) {
+            // Only HOME consumes a command in the wake utterance; capability probes never do.
+            val command = if (listenUntilWake && extraction is WakePhraseCommandExtraction.Command) {
+                transcript.copy(text = extraction.text)
+            } else null
+            finish(VoskWakePhraseProbeResult.available(command))
+        }
     }
 
     private fun handleError(

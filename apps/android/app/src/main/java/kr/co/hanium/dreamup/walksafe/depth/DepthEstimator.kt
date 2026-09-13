@@ -15,6 +15,12 @@ data class ObjectDepthInput(
     val motionContext: MotionContext = MotionContext(),
     val groundDistanceM: Float? = null,
     val rayDistanceM: Float? = null,
+    val rawDepthMatchesCameraFrame: Boolean = false,
+    val fullDepthMatchesCameraFrame: Boolean = false,
+    val rawDepthTimestampNs: Long? = null,
+    val fullDepthTimestampNs: Long? = null,
+    val visualTrackingQuality: Float = 1f,
+    val requireIndependentDepthObservation: Boolean = false,
 )
 
 /**
@@ -28,6 +34,21 @@ class ObjectDepthEstimator(
     private val tracker: ObjectTracker,
     private val messagePolicy: MessagePolicy = MessagePolicy(),
 ) {
+    /** Accepts validated mask statistics without resampling the surrounding bounding rectangle. */
+    fun estimateSupportedMask(input: ObjectDepthInput, stats: DepthStats, supportedPositionInAnchor: Vec3? = null,
+                              source: DepthSource = DepthSource.ARCORE_RAW_DEPTH): TrackedObjectDepth {
+        require(input.requireIndependentDepthObservation) { "mask depth requires independent observation accounting" }
+        require(when (source) {
+            DepthSource.ARCORE_RAW_DEPTH -> input.rawDepth != null && input.rawConfidence != null
+            DepthSource.ARCORE_FULL_DEPTH -> input.fullDepth != null
+            else -> false
+        }) { "mask depth requires its captured depth source" }
+        require(stats.medianM?.let { it.isFinite() && it > 0f } == true && stats.validSampleCount > 0 &&
+            stats.validSampleRatio.isFinite() && stats.validSampleRatio in 0f..1f
+        ) { "mask statistics must describe a supported whole mask" }
+        return buildMetricResult(source, stats, input, supportedPositionInAnchor)
+    }
+
     fun estimate(input: ObjectDepthInput): TrackedObjectDepth {
         val depthPolygon = input.mapper.imagePolygonToDepthPolygon(input.geometry.polygonNorm)
         if (depthPolygon.size < 3) {
@@ -65,7 +86,8 @@ class ObjectDepthEstimator(
         return buildPseudoTrendResult(input)
     }
 
-    private fun buildMetricResult(source: DepthSource, stats: DepthStats, input: ObjectDepthInput): TrackedObjectDepth {
+    private fun buildMetricResult(source: DepthSource, stats: DepthStats, input: ObjectDepthInput,
+                                  supportedPositionInAnchor: Vec3? = null): TrackedObjectDepth {
         val riskDistance = chooseRiskDistance(input.geometry.className, stats, input.groundDistanceM)
         val provisionalConfidence = computeConfidence(
             source = source,
@@ -74,14 +96,31 @@ class ObjectDepthEstimator(
             track = input.track,
             motionContext = input.motionContext,
             depthFreshnessQuality = input.depthFreshnessQuality(source),
+            visualTrackingQuality = input.visualTrackingQuality,
             hardGate = if (input.track.idSwitchSuspected) 0f else 1f,
         )
-        tracker.recordDistance(
+        val cameraPose = input.motionContext.reliableCameraPoseEvidence()?.takeIf {
+            it.timestampMs == input.timestampMs && input.depthFreshnessQuality(source) >= 0.8f &&
+                when (source) {
+                    DepthSource.ARCORE_RAW_DEPTH -> input.rawDepthMatchesCameraFrame
+                    DepthSource.ARCORE_FULL_DEPTH -> input.fullDepthMatchesCameraFrame
+                    else -> false
+                }
+        }
+        val metricObservationAccepted = tracker.recordDistance(
             track = input.track,
             distanceM = riskDistance,
             source = source,
             confidence = provisionalConfidence.finalScore,
             timestampMs = input.timestampMs,
+            cameraPoseEvidence = cameraPose,
+            objectPositionInAnchor = supportedPositionInAnchor ?: stats.medianM?.let { cameraPose?.objectCenterInAnchor(input.geometry.centerNorm, it) },
+            depthObservationTimestampNs = when (source) {
+                DepthSource.ARCORE_RAW_DEPTH -> input.rawDepthTimestampNs?.takeIf { it > 0L && input.rawDepthMatchesCameraFrame }
+                DepthSource.ARCORE_FULL_DEPTH -> input.fullDepthTimestampNs?.takeIf { it > 0L && input.fullDepthMatchesCameraFrame }
+                else -> null
+            },
+            requireIndependentDepthObservation = input.requireIndependentDepthObservation,
         )
         val kinematics = tracker.approachKinematics(input.track, riskDistance, source)
         val confidence = computeConfidence(
@@ -91,7 +130,8 @@ class ObjectDepthEstimator(
             track = input.track,
             motionContext = input.motionContext,
             depthFreshnessQuality = input.depthFreshnessQuality(source),
-            hardGate = if (input.track.idSwitchSuspected) 0f else 1f,
+            visualTrackingQuality = input.visualTrackingQuality,
+            hardGate = if (input.track.idSwitchSuspected || !metricObservationAccepted) 0f else 1f,
         )
         val userFacing = messagePolicy.buildUserFacing(
             MetricDepthDecision(
@@ -102,6 +142,8 @@ class ObjectDepthEstimator(
                 confidenceFinal = confidence.finalScore,
                 trackKey = input.track.trackId,
                 timeToCollisionMs = kinematics.timeToCollisionMs,
+                objectMotion = kinematics.objectMotion,
+                motionEstimate = kinematics.motionEstimate,
             ),
             nowMs = input.timestampMs,
         )
@@ -120,6 +162,7 @@ class ObjectDepthEstimator(
 
     /** Keeps approach/recede context without fabricating metric distance when ARCore depth is unusable. */
     private fun buildPseudoTrendResult(input: ObjectDepthInput, reasonHardGate: Float = 1f): TrackedObjectDepth {
+        input.track.invalidateMotionEvidence(input.timestampMs)
         val pseudo = pseudoTrend(input.track, input.motionContext)
         val stats = DepthStats(
             validSampleCount = 0,
@@ -138,7 +181,8 @@ class ObjectDepthEstimator(
             sampleQuality = 0f,
             depthQuality = 0f,
             detectionQuality = input.geometry.detectionConfidence.coerceIn(0f, 1f),
-            trackingQuality = if (input.track.stable && !input.track.idSwitchSuspected) 0.8f else 0.2f,
+            trackingQuality = (if (input.track.stable && !input.track.idSwitchSuspected) 0.8f else 0.2f) *
+                input.visualTrackingQuality.coerceIn(0f, 1f),
             motionQuality = input.motionContext.safeMotionQuality,
             freshnessQuality = input.motionContext.freshnessQuality.coerceIn(0f, 1f),
             corridorQuality = corridorQuality(input.geometry),
@@ -175,6 +219,7 @@ class ObjectDepthEstimator(
         track: TrackState,
         motionContext: MotionContext,
         depthFreshnessQuality: Float,
+        visualTrackingQuality: Float,
         hardGate: Float,
     ): DepthConfidenceBreakdown {
         val sampleCountScore = (stats.validSampleCount / TARGET_SAMPLES.toFloat()).coerceIn(0f, 1f)
@@ -202,7 +247,7 @@ class ObjectDepthEstimator(
             sampleQuality = sampleQuality.coerceIn(0f, 1f),
             depthQuality = depthQuality.coerceIn(0f, 1f),
             detectionQuality = geometry.detectionConfidence.coerceIn(0f, 1f),
-            trackingQuality = trackingQuality,
+            trackingQuality = trackingQuality * visualTrackingQuality.coerceIn(0f, 1f),
             motionQuality = motionContext.safeMotionQuality,
             freshnessQuality = minOf(
                 motionContext.freshnessQuality.coerceIn(0f, 1f),
@@ -297,6 +342,9 @@ class ObjectDepthEstimator(
             userFacing = userFacing,
             trackAgeFrames = track.ageFrames,
             trackStableMs = (timestampMs - track.createdAtMs).coerceAtLeast(0L),
+            objectMotion = kinematics.objectMotion,
+            motionEstimate = kinematics.motionEstimate,
+            userMotion = motionContext.userMotion,
         )
     }
 

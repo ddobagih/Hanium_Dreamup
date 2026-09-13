@@ -36,6 +36,30 @@ class PositionFieldSessionRecorderTest {
     val temporaryFolder = TemporaryFolder()
 
     @Test
+    fun exportsUnavailableReplayedMatchAsExplicitEvaluationWithoutInventingCoordinates() {
+        val fixture = fixture("replayed_match")
+        val lease = requireNotNull(fixture.recorder.start(metadata(), binding(17L)))
+        fixture.elapsedNs = 2_000L
+        assertTrue(fixture.recorder.append(lease, fullRecord(fixture.elapsedNs).copy(
+            source = PositionTraceSource.SENSOR_GNSS_ANCHORED,
+            rawPosition = null,
+            matchedPosition = null,
+            routeMatchEvaluated = true,
+        )))
+        fixture.elapsedNs = 3_000L
+        fixture.nowMs = 2_000L
+        assertTrue(fixture.recorder.stop(lease))
+        val output = ByteArrayOutputStream()
+        assertEquals(PositionFieldExportStatus.EXPORTED,
+            fixture.recorder.export(lease.sessionId, binding(17L), output).status)
+        val record = JSONObject(output.toString(Charsets.UTF_8.name()).lineSequence().drop(1).first())
+        assertTrue(record.getBoolean("route_match_evaluated"))
+        assertFalse(record.has("matched_position"))
+        assertFalse(record.has("raw_position"))
+        assertEquals("sensor_gnss_anchored", record.getString("source"))
+    }
+
+    @Test
     fun exportsCanonicalHeaderRecordsAndHashedFooterWithoutScope() {
         val fixture = fixture("canonical_export")
         val lease = requireNotNull(fixture.recorder.start(metadata(), binding(17L)))

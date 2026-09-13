@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.positioneval.core
 
 import java.io.File
 import java.security.MessageDigest
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -26,6 +27,210 @@ class TraceV2ParserTest {
         val result = TraceV2Parser.parse(temporaryFile(validTrace(records)))
         assertEquals(2, result.samples.size)
         assertEquals(0.0, result.timeOffsetSpreadMs, 0.001)
+    }
+
+    @Test
+    fun delayedGnssAfterSensorIsSortedByMeasurementUtcWithLaterCorrectionLast() {
+        val origin = 1_700_000_000_000L
+        val records = listOf(
+            position(1, 2_100_000_000L, 2_000_000_000L, "sensor_gnss_anchored", origin + 2_000L),
+            position(2, 2_200_000_000L, 1_000_000_000L, "gnss", origin + 1_000L),
+            position(3, 2_300_000_000L, 2_000_000_000L, "sensor_gnss_anchored", origin + 2_000L),
+        )
+
+        val result = TraceV2Parser.parse(temporaryFile(validTrace(records)))
+
+        assertEquals(listOf(2L, 1L, 3L), result.samples.map { it.sequence })
+        assertEquals(origin + 1_000L, result.startUtcEpochMs)
+        assertEquals(origin + 2_000L, result.endUtcEpochMs)
+        assertEquals(0.0, result.timeOffsetSpreadMs, 0.001)
+    }
+
+    @Test
+    fun fractionalNanosecondGnssReanchorNormalizesSameMeasurementWithoutChangingSealedFile() {
+        val origin = 1_700_000_000_000L
+        val records = listOf(
+            position(1, 1_100_000_000L, 1_000_900_000L, "gnss", origin + 1_001L),
+            position(2, 2_100_000_000L, 2_000_000_000L, "sensor_gnss_anchored", origin + 2_000L),
+            position(3, 2_200_000_000L, 1_500_100_000L, "gnss", origin + 1_500L),
+            position(4, 2_300_000_000L, 2_000_000_000L, "sensor_gnss_anchored", origin + 1_999L),
+        )
+        val file = temporaryFile(validTrace(records))
+        val sealedBytes = file.readBytes()
+
+        val result = TraceV2Parser.parse(file)
+
+        assertEquals(listOf(1L, 3L, 2L, 4L), result.samples.map { it.sequence })
+        assertEquals(listOf(origin + 2_000L, origin + 2_000L), result.samples.takeLast(2).map { it.utcEpochMs })
+        assertEquals(1.1, result.timeOffsetSpreadMs, 0.001)
+        assertArrayEquals(sealedBytes, file.readBytes())
+    }
+
+    @Test
+    fun oneMillisecondReversalRetainsActualMeasurementOrderBeforeReceiptTieBreaking() {
+        val origin = 1_700_000_000_000L
+        val records = listOf(
+            position(1, 1_100_000_000L, 1_000_200_000L, "gnss", origin + 1_001L),
+            position(2, 1_200_000_000L, 1_000_100_000L, "gnss", origin + 1_002L),
+        )
+
+        val result = TraceV2Parser.parse(temporaryFile(validTrace(records)))
+
+        assertEquals(listOf(2L, 1L), result.samples.map { it.sequence })
+        assertEquals(listOf(origin + 1_002L, origin + 1_002L), result.samples.map { it.utcEpochMs })
+    }
+
+    @Test
+    fun repeatedOneMillisecondRegressionsCannotAccumulateBehindRoundingClamp() {
+        val origin = 1_700_000_000_000L
+        assertReason(
+            "TIME_ALIGNMENT_FAILED",
+            validTrace(
+                listOf(
+                    position(1, 1_100_000_000L, 1_000_000_000L, "gnss", origin + 1_000L),
+                    position(2, 1_200_000_000L, 1_000_100_000L, "gnss", origin + 999L),
+                    position(3, 1_300_000_000L, 1_000_200_000L, "gnss", origin + 998L),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun sameMeasurementGroupCannotHideTwoMillisecondClockChangeOrCompoundRounding() {
+        val origin = 1_700_000_000_000L
+        val first = position(1, 1_100_000_000L, 1_000_000_000L, "gnss", origin + 1_000L)
+        listOf(1_000_000_000L, 1_000_100_000L).forEach { measurement ->
+            assertReason(
+                "TIME_ALIGNMENT_FAILED",
+                validTrace(
+                    listOf(
+                        first,
+                        position(2, 1_200_000_000L, measurement, "gnss", origin + 999L),
+                        position(3, 1_300_000_000L, measurement, "gnss", origin + 998L),
+                    ),
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun routeMatchEvaluationFlagUsesStrictBooleanAndPreservesLegacySourceDefaults() {
+        val origin = 1_700_000_000_000L
+        val records = listOf(
+            position(1, 1_100_000_000L, 1_000_000_000L, "gnss", origin + 1_000L),
+            position(2, 1_200_000_000L, 1_000_000_000L, "sensor_gnss_anchored", origin + 1_000L),
+            positionWithPoints(
+                3, 1_300_000_000L, 1_000_000_000L, "sensor_gnss_anchored", origin + 1_000L,
+                null, 37.5, null, routeMatchEvaluated = true,
+            ),
+            positionWithPoints(
+                4, 1_400_000_000L, 1_000_000_000L, "sensor_gnss_anchored", origin + 1_000L,
+                null, 37.5, null, routeMatchEvaluated = false,
+            ),
+        )
+        val result = TraceV2Parser.parse(temporaryFile(validTrace(records)))
+        assertEquals(listOf(true, false, true, false), result.samples.map { it.routeMatchEvaluated })
+        listOf("\"true\"", "1", "null").forEach { invalid ->
+            assertReason(
+                "TRACE_FIELD_INVALID",
+                validTrace(listOf(records.first().dropLast(1) + ",\"route_match_evaluated\":$invalid}")),
+            )
+        }
+    }
+
+    @Test
+    fun millisecondNormalizedReplayUsesLatestMatchOrExplicitUnmatchedCorrection() {
+        val origin = 1_700_000_000_000L
+        val truthPoint = GeoPoint(37.5, 127.2)
+        for (correctionHasMatch in listOf(true, false)) {
+            val records = (1..31).flatMap { index ->
+                val measurementNs = index * 1_000_000_000L
+                val utc = origin + index * 1_000L
+                listOf(
+                    positionWithPoints(
+                        index * 2 - 1, measurementNs + 100_000_000L, measurementNs, "sensor_gnss_anchored", utc,
+                        null, 37.5, 37.6, routeMatchEvaluated = true,
+                    ),
+                    positionWithPoints(
+                        index * 2, measurementNs + 200_000_000L, measurementNs, "sensor_gnss_anchored", utc - 1L,
+                        null, 37.5, 37.5.takeIf { correctionHasMatch }, routeMatchEvaluated = true,
+                    ),
+                )
+            }
+            val trace = TraceV2Parser.parse(temporaryFile(validTrace(records)))
+            val epochs = (1..31).map { index ->
+                PpkEpoch(origin + index * 1_000L, truthPoint, 0.0, 1, 15, 0.1, 0.1, 5.0)
+            }
+
+            val result = PositionEvaluator.evaluate(trace, ParsedPpk("UTC", epochs, epochs.size))
+
+            assertEquals(EvaluationStatus.EVALUATED, result.status)
+            val matched = result.metrics.single { it.channel == PositionChannel.MATCHED }
+            assertEquals(if (correctionHasMatch) 31 else 0, matched.availableCount)
+            if (correctionHasMatch) assertEquals(0.0, requireNotNull(matched.maxErrorM), 0.001)
+        }
+    }
+
+    @Test
+    fun delayedPositionAfterAnchoredCheckpointIsAllowedWhenMeasurementClocksAgree() {
+        val origin = 1_700_000_000_000L
+        val records = listOf(
+            checkpoint(1, 2_100_000_000L, 2_000_000_000L, "checkpoint_gnss_anchored", origin + 2_000L, 1),
+            position(2, 2_200_000_000L, 1_000_000_000L, "gnss", origin + 1_000L),
+        )
+
+        val result = TraceV2Parser.parse(temporaryFile(validTrace(records)))
+
+        assertEquals(1, result.samples.size)
+        assertEquals(0.0, result.timeOffsetSpreadMs, 0.001)
+    }
+
+    @Test
+    fun rejectsActualMeasurementUtcRegressionEvenWithinOffsetTolerance() {
+        val origin = 1_700_000_000_000L
+        assertReason(
+            "TIME_ALIGNMENT_FAILED",
+            validTrace(
+                listOf(
+                    position(1, 1_100_000_000L, 1_000_000_000L, "gnss", origin + 1_000L),
+                    position(2, 1_200_000_000L, 1_050_000_000L, "gnss", origin + 990L),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun rejectsAnchoredCheckpointWithInconsistentUtcClock() {
+        val origin = 1_700_000_000_000L
+        assertReason(
+            "TIME_ALIGNMENT_FAILED",
+            validTrace(
+                listOf(
+                    position(1, 1_100_000_000L, 1_000_000_000L, "gnss", origin + 1_000L),
+                    checkpoint(2, 2_100_000_000L, 2_000_000_000L, "checkpoint_gnss_anchored", origin + 2_101L, 1),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun measurementReorderingDoesNotRelaxReceiptSequenceOrElapsedValidation() {
+        val origin = 1_700_000_000_000L
+        val first = position(1, 2_100_000_000L, 2_000_000_000L, "sensor_gnss_anchored", origin + 2_000L)
+        listOf(2_000_000_000L, 2_100_000_000L).forEach { receipt ->
+            assertReason(
+                "TIME_ALIGNMENT_FAILED",
+                validTrace(listOf(first, position(2, receipt, 1_000_000_000L, "gnss", origin + 1_000L))),
+            )
+        }
+        assertReason(
+            "TRACE_SEQUENCE_INVALID",
+            validTrace(listOf(first, position(3, 2_200_000_000L, 1_000_000_000L, "gnss", origin + 1_000L))),
+        )
+        assertReason(
+            "TIME_ALIGNMENT_FAILED",
+            validTrace(listOf(first, position(2, 2_200_000_000L, 2_300_000_000L, "gnss", origin + 2_300L))),
+        )
     }
 
     @Test
@@ -118,9 +323,11 @@ class TraceV2ParserTest {
         rawLatitude: Double?,
         filteredLatitude: Double?,
         matchedLatitude: Double?,
+        routeMatchEvaluated: Boolean? = null,
     ): String =
         "{\"elapsed_realtime_ns\":$elapsed,\"measurement_elapsed_realtime_ns\":$measurement," +
             (utc?.let { "\"measurement_utc_epoch_ms\":$it," } ?: "") +
+            (routeMatchEvaluated?.let { "\"route_match_evaluated\":$it," } ?: "") +
             (rawLatitude?.let { "\"raw_position\":{\"latitude_deg\":$it,\"longitude_deg\":127.0}," } ?: "") +
             (filteredLatitude?.let { "\"filtered_position\":{\"latitude_deg\":$it,\"longitude_deg\":127.1}," } ?: "") +
             (matchedLatitude?.let { "\"matched_position\":{\"latitude_deg\":$it,\"longitude_deg\":127.2}," } ?: "") +

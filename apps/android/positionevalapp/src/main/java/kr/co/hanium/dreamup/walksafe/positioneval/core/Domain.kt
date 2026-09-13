@@ -15,12 +15,14 @@ enum class PositionChannel(val wireName: String) {
 
 data class TraceSample(
     val sequence: Long,
+    /** Derived join time; parser may normalize UTC quantization forward by at most 1ms. */
     val utcEpochMs: Long,
     val elapsedRealtimeNs: Long,
     val measurementTimeSource: String,
     val raw: GeoPoint?,
     val filtered: GeoPoint?,
     val matched: GeoPoint?,
+    val routeMatchEvaluated: Boolean = measurementTimeSource == "gnss",
 ) {
     fun point(channel: PositionChannel): GeoPoint? = when (channel) {
         PositionChannel.RAW -> raw
@@ -34,6 +36,7 @@ data class TraceSession(
     val startUtcEpochMs: Long,
     val endUtcEpochMs: Long,
     val center: GeoPoint,
+    /** Spread of original sealed measurement UTC offsets, before derived-time normalization. */
     val timeOffsetSpreadMs: Double,
 )
 

@@ -37,7 +37,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
-            android:text="기준국 다운로드 설정"
+            android:text="자동 다운로드용 키 (선택)"
             android:textColor="@color/ink"
             android:textSize="20sp"
             android:textStyle="bold" />
@@ -111,6 +111,32 @@
             android:text="@string/gnss_empty"
             android:textColor="@color/muted"
             android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/selectBaseButton"
+            style="@style/EvalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/select_base" />
+
+        <TextView
+            android:id="@+id/baseState"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/base_empty"
+            android:textColor="@color/muted"
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/analyzeManualButton"
+            style="@style/EvalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:enabled="false"
+            android:text="@string/start_manual_analysis" />
 
         <Button
             android:id="@+id/analyzeButton"

@@ -15,6 +15,7 @@ class MainActivityWalkVoiceControlStaticTest {
             source,
             "private fun handleVoiceCommandPhrases",
         )
+        assertTrue(commands.contains("val recognized = phrases.firstOrNull().orEmpty()"))
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 commands,

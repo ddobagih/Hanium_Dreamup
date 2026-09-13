@@ -9,52 +9,108 @@ import java.io.File
 
 class TwoModelRuntimeConfigTest {
     @Test
+    fun runtimeThreadsAcceptEntirePositiveIntDomainWithoutADeviceLimit() {
+        val json = File("src/main/assets/model-config/two_model_runtime.json").readText()
+        for (threads in listOf(1, 3, 8, 9, 12, Int.MAX_VALUE)) {
+            assertEquals(threads, ModelRuntimeOptions(numThreads = threads).numThreads)
+            val changed = json.replace(Regex("\"num_threads\"\\s*:\\s*[0-9]+"), "\"num_threads\": $threads")
+            assertEquals(threads, TwoModelRuntimeConfig.parse(changed).unifiedWalksafe?.runtime?.numThreads)
+        }
+    }
+
+    @Test
+    fun runtimeThreadsRejectFractionStringsNullAndOverflowInsteadOfCoercing() {
+        val json = File("src/main/assets/model-config/two_model_runtime.json").readText()
+        for (invalid in listOf("0", "-1", "1.5", "4.0", "\"4\"", "null", "true", "2147483648", "4294967300", "1e100")) {
+            val changed = json.replace(Regex("\"num_threads\"\\s*:\\s*[0-9]+"), "\"num_threads\": $invalid")
+            assertThrows("must reject $invalid", IllegalArgumentException::class.java) { TwoModelRuntimeConfig.parse(changed) }
+        }
+        assertThrows(IllegalArgumentException::class.java) { ModelRuntimeOptions(numThreads = 0) }
+        assertThrows(IllegalArgumentException::class.java) { ModelRuntimeOptions(numThreads = -1) }
+    }
+
+    @Test
     fun parsesAndroidAssetConfigAsRuntimeSourceOfTruth() {
         val json = File("src/main/assets/model-config/two_model_runtime.json").readText()
         val config = TwoModelRuntimeConfig.parse(json)
 
-        assertEquals("walksafe-android-runtime-unified-768-primary-20260711", config.bundleVersion)
+        assertEquals("walksafe-android-runtime-walkmate21-yolo11n-768-fp32-normalized-bilinear-20260913", config.bundleVersion)
         assertEquals(TwoModelRuntimeConfig.UNIFIED_MODEL_KEY, config.primaryModelKey)
-        assertEquals(TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY, config.fallbackModelKey)
-        assertEquals("models/walksafe_unified_yolo26n_768_float32.tflite", config.unifiedWalksafe?.asset)
+        assertNull(config.fallbackModelKey)
+        assertEquals("models/walkmate_yolo11n_21cls_768_float32.tflite", config.unifiedWalksafe?.asset)
         assertEquals(768, config.unifiedWalksafe?.inputSize)
-        assertEquals("92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19", config.unifiedWalksafe?.artifactSha256)
-        assertEquals("a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669", config.unifiedWalksafe?.sourceModelSha256)
+        assertEquals("d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57", config.unifiedWalksafe?.artifactSha256)
+        assertEquals("6f8ae9d2bb82f91e4391e42957a1b374bd4b14efa4702a86f7283454bc38cee0", config.unifiedWalksafe?.sourceModelSha256)
         assertEquals(
-            "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+            "model/artifacts/candidates/walkmate_21cls_yolo11n_img768_20260912/best.pt",
             config.unifiedWalksafe?.sourceModel,
         )
+        val unifiedRuntime = requireNotNull(config.unifiedWalksafe).runtime
+        assertEquals("gpu", unifiedRuntime.delegate)
+        assertEquals(4, unifiedRuntime.numThreads)
+        assertTrue(unifiedRuntime.fallbackToCpu)
+        assertEquals(false, unifiedRuntime.gpuPrecisionLossAllowed)
+        assertTrue(unifiedRuntime.gpuSerializationCacheEnabled)
         assertEquals(true, config.unifiedWalksafe?.enabled)
-        assertEquals(13, config.unifiedWalksafe?.classes?.size)
-        assertEquals("person", config.unifiedWalksafe?.classNameForId(0))
-        assertEquals("car", config.unifiedWalksafe?.classNameForId(2))
-        assertEquals("normal_tactile_block", config.unifiedWalksafe?.classNameForId(7))
-        assertEquals("damaged_tactile_block", config.unifiedWalksafe?.classNameForId(8))
-        assertEquals("crosswalk", config.unifiedWalksafe?.classNameForId(9))
-        assertEquals("curb_step", config.unifiedWalksafe?.classNameForId(10))
-        assertEquals("uneven_sidewalk", config.unifiedWalksafe?.classNameForId(11))
-        assertEquals("e_scooter_obstruction", config.unifiedWalksafe?.classNameForId(12))
-        assertTrue(config.unifiedWalksafe?.isAllowedClass("car") == true)
-        assertTrue(config.unifiedWalksafe?.isAllowedClass("normal_tactile_block") == true)
-        assertTrue(config.unifiedWalksafe?.isAllowedClass("e_scooter_obstruction") == true)
+        assertEquals(YoloOutputFormat.RAW_XYWH_NORMALIZED, config.unifiedWalksafe?.outputFormat)
+        org.junit.Assert.assertArrayEquals(intArrayOf(1, 25, 12096), requireNotNull(config.unifiedWalksafe).outputTensorShape())
+        assertEquals(21, config.unifiedWalksafe?.classes?.size)
+        assertEquals("linear_tactile_paving", config.unifiedWalksafe?.classNameForId(0))
+        assertEquals("damaged_linear_tactile_paving", config.unifiedWalksafe?.classNameForId(1))
+        assertEquals("dot_tactile_paving", config.unifiedWalksafe?.classNameForId(2))
+        assertEquals("damaged_dot_tactile_paving", config.unifiedWalksafe?.classNameForId(3))
+        assertEquals("passenger_car", config.unifiedWalksafe?.classNameForId(4))
+        assertEquals("bus", config.unifiedWalksafe?.classNameForId(5))
+        assertEquals("truck", config.unifiedWalksafe?.classNameForId(6))
+        assertEquals("motorcycle", config.unifiedWalksafe?.classNameForId(7))
+        assertEquals("bicycle", config.unifiedWalksafe?.classNameForId(8))
+        assertEquals("abandoned_e_scooter", config.unifiedWalksafe?.classNameForId(9))
+        assertEquals("moving_e_scooter", config.unifiedWalksafe?.classNameForId(10))
+        assertEquals("traffic_light", config.unifiedWalksafe?.classNameForId(11))
+        assertEquals("crosswalk", config.unifiedWalksafe?.classNameForId(12))
+        assertEquals("construction_fence", config.unifiedWalksafe?.classNameForId(13))
+        assertEquals("barricade", config.unifiedWalksafe?.classNameForId(14))
+        assertEquals("traffic_cone", config.unifiedWalksafe?.classNameForId(15))
+        assertEquals("bollard", config.unifiedWalksafe?.classNameForId(16))
+        assertEquals("utility_or_streetlight_pole", config.unifiedWalksafe?.classNameForId(17))
+        assertEquals("trash_bin", config.unifiedWalksafe?.classNameForId(18))
+        assertEquals("portable_sign", config.unifiedWalksafe?.classNameForId(19))
+        assertEquals("person", config.unifiedWalksafe?.classNameForId(20))
+        assertTrue(config.unifiedWalksafe?.isAllowedClass("passenger_car") == true)
+        assertTrue(config.unifiedWalksafe?.isAllowedClass("linear_tactile_paving") == true)
+        assertTrue(config.unifiedWalksafe?.isAllowedClass("abandoned_e_scooter") == true)
         val activeThresholds = mapOf(
-            "person" to 0.2f,
-            "bicycle" to 0.2f,
-            "car" to 0.2f,
-            "motorcycle" to 0.2f,
-            "bus" to 0.2f,
-            "truck" to 0.2f,
-            "traffic light" to 0.3f,
-            "normal_tactile_block" to 0.3f,
-            "damaged_tactile_block" to 0.3f,
-            "crosswalk" to 0.3f,
-            "curb_step" to 0.2f,
-            "uneven_sidewalk" to 0.15f,
-            "e_scooter_obstruction" to 0.35f,
+            "linear_tactile_paving" to 0.25f,
+            "damaged_linear_tactile_paving" to 0.3f,
+            "dot_tactile_paving" to 0.25f,
+            "damaged_dot_tactile_paving" to 0.3f,
+            "passenger_car" to 0.15f,
+            "bus" to 0.15f,
+            "truck" to 0.15f,
+            "motorcycle" to 0.15f,
+            "bicycle" to 0.15f,
+            "abandoned_e_scooter" to 0.25f,
+            "moving_e_scooter" to 0.15f,
+            "traffic_light" to 0.3f,
+            "crosswalk" to 0.25f,
+            "construction_fence" to 0.15f,
+            "barricade" to 0.15f,
+            "traffic_cone" to 0.15f,
+            "bollard" to 0.15f,
+            "utility_or_streetlight_pole" to 0.15f,
+            "trash_bin" to 0.15f,
+            "portable_sign" to 0.15f,
+            "person" to 0.15f,
         )
         activeThresholds.forEach { (className, expected) ->
             assertEquals(className, expected, requireNotNull(config.unifiedWalksafe).thresholdForClass(className), 0.0001f)
         }
+        assertEquals(0.15f, requireNotNull(config.unifiedWalksafe).thresholdForClass("unconfigured_class"), 0.0001f)
+        assertEquals(
+            0.30f,
+            requireNotNull(config.thresholdForReportClass(TwoModelRuntimeConfig.UNIFIED_MODEL_KEY, "damaged_linear_tactile_paving")),
+            0.0001f,
+        )
 
         val customTactile = requireNotNull(config.customTactile)
         assertEquals("models/custom_tactile_yolo26s_float32.tflite", customTactile.asset)
@@ -139,6 +195,7 @@ class TwoModelRuntimeConfigTest {
     @Test
     fun configuredLegacyFallbackRejectsMissingArtifactHash() {
         val json = File("src/main/assets/model-config/two_model_runtime.json").readText()
+            .replace("\"fallback_model\": null", "\"fallback_model\": \"legacy_two_model\"")
             .replace(
                 "      \"artifact_sha256\": \"3336a4411eda461a3159cca80c046d52a5dadfd6a91f3831490bb5574a160780\",\n",
                 "",
@@ -155,15 +212,15 @@ class TwoModelRuntimeConfigTest {
         listOf(
             json.replace(Regex("\\s*\\\"version\\\"\\s*:\\s*\\\"[^\\\"]+\\\",?"), ""),
             json.replace(
-                "\"version\": \"walksafe-android-runtime-unified-768-primary-20260711\"",
+                "\"version\": \"walksafe-android-runtime-walkmate21-yolo11n-768-fp32-normalized-bilinear-20260913\"",
                 "\"version\": 1",
             ),
             json.replace(
-                "walksafe-android-runtime-unified-768-primary-20260711",
+                "walksafe-android-runtime-walkmate21-yolo11n-768-fp32-normalized-bilinear-20260913",
                 " ",
             ),
             json.replace(
-                "walksafe-android-runtime-unified-768-primary-20260711",
+                "walksafe-android-runtime-walkmate21-yolo11n-768-fp32-normalized-bilinear-20260913",
                 " version-with-space ",
             ),
         ).forEach { invalid ->

@@ -92,6 +92,8 @@ enum class PhoneMountingAssessmentPhase {
 enum class PhoneMountingReason(
     val accessibleReasonKo: String,
     val accessibleActionKo: String,
+    val speakReason: Boolean = true,
+    private val spokenActionKo: String = accessibleActionKo,
 ) {
     PASSED(
         "휴대전화가 앞을 향하도록 고정되었고 카메라 상태가 확인되었습니다.",
@@ -104,6 +106,7 @@ enum class PhoneMountingReason(
     CHECK_REQUEST_EPOCH_MISMATCH(
         "이전 보행의 센서 점검 요청은 현재 보행에 사용할 수 없습니다.",
         "현재 목적지에서 안내 시작을 다시 선택하세요.",
+        speakReason = false,
     ),
     CHECK_REQUEST_INVALID(
         "센서 점검 요청 시각이나 요청 정보가 올바르지 않습니다.",
@@ -112,6 +115,8 @@ enum class PhoneMountingReason(
     POST_CHECK_CAMERA_EVIDENCE_REQUIRED(
         "이번 안내 시작 요청 이후의 새 카메라 측정이 필요합니다.",
         "휴대전화를 앞을 향하게 유지하고 새 센서 점검 결과를 기다리세요.",
+        speakReason = false,
+        spokenActionKo = "휴대전화를 앞을 향하게 유지하면 다시 확인합니다.",
     ),
     POST_FAULT_CHECK_REQUEST_REQUIRED(
         "장착 문제가 발생한 뒤의 새 센서 점검 요청이 필요합니다.",
@@ -123,23 +128,29 @@ enum class PhoneMountingReason(
     ),
     STATE_EPOCH_MISMATCH(
         "이전 보행의 장착 상태가 남아 있어 현재 보행에 사용할 수 없습니다.",
-        "보행을 안전하게 멈춘 뒤 새 장착 확인을 시작하세요.",
+        "안전한 곳에서 장착 상태를 다시 확인하세요.",
+        speakReason = false,
     ),
     USER_CONFIRMATION_MISSING(
         "휴대전화 정면 고정 확인이 필요합니다.",
         "휴대전화를 앞을 향하도록 고정한 뒤 화면의 장착 확인을 선택하세요.",
+        speakReason = false,
     ),
     USER_CONFIRMATION_EPOCH_MISMATCH(
         "이전 보행에서 확인한 장착 정보는 현재 보행에 사용할 수 없습니다.",
         "현재 보행 화면에서 장착 상태를 다시 확인하세요.",
+        speakReason = false,
     ),
     USER_CONFIRMATION_STALE(
         "장착 확인 시간이 오래되었거나 올바르지 않습니다.",
         "휴대전화 장착 상태를 지금 다시 확인하세요.",
+        speakReason = false,
+        spokenActionKo = "화면에서 장착 상태를 다시 확인하세요.",
     ),
     PROHIBITED_MOUNTING_METHOD(
         "손에 들거나 주머니에 넣은 휴대전화는 안전한 장착으로 인정되지 않습니다.",
         "휴대전화를 몸 앞에 세로로 고정하고 후면 카메라가 바깥을 향하게 하세요.",
+        speakReason = false,
     ),
     CAMERA_EVIDENCE_MISSING(
         "카메라 방향과 가림, 흔들림, 영상 품질을 확인할 수 없습니다.",
@@ -148,6 +159,7 @@ enum class PhoneMountingReason(
     CAMERA_EPOCH_MISMATCH(
         "이전 보행에서 측정한 카메라 상태는 현재 보행에 사용할 수 없습니다.",
         "현재 장착 상태에서 카메라 검사를 다시 실행하세요.",
+        speakReason = false,
     ),
     CAMERA_PROFILE_MISMATCH(
         "승인된 카메라 검사 기준과 현재 검사 기준이 일치하지 않습니다.",
@@ -156,35 +168,49 @@ enum class PhoneMountingReason(
     CAMERA_EVIDENCE_STALE(
         "카메라 장착 검사가 오래되었거나 측정 시간이 올바르지 않습니다.",
         "현재 장착 상태에서 카메라 검사를 다시 실행하세요.",
+        speakReason = false,
     ),
     POST_CONFIRMATION_CAMERA_EVIDENCE_REQUIRED(
         "현재 장착을 확인하기 전에 측정한 카메라 결과는 사용할 수 없습니다.",
         "장착 확인 뒤 새 카메라 검사가 끝날 때까지 기다리세요.",
+        speakReason = false,
+        spokenActionKo = "휴대전화를 앞을 향하게 유지하면 다시 확인합니다.",
     ),
     CAMERA_QUALITY_UNKNOWN(
         "카메라 장착 품질을 신뢰할 수 있는 근거가 부족합니다.",
         "렌즈 방향과 가림, 흔들림을 확인한 뒤 다시 검사하세요.",
+        speakReason = false,
     ),
     CAMERA_QUALITY_FAILED(
         "카메라 방향, 가림, 흔들림 또는 영상 품질이 장착 기준에 맞지 않습니다.",
         "휴대전화 위치와 렌즈 가림을 바로잡은 뒤 다시 검사하세요.",
+        speakReason = false,
     ),
     POST_FAULT_CAMERA_EVIDENCE_REQUIRED(
-        "장착 문제가 발생하기 전에 측정한 카메라 결과로는 보행을 다시 시작할 수 없습니다.",
-        "장착을 바로잡은 뒤 새로운 카메라 검사를 실행하세요.",
+        "장착 문제가 발생하기 전에 측정한 카메라 결과로는 카메라 안내를 재개할 수 없습니다.",
+        "장착 교정을 확인한 뒤 새 카메라 검사 결과를 기다리세요.",
+        speakReason = false,
     ),
     POST_FAULT_CONFIRMATION_REQUIRED(
-        "장착 문제를 바로잡았다는 새 확인 없이는 보행을 다시 시작할 수 없습니다.",
+        "장착 문제를 바로잡았다는 새 확인 없이는 카메라 안내를 재개할 수 없습니다.",
         "현재 장착 상태를 확인하고 교정 완료를 명시적으로 선택하세요.",
+        speakReason = false,
     ),
     RETRY_LIMIT_REACHED(
         "제한된 장착 재검사에서 상태가 회복되지 않았습니다.",
-        "위험 안내를 신뢰하지 말고 전체 보행을 안전하게 멈추세요.",
+        "카메라 위험 안내를 이용할 수 없습니다. 안전한 곳에서 장착 상태를 확인하세요.",
+        speakReason = false,
     ),
     SAFETY_STOP_LATCHED(
-        "장착 문제로 안전정지가 필요하며 자동으로 보행을 다시 시작할 수 없습니다.",
+        "장착 문제로 카메라 안내가 제한되어 자동으로 재개할 수 없습니다.",
         "안전한 곳에서 멈춘 뒤 새 보행으로 장착 확인을 다시 시작하세요.",
+        speakReason = false,
     ),
+    ;
+
+    /** The screen keeps the detailed cause while speech focuses on the required action. */
+    val spokenGuidanceKo: String
+        get() = if (speakReason) "$accessibleReasonKo $spokenActionKo" else spokenActionKo
 }
 
 data class PhoneMountingAssessment(
@@ -211,6 +237,27 @@ data class PhoneMountingAssessment(
 
     val accessibleActionKo: String
         get() = reason.accessibleActionKo
+
+    val spokenGuidanceKo: String
+        get() = if (
+            phase == PhoneMountingAssessmentPhase.ACTIVE &&
+            status == PhoneMountingStatus.CORRECTION_REQUIRED &&
+            reason in setOf(
+                PhoneMountingReason.PROHIBITED_MOUNTING_METHOD,
+                PhoneMountingReason.CAMERA_EVIDENCE_MISSING,
+                PhoneMountingReason.CAMERA_EPOCH_MISMATCH,
+                PhoneMountingReason.CAMERA_EVIDENCE_STALE,
+                PhoneMountingReason.POST_CHECK_CAMERA_EVIDENCE_REQUIRED,
+                PhoneMountingReason.POST_CONFIRMATION_CAMERA_EVIDENCE_REQUIRED,
+                PhoneMountingReason.CAMERA_QUALITY_UNKNOWN,
+                PhoneMountingReason.CAMERA_QUALITY_FAILED,
+            )
+        ) {
+            // Runtime faults require an explicit correction before fresh frames restore output.
+            "휴대전화를 앞을 향하게 고정하고 렌즈 가림을 바로잡은 뒤 화면에서 장착 교정을 확인하세요."
+        } else {
+            reason.spokenGuidanceKo
+        }
 }
 
 object PhoneMountingPolicy {

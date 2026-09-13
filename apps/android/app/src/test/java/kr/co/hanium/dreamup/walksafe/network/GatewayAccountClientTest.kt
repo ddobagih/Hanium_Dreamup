@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.network
 
 import java.util.Base64
+import java.io.IOException
 import kr.co.hanium.dreamup.walksafe.account.SignupConsentSelections
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -11,6 +12,65 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GatewayAccountClientTest {
+    @Test
+    fun restoredPasswordLoginRetainsProofAcrossOfflineAndTemporaryServerFailures() {
+        val deviceId = "android-device-account-01"
+        val transport = AccountTransport(
+            postResponse = GatewayHttpResponse(
+                200, """{"session_scope":"general"}""",
+                mapOf("Set-Cookie" to
+                    "walksafe_field_session=${v7CookieValue(ACTOR_ID, deviceId)}; Path=/; HttpOnly; SameSite=Strict; Secure"),
+            ),
+            getResponse = GatewayHttpResponse(200, accountStatusWithCapacity()),
+        )
+        val client = GatewayFieldSessionClient(transport)
+        val loggedIn = client.loginWithPassword(
+            "https://gateway.example", "person@example.com", "correct horse battery",
+            false, deviceId, 1_000L,
+        )
+        val persisted = requireNotNull(loggedIn.backendDevicePersistenceSnapshotOrNull(2_000L))
+        val restored = requireNotNull(GatewayFieldSession.restoreBackendAccountDevice(
+            persisted, "https://gateway.example", ACTOR_ID, deviceId, 2_000L,
+        ))
+
+        transport.getFailure = IOException("offline")
+        val offline = assertThrows(GatewaySessionHttpException::class.java) {
+            client.revalidateBackendAccountDeviceSession(restored, 2_000L)
+        }
+        assertEquals("gateway_backend_device_restore_unavailable", offline.reason)
+        transport.getFailure = null
+        listOf(GatewayHttpResponse(408, "{}"), GatewayHttpResponse(429, "{}"), GatewayHttpResponse(503, "{}"),
+            GatewayHttpResponse(200, "invalid-json")).forEach { unavailable ->
+            transport.getResponse = unavailable
+            val failure = assertThrows(GatewaySessionHttpException::class.java) {
+                client.revalidateBackendAccountDeviceSession(restored, 2_000L)
+            }
+            assertEquals("gateway_backend_device_restore_unavailable", failure.reason)
+            assertFalse(restored.isUsableFor(ACTOR_ID, 2_000L))
+            assertEquals(persisted, restored.backendDeviceRevalidationSnapshotOrNull(2_000L))
+        }
+        transport.getResponse = GatewayHttpResponse(200, accountStatusWithCapacity())
+        assertTrue(client.revalidateBackendAccountDeviceSession(restored, 2_000L)
+            .isUsableFor(ACTOR_ID, 2_000L))
+    }
+
+    @Test
+    fun restoredPasswordLoginRejectedByServerCannotBeVerifiedAgain() {
+        val deviceId = "android-device-account-01"
+        val session = GatewayFieldSession.restoreBackendAccountDevice(
+            GatewayBackendDeviceSessionPersistence(
+                "https://gateway.example", ACTOR_ID, 7L, 3L, deviceId, "i".repeat(43),
+                "walksafe_field_session=${v7CookieValue(ACTOR_ID, deviceId)}", 44_000L,
+            ), "https://gateway.example", ACTOR_ID, deviceId, 2_000L,
+        )!!
+        val transport = AccountTransport(GatewayHttpResponse(200, "{}"), GatewayHttpResponse(401, "{}"))
+        val failure = assertThrows(GatewaySessionHttpException::class.java) {
+            GatewayFieldSessionClient(transport).revalidateBackendAccountDeviceSession(session, 2_000L)
+        }
+        assertEquals("gateway_backend_device_restore_rejected", failure.reason)
+        assertNull(session.backendDeviceRevalidationSnapshotOrNull(2_000L))
+    }
+
     @Test
     fun emailOtpRequestUsesExactContractAndParsesOnlyExactResponse() {
         val transport = AccountTransport(
@@ -423,6 +483,7 @@ class GatewayAccountClientTest {
         var url: String = ""
         var body: String = ""
         var getCount: Int = 0
+        var getFailure: Exception? = null
 
         override fun postJson(url: String, body: String): GatewayHttpResponse {
             this.url = url
@@ -430,8 +491,11 @@ class GatewayAccountClientTest {
             return postResponse
         }
 
-        override fun get(url: String, headers: Map<String, String>): GatewayHttpResponse =
-            getResponse.also { getCount += 1 }
+        override fun get(url: String, headers: Map<String, String>): GatewayHttpResponse {
+            getCount += 1
+            getFailure?.let { throw it }
+            return getResponse
+        }
 
         override fun delete(url: String, headers: Map<String, String>): GatewayHttpResponse =
             GatewayHttpResponse(204, "")

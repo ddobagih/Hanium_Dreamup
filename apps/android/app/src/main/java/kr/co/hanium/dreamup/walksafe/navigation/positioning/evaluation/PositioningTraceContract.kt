@@ -146,6 +146,8 @@ data class PositioningTraceRecord(
     val stepProfile: PositionStepProfileTrace? = null,
     val heading: PositionHeadingTrace? = null,
     val stationary: PositionStationaryTrace? = null,
+    /** True when this row replaces the route-match result, including an unavailable result. */
+    val routeMatchEvaluated: Boolean? = null,
 ) {
     init {
         require(elapsedRealtimeNs >= 0L)
@@ -203,6 +205,7 @@ internal fun PositioningTraceRecord.toStoredTraceJson(
     .putOptional("step_profile", stepProfile?.toJson())
     .putOptional("heading", heading?.toJson())
     .putOptional("stationary", stationary?.toJson())
+    .putOptional("route_match_evaluated", routeMatchEvaluated)
 
 internal fun PositioningTraceCheckpoint.toStoredTraceJson(
     sessionId: String,
@@ -250,6 +253,7 @@ internal fun JSONObject.toExportRecordJson(): JSONObject? {
             .copyOptional(this, "step_profile")
             .copyOptional(this, "heading")
             .copyOptional(this, "stationary")
+            .copyOptional(this, "route_match_evaluated")
         "checkpoint" -> exported
             .put("checkpoint_id", opt("checkpoint_id"))
             .put("ordinal", opt("ordinal"))

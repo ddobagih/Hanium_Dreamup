@@ -28,7 +28,7 @@ class ArCoreTactileProjectionContextFactoryTest {
         assertTrue(builder.contains(factoryInstance))
         assertTrue(builder.contains(factoryCall))
         val instructionsBeforeFactory = bytecodeInstructions(builder.substringBefore(factoryCall))
-        assertFalse(instructionsBeforeFactory.map(::operation).any { it == "astore_1" || it == "astore 1" || it == "lstore_2" || it == "lstore 2" })
+        assertFalse(instructionsBeforeFactory.map(::operation).any { it == "astore 1" || it == "lstore 2" })
         val factoryArguments = bytecodeInstructions(
             builder.substringAfter(factoryInstance).substringBefore(factoryCall),
         )
@@ -41,127 +41,164 @@ class ArCoreTactileProjectionContextFactoryTest {
     @Test
     fun compiledDrawAndDetectionChainPassesSessionFrameIntoFrameEvidence() {
         val disassembly = disassembleMainActivity()
-        val drawSignature = "public void onDrawFrame(javax.microedition.khronos.opengles.GL10);"
-        assertTrue(disassembly.contains(drawSignature))
-        val onDrawFrame = disassembly
-            .substringAfter(drawSignature)
-            .substringBefore("private final void handleRuntimeMetricPreflightFrame")
+        val onDrawFrame = compiledMethod(disassembly, "onDrawFrame")
+        val drawInstructions = bytecodeInstructions(onDrawFrame)
         val sessionUpdate = "com/google/ar/core/Session.update:()Lcom/google/ar/core/Frame;"
-        assertTrue(onDrawFrame.contains(sessionUpdate))
-        assertEquals(1, Regex(Regex.escape(sessionUpdate)).findAll(onDrawFrame).count())
         assertEquals(1, Regex(Regex.escape(sessionUpdate)).findAll(disassembly).count())
-        val updateResultStore = operation(bytecodeInstructions(onDrawFrame.substringAfter(sessionUpdate)).first())
-        assertTrue(updateResultStore.startsWith("astore"))
+        val frameLoad = localLoad(onDrawFrame, "frame", "a")
+        val providerLoad = localLoad(onDrawFrame, "provider", "a")
+        val timestampLoad = localLoad(onDrawFrame, "timestampMs", "l")
+        val elapsedLoad = localLoad(onDrawFrame, "elapsedRealtimeMs", "l")
+        val snapshotLoad = localLoad(onDrawFrame, "snapshot", "a")
         val displayGeometryCall = "Frame.hasDisplayGeometryChanged:()Z"
-        assertTrue(onDrawFrame.contains(displayGeometryCall))
-        val displayInstructions = bytecodeInstructions(onDrawFrame.substringBefore(displayGeometryCall)).takeLast(2)
-        assertEquals("invokevirtual", opcode(displayInstructions[1]))
-        val frameLoad = operation(displayInstructions[0])
-        assertTrue(frameLoad.startsWith("aload"))
+        val displayIndex = drawInstructions.indexOfFirst { it.contains(displayGeometryCall) }
+        assertTrue(displayIndex > 0)
+        assertEquals(frameLoad, operation(drawInstructions[displayIndex - 1]))
+        // Kotlin may copy the try-expression result through temporary locals. Follow those
+        // copies back to Session.update instead of assuming a particular local slot.
+        assertLocalOrigin(drawInstructions.take(displayIndex), frameLoad, sessionUpdate)
         assertTrue(
             onDrawFrame.substringAfter(sessionUpdate).substringBefore(displayGeometryCall)
                 .contains("isArSessionLeaseCurrent"),
         )
-        val frameTimestampCall = "com/google/ar/core/Frame.getTimestamp:()J"
-        assertEquals(1, Regex(Regex.escape(frameTimestampCall)).findAll(onDrawFrame).count())
-        val timestampInput = bytecodeInstructions(onDrawFrame.substringBefore(frameTimestampCall)).takeLast(2)
-        assertEquals(frameLoad, operation(timestampInput[0]))
-        assertEquals("invokevirtual", opcode(timestampInput[1]))
-        val timestampConversion = bytecodeInstructions(onDrawFrame.substringAfter(frameTimestampCall)).take(3)
-        assertEquals(listOf("ldc2_w", "ldiv", "lstore"), timestampConversion.map(::opcode))
-        assertTrue(timestampConversion[0].contains("long 1000000l"))
-        val timestampStore = operation(timestampConversion[2])
-        val depthCall = "ArCoreFrameProvider.acquireDepthBundle:(Lcom/google/ar/core/Frame;Z)Lkr/co/hanium/dreamup/walksafe/depth/ArCoreDepthBundle;"
-        assertTrue(onDrawFrame.contains(depthCall))
+        assertLocalNotReassigned(drawInstructions.drop(displayIndex), frameLoad)
+        assertFrameTimestampReceivers(onDrawFrame, frameLoad)
+        val timestampConversion = drawInstructions.windowed(4).single {
+            it[0].contains(FRAME_TIMESTAMP_CALL) && it[1].contains("long 1000000l")
+        }
+        assertEquals(listOf("invokevirtual", "ldc2_w", "ldiv", "lstore"), timestampConversion.map(::opcode))
+        assertEquals(timestampLoad.replaceFirst("load", "store"), operation(timestampConversion.last()))
+        assertLocalNotReassigned(drawInstructions.dropWhile { it != timestampConversion.last() }.drop(1), timestampLoad)
+
+        val depthCall = "ArCoreFrameProvider.acquireDepthSnapshot:(Lcom/google/ar/core/Frame;Z)Lkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;"
         val depthArguments = bytecodeInstructions(onDrawFrame.substringBefore(depthCall)).takeLast(4)
-        val providerLoad = operation(depthArguments[0])
-        assertTrue(providerLoad.startsWith("aload"))
-        assertEquals(frameLoad, operation(depthArguments[1]))
+        assertTrue(onDrawFrame.contains(depthCall))
+        assertEquals(listOf(providerLoad, frameLoad), depthArguments.take(2).map(::operation))
         assertTrue(operation(depthArguments[2]).startsWith("iload"))
-        assertEquals("invokevirtual", opcode(depthArguments[3]))
-        val snapshotStore = bytecodeInstructions(onDrawFrame.substringAfter(depthCall))
-            .first { opcode(it) == "astore" }
-            .let(::operation)
-        val scheduleCall = "scheduleDetectionIfDue:(Lkr/co/hanium/dreamup/walksafe/depth/ArCoreFrameProvider;Lcom/google/ar/core/Frame;JJJLkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;ILkr/co/hanium/dreamup/walksafe/session/WalkRuntimeEpoch;J)V"
+        val snapshotStore = bytecodeInstructions(onDrawFrame.substringAfter(depthCall)).first()
+        assertEquals(snapshotLoad.replaceFirst("load", "store"), operation(snapshotStore))
+        assertLocalNotReassigned(drawInstructions.dropWhile { it != snapshotStore }.drop(1), snapshotLoad)
+
+        val gateCall = "updateRuntimeMetricOutputGate:"
+        val duplicateRead = "Field lastRuntimeCameraFrameId:J"
+        assertTrue("duplicate frames must still reach the elapsed-time quality gate", onDrawFrame.contains(duplicateRead))
+        assertTrue(onDrawFrame.indexOf(gateCall) in 0 until onDrawFrame.indexOf(duplicateRead))
+        assertTrue(onDrawFrame.indexOf(duplicateRead) < onDrawFrame.indexOf("captureVisualTrackingFrame:"))
+
+        val scheduleCall = "scheduleDetectionIfDue:(Lkr/co/hanium/dreamup/walksafe/depth/ArCoreFrameProvider;Lcom/google/ar/core/Frame;JJJLkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;ILkr/co/hanium/dreamup/walksafe/session/WalkRuntimeEpoch;JLkr/co/hanium/dreamup/walksafe/inference/tracking/VisualFrameKey;)V"
         assertTrue(onDrawFrame.contains(scheduleCall))
-        val timestampStoresBeforeSchedule = bytecodeInstructions(
-            onDrawFrame.substringAfter(frameTimestampCall).substringBefore(scheduleCall),
-        ).map(::operation).count { it == timestampStore }
-        assertEquals(1, timestampStoresBeforeSchedule)
-        val drawInstructionsBeforeSchedule = bytecodeInstructions(onDrawFrame.substringBefore(scheduleCall))
-        val scheduleArguments = drawInstructionsBeforeSchedule.takeLast(12)
+        val scheduleSetup = bytecodeInstructions(
+            onDrawFrame.substringAfter("captureVisualTrackingFrame:").substringBefore(scheduleCall),
+        )
+        assertEquals(localLoad(onDrawFrame, "grayFrame", "a").replaceFirst("load", "store"), operation(scheduleSetup.first()))
+        val scheduleArguments = scheduleSetup.drop(1)
+        // The nullable visual key adds branches after the stable capture arguments;
+        // do not count instructions backwards from the invocation.
         assertEquals(
             listOf(
-                "aload_0",
-                "aload",
-                "aload",
-                "lload",
-                "lload",
-                "lload",
-                "aload",
-                "iload_2",
-                "aload",
-                "aload_3",
-                "invokevirtual",
-                "invokespecial",
+                "aload 0", providerLoad, frameLoad, timestampLoad,
+                localLoad(onDrawFrame, "nowMs", "l"), elapsedLoad, snapshotLoad,
+                localLoad(onDrawFrame, "frameGeneration", "i"),
+                localLoad(onDrawFrame, "walkEpoch", "a"),
+                localLoad(onDrawFrame, "arLease", "a"),
             ),
-            scheduleArguments.map(::opcode),
+            scheduleArguments.take(10).map(::operation),
         )
-        assertEquals(providerLoad, operation(scheduleArguments[1]))
-        assertEquals(frameLoad, operation(scheduleArguments[2]))
-        assertEquals(snapshotStore.replaceFirst("astore", "aload"), operation(scheduleArguments[6]))
         assertTrue(scheduleArguments[10].contains("ArSessionLease.getGeneration:()J"))
-        val afterSessionFrameAssignment = bytecodeInstructions(
-            onDrawFrame.substringAfter(displayGeometryCall).substringBefore(scheduleCall),
-        )
-        val frameStore = frameLoad.replaceFirst("aload", "astore")
-        assertFalse(afterSessionFrameAssignment.map(::operation).any { it == frameStore })
+        assertEquals(localLoad(onDrawFrame, "grayFrame", "a"), operation(scheduleArguments[11]))
+        assertTrue(scheduleArguments.any { it.contains("GrayTrackingFrame.getKey:") })
 
-        val scheduleSignature = "scheduleDetectionIfDue(kr.co.hanium.dreamup.walksafe.depth.ArCoreFrameProvider, com.google.ar.core.Frame, long, long, long, kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot, int, kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch, long);"
-        assertTrue(disassembly.contains(scheduleSignature))
-        val schedule = disassembly
-            .substringAfter(scheduleSignature)
-            .substringBefore("private final byte[] encodeDebugFrameJpeg")
-        val cameraImageCall = "kr/co/hanium/dreamup/walksafe/depth/ArCoreFrameProvider.acquireCameraImageOrNull:(Lcom/google/ar/core/Frame;)Landroid/media/Image;"
+        val schedule = compiledMethod(disassembly, "scheduleDetectionIfDue")
+        val scheduledFrameLoad = localLoad(schedule, "frame", "a")
+        val scheduledTimestampLoad = localLoad(schedule, "timestampMs", "l")
+        val scheduledElapsedLoad = localLoad(schedule, "elapsedRealtimeMs", "l")
+        val scheduledDepthLoad = localLoad(schedule, "capturedDepthSnapshot", "a")
+        val cameraImageCall = "ArCoreFrameProvider.acquireCameraImageOrNull:(Lcom/google/ar/core/Frame;)Landroid/media/Image;"
         assertTrue(schedule.contains(cameraImageCall))
-        val cameraImageArguments = bytecodeInstructions(schedule.substringBefore(cameraImageCall)).takeLast(3)
-        assertEquals(listOf("aload_1", "aload_2", "invokevirtual"), cameraImageArguments.map(::opcode))
-        val evidenceStart = "MainActivity\$DetectionFrameEvidence"
-        assertTrue(schedule.contains(evidenceStart))
-        val evidenceConstruction = schedule
-            .substringAfter("// class kr/co/hanium/dreamup/walksafe/$evidenceStart")
-            .substringBefore("$evidenceStart.\"<init>\"")
-        val projectionCall = "buildTactileProjectionContext:(Lcom/google/ar/core/Frame;J)Lkr/co/hanium/dreamup/walksafe/navigation/TactileProjectionContext;"
-        assertTrue(evidenceConstruction.contains(projectionCall))
-        val scheduleTimestampCalls = Regex(Regex.escape(frameTimestampCall)).findAll(schedule).toList()
-        assertEquals(3, scheduleTimestampCalls.size)
-        for (timestampCall in scheduleTimestampCalls) {
-            val input = bytecodeInstructions(schedule.substring(0, timestampCall.range.first)).takeLast(2)
-            assertEquals(listOf("aload_2", "invokevirtual"), input.map(::opcode))
-        }
-        assertEquals(2, Regex(Regex.escape(frameTimestampCall)).findAll(evidenceConstruction).count())
-        val firstEvidenceTimestamp = bytecodeInstructions(evidenceConstruction.substringBefore(frameTimestampCall)).takeLast(2)
-        assertEquals(listOf("aload_2", "invokevirtual"), firstEvidenceTimestamp.map(::opcode))
-        assertEquals("lload_3", bytecodeOpcodes(evidenceConstruction.substringAfter(frameTimestampCall)).first())
-        val frozenMapperCall = "createFrozenDepthMapper:(Lcom/google/ar/core/Frame;JIILkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;)Lkr/co/hanium/dreamup/walksafe/FrozenImageToTextureCoordinateMapper;"
-        assertTrue(evidenceConstruction.contains(frozenMapperCall))
-        val frozenMapperArguments = bytecodeInstructions(evidenceConstruction.substringBefore(frozenMapperCall)).takeLast(8)
-        assertEquals(listOf("aload_0", "aload_2"), frozenMapperArguments.take(2).map(::opcode))
-        assertEquals("invokespecial", opcode(frozenMapperArguments.last()))
-        val scheduleInstructionsBeforeProjection = bytecodeInstructions(schedule.substringBefore(projectionCall))
-        assertFalse(
-            scheduleInstructionsBeforeProjection.map(::operation).any {
-                it == "astore_2" || it == "astore 2" || it == "lstore_3" || it == "lstore 3" || it == "lstore 7"
-            },
+        assertEquals(
+            listOf(localLoad(schedule, "provider", "a"), scheduledFrameLoad),
+            bytecodeInstructions(schedule.substringBefore(cameraImageCall)).takeLast(3).take(2).map(::operation),
         )
-        val projectionArguments = bytecodeInstructions(evidenceConstruction.substringBefore(projectionCall)).takeLast(4)
-        assertEquals(listOf("aload_0", "aload_2", "lload", "invokespecial"), projectionArguments.map(::opcode))
-        assertEquals("lload 7", operation(projectionArguments[2]))
-        val afterProjectionCall = evidenceConstruction.substringAfter(projectionCall)
-        assertFalse(afterProjectionCall.contains("Method kr/co/hanium/dreamup/walksafe/navigation/TactileProjectionContext."))
-        val instructionsAfterProjection = bytecodeInstructions(afterProjectionCall)
-        assertEquals(listOf("aload_0", "lload", "invokespecial"), instructionsAfterProjection.take(3).map(::opcode))
-        assertTrue(instructionsAfterProjection[2].contains("buildDepthMotionContext"))
+        for (load in listOf(scheduledFrameLoad, scheduledTimestampLoad, scheduledElapsedLoad, scheduledDepthLoad)) {
+            assertLocalNotReassigned(bytecodeInstructions(schedule), load)
+        }
+        assertFrameTimestampReceivers(schedule, scheduledFrameLoad)
+        // takeIf on visualFrameKey can spill constructor arguments before `new`.
+        // Start after the preceding identity construction, retaining their producers.
+        val sourceEvidence = schedule.substringAfter("AndroidDetectionSnapshotFrameIdentity.\"<init>\"")
+            .substringBefore("MainActivity\$DetectionFrameEvidence.\"<init>\"")
+        assertEvidenceInputs(sourceEvidence, scheduledFrameLoad, scheduledTimestampLoad, scheduledElapsedLoad, scheduledDepthLoad)
+        val currentEvidence = onDrawFrame.substringAfter("// class kr/co/hanium/dreamup/walksafe/MainActivity\$DetectionFrameEvidence")
+            .substringBefore("MainActivity\$DetectionFrameEvidence.\"<init>\"")
+        assertEvidenceInputs(currentEvidence, frameLoad, timestampLoad, elapsedLoad, snapshotLoad)
+    }
+
+    private fun assertEvidenceInputs(
+        evidence: String,
+        frameLoad: String,
+        timestampLoad: String,
+        elapsedLoad: String,
+        snapshotLoad: String,
+    ) {
+        assertTrue(evidence.contains(FRAME_TIMESTAMP_CALL))
+        val frameIdentity = bytecodeInstructions(evidence.substringAfter(FRAME_TIMESTAMP_CALL)).take(2)
+        assertEquals(listOf(timestampLoad, snapshotLoad), frameIdentity.map(::operation))
+        val mapperCall = "createFrozenDepthMapper:(Lcom/google/ar/core/Frame;JIILkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;)Lkr/co/hanium/dreamup/walksafe/FrozenImageToTextureCoordinateMapper;"
+        assertTrue(evidence.contains(mapperCall))
+        val mapperArguments = bytecodeInstructions(evidence.substringAfter(FRAME_TIMESTAMP_CALL).substringBefore(mapperCall)).drop(2)
+        assertEquals(listOf("aload 0", frameLoad, frameLoad), mapperArguments.take(3).map(::operation))
+        assertTrue(mapperArguments[3].contains(FRAME_TIMESTAMP_CALL))
+        assertEquals(snapshotLoad, operation(mapperArguments[mapperArguments.lastIndex - 1]))
+        val projectionCall = "buildTactileProjectionContext:(Lcom/google/ar/core/Frame;J)Lkr/co/hanium/dreamup/walksafe/navigation/TactileProjectionContext;"
+        assertEquals(1, Regex(Regex.escape(projectionCall)).findAll(evidence).count())
+        assertEquals(
+            listOf("aload 0", frameLoad, elapsedLoad),
+            bytecodeInstructions(evidence.substringBefore(projectionCall)).takeLast(4).take(3).map(::operation),
+        )
+        val afterProjection = evidence.substringAfter(projectionCall)
+        assertFalse(afterProjection.contains("Method kr/co/hanium/dreamup/walksafe/navigation/TactileProjectionContext."))
+        val motionArguments = bytecodeInstructions(afterProjection).take(3)
+        assertEquals(listOf("aload 0", elapsedLoad), motionArguments.take(2).map(::operation))
+        assertTrue(motionArguments[2].contains("buildDepthMotionContext"))
+    }
+
+    private fun assertFrameTimestampReceivers(method: String, expectedFrameLoad: String) {
+        val instructions = bytecodeInstructions(method)
+        val calls = instructions.indices.filter { instructions[it].contains(FRAME_TIMESTAMP_CALL) }
+        assertTrue("frame timestamps must be present", calls.isNotEmpty())
+        for (index in calls) {
+            assertEquals("timestamp receiver at ${instructions[index]}", expectedFrameLoad, operation(instructions[index - 1]))
+        }
+    }
+
+    private fun assertLocalOrigin(instructions: List<String>, load: String, producer: String) {
+        val store = load.replaceFirst("load", "store")
+        val storeIndex = instructions.indexOfLast { operation(it) == store }
+        assertTrue("missing assignment for $load", storeIndex > 0)
+        val source = instructions[storeIndex - 1]
+        if (source.contains(producer)) return
+        assertTrue("$load must copy the session update result: $source", operation(source).startsWith("aload "))
+        assertLocalOrigin(instructions.take(storeIndex), operation(source), producer)
+    }
+
+    private fun assertLocalNotReassigned(instructions: List<String>, load: String) {
+        val store = load.replaceFirst("load", "store")
+        assertFalse("captured value must not be replaced: $load", instructions.any { operation(it) == store })
+    }
+
+    private fun compiledMethod(disassembly: String, name: String): String {
+        val header = Regex("(?m)^  [^\\n]* " + Regex.escape(name) + "\\([^\\n]*\\);$")
+            .find(disassembly)
+        assertTrue("compiled method missing: $name", header != null)
+        return disassembly.substring(requireNotNull(header).range.last + 1)
+            .lineSequence().takeWhile { !Regex("^  \\S").containsMatchIn(it) }.joinToString("\n")
+    }
+
+    private fun localLoad(method: String, name: String, type: String): String {
+        val row = Regex("(?m)^\\s*\\d+\\s+\\d+\\s+(\\d+)\\s+" + Regex.escape(name) + "\\s+\\S+\\s*$")
+            .find(method.substringAfter("LocalVariableTable:"))
+        assertTrue("compiled local missing: $name", row != null)
+        return "${type}load ${requireNotNull(row).groupValues[1]}"
     }
 
     @Test
@@ -305,6 +342,7 @@ class ArCoreTactileProjectionContextFactoryTest {
             mainClasses.absolutePath,
             "-p",
             "-c",
+            "-l",
             MainActivity::class.java.name,
         ).redirectErrorStream(true).start()
         val disassembly = process.inputStream.bufferedReader().use { it.readText() }
@@ -333,6 +371,7 @@ class ArCoreTactileProjectionContextFactoryTest {
         .substringBefore("//")
         .trim()
         .replace(Regex("\\s+"), " ")
+        .replace(Regex("^([ailfd](?:load|store))_([0-3])$"), "$1 $2")
 
     private class TestFrame(
         private val timestamp: Long,
@@ -371,6 +410,7 @@ class ArCoreTactileProjectionContextFactoryTest {
     }
 
     private companion object {
+        const val FRAME_TIMESTAMP_CALL = "com/google/ar/core/Frame.getTimestamp:()J"
         const val FRAME_ID = 123_456_789L
         const val NOW_MS = 10_000L
         const val ROUTE_ID = "route-1"

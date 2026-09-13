@@ -829,11 +829,27 @@ class GatewayFieldSessionClient(
         val headers = mapOf(
             GatewayFieldSession.COOKIE_HEADER to snapshot.accessCookiePair,
         )
-        val response = transport.get(
-            session.gatewayBaseUrl.trimEnd('/') + "/api/field-session",
-            headers,
-        )
+        val response = try {
+            transport.get(
+                session.gatewayBaseUrl.trimEnd('/') + "/api/field-session",
+                headers,
+            )
+        } catch (_: Exception) {
+            throw GatewaySessionHttpException(0, "gateway_backend_device_restore_unavailable")
+        }
+        if (response.statusCode in setOf(408, 429) || response.statusCode >= 500) {
+            throw GatewaySessionHttpException(
+                response.statusCode,
+                "gateway_backend_device_restore_unavailable",
+            )
+        }
         val status = runCatching { JSONObject(response.responseBody) }.getOrNull()
+        if (response.statusCode in 200..299 && status == null) {
+            throw GatewaySessionHttpException(
+                response.statusCode,
+                "gateway_backend_device_restore_unavailable",
+            )
+        }
         if (
             response.statusCode !in 200..299 ||
             status == null ||
@@ -969,7 +985,7 @@ class GatewayFieldSessionClient(
         val endpoint = session.gatewayBaseUrl.trimEnd('/') + "/api/field-session"
         val response = try {
             transport.get(endpoint, session.cookieHeaders(nowEpochMs))
-        } catch (_: RuntimeException) {
+        } catch (_: Exception) {
             return result(
                 GatewaySessionRevalidationStatus.PENDING,
                 "gateway_status_unreachable",

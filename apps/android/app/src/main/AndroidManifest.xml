@@ -35,6 +35,9 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme">
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
         <meta-data
             android:name="com.google.ar.core"
             android:value="optional" />

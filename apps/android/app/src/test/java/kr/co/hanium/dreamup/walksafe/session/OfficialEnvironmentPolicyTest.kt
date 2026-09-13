@@ -126,14 +126,17 @@ class OfficialEnvironmentPolicyTest {
     fun runtimeDegradationSuppressesImmediatelyThenSafeStopsAfterBoundedRetries() {
         val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
         val degraded = assess(
+            gpsQuality = gpsEvidence().copy(status = EnvironmentEvidenceStatus.FAIL),
             cameraQuality = cameraEvidence().copy(status = EnvironmentEvidenceStatus.FAIL),
         )
 
         val first = guard.onAssessment(degraded, NOW_MS)
-        val secondAssessment = degraded.copy(assessedAtElapsedRealtimeMs = NOW_MS + 1L)
-        val second = guard.onAssessment(secondAssessment, NOW_MS + 1L)
-        val thirdAssessment = degraded.copy(assessedAtElapsedRealtimeMs = NOW_MS + 2L)
-        val third = guard.onAssessment(thirdAssessment, NOW_MS + 2L)
+        val secondAtMs = NOW_MS + PROFILE.runtimeRetryIntervalMs
+        val secondAssessment = degraded.copy(assessedAtElapsedRealtimeMs = secondAtMs)
+        val second = guard.onAssessment(secondAssessment, secondAtMs)
+        val thirdAtMs = secondAtMs + PROFILE.runtimeRetryIntervalMs
+        val thirdAssessment = degraded.copy(assessedAtElapsedRealtimeMs = thirdAtMs)
+        val third = guard.onAssessment(thirdAssessment, thirdAtMs)
 
         assertEquals(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY, first.action)
         assertEquals(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY, second.action)
@@ -151,7 +154,7 @@ class OfficialEnvironmentPolicyTest {
             PROFILE.copy(maximumRuntimeRetryAttempts = 0),
         )
         val stopped = guard.onAssessment(
-            assess(cameraQuality = cameraEvidence().copy(status = EnvironmentEvidenceStatus.FAIL)),
+            assess(gpsQuality = null, cameraQuality = null),
             NOW_MS,
         )
 
@@ -169,6 +172,7 @@ class OfficialEnvironmentPolicyTest {
     fun recoveryBeforeTerminalClearsTheRetryBudget() {
         val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
         val degraded = assess(
+            gpsQuality = null,
             cameraQuality = cameraEvidence().copy(status = EnvironmentEvidenceStatus.UNKNOWN),
         )
 
@@ -184,6 +188,206 @@ class OfficialEnvironmentPolicyTest {
             ).action,
         )
         assertEquals(0, guard.decision().consecutiveDegradations)
+    }
+
+    @Test
+    fun rapidCallbacksForOneFaultDoNotExhaustRetries() {
+        val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+        val degraded = assess(gpsQuality = null, cameraQuality = null)
+        repeat(100) { index ->
+            val now = NOW_MS + index
+            val decision = guard.onAssessment(
+                degraded.copy(assessedAtElapsedRealtimeMs = now), now,
+            )
+            assertEquals(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY, decision.action)
+            assertEquals(1, decision.consecutiveDegradations)
+        }
+        val atBoundary = NOW_MS + PROFILE.runtimeRetryIntervalMs
+        val second = guard.onAssessment(
+            degraded.copy(assessedAtElapsedRealtimeMs = atBoundary), atBoundary,
+        )
+        assertEquals(2, second.consecutiveDegradations)
+        assertFalse(second.isTerminal)
+    }
+
+    @Test
+    fun staleEvidenceRemainsSuppressedAndEventuallyStopsEvenWithoutNewCallbacks() {
+        val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+        val supported = supportedAssessment()
+        assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, guard.onAssessment(supported, NOW_MS).action)
+        val staleAtMs = NOW_MS + MAX_AGE_MS + 1L
+        repeat(PROFILE.maximumRuntimeRetryAttempts + 1) { index ->
+            val decision = guard.onAssessment(
+                supported, staleAtMs + index * PROFILE.runtimeRetryIntervalMs,
+            )
+            assertTrue(decision.suppressAllWalkOutputs)
+        }
+        assertTrue(guard.decision().isTerminal)
+    }
+
+    @Test
+    fun gpsOnlyFailureRestrictsNavigationAndKeepsCameraForContinuedUse() {
+        val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+        val degraded = assess(gpsQuality = null)
+        repeat(5) { index ->
+            val now = NOW_MS + index * PROFILE.runtimeRetryIntervalMs
+            val decision = guard.onAssessment(degraded.copy(assessedAtElapsedRealtimeMs = now), now)
+            assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, decision.action)
+            assertFalse(decision.navigationOutputsAllowed)
+            assertTrue(decision.cameraOutputsAllowed)
+            assertEquals(setOf(OfficialEnvironmentFactor.GPS_QUALITY), decision.unavailableFactors)
+            assertEquals(0, decision.consecutiveDegradations)
+        }
+    }
+
+    @Test
+    fun cameraOnlyFailureRestrictsCameraAndKeepsNavigationForContinuedUse() {
+        val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+        val degraded = assess(cameraQuality = null)
+        repeat(5) { index ->
+            val now = NOW_MS + index * PROFILE.runtimeRetryIntervalMs
+            val decision = guard.onAssessment(degraded.copy(assessedAtElapsedRealtimeMs = now), now)
+            assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, decision.action)
+            assertTrue(decision.navigationOutputsAllowed)
+            assertFalse(decision.cameraOutputsAllowed)
+            assertEquals(setOf(OfficialEnvironmentFactor.CAMERA_QUALITY), decision.unavailableFactors)
+            assertEquals(0, decision.consecutiveDegradations)
+        }
+    }
+
+    @Test
+    fun passingCameraQualityCannotHideMountingRestrictionWhenGpsIsUnavailable() {
+        val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+        val blocked = assess(gpsQuality = null).copy(
+            runtimeUnavailableMeasuredFactors = setOf(OfficialEnvironmentFactor.CAMERA_QUALITY),
+        )
+        assertEquals(EnvironmentEvidenceStatus.PASS, blocked.factorStatuses[OfficialEnvironmentFactor.CAMERA_QUALITY])
+        repeat(PROFILE.maximumRuntimeRetryAttempts + 1) { index ->
+            val now = NOW_MS + index * PROFILE.runtimeRetryIntervalMs
+            val decision = guard.onAssessment(blocked.copy(assessedAtElapsedRealtimeMs = now), now)
+            assertTrue(decision.suppressAllWalkOutputs)
+            assertFalse(decision.cameraOutputsAllowed)
+            assertFalse(decision.navigationOutputsAllowed)
+            assertEquals(index + 1, decision.consecutiveDegradations)
+        }
+        assertTrue(guard.decision().isTerminal)
+    }
+
+    @Test
+    fun mountingCorrectionBeforeTerminalRestoresCameraWithoutRestoringGps() {
+        val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+        val cameraOnly = assess(gpsQuality = null)
+        val blocked = cameraOnly.copy(
+            runtimeUnavailableMeasuredFactors = setOf(OfficialEnvironmentFactor.CAMERA_QUALITY),
+        )
+        assertTrue(guard.onAssessment(blocked, NOW_MS).suppressAllWalkOutputs)
+        val recovered = guard.onAssessment(
+            cameraOnly.copy(assessedAtElapsedRealtimeMs = NOW_MS + 1L), NOW_MS + 1L,
+        )
+        assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, recovered.action)
+        assertTrue(recovered.cameraOutputsAllowed)
+        assertFalse(recovered.navigationOutputsAllowed)
+        assertEquals(0, recovered.consecutiveDegradations)
+    }
+
+    @Test
+    fun mountingRestrictionPreservesNavigationAndDoesNotRewritePreflightQuality() {
+        val blocked = supportedAssessment().copy(
+            runtimeUnavailableMeasuredFactors = setOf(OfficialEnvironmentFactor.CAMERA_QUALITY),
+        )
+        assertTrue(blocked.canStartWalk)
+        assertEquals(OfficialEnvironmentSupport.SUPPORTED, blocked.support)
+        assertEquals(EnvironmentEvidenceStatus.PASS, blocked.factorStatuses[OfficialEnvironmentFactor.CAMERA_QUALITY])
+        val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(blocked, NOW_MS)
+        assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, decision.action)
+        assertTrue(decision.navigationOutputsAllowed)
+        assertFalse(decision.cameraOutputsAllowed)
+        assertEquals(setOf(OfficialEnvironmentFactor.CAMERA_QUALITY), decision.unavailableFactors)
+    }
+
+    @Test
+    fun lossOfRemainingFunctionStartsTheGlobalRetryWindow() {
+        val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+        val gpsMissing = assess(gpsQuality = null)
+        assertTrue(guard.onAssessment(gpsMissing, NOW_MS).cameraOutputsAllowed)
+        val bothMissing = assess(gpsQuality = null, cameraQuality = null)
+        val first = guard.onAssessment(
+            bothMissing.copy(assessedAtElapsedRealtimeMs = NOW_MS + 1L), NOW_MS + 1L,
+        )
+        assertTrue(first.suppressAllWalkOutputs)
+        assertFalse(first.navigationOutputsAllowed)
+        assertFalse(first.cameraOutputsAllowed)
+        assertFalse(first.isTerminal)
+        assertEquals(1, first.consecutiveDegradations)
+    }
+
+    @Test
+    fun oneRecoveredSensorRestoresOnlyItsFunctionBeforeGlobalStop() {
+        val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+        guard.onAssessment(assess(gpsQuality = null, cameraQuality = null), NOW_MS)
+        val recovered = guard.onAssessment(
+            assess(cameraQuality = null).copy(assessedAtElapsedRealtimeMs = NOW_MS + 1L), NOW_MS + 1L,
+        )
+        assertTrue(recovered.navigationOutputsAllowed)
+        assertFalse(recovered.cameraOutputsAllowed)
+        assertEquals(0, recovered.consecutiveDegradations)
+        assertFalse(recovered.isTerminal)
+    }
+
+    @Test
+    fun explicitCommonEnvironmentFailuresRestrictBothFunctions() {
+        val supported = supportedAssessment()
+        OfficialEnvironmentFactor.entries.filter {
+            it != OfficialEnvironmentFactor.GPS_QUALITY &&
+                it != OfficialEnvironmentFactor.CAMERA_QUALITY
+        }.forEach { factor ->
+            val failed = supported.copy(
+                factorStatuses = supported.factorStatuses + (factor to EnvironmentEvidenceStatus.FAIL),
+                usageLimitsAcknowledged = true,
+            )
+            val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(failed, NOW_MS)
+            assertTrue(decision.suppressAllWalkOutputs)
+            assertFalse(decision.navigationOutputsAllowed)
+            assertFalse(decision.cameraOutputsAllowed)
+        }
+    }
+
+    @Test
+    fun disabledCameraIsExcludedWithoutChangingItsMeasuredFailureToPass() {
+        val assessment = assess(cameraQuality = null).copy(
+            enabledMeasuredFactors = setOf(OfficialEnvironmentFactor.GPS_QUALITY),
+        )
+        assertTrue(assessment.canStartWalk)
+        assertEquals(EnvironmentEvidenceStatus.UNKNOWN, assessment.factorStatuses[OfficialEnvironmentFactor.CAMERA_QUALITY])
+        val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(assessment, NOW_MS)
+        assertTrue(decision.navigationOutputsAllowed)
+        assertFalse(decision.cameraOutputsAllowed)
+        assertFalse(decision.suppressAllWalkOutputs)
+    }
+
+    @Test
+    fun disabledSensorCannotMasqueradeAsASurvivingIndependentFunction() {
+        val assessment = assess(gpsQuality = null).copy(
+            enabledMeasuredFactors = setOf(OfficialEnvironmentFactor.GPS_QUALITY),
+        )
+        assertFalse(assessment.canStartWalk)
+        val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(assessment, NOW_MS)
+        assertTrue(decision.suppressAllWalkOutputs)
+        assertFalse(decision.navigationOutputsAllowed)
+        assertFalse(decision.cameraOutputsAllowed)
+    }
+
+    @Test
+    fun disablingBothMeasuredFeaturesDoesNotForceAnUnrelatedApplicationStop() {
+        val assessment = educatedAssessment(gpsQuality = null, cameraQuality = null).copy(
+            enabledMeasuredFactors = emptySet(),
+        )
+        assertTrue(assessment.canStartWalk)
+        val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(assessment, NOW_MS)
+        assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, decision.action)
+        assertFalse(decision.navigationOutputsAllowed)
+        assertFalse(decision.cameraOutputsAllowed)
+        assertFalse(assessment.copy(profileId = null).canStartWalk)
     }
 
     @Test
@@ -293,8 +497,17 @@ class OfficialEnvironmentPolicyTest {
         )
         failures.forEach {
             assertFalse(it.canStartWalk)
-            assertTrue(OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
-                .onAssessment(it, NOW_MS).suppressAllWalkOutputs)
+            val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(it, NOW_MS)
+            assertEquals(
+                it.profileId == PROFILE.profileId &&
+                    it.factorStatuses[OfficialEnvironmentFactor.GPS_QUALITY] == EnvironmentEvidenceStatus.PASS,
+                decision.navigationOutputsAllowed,
+            )
+            assertEquals(
+                it.profileId == PROFILE.profileId &&
+                    it.factorStatuses[OfficialEnvironmentFactor.CAMERA_QUALITY] == EnvironmentEvidenceStatus.PASS,
+                decision.cameraOutputsAllowed,
+            )
         }
         assertFalse(educatedAssessment().copy(usageLimitsAcknowledged = false).canStartWalk)
     }
@@ -311,9 +524,12 @@ class OfficialEnvironmentPolicyTest {
         listOf(weather, camera).forEach {
             assertEquals(OfficialEnvironmentSupport.UNSUPPORTED, it.support)
             assertFalse(it.canStartWalk)
-            assertTrue(OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
-                .onAssessment(it, NOW_MS).suppressAllWalkOutputs)
         }
+        assertTrue(OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
+            .onAssessment(weather, NOW_MS).suppressAllWalkOutputs)
+        val cameraDecision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(camera, NOW_MS)
+        assertTrue(cameraDecision.navigationOutputsAllowed)
+        assertFalse(cameraDecision.cameraOutputsAllowed)
     }
 
     @Test
@@ -335,16 +551,16 @@ class OfficialEnvironmentPolicyTest {
     fun conditionalRuntimeStopsAfterRealDegradationAndDoesNotAutoResume() {
         val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
         assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, guard.onAssessment(educatedAssessment(), NOW_MS).action)
-        val failed = educatedAssessment(cameraQuality = cameraEvidence().copy(status = EnvironmentEvidenceStatus.FAIL))
+        val failed = educatedAssessment(gpsQuality = null, cameraQuality = null)
         repeat(PROFILE.maximumRuntimeRetryAttempts + 1) { index ->
-            val now = NOW_MS + index + 1L
+            val now = NOW_MS + index * PROFILE.runtimeRetryIntervalMs + 1L
             guard.onAssessment(failed.copy(assessedAtElapsedRealtimeMs = now), now)
         }
         assertEquals(OfficialEnvironmentRuntimeAction.SAFE_STOP, guard.decision().action)
         assertTrue(guard.decision().suppressAllWalkOutputs)
         val recovered = guard.onAssessment(
-            educatedAssessment().copy(assessedAtElapsedRealtimeMs = NOW_MS + 10L),
-            NOW_MS + 10L,
+            educatedAssessment().copy(assessedAtElapsedRealtimeMs = NOW_MS + 10_000L),
+            NOW_MS + 10_000L,
         )
         assertEquals(OfficialEnvironmentRuntimeAction.SAFE_STOP, recovered.action)
         assertTrue(recovered.suppressAllWalkOutputs)

@@ -7,7 +7,7 @@ import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState
 import kr.co.hanium.dreamup.walksafe.navigation.parseAndroidVoiceCommand
 
 internal enum class PlatformVoiceCandidateDisposition {
-    NOT_APPLICABLE, INVALID_FINAL, AMBIGUOUS, PREVIEW_ONLY, CONFIRMATION_REQUIRED,
+    NOT_APPLICABLE, INVALID_FINAL, AMBIGUOUS, UNRECOGNIZED, PREVIEW_ONLY, CONFIRMATION_REQUIRED,
 }
 
 internal data class PlatformVoiceCandidateDecision(
@@ -44,8 +44,8 @@ internal fun assessPlatformVoiceCandidate(
     if (scores.firstOrNull() != 0f) {
         return decision(PlatformVoiceCandidateDisposition.NOT_APPLICABLE)
     }
-    // The HOME intent requests at most three candidates. Never silently discard extras.
-    if (phrases.size !in 1..3 || scores.size != phrases.size ||
+    // Providers may return more candidates than requested; every supplied candidate must agree.
+    if (phrases.isEmpty() || scores.size != phrases.size ||
         phrases.any { it.isBlank() } ||
         scores.any { !it.isFinite() || (it != -1f && it !in 0f..1f) }
     ) {
@@ -55,6 +55,9 @@ internal fun assessPlatformVoiceCandidate(
         return decision(PlatformVoiceCandidateDisposition.AMBIGUOUS)
     }
     val candidates = phrases.map { parseAndroidVoiceCommand(it, allowBareDestinationIndex) }
+    if (candidates.all { it == null }) {
+        return decision(PlatformVoiceCandidateDisposition.UNRECOGNIZED)
+    }
     val candidate = candidates.firstOrNull()
         ?: return decision(PlatformVoiceCandidateDisposition.AMBIGUOUS)
     if (candidates.any { it == null || it != candidate }) {

@@ -65,6 +65,7 @@ class PositionConfidencePolicy(
 ) {
     private var currentQuality: PositionQuality? = null
     private var lastSampleAtMs: Long? = null
+    private var lastMotionSampleAtMs: Long? = null
     private var lastEvaluationAtMs: Long? = null
     private var degradedEpisodeId: Long? = null
     private var nextEpisodeId = 0L
@@ -78,6 +79,7 @@ class PositionConfidencePolicy(
     fun reset() {
         currentQuality = null
         lastSampleAtMs = null
+        lastMotionSampleAtMs = null
         lastEvaluationAtMs = null
         degradedEpisodeId = null
         consecutiveHighSamples = 0
@@ -91,6 +93,7 @@ class PositionConfidencePolicy(
         quality: PositionQuality,
         sampleAtElapsedRealtimeMs: Long,
         nowElapsedRealtimeMs: Long = sampleAtElapsedRealtimeMs,
+        informativeGnss: Boolean = true,
     ): PositionConfidenceDecision {
         val failure = validateTime(sampleAtElapsedRealtimeMs, nowElapsedRealtimeMs)
         if (failure != null) {
@@ -110,6 +113,26 @@ class PositionConfidencePolicy(
         }
 
         lastSampleAtMs = sampleAtElapsedRealtimeMs
+        lastEvaluationAtMs = nowElapsedRealtimeMs
+        return applyQuality(
+            quality, nowElapsedRealtimeMs, failureReason = null,
+            recoverySampleAtMs = sampleAtElapsedRealtimeMs.takeIf { informativeGnss },
+        )
+    }
+
+    /** Motion may degrade confidence, but cannot consume or replace GNSS recovery evidence. */
+    fun observeMotion(
+        quality: PositionQuality,
+        sampleAtElapsedRealtimeMs: Long,
+        nowElapsedRealtimeMs: Long = sampleAtElapsedRealtimeMs,
+    ): PositionConfidenceDecision {
+        val failure = validateTime(sampleAtElapsedRealtimeMs, nowElapsedRealtimeMs, lastMotionSampleAtMs)
+        if (failure != null) {
+            val safeNowMs = maxOf(lastEvaluationAtMs ?: 0L, nowElapsedRealtimeMs.coerceAtLeast(0L))
+            lastEvaluationAtMs = safeNowMs
+            return applyQuality(PositionQuality.UNAVAILABLE, safeNowMs, failure)
+        }
+        lastMotionSampleAtMs = sampleAtElapsedRealtimeMs
         lastEvaluationAtMs = nowElapsedRealtimeMs
         return applyQuality(quality, nowElapsedRealtimeMs, failureReason = null)
     }
@@ -139,6 +162,7 @@ class PositionConfidencePolicy(
     private fun validateTime(
         sampleAtMs: Long,
         nowMs: Long,
+        previousSampleAtMs: Long? = lastSampleAtMs,
     ): PositionConfidenceFailureReason? {
         if (sampleAtMs < 0L || nowMs < 0L || nowMs < sampleAtMs) {
             return PositionConfidenceFailureReason.INVALID_TIME
@@ -146,7 +170,7 @@ class PositionConfidencePolicy(
         if (lastEvaluationAtMs?.let { nowMs < it } == true) {
             return PositionConfidenceFailureReason.INVALID_TIME
         }
-        if (lastSampleAtMs?.let { sampleAtMs <= it } == true) {
+        if (previousSampleAtMs?.let { sampleAtMs <= it } == true) {
             return PositionConfidenceFailureReason.OUT_OF_ORDER
         }
         if (nowMs - sampleAtMs > config.maximumSampleAgeMs) {
@@ -159,6 +183,7 @@ class PositionConfidencePolicy(
         quality: PositionQuality,
         nowMs: Long,
         failureReason: PositionConfidenceFailureReason?,
+        recoverySampleAtMs: Long? = null,
     ): PositionConfidenceDecision {
         val previous = currentQuality
         currentQuality = quality
@@ -191,17 +216,17 @@ class PositionConfidencePolicy(
             }
         } else if (degradedEpisodeId != null) {
             decisionEpisodeId = degradedEpisodeId
-            if (quality == PositionQuality.HIGH) {
+            if (quality == PositionQuality.HIGH && recoverySampleAtMs != null) {
                 val previousHighAtMs = lastHighSampleAtMs
                 consecutiveHighSamples = if (
                     previousHighAtMs != null &&
-                    nowMs - previousHighAtMs in 1L..config.maximumHighRecoverySampleGapMs
+                    recoverySampleAtMs - previousHighAtMs in 1L..config.maximumHighRecoverySampleGapMs
                 ) {
                     consecutiveHighSamples + 1
                 } else {
                     1
                 }
-                lastHighSampleAtMs = nowMs
+                lastHighSampleAtMs = recoverySampleAtMs
                 if (consecutiveHighSamples >= config.requiredHighRecoverySamples) {
                     val recoveredEpisodeId = requireNotNull(degradedEpisodeId)
                     degradedEpisodeId = null
@@ -218,7 +243,7 @@ class PositionConfidencePolicy(
                 } else {
                     transition = PositionConfidenceTransition.RECOVERY_PENDING
                 }
-            } else {
+            } else if (quality != PositionQuality.HIGH) {
                 clearRecoveryEvidence()
             }
         } else {

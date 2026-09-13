@@ -49,7 +49,10 @@ class MainActivityRawCollectionRuntimeStaticTest {
             assertFalse(capture.contains(forbiddenReference))
         }
         assertFalse(capture.contains("frameStateLock"))
-        assertTrue(scheduling.contains("rawDetectionDueButInFlightDropCount.incrementAndGet()"))
+        assertTrue(scheduling.contains("tryStartDetectionWork(elapsedRealtimeMs)"))
+        val admission = source.substringAfter("private fun tryStartDetectionWork(")
+            .substringBefore("private fun finishDetectionWork(")
+        assertTrue(admission.contains("rawDetectionDueButInFlightDropCount.incrementAndGet()"))
         assertTrue(publishBoundary.contains("recordRawCollectionDetectionMetadata("))
         assertTrue(
             publishBoundary.indexOf("recordRawCollectionDetectionMetadata(") <

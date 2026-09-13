@@ -4,6 +4,7 @@ import java.util.Locale
 
 sealed interface AndroidVoiceCommand {
     data object CreateReport : AndroidVoiceCommand
+    data object OpenSettings : AndroidVoiceCommand
     data class SetDestination(val placeName: String) : AndroidVoiceCommand
     data class SelectDestinationCandidate(val oneBasedIndex: Int) : AndroidVoiceCommand
     data object RepeatDestinationCandidates : AndroidVoiceCommand
@@ -22,6 +23,7 @@ sealed interface AndroidVoiceCommand {
 
 sealed interface AndroidVoiceAction {
     data object CreateReport : AndroidVoiceAction
+    data object OpenSettings : AndroidVoiceAction
     data class SearchDestination(val query: String) : AndroidVoiceAction
     data class SelectDestinationCandidate(val oneBasedIndex: Int) : AndroidVoiceAction
     data object RepeatDestinationCandidates : AndroidVoiceAction
@@ -125,6 +127,7 @@ data class DestinationSearchVoiceState(
 fun AndroidVoiceCommand.toAction(): AndroidVoiceAction {
     return when (this) {
         AndroidVoiceCommand.CreateReport -> AndroidVoiceAction.CreateReport
+        AndroidVoiceCommand.OpenSettings -> AndroidVoiceAction.OpenSettings
         is AndroidVoiceCommand.SetDestination -> AndroidVoiceAction.SearchDestination(placeName)
         is AndroidVoiceCommand.SelectDestinationCandidate -> AndroidVoiceAction.SelectDestinationCandidate(oneBasedIndex)
         AndroidVoiceCommand.RepeatDestinationCandidates -> AndroidVoiceAction.RepeatDestinationCandidates
@@ -165,11 +168,7 @@ fun parseDestinationSearchVoiceCommand(
     text: String,
     allowBareDestinationIndex: Boolean = false,
 ): DestinationSearchVoiceCommand? {
-    val compact = text
-        .trim()
-        .lowercase(Locale.KOREAN)
-        .replace(PUNCTUATION, "")
-        .replace(WHITESPACE, "")
+    val compact = compactVoicePhrase(text)
     if (compact.isBlank() || NEGATION_MARKERS.any(compact::contains)) return null
     if (compact == "다시듣기") return DestinationSearchVoiceCommand.RepeatPage
     if (compact == "더듣기") return DestinationSearchVoiceCommand.HearMore
@@ -182,6 +181,13 @@ fun parseDestinationSearchVoiceCommand(
     return DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex)
 }
 
+/** Shared command normalization for recognizer spacing, punctuation and case. */
+internal fun compactVoicePhrase(text: String): String = text
+    .trim()
+    .replace(PUNCTUATION, "")
+    .replace(WHITESPACE, "")
+    .lowercase(Locale.KOREAN)
+
 fun parseAndroidVoiceCommand(
     text: String,
     allowBareDestinationIndex: Boolean = false,
@@ -190,9 +196,10 @@ fun parseAndroidVoiceCommand(
         .trim()
         .replace(PUNCTUATION, "")
         .replace(WHITESPACE, " ")
-    val compact = normalized.lowercase(Locale.KOREAN).replace(" ", "")
+    val compact = compactVoicePhrase(text)
     if (compact.isBlank() || NEGATION_MARKERS.any(compact::contains)) return null
 
+    if (compact in OPEN_SETTINGS_COMMANDS) return AndroidVoiceCommand.OpenSettings
     if (compact in DESTINATION_CANCEL_COMMANDS) return AndroidVoiceCommand.CancelDestination
     if (compact == "다시듣기") return AndroidVoiceCommand.RepeatDestinationCandidates
     if (compact == "더듣기") return AndroidVoiceCommand.HearMoreDestinationCandidates
@@ -293,6 +300,7 @@ private fun bareDestinationCandidateIndex(compact: String): Int? {
 private val WHITESPACE = Regex("\\s+")
 private val PUNCTUATION = Regex("[.,!?~。？！]+")
 private val REPORT_COMMAND = Regex("(?:(?:이거|여기|위험)(?:을|를)?)?(?:신고|싱고)(?:해|해줘|해주세요|접수)?")
+private val OPEN_SETTINGS_COMMANDS = setOf("설정", "설정열어줘", "설정으로이동")
 private val DESTINATION_CANDIDATE_NUMBER = Regex(
     "(?:목적지)?([1-9]\\d*)번(?:목적지)?(?:을|를)?(?:선택|골라)(?:해|해줘|해주세요)?",
 )
@@ -376,6 +384,8 @@ private val NEXT_NAVIGATION_COMMANDS = setOf(
     "다음안내알려줘",
 )
 private val REROUTE_COMMANDS = setOf(
+    "새경로요청",
+    "새경로요청해줘",
     "새경로찾아줘",
     "경로다시찾아줘",
     "재탐색해줘",

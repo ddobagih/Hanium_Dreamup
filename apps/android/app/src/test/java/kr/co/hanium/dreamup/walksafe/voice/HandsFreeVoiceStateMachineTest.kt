@@ -37,7 +37,14 @@ class HandsFreeVoiceStateMachineTest {
         val machine = eligibleMachine()
         val wakeGeneration = machine.snapshot().generation
 
-        val commandWindow = machine.onWakeWordDetected(wakeGeneration)
+        val acknowledging = machine.onWakeWordDetected(wakeGeneration)
+        assertTrue(acknowledging.state is HandsFreeVoiceState.AcknowledgingWake)
+        assertEquals(
+            HandsFreeVoiceEffect.AcknowledgeWake(acknowledging.state.generation),
+            acknowledging.effects.single(),
+        )
+        assertFalse(machine.onCommandRecognized(acknowledging.state.generation, "신고해줘").accepted)
+        val commandWindow = machine.onWakeAcknowledgementFinished(acknowledging.state.generation)
         assertTrue(commandWindow.state is HandsFreeVoiceState.WaitingForCommand)
         assertEquals(
             HandsFreeVoiceEffect.StartCommandWindow(commandWindow.state.generation),
@@ -85,15 +92,51 @@ class HandsFreeVoiceStateMachineTest {
     }
 
     @Test
+    fun repeatedWakeAndEarlyCommandCannotBypassOrDuplicateAcknowledgement() {
+        val machine = eligibleMachine()
+        val wakeGeneration = machine.snapshot().generation
+        val acknowledging = machine.onWakeWordDetected(wakeGeneration)
+
+        assertFalse(machine.onWakeWordDetected(wakeGeneration).accepted)
+        assertFalse(machine.onWakeWordDetected(acknowledging.state.generation).accepted)
+        assertFalse(machine.onCommandRecognized(acknowledging.state.generation, "설정").accepted)
+        assertFalse(machine.onCommandWindowTimedOut(acknowledging.state.generation).accepted)
+
+        val commandWindow = machine.onWakeAcknowledgementFinished(acknowledging.state.generation)
+        assertTrue(commandWindow.state is HandsFreeVoiceState.WaitingForCommand)
+        assertFalse(machine.onWakeAcknowledgementFinished(acknowledging.state.generation).accepted)
+        assertTrue(machine.onCommandRecognized(commandWindow.state.generation, "설정").accepted)
+    }
+
+    @Test
+    fun cancelledStoppedOrIneligibleAcknowledgementCannotOpenCommandWindowLater() {
+        listOf<(HandsFreeVoiceStateMachine, Long) -> Unit>(
+            { machine, generation -> machine.cancel(generation) },
+            { machine, _ -> machine.stop() },
+            { machine, _ ->
+                machine.startIfEligible(WalkSessionState.ACTIVE, voiceConsentGranted = false, modelsReady = true)
+            },
+        ).forEach { invalidate ->
+            val machine = eligibleMachine()
+            val acknowledging = machine.onWakeWordDetected(machine.snapshot().generation)
+            invalidate(machine, acknowledging.state.generation)
+            val invalidated = machine.snapshot()
+
+            assertFalse(machine.onWakeAcknowledgementFinished(acknowledging.state.generation).accepted)
+            assertEquals(invalidated, machine.snapshot())
+        }
+    }
+
+    @Test
     fun timeoutAndCancelReturnToWakeWordListeningWithNewGenerations() {
         val machine = eligibleMachine()
-        val firstCommandWindow = machine.onWakeWordDetected(machine.snapshot().generation)
+        val firstCommandWindow = openCommandWindow(machine)
 
         val timedOut = machine.onCommandWindowTimedOut(firstCommandWindow.state.generation)
         assertTrue(timedOut.state is HandsFreeVoiceState.WaitingForWakeWord)
         assertTrue(timedOut.state.generation > firstCommandWindow.state.generation)
 
-        val secondCommandWindow = machine.onWakeWordDetected(timedOut.state.generation)
+        val secondCommandWindow = openCommandWindow(machine)
         val cancelled = machine.cancel(secondCommandWindow.state.generation)
         assertTrue(cancelled.state is HandsFreeVoiceState.WaitingForWakeWord)
         assertEquals(
@@ -151,7 +194,7 @@ class HandsFreeVoiceStateMachineTest {
     @Test
     fun existingCommandDispatcherCanOwnSpeechWithoutDuplicatingIt() {
         val machine = eligibleMachine()
-        val commandWindow = machine.onWakeWordDetected(machine.snapshot().generation)
+        val commandWindow = openCommandWindow(machine)
         val processing = machine.onCommandRecognized(
             callbackGeneration = commandWindow.state.generation,
             command = "서울역으로 안내해줘",
@@ -166,7 +209,7 @@ class HandsFreeVoiceStateMachineTest {
     @Test
     fun stopInvalidatesWorkBeforeFallibleAudioShutdownAndRejectsLateCallbacks() {
         val machine = eligibleMachine()
-        val commandWindow = machine.onWakeWordDetected(machine.snapshot().generation)
+        val commandWindow = openCommandWindow(machine)
         val processing = machine.onCommandRecognized(
             callbackGeneration = commandWindow.state.generation,
             command = "다음 안내 알려줘",
@@ -189,7 +232,10 @@ class HandsFreeVoiceStateMachineTest {
     fun everyAsyncBoundaryRejectsCallbacksFromEarlierGenerations() {
         val machine = eligibleMachine()
         val staleWakeGeneration = machine.snapshot().generation
-        val commandWindow = machine.onWakeWordDetected(staleWakeGeneration)
+        val acknowledging = machine.onWakeWordDetected(staleWakeGeneration)
+        assertFalse(machine.onWakeAcknowledgementFinished(staleWakeGeneration).accepted)
+        val commandWindow = machine.onWakeAcknowledgementFinished(acknowledging.state.generation)
+        assertFalse(machine.onWakeAcknowledgementFinished(acknowledging.state.generation).accepted)
 
         assertFalse(machine.onWakeWordDetected(staleWakeGeneration).accepted)
         assertFalse(machine.onCommandRecognized(staleWakeGeneration, "신고해줘").accepted)
@@ -240,6 +286,11 @@ class HandsFreeVoiceStateMachineTest {
 
     private fun eligibleMachine() = HandsFreeVoiceStateMachine().also(::startEligible)
 
+    private fun openCommandWindow(machine: HandsFreeVoiceStateMachine): HandsFreeVoiceTransition {
+        val acknowledging = machine.onWakeWordDetected(machine.snapshot().generation)
+        return machine.onWakeAcknowledgementFinished(acknowledging.state.generation)
+    }
+
     private fun startEligible(machine: HandsFreeVoiceStateMachine) = machine.startIfEligible(
         walkState = WalkSessionState.ACTIVE,
         voiceConsentGranted = true,
@@ -248,7 +299,7 @@ class HandsFreeVoiceStateMachineTest {
 
     private fun speakingMachine(): HandsFreeVoiceStateMachine {
         val machine = eligibleMachine()
-        val commandWindow = machine.onWakeWordDetected(machine.snapshot().generation)
+        val commandWindow = openCommandWindow(machine)
         val processing = machine.onCommandRecognized(
             commandWindow.state.generation,
             "목적지 서울역 설정해",

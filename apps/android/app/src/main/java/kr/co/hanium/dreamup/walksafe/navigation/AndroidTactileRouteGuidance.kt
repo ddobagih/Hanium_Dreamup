@@ -6,6 +6,7 @@ import kr.co.hanium.dreamup.walksafe.depth.Point2
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.depth.UserFacingDepth
 import kr.co.hanium.dreamup.walksafe.depth.Vec3
+import kr.co.hanium.dreamup.walksafe.inference.WalkMateClassPolicy
 import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.atan2
@@ -122,20 +123,50 @@ class FrozenImageToDepthTransform private constructor(
     private val bottomLeft: Point2,
     private val bottomRight: Point2,
 ) {
+    /** Affine pixel-edge mapping, including image portions outside the depth crop. */
+    fun imagePixelsToDepthUvMatrix(imageWidth: Int, imageHeight: Int): DoubleArray? {
+        if (imageWidth <= 0 || imageHeight <= 0) return null
+        return doubleArrayOf(
+            (topRight.x.toDouble() - topLeft.x) / imageWidth,
+            (bottomLeft.x.toDouble() - topLeft.x) / imageHeight,
+            topLeft.x.toDouble(),
+            (topRight.y.toDouble() - topLeft.y) / imageWidth,
+            (bottomLeft.y.toDouble() - topLeft.y) / imageHeight,
+            topLeft.y.toDouble(),
+            0.0, 0.0, 1.0,
+        )
+    }
+
     fun map(imagePoint: Point2): Point2? {
         if (!imagePoint.isNormalized()) {
             return null
         }
+        return interpolate(imagePoint).takeIf { it.isNormalized() }
+    }
+
+    private fun interpolate(imagePoint: Point2): Point2 {
         val top = lerp(topLeft, topRight, imagePoint.x)
         val bottom = lerp(bottomLeft, bottomRight, imagePoint.x)
-        return lerp(top, bottom, imagePoint.y).takeIf { it.x in 0f..1f && it.y in 0f..1f }
+        return lerp(top, bottom, imagePoint.y)
     }
 
     companion object {
         fun create(frameId: Long, mappedCorners: List<Point2>, mappedCenter: Point2): FrozenImageToDepthTransform? {
-            if (frameId <= 0L || mappedCorners.size != 4 || mappedCorners.any { !it.isNormalized() } || !mappedCenter.isNormalized()) {
+            if (frameId <= 0L || mappedCorners.size != 4 ||
+                mappedCorners.any { !it.x.isFinite() || !it.y.isFinite() } ||
+                !mappedCenter.x.isFinite() || !mappedCenter.y.isFinite()
+            ) {
                 return null
             }
+            // CPU and depth images may have different crops/aspect ratios. Their complete image
+            // corners need not lie inside the depth texture; bounds apply to each sampled point.
+            val horizontal = Point2(mappedCorners[1].x - mappedCorners[0].x, mappedCorners[1].y - mappedCorners[0].y)
+            val vertical = Point2(mappedCorners[2].x - mappedCorners[0].x, mappedCorners[2].y - mappedCorners[0].y)
+            val determinant = horizontal.x * vertical.y - horizontal.y * vertical.x
+            if (!determinant.isFinite() || determinant == 0f ||
+                abs(mappedCorners[2].x + horizontal.x - mappedCorners[3].x) > MAX_CENTER_ERROR ||
+                abs(mappedCorners[2].y + horizontal.y - mappedCorners[3].y) > MAX_CENTER_ERROR
+            ) return null
             val transform = FrozenImageToDepthTransform(
                 frameId = frameId,
                 topLeft = mappedCorners[0],
@@ -143,7 +174,7 @@ class FrozenImageToDepthTransform private constructor(
                 bottomLeft = mappedCorners[2],
                 bottomRight = mappedCorners[3],
             )
-            val interpolatedCenter = transform.map(Point2(0.5f, 0.5f)) ?: return null
+            val interpolatedCenter = transform.interpolate(Point2(0.5f, 0.5f))
             return transform.takeIf {
                 abs(interpolatedCenter.x - mappedCenter.x) <= MAX_CENTER_ERROR &&
                     abs(interpolatedCenter.y - mappedCenter.y) <= MAX_CENTER_ERROR
@@ -329,13 +360,11 @@ class AndroidTactileRouteObservationSupplier : TactileRouteObservationSupplier {
     }
 
     private fun TrackedObjectDepth.isTactileRouteClass(): Boolean {
-        return className.equals(TRAVERSABLE_TACTILE_CLASS, ignoreCase = true) ||
-            className.equals(DAMAGED_TACTILE_CLASS, ignoreCase = true)
+        return WalkMateClassPolicy.isTraversableTactileClass(className) ||
+            WalkMateClassPolicy.isTactileRouteBlockingClass(className)
     }
 
     private companion object {
-        const val TRAVERSABLE_TACTILE_CLASS = "normal_tactile_block"
-        const val DAMAGED_TACTILE_CLASS = "damaged_tactile_block"
         const val MAX_LOCATION_AGE_MS = 2_000L
         const val MAX_ORIENTATION_AGE_MS = 150L
         const val MAX_CAMERA_FRAME_AGE_MS = 100L
@@ -476,9 +505,13 @@ class AndroidTactileRouteGuidance(
         val observations = if (context == null) emptyList() else observationSupplier?.let { supplier ->
             tactileOutputs.mapNotNull { output -> supplier.observationFor(output, context) }
         }.orEmpty()
-        val hasUnprojectedDamage = tactileOutputs.any { it.isDamagedTactile() } &&
-            observations.none { it.className.equals(DAMAGED_TACTILE_CLASS, ignoreCase = true) }
-        val selected = if (hasUnprojectedDamage) null else policy.selectCandidate(observations)
+        val hasUnprojectedBlocker = tactileOutputs.any { output ->
+            WalkMateClassPolicy.isTactileRouteBlockingClass(output.className) &&
+                observations.none {
+                    it.candidateId == output.trackId && it.className.equals(output.className, ignoreCase = true)
+                }
+        }
+        val selected = if (hasUnprojectedBlocker) null else policy.selectCandidate(observations)
         val decision = policy.evaluate(
             TactileRoutePolicyInput(
                 navigationActive = navigationActive,
@@ -489,8 +522,9 @@ class AndroidTactileRouteGuidance(
             ),
         )
         val guidedOutputs = outputs.map { output ->
-            if (!output.className.equals(TRAVERSABLE_TACTILE_CLASS, ignoreCase = true)) return@map output
-            val useAsLocalPath = decision.mode == LocalRouteMode.TACTILE_LOCAL && output.trackId == selected?.candidateId
+            if (!WalkMateClassPolicy.isTactileClass(output.className)) return@map output
+            val useAsLocalPath = WalkMateClassPolicy.isTraversableTactileClass(output.className) &&
+                decision.mode == LocalRouteMode.TACTILE_LOCAL && output.trackId == selected?.candidateId
             output.copy(
                 userFacing = if (useAsLocalPath) {
                     UserFacingDepth(
@@ -507,16 +541,8 @@ class AndroidTactileRouteGuidance(
     }
 
     private fun TrackedObjectDepth.isTactileClass(): Boolean {
-        return className.equals(TRAVERSABLE_TACTILE_CLASS, ignoreCase = true) || isDamagedTactile()
-    }
-
-    private fun TrackedObjectDepth.isDamagedTactile(): Boolean {
-        return className.equals(DAMAGED_TACTILE_CLASS, ignoreCase = true)
-    }
-
-    private companion object {
-        const val TRAVERSABLE_TACTILE_CLASS = "normal_tactile_block"
-        const val DAMAGED_TACTILE_CLASS = "damaged_tactile_block"
+        return WalkMateClassPolicy.isTraversableTactileClass(className) ||
+            WalkMateClassPolicy.isTactileRouteBlockingClass(className)
     }
 }
 

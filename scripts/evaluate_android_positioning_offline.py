@@ -76,6 +76,7 @@ POSITION_KEYS = frozenset(
         "step_profile",
         "heading",
         "stationary",
+        "route_match_evaluated",
     }
 )
 POSITION_REQUIRED_KEYS = frozenset(
@@ -317,6 +318,8 @@ def _point(value: Any, context: str) -> tuple[float, float] | None:
 
 
 def _validate_optional_telemetry(record: dict[str, Any], context: str) -> None:
+    if "route_match_evaluated" in record:
+        _boolean(record["route_match_evaluated"], f"{context}.route_match_evaluated")
     gnss = record.get("gnss")
     if gnss is not None:
         gnss = _object(gnss, f"{context}.gnss")

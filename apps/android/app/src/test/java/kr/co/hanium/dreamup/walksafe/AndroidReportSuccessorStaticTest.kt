@@ -20,7 +20,7 @@ class AndroidReportSuccessorStaticTest {
             appearsInOrder(
                 process,
                 "walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch)",
-                "!officialEnvironmentOutputsAllowed || !phoneMountingOutputsAllowed",
+                "!walkSafetyOutputsAllowed()",
                 "integratedConsentSession.currentConfirmationOrNull()",
                 "reportQueueStore.enqueue(",
                 "walkSessionId = expectedWalkEpoch.walkSessionId",

@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.network
 
 import java.time.Instant
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -508,6 +509,24 @@ class GatewayFieldSessionTest {
         val malformed = client.revalidate(session, "tester-01", nowEpochMs = 2_000L)
         assertEquals(GatewaySessionRevalidationStatus.PENDING, malformed.status)
         assertTrue(session.isUsableFor("tester-01", nowEpochMs = 2_000L))
+    }
+
+    @Test
+    fun connectionLossDuringRevalidationKeepsTheLoginAndCanRecover() {
+        val transport = FakeTransport()
+        val client = GatewayFieldSessionClient(transport)
+        val session = client.login(
+            "https://field.example", "tester-01", ACCOUNT_TOKEN, nowEpochMs = 1_000L,
+        )
+        transport.statusFailure = IOException("connection unavailable")
+
+        val pending = client.revalidate(session, "tester-01", nowEpochMs = 2_000L)
+
+        assertEquals(GatewaySessionRevalidationStatus.PENDING, pending.status)
+        assertTrue(session.isUsableFor("tester-01", nowEpochMs = 2_000L))
+        transport.statusFailure = null
+        assertEquals(GatewaySessionRevalidationStatus.READY,
+            client.revalidate(session, "tester-01", nowEpochMs = 2_000L).status)
     }
 
     @Test
@@ -1072,6 +1091,7 @@ class GatewayFieldSessionTest {
         var getCount = 0
         var lastGetUrl: String? = null
         var statusCode = 200
+        var statusFailure: Exception? = null
         var statusBody = statusBody
 
         override fun postJson(url: String, body: String): GatewayHttpResponse {
@@ -1096,6 +1116,7 @@ class GatewayFieldSessionTest {
 
         override fun get(url: String, headers: Map<String, String>): GatewayHttpResponse {
             getCount += 1
+            statusFailure?.let { throw it }
             lastGetUrl = url
             statusHeaders = headers
             return GatewayHttpResponse(statusCode, statusBody)

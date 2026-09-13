@@ -71,7 +71,7 @@ class AndroidTactileRouteGuidanceTest {
             .substringBefore(nextMethodSignature)
         assertTrue(onDrawFrame.contains("Method prepareTactileFrameDispatch"))
         assertTrue(
-            onDrawFrame.contains("PreparedTactileFrameDispatch.dispatchFeedback"),
+            onDrawFrame.contains("Method dispatchTactileFrameFeedback"),
         )
     }
 

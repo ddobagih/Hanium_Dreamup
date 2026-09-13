@@ -36,6 +36,21 @@ data class WalkSessionDeviceResourceSnapshot(
             if (privateStorageAboveSystemLow == null) add("private_storage_state_pending")
             if (thermalBelowCritical == null) add("thermal_state_pending")
         }.joinToString(",")
+
+    /** Stable measurement conditions for device checks, separate from runtime resource safety. */
+    val measurementReadinessStatus: WalkSessionReadinessStatus
+        get() = when {
+            readinessStatus != WalkSessionReadinessStatus.READY -> readinessStatus
+            thermalThrottled != false -> WalkSessionReadinessStatus.PENDING
+            else -> WalkSessionReadinessStatus.READY
+        }
+
+    val measurementReason: String
+        get() = buildList {
+            if (reason.isNotEmpty()) add(reason)
+            if (thermalThrottled == true) add("thermal_throttled")
+            if (thermalThrottled == null) add("thermal_throttle_state_pending")
+        }.joinToString(",")
 }
 
 /**

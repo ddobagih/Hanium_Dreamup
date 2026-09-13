@@ -1,0 +1,331 @@
+{
+  "source_zip_sha256": "93102ed502a7966a193733725a0d17908c1481e4ffc02ed7e9f83b13d7259bdc",
+  "source_model_sha256": "6f8ae9d2bb82f91e4391e42957a1b374bd4b14efa4702a86f7283454bc38cee0",
+  "classes": {
+    "0": "linear_tactile_paving",
+    "1": "damaged_linear_tactile_paving",
+    "2": "dot_tactile_paving",
+    "3": "damaged_dot_tactile_paving",
+    "4": "passenger_car",
+    "5": "bus",
+    "6": "truck",
+    "7": "motorcycle",
+    "8": "bicycle",
+    "9": "abandoned_e_scooter",
+    "10": "moving_e_scooter",
+    "11": "traffic_light",
+    "12": "crosswalk",
+    "13": "construction_fence",
+    "14": "barricade",
+    "15": "traffic_cone",
+    "16": "bollard",
+    "17": "utility_or_streetlight_pole",
+    "18": "trash_bin",
+    "19": "portable_sign",
+    "20": "person"
+  },
+  "architecture": {
+    "nc": 21,
+    "scales": {
+      "n": [
+        0.5,
+        0.25,
+        1024
+      ],
+      "s": [
+        0.5,
+        0.5,
+        1024
+      ],
+      "m": [
+        0.5,
+        1.0,
+        512
+      ],
+      "l": [
+        1.0,
+        1.0,
+        512
+      ],
+      "x": [
+        1.0,
+        1.5,
+        512
+      ]
+    },
+    "backbone": [
+      [
+        -1,
+        1,
+        "Conv",
+        [
+          64,
+          3,
+          2
+        ]
+      ],
+      [
+        -1,
+        1,
+        "Conv",
+        [
+          128,
+          3,
+          2
+        ]
+      ],
+      [
+        -1,
+        2,
+        "C3k2",
+        [
+          256,
+          false,
+          0.25
+        ]
+      ],
+      [
+        -1,
+        1,
+        "Conv",
+        [
+          256,
+          3,
+          2
+        ]
+      ],
+      [
+        -1,
+        2,
+        "C3k2",
+        [
+          512,
+          false,
+          0.25
+        ]
+      ],
+      [
+        -1,
+        1,
+        "Conv",
+        [
+          512,
+          3,
+          2
+        ]
+      ],
+      [
+        -1,
+        2,
+        "C3k2",
+        [
+          512,
+          true
+        ]
+      ],
+      [
+        -1,
+        1,
+        "Conv",
+        [
+          1024,
+          3,
+          2
+        ]
+      ],
+      [
+        -1,
+        2,
+        "C3k2",
+        [
+          1024,
+          true
+        ]
+      ],
+      [
+        -1,
+        1,
+        "SPPF",
+        [
+          1024,
+          5
+        ]
+      ],
+      [
+        -1,
+        2,
+        "C2PSA",
+        [
+          1024
+        ]
+      ]
+    ],
+    "head": [
+      [
+        -1,
+        1,
+        "nn.Upsample",
+        [
+          "None",
+          2,
+          "nearest"
+        ]
+      ],
+      [
+        [
+          -1,
+          6
+        ],
+        1,
+        "Concat",
+        [
+          1
+        ]
+      ],
+      [
+        -1,
+        2,
+        "C3k2",
+        [
+          512,
+          false
+        ]
+      ],
+      [
+        -1,
+        1,
+        "nn.Upsample",
+        [
+          "None",
+          2,
+          "nearest"
+        ]
+      ],
+      [
+        [
+          -1,
+          4
+        ],
+        1,
+        "Concat",
+        [
+          1
+        ]
+      ],
+      [
+        -1,
+        2,
+        "C3k2",
+        [
+          256,
+          false
+        ]
+      ],
+      [
+        -1,
+        1,
+        "Conv",
+        [
+          256,
+          3,
+          2
+        ]
+      ],
+      [
+        [
+          -1,
+          13
+        ],
+        1,
+        "Concat",
+        [
+          1
+        ]
+      ],
+      [
+        -1,
+        2,
+        "C3k2",
+        [
+          512,
+          false
+        ]
+      ],
+      [
+        -1,
+        1,
+        "Conv",
+        [
+          512,
+          3,
+          2
+        ]
+      ],
+      [
+        [
+          -1,
+          10
+        ],
+        1,
+        "Concat",
+        [
+          1
+        ]
+      ],
+      [
+        -1,
+        2,
+        "C3k2",
+        [
+          1024,
+          true
+        ]
+      ],
+      [
+        [
+          16,
+          19,
+          22
+        ],
+        1,
+        "Detect",
+        [
+          "nc"
+        ]
+      ]
+    ],
+    "scale": "n",
+    "yaml_file": "yolo11n.yaml",
+    "ch": 3,
+    "channels": 3
+  },
+  "export_args": {
+    "format": "tflite",
+    "imgsz": 768,
+    "batch": 1,
+    "half": false,
+    "int8": false,
+    "nms": false,
+    "dynamic": false,
+    "device": "cpu"
+  },
+  "versions": {
+    "ultralytics": "8.4.48",
+    "torch": "2.6.0+cpu",
+    "tensorflow": "2.19.1",
+    "onnx": "1.21.0",
+    "onnx2tf": "1.28.8",
+    "onnxslim": "0.1.94",
+    "onnxruntime": "1.26.0",
+    "tf-keras": "2.19.0"
+  },
+  "functional_tests": "NOT_RUN per user request",
+  "benchmark": "NOT_RUN per user request",
+  "device": "NOT_RUN per user request",
+  "coordinate_contract": "xywh pixels: Ultralytics 8.4.48 Detect._get_decode_boxes uses decoded boxes * strides",
+  "status": "exported",
+  "export_output": "/home/ddobagi/Documents/Codex/2026-09-08/new-chat-2/work/walkmate-device-voice-integration-20260912/model/export/walkmate_yolo11n_21cls_768_saved_model/walkmate_yolo11n_21cls_768_float32.tflite",
+  "artifact_sha256": "d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57",
+  "artifact_bytes": 10715788,
+  "elapsed_seconds": 8.244666712998878
+}

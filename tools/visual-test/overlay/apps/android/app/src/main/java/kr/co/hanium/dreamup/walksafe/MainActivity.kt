@@ -8964,7 +8964,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         } else {
             ActiveNetworkTransport.OFFLINE
         }
-        val preference = permissionSessionPolicy.snapshot().mobileNetworkPreference
+        // Outdoor visual testing permits essential requests without granting
+        // optional original-data or report uploads over the mobile network.
+        val preference = if (
+            BuildConfig.VISUAL_TEST_ENABLED &&
+            reason in setOf("gateway_login", "destination_search", "walking_route")
+        ) {
+            MobileNetworkPreference.ALLOW_CELLULAR
+        } else {
+            permissionSessionPolicy.snapshot().mobileNetworkPreference
+        }
         if (AndroidNetworkTransferPolicy.isAllowed(preference, transport)) return true
         val publishBlockedState = {
             updateNavigationStatus(

@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
+import kr.co.hanium.dreamup.walksafe.inference.WalkMateClassPolicy
 import kotlin.math.abs
 
 data class TactileRoutePolicyConfig(
@@ -59,28 +60,28 @@ data class TactileRouteDecision(
 )
 
 /**
- * Keeps TMAP as the global route and admits a detected normal tactile block only as a short-range
+ * Keeps TMAP as the global route and admits a detected linear tactile block only as a short-range
  * walking corridor. Every missing or uncertain input fails back to TMAP.
  */
 class TactileRoutePolicy(
     private val config: TactileRoutePolicyConfig = TactileRoutePolicyConfig(),
 ) {
-    /** A credible damaged block in the visual corridor always blocks a normal local-path choice. */
+    /** Damage or a dot warning tile in the corridor blocks a directional local-path choice. */
     fun selectCandidate(candidates: List<TactileRouteObservation>): TactileRouteObservation? {
         val inCorridor = candidates.filter {
             it.tmapCorridorProjection == TmapCorridorProjectionEvidence.OVERLAPS
         }
         return inCorridor
-            .filter { it.className.equals(DAMAGED_TACTILE_CLASS, ignoreCase = true) }
+            .filter { WalkMateClassPolicy.isTactileRouteBlockingClass(it.className) }
             .maxByOrNull(TactileRouteObservation::confidence)
             ?: inCorridor
-                .filter { it.className.equals(TRAVERSABLE_TACTILE_CLASS, ignoreCase = true) }
+                .filter { WalkMateClassPolicy.isTraversableTactileClass(it.className) }
                 .maxByOrNull(TactileRouteObservation::confidence)
             ?: candidates
-                .filter { it.className.equals(DAMAGED_TACTILE_CLASS, ignoreCase = true) }
+                .filter { WalkMateClassPolicy.isTactileRouteBlockingClass(it.className) }
                 .maxByOrNull(TactileRouteObservation::confidence)
             ?: candidates
-                .filter { it.className.equals(TRAVERSABLE_TACTILE_CLASS, ignoreCase = true) }
+                .filter { WalkMateClassPolicy.isTraversableTactileClass(it.className) }
                 .maxByOrNull(TactileRouteObservation::confidence)
     }
 
@@ -103,7 +104,7 @@ class TactileRoutePolicy(
             TmapCorridorProjectionEvidence.OUTSIDE -> return tmap("tactile_outside_tmap_corridor")
             TmapCorridorProjectionEvidence.OVERLAPS -> Unit
         }
-        if (!tactile.className.equals(TRAVERSABLE_TACTILE_CLASS, ignoreCase = true)) {
+        if (!WalkMateClassPolicy.isTraversableTactileClass(tactile.className)) {
             return tmap("tactile_not_traversable")
         }
         if (!tactile.confidence.isFinite() || tactile.confidence < config.minimumConfidence) {
@@ -146,11 +147,6 @@ class TactileRoutePolicy(
             reason = reason,
             instruction = null,
         )
-    }
-
-    private companion object {
-        const val TRAVERSABLE_TACTILE_CLASS = "normal_tactile_block"
-        const val DAMAGED_TACTILE_CLASS = "damaged_tactile_block"
     }
 }
 

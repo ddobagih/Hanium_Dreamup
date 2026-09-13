@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
 import java.util.Locale
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingFailure
 
 interface DetectionProvider {
     fun detect(frameId: Long, timestampMs: Long): List<DetectionCandidate>
@@ -22,6 +24,10 @@ class ObjectDepthRuntimePipeline(
         messagePolicy = messagePolicy,
     )
     private var lastCompletedDetectionSequenceId: Long? = null
+    private var lastVisualSourceKey: VisualFrameKey? = null
+    private var lastVisualObservation: CurrentTrackedFrameObservation? = null
+    private var visualAssignments: Map<Int, String> = emptyMap()
+    private var lastVisualOutputs: List<TrackedObjectDepth> = emptyList()
 
     fun setUserStepLength(stepLengthM: Float) {
         estimator = ObjectDepthEstimator(
@@ -68,7 +74,87 @@ class ObjectDepthRuntimePipeline(
             tracker.activeTracks()
         }
 
-        return activeTracks.filter { it.missedFrames == 0 }.mapNotNull { track ->
+        return estimateTracks(snapshot, frameId, timestampMs, activeTracks, effectiveMapper, motionContext)
+    }
+
+    /** Consumes actual current-image geometry; detector confirmation advances only on a new source. */
+    fun processTrackedObservation(
+        snapshot: DepthFrameSnapshot,
+        observation: CurrentTrackedFrameObservation,
+        mapper: CoordinateMapper,
+        mapperFrameId: Long,
+        nowElapsedRealtimeMs: Long,
+        motionContext: MotionContext = MotionContext(),
+    ): List<TrackedObjectDepth> {
+        if (!observation.isFreshAt(nowElapsedRealtimeMs) || !observation.matchesDepthSnapshot(snapshot) ||
+            mapperFrameId != observation.targetKey.frameId
+        ) return emptyList()
+        // The visual tracker resumes unfinished backfill. It has no current geometry yet, so do
+        // not consume this detector source or turn pending work into a terminal track loss.
+        if (observation.observations.any {
+                it.failure == VisualTrackingFailure.WORK_BUDGET_EXCEEDED ||
+                    it.failure == VisualTrackingFailure.TIME_BUDGET_EXCEEDED
+            }
+        ) return emptyList()
+        val previous = lastVisualObservation
+        if (previous != null) {
+            if (previous.targetKey.epoch != observation.targetKey.epoch ||
+                previous.targetKey.geometryVersion != observation.targetKey.geometryVersion ||
+                observation.targetKey.frameId < previous.targetKey.frameId ||
+                observation.sourceKey.frameId < previous.sourceKey.frameId
+            ) return emptyList()
+            if (observation.targetKey.frameId == previous.targetKey.frameId) {
+                return if (observation.targetKey == previous.targetKey && observation.sourceKey == previous.sourceKey &&
+                    observation.sourceDetections == previous.sourceDetections && observation.observations == previous.observations
+                ) lastVisualOutputs else emptyList()
+            }
+            if (observation.targetKey.cameraTimestampNs <= previous.targetKey.cameraTimestampNs ||
+                observation.targetKey.capturedAtElapsedRealtimeMs < previous.targetKey.capturedAtElapsedRealtimeMs ||
+                (observation.sourceKey == previous.sourceKey && observation.sourceDetections != previous.sourceDetections)
+            ) return emptyList()
+        }
+        val indexed = observation.trackedObservations.mapNotNull { tracked ->
+            val geometry = extractor.extract(requireNotNull(tracked.geometry))
+                .takeIf { it.detectionConfidence >= MIN_DETECTION_CONFIDENCE } ?: return@mapNotNull null
+            IndexedObjectGeometry(tracked.sourceIndex, geometry)
+        }
+        val sourceChanged = observation.sourceKey != lastVisualSourceKey
+        val tracks = if (sourceChanged) {
+            // Equal source frame IDs with changed metadata are never another completed detection.
+            if (lastVisualSourceKey?.frameId == observation.sourceKey.frameId) return emptyList()
+            val assignments = tracker.updateWithAssignments(indexed, observation.timestampMs)
+            visualAssignments = assignments.associate { it.sourceDetectionIndex to it.track.trackId }
+            lastVisualSourceKey = observation.sourceKey
+            assignments.map { it.track }
+        } else {
+            tracker.applyTrackedObservations(
+                indexed.mapNotNull { indexedGeometry ->
+                    visualAssignments[indexedGeometry.sourceDetectionIndex]?.let { it to indexedGeometry.geometry }
+                },
+                observation.timestampMs,
+            )
+        }
+        val visualQualities = observation.trackedObservations.mapNotNull { tracked ->
+            visualAssignments[tracked.sourceIndex]?.let { it to tracked.trackingQuality }
+        }.toMap()
+        lastVisualObservation = observation
+        lastVisualOutputs = estimateTracks(
+            snapshot, observation.targetKey.frameId, observation.timestampMs, tracks, mapper, motionContext, visualQualities,
+            requireIndependentDepthObservation = true,
+        )
+        return lastVisualOutputs
+    }
+
+    private fun estimateTracks(
+        snapshot: DepthFrameSnapshot,
+        frameId: Long,
+        timestampMs: Long,
+        tracks: List<TrackState>,
+        mapper: CoordinateMapper,
+        motionContext: MotionContext,
+        visualQualities: Map<String, Float> = emptyMap(),
+        requireIndependentDepthObservation: Boolean = false,
+    ): List<TrackedObjectDepth> = tracks.filter { it.missedFrames == 0 }.mapNotNull { track ->
             val geometry = track.latestGeometry ?: return@mapNotNull null
             estimator.estimate(
                 ObjectDepthInput(
@@ -76,16 +162,23 @@ class ObjectDepthRuntimePipeline(
                     timestampMs = timestampMs,
                     geometry = geometry,
                     track = track,
-                    mapper = effectiveMapper,
+                    mapper = mapper,
                     rawDepth = snapshot.rawDepth,
                     rawConfidence = snapshot.rawConfidence,
                     rawDepthFreshnessQuality = snapshot.rawDepthFreshnessQuality,
-                    fullDepth = snapshot.fullDepth,
-                    motionContext = motionContext,
+                    rawDepthMatchesCameraFrame = snapshot.rawDepthMatchesCameraImage,
+                    fullDepth = snapshot.fullDepth?.takeIf { snapshot.hasFreshFullDepth },
+                    fullDepthMatchesCameraFrame = snapshot.hasFreshFullDepth,
+                    rawDepthTimestampNs = snapshot.rawDepthTimestampNs,
+                    fullDepthTimestampNs = snapshot.fullDepthTimestampNs,
+                    visualTrackingQuality = visualQualities[track.trackId] ?: 1f,
+                    requireIndependentDepthObservation = requireIndependentDepthObservation,
+                    motionContext = motionContext.copy(
+                        cameraPoseEvidence = snapshot.cameraPoseEvidence,
+                    ),
                 ),
             )
         }
-    }
 
     private fun identityMapper(width: Int, height: Int): LetterboxCoordinateMapper {
         return LetterboxCoordinateMapper(

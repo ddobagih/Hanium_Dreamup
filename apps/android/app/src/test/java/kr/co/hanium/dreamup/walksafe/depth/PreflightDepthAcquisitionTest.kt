@@ -100,6 +100,100 @@ class PreflightDepthAcquisitionTest {
         assertEquals(1, confidence.closeCount)
     }
 
+    @Test
+    fun samePositiveObservationTransfersBothImagesWithoutClosingThemEarly() {
+        val raw = FakeImage(timestampNs = 90L)
+        val confidence = FakeImage(timestampNs = 90L)
+        val pair = acquireMatchingRawDepthPair({ raw }, { confidence }, ::matchingObservation)
+
+        assertSame(raw, pair?.first)
+        assertSame(confidence, pair?.second)
+        assertEquals(0, raw.closeCount)
+        assertEquals(0, confidence.closeCount)
+        pair?.first?.close()
+        pair?.second?.close()
+    }
+
+    @Test
+    fun mismatchedOrNonPositiveObservationsCloseBothImagesBeforePreflightPublishesMissingRaw() {
+        listOf(90L to 91L, 0L to 0L, -1L to -1L).forEach { (rawNs, confidenceNs) ->
+            val raw = FakeImage(timestampNs = rawNs)
+            val confidence = FakeImage(timestampNs = confidenceNs)
+            val bundle = acquirePreflightDepth(
+                acquireFullDepth = { null },
+                acquireRawDepth = { raw },
+                acquireRawConfidence = { confidence },
+                isMatchingRawPair = ::matchingObservation,
+            ) { full, acceptedRaw, acceptedConfidence ->
+                assertEquals(1, raw.closeCount)
+                assertEquals(1, confidence.closeCount)
+                Images(full, acceptedRaw, acceptedConfidence)
+            }
+
+            assertEquals(Images(null, null, null), bundle)
+            bundle.close()
+            assertEquals(1, raw.closeCount)
+            assertEquals(1, confidence.closeCount)
+        }
+    }
+
+    @Test
+    fun sameTimestampWithDifferentDimensionsIsNotPublishedAsRawPair() {
+        val raw = FakeImage(width = 2, height = 2)
+        val confidence = FakeImage(width = 1, height = 4)
+        val pair = acquireMatchingRawDepthPair({ raw }, { confidence }, ::matchingObservation)
+
+        assertNull(pair)
+        assertEquals(1, raw.closeCount)
+        assertEquals(1, confidence.closeCount)
+    }
+
+    @Test
+    fun fullDepthPreservesItsPriorityWithoutAcquiringOrValidatingRaw() {
+        val full = FakeImage()
+        val bundle = acquirePreflightDepth(
+            acquireFullDepth = { full },
+            acquireRawDepth = { error("Full depth is already held") },
+            acquireRawConfidence = { error("No raw observation was acquired") },
+            isMatchingRawPair = { _, _ -> error("No raw pair to validate") },
+            createBundle = ::Images,
+        )
+
+        assertSame(full, bundle.full)
+        bundle.close()
+        assertEquals(1, full.closeCount)
+    }
+
+    @Test
+    fun pairValidationExceptionReleasesBothImagesAndPreservesTheFailure() {
+        val raw = FakeImage()
+        val confidence = FakeImage()
+        val failure = runCatching {
+            acquireMatchingRawDepthPair({ raw }, { confidence }) { _, _ -> error("timestamp read failed") }
+        }.exceptionOrNull()
+
+        assertEquals("timestamp read failed", failure?.message)
+        assertEquals(1, raw.closeCount)
+        assertEquals(1, confidence.closeCount)
+    }
+
+    @Test
+    fun rejectedPairStillClosesConfidenceWhenRawCloseThrows() {
+        val raw = FakeImage(failClose = true)
+        val confidence = FakeImage()
+        assertTrue(runCatching {
+            acquireMatchingRawDepthPair({ raw }, { confidence }) { _, _ -> false }
+        }.isFailure)
+
+        assertEquals(1, raw.closeCount)
+        assertEquals(1, confidence.closeCount)
+    }
+
+    private fun matchingObservation(raw: FakeImage, confidence: FakeImage): Boolean =
+        rawConfidenceObservationMatches(
+            raw.timestampNs, confidence.timestampNs, raw.width, raw.height, confidence.width, confidence.height,
+        )
+
     private data class Images(
         val full: FakeImage?,
         val raw: FakeImage?,
@@ -112,10 +206,18 @@ class PreflightDepthAcquisitionTest {
         }
     }
 
-    private class FakeImage : AutoCloseable {
+    private class FakeImage(
+        val timestampNs: Long = 100L,
+        val width: Int = 2,
+        val height: Int = 2,
+        private val failClose: Boolean = false,
+    ) : AutoCloseable {
         var closeCount = 0
             private set
 
-        override fun close() { closeCount += 1 }
+        override fun close() {
+            closeCount += 1
+            if (failClose) error("close failed")
+        }
     }
 }

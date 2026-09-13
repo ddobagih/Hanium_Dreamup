@@ -45,7 +45,7 @@ data class AndroidReportCandidate(
 class AndroidReportCandidatePolicy {
     fun prepare(input: AndroidReportCandidateInput): AndroidReportCandidate? {
         if (!input.deviceGateAllowsReports) return null
-        if (input.depth.className != DAMAGED_TACTILE_BLOCK) return null
+        if (!isReportableDamageClass(input.depth.className)) return null
         if (input.trigger !in ALLOWED_TRIGGERS) return null
         if (
             input.trigger == TRIGGER_AUTO &&
@@ -65,7 +65,7 @@ class AndroidReportCandidatePolicy {
         if (!location.accuracyM.isFinite() || location.accuracyM < 0f || location.accuracyM > REPORT_LOCATION_CONFIG.maxAccuracyM) return null
         val threshold = input.threshold ?: return null
         val sourceModel = input.sourceModel?.takeIf { it.isNotBlank() } ?: return null
-        val modelClassId = REPORT_CLASS_IDS[modelKey] ?: return null
+        val modelClassId = REPORT_CLASS_IDS[modelKey]?.get(input.depth.className) ?: return null
         if (input.sourceCommit != "unverified" && !SOURCE_COMMIT_PATTERN.matches(input.sourceCommit)) return null
 
         val metadata = JSONObject()
@@ -139,12 +139,20 @@ class AndroidReportCandidatePolicy {
         const val AUTO_REPORT_MIN_TRACK_STABLE_MS = 700L
         const val AUTO_REPORT_MIN_DETECTION_CONFIDENCE = 0.70f
         const val REPORT_MAX_DETECTION_AGE_MS = 1_200L
-        val ALLOWED_MODEL_KEYS = setOf("custom_tactile", "unified_walksafe")
         val ALLOWED_TRIGGERS = setOf(TRIGGER_AUTO, TRIGGER_ON_SCREEN, TRIGGER_VOICE)
+        // Keep the model-local class id while reporting a shared damage category to the backend.
         val REPORT_CLASS_IDS = mapOf(
-            "custom_tactile" to 1,
-            "unified_walksafe" to 8,
+            "custom_tactile" to mapOf(DAMAGED_TACTILE_BLOCK to 1),
+            "unified_walksafe" to mapOf(DAMAGED_TACTILE_BLOCK to 8),
+            "walkmate_21cls" to mapOf(
+                "damaged_linear_tactile_paving" to 1,
+                "damaged_dot_tactile_paving" to 3,
+            ),
         )
+        val ALLOWED_MODEL_KEYS = REPORT_CLASS_IDS.keys
+        private val REPORTABLE_DAMAGE_CLASSES = REPORT_CLASS_IDS.values.flatMap { it.keys }.toSet()
+
+        fun isReportableDamageClass(className: String): Boolean = className in REPORTABLE_DAMAGE_CLASSES
 
         fun isStableAutomaticDetection(depth: TrackedObjectDepth): Boolean {
             return depth.trackAgeFrames >= AUTO_REPORT_MIN_TRACK_AGE_FRAMES &&

@@ -1,4 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:networkSecurityConfig="@xml/debug_network_security_config" />
+    <application android:networkSecurityConfig="@xml/debug_network_security_config">
+        <activity android:name=".CameraTestActivity" android:exported="false"
+            android:label="카메라 테스트" />
+        <activity
+            android:name=".device.RuntimeCalibrationTestHostActivity"
+            android:exported="false" />
+        <activity
+            android:name=".fieldtest.OutdoorPositionTestActivity"
+            android:label="위치 야외 테스트"
+            android:exported="true"
+            android:configChanges="orientation|screenSize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>

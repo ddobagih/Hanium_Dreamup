@@ -73,9 +73,11 @@ class MainActivityCommandFeedbackLeaseStaticTest {
 
     @Test
     fun pageExitCancelsCommandSpeechAndBackgroundStillClosesTheActualEngine() {
-        val page = functionBlock("private fun showNativeUiPage(")
+        val page = functionBlock("private fun showNativeUiPage(page: NativeUiPage, preserveVoiceInteraction: Boolean)")
         val pageChange = page.substringBefore("nativeUiPage = page")
         assertTrue(pageChange.contains("if (nativeUiPage != page)"))
+        assertTrue(pageChange.contains("if (!preserveVoiceInteraction)"))
+        assertTrue(pageChange.contains("stopHandsFreeVoiceService()"))
         assertTrue(pageChange.contains("cancelVoiceCommandRecognition()"))
         assertTrue(pageChange.contains("cancelCommandSpeechResponse()"))
         assertFalse(pageChange.contains("feedbackActuator?.close()"))

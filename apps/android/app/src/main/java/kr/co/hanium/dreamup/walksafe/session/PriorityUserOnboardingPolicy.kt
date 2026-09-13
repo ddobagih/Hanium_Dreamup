@@ -20,7 +20,7 @@ enum class PriorityUserPractice(
 ) {
     HAZARD_ALERT(
         actionLabelKo = "위험 안내 연습",
-        instructionKo = "위험 안내입니다. 멈추고 주변을 확인하세요.",
+        instructionKo = "전방 장애물. 멈추세요. 주변을 확인하세요.",
     ),
     PAUSE(
         actionLabelKo = "일시정지 연습",
@@ -32,7 +32,8 @@ enum class PriorityUserPractice(
     ),
     SAFE_STOP(
         actionLabelKo = "안전정지 연습",
-        instructionKo = "필수 기능을 사용할 수 없어 보행 안내를 안전정지했습니다.",
+        instructionKo = "보행 기능을 안전 중지했습니다. " +
+            "필수 기능 상태가 바뀌어 새 보행 준비가 필요합니다.",
     ),
 }
 
@@ -69,6 +70,7 @@ enum class PriorityUserBlockReason(val noticeKo: String) {
     REQUIRED_PRACTICE_INCOMPLETE("위험 안내·일시정지·재개·안전정지 연습을 모두 완료하세요."),
 }
 
+/** Vibration availability restricts haptic feedback without blocking spoken onboarding. */
 data class PriorityUserSupportEnvironment(
     val screenReaderActive: Boolean,
     val largeTextEnabled: Boolean,
@@ -90,6 +92,7 @@ data class PriorityUserOnboardingSnapshot(
     val usageConditionsAcknowledged: Boolean = false,
     val appUsageReviewed: Boolean = false,
     val appUsageAccepted: Boolean = false,
+    val hazardResponseConfirmed: Boolean = false,
 ) {
     init {
         require(policyVersion == PRIORITY_USER_TRAINING_POLICY_VERSION) {
@@ -120,6 +123,9 @@ data class PriorityUserOnboardingSnapshot(
         require(completedPractices.isEmpty() || safePracticePlaceConfirmed) {
             "Practice success requires a confirmed safe practice place"
         }
+        require(!hazardResponseConfirmed || PriorityUserPractice.HAZARD_ALERT in completedPractices) {
+            "A hazard response requires a completed hazard practice"
+        }
         require(
             completedPractices ==
                 PriorityUserPractice.entries.take(completedPractices.size).toSet(),
@@ -137,7 +143,7 @@ data class PriorityUserOnboardingSnapshot(
 
     val nativeEducationComplete: Boolean
         get() = educationConsentComplete && usageConditionsAcknowledged &&
-            appUsageReviewed && appUsageAccepted
+            appUsageReviewed && appUsageAccepted && interactivePracticeComplete
 
     val nativeEducationStep: PriorityUserNativeEducationStep
         get() = when {
@@ -153,6 +159,12 @@ data class PriorityUserOnboardingSnapshot(
         get() = educationReviewed &&
             safePracticePlaceConfirmed &&
             nextRequiredPractice == null
+
+    val interactivePracticeComplete: Boolean
+        get() = trainingComplete && hazardResponseConfirmed
+
+    val requiresPracticeRestart: Boolean
+        get() = completedPractices.isNotEmpty() && !hazardResponseConfirmed
 }
 
 data class PriorityUserOnboardingDecision(
@@ -314,9 +326,12 @@ class PriorityUserOnboardingPolicy(
     private data class PendingPracticeAttempt(
         val token: PriorityUserPracticeAttemptToken,
         val practice: PriorityUserPractice,
-        val speechPlaybackCompleted: Boolean = false,
-        val vibrationRequestWindowElapsed: Boolean = false,
-    )
+        val requiredDeliverySignals: Set<PriorityUserPracticeDeliverySignal>,
+        val deliveredSignals: Set<PriorityUserPracticeDeliverySignal> = emptySet(),
+    ) {
+        val deliveryComplete: Boolean
+            get() = deliveredSignals.containsAll(requiredDeliverySignals)
+    }
 
     private val lock = Any()
     private var current = initial
@@ -419,7 +434,7 @@ class PriorityUserOnboardingPolicy(
 
     fun acceptAppUsageEducation(): PriorityUserOnboardingSnapshot = synchronized(lock) {
         if (current.safetyEducationConsentComplete && current.usageConditionsAcknowledged &&
-            current.appUsageReviewed && accountBlockReason(current) == null) {
+            current.appUsageReviewed && current.interactivePracticeComplete && accountBlockReason(current) == null) {
             current = current.copy(appUsageAccepted = true)
         }
         current
@@ -427,16 +442,27 @@ class PriorityUserOnboardingPolicy(
 
     fun confirmSafePracticePlace(): PriorityUserOnboardingSnapshot = synchronized(lock) {
         if (current.educationReviewed && accountBlockReason(current) == null) {
-            current = current.copy(safePracticePlaceConfirmed = true)
+            // Old completion records do not prove the newly required hazard response.
+            // Only an explicit place confirmation begins that practice again.
+            val restart = current.requiresPracticeRestart
+            current = current.copy(
+                safePracticePlaceConfirmed = true,
+                completedPractices = if (restart) emptySet() else current.completedPractices,
+            )
+            if (restart) cancelPendingPracticeLocked()
         }
         current
     }
 
     fun beginPractice(
         practice: PriorityUserPractice,
+        requiredDeliverySignals: Set<PriorityUserPracticeDeliverySignal> =
+            PriorityUserPracticeDeliverySignal.entries.toSet(),
     ): PriorityUserPracticeAttemptToken? = synchronized(lock) {
         if (
             pendingPractice != null ||
+            requiredDeliverySignals.isEmpty() ||
+            current.requiresPracticeRestart ||
             !current.safePracticePlaceConfirmed ||
             accountBlockReason(current) != null ||
             current.nextRequiredPractice != practice ||
@@ -448,6 +474,7 @@ class PriorityUserOnboardingPolicy(
             pendingPractice = PendingPracticeAttempt(
                 token = token,
                 practice = practice,
+                requiredDeliverySignals = requiredDeliverySignals.toSet(),
             )
         }
     }
@@ -458,29 +485,32 @@ class PriorityUserOnboardingPolicy(
     ): PriorityUserOnboardingSnapshot = synchronized(lock) {
         val pending = pendingPractice
         if (pending == null || pending.token != token) return@synchronized current
-        val signalled = when (signal) {
-            PriorityUserPracticeDeliverySignal.SPEECH_PLAYBACK_COMPLETED ->
-                pending.copy(speechPlaybackCompleted = true)
-
-            PriorityUserPracticeDeliverySignal.VIBRATION_REQUEST_WINDOW_ELAPSED ->
-                pending.copy(vibrationRequestWindowElapsed = true)
-        }
-        if (
-            signalled.speechPlaybackCompleted &&
-            signalled.vibrationRequestWindowElapsed &&
-            current.nextRequiredPractice == signalled.practice &&
-            current.safePracticePlaceConfirmed &&
-            accountBlockReason(current) == null
-        ) {
-            current = current.copy(
-                completedPractices = current.completedPractices + signalled.practice,
-            )
-            pendingPractice = null
-        } else {
-            pendingPractice = signalled
+        if (signal !in pending.requiredDeliverySignals) return@synchronized current
+        val signalled = pending.copy(deliveredSignals = pending.deliveredSignals + signal)
+        pendingPractice = signalled
+        if (signalled.practice != PriorityUserPractice.HAZARD_ALERT && canCompletePracticeLocked(signalled)) {
+            completePracticeLocked(signalled)
         }
         current
     }
+
+    fun isHazardResponseReady(token: PriorityUserPracticeAttemptToken): Boolean = synchronized(lock) {
+        pendingPractice?.let { pending ->
+            pending.token === token && pending.practice == PriorityUserPractice.HAZARD_ALERT &&
+                canCompletePracticeLocked(pending)
+        } == true
+    }
+
+    /** A user's response after the example, not a sensor observation of stopping or surroundings. */
+    fun confirmHazardResponse(token: PriorityUserPracticeAttemptToken): PriorityUserOnboardingSnapshot =
+        synchronized(lock) {
+            val pending = pendingPractice
+            if (pending != null && pending.token === token &&
+                pending.practice == PriorityUserPractice.HAZARD_ALERT && canCompletePracticeLocked(pending)) {
+                completePracticeLocked(pending)
+            }
+            current
+        }
 
     fun cancelPractice(
         token: PriorityUserPracticeAttemptToken? = null,
@@ -502,6 +532,7 @@ class PriorityUserOnboardingPolicy(
             usageConditionsAcknowledged = false,
             appUsageReviewed = false,
             appUsageAccepted = false,
+            hazardResponseConfirmed = false,
         )
         cancelPendingPracticeLocked()
         current
@@ -517,6 +548,7 @@ class PriorityUserOnboardingPolicy(
         )
         val walkBlock = accountBlock ?: when {
             current.nativeEducationComplete -> null
+            current.requiresPracticeRestart -> PriorityUserBlockReason.REQUIRED_PRACTICE_INCOMPLETE
             current.safetyEducationConsentComplete -> PriorityUserBlockReason.APP_USAGE_EDUCATION_INCOMPLETE
             !current.educationReviewed ->
                 PriorityUserBlockReason.SAFETY_EDUCATION_NOT_REVIEWED
@@ -559,5 +591,18 @@ class PriorityUserOnboardingPolicy(
         pendingUsagePlayback = null
         pendingPractice = null
         practiceLifecycle = PriorityUserPracticeLifecycle(current.completedPractices)
+    }
+
+    private fun canCompletePracticeLocked(pending: PendingPracticeAttempt): Boolean =
+        pending.deliveryComplete && current.nextRequiredPractice == pending.practice &&
+            current.safePracticePlaceConfirmed && accountBlockReason(current) == null
+
+    private fun completePracticeLocked(pending: PendingPracticeAttempt) {
+        current = current.copy(
+            completedPractices = current.completedPractices + pending.practice,
+            hazardResponseConfirmed = current.hazardResponseConfirmed ||
+                pending.practice == PriorityUserPractice.HAZARD_ALERT,
+        )
+        pendingPractice = null
     }
 }

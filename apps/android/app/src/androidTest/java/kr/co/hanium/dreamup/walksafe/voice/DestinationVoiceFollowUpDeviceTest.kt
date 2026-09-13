@@ -323,6 +323,13 @@ class DestinationVoiceFollowUpDeviceTest {
                 events.anyReady
             }
             if (events.markerSeen && ready && (!recognizerErrorRequired || events.readyAfterRecognizerError)) {
+                if (candidatePromptRequired) {
+                    assertEquals(
+                        "Candidate follow-up must keep the 길라잡이 results page visible",
+                        "DESTINATION_SEARCH",
+                        observed.page,
+                    )
+                }
                 Log.i(
                     TAG,
                     "event=DESTINATION_DIALOG_DEVICE_READY step=$step " +

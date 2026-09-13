@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.device
 
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -20,9 +22,7 @@ class AndroidKoreanTextToSpeechSynthesisProbeTest {
         ).readText()
 
         assertTrue(source.contains("textToSpeech.setLanguage(Locale.KOREAN)"))
-        assertTrue(source.contains("textToSpeech.voices"))
-        assertTrue(source.contains("!voice.isNetworkConnectionRequired"))
-        assertTrue(source.contains("textToSpeech.setVoice(offlineKoreanVoice)"))
+        assertTrue(source.contains("selectInstalledOfflineKoreanVoice(textToSpeech) == KoreanOfflineVoiceSelection.SELECTED"))
         assertTrue(source.contains("textToSpeech.synthesizeToFile"))
         assertTrue(source.contains("object : UtteranceProgressListener()"))
         assertFalse(source.contains("Build.MANUFACTURER"))
@@ -30,10 +30,10 @@ class AndroidKoreanTextToSpeechSynthesisProbeTest {
     }
 
     @Test
-    fun nonEmptyCompletedSynthesisIsTheOnlyAvailableResult() {
+    fun completedSynthesisWithOneSecondOfPcmIsAvailable() {
         val engine = FakeEngine(
             onSynthesize = { file, utteranceId, listener ->
-                file.writeBytes(byteArrayOf(1, 2, 3))
+                file.writeBytes(oneSecondPcmWav())
                 listener.onDone(utteranceId)
             },
         )
@@ -183,6 +183,29 @@ class AndroidKoreanTextToSpeechSynthesisProbeTest {
         assertTrue(fixture.results.isEmpty())
         fixture.scheduler.fire()
         assertEquals(listOf(KoreanTextToSpeechSynthesisProbeResult.TIMED_OUT), fixture.results)
+    }
+
+    private fun oneSecondPcmWav(): ByteArray {
+        val sampleRate = 16_000
+        val bytesPerSample = 2
+        val dataBytes = sampleRate * bytesPerSample
+        return ByteBuffer.allocate(44 + dataBytes).order(ByteOrder.LITTLE_ENDIAN).apply {
+            put("RIFF".toByteArray(Charsets.US_ASCII))
+            putInt(36 + dataBytes)
+            put("WAVE".toByteArray(Charsets.US_ASCII))
+            put("fmt ".toByteArray(Charsets.US_ASCII))
+            putInt(16)
+            putShort(1) // Integer PCM.
+            putShort(1) // Mono.
+            putInt(sampleRate)
+            putInt(sampleRate * bytesPerSample)
+            putShort(bytesPerSample.toShort())
+            putShort(16)
+            put("data".toByteArray(Charsets.US_ASCII))
+            putInt(dataBytes)
+            // Silence is sufficient for the structure/duration contract, not audible speech.
+            put(ByteArray(dataBytes))
+        }.array()
     }
 
     private fun fixture(engine: FakeEngine): Fixture {

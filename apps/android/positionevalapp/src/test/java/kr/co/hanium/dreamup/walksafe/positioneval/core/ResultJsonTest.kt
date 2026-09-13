@@ -36,6 +36,20 @@ class ResultJsonTest {
     }
 
     @Test
+    fun manualBaseProvenanceIncludesHashesWithoutInventedDownloadUrlOrPrivateFilename() {
+        val value = ResultJson.processingFailure(
+            "BASE_DATA_INVALID", "입력 확인", null, null, null,
+            manualBaseArtifacts = listOf(artifact("private-base.zip")),
+        )
+        val root = JSONObject(value)
+        val provenance = root.getJSONObject("reference_provenance")
+        assertEquals("USER_SELECTED_RINEX_HEADER_VALIDATED", provenance.getString("base_input_mode"))
+        assertEquals("a".repeat(64), provenance.getJSONArray("base_input_files").getJSONObject(0).getString("sha256"))
+        assertEquals(0, root.getJSONArray("downloads").length())
+        assertFalse(value.contains("private-base.zip"))
+    }
+
+    @Test
     fun preEvaluationReferenceShortageUsesTruthInsufficientWithoutComponentDetail() {
         val value = ResultJson.processingFailure(
             "NGII_REFERENCE_INCOMPLETE",

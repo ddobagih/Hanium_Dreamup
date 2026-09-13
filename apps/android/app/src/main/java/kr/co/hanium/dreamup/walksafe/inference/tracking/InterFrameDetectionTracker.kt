@@ -1,0 +1,354 @@
+package kr.co.hanium.dreamup.walksafe.inference.tracking
+
+import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
+import kr.co.hanium.dreamup.walksafe.depth.Point2
+import kr.co.hanium.dreamup.walksafe.depth.RectNorm
+
+/**
+ * Short-lived CPU-image tracking, independent of detector scheduling and depth/risk evidence.
+ * Calls serialize around owned image copies. Budget-limited backfill resumes at the last completed
+ * object/frame edge; no geometry is published for an object until it reaches the exact target.
+ */
+class InterFrameDetectionTracker(
+    private val config: VisualTrackingConfig = VisualTrackingConfig(),
+    private val clockNanos: () -> Long = System::nanoTime,
+) {
+    private val history = ArrayDeque<GrayTrackingFrame>()
+    private val estimator: VisualMotionEstimator by lazy {
+        when (config.backend) {
+            VisualTrackingBackend.OPENCV_PYRAMIDAL_LK -> OpenCvPyramidalMotionEstimator(config.maxFeaturesPerObject, config.allowSimilarityTransform)
+            VisualTrackingBackend.PATCH_DIAGNOSTIC -> PatchMotionEstimator(minOf(config.maxFeaturesPerObject, 16))
+        }
+    }
+    private var batch: Batch? = null
+    private var acceptedEpoch: Long? = null
+    private var acceptedGeometryVersion: Long? = null
+    private var acceptedDimensions: FrameDimensions? = null
+
+    @Synchronized
+    fun initialize(): Boolean = estimator.initialize()
+
+    @Synchronized
+    fun clear() {
+        history.clear()
+        batch = null
+    }
+
+    @Synchronized
+    fun offerFrame(frame: GrayTrackingFrame): TrackingFrameAdmission {
+        val epoch = acceptedEpoch
+        if (epoch != null && (frame.key.epoch < epoch || (frame.key.epoch == epoch &&
+                frame.key.geometryVersion < requireNotNull(acceptedGeometryVersion)))) {
+            return TrackingFrameAdmission(false, false, VisualTrackingFailure.EPOCH_OR_GEOMETRY_CHANGED)
+        }
+        val duplicate = history.firstOrNull { it.key.epoch == frame.key.epoch && it.key.frameId == frame.key.frameId }
+        if (duplicate != null) {
+            return if (duplicate.key == frame.key && duplicate.samePixels(frame)) {
+                TrackingFrameAdmission(accepted = true, reset = false)
+            } else {
+                clear()
+                TrackingFrameAdmission(false, true, VisualTrackingFailure.FRAME_IDENTITY_CONFLICT)
+            }
+        }
+        var reset = false
+        val contextChanged = epoch != null && (epoch != frame.key.epoch || acceptedGeometryVersion != frame.key.geometryVersion)
+        // Context identity survives clear(), including a rejected frame that cleared the history.
+        val dimensions = acceptedDimensions
+        val dimensionsChanged = dimensions != null && (dimensions.width != frame.width || dimensions.height != frame.height ||
+            dimensions.sourceWidth != frame.sourceWidth || dimensions.sourceHeight != frame.sourceHeight)
+        if (dimensionsChanged && !contextChanged) {
+            clear()
+            return TrackingFrameAdmission(false, true, VisualTrackingFailure.FRAME_IDENTITY_CONFLICT)
+        }
+        if (contextChanged) {
+            clear()
+            reset = true
+        }
+        val previous = history.lastOrNull()
+        if (previous != null && (
+                frame.key.frameId <= previous.key.frameId ||
+                    frame.key.cameraTimestampNs <= previous.key.cameraTimestampNs ||
+                    frame.key.capturedAtElapsedRealtimeMs < previous.key.capturedAtElapsedRealtimeMs
+                )) return TrackingFrameAdmission(false, reset, VisualTrackingFailure.FRAME_ORDER_INVALID)
+        history.addLast(frame)
+        acceptedEpoch = frame.key.epoch
+        acceptedGeometryVersion = frame.key.geometryVersion
+        acceptedDimensions = FrameDimensions(frame.width, frame.height, frame.sourceWidth, frame.sourceHeight)
+        while (history.size > config.maxHistoryFrames ||
+            frame.key.capturedAtElapsedRealtimeMs - history.first().key.capturedAtElapsedRealtimeMs > config.maxHistoryAgeMs
+        ) history.removeFirst()
+        return TrackingFrameAdmission(true, reset)
+    }
+
+    @Synchronized
+    fun trackFrom(
+        sourceKey: VisualFrameKey,
+        detections: List<DetectionCandidate>,
+        targetKey: VisualFrameKey,
+        detectionRevision: Long = 0L,
+        completed: Boolean = true,
+        /** Live callers pass current elapsed realtime; the default also supports offline replay. */
+        observedAtElapsedRealtimeMs: Long = targetKey.capturedAtElapsedRealtimeMs,
+        executionBudgetNs: Long = config.maxExecutionNs,
+    ): VisualTrackingResult {
+        require(executionBudgetNs in 1L..100_000_000L)
+        val started = clockNanos()
+        val budget = TrackingWorkBudget(config, clockNanos, started, executionBudgetNs)
+        var edges = 0
+        if (detections.size > config.maxInputDetections) {
+            return result(sourceKey, targetKey, emptyList(), started, edges, budget, false).copy(
+                batchFailure = VisualTrackingFailure.INPUT_BUDGET_EXCEEDED,
+                rejectedInputCount = detections.size,
+            )
+        }
+        fun failed(failure: VisualTrackingFailure): VisualTrackingResult = result(
+            sourceKey, targetKey,
+            detections.indices.map { lost(it, sourceKey, targetKey, failure) },
+            started, edges, budget, false,
+        )
+        if (detections.any { it.polygonNorm.size > 128 || it.className.length > 128 }) {
+            return failed(VisualTrackingFailure.INVALID_GEOMETRY)
+        }
+        if (sourceKey.epoch != targetKey.epoch || sourceKey.geometryVersion != targetKey.geometryVersion) {
+            return failed(VisualTrackingFailure.EPOCH_OR_GEOMETRY_CHANGED)
+        }
+        val frames = history.toList()
+        if (frames.any { (it.key.frameId == sourceKey.frameId && it.key != sourceKey) ||
+                (it.key.frameId == targetKey.frameId && it.key != targetKey) }) {
+            return failed(VisualTrackingFailure.FRAME_IDENTITY_CONFLICT)
+        }
+        val sourceIndex = frames.indexOfFirst { it.key == sourceKey }
+        val targetIndex = frames.indexOfFirst { it.key == targetKey }
+        if (sourceIndex < 0) return failed(VisualTrackingFailure.SOURCE_NOT_IN_HISTORY)
+        if (targetIndex < 0) return failed(VisualTrackingFailure.TARGET_NOT_IN_HISTORY)
+        if (targetIndex != frames.lastIndex) return failed(VisualTrackingFailure.TARGET_NOT_CURRENT)
+        if (sourceIndex > targetIndex) return failed(VisualTrackingFailure.FRAME_ORDER_INVALID)
+        if (observedAtElapsedRealtimeMs < targetKey.capturedAtElapsedRealtimeMs) return failed(VisualTrackingFailure.FRAME_ORDER_INVALID)
+        if (targetKey.capturedAtElapsedRealtimeMs - sourceKey.capturedAtElapsedRealtimeMs > config.maxDetectionAgeMs ||
+            observedAtElapsedRealtimeMs - sourceKey.capturedAtElapsedRealtimeMs > config.maxDetectionAgeMs ||
+            (targetKey.cameraTimestampNs - sourceKey.cameraTimestampNs) / 1_000_000L > config.maxDetectionAgeMs
+        ) return failed(VisualTrackingFailure.SOURCE_EXPIRED)
+        if (detectionRevision < 0L) return failed(VisualTrackingFailure.DETECTION_REVISION_OLD)
+        if (!initialize()) return failed(VisualTrackingFailure.NATIVE_INITIALIZATION_FAILED)
+
+        val previous = batch
+        if (previous != null && previous.sourceKey != sourceKey &&
+            previous.sourceKey.cameraTimestampNs >= sourceKey.cameraTimestampNs) {
+            return failed(VisualTrackingFailure.DETECTOR_SOURCE_OUT_OF_ORDER)
+        }
+        if (previous?.sourceKey == sourceKey) {
+            if (detectionRevision < previous.revision || (previous.completed && !completed)) {
+                return failed(VisualTrackingFailure.DETECTION_REVISION_OLD)
+            }
+            if (detectionRevision == previous.revision && (previous.detections != detections || previous.completed != completed)) {
+                return failed(VisualTrackingFailure.DETECTION_IDENTITY_CONFLICT)
+            }
+        }
+        if (previous == null || previous.sourceKey != sourceKey || previous.revision != detectionRevision) {
+            val frozen = detections.map { it.copy(polygonNorm = it.polygonNorm.toList()) }
+            batch = Batch(sourceKey, detectionRevision, completed, frozen, frozen.mapIndexed { index, detection ->
+                State(
+                    lastKey = sourceKey,
+                    failure = when {
+                        index >= config.maxTrackedObjects -> VisualTrackingFailure.OBJECT_BUDGET_EXCEEDED
+                        !valid(detection) -> VisualTrackingFailure.INVALID_GEOMETRY
+                        else -> null
+                    },
+                )
+            }.toMutableList())
+        }
+        val current = requireNotNull(batch)
+        val source = frames[sourceIndex]
+        var budgetFailure: VisualTrackingFailure? = null
+        for (index in current.states.indices) {
+            val state = current.states[index]
+            if (state.failure != null || state.lastKey == targetKey) continue
+            if (budgetFailure != null) continue
+            val detection = current.detections[index]
+            try {
+                budget.charge()
+                if (state.features == null) {
+                    val features = estimator.seed(source, detection, budget)
+                    state.features = features
+                    state.originalCount = features.size
+                    if (features.size < 6) {
+                        state.failure = VisualTrackingFailure.TOO_FEW_FEATURES
+                        continue
+                    }
+                    budget.charge()
+                }
+                val lastIndex = frames.indexOfFirst { it.key == state.lastKey }
+                if (lastIndex < 0) {
+                    state.failure = VisualTrackingFailure.SOURCE_NOT_IN_HISTORY
+                    continue
+                }
+                for (nextIndex in lastIndex + 1..targetIndex) {
+                    val before = frames[nextIndex - 1]
+                    val target = frames[nextIndex]
+                    if (target.key.capturedAtElapsedRealtimeMs - before.key.capturedAtElapsedRealtimeMs > config.maxFrameGapMs ||
+                        (target.key.cameraTimestampNs - before.key.cameraTimestampNs) / 1_000_000L > config.maxFrameGapMs
+                    ) {
+                        state.failure = VisualTrackingFailure.FRAME_GAP
+                        break
+                    }
+                    val estimate = estimator.advance(source, before, target, detection, requireNotNull(state.features), state.originalCount, budget)
+                    edges++
+                    if (estimate.failure != null) {
+                        state.failure = estimate.failure
+                        break
+                    }
+                    if (!valid(transform(detection, estimate.transformNorm))) {
+                        state.failure = VisualTrackingFailure.OUT_OF_FRAME
+                        break
+                    }
+                    // Commit only an entirely validated edge, so interrupted work cannot leak.
+                    state.features = estimate.features
+                    state.transform = estimate.transformNorm
+                    state.residual = estimate.residual
+                    state.quality = minOf(state.quality, estimate.quality)
+                    state.lastKey = target.key
+                    // Native calls cannot be preempted. Stop before starting another edge if
+                    // this completed edge crossed the work budget.
+                    budget.charge()
+                }
+            } catch (exceeded: TrackingBudgetExceeded) {
+                budgetFailure = exceeded.failure
+            }
+        }
+        val reachedTarget = current.states.all { it.failure != null || it.lastKey == targetKey }
+        val completedAfterDeadline = budgetFailure == VisualTrackingFailure.TIME_BUDGET_EXCEEDED && reachedTarget
+        val incompleteBatch = budgetFailure != null && !completedAfterDeadline
+        if (!incompleteBatch) rejectCompetingObjects(current, targetKey)
+        val observations = current.states.mapIndexed { index, state ->
+            val failure = state.failure ?: if (incompleteBatch || state.lastKey != targetKey) budgetFailure else null
+            if (failure != null) {
+                lost(index, sourceKey, targetKey, failure, state.originalCount, state.features?.size ?: 0)
+            } else {
+                val original = current.detections[index]
+                VisualTrackingObservation(
+                    sourceIndex = index,
+                    detectorSourceKey = sourceKey,
+                    trackedTargetKey = targetKey,
+                    status = VisualTrackingStatus.TRACKED,
+                    geometry = transform(original, state.transform),
+                    trackingQuality = state.quality,
+                    failure = null,
+                    translationNorm = if (state.transform.translationOnly) Point2(state.transform.tx, state.transform.ty) else null,
+                    originalFeatureCount = state.originalCount,
+                    survivingFeatureCount = state.features?.size ?: 0,
+                    residualPx = state.residual,
+                    polygonConstrained = original.polygonNorm.isNotEmpty(),
+                    transformNorm = state.transform,
+                )
+            }
+        }
+        return result(sourceKey, targetKey, observations, started, edges, budget,
+            previous === current && edges == 0 && budget.pixelComparisons == 0L && budgetFailure == null,
+            observedAtElapsedRealtimeMs)
+    }
+
+    private fun result(
+        source: VisualFrameKey, target: VisualFrameKey, observations: List<VisualTrackingObservation>,
+        started: Long, edges: Int, budget: TrackingWorkBudget, cacheHit: Boolean,
+        observedAtElapsedRealtimeMs: Long? = null,
+    ): VisualTrackingResult {
+        val durationNs = (clockNanos() - started).coerceAtLeast(0L)
+        // Check source lifetime at the same final instant as the duration metric, after native
+        // work, competition checks and geometry construction (including completed overruns).
+        val expired = observedAtElapsedRealtimeMs != null &&
+            observedAtElapsedRealtimeMs - source.capturedAtElapsedRealtimeMs + durationNs / 1_000_000L > config.maxDetectionAgeMs
+        val finalObservations = if (expired) observations.map {
+            lost(it.sourceIndex, source, target, VisualTrackingFailure.SOURCE_EXPIRED,
+                it.originalFeatureCount, it.survivingFeatureCount)
+        } else observations
+        return VisualTrackingResult(source, target, finalObservations, VisualTrackingMetrics(
+            durationNs = durationNs,
+            processedEdges = edges,
+            pixelComparisons = budget.pixelComparisons,
+            cacheHit = cacheHit,
+            retainedFrames = history.size,
+            retainedImageBytes = history.sumOf { it.retainedBytes },
+            executionBudgetOverrun = durationNs > budget.executionBudgetNs,
+            executionBudgetNs = budget.executionBudgetNs,
+        ))
+    }
+
+    private fun lost(
+        index: Int, source: VisualFrameKey, target: VisualFrameKey, failure: VisualTrackingFailure,
+        originalCount: Int = 0, survivingCount: Int = 0,
+    ) = VisualTrackingObservation(index, source, target, VisualTrackingStatus.LOST, null, 0f, failure, null,
+        originalCount, survivingCount, null, false)
+
+    private fun valid(detection: DetectionCandidate): Boolean {
+        val rect = detection.bboxNorm
+        val maskArea = detection.maskAreaNorm
+        return detection.detectionConfidence.isFinite() && detection.detectionConfidence in 0f..1f &&
+            rect.x.isFinite() && rect.y.isFinite() && rect.width.isFinite() && rect.height.isFinite() &&
+            rect.x >= 0f && rect.y >= 0f && rect.width > 0f && rect.height > 0f &&
+            rect.x + rect.width <= 1f && rect.y + rect.height <= 1f &&
+            (detection.polygonNorm.isEmpty() || detection.polygonNorm.size in 3..128) &&
+            detection.polygonNorm.all { it.x.isFinite() && it.y.isFinite() && it.x in 0f..1f && it.y in 0f..1f } &&
+            (maskArea == null || (maskArea.isFinite() && maskArea in 0f..1f))
+    }
+
+    private fun transform(detection: DetectionCandidate, transform: VisualAffineTransform): DetectionCandidate {
+        val rect = detection.bboxNorm
+        val transformedRect = if (transform.translationOnly) {
+            rect.copy(x = rect.x + transform.tx, y = rect.y + transform.ty)
+        } else {
+            val corners = listOf(Point2(rect.x, rect.y), Point2(rect.x + rect.width, rect.y),
+                Point2(rect.x + rect.width, rect.y + rect.height), Point2(rect.x, rect.y + rect.height)).map(transform::map)
+            val left = corners.minOf { it.x }
+            val top = corners.minOf { it.y }
+            RectNorm(left, top, corners.maxOf { it.x } - left, corners.maxOf { it.y } - top)
+        }
+        return detection.copy(
+            bboxNorm = transformedRect,
+            polygonNorm = detection.polygonNorm.map(transform::map),
+            maskAreaNorm = detection.maskAreaNorm?.let { it * transform.areaScale },
+        )
+    }
+
+    private fun rejectCompetingObjects(batch: Batch, target: VisualFrameKey) {
+        val count = minOf(batch.states.size, config.maxTrackedObjects)
+        for (i in 0 until count) for (j in i + 1 until count) {
+            val first = batch.states[i]
+            val second = batch.states[j]
+            if (first.failure != null || second.failure != null || first.lastKey != target || second.lastKey != target) continue
+            val originalFirst = batch.detections[i]
+            val originalSecond = batch.detections[j]
+            if (iou(originalFirst.bboxNorm, originalSecond.bboxNorm) >= 0.30f) continue
+            if (iou(transform(originalFirst, first.transform).bboxNorm,
+                    transform(originalSecond, second.transform).bboxNorm) > 0.65f) {
+                first.failure = VisualTrackingFailure.OBJECT_COMPETITION
+                second.failure = VisualTrackingFailure.OBJECT_COMPETITION
+            }
+        }
+    }
+
+    private fun iou(a: RectNorm, b: RectNorm): Float {
+        val area = (minOf(a.x + a.width, b.x + b.width) - maxOf(a.x, b.x)).coerceAtLeast(0f) *
+            (minOf(a.y + a.height, b.y + b.height) - maxOf(a.y, b.y)).coerceAtLeast(0f)
+        return area / (a.area + b.area - area).coerceAtLeast(0.00001f)
+    }
+
+    private data class FrameDimensions(val width: Int, val height: Int, val sourceWidth: Int, val sourceHeight: Int)
+
+    private data class Batch(
+        val sourceKey: VisualFrameKey,
+        val revision: Long,
+        val completed: Boolean,
+        val detections: List<DetectionCandidate>,
+        val states: MutableList<State>,
+    )
+
+    private data class State(
+        var lastKey: VisualFrameKey,
+        var features: List<VisualMotionFeature>? = null,
+        var originalCount: Int = 0,
+        var transform: VisualAffineTransform = VisualAffineTransform(),
+        var quality: Float = 1f,
+        var residual: Float? = null,
+        var failure: VisualTrackingFailure? = null,
+    )
+}

@@ -54,6 +54,16 @@ class AnalysisFailurePolicyTest {
     }
 
     @Test
+    fun `manual base readiness allows keyless analysis while automatic mode still requires key`() {
+        val state = AnalysisSnapshot(inputsReady = true, manualBaseReady = true)
+        assertTrue(state.canAnalyzeManual)
+        assertFalse(state.canAnalyze)
+        assertFalse(state.copy(busy = true).canAnalyzeManual)
+        assertFalse(state.copy(manualBaseReady = false).canAnalyzeManual)
+        assertTrue(state.copy(keyStored = true).canAnalyze)
+    }
+
+    @Test
     fun `base observation set rejects mixed station and long outage but accepts short gaps`() {
         val continuous = listOf(
             header("SUWN", 0L, 1_000L, 1_000L),

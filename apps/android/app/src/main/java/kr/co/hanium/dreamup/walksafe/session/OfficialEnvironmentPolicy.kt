@@ -58,6 +58,8 @@ data class ApprovedOfficialEnvironmentProfile(
     val maximumGpsHorizontalAccuracyMeters: Double,
     val maximumMeasuredEvidenceAgeMs: Long,
     val maximumRuntimeRetryAttempts: Int,
+    // Allows two regular GNSS update intervals before consuming another retry.
+    val runtimeRetryIntervalMs: Long = 3_000L,
 ) {
     init {
         require(profileId.isNotBlank()) { "profileId must not be blank" }
@@ -76,6 +78,9 @@ data class ApprovedOfficialEnvironmentProfile(
         require(maximumRuntimeRetryAttempts >= 0) {
             "maximumRuntimeRetryAttempts must not be negative"
         }
+        require(runtimeRetryIntervalMs > 0L) {
+            "runtimeRetryIntervalMs must be positive"
+        }
     }
 }
 
@@ -85,36 +90,53 @@ data class OfficialEnvironmentAssessment(
     val profileId: String?,
     val factorStatuses: Map<OfficialEnvironmentFactor, EnvironmentEvidenceStatus>,
     val usageLimitsAcknowledged: Boolean = false,
+    val enabledMeasuredFactors: Set<OfficialEnvironmentFactor> = setOf(
+        OfficialEnvironmentFactor.GPS_QUALITY,
+        OfficialEnvironmentFactor.CAMERA_QUALITY,
+    ),
+    // Runtime gates such as mounting correction can block outputs despite good raw quality.
+    val runtimeUnavailableMeasuredFactors: Set<OfficialEnvironmentFactor> = emptySet(),
 ) {
     init {
         require(factorStatuses.keys == OfficialEnvironmentFactor.entries.toSet()) {
             "An environment assessment must include every factor"
         }
+        require(enabledMeasuredFactors.all {
+            it == OfficialEnvironmentFactor.GPS_QUALITY || it == OfficialEnvironmentFactor.CAMERA_QUALITY
+        }) { "Only measured factors can be enabled or disabled" }
+        require(runtimeUnavailableMeasuredFactors.all {
+            it == OfficialEnvironmentFactor.GPS_QUALITY || it == OfficialEnvironmentFactor.CAMERA_QUALITY
+        }) { "Runtime output restrictions must identify measured factors" }
     }
+
+    private val applicableStatuses: Map<OfficialEnvironmentFactor, EnvironmentEvidenceStatus>
+        get() = factorStatuses.filterKeys {
+            it in enabledMeasuredFactors ||
+                (it != OfficialEnvironmentFactor.GPS_QUALITY && it != OfficialEnvironmentFactor.CAMERA_QUALITY)
+        }
 
     val support: OfficialEnvironmentSupport
         get() = when {
-            factorStatuses.values.any { it == EnvironmentEvidenceStatus.FAIL } ->
+            applicableStatuses.values.any { it == EnvironmentEvidenceStatus.FAIL } ->
                 OfficialEnvironmentSupport.UNSUPPORTED
 
-            factorStatuses.values.all { it == EnvironmentEvidenceStatus.PASS } ->
+            applicableStatuses.values.all { it == EnvironmentEvidenceStatus.PASS } ->
                 OfficialEnvironmentSupport.SUPPORTED
 
             else -> OfficialEnvironmentSupport.LIMITED
         }
 
     val canStartWalk: Boolean
-        get() = support == OfficialEnvironmentSupport.SUPPORTED ||
-            (usageLimitsAcknowledged && profileId != null &&
-                factorStatuses.values.none { it == EnvironmentEvidenceStatus.FAIL } &&
-                factorStatuses[OfficialEnvironmentFactor.GPS_QUALITY] == EnvironmentEvidenceStatus.PASS &&
-                factorStatuses[OfficialEnvironmentFactor.CAMERA_QUALITY] == EnvironmentEvidenceStatus.PASS)
+        get() = profileId != null && (support == OfficialEnvironmentSupport.SUPPORTED ||
+            (usageLimitsAcknowledged &&
+                applicableStatuses.values.none { it == EnvironmentEvidenceStatus.FAIL } &&
+                enabledMeasuredFactors.all { factorStatuses[it] == EnvironmentEvidenceStatus.PASS }))
 
     val conditionallyAllowed: Boolean
         get() = canStartWalk && support != OfficialEnvironmentSupport.SUPPORTED
 
     val blockingFactors: Set<OfficialEnvironmentFactor>
-        get() = factorStatuses
+        get() = applicableStatuses
             .filterValues { it != EnvironmentEvidenceStatus.PASS }
             .keys
 }
@@ -318,12 +340,24 @@ data class OfficialEnvironmentRuntimeDecision(
     val action: OfficialEnvironmentRuntimeAction,
     val consecutiveDegradations: Int,
     val retryAttemptsRemaining: Int,
+    val unavailableFactors: Set<OfficialEnvironmentFactor>,
+    val enabledMeasuredFactors: Set<OfficialEnvironmentFactor>,
 ) {
     val suppressAllWalkOutputs: Boolean
         get() = action != OfficialEnvironmentRuntimeAction.CONTINUE
 
     val isTerminal: Boolean
         get() = action == OfficialEnvironmentRuntimeAction.SAFE_STOP
+
+    val navigationOutputsAllowed: Boolean
+        get() = !suppressAllWalkOutputs &&
+            OfficialEnvironmentFactor.GPS_QUALITY in enabledMeasuredFactors &&
+            OfficialEnvironmentFactor.GPS_QUALITY !in unavailableFactors
+
+    val cameraOutputsAllowed: Boolean
+        get() = !suppressAllWalkOutputs &&
+            OfficialEnvironmentFactor.CAMERA_QUALITY in enabledMeasuredFactors &&
+            OfficialEnvironmentFactor.CAMERA_QUALITY !in unavailableFactors
 }
 
 class OfficialEnvironmentRuntimeGuard(
@@ -332,8 +366,9 @@ class OfficialEnvironmentRuntimeGuard(
 ) {
     private var consecutiveDegradations = 0
     private var terminal = approvedProfile == null
-    private var lastAssessment: OfficialEnvironmentAssessment? = null
-    private var lastAssessmentSupportedAtEvaluation: Boolean? = null
+    private var lastDegradationCountedAtMs: Long? = null
+    private var unavailableFactors = OfficialEnvironmentFactor.entries.toSet()
+    private var enabledMeasuredFactors = emptySet<OfficialEnvironmentFactor>()
     private var lastDecision = decision(
         action = if (terminal) {
             OfficialEnvironmentRuntimeAction.SAFE_STOP
@@ -357,25 +392,45 @@ class OfficialEnvironmentRuntimeGuard(
                 nowElapsedRealtimeMs >= 0L &&
                 nowElapsedRealtimeMs - assessment.assessedAtElapsedRealtimeMs in
                 0L..profile.maximumMeasuredEvidenceAgeMs
-        val supported =
+        val contextCurrent =
             freshAssessment &&
             assessment.epoch == epoch &&
-                assessment.profileId == profile.profileId &&
-                assessment.canStartWalk
-        if (
-            assessment == lastAssessment &&
-            supported == lastAssessmentSupportedAtEvaluation
-        ) {
-            return lastDecision
+                assessment.profileId == profile.profileId
+        enabledMeasuredFactors = assessment.enabledMeasuredFactors
+        unavailableFactors = if (contextCurrent) {
+            assessment.blockingFactors +
+                assessment.runtimeUnavailableMeasuredFactors.intersect(enabledMeasuredFactors)
+        } else {
+            OfficialEnvironmentFactor.entries.toSet()
         }
-        lastAssessment = assessment
-        lastAssessmentSupportedAtEvaluation = supported
-        if (supported) {
+        val commonStatuses = assessment.factorStatuses.filterKeys {
+            it != OfficialEnvironmentFactor.GPS_QUALITY &&
+                it != OfficialEnvironmentFactor.CAMERA_QUALITY
+        }.values
+        val commonConditionsAllowed = contextCurrent &&
+            commonStatuses.none { it == EnvironmentEvidenceStatus.FAIL } &&
+            (assessment.usageLimitsAcknowledged ||
+                commonStatuses.all { it == EnvironmentEvidenceStatus.PASS })
+        val anyMeasuredFeatureAvailable = enabledMeasuredFactors.isEmpty() ||
+            enabledMeasuredFactors.any { it !in unavailableFactors }
+        if (commonConditionsAllowed && anyMeasuredFeatureAvailable) {
             consecutiveDegradations = 0
+            lastDegradationCountedAtMs = null
             lastDecision = decision(OfficialEnvironmentRuntimeAction.CONTINUE)
             return lastDecision
         }
 
+        // Sensor callbacks and watchdogs can assess the same fault many times per second.
+        // Restrict outputs immediately, but spend retry attempts only after real time passes.
+        val lastCountedAtMs = lastDegradationCountedAtMs
+        if (lastCountedAtMs != null &&
+            nowElapsedRealtimeMs - lastCountedAtMs < profile.runtimeRetryIntervalMs
+        ) {
+            lastDecision = decision(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY)
+            return lastDecision
+        }
+
+        lastDegradationCountedAtMs = nowElapsedRealtimeMs
         consecutiveDegradations += 1
         if (consecutiveDegradations > profile.maximumRuntimeRetryAttempts) {
             terminal = true
@@ -396,5 +451,7 @@ class OfficialEnvironmentRuntimeGuard(
         retryAttemptsRemaining = (
             approvedProfile?.maximumRuntimeRetryAttempts?.minus(consecutiveDegradations) ?: 0
             ).coerceAtLeast(0),
+        unavailableFactors = unavailableFactors,
+        enabledMeasuredFactors = enabledMeasuredFactors,
     )
 }

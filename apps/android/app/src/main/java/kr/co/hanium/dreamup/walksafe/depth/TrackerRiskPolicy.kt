@@ -5,7 +5,146 @@ import kotlin.math.max
 import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
-/** Positive speed means the tracked object is closing in on the user. */
+/**
+ * Uses complete object positions reconstructed in one anchor reference. Axial depth residual alone
+ * cannot establish stationary motion because an object may be moving sideways.
+ */
+object ObjectMotionPolicy {
+    fun classify(track: TrackState, motionEstimate: ObjectMotionEstimate = estimate(track)): ObjectMotion {
+        val center = track.latestGeometry?.centerNorm ?: return ObjectMotion.UNKNOWN
+        if (center.x !in 0.35f..0.65f || (motionEstimate.relativeClosingSpeedMps ?: 0f) < 0.25f) {
+            return ObjectMotion.UNKNOWN
+        }
+        val cameraVelocity = motionEstimate.cameraVelocityInAnchorMps ?: return ObjectMotion.UNKNOWN
+        val latest = track.motionSamples().lastOrNull() ?: return ObjectMotion.UNKNOWN
+        val pose = latest.cameraPoseEvidence ?: return ObjectMotion.UNKNOWN
+        val objectPosition = latest.objectPositionInAnchor ?: return ObjectMotion.UNKNOWN
+        val cameraTowardObject = (objectPosition - pose.position()).normalized()
+        return when {
+            motionEstimate.direction == ObjectMovementDirection.TOWARD_USER -> ObjectMotion.OBJECT_APPROACHING
+            motionEstimate.direction == ObjectMovementDirection.STATIONARY && cameraVelocity.dot(cameraTowardObject) >= 0.35f ->
+                ObjectMotion.USER_APPROACHING_STATIONARY
+            else -> ObjectMotion.UNKNOWN
+        }
+    }
+
+    fun estimate(track: TrackState): ObjectMotionEstimate {
+        val unknown = ObjectMotionEstimate()
+        if (!track.stable || track.idSwitchSuspected || !track.metricDistanceReliable || track.missedFrames != 0) return unknown
+        // Selection is anchored at this observation, so an old/reprojected depth cannot publish fresh motion.
+        val history = track.motionSamples()
+        val latestAtMs = history.lastOrNull()?.timestampMs ?: return unknown
+        if (history.size < 4 || history.any {
+                !it.source.trustedForStepGuidance || !it.confidence.isFinite() || it.confidence < 0.55f ||
+                    !it.distanceM.isFinite() || it.distanceM <= 0f ||
+                    it.cameraPoseEvidence?.isValidFor(it.timestampMs) != true ||
+                    it.cameraPoseEvidence?.imageProjection == null ||
+                    it.objectPositionInAnchor?.isFinite() != true
+            }
+        ) return unknown
+        if (history.map { it.source }.distinct().size != 1) return unknown
+        val elapsedMs = history.last().timestampMs - history.first().timestampMs
+        if (elapsedMs !in 600L..4_000L || history.zipWithNext().any { (a, b) ->
+                b.timestampMs - a.timestampMs !in 100L..1_500L
+            }
+        ) return unknown
+        val reference = requireNotNull(history.first().cameraPoseEvidence)
+        if (history.any {
+                val pose = requireNotNull(it.cameraPoseEvidence)
+                pose.referenceId != reference.referenceId || forwardAlignment(reference, pose) < 0.9961947f
+            }
+        ) return unknown
+
+        val first = history.first()
+        val latest = history.last()
+        val latestPose = requireNotNull(latest.cameraPoseEvidence)
+        val projection = requireNotNull(latestPose.imageProjection)
+        val elapsedSeconds = elapsedMs / 1_000f
+        val objectVelocity = (requireNotNull(latest.objectPositionInAnchor) -
+            requireNotNull(first.objectPositionInAnchor)) * (1f / elapsedSeconds)
+        val cameraVelocity = (latestPose.position() - reference.position()) * (1f / elapsedSeconds)
+        val denseHistory = track.denseMotionHistory().filter { it.timestampMs >= first.timestampMs }
+        if (denseHistory.any {
+                forwardAlignment(reference, requireNotNull(it.cameraPoseEvidence)) < 0.9961947f
+            } || denseHistory.zipWithNext().any { (a, b) ->
+                val seconds = (b.timestampMs - a.timestampMs) / 1_000f
+                seconds <= 0f || (requireNotNull(b.cameraPoseEvidence).position() -
+                    requireNotNull(a.cameraPoseEvidence).position()).norm() / seconds > 3.5f
+            }
+        ) return unknown
+        // Key sampling must not hide a short movement onset inside a nominally stationary fit.
+        if (objectVelocity.norm() <= 0.20f && denseHistory.zipWithNext().any { (a, b) ->
+                val seconds = (b.timestampMs - a.timestampMs) / 1_000f
+                seconds <= 0f || (requireNotNull(b.objectPositionInAnchor) -
+                    requireNotNull(a.objectPositionInAnchor)).norm() / seconds > 0.20f
+            }
+        ) return unknown
+        // Consistent full 3D displacement is needed: an average must not hide stop-go or depth noise.
+        for ((a, b) in history.zipWithNext()) {
+            val previous = requireNotNull(a.cameraPoseEvidence)
+            val current = requireNotNull(b.cameraPoseEvidence)
+            val seconds = (b.timestampMs - a.timestampMs) / 1_000f
+            val cameraSegmentVelocity = (current.position() - previous.position()) * (1f / seconds)
+            val objectSegmentVelocity = (requireNotNull(b.objectPositionInAnchor) -
+                requireNotNull(a.objectPositionInAnchor)) * (1f / seconds)
+            if (forwardAlignment(previous, current) < 0.9961947f ||
+                cameraSegmentVelocity.norm() > 3.5f || (cameraSegmentVelocity - cameraVelocity).norm() > 0.35f ||
+                (objectSegmentVelocity - objectVelocity).norm() > 0.35f ||
+                // A low average must not label an object that just started moving as stationary.
+                (objectVelocity.norm() <= 0.20f && objectSegmentVelocity.norm() > 0.20f)
+            ) return unknown
+        }
+        val relativeVelocity = objectVelocity - cameraVelocity
+        val objectToCamera = latestPose.position() - requireNotNull(latest.objectPositionInAnchor)
+        if (objectToCamera.norm() <= 0.01f) return unknown
+        val towardUser = objectToCamera.normalized()
+        val objectClosingSpeed = objectVelocity.dot(towardUser)
+        val relativeClosingSpeed = relativeVelocity.dot(towardUser)
+        val speed = objectVelocity.norm()
+        val rightSpeed = objectVelocity.dot(Vec3(projection.rightX, projection.rightY, projection.rightZ))
+        val upSpeed = objectVelocity.dot(Vec3(projection.upX, projection.upY, projection.upZ))
+        val forwardSpeed = objectVelocity.dot(Vec3(latestPose.forwardX, latestPose.forwardY, latestPose.forwardZ))
+        if (listOf(speed, relativeClosingSpeed, rightSpeed, upSpeed, forwardSpeed).any { !it.isFinite() }) return unknown
+        val direction = when {
+            speed <= 0.20f -> ObjectMovementDirection.STATIONARY
+            objectClosingSpeed >= 0.45f -> ObjectMovementDirection.TOWARD_USER
+            objectClosingSpeed <= -0.45f -> ObjectMovementDirection.AWAY_FROM_USER
+            abs(rightSpeed) >= 0.25f && abs(rightSpeed) >= abs(forwardSpeed) && abs(rightSpeed) >= abs(upSpeed) ->
+                if (rightSpeed > 0f) ObjectMovementDirection.RIGHT else ObjectMovementDirection.LEFT
+            else -> ObjectMovementDirection.OTHER
+        }
+        return ObjectMotionEstimate(
+            referenceId = reference.referenceId,
+            observedAtMs = latestAtMs,
+            elapsedMs = elapsedMs,
+            objectVelocityInAnchorMps = objectVelocity,
+            relativeVelocityInAnchorMps = relativeVelocity,
+            cameraVelocityInAnchorMps = cameraVelocity,
+            objectDirectionInCamera = if (direction == ObjectMovementDirection.STATIONARY) null else
+                Vec3(rightSpeed, upSpeed, forwardSpeed).normalized(),
+            objectSpeedMps = speed,
+            relativeClosingSpeedMps = relativeClosingSpeed,
+            direction = direction,
+            confidence = history.minOf { it.confidence },
+        )
+    }
+
+    private fun Vec3.isFinite(): Boolean = x.isFinite() && y.isFinite() && z.isFinite()
+    private fun CameraPoseEvidence.position(): Vec3 = Vec3(positionX, positionY, positionZ)
+
+    private fun CameraPoseEvidence.isValidFor(observedAtMs: Long): Boolean {
+        val values = listOf(positionX, positionY, positionZ, forwardX, forwardY, forwardZ)
+        val forwardLengthSquared = forwardX * forwardX + forwardY * forwardY + forwardZ * forwardZ
+        return referenceId >= 0L && timestampMs == observedAtMs && values.all { it.isFinite() } &&
+            abs(forwardLengthSquared - 1f) <= 0.001f && objectCenterInAnchor(Point2(0.5f, 0.5f), 1f) != null
+    }
+
+    private fun forwardAlignment(a: CameraPoseEvidence, b: CameraPoseEvidence): Float =
+        Vec3(a.forwardX, a.forwardY, a.forwardZ).normalized()
+            .dot(Vec3(b.forwardX, b.forwardY, b.forwardZ).normalized())
+}
+
+/** Positive speed means relative distance is closing; it does not establish which actor moved. */
 data class ApproachSpeed(
     val metersPerSecond: Float?,
     val confidence: Float,

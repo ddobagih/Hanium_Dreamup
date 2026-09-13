@@ -172,7 +172,7 @@ class MainActivitySignupUiStaticTest {
         assertTrue(source.contains("private enum class AccountSignupStep { CONSENT, DETAILS }"))
         val home = functionBlock("private fun buildHomeCardGrid()")
         assertTrue(home.contains("orientation = LinearLayout.VERTICAL"))
-        assertTrue(home.contains("title = \"목적지 검색\""))
+        assertTrue(home.contains("title = \"길라잡이\""))
         assertTrue(home.contains("title = \"음성 명령\""))
         assertTrue(home.contains("title = \"설정\""))
         assertFalse(home.contains("title = \"손상 점자블록 신고\""))

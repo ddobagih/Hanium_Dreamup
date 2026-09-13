@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.ObstacleLabels
+import kr.co.hanium.dreamup.walksafe.inference.WalkMateClassPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.CROSSWALK_REFERENCE_NOTICE_KO
 import kr.co.hanium.dreamup.walksafe.navigation.CrosswalkReferencePolicy
 
@@ -48,7 +50,7 @@ data class MessagePolicyDecision(
  * Converts depth/tracking evidence into a rate-limited user message.
  *
  * Reporting and user guidance are deliberately separate: damaged tactile blocks stay silent and
- * report-only, while only trusted metric sources can produce distance or step guidance.
+ * report-only, while only trusted metric sources can trigger distance-based obstacle warnings.
  */
 class MessagePolicy(
     private val stepLengthM: Float = 0.65f,
@@ -64,14 +66,14 @@ class MessagePolicy(
     fun evaluate(result: MetricDepthDecision, nowMs: Long = System.currentTimeMillis()): MessagePolicyDecision {
         val candidate = when {
             CrosswalkReferencePolicy.isCrosswalkDetectorClass(result.className) -> crosswalkGuidanceMessage(result)
-            result.className.equals("traffic light", ignoreCase = true) -> none("traffic light color guidance deferred")
+            WalkMateClassPolicy.isTrafficLightClass(result.className) -> none("traffic light color guidance deferred")
             isTactileClass(result.className) -> tactileMessage(result)
-            else -> metricOrPseudoObstacleMessage(result)
+            else -> metricOrPseudoObstacleMessage(result, nowMs)
         }
         return applyRateLimit(candidate, result, nowMs)
     }
 
-    private fun metricOrPseudoObstacleMessage(result: MetricDepthDecision): MessagePolicyDecision {
+    private fun metricOrPseudoObstacleMessage(result: MetricDepthDecision, frameTimestampMs: Long): MessagePolicyDecision {
         if (!hasReliableMetricDistance(result)) {
             activeObstacleLevelByKey.remove(stateKeyFor(result))
             return pseudoOrWeakMessage(result)
@@ -85,43 +87,62 @@ class MessagePolicy(
             return none("outside obstacle warning threshold")
         }
         activeObstacleLevelByKey[stateKey] = level
-        val steps = distanceMetersToSteps(result.riskDistanceM, stepLengthM)
         if (level == MessageLevel.AWARE) {
             return MessagePolicyDecision(
-                userFacing = UserFacingDepth(stepsAhead = steps, messageLevel = MessageLevel.AWARE, message = null),
+                userFacing = UserFacingDepth(stepsAhead = null, messageLevel = MessageLevel.AWARE, message = null),
                 purpose = MessagePurpose.NONE,
                 reason = "approaching object aware",
             )
         }
         val target = labelForClass(result.className)
-        val phrase = when {
-            steps == null -> "전방 $target"
-            steps <= 1 -> "전방 바로 앞 $target"
-            steps <= 2 -> "전방 약 ${steps}보 이내 $target"
-            steps <= 4 -> "전방 약 ${steps}보 앞 $target"
-            else -> "전방 $target"
+        val phrase = "전방 $target"
+        val currentMotion = result.motionEstimate.takeIf { it.isCurrentMeasuredMotion(frameTimestampMs) }
+        val motionPhrase = when {
+            result.trend == Trend.APPROACHING && result.objectMotion == ObjectMotion.USER_APPROACHING_STATIONARY &&
+                currentMotion?.direction == ObjectMovementDirection.STATIONARY ->
+                " 정지해 있는 것으로 보이며, 현재 이 물체에 가까워지고 있습니다."
+            result.trend == Trend.APPROACHING && result.objectMotion == ObjectMotion.OBJECT_APPROACHING &&
+                currentMotion?.direction == ObjectMovementDirection.TOWARD_USER &&
+                (currentMotion.relativeClosingSpeedMps ?: 0f) >= 0.25f ->
+                " 이 물체가 사용자 쪽으로 다가오는 것으로 보입니다."
+            currentMotion?.direction == ObjectMovementDirection.STATIONARY ->
+                " 정지해 있는 것으로 보입니다."
+            currentMotion?.direction == ObjectMovementDirection.TOWARD_USER ->
+                " 이 물체가 사용자 쪽으로 이동하는 것으로 보입니다."
+            currentMotion?.direction == ObjectMovementDirection.LEFT ->
+                " 이 물체가 카메라 기준 왼쪽으로 이동하는 것으로 보입니다."
+            currentMotion?.direction == ObjectMovementDirection.RIGHT ->
+                " 이 물체가 카메라 기준 오른쪽으로 이동하는 것으로 보입니다."
+            currentMotion?.direction == ObjectMovementDirection.AWAY_FROM_USER ->
+                " 이 물체가 사용자에게서 멀어지는 방향으로 이동하는 것으로 보입니다."
+            result.trend == Trend.APPROACHING -> " 거리가 줄어들고 있습니다."
+            else -> ""
         }
         val action = if (level == MessageLevel.STOP) "멈추세요. 주변을 확인하세요." else "멈출 준비를 하세요."
         return MessagePolicyDecision(
-            userFacing = UserFacingDepth(stepsAhead = steps, messageLevel = level, message = "$phrase. $action"),
+            userFacing = UserFacingDepth(stepsAhead = null, messageLevel = level, message = "$phrase.$motionPhrase $action"),
             purpose = MessagePurpose.OBSTACLE_WARNING,
             reason = if (level == MessageLevel.STOP) "near metric obstacle" else "metric obstacle warning",
         )
     }
 
     private fun tactileMessage(result: MetricDepthDecision): MessagePolicyDecision {
-        return when (result.className.lowercase()) {
+        return when {
             // Normal tactile guidance is admitted later only when the active TMAP route and the
             // stable local tactile observation agree.
-            "normal_tactile_block" -> none("normal tactile guidance requires TMAP-aligned route policy")
+            WalkMateClassPolicy.isTraversableTactileClass(result.className) ->
+                none("normal tactile guidance requires TMAP-aligned route policy")
             // Damage is captured by the report pipeline; announcing every detection would overload
             // the user and conflict with the current silent-auto-report policy.
-            "damaged_tactile_block" -> MessagePolicyDecision(
+            WalkMateClassPolicy.isDamagedTactileClass(result.className) -> MessagePolicyDecision(
                 userFacing = UserFacingDepth(stepsAhead = null, messageLevel = MessageLevel.NONE, message = null),
                 purpose = MessagePurpose.REPORT_ONLY,
                 reason = "damaged tactile block is report-only",
             )
-            "tactile_damage_area" -> none("tactile damage area is not user guidance")
+            result.className.equals("dot_tactile_paving", ignoreCase = true) ->
+                none("dot tactile paving does not establish a walking direction")
+            result.className.equals("tactile_damage_area", ignoreCase = true) ->
+                none("tactile damage area is not user guidance")
             else -> none("unrecognized tactile class is not traversable")
         }
     }
@@ -256,30 +277,10 @@ class MessagePolicy(
     }
 
     private fun isTactileClass(className: String): Boolean {
-        return className.lowercase() in tactileClassNames || isTactileBlockClass(className)
+        return WalkMateClassPolicy.isTactileClass(className) || isTactileBlockClass(className)
     }
 
-    private fun labelForClass(className: String): String {
-        return when (className.lowercase()) {
-            "person" -> "사람"
-            "bicycle" -> "자전거"
-            "car", "bus", "truck", "motorcycle" -> "차량"
-            "normal_tactile_block" -> "점자블록"
-            "crosswalk" -> "횡단보도"
-            "curb_step" -> "보도 턱"
-            "uneven_sidewalk" -> "고르지 않은 보도"
-            "e_scooter_obstruction" -> "방치 킥보드"
-            else -> "물체"
-        }
-    }
-
-    private companion object {
-        val tactileClassNames = setOf(
-            "normal_tactile_block",
-            "damaged_tactile_block",
-            "tactile_damage_area",
-        )
-    }
+    private fun labelForClass(className: String): String = ObstacleLabels.labelFor(className)
 }
 
 data class MetricDepthDecision(
@@ -290,6 +291,8 @@ data class MetricDepthDecision(
     val confidenceFinal: Float,
     val trackKey: String? = null,
     val timeToCollisionMs: Long? = null,
+    val objectMotion: ObjectMotion = ObjectMotion.UNKNOWN,
+    val motionEstimate: ObjectMotionEstimate = ObjectMotionEstimate(),
 )
 
 fun defaultMetricSourceMinConfidence(): Map<DepthSource, Float> {
@@ -300,3 +303,17 @@ fun defaultMetricSourceMinConfidence(): Map<DepthSource, Float> {
         DepthSource.MONOCULAR_METRIC_DEPTH to 0.70f,
     )
 }
+
+/** Frame-clock provenance is mandatory: a legacy/cached motion must not describe a new capture. */
+internal fun ObjectMotionEstimate.isCurrentMeasuredMotion(frameTimestampMs: Long): Boolean =
+    frameTimestampMs >= 0L && observedAtMs == frameTimestampMs &&
+        referenceId?.let { it >= 0L } == true && elapsedMs in 600L..4_000L &&
+        confidence.isFinite() && confidence >= 0.55f &&
+        objectSpeedMps?.let { it.isFinite() && it >= 0f } == true &&
+        relativeClosingSpeedMps?.isFinite() == true &&
+        objectVelocityInAnchorMps.hasFiniteComponents() &&
+        relativeVelocityInAnchorMps.hasFiniteComponents() &&
+        cameraVelocityInAnchorMps.hasFiniteComponents()
+
+private fun Vec3?.hasFiniteComponents(): Boolean =
+    this != null && x.isFinite() && y.isFinite() && z.isFinite()

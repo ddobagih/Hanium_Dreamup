@@ -45,7 +45,8 @@ class AndroidFeedbackActuatorStaticTest {
 
         assertTrue(cancellation.contains("ANNOUNCE_NAV_PREFIX"))
         assertTrue(cancellation.contains("if (ttsState == TtsState.READY) textToSpeech.stop()"))
-        assertTrue(cancellation.contains("completed = false, notifyFailure = false"))
+        assertTrue(cancellation.contains("it in explicitTerminalRequiredUtterances"))
+        assertTrue(cancellation.contains("completed = false, notifyFailure = notifyFailure"))
         assertTrue(dispatch.contains("pendingIds.any { !it.startsWith(\"\$ANNOUNCE_ADVISORY_PREFIX-\") }"))
         assertTrue(dispatch.contains("return NavigationSpeechDispatchResult.SUPPRESSED"))
         assertTrue(dispatch.contains("SpeechPriority.RISK -> TextToSpeech.QUEUE_FLUSH"))
@@ -116,8 +117,11 @@ class AndroidFeedbackActuatorStaticTest {
 
         assertTrue(initialization.contains("TextToSpeech.LANG_MISSING_DATA"))
         assertTrue(initialization.contains("TextToSpeech.LANG_NOT_SUPPORTED"))
-        assertTrue(initialization.contains("!voice.isNetworkConnectionRequired"))
-        assertTrue(initialization.contains("textToSpeech.setVoice(offlineKoreanVoice)"))
+        assertTrue(initialization.contains("selectInstalledOfflineKoreanVoice(textToSpeech)"))
+        assertTrue(initialization.substringAfter("KoreanOfflineVoiceSelection.UNAVAILABLE ->")
+            .substringBefore("KoreanOfflineVoiceSelection.REJECTED ->").contains("failOfflineKoreanLanguage()"))
+        assertTrue(initialization.substringAfter("KoreanOfflineVoiceSelection.REJECTED ->")
+            .substringBefore("textToSpeech.setAudioAttributes(").contains("recoverTextToSpeechOrFail()"))
         assertTrue(initialization.contains("flushPendingSpeech()"))
         assertTrue(speak.contains("priority == SpeechPriority.INTERACTION"))
         assertTrue(speak.contains("pendingSpeechQueue.offer(message, priority, riskRank)"))
@@ -240,7 +244,8 @@ class AndroidFeedbackActuatorStaticTest {
                 dispatch.indexOf("val vibrationAccepted = vibrate("),
         )
         assertFalse(
-            dispatch.substringBefore("val vibrationAccepted = vibrate(")
+            dispatch.substringAfter("val speech = speak(")
+                .substringBefore("val vibrationAccepted = vibrate(")
                 .contains("return RiskFeedbackDispatchResult"),
         )
     }
@@ -400,7 +405,7 @@ class AndroidFeedbackActuatorStaticTest {
         val ownership = cancellation.indexOf("utteranceCallbacks.exclusiveCommandUtteranceIds(")
         val engineStop = cancellation.indexOf("textToSpeech.stop()")
         assertTrue(cancellation.contains("synchronized(pendingUtterances)"))
-        assertTrue(cancellation.contains("ANNOUNCE_ASSERTIVE_PREFIX"))
+        assertTrue(cancellation.contains("!it.startsWith(\"\$ANNOUNCE_INTERACTION_PREFIX-\")"))
         assertTrue(ownership >= 0 && ownership < engineStop)
         assertTrue(cancellation.indexOf("if (owned.isEmpty()) return") < engineStop)
         assertTrue(cancellation.contains("explicitTerminalRequiredIds = explicitTerminalRequiredUtterances"))
@@ -421,6 +426,30 @@ class AndroidFeedbackActuatorStaticTest {
         assertTrue(dispatch.indexOf(guard) >= 0)
         assertTrue(dispatch.indexOf(guard) < dispatch.indexOf("val queueMode = when"))
         assertTrue(dispatch.indexOf(guard) < dispatch.indexOf("markUtteranceStarted("))
+    }
+
+    @Test
+    fun claimedInformationFeedbackKeepsFailureOwnershipWhenNavigationIsInterrupted() {
+        val navigation = source.substringAfter("fun speakNavigation(")
+            .substringBefore("fun cancelNavigationSpeech()")
+        val preparation = source.substringAfter("fun prepareForSpeechRecognition()")
+            .substringBefore("fun playProgressBeep(")
+        val flush = source.substringAfter("private fun cancelQueuedCompletionCallbacks(")
+            .substringBefore("override fun close()")
+        val activity = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        val information = activity.substringAfter("private fun emitFeedbackAction(")
+            .substringBefore("private fun isFeedbackActionStillDeliverable(")
+            .substringAfter("val speech = actuator.speakNavigation(")
+
+        assertTrue(navigation.contains("requiresExplicitTerminalCallback: Boolean = false"))
+        assertTrue(navigation.contains("requiresExplicitTerminalCallback = requiresExplicitTerminalCallback"))
+        assertTrue(navigation.contains("protectsFromFollowingSpeech = false"))
+        assertTrue(information.contains("requiresExplicitTerminalCallback = true"))
+        assertTrue(information.contains("feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)"))
+        for (cancellation in listOf(preparation, flush)) {
+            assertTrue(cancellation.contains("explicitTerminalRequiredUtterances"))
+            assertTrue(cancellation.contains("takeTerminalCallback(it, completed = false, notifyFailure = true)"))
+        }
     }
 
 }

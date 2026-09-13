@@ -1,6 +1,33 @@
 package kr.co.hanium.dreamup.walksafe
 
 import android.Manifest
+import kr.co.hanium.dreamup.walksafe.inference.AndroidRuntimeLoadObservationSource
+import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceTuningProfileStore
+import kr.co.hanium.dreamup.walksafe.device.AndroidRuntimeCalibrationSession
+import kr.co.hanium.dreamup.walksafe.device.AndroidRuntimeCalibrationRunner
+import kr.co.hanium.dreamup.walksafe.device.DeviceTuningRecheckReason
+import kr.co.hanium.dreamup.walksafe.device.RuntimeCalibrationSelection
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeBackend
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeCandidate
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeFeatureScope
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeTuningProfile
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeSelectionStatus
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeLoadMonitor
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeLoadCompletion
+import kr.co.hanium.dreamup.walksafe.inference.InferenceLoadObservation
+import kr.co.hanium.dreamup.walksafe.inference.RuntimeCalibrationFixtures
+import kr.co.hanium.dreamup.walksafe.depth.ObjectTracker
+import kr.co.hanium.dreamup.walksafe.inference.tracking.GrayTrackingFrame
+import kr.co.hanium.dreamup.walksafe.inference.tracking.InterFrameDetectionTracker
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingBackend
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingConfig
+import kr.co.hanium.dreamup.walksafe.inference.tracking.AdaptiveVisualTrackingBudget
+import kr.co.hanium.dreamup.walksafe.inference.YuvPreprocessingStrategy
+import kr.co.hanium.dreamup.walksafe.navigation.AndroidTactileFrameCoordinator
+import kr.co.hanium.dreamup.walksafe.navigation.CurrentTrackedFrameEvidence
+import kr.co.hanium.dreamup.walksafe.navigation.UserMotionEstimateFactory
+import kr.co.hanium.dreamup.walksafe.navigation.UserMotionLocationEvidence
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -159,13 +186,17 @@ import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceCheckResultStore
 import kr.co.hanium.dreamup.walksafe.device.POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION
 import kr.co.hanium.dreamup.walksafe.device.OfficialEnvironmentGpsPreflightPolicy
 import kr.co.hanium.dreamup.walksafe.device.OfficialEnvironmentGpsSample
+import kr.co.hanium.dreamup.walksafe.device.RuntimeMeasuredQualityGate
 import kr.co.hanium.dreamup.walksafe.device.ApprovedDeviceProfileMatch
 import kr.co.hanium.dreamup.walksafe.device.DeviceGateState
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckCameraSampleVerdict
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckCameraSamplingPolicy
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckDetectorExecutionPolicy
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixDecision
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixObservation
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixPolicy
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixReason
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckLocationFixUnavailability
 import kr.co.hanium.dreamup.walksafe.device.RuntimeMetricDepthSupport
 import kr.co.hanium.dreamup.walksafe.device.RuntimeMetricFrameEvidence
 import kr.co.hanium.dreamup.walksafe.device.RuntimeMetricPreflightPolicy
@@ -189,6 +220,7 @@ import kr.co.hanium.dreamup.walksafe.depth.CameraIntrinsics
 import kr.co.hanium.dreamup.walksafe.depth.CoordinateMapper
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
 import kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot
+import kr.co.hanium.dreamup.walksafe.depth.assessRuntimeDepthFrame
 import kr.co.hanium.dreamup.walksafe.depth.ImageSize
 import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
 import kr.co.hanium.dreamup.walksafe.depth.MotionContext
@@ -241,11 +273,26 @@ import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorTiming
 import kr.co.hanium.dreamup.walksafe.inference.AndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.ArgbImage
 import kr.co.hanium.dreamup.walksafe.inference.DetectorRuntimeFailureAction
+import kr.co.hanium.dreamup.walksafe.inference.AdaptiveInferencePacingPolicy
 import kr.co.hanium.dreamup.walksafe.inference.DetectorRuntimeSupervisor
+import kr.co.hanium.dreamup.walksafe.inference.InferencePacingTicket
 import kr.co.hanium.dreamup.walksafe.inference.NoopAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.TfliteAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.TwoModelRuntimeConfig
 import kr.co.hanium.dreamup.walksafe.inference.YuvImagePreprocessor
+import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamFrameToken
+import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamResult
+import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeService
+import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeOptions
+import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.UnknownRuntimeAttachment
+import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.UnknownRuntimeCalibration
+import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.UnknownRuntimeBinding
+import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.UnknownRuntimeLoadControl
+import kr.co.hanium.dreamup.walksafe.inference.unknown.tuning.AndroidUnknownRuntimeProfileStore
+import kr.co.hanium.dreamup.walksafe.depth.UnknownObjectFeedbackBatch
+import kr.co.hanium.dreamup.walksafe.depth.UnknownObjectFeedbackPolicy
+import kr.co.hanium.dreamup.walksafe.depth.unknown.FrozenUnknownDepthCapture
+import kr.co.hanium.dreamup.walksafe.depth.unknown.UnknownObjectDepthPipeline
 import kr.co.hanium.dreamup.walksafe.navigation.AndroidStepTracker
 import kr.co.hanium.dreamup.walksafe.navigation.AndroidEarthOrientationTracker
 import kr.co.hanium.dreamup.walksafe.navigation.AndroidDetectionSnapshotFrameIdentity
@@ -284,6 +331,7 @@ import kr.co.hanium.dreamup.walksafe.navigation.StepLengthEstimator
 import kr.co.hanium.dreamup.walksafe.navigation.StepCalibrationSample
 import kr.co.hanium.dreamup.walksafe.navigation.StepEvent
 import kr.co.hanium.dreamup.walksafe.navigation.StepEventConfidence
+import kr.co.hanium.dreamup.walksafe.navigation.StepEventSource
 import kr.co.hanium.dreamup.walksafe.navigation.TactileProjectionContext
 import kr.co.hanium.dreamup.walksafe.navigation.TactileRouteGuidanceResult
 import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
@@ -295,12 +343,17 @@ import kr.co.hanium.dreamup.walksafe.navigation.reliableMovementHeadingDegrees
 import kr.co.hanium.dreamup.walksafe.navigation.classifyNavigationBackendFailure
 import kr.co.hanium.dreamup.walksafe.navigation.canonicalDestinationSearchQueryOrNull
 import kr.co.hanium.dreamup.walksafe.navigation.selectAndroidVoiceAction
+import kr.co.hanium.dreamup.walksafe.navigation.VoiceCommandUiDestination
+import kr.co.hanium.dreamup.walksafe.navigation.uiDestination
 import kr.co.hanium.dreamup.walksafe.navigation.createProductionAndroidTactileFrameCoordinator
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.AndroidPedestrianMotionTracker
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.AndroidPedestrianProfileStore
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.FilteredRoutePosition
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.GnssObservationDisposition
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.GnssPositionObservation
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.RawWalkingCalibrationFix
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.TimestampAlignedWalkingCalibration
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.WalkingCalibrationSample
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.HeadingObservation
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.PdrStepQuality
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.PedestrianHeadingInput
@@ -310,7 +363,6 @@ import kr.co.hanium.dreamup.walksafe.navigation.positioning.PositioningCoordinat
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.PositioningFilteredFix
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.PositioningSnapshot
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteHeadingEstimate
-import kr.co.hanium.dreamup.walksafe.navigation.positioning.WalkingCalibrationSample
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.WalkingSpeedObservation
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.ZuptObservation
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.gnss.AndroidGnssObservationSource
@@ -403,6 +455,7 @@ import kr.co.hanium.dreamup.walksafe.network.GatewayWalkStartResult
 import kr.co.hanium.dreamup.walksafe.network.GatewayWalkTakeoverConfirmation
 import kr.co.hanium.dreamup.walksafe.network.RestoredGatewayLoginBundle
 import kr.co.hanium.dreamup.walksafe.network.MobileNetworkPreference
+import kr.co.hanium.dreamup.walksafe.network.GatewaySpeechNetworkGate
 import kr.co.hanium.dreamup.walksafe.network.newNavigationRequestExecutor
 import kr.co.hanium.dreamup.walksafe.network.isGatewaySpeechCallbackCurrent
 import kr.co.hanium.dreamup.walksafe.report.AndroidReportCandidateInput
@@ -557,6 +610,8 @@ import kr.co.hanium.dreamup.walksafe.session.PriorityUserAgeBand
 import kr.co.hanium.dreamup.walksafe.session.PriorityUserOnboardingPolicy
 import kr.co.hanium.dreamup.walksafe.session.PriorityUserOnboardingSnapshot
 import kr.co.hanium.dreamup.walksafe.session.PriorityUserPractice
+import kr.co.hanium.dreamup.walksafe.session.PriorityUserEducationPlayback
+import kr.co.hanium.dreamup.walksafe.session.PriorityUserEducationPresentation
 import kr.co.hanium.dreamup.walksafe.session.PriorityUserPracticeAttemptToken
 import kr.co.hanium.dreamup.walksafe.session.PriorityUserPracticeDeliverySignal
 import kr.co.hanium.dreamup.walksafe.session.PriorityUserSupportEnvironment
@@ -703,6 +758,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var startupCapabilityConfirmButton: Button
     private lateinit var priorityUserOnboardingControls: LinearLayout
     private lateinit var priorityUserOnboardingStatusText: TextView
+    private lateinit var priorityUserEducationBodyText: TextView
+    private lateinit var priorityUserEducationProgressText: TextView
     private lateinit var priorityUserEducationButton: Button
     private lateinit var priorityUserSafePlaceButton: Button
     private lateinit var priorityUserResetButton: Button
@@ -797,9 +854,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var gatewaySessionControlsToggleButton: Button
     private var gatewaySessionControlsExpanded = false
     private lateinit var gatewaySessionControls: LinearLayout
-    private lateinit var runtimeDebugControlsToggleButton: Button
     private lateinit var runtimeDebugControls: LinearLayout
-    private var runtimeDebugControlsExpanded = false
+    private var fixedFixturePerformanceCheckRunning = false
+    @Volatile private var cameraScreenVisible = false
+    private var lastCameraScreenFrameUiMs = 0L
+    private var cameraScreenOwnsWalk = false
+    private lateinit var cameraScreenControls: LinearLayout
+    private lateinit var cameraScreenStatus: TextView
+    private var developmentGuidanceStartRequested = false
+    private var developmentGuidanceResumeRequestedEpoch: WalkRuntimeEpoch? = null
     private lateinit var reportPrivacyConsentButton: Button
     private lateinit var automaticReportConsentButton: Button
     private lateinit var mobileNetworkPreferenceButton: Button
@@ -875,19 +938,36 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var cameraFallbackCleanupPending = false
     private var cameraFallbackAfterRelease: (() -> Unit)? = null
     @Volatile
-    private var lastCameraFallbackAnalysisMs = 0L
-    @Volatile
     private var cameraFallbackFrameAnalyzedGeneration = -1
     private var cameraFallbackStartReason: CameraFallbackStartReason? = null
     private var cameraFallbackAvailability: ArCoreApk.Availability? = null
     private val nonMetricAdvisoryPolicy = AndroidNonMetricObstacleAdvisoryPolicy()
     private var objectDepthPipeline = ObjectDepthRuntimePipeline()
+    private val visualFrameTracker = InterFrameDetectionTracker(
+        VisualTrackingConfig(
+            backend = VisualTrackingBackend.OPENCV_PYRAMIDAL_LK,
+            maxFeaturesPerObject = 40,
+            allowSimilarityTransform = true,
+        ),
+    )
+    private var visualGeometryVersion = 0L
+    private val visualTrackingBudget = AdaptiveVisualTrackingBudget()
+    private var currentVisualTrackingBudgetNs = 5_000_000L
+    private var lastVisualFrameKey: VisualFrameKey? = null
+    private var lastRuntimeCameraFrameId = 0L
+    private var currentObjectDepthPipeline = ObjectDepthRuntimePipeline(
+        tracker = ObjectTracker(trackIdPrefix = "visual-0-track-"),
+    )
+    private var latestVisualOverlayFrameId = 0L
+    private var latestVisualTrackingStatus = "visual=waiting"
+    private val frozenReportFrameCoordinator by lazy {
+        createProductionAndroidTactileFrameCoordinator(feedbackPolicy, TactileFrameFeedbackActuator { _ -> })
+    }
     private val backgroundRenderer = CameraBackgroundRenderer()
     @Volatile
     private var frameDetector: AndroidFrameDetector = NoopAndroidFrameDetector()
     private val detectorRuntimeSupervisor = DetectorRuntimeSupervisor()
     private val captureLog = MetadataCaptureLog()
-    private val tactileOverlayStabilizer = TactileOverlayStabilizer()
     private var feedbackActuator: AndroidFeedbackActuator? = null
     private var speechRecognizer: PreferredOfflineSpeechRecognizer? = null
     private var voiceRecognitionActive = false
@@ -914,6 +994,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
     private val gatewaySpeechClient = AndroidGatewaySpeechClient()
+    private val gatewayFeatureNetworkLock = Any()
+    private var lastGatewayFeatureNetworkState:
+        Pair<MobileNetworkPreference, ActiveNetworkTransport>? = null
+    private val gatewaySpeechNetworkGate = GatewaySpeechNetworkGate {
+        gatewayFeatureNetworkState()
+    }
     private val gatewaySpeechExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "walksafe-gateway-speech").apply {
             isDaemon = true
@@ -998,6 +1084,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var latestWalkingSpeedObservation: WalkingSpeedObservation? = null
     private var latestGpsCourseObservation: HeadingObservation? = null
     private var latestRawRouteLocation: TrustedLocation? = null
+    private data class GpsMotionInputs(
+        val speed: WalkingSpeedObservation?,
+        val course: HeadingObservation?,
+        val evidence: UserMotionLocationEvidence,
+    )
+    @Volatile
+    private var latestGpsMotionInputs: GpsMotionInputs? = null
+    private val gpsMotionInputHistory = java.util.ArrayDeque<GpsMotionInputs>()
+    private var lastPositionZuptAtElapsedMs: Long? = null
+    private var lastPositionFieldTelemetryAtElapsedMs: Long? = null
     private var positionGuidancePaused = false
     private var orientationLocationOwnerActive = false
     private var positionFieldRecorder: PositionFieldSessionRecorder? = null
@@ -1017,6 +1113,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var pendingPositionFieldExportSessionId: String? = null
     private var pendingPositionFieldExportGeneration: Long? = null
     private var pendingPositionFieldExportBinding: RecorderBinding? = null
+    private data class PositionFieldExportAuthority(
+        val localScopeId: String,
+        val walkSessionId: String,
+        val actorId: String,
+        val gatewayGeneration: Long,
+    )
+    private var pendingPositionFieldExportAuthority: PositionFieldExportAuthority? = null
     private var latestPositionStationaryState = PositionStationaryState.UNKNOWN
     private var latestPositionStationarySinceMs: Long? = null
     private val activityOriginalUploadAdmission =
@@ -1054,6 +1157,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var priorityUserEducationInFlight = false
     private var priorityUserEducationPlaybackIsPracticeNecessity = false
     private var priorityUserPracticeInFlight: PriorityUserPractice? = null
+    private var priorityUserPracticeAttemptToken: PriorityUserPracticeAttemptToken? = null
     private var priorityUserTrainingGeneration = 0L
     private lateinit var walkSessionLifecycle: WalkSessionLifecycle
     private lateinit var walkSessionResourceProbe: AndroidWalkSessionResourceProbe
@@ -1253,6 +1357,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val routeRequestInFlight = AtomicBoolean(false)
     private val navigationRequests = AndroidNavigationRequestCoordinator()
     private val gatewaySessionOwner = Any()
+    @Volatile
+    private var backendDeviceRestorePending = false
     private val reportLocationStartScheduled = AtomicBoolean(false)
     private val gatewaySessionExecutor
         get() = GatewaySessionProcessCoordinator.executor
@@ -1272,11 +1378,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 onReportQueueDrainNetworkChanged()
+                refreshGatewayFeatureNetworkPolicy()
                 requestGatewayCapacityRefresh("network_reconnected")
+                runOnUiThread { retryPendingBackendDeviceRestore() }
             }
 
             override fun onLost(network: Network) {
                 onReportQueueDrainNetworkChanged()
+                refreshGatewayFeatureNetworkPolicy()
             }
 
             override fun onCapabilitiesChanged(
@@ -1284,6 +1393,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 networkCapabilities: NetworkCapabilities,
             ) {
                 onReportQueueDrainNetworkChanged()
+                refreshGatewayFeatureNetworkPolicy()
             }
         }
     private var currentDestination: RoutePoint? = null
@@ -1383,6 +1493,90 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
     private val detectionInFlight = AtomicBoolean(false)
+    @Volatile private var unknownRuntimeService: FastSamRuntimeService<UnknownRuntimeAttachment>? = null
+    @Volatile private var unknownLoadingService: FastSamRuntimeService<UnknownRuntimeAttachment>? = null
+    @Volatile private var unknownProcessingContext: UnknownProcessingContext? = null
+    @Volatile private var latestUnknownFeedback: UnknownFeedbackObservation? = null
+    @Volatile private var unknownRuntimeStatus = "추가 물체 인식 준비 전"
+    private val unknownContextSequence = java.util.concurrent.atomic.AtomicLong(0L)
+    private val unknownServiceSequence = java.util.concurrent.atomic.AtomicLong(0L)
+    private val unknownTuningStore by lazy { AndroidUnknownRuntimeProfileStore(applicationContext) }
+    @Volatile private var unknownCalibration: UnknownRuntimeCalibration? = null
+    @Volatile private var unknownRuntimeBinding: UnknownRuntimeBinding? = null
+    @Volatile private var unknownRuntimeClosing = false
+    private val unknownLoadControl = UnknownRuntimeLoadControl()
+    @Volatile private var unknownLoadRecheckRecorded = false
+    @Volatile private var latestUnknownLoadObservation: kr.co.hanium.dreamup.walksafe.inference.InferenceLoadObservation? = null
+
+    /** Each service/camera/walk lease owns its history; a late callback can only mutate its old copy. */
+    private class UnknownProcessingContext(
+        val identity: Long,
+        val service: FastSamRuntimeService<UnknownRuntimeAttachment>,
+        val detectorGeneration: Int,
+        val walkEpoch: WalkRuntimeEpoch,
+        val arSessionGeneration: Long,
+        val geometryId: String,
+        stepLengthM: Float,
+    ) {
+        val pipeline = UnknownObjectDepthPipeline(
+            maximumSourceAgeMs = MAX_DEPTH_DETECTION_SOURCE_AGE_MS,
+            elapsedRealtimeMs = SystemClock::elapsedRealtime,
+        ).also { it.setUserStepLength(stepLengthM) }
+        val feedback = UnknownObjectFeedbackPolicy(stepLengthM)
+        val pacing = AdaptiveInferencePacingPolicy(MAX_DEPTH_DETECTION_SOURCE_AGE_MS)
+        @Volatile var activeFrameId = -1L
+        @Volatile var activeTicket: InferencePacingTicket? = null
+    }
+
+    private data class UnknownFrameAttachment(
+        val context: UnknownProcessingContext,
+        val capture: FrozenUnknownDepthCapture,
+        val ticket: InferencePacingTicket,
+    ) : UnknownRuntimeAttachment
+
+    private data class UnknownFeedbackObservation(
+        val context: UnknownProcessingContext,
+        val batch: UnknownObjectFeedbackBatch,
+    )
+    private var detectorLoadGeneration = 0L
+    private var detectorClosing = false
+    private val deviceTuningStore by lazy { AndroidDeviceTuningProfileStore(applicationContext) }
+    private val deviceTuningExecutor = Executors.newSingleThreadExecutor { task -> Thread(task, "walksafe-device-tuning") }
+    private var runtimeServicesPreparing = false
+    private var configuredRuntimeWarmupAttempted = false
+    @Volatile private var runtimeCalibration: AndroidRuntimeCalibrationSession? = null
+    @Volatile private var runtimeTuningPreparing = false
+    @Volatile private var runtimeTuningGeneration = 0L
+    @Volatile private var runtimeActiveCandidate: RuntimeCandidate? = null
+    @Volatile private var runtimeActiveProfile: RuntimeTuningProfile? = null
+    @Volatile private var runtimeSelectionBinding: String? = null
+    private var runtimeRestoreAttemptedBinding: String? = null
+    private var runtimeTuningSchedule: Runnable? = null
+    private var detectorCloseAfterCalibration = false
+    @Volatile private var runtimeOldDetectorReleasePending = false
+    private var runtimeAfterOldDetectorRelease: (() -> Unit)? = null
+    private val runtimeLoadMonitor = RuntimeLoadMonitor()
+    @Volatile private var runtimeCameraFrameBudgetMs: Long? = null
+    @Volatile private var runtimeLoadNormalFrameAtMs: Long? = null
+    @Volatile private var runtimeLoadFrameScope = RuntimeFeatureScope.CAMERA_TRACKING
+    @Volatile private var runtimeLoadPendingRecordedBinding: String? = null
+    private val runtimeLoadObservationSourceHolder = lazy {
+        AndroidRuntimeLoadObservationSource(
+            Handler(Looper.getMainLooper()),
+            expectedCameraFrameIntervalMs = { runtimeCameraFrameBudgetMs },
+            uiDispatchBudgetMs = {
+                runCatching { windowManager.defaultDisplay.refreshRate }
+                    .getOrNull()?.takeIf { it.isFinite() && it > 0f }
+                    ?.let { kotlin.math.ceil(1000.0 / it).toLong() }
+            },
+        )
+    }
+    private val runtimeLoadObservationSource get() = runtimeLoadObservationSourceHolder.value
+    private val adaptiveInferencePacing = AdaptiveInferencePacingPolicy(
+        maximumFreshFrameAgeMs = MAX_DEPTH_DETECTION_SOURCE_AGE_MS,
+    )
+    @Volatile
+    private var latestInferenceThermalThrottled: Boolean? = null
     private val frameCaptureRequested = AtomicBoolean(false)
     private val frameStateLock = Any()
     @Volatile
@@ -1392,14 +1586,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var cameraTextureBound = false
     private var lastUiUpdateMs = 0L
     private var lastOverlayUpdateMs = 0L
-    @Volatile
-    private var lastDetectionRunMs = 0L
+    private var lastDetectionCaptureFrameId = 0L
+    private var lastDetectionCaptureGeneration = -1
+    private var lastDetectionCaptureArSessionGeneration = -1L
     @Volatile
     private var latestDetectionSnapshot = DetectionSnapshot.empty()
-    @Volatile
-    private var latestTactileOverlaySnapshot = DetectionSnapshot.empty()
-    @Volatile
-    private var lastNonEmptyOverlaySnapshot = DetectionSnapshot.empty()
     @Volatile
     private var detectorGeneration = 0
     private var surfaceWidth = 0
@@ -1450,6 +1641,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var foregroundHomeWakeGeneration = 0L
     private var foregroundHomeWakeOwnerIsCurrent: (() -> Boolean)? = null
     private var foregroundHomeWakeFailed = false
+    private var foregroundHomeWakeAcknowledgement: kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer? = null
+    private var foregroundHomeWakeAcknowledgementGeneration = 0L
+    private var handsFreeVoiceOwnsCommandPage = false
     private var postLoginWakePhraseReadyCue: AndroidDeviceCheckHapticProbe? = null
     private var postLoginWakePhraseStartRunnable: Runnable? = null
     private var postLoginWakePhraseUserStarted = false
@@ -1495,6 +1689,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var prewalkGuidanceStage = 0
     private lateinit var phoneMountingSensorProbe: AndroidPhoneMountingSensorProbe
     private var officialEnvironmentRuntimeGuard: OfficialEnvironmentRuntimeGuard? = null
+    private val runtimeGpsQualityGate = RuntimeMeasuredQualityGate()
+    private val runtimeCameraQualityGate = RuntimeMeasuredQualityGate()
+    private var lastOfficialEnvironmentRuntimeAction: OfficialEnvironmentRuntimeAction? = null
+    private var lastOfficialEnvironmentUnavailableFactors = emptySet<OfficialEnvironmentFactor>()
+    @Volatile
+    private var latestRuntimeRawCameraAssessment: CameraFrameQualityAssessment? = null
     @Volatile
     private var officialEnvironmentOutputsAllowed = false
     private var officialEnvironmentWatchdogGeneration = 0L
@@ -1531,6 +1731,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var metricDistanceCapabilityOverride: Boolean? = null
     private val developmentQuickStartEnabled: Boolean
         get() = BuildConfig.DEBUG && BuildConfig.DEVELOPMENT_QUICK_START
+    private val developmentPostLoginDeviceCheckBypassed: Boolean
+        get() = BuildConfig.DEBUG && !BuildConfig.WALKSAFE_POST_LOGIN_DEVICE_CHECK_REQUIRED
+    private val developmentGuidanceStartBypassEnabled: Boolean
+        get() = BuildConfig.DEBUG && BuildConfig.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS &&
+            developmentGuidanceStartRequested
     private var developmentQuickStartStatusText: TextView? = null
     private var developmentQuickStartButton: Button? = null
     private var developmentQuickStartRequested = false
@@ -1594,12 +1799,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var detectorStatusText = "detector=load_pending_after_camera_gate"
     private var locationCallback: LocationCallback? = null
     private var locationCallbackGeneration = 0
-    private var lastCalibrationLocation: TrustedLocation? = null
-    private var lastCalibrationStepCount: Int = 0
-    private var lastCalibrationAtMs: Long = 0L
+    private var locationCollectionOwner: LocationCollectionOwner? = null
+
+    private data class LocationCollectionOwner(
+        val actorId: String?,
+        val gatewaySession: GatewayFieldSession?,
+        val gatewayGeneration: Long,
+        val fieldWalkEpoch: WalkRuntimeEpoch? = null,
+        val fieldScopeId: String? = null,
+    )
+
+    private val walkingCalibrationSegments = TimestampAlignedWalkingCalibration()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        initialAppPermissionReRequestedThisLaunch =
+            savedInstanceState?.getBoolean(STATE_INITIAL_APP_PERMISSION_RE_REQUESTED, false) == true
         BoundedRuntimeDiagnosticLog.initialize(applicationContext)
         restoredUserReportStatusFilter = savedInstanceState
             ?.getString(STATE_USER_REPORT_STATUS_FILTER)
@@ -1843,8 +2058,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     ::dispatchGatewayProcessSessionChanged,
                 )
                 registerGatewayCapacityNetworkObserver()
-                scheduleGatewaySessionRestoreAfterPrivacyStartupInspection()
                 enforcePriorityUserAccountEligibility()
+                scheduleGatewaySessionRestoreAfterPrivacyStartupInspection()
                 fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
                 stepTracker = AndroidStepTracker(
                     context = this,
@@ -2144,6 +2359,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val savedStepLength = stepLengthPrefs.getFloat(PREF_STEP_LENGTH_KEY, StepLengthEstimator.DEFAULT_STEP_LENGTH_M)
         stepLengthEstimator.setStepLengthM(savedStepLength)
         objectDepthPipeline.setUserStepLength(savedStepLength)
+        currentObjectDepthPipeline.setUserStepLength(savedStepLength)
     }
 
     private fun persistStepLength() {
@@ -2241,6 +2457,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     safePracticePlaceConfirmed =
                         profile.getBoolean("safe_practice_place_confirmed"),
                     completedPractices = completedPractices.toSet(),
+                    hazardResponseConfirmed = profile.optBoolean("hazard_response_confirmed", false),
                     phonePostureAcknowledged = profile.optBoolean("phone_posture_acknowledged", false),
                     practiceNecessityReviewed = profile.optBoolean("practice_necessity_reviewed", false),
                     educationAccepted = profile.optBoolean("education_accepted", false),
@@ -2286,6 +2503,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             .put("usage_conditions_acknowledged", snapshot.usageConditionsAcknowledged)
             .put("app_usage_reviewed", snapshot.appUsageReviewed)
             .put("app_usage_accepted", snapshot.appUsageAccepted)
+            .put("hazard_response_confirmed", snapshot.hazardResponseConfirmed)
             .put("native_completed_first_run", nativeCompletedFirstRunRecord ?: JSONObject.NULL)
             .put(
                 "safe_practice_place_confirmed",
@@ -2328,13 +2546,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun enforcePriorityUserAccountEligibility() {
+        val process = GatewaySessionProcessCoordinator.snapshot()
+        val session = process.session ?: return
+        if (
+            reporterUserId != session.actorId ||
+            process.inFlightOperationId != null ||
+            process.storageBlocked ||
+            process.deletionRecoveryOnly ||
+            session.sessionScope != GatewaySessionScope.GENERAL ||
+            session.verificationState != GatewaySessionVerificationState.VERIFIED
+        ) return
         if (
             priorityUserOnboardingActorId == reporterUserId &&
             priorityUserOnboardingPolicy.accountBlockReason() == null
         ) {
             return
         }
-        clearGatewaySession(logoutRemote = true)
+        clearGatewaySession(
+            logoutRemote = true,
+            expectedSession = session,
+            expectedProcessGeneration = process.generation,
+        )
     }
 
     private fun restorePermissionSessionStateFromPrefs() {
@@ -6250,6 +6482,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun onGatewayProcessSessionChanged(
         snapshot: GatewaySessionProcessSnapshot,
     ) {
+        if (snapshot.session?.isBackendAccountDeviceBound == true) {
+            backendDeviceRestorePending = snapshot.session.verificationState ==
+                GatewaySessionVerificationState.RESTORED_UNVERIFIED
+            if (backendDeviceRestorePending) {
+                snapshot.restoredFirstRunSnapshot?.let { firstRunOnboardingSnapshot = it }
+            }
+        } else if (snapshot.deletionRecoveryOnly) {
+            backendDeviceRestorePending = false
+        }
         cancelUserReportAuthorityExpirySchedule()
         invalidatePendingExplicitReport()
         cancelIntegratedConsentControlCall()
@@ -6415,6 +6656,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         } else {
             permissionSessionPolicy.authenticationExpired()
         }
+        if (verifiedActorSession != null) {
+            enforcePriorityUserAccountEligibility()
+        }
         if (
             session != null &&
             !snapshot.deletionRecoveryOnly &&
@@ -6477,6 +6721,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         }
         maybeStartPausedReportQueueRecoveryObservation()
+        startLocationUpdatesIfAllowed()
     }
 
     private fun dispatchGatewayProcessSessionChanged(
@@ -6653,6 +6898,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             GatewaySessionProcessCoordinator.markStorageBlocked(operation)
             return
         }
+        val backendDevice = gatewaySessionStore.restoreBackendDevice(expectedOrigin)
+        if (gatewaySessionStore.isStorageBlocked()) {
+            GatewaySessionProcessCoordinator.markStorageBlocked(operation)
+            return
+        }
+        if (backendDevice != null) {
+            restoreBackendDeviceSession(backendDevice, operation)
+            return
+        }
+        backendDeviceRestorePending = false
         val recovered = gatewaySessionStore.recoverRenewingToPendingRevocation()
         if (
             recovered == GatewaySessionStoreResult.BLOCKED ||
@@ -6731,6 +6986,85 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 firstRunSnapshot = restored.firstRunSnapshot,
             ) ?: return
         renewRestoredGatewaySession(restored, renewalOperation)
+    }
+
+    private fun retryPendingBackendDeviceRestore() {
+        if (
+            backendDeviceRestorePending && isActivityForeground &&
+            privacyStartupInspectionComplete && !privacyStartupInspectionDestroyed &&
+            !accountDeletionStateMachine.durableConfirmationRecoveryRequired()
+        ) {
+            restoreGatewaySessionFromPrefs()
+        }
+    }
+
+    private fun restoreBackendDeviceSession(
+        restored: RestoredGatewayLoginBundle,
+        operation: GatewaySessionOperation,
+    ) {
+        backendDeviceRestorePending = true
+        firstRunOnboardingSnapshot = restored.firstRunSnapshot
+        val expectedActivityLease = accountDeletionActivityLease
+        val verificationOperation = GatewaySessionProcessCoordinator.publishRestoredUnverified(
+            operation, restored.session, restored.firstRunSnapshot,
+        ) ?: return
+        fun unavailable() {
+            val cleared = GatewaySessionProcessCoordinator.clear(verificationOperation) ?: return
+            postGatewayActivityCallback(expectedActivityLease) {
+                if (GatewaySessionProcessCoordinator.snapshot().generation != cleared.generation) {
+                    return@postGatewayActivityCallback
+                }
+                showAccountMessage("저장된 로그인을 확인하려면 인터넷 연결이 필요합니다. 연결 후 다시 확인하세요.")
+                updateFirstRunOnboardingUi()
+            }
+        }
+        try {
+            gatewaySessionExecutor.execute {
+                try {
+                    val verified = gatewaySessionClient.revalidateBackendAccountDeviceSession(restored.session)
+                    if (!GatewaySessionProcessCoordinator.publishVerified(
+                            verificationOperation, verified, restored.firstRunSnapshot,
+                        )
+                    ) {
+                        verified.invalidate()
+                        return@execute
+                    }
+                    backendDeviceRestorePending = false
+                    postGatewayActivityCallback(expectedActivityLease) {
+                        if (gatewayFieldSession !== verified) return@postGatewayActivityCallback
+                        accountAccessNotice = null
+                        onFirstRunOnboardingStateChanged("저장된 로그인으로 이어갑니다.")
+                        refreshIntegratedConsentFromServer()
+                    }
+                } catch (error: GatewaySessionHttpException) {
+                    if (error.reason == "gateway_backend_device_restore_unavailable") {
+                        unavailable()
+                        return@execute
+                    }
+                    val process = GatewaySessionProcessCoordinator.snapshot()
+                    if (process.inFlightOperationId != verificationOperation.operationId ||
+                        process.generation != verificationOperation.generation
+                    ) return@execute
+                    val removed = gatewaySessionStore.removeBackendDeviceIfCurrent(restored.version)
+                    if (removed == GatewaySessionStoreResult.BLOCKED ||
+                        removed == GatewaySessionStoreResult.STORAGE_FAILURE
+                    ) {
+                        GatewaySessionProcessCoordinator.markStorageBlocked(verificationOperation)
+                    } else {
+                        backendDeviceRestorePending = false
+                        GatewaySessionProcessCoordinator.clear(verificationOperation)
+                        postGatewayActivityCallback(expectedActivityLease) {
+                            showAccountMessage("저장된 로그인이 만료되었거나 해제되었습니다. 다시 로그인하세요.")
+                            updateFirstRunOnboardingUi()
+                        }
+                    }
+                } catch (_: Exception) {
+                    unavailable()
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            unavailable()
+        }
     }
 
     private fun stageRestoredGatewayRevocation(
@@ -7445,6 +7779,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         passwordOverride: String? = null,
         expectedCreatedActorId: String? = null,
     ) {
+        if (backendDeviceRestorePending) {
+            restoreGatewaySessionFromPrefs()
+            updateFirstRunOnboardingUi()
+            return
+        }
         if (!positionFieldAccountTransitionAllowed()) return
         val email = emailOverride ?: accountEmailInput.text?.toString().orEmpty()
         val password = passwordOverride ?: accountPasswordInput.text?.toString().orEmpty()
@@ -7503,7 +7842,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         gatewayBaseUrl = gatewayOrigin,
                         email = email,
                         password = password,
-                        rememberMe = false,
+                        rememberMe = true,
                         deviceId = installationDeviceId,
                     )
                     runOnUiThread {
@@ -7554,17 +7893,37 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         if (developmentQuickStartEnabled) {
                             developmentQuickStartAuthenticatedActorId = session.actorId
                         }
+                        val stored = gatewaySessionStore.saveBackendDeviceIfAbsent(
+                            session, nextFirstRunSnapshot, gatewayOrigin,
+                        )
+                        if (stored != GatewaySessionStoreResult.COMMITTED &&
+                            stored != GatewaySessionStoreResult.ALREADY_COMMITTED
+                        ) {
+                            session.invalidate()
+                            if (stored == GatewaySessionStoreResult.BLOCKED ||
+                                stored == GatewaySessionStoreResult.STORAGE_FAILURE
+                            ) {
+                                GatewaySessionProcessCoordinator.markStorageBlocked(operation)
+                            } else {
+                                GatewaySessionProcessCoordinator.clear(operation)
+                            }
+                            showAccountMessage("로그인을 안전하게 저장하지 못했습니다. 다시 확인하세요.")
+                            updateFirstRunOnboardingUi()
+                            return@runOnUiThread
+                        }
                         val published = GatewaySessionProcessCoordinator.publishVerified(
                             operation = operation,
                             session = session,
                             firstRunSnapshot = nextFirstRunSnapshot,
                         )
                         if (!published) {
+                            session.versionOrNull?.let(gatewaySessionStore::removeBackendDeviceIfCurrent)
                             session.invalidate()
                             showAccountMessage("로그인 세션을 안전하게 연결하지 못했습니다.")
                             updateFirstRunOnboardingUi()
                             return@runOnUiThread
                         }
+                        backendDeviceRestorePending = false
                         firstRunOnboardingSnapshot = nextFirstRunSnapshot
                         reporterUserId = session.actorId
                         priorityUserOnboardingActorId = session.actorId
@@ -7749,10 +8108,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         invalidatePhoneMountingEvidence("priority_user_account_logged_out")
         cancelPendingPriorityUserTrainingFeedback()
         val currentSession = gatewayFieldSession
-        clearGatewaySession(
-            logoutRemote = currentSession != null,
+        val clearStarted = clearGatewaySession(
+            logoutRemote = currentSession != null || backendDeviceRestorePending,
             expectedSession = currentSession,
         )
+        if (clearStarted == null) {
+            showAccountMessage("로그인 확인이 진행 중입니다. 완료된 뒤 다시 로그아웃하세요.")
+            return
+        }
         reporterUserId = null
         priorityUserOnboardingActorId = null
         nativeCompletedFirstRunRecord = null
@@ -7807,6 +8170,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             showAccountMessage(
                 "로그인 저장소가 안전 차단 상태입니다. 재로그인 전에 앱 지원 담당자에게 문의하세요.",
             )
+            return
+        }
+        if (backendDeviceRestorePending) {
+            onAccountLogoutClicked()
             return
         }
         val preservesAdvancedProgress =
@@ -8014,6 +8381,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     permissionSessionPolicy.setMobileNetworkPreference(
                         MobileNetworkPreference.WIFI_ONLY,
                     )
+                    refreshGatewayFeatureNetworkPolicy()
                     if (
                         ::networkStateProbe.isInitialized &&
                         networkStateProbe.currentTransport() ==
@@ -8944,6 +9312,38 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
     }
 
+    private fun gatewayFeatureNetworkState(): Pair<MobileNetworkPreference, ActiveNetworkTransport> =
+        permissionSessionPolicy.snapshot().mobileNetworkPreference to
+            if (::networkStateProbe.isInitialized) networkStateProbe.currentTransport()
+            else ActiveNetworkTransport.OFFLINE
+
+    private fun isGatewayFeatureNetworkAllowed(): Boolean {
+        val (preference, transport) = gatewayFeatureNetworkState()
+        return AndroidNetworkTransferPolicy.isAllowed(preference, transport)
+    }
+
+    private fun refreshGatewayFeatureNetworkPolicy() {
+        if (privacyStartupInspectionDestroyed) return
+        val changed = synchronized(gatewayFeatureNetworkLock) {
+            val current = gatewayFeatureNetworkState()
+            if (lastGatewayFeatureNetworkState == current) {
+                false
+            } else {
+                lastGatewayFeatureNetworkState = current
+                gatewaySpeechNetworkGate.onNetworkPolicyChanged()
+                true
+            }
+        }
+        if (!changed) return
+        if (::userReportController.isInitialized) userReportController.onNetworkPolicyChanged()
+        runOnUiThread {
+            val active = activeGatewaySpeechInteraction
+            if (active != null && !gatewaySpeechNetworkGate.isCurrent(active.networkTicket)) {
+                cancelGatewaySpeechInteraction("network_policy_changed")
+            }
+        }
+    }
+
     private fun isGatewayNetworkAllowed(
         reason: String,
         announce: Boolean = true,
@@ -9185,6 +9585,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     "내 신고 상태 오류: 요청은 접수됐지만 이 기기에 상태 추적 정보를 저장하지 못했습니다."
                 UserReportFailure.MALFORMED_RESPONSE ->
                     "내 신고 상태 오류: 서버 응답 형식을 확인할 수 없습니다."
+                UserReportFailure.NETWORK_RESTRICTED ->
+                    "내 신고: Wi-Fi에 연결하거나 모바일 데이터 사용을 허용한 뒤 다시 시도하세요."
                 UserReportFailure.TEMPORARY,
                 null,
                 -> "내 신고 상태 오류: 연결을 확인한 뒤 다시 시도하세요."
@@ -10291,8 +10693,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             before.deletionRecoveryOnly &&
             accountDeletionStateMachine.durableConfirmationRecoveryRequired()
         ) return null
-        val previous = before.session
-        if (expectedSession != null && previous !== expectedSession) return null
+        if (expectedSession != null && before.session !== expectedSession) return null
+        val previous = before.session ?: if (backendDeviceRestorePending) {
+            configuredGatewayOriginOrNull()?.let { origin ->
+                gatewaySessionStore.restoreBackendDevice(origin)?.session
+            }
+        } else null
         cancelDestinationSearchLocation()
         val shouldDowngradeWalk =
             previous != null || permissionSessionPolicy.snapshot().mayUseProtectedServerFeature
@@ -10305,19 +10711,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             GatewaySessionProcessCoordinator.beginOperation()
         } ?: return null
         val version = previous?.versionOrNull
+        val backendDevice = previous?.isBackendAccountDeviceBound == true
         var mayLogoutPrevious = true
-        var revocationStorageBlocked = false
+        var revocationStorageBlocked =
+            ::gatewaySessionStore.isInitialized && gatewaySessionStore.isStorageBlocked()
         val pending = if (version != null && ::gatewaySessionStore.isInitialized) {
-            val staged = gatewaySessionStore.moveActiveToPendingRevocation(
-                expectedVersion = version,
-                operationId = operation.operationId,
-            )
+            val staged = if (backendDevice) {
+                gatewaySessionStore.removeBackendDeviceIfCurrent(version)
+            } else {
+                gatewaySessionStore.moveActiveToPendingRevocation(
+                    expectedVersion = version,
+                    operationId = operation.operationId,
+                )
+            }
             when (staged) {
                 GatewaySessionStoreResult.COMMITTED,
                 GatewaySessionStoreResult.ALREADY_COMMITTED -> {
-                    val restoredPending =
+                    val restoredPending = if (backendDevice) null else
                         gatewaySessionStore.restorePendingRevocation(version.gatewayBaseUrl)
-                    if (restoredPending == null) {
+                    if (restoredPending == null && !backendDevice) {
                         revocationStorageBlocked = true
                         android.util.Log.w(
                             "WalkSafeGatewaySession",
@@ -10344,6 +10756,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         } else {
             null
         }
+        if (!revocationStorageBlocked) backendDeviceRestorePending = false
         val pendingOperation = if (revocationStorageBlocked) {
             if (!GatewaySessionProcessCoordinator.markStorageBlocked(operation)) return null
             null
@@ -10568,8 +10981,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 reporterUserId == onboardingActorId &&
                 priorityUserOnboardingActorId == onboardingActorId
         if (readyForOnboardingRefresh) return session
-        clearGatewaySession(logoutRemote = false, expectedSession = session)
+        clearExpiredGatewaySessionIfCurrent(session)
         return null
+    }
+
+    private fun clearExpiredGatewaySessionIfCurrent(session: GatewayFieldSession) {
+        if (
+            session.verificationState != GatewaySessionVerificationState.VERIFIED ||
+            session.isUsableFor(session.actorId)
+        ) return
+        val process = GatewaySessionProcessCoordinator.snapshot()
+        clearGatewaySession(
+            logoutRemote = false,
+            expectedSession = session,
+            expectedProcessGeneration = process.generation,
+        )
     }
 
     private fun isCurrentGatewaySession(session: GatewayFieldSession): Boolean =
@@ -10666,6 +11092,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountRequestFence.enteredForeground()
         feedbackLifecycleGeneration += 1
         isActivityForeground = true
+        runtimeLoadObservationSource.start()
         cancelForegroundHomeWakeListening(resetFailure = true)
         revalidateUserReportAuthorityOnResume()
         if (::firstRunWaitingCard.isInitialized) {
@@ -10692,6 +11119,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection() {
+        retryPendingBackendDeviceRestore()
         if (permissionRecoveryGate.blocksAutomaticResourceStart) {
             permissionRecoveryGate = permissionRecoveryGate.recheckRequired()
             persistPermissionRecoveryGate()
@@ -10744,6 +11172,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             setActionButton("ARCore Depth 시작", ActionMode.START, enabled = true)
             updateStatus("ARCore Depth 대기", "카메라 권한이 허용되었습니다. ARCore Depth를 시작할 수 있습니다.")
         }
+        scheduleDeviceRuntimeCalibration()
     }
 
     @SuppressLint("GestureBackNavigation")
@@ -10795,6 +11224,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(STATE_INITIAL_APP_PERMISSION_RE_REQUESTED, initialAppPermissionReRequestedThisLaunch)
         if (::userReportController.isInitialized) {
             userReportController.snapshot().statusFilter?.let { filter ->
                 outState.putString(STATE_USER_REPORT_STATUS_FILTER, filter.wireValue)
@@ -10804,6 +11234,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     override fun onPause() {
+        cancelDeviceRuntimeCalibration("backgrounded")
+        runtimeLoadMonitor.pause()
+        if (runtimeLoadObservationSourceHolder.isInitialized()) runtimeLoadObservationSource.pause()
+        runtimeLoadNormalFrameAtMs = null
+        cancelForegroundHomeWakeAcknowledgement()
         cancelForegroundHomeWakeListening()
         clearHomeDestinationVoiceDialog(VoiceDialogDiagnosticReason.BACKGROUNDED)
         clearPendingExplicitRouteStart()
@@ -10913,9 +11348,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun invalidateFrameStateForPause() {
         synchronized(frameStateLock) {
             detectorGeneration += 1
+            resetVisualTrackingState()
             latestDetectionSnapshot = DetectionSnapshot.empty()
-            latestTactileOverlaySnapshot = DetectionSnapshot.empty()
-            lastNonEmptyOverlaySnapshot = DetectionSnapshot.empty()
             latestExplicitReportOutput = null
             latestExplicitReportImage = null
             latestExplicitReportGateState = null
@@ -10923,14 +11357,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             latestReportCandidateStatus = "reportCandidate=blocked:runtime_paused"
             frameCaptureRequested.set(false)
             reportLocationStartScheduled.set(false)
-            lastDetectionRunMs = 0L
+            adaptiveInferencePacing.reset()
             lastOverlayUpdateMs = 0L
             lastUiUpdateMs = 0L
             latestTactileRouteState = "localRoute=tmap:tactile_not_visible"
             objectDepthPipeline = ObjectDepthRuntimePipeline().also { pipeline ->
                 pipeline.setUserStepLength(stepLengthEstimator.stepLengthM)
             }
-            tactileOverlayStabilizer.clear()
             captureLog.clear()
         }
         if (::debugBboxOverlay.isInitialized) runOnUiThread { debugBboxOverlay.clear() }
@@ -10938,6 +11371,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     override fun onDestroy() {
+        if (runtimeLoadObservationSourceHolder.isInitialized()) runtimeLoadObservationSource.close()
+        synchronized(frameStateLock) {
+            detectorClosing = true
+            detectorLoadGeneration += 1L
+        }
         cancelDestinationSearchLocation()
         initialAppPermissionExitDialog?.dismiss()
         initialAppPermissionExitDialog = null
@@ -11303,16 +11741,94 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         backgroundRenderer.createOnGlThread()
+        synchronized(frameStateLock) {
+            if (!visualFrameTracker.initialize()) latestVisualTrackingStatus = "visual=native_initialization_failed"
+        }
         cameraTextureBound = false
         cameraTextureId = createExternalCameraTexture()
         bindCameraTextureIfReady()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        if (surfaceWidth != width || surfaceHeight != height) resetVisualTrackingState()
         surfaceWidth = width
         surfaceHeight = height
         GLES20.glViewport(0, 0, width, height)
         updateDisplayGeometryIfReady()
+    }
+
+    private fun resetVisualTrackingState() = synchronized(frameStateLock) {
+        invalidateUnknownObjectObservations()
+        unknownLoadControl.pause()
+        latestUnknownLoadObservation = null
+        visualFrameTracker.clear()
+        visualTrackingBudget.reset()
+        runtimeCameraFrameBudgetMs = null
+        runtimeLoadNormalFrameAtMs = null
+        runtimeLoadMonitor.reset()
+        currentVisualTrackingBudgetNs = 5_000_000L
+        visualGeometryVersion += 1L
+        lastVisualFrameKey = null
+        lastRuntimeCameraFrameId = 0L
+        latestVisualOverlayFrameId = 0L
+        latestVisualTrackingStatus = "visual=waiting_for_new_capture"
+        currentObjectDepthPipeline = ObjectDepthRuntimePipeline(
+            tracker = ObjectTracker(trackIdPrefix = "visual-$visualGeometryVersion-track-"),
+        ).also { it.setUserStepLength(stepLengthEstimator.stepLengthM) }
+    }
+
+    private fun hasFreshVisualSource(nowElapsedRealtimeMs: Long): Boolean {
+        val source = latestDetectionSnapshot
+        val capturedAt = source.capturedAtElapsedRealtimeMs ?: return false
+        return !source.partial && source.detections.isNotEmpty() &&
+            source.frameEvidence?.visualFrameKey != null &&
+            nowElapsedRealtimeMs - capturedAt in 0L..MAX_DEPTH_DETECTION_SOURCE_AGE_MS
+    }
+
+    private fun captureVisualTrackingFrame(
+        provider: ArCoreFrameProvider,
+        frame: Frame,
+        snapshot: DepthFrameSnapshot,
+        capturedAtElapsedRealtimeMs: Long,
+        frameGeneration: Int,
+        walkEpoch: WalkRuntimeEpoch,
+        arGeneration: Long,
+    ): GrayTrackingFrame? {
+        if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.OBSTACLE_DETECTION)) return null
+        val geometryVersion = synchronized(frameStateLock) {
+            if (!isCurrentFrameGeneration(frameGeneration, walkEpoch) || !detectorAvailable) return null
+            visualGeometryVersion
+        }
+        val gray = try {
+            provider.acquireCameraImageOrNull(frame)?.use { image ->
+                if (image.timestamp <= 0L || image.timestamp != snapshot.cameraImageTimestampNs) return@use null
+                val plane = image.planes.firstOrNull() ?: return@use null
+                GrayTrackingFrame.copyFromLuma(
+                    VisualFrameKey(arGeneration, frame.timestamp, image.timestamp, capturedAtElapsedRealtimeMs, geometryVersion),
+                    image.width, image.height, plane.buffer, plane.rowStride, plane.pixelStride,
+                )
+            }
+        } catch (_: IllegalArgumentException) {
+            null
+        } catch (_: IllegalStateException) {
+            null
+        } ?: return null
+        return synchronized(frameStateLock) {
+            if (!isCurrentFrameGeneration(frameGeneration, walkEpoch) || visualGeometryVersion != geometryVersion) return null
+            // A repeated Session.update is not another camera observation or a new capture time.
+            val previous = lastVisualFrameKey
+            if (previous != null && previous.epoch == arGeneration && previous.frameId >= gray.key.frameId) return null
+            val admission = visualFrameTracker.offerFrame(gray)
+            if (!admission.accepted) return null
+            if (admission.reset) {
+                currentObjectDepthPipeline = ObjectDepthRuntimePipeline(
+                    tracker = ObjectTracker(trackIdPrefix = "visual-$geometryVersion-${gray.key.frameId}-track-"),
+                ).also { it.setUserStepLength(stepLengthEstimator.stepLengthM) }
+            }
+            lastVisualFrameKey = gray.key
+            currentVisualTrackingBudgetNs = visualTrackingBudget.budgetForFrame(gray.key)
+            gray
+        }
     }
 
     /** Keeps preview, coordinate mapping and depth acquisition on the same ARCore frame. */
@@ -11363,7 +11879,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (!isArSessionLeaseCurrent(arLease)) return
         if (frame.hasDisplayGeometryChanged()) {
+            resetVisualTrackingState()
             updateDisplayGeometryIfReady()
+            runOnUiThread {
+                if (isArSessionLeaseCurrent(arLease) &&
+                    isCurrentFrameGeneration(frameGeneration, frameWalkEpoch)
+                ) debugBboxOverlay.clear()
+            }
         }
 
         val provider = arLease.provider
@@ -11375,16 +11897,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             synchronized(frameStateLock) {
                 detectorAvailable &&
                     !detectionInFlight.get() &&
-                    elapsedRealtimeMs - lastDetectionRunMs >= DETECTION_INTERVAL_MS
-            }
+                    adaptiveInferencePacing.isDue(elapsedRealtimeMs)
+            } || hasFreshVisualSource(elapsedRealtimeMs)
+        val depthProcessingStartedMs = SystemClock.elapsedRealtime()
         val snapshot = if (arLease.purpose == ArSessionPurpose.PREFLIGHT) {
-            provider.acquirePreflightDepthBundle(frame)
+            provider.acquirePreflightDepthBundle(frame).toSnapshotAndClose()
         } else {
-            provider.acquireDepthBundle(
+            provider.acquireDepthSnapshot(
                 frame,
                 includeFullDepthWhenRawAvailable = includeFullDepthWhenRawAvailable,
             )
-        }.toSnapshotAndClose()
+        }
+        val depthProcessingMs = SystemClock.elapsedRealtime() - depthProcessingStartedMs
         if (!isArSessionLeaseCurrent(arLease)) return
         if (arLease.purpose == ArSessionPurpose.PREFLIGHT) {
             handleRuntimeMetricPreflightFrame(
@@ -11412,6 +11936,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             expectedArSessionGeneration = arLease.generation,
             expectedWalkEpoch = walkEpoch,
         )
+        synchronized(frameStateLock) {
+            if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
+            // Repeated frames still pass the elapsed-time loss gate above, but cannot renew evidence.
+            if (frame.timestamp <= lastRuntimeCameraFrameId) return
+            lastRuntimeCameraFrameId = frame.timestamp
+        }
+        val expectedFps = arLease.session.cameraConfig.fpsRange.lower
+        runtimeCameraFrameBudgetMs = expectedFps.takeIf { it > 0 }?.let { kotlin.math.ceil(1000.0 / it).toLong() }
+        runtimeLoadFrameScope = RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH
+        runtimeLoadNormalFrameAtMs = if (runtimeMetricOutputAllowed && frame.camera.trackingState == TrackingState.TRACKING)
+            SystemClock.elapsedRealtime() else null
+        observeRuntimeInferenceLoad(inputObserved = true)
+        val grayFrame = captureVisualTrackingFrame(
+            provider, frame, snapshot, elapsedRealtimeMs, frameGeneration, walkEpoch, arLease.generation,
+        )
         scheduleDetectionIfDue(
             provider,
             frame,
@@ -11422,25 +11961,94 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             frameGeneration,
             walkEpoch,
             arLease.generation,
+            grayFrame?.key,
         )
-        if (!runtimeMetricOutputAllowed) return
-        if (!currentRuntimeMetricOutputAllowsWork(arLease.generation)) return
+        if (!runtimeMetricOutputAllowed || !currentRuntimeMetricOutputAllowsWork(arLease.generation)) {
+            if (cameraScreenVisible && elapsedRealtimeMs - lastCameraScreenFrameUiMs >= 250L) {
+                lastCameraScreenFrameUiMs = elapsedRealtimeMs
+                val observed = latestDetectionSnapshot
+                val sourceAt = observed.capturedAtElapsedRealtimeMs
+                val fresh = sourceAt != null && elapsedRealtimeMs - sourceAt in 0L..MAX_OVERLAY_DETECTION_SOURCE_AGE_MS
+                val boxes = buildDebugOverlayBoxes(frame,
+                    if (fresh) observed.detections else emptyList(), null,
+                    grayFrame?.sourceWidth, grayFrame?.sourceHeight)
+                val message = "ARCore ${frame.camera.trackingState}\n${snapshot.statusTextForNoDetection()}\n" +
+                    observed.debugStatusText(nowMs, timestampMs,
+                        MAX_OVERLAY_DETECTION_SOURCE_AGE_MS, MAX_OVERLAY_DETECTION_FRAME_DELTA_MS)
+                val displayFrameId = observed.frameEvidence?.frameId ?: frame.timestamp
+                runOnUiThread {
+                    if (cameraScreenVisible && isArSessionLeaseCurrent(arLease)) {
+                        cameraScreenStatus.text = message
+                        if (fresh && sourceAt != null) debugBboxOverlay.updateMapped(
+                            boxes, displayFrameId, sourceAt,
+                            sourceComplete = true, animate = false)
+                        else debugBboxOverlay.clear()
+                    }
+                }
+            }
+            return
+        }
         val detectionSnapshot = latestDetectionSnapshot
         val overlaySelection = synchronized(frameStateLock) {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
             selectOverlayDetections(detectionSnapshot, nowMs, timestampMs)
         }
-        val overlaySnapshot = overlaySelection.mappingSnapshot
-        val overlayDetections = overlaySelection.detections
-        var overlayDebugState = overlaySelection.debugState
+        val trackingProcessingStartedMs = SystemClock.elapsedRealtime()
+        val trackingResult = synchronized(frameStateLock) {
+            val sourceKey = detectionSnapshot.frameEvidence?.visualFrameKey
+            if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
+            if (grayFrame == null || sourceKey == null || detectionSnapshot.partial) null
+            else visualFrameTracker.trackFrom(
+                sourceKey, detectionSnapshot.detections, grayFrame.key, completed = true,
+                observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                executionBudgetNs = currentVisualTrackingBudgetNs,
+            )
+        }
+        runtimeLoadObservationSource.recordFrame(
+            cameraTimestampNs = snapshot.cameraImageTimestampNs ?: frame.timestamp,
+            observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            depthProcessingMs = depthProcessingMs,
+            trackingProcessingMs = if (grayFrame != null) SystemClock.elapsedRealtime() - trackingProcessingStartedMs else null,
+            trackingBudgetMs = kotlin.math.ceil(currentVisualTrackingBudgetNs / 1_000_000.0).toLong(),
+            environmentKey = runtimeLoadEnvironmentKey(),
+        )
+        val currentEvidence = if (grayFrame != null && trackingResult != null) DetectionFrameEvidence(
+            frameId = frame.timestamp,
+            frameTimestampMs = timestampMs,
+            depthSnapshot = snapshot,
+            depthMapper = createFrozenDepthMapper(frame, frame.timestamp, grayFrame.sourceWidth, grayFrame.sourceHeight, snapshot),
+            tactileContext = buildTactileProjectionContext(frame, elapsedRealtimeMs),
+            motionContext = buildDepthMotionContext(elapsedRealtimeMs),
+            navigationActive = isRouteActive && !routeRequestInFlight.get(),
+            tmapOnRoute = latestTmapOnRoute,
+            visualFrameKey = grayFrame.key,
+        ) else null
+        val currentObservation = if (trackingResult != null && currentEvidence != null) {
+            CurrentTrackedFrameEvidence.fromTrackingResult(
+                detectionSnapshot, trackingResult, currentEvidence, SystemClock.elapsedRealtime(),
+            )
+        } else null
+        val overlayDetections = currentObservation?.observation?.trackedObservations.orEmpty().mapNotNull { it.geometry }
+        var overlayDebugState = overlaySelection.debugState.copy(
+            selection = "current_visual_observation",
+            detectionCount = overlayDetections.size,
+            holdApplied = false,
+        )
+        latestVisualTrackingStatus = trackingResult?.let { result ->
+            "visual=${overlayDetections.size}/${result.observations.size} " +
+                "cost=${result.metrics.durationNs / 1_000_000L}ms " +
+                "budget=${result.metrics.executionBudgetNs / 1_000_000L}ms overrun=${result.metrics.executionBudgetOverrun} " +
+                "lost=${result.observations.mapNotNull { it.failure }.distinct().joinToString()}"
+        } ?: "visual=source_or_current_image_unavailable"
         if (!currentRuntimeMetricOutputAllowsWork(arLease.generation)) return
-        val preparedTactileFrame = this.prepareTactileFrameDispatch(
+        val frozenPreparedFrame = this.prepareTactileFrameDispatch(
             detectionSnapshot = detectionSnapshot,
             nowMs = nowMs,
             currentFrameTimestampMs = timestampMs,
             maxDetectionSourceAgeMs = MAX_DEPTH_DETECTION_SOURCE_AGE_MS,
             maxDetectionFrameDeltaMs = MAX_DEPTH_DETECTION_FRAME_DELTA_MS,
             detectionAgeMs = detectionSnapshot.sourceAgeMs(nowMs),
+            coordinator = frozenReportFrameCoordinator,
         ) { evidence, depthDetections ->
             synchronized(frameStateLock) {
                 if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) {
@@ -11459,7 +12067,29 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
             }
         }
+        val currentFrame = tactileFrameCoordinator.processTrackedObservation(
+            frame = currentObservation,
+            nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            navigationActiveNow = isRouteActive && !routeRequestInFlight.get(),
+            tmapOnRouteNow = latestTmapOnRoute,
+            activeRouteId = routeNavigator.currentRouteId(),
+        ) { observation, evidence ->
+            synchronized(frameStateLock) {
+                if (!isCurrentFrameGeneration(frameGeneration, walkEpoch) ||
+                    !currentRuntimeMetricOutputAllowsWork(arLease.generation)) emptyList()
+                else currentObjectDepthPipeline.processTrackedObservation(
+                    snapshot = evidence.depthSnapshot,
+                    observation = observation,
+                    mapper = requireNotNull(evidence.depthMapper),
+                    mapperFrameId = evidence.depthMapper.frameId,
+                    nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                    motionContext = evidence.motionContext,
+                )
+            }
+        }
+        val preparedTactileFrame = ProductionPreparedTactileFrameDispatch(currentFrame)
         val tactileFrame = preparedTactileFrame.frame
+        val frozenReportOutputs = frozenPreparedFrame.frame.guidance.outputs
         synchronized(frameStateLock) {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
             latestTactileRouteState =
@@ -11471,27 +12101,51 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val depthInputDetections = if (depthMapper == null) emptyList() else depthDetections
         val guidanceOutputs = tactileFrame.guidance.outputs
         val bestOutput = AndroidRiskSelectionPolicy.selectBestOutput(guidanceOutputs)
-        val reportOutput = AndroidRiskSelectionPolicy.selectReportOutput(guidanceOutputs)
-        val automaticReportOutput = AndroidRiskSelectionPolicy.selectAutomaticReportOutput(guidanceOutputs)
-        val prioritizedFeedbackOutputs = AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(guidanceOutputs)
+        val reportOutput = AndroidRiskSelectionPolicy.selectReportOutput(frozenReportOutputs)
+        val automaticReportOutput = AndroidRiskSelectionPolicy.selectAutomaticReportOutput(frozenReportOutputs)
+        val independentFeedbackBatches = freshUnknownFeedbackBatches(SystemClock.elapsedRealtime())
+        val prioritizedFeedbackOutputs = AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(
+            guidanceOutputs + independentFeedbackBatches.flatMap { it.outputs },
+        )
         val feedbackGateOutput = prioritizedFeedbackOutputs.firstOrNull { output ->
             output.source.metric && output.confidence.finalScore >= FEEDBACK_MIN_DEPTH_CONFIDENCE
         }
         val shouldUpdateOverlay = synchronized(frameStateLock) {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
-            elapsedRealtimeMs - lastOverlayUpdateMs >= OVERLAY_UPDATE_INTERVAL_MS || overlayDetections.isEmpty()
+            currentObservation != null ||
+                elapsedRealtimeMs - lastOverlayUpdateMs >= OVERLAY_UPDATE_INTERVAL_MS || overlayDetections.isEmpty()
         }
         if (shouldUpdateOverlay) {
-            val overlayBoxes = buildDebugOverlayBoxes(frame, overlayDetections, bestOutput, overlaySnapshot)
-            val stabilizedOverlay = synchronized(frameStateLock) {
+            val mappedViewportWidth = surfaceWidth
+            val mappedViewportHeight = surfaceHeight
+            val overlayBoxes = buildDebugOverlayBoxes(
+                frame, overlayDetections,
+                bestOutput?.takeIf { it.frameId == grayFrame?.key?.frameId },
+                grayFrame?.sourceWidth, grayFrame?.sourceHeight,
+            )
+            synchronized(frameStateLock) {
                 if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
                 lastOverlayUpdateMs = elapsedRealtimeMs
-                tactileOverlayStabilizer.update(overlayBoxes, elapsedRealtimeMs)
             }
-            overlayDebugState = overlayDebugState.withStabilizer(stabilizedOverlay)
+            overlayDebugState = overlayDebugState.copy(boxCount = overlayBoxes.size)
+            val sourceFrameId = grayFrame?.key?.frameId
+            val sourceCapturedAt = detectionSnapshot.capturedAtElapsedRealtimeMs
+            synchronized(frameStateLock) { latestVisualOverlayFrameId = sourceFrameId ?: 0L }
             runOnUiThread {
-                if (isCurrentFrameGeneration(frameGeneration, walkEpoch)) {
-                    debugBboxOverlay.updateMapped(stabilizedOverlay.boxes)
+                if (isCurrentFrameGeneration(frameGeneration, walkEpoch) && isArSessionLeaseCurrent(arLease)) {
+                    if (debugBboxOverlay.width != mappedViewportWidth || debugBboxOverlay.height != mappedViewportHeight) {
+                        return@runOnUiThread
+                    }
+                    if (synchronized(frameStateLock) { latestVisualOverlayFrameId != (sourceFrameId ?: 0L) }) return@runOnUiThread
+                    if (sourceFrameId == null || sourceCapturedAt == null) {
+                        debugBboxOverlay.clear()
+                    } else {
+                        debugBboxOverlay.updateMapped(
+                            overlayBoxes, sourceFrameId, sourceCapturedAt,
+                            sourceComplete = true,
+                            animate = false,
+                        )
+                    }
                 }
             }
         }
@@ -11504,7 +12158,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             detectionsUsedForDepth = depthInputDetections,
             snapshot = matchedEvidence?.depthSnapshot ?: snapshot,
             bestOutput = bestOutput,
-            depthTransformPath = if (depthMapper == null) "unavailable" else "frozen_capture_image_to_texture_normalized",
+            depthTransformPath = if (depthMapper == null) "unavailable" else "current_visual_image_to_texture_normalized",
             depthFallbackReason = when {
                 matchedEvidence == null -> "matched_detection_frame_evidence_unavailable"
                 depthMapper == null -> "frozen_depth_mapper_unavailable"
@@ -11526,7 +12180,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val deviceGateState = buildDeviceGateState(
             bestOutput = feedbackGateOutput,
-            staleReason = captureLogEntry.staleReason,
+            staleReason = if (independentFeedbackBatches.isNotEmpty()) null else captureLogEntry.staleReason,
             expectedRuntimeMetricGeneration = arLease.generation,
         )
         val reportGateState = buildDeviceGateState(
@@ -11580,10 +12234,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             )
         ) return
         if (!currentRuntimeMetricOutputAllowsWork(arLease.generation)) return
-        preparedTactileFrame.dispatchFeedback(
+        dispatchTactileFrameFeedback(
+            frame = tactileFrame,
             stale = captureLogEntry.staleReason != null,
             deviceGateAllowsAlerts = deviceGateState.alertsAllowed,
-            nowMs = elapsedRealtimeMs,
+            nowMs = SystemClock.elapsedRealtime(),
+            independentFreshOutputs = freshUnknownFeedbackBatches(SystemClock.elapsedRealtime()),
         )
         val shouldUpdateUi = synchronized(frameStateLock) {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
@@ -11605,7 +12261,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     detail = "${snapshot.statusTextForNoDetection()}\n" +
                         "${detectionSnapshot.debugStatusText(nowMs, timestampMs, MAX_OVERLAY_DETECTION_SOURCE_AGE_MS, MAX_OVERLAY_DETECTION_FRAME_DELTA_MS)}\n" +
                         "$gateText · $latestTactileRouteState · ${feedbackActuatorStatusText()} · $latestReportCandidateStatus · steps=$latestStepCount stepLength=${meters(stepLengthEstimator.stepLengthM)}\n" +
-                        "$detectorStatusText\n" +
+                        "${currentUserMotionStatusText()}\n" +
+                        "${adaptiveInferencePacingStatusText()}\n${latestVisualTrackingStatus}\n" +
+                        "$detectorStatusText\n$unknownRuntimeStatus\n" +
                         "${metadataLogUploader.statusText()}\n" +
                         captureLog.summaryText(),
                 )
@@ -11616,7 +12274,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         "${detectionSnapshot.debugStatusText(nowMs, timestampMs, MAX_OVERLAY_DETECTION_SOURCE_AGE_MS, MAX_OVERLAY_DETECTION_FRAME_DELTA_MS)}\n" +
                         "${bestOutput.debugGeometryText()}\n" +
                         "$gateText · $latestTactileRouteState · ${feedbackActuatorStatusText()} · $latestReportCandidateStatus · steps=$latestStepCount stepLength=${meters(stepLengthEstimator.stepLengthM)}\n" +
-                        "$detectorStatusText\n" +
+                        "${currentUserMotionStatusText()}\n" +
+                        "${adaptiveInferencePacingStatusText()}\n${latestVisualTrackingStatus}\n" +
+                        "$detectorStatusText\n$unknownRuntimeStatus\n" +
                         "${metadataLogUploader.statusText()}\n" +
                         captureLog.summaryText(),
                 )
@@ -11641,7 +12301,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ) {
             return
         }
-        val validSamples = snapshot.runtimeMetricValidSampleCount()
+        val validSamples = snapshot.runtimeMetricValidSampleCount(requireFreshRaw = true)
         frameProvider?.recordPreflightSamples(validSamples)
         val result = evaluator.observe(
             RuntimeMetricFrameEvidence(
@@ -11649,7 +12309,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 frameTimestampNanos = frame.timestamp,
                 observedAtElapsedRealtimeMs = observedAtElapsedRealtimeMs,
                 tracking = frame.camera.trackingState == TrackingState.TRACKING,
-                metricDepthAvailable = snapshot.hasFreshMetricRawDepth || snapshot.hasFullDepth,
+                metricDepthAvailable = snapshot.hasFreshMetricRawDepth || snapshot.hasFreshFullDepth,
                 validMetricSamplesInRange = validSamples,
             ),
         )
@@ -11727,7 +12387,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             firstRunOnboardingComplete() &&
                 isWalkSessionRuntimeActive() &&
                 isActivityForeground &&
-                officialEnvironmentOutputsAllowed &&
+                cameraEnvironmentOutputsAllowed() &&
                 phoneMountingOutputsAllowed &&
                 arSessionPurpose == ArSessionPurpose.RUNTIME &&
                 (expectedGeneration == null || arSessionGeneration == expectedGeneration) &&
@@ -11766,7 +12426,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             frameTimestampNanos = frame.timestamp,
             observedAtElapsedRealtimeMs = observedAtElapsedRealtimeMs,
             tracking = frame.camera.trackingState == TrackingState.TRACKING,
-            metricDepthAvailable = snapshot.hasMetricRawDepth || snapshot.hasFullDepth,
+            metricDepthAvailable = snapshot.hasMetricRawDepth || snapshot.hasFreshFullDepth,
             validMetricSamplesInRange = validSamples,
         )
         if (activation != null) {
@@ -11828,20 +12488,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 runtimeMetricOutputAllowed = false
                 return
             }
-            val frameOrderValid = frame.timestamp > runtimeMetricLastFrameTimestampNanos
-            val currentFrameValid = samplesAreValid && frameOrderValid
-            if (frameOrderValid) {
+            val assessment = assessRuntimeDepthFrame(
+                frameTimestampNanos = frame.timestamp,
+                previousFrameTimestampNanos = runtimeMetricLastFrameTimestampNanos,
+                observedAtElapsedRealtimeMs = observedAtElapsedRealtimeMs,
+                lastValidFrameAtElapsedRealtimeMs = runtimeMetricLastValidFrameAtMs,
+                samplesAreValid = samplesAreValid,
+                staleTimeoutMs = RUNTIME_METRIC_STALE_TIMEOUT_MS,
+            )
+            if (assessment.isNewFrame) {
                 runtimeMetricLastFrameTimestampNanos = frame.timestamp
             }
-            shouldStartNavigation = currentFrameValid && runtimeMetricInitialNavigationStartPending
-            runtimeMetricOutputAllowed = currentFrameValid
-            if (currentFrameValid) {
+            shouldStartNavigation = assessment.outputAllowed && runtimeMetricInitialNavigationStartPending
+            runtimeMetricOutputAllowed = assessment.outputAllowed
+            if (assessment.refreshesLastValidTime) {
                 runtimeMetricLastValidFrameAtMs = observedAtElapsedRealtimeMs
-            } else {
-                shouldHandleLoss = !frameOrderValid ||
-                    observedAtElapsedRealtimeMs - runtimeMetricLastValidFrameAtMs >=
-                    RUNTIME_METRIC_STALE_TIMEOUT_MS
             }
+            shouldHandleLoss = assessment.shouldHandleLoss
         }
         if (!runtimeMetricOutputAllowed) clearExplicitReportFrameState("runtime_metric_frame_invalid")
         if (shouldStartNavigation) {
@@ -11895,33 +12558,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
-    private fun DepthFrameSnapshot.runtimeMetricValidSampleCount(): Int {
-        val raw = rawDepth
-        val confidence = rawConfidence
-        var rawCount = 0
-        if (
-            hasFreshMetricRawDepth &&
-            raw != null &&
-            confidence != null &&
-            raw.width == confidence.width &&
-            raw.height == confidence.height
-        ) {
-            for (index in 0 until raw.width * raw.height) {
-                val distanceMeters = raw.millimeters[index] / 1_000.0
-                val confidenceValue = (confidence.values[index].toInt() and 0xff) / 255.0
-                if (
-                    confidenceValue >= RUNTIME_METRIC_MIN_RAW_CONFIDENCE &&
-                    RuntimeMetricPreflightPolicy.isValidMetricDistanceMeters(distanceMeters)
-                ) {
-                    rawCount += 1
-                }
-            }
-        }
-        val fullCount = fullDepth?.millimeters?.count { millimeters ->
-            RuntimeMetricPreflightPolicy.isValidMetricDistanceMeters(millimeters / 1_000.0)
-        } ?: 0
-        return maxOf(rawCount, fullCount)
-    }
+    private fun DepthFrameSnapshot.runtimeMetricValidSampleCount(
+        requireFreshRaw: Boolean = false,
+    ): Int = validMetricSampleCount(
+        minimumRawConfidence = RUNTIME_METRIC_MIN_RAW_CONFIDENCE,
+        minimumDistanceMeters = RuntimeMetricPreflightPolicy.MIN_VALID_DISTANCE_METERS,
+        maximumDistanceMeters = RuntimeMetricPreflightPolicy.MAX_VALID_DISTANCE_METERS,
+        requireFreshRaw = requireFreshRaw,
+    )
 
     private fun accessibilityTargetSizePx(): Int =
         (WS_TOUCH_MIN_DP * resources.displayMetrics.density).roundToInt()
@@ -12097,7 +12741,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun buildHomeCardGrid(): LinearLayout {
         val gap = (16f * resources.displayMetrics.density).roundToInt()
         homeCardRefreshers.clear()
-        val cards = listOf(
+        val cards = listOfNotNull(
+            wsHomeCard(
+                title = "카메라 테스트",
+                subtitle = "안내 시작 없이 객체 인식과 깊이를 확인합니다",
+                lockTitle = "", lockDetail = "",
+                unlocked = { true },
+                onOpen = ::openLiveCameraScreen,
+            ).takeIf { BuildConfig.DEBUG },
             wsHomeCard(
                 title = "음성 명령",
                 subtitle = "음성으로 앱 기능을 사용합니다",
@@ -12107,7 +12758,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 onOpen = { requestNativeFeature(NativeUiPage.VOICE_COMMAND) },
             ),
             wsHomeCard(
-                title = "목적지 검색",
+                title = "길라잡이",
                 subtitle = "목적지를 찾고 경로 안내를 시작합니다",
                 lockTitle = "앱 내의 기능 사용 제한",
                 lockDetail = "기기 장착 상태와 기기 상태를 확인해주세요.",
@@ -12225,6 +12876,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             nativeUiPage == NativeUiPage.HOME && pendingNativeUiPage == null &&
             homeVoiceCommandAvailable() && isHandsFreeVoiceDisclosureAccepted() &&
             !voiceRecognitionActive && !voiceCommandPromptPending &&
+            foregroundHomeWakeAcknowledgement?.isPlaying() != true &&
             gatewayVoiceRecorder?.isRecording != true && activeGatewaySpeechInteraction == null
 
     private fun cancelForegroundHomeWakeListening(resetFailure: Boolean = false) {
@@ -12235,6 +12887,67 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (resetFailure) foregroundHomeWakeFailed = false
         // All Main owners call this on the UI thread, so stop/close joins capture first.
         probe?.cancel()
+    }
+
+    private fun cancelForegroundHomeWakeAcknowledgement() {
+        foregroundHomeWakeAcknowledgementGeneration += 1L
+        foregroundHomeWakeAcknowledgement?.cancel()
+    }
+
+    private fun acknowledgeForegroundHomeWake(command: kr.co.hanium.dreamup.walksafe.voice.VoskTranscript?) {
+        cancelForegroundHomeWakeAcknowledgement()
+        showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)
+        val actor = reporterUserId ?: return
+        val processGeneration = GatewaySessionProcessCoordinator.snapshot().generation
+        val epoch = walkSessionLifecycle.snapshot().epoch
+        val recognitionGeneration = voiceRecognitionGeneration
+        val generation = ++foregroundHomeWakeAcknowledgementGeneration
+        val player = foregroundHomeWakeAcknowledgement
+            ?: kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer(
+                context = this,
+                isAppSpeechActive = ::isHandsFreeVoiceSpeechOutputActive,
+            ).also { foregroundHomeWakeAcknowledgement = it }
+        val isCurrent = {
+            !handsFreeVoiceDestroyed && isActivityForeground &&
+                foregroundHomeWakeAcknowledgement === player &&
+                foregroundHomeWakeAcknowledgementGeneration == generation &&
+                reporterUserId == actor &&
+                GatewaySessionProcessCoordinator.snapshot().generation == processGeneration &&
+                walkSessionLifecycle.snapshot().epoch == epoch &&
+                voiceRecognitionGeneration == recognitionGeneration &&
+                nativeUiPage == NativeUiPage.VOICE_COMMAND &&
+                homeVoiceCommandAvailable() && isHandsFreeVoiceDisclosureAccepted()
+        }
+        updateGatewayVoiceStatus("호출어를 인식했습니다.")
+        if (!isCurrent()) return
+        // The lease exists before play: an unavailable tone can fail synchronously.
+        if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeVoiceInput", "event=HOME_WAKE_ACK_REQUESTED")
+        player.play { result ->
+            if (!isCurrent()) return@play
+            foregroundHomeWakeAcknowledgementGeneration += 1L
+            if (BuildConfig.DEBUG) android.util.Log.d(
+                "WalkSafeVoiceInput", "event=HOME_WAKE_ACK_TERMINAL result=${result.name}",
+            )
+            if (result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.CANCELLED ||
+                isHandsFreeVoiceSpeechOutputActive()
+            ) return@play
+            if (command == null) {
+                // A completed cue is the listening prompt; a failed cue uses the normal spoken prompt.
+                if (result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.COMPLETED) {
+                    voiceCommandPromptReadyGeneration = voiceRecognitionGeneration
+                }
+                startVoiceCommandRecognition()
+            } else {
+                handleVoiceCommandPhrases(
+                    phrases = listOf(command.text),
+                    confidenceScores = floatArrayOf(command.confidence ?: Float.NaN),
+                    expectedNavigationDecisionToken = routeNavigator.pendingDecisionToken(),
+                    includeRecognizedTextInStatus = false,
+                    redactedRecognitionSource = "on_device_home_wake",
+                    resultBackend = OfflineSpeechEngine.VOSK,
+                )
+            }
+        }
     }
 
     private fun refreshForegroundHomeWakeListening() {
@@ -12300,8 +13013,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         if (BuildConfig.DEBUG) {
                             android.util.Log.d("WalkSafeVoiceInput", "event=HOME_WAKE_HANDOFF backend=VOSK")
                         }
-                        showNativeUiPage(NativeUiPage.VOICE_COMMAND)
-                        startVoiceCommandRecognition()
+                        acknowledgeForegroundHomeWake(result.commandTranscript)
                     } else {
                         // A passive render must not create an unbounded failure/restart loop.
                         foregroundHomeWakeFailed = true
@@ -12342,7 +13054,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
 
     private fun currentDestinationSearchAllowsWork(): Boolean =
-        currentNavigationCollectionAllowsWork() ||
+        (BuildConfig.DEBUG && BuildConfig.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS &&
+            isActivityForeground && shouldShowNativeHome()) || currentNavigationCollectionAllowsWork() ||
             (nativeHomeFeatureContextAvailable() &&
                 postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE))
 
@@ -12404,15 +13117,30 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         renderMainUi()
     }
 
+    private fun NativeUiPage.isVoiceInteractionPage(): Boolean =
+        this == NativeUiPage.VOICE_COMMAND || this == NativeUiPage.DESTINATION_SEARCH
+
     private fun showNativeUiPage(page: NativeUiPage) {
+        handsFreeVoiceOwnsCommandPage = false
+        showNativeUiPage(page, preserveVoiceInteraction = false)
+    }
+
+    private fun showNativeUiPage(page: NativeUiPage, preserveVoiceInteraction: Boolean) {
+        if (nativeUiPage != page) cancelDeviceRuntimeCalibration("page_changed")
+        if (!preserveVoiceInteraction) cancelForegroundHomeWakeAcknowledgement()
         cancelForegroundHomeWakeListening(resetFailure = true)
         // This helper is an explicit navigation action; passive rendering does not call it.
         if (nativeUiPage != page) {
-            clearHomeDestinationVoiceDialog(VoiceDialogDiagnosticReason.PAGE_CHANGED)
-            if (nativeUiPage == NativeUiPage.VOICE_COMMAND) {
-                cancelVoiceCommandRecognition()
-            } else {
-                cancelCommandSpeechResponse()
+            if (!preserveVoiceInteraction || !nativeUiPage.isVoiceInteractionPage() || !page.isVoiceInteractionPage()) {
+                clearHomeDestinationVoiceDialog(VoiceDialogDiagnosticReason.PAGE_CHANGED)
+            }
+            if (!preserveVoiceInteraction) {
+                if (nativeUiPage.isVoiceInteractionPage()) {
+                    stopHandsFreeVoiceService()
+                    cancelVoiceCommandRecognition()
+                } else {
+                    cancelCommandSpeechResponse()
+                }
             }
         }
         if (page == NativeUiPage.HOME || page == NativeUiPage.SETTINGS) {
@@ -12444,6 +13172,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             NativeUiPage.SETTINGS -> nativeSettingsTitle
         }
         if (page == NativeUiPage.DESTINATION_SEARCH) requestDestinationSearchLocation()
+        // Voice-driven page changes retain the input/output owner and do not trigger focus speech.
+        if (preserveVoiceInteraction) return
         focusTarget?.post {
             if (nativeUiPage == page && focusTarget.isShown) {
                 focusTarget.requestFocus()
@@ -12487,6 +13217,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun renderMainUi() {
+        updateRuntimeDebugControlsVisibility()
+        updateLiveCameraScreenVisibility()
         if (
             nativeUiRendering || !::firstRunOnboardingSnapshot.isInitialized ||
             !::homeCardGrid.isInitialized || !::nativeVoiceControls.isInitialized ||
@@ -12515,9 +13247,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 nativeFeatureAvailable(pending)
             ) {
                 pendingNativeUiPage = null
-                if (pending != NativeUiPage.DESTINATION_CONFIRM ||
-                    nativeUiPage != NativeUiPage.GUIDANCE
-                ) nativeUiPage = pending
+                if (pending != NativeUiPage.DESTINATION_CONFIRM) nativeUiPage = pending
                 startVoice = pending == NativeUiPage.VOICE_COMMAND
                 if (pending == NativeUiPage.DESTINATION_CONFIRM) {
                     startDestination = pendingUiDestination
@@ -12542,6 +13272,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 if (featureVisible && nativeUiPage == NativeUiPage.GUIDANCE) View.VISIBLE else View.GONE
             nativeVoiceControls.visibility =
                 if (featureVisible && nativeUiPage == NativeUiPage.VOICE_COMMAND) View.VISIBLE else View.GONE
+            gatewayVoiceStatusText.visibility = nativeVoiceControls.visibility
             val preparingDestination = nativeUiPage == NativeUiPage.GUIDANCE
             if (nativeUiPage == NativeUiPage.DESTINATION_CONFIRM) {
                 nativeDestinationConfirmationText.text = nativePanelMessage(
@@ -12601,7 +13332,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             val target = if (nativeUiPage == NativeUiPage.GUIDANCE)
                 nativeGuidanceStatusText else nativeDestinationConfirmationText
             target.post {
-                if (nativeUiPage in setOf(NativeUiPage.DESTINATION_CONFIRM, NativeUiPage.GUIDANCE) &&
+                if (nativeUiPage in setOf(NativeUiPage.HOME, NativeUiPage.DESTINATION_CONFIRM, NativeUiPage.GUIDANCE) &&
                     pendingUiDestination == destination && shouldShowNativeHome() &&
                     reporterUserId == expectedActorId &&
                     nativePhoneMountingCheckRequest == expectedSensorRequest &&
@@ -12710,7 +13441,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             applyNativePanelStyle(this)
-            val labels = listOf("ARCore Depth", "카메라", "위치", "한국어 음성", "호출어")
+            val labels = listOf("ARCore Depth", "카메라", "위치", "한국어 음성", "호출어", "기기 상태")
             labels.forEachIndexed { index, label ->
                 val row = LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -12775,6 +13506,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val preparing = (nativePrewalkStartEpoch != null ||
             pendingNativeUiPage == NativeUiPage.DESTINATION_CONFIRM) && !isWalkSessionRuntimeActive()
         val showPhysicalPreparation = !guidanceVisible && homeAvailable && preparing &&
+            !developmentGuidanceStartBypassEnabled &&
             !settingsVisible && !accountVisible && !purpose && !deviceScreen
         val showMountingPreparation = showPhysicalPreparation && cameraAnalysisFeaturesEnabled()
         val limitedHome = homeVisible && !deviceScreen && isWalkSessionRuntimeActive() && (
@@ -12808,8 +13540,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         show(firstRunOnboardingStatusText, heading != null)
         show(productPurposeText, purpose)
         show(accountAccessControls, accountVisible)
+        val accountSession = GatewaySessionProcessCoordinator.snapshot()
         show(accountSessionLogoutButton,
-            accountVisible && accountSessionLogoutButton.text == "이전 로그인 상태 정리")
+            accountVisible && !accountSession.storageBlocked && !accountSession.deletionRecoveryOnly &&
+                (backendDeviceRestorePending ||
+                    accountSession.session?.sessionScope == GatewaySessionScope.GENERAL))
         if (!accountVisible) show(accountAccessStatusText, false)
         if (accountVisible && accountAccessStatusText.visibility == View.VISIBLE) {
             val tone = when {
@@ -12986,6 +13721,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (page == NativeUiPage.VOICE_COMMAND) ensureVoicePermissionThenListen()
             return
         }
+        // An explicit debug start already owns its asynchronous server request. Rendering must
+        // neither restart that request nor clear a failure that requires another button press.
+        if (developmentGuidanceStartBypassEnabled) return
         if (nativePrewalkStartEpoch != null) {
             continueNativePrewalkIfReady()
             if (nativePrewalkStartEpoch == null && pendingNativeUiPage == null &&
@@ -13041,13 +13779,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var nativePhoneMountingCheckRequestId = 0L
 
     private val nativePhonePostureNotice: String
-        get() = "휴대전화를 몸 앞에 세로로 흔들리지 않게 고정하세요. " +
-            "상단은 위로, 후면 카메라는 바깥으로 향하게 하고 카메라 앞 시야를 가리지 마세요. " +
-            "손에 들거나 주머니에 넣지 마세요. " +
-            "밝고 건조하며 짙은 안개가 없는 일반 도심 보도에서만 사용하세요. " +
-            "공사 구간이나 심하게 붐비는 곳에서는 사용하지 마세요. " +
-            "이 확인은 공식 사용범위를 이해하고 지키겠다는 뜻이며 현재 장소가 안전하다는 증명이 아닙니다. " +
-            "실제 보행은 별도의 위치·카메라 측정과 장착 확인을 통과해야 합니다. 흰지팡이와 안내견을 대신하지 않습니다."
+        get() = PriorityUserEducationPresentation.phonePostureNoticeKo
 
 
 
@@ -13069,7 +13801,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (firstRunOnboardingSnapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4) {
             priorityUserOnboardingPolicy.snapshot().nativeEducationComplete
         } else {
-            priorityUserOnboardingPolicy.snapshot().trainingComplete
+            priorityUserOnboardingPolicy.snapshot().interactivePracticeComplete
         }
 
     private fun shouldShowNativeHome(): Boolean {
@@ -13101,7 +13833,30 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val playing = priorityUserEducationInFlight || priorityUserPracticeInFlight != null
         val educationPlaying = priorityUserEducationInFlight && !priorityUserEducationPlaybackIsPracticeNecessity
         val necessityPlaying = priorityUserEducationInFlight && priorityUserEducationPlaybackIsPracticeNecessity
+        val playback = if (!priorityUserEducationInFlight) null else when {
+            showPosture -> PriorityUserEducationPlayback.APP_USAGE
+            necessityPlaying -> PriorityUserEducationPlayback.PRACTICE_NECESSITY
+            else -> PriorityUserEducationPlayback.SAFETY_LIMITS
+        }
+        val hazardResponseReady = priorityUserPracticeAttemptToken?.let {
+            priorityUserOnboardingPolicy.isHazardResponseReady(it)
+        } == true
+        priorityUserEducationBodyText.visibility = if (showAnyEducation) View.VISIBLE else View.GONE
+        val body = PriorityUserEducationPresentation.screenText(state) +
+            priorityUserPracticeInFlight?.let { "\n\n${it.actionLabelKo} 안내\n${it.instructionKo}" }.orEmpty()
+        if (priorityUserEducationBodyText.text.toString() != body) priorityUserEducationBodyText.text = body
+        priorityUserEducationBodyText.contentDescription = body
+        priorityUserEducationProgressText.visibility = if (showAnyEducation) View.VISIBLE else View.GONE
+        val progress = PriorityUserEducationPresentation.progressNotice(
+            state, playback, priorityUserPracticeInFlight, hazardResponseReady,
+        )
+        if (priorityUserEducationProgressText.text.toString() != progress) {
+            priorityUserEducationProgressText.text = progress
+        }
+        priorityUserEducationProgressText.contentDescription = progress
         firstRunPhonePostureControls.visibility = if (showPosture) View.VISIBLE else View.GONE
+        // The shared body already displays the complete posture notice spoken by TTS.
+        firstRunPhonePostureText.visibility = View.GONE
         firstRunPhonePostureButton.isEnabled = showPosture && eligible && !playing && !state.usageConditionsAcknowledged
         firstRunPhonePostureButton.text = if (state.usageConditionsAcknowledged)
             "착용 방법과 사용 환경 확인 완료" else "착용 방법과 사용 환경을 이해했습니다"
@@ -13111,8 +13866,30 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (priorityUserOnboardingStatusText.text.toString() != heading) priorityUserOnboardingStatusText.text = heading
         priorityUserOnboardingStatusText.contentDescription = priorityUserOnboardingStatusText.text
         priorityUserAgeButtons.values.forEach { it.visibility = View.GONE }
-        priorityUserPracticeButtons.values.forEach { it.visibility = View.GONE }
-        priorityUserSafePlaceButton.visibility = View.GONE
+        val practiceEligible = showPosture && eligible && state.usageConditionsAcknowledged && state.appUsageReviewed
+        priorityUserSafePlaceButton.visibility = if (showPosture) View.VISIBLE else View.GONE
+        priorityUserSafePlaceButton.text = if (state.safePracticePlaceConfirmed && !state.requiresPracticeRestart)
+            "안전한 연습 장소 확인 완료" else "안전한 연습 장소 확인: 실제 도로가 아닌 장소에 멈춰 있습니다"
+        priorityUserSafePlaceButton.contentDescription = priorityUserSafePlaceButton.text
+        priorityUserSafePlaceButton.isEnabled = practiceEligible && !playing &&
+            (!state.safePracticePlaceConfirmed || state.requiresPracticeRestart)
+        priorityUserPracticeButtons.forEach { (practice, button) ->
+            button.visibility = if (showPosture) View.VISIBLE else View.GONE
+            val awaitingHazardResponse = practice == PriorityUserPractice.HAZARD_ALERT && hazardResponseReady
+            val completed = !state.requiresPracticeRestart && practice in state.completedPractices
+            button.text = if (awaitingHazardResponse) PriorityUserEducationPresentation.hazardResponseActionKo else {
+                practice.actionLabelKo + when {
+                    completed -> " · 완료"
+                    state.requiresPracticeRestart -> " · 장소 확인 후 다시 연습"
+                    state.nextRequiredPractice == practice -> " · 다음"
+                    else -> " · 순서 대기"
+                }
+            }
+            button.contentDescription = button.text
+            button.isEnabled = practiceEligible && (awaitingHazardResponse ||
+                (!playing && state.safePracticePlaceConfirmed && !state.requiresPracticeRestart &&
+                    state.nextRequiredPractice == practice))
+        }
         priorityUserResetButton.visibility = View.GONE
         loginUserIdInput.visibility = View.GONE
         loginSaveButton.visibility = View.GONE
@@ -13123,6 +13900,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         priorityUserEducationAgreeButton.text = if (showPosture) "완료하고 홈으로" else "안전 교육 동의하고 사전 연습으로"
         priorityUserEducationAgreeButton.contentDescription = priorityUserEducationAgreeButton.text
         priorityUserEducationButton.text = when {
+            priorityUserPracticeInFlight != null -> "이번 연습 중지"
             educationPlaying -> if (showPosture) "사전 연습 듣기 중지" else "1. 안전 제한 안내 듣기 중지"
             showPosture && state.appUsageReviewed -> "사전 연습 다시 듣기"
             showPosture -> "사전 연습 듣기"
@@ -13137,20 +13915,49 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         priorityUserEducationButton.contentDescription = priorityUserEducationButton.text
         priorityUserPracticeNecessityButton.contentDescription = priorityUserPracticeNecessityButton.text
         priorityUserEducationButton.isEnabled = showAnyEducation &&
-            (educationPlaying || (eligible && !playing))
+            (priorityUserPracticeInFlight != null || educationPlaying || (eligible && !playing))
         priorityUserPracticeNecessityButton.isEnabled = showEducation &&
             (necessityPlaying || (eligible && state.educationReviewed && !playing))
         priorityUserEducationAgreeButton.isEnabled = eligible && if (showPosture) {
-            state.usageConditionsAcknowledged && state.appUsageReviewed
+            state.usageConditionsAcknowledged && state.appUsageReviewed && state.interactivePracticeComplete
         } else {
             showEducation && state.educationReviewed && state.practiceNecessityReviewed
         }
-        firstRunPhonePostureButton.accessibilityTraversalAfter = firstRunPhonePostureText.id
+        priorityUserEducationProgressText.accessibilityTraversalAfter = priorityUserOnboardingStatusText.id
+        priorityUserEducationBodyText.accessibilityTraversalAfter = priorityUserEducationProgressText.id
+        firstRunPhonePostureButton.accessibilityTraversalAfter = priorityUserEducationBodyText.id
         priorityUserPracticeNecessityButton.accessibilityTraversalAfter = priorityUserEducationButton.id
         priorityUserEducationButton.accessibilityTraversalAfter =
-            if (showPosture) firstRunPhonePostureButton.id else priorityUserOnboardingStatusText.id
+            if (showPosture) firstRunPhonePostureButton.id else priorityUserEducationBodyText.id
+        priorityUserSafePlaceButton.accessibilityTraversalAfter = priorityUserEducationButton.id
+        var previousPracticeControl: View = priorityUserSafePlaceButton
+        PriorityUserPractice.entries.forEach { practice ->
+            val button = priorityUserPracticeButtons.getValue(practice)
+            button.accessibilityTraversalAfter = previousPracticeControl.id
+            previousPracticeControl = button
+        }
         priorityUserEducationAgreeButton.accessibilityTraversalAfter =
-            if (showPosture) priorityUserEducationButton.id else priorityUserPracticeNecessityButton.id
+            if (showPosture) previousPracticeControl.id else priorityUserPracticeNecessityButton.id
+        val enabledActions = buildList {
+            if (showPosture) add(firstRunPhonePostureButton)
+            add(priorityUserEducationButton)
+            if (showEducation) add(priorityUserPracticeNecessityButton)
+            if (showPosture) {
+                add(priorityUserSafePlaceButton)
+                PriorityUserPractice.entries.forEach { add(priorityUserPracticeButtons.getValue(it)) }
+            }
+            add(priorityUserEducationAgreeButton)
+        }.filter { it.isEnabled }
+        enabledActions.forEach {
+            it.nextFocusForwardId = View.NO_ID
+            it.nextFocusDownId = View.NO_ID
+            it.nextFocusUpId = View.NO_ID
+        }
+        enabledActions.zipWithNext().forEach { (previous, current) ->
+            previous.nextFocusForwardId = current.id
+            previous.nextFocusDownId = current.id
+            current.nextFocusUpId = previous.id
+        }
         if ((showPosture || showEducation) && eligible && isActivityForeground) {
             ensureFeedbackActuator()
         }
@@ -13208,30 +14015,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 detail = "안내를 끝까지 재생하지 못했습니다. 다시 듣기를 눌러 주세요. 이미 완료한 청취 기록은 유지됩니다.",
             )
         }
-        val message = if (usageEducation) {
-            nativePhonePostureNotice + " 사전 연습 안내입니다. 홈의 음성 명령 버튼을 누른 뒤 명령을 말하세요. " +
-                "호출어 길라잡이는 호출어 듣기가 실행 중일 때만 사용할 수 있습니다. " +
-                "서울역으로 안내해줘라고 목적지를 말하거나 홈의 목적지 검색에서 직접 입력하세요. " +
-                "후보가 표시된 동안에만 번호로 선택할 수 있습니다. 목적지 취소라고 말하면 취소합니다. " +
-                "목적지 선택 후 안내 시작이라고 말하세요. 안내 시작 때 실제 위치와 카메라 품질을 점검하고 " +
-                "필요하면 현재 휴대전화 정면 고정 상태를 확인해야 합니다. 보행 일시정지로 보행 전체를 잠시 멈추고, 보행 재개로 이어갑니다. " +
-                "보행 종료는 종료 확인 안내를 거쳐 전체 보행을 끝냅니다. 길안내 종료는 경로 안내만 끝내며 보행 일시정지와 다릅니다. " +
-                "신고해는 신고 확인을 시작합니다. 신고는 실제 보행 중 위치 등 필요한 조건이 충족될 때만 가능합니다. " +
-                "도움말은 사용 가능한 명령을, 다시 말해줘는 현재 안내만 읽습니다. " +
-                "음성 안내 중에는 입력이 잠시 멈춥니다. 듣기가 실패하거나 중지되면 다시 시도하세요. " +
-                "이 교육의 완료는 현재 장소가 안전하거나 실제 보행 연습을 마쳤다는 뜻이 아닙니다."
-        } else if (practiceNecessity) {
-            "실제 도로에서 사용하기 전에 안전한 장소에서 안내와 조작을 익혀야 합니다. " +
-                "위험 안내를 들었을 때 멈추는 방법과 일시정지, 재개, 안전정지의 차이를 먼저 익히세요. " +
-                "이 안내를 들었다는 기록은 실제 보행 연습이나 위치 보정을 완료했다는 기록이 아닙니다."
-        } else {
-            "이 앱은 흰지팡이나 안내견을 대신하지 않으며 안전을 보장하지 않습니다. " +
-                "모든 장애물을 인식하지 못할 수 있고 위치와 거리 안내에 오차가 있을 수 있습니다. " +
-                "위험 안내를 들으면 멈추고 기존 보조수단으로 주변을 확인하세요. " +
-                "지원하는 환경과 휴대폰 고정 조건을 지키고 실제 도로가 아닌 안전한 장소에서 먼저 익히세요."
+        val playback = when {
+            usageEducation -> PriorityUserEducationPlayback.APP_USAGE
+            practiceNecessity -> PriorityUserEducationPlayback.PRACTICE_NECESSITY
+            else -> PriorityUserEducationPlayback.SAFETY_LIMITS
         }
+        val message = PriorityUserEducationPresentation.speechText(playback)
         val actuator = ensureFeedbackActuator()
-        val initializationDeadlineMs = SystemClock.elapsedRealtime() + 8_000L
+        val initializationDeadlineMs = SystemClock.elapsedRealtime() +
+            AndroidFeedbackActuator.INITIALIZATION_READINESS_TIMEOUT_MS
         val playbackHandler = android.os.Handler(android.os.Looper.getMainLooper())
         fun dispatchWhenReady() {
             if (isFinishing || isDestroyed) return
@@ -13293,7 +14085,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val state = priorityUserOnboardingPolicy.snapshot()
         if (priorityUserOnboardingActorId != actorId ||
             !state.educationReviewed || !state.practiceNecessityReviewed ||
-            (usageEducation && (!state.usageConditionsAcknowledged || !state.appUsageReviewed))) return
+            (usageEducation && (!state.usageConditionsAcknowledged || !state.appUsageReviewed ||
+                !state.interactivePracticeComplete))) return
         if (!beginPriorityUserProfileMutationOrFailClosed()) return
         if (usageEducation) priorityUserOnboardingPolicy.acceptAppUsageEducation()
         else priorityUserOnboardingPolicy.acceptEducationConsent()
@@ -13410,7 +14203,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ).apply { bottomMargin = (24 * density).toInt() }
         })
         content.addView(TextView(this).apply {
-            text = "필수 권한이 부족하여 앱을 실행할 수 없습니다. 앱을 다시 실행한 뒤 모든 필수 권한에 동의해 주세요."
+            // Restarting is what revoked a one-time grant, so it is the one instruction that
+            // cannot work here. Name the permissions and the place they are granted instead.
+            text = "필수 권한이 없어 보행을 시작할 수 없습니다. 설정에서 " +
+                "${missing.joinToString { it.permissionLabelKo() }} 권한을 허용해 주세요."
             textSize = 18f
             setTextColor(0xff1b1b1d.toInt())
             setLineSpacing(0f, 1.65f)
@@ -13418,6 +14214,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply { bottomMargin = (24 * density).toInt() }
+        })
+        // A walker who cannot read the screen will not find Android settings on their own, so
+        // the dialog that demands them has to open them.
+        content.addView(Button(this).apply {
+            text = "설정 열기"
+            applyWsButtonStyle(this, 144f, primary = true)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = (12 * density).toInt() }
+            setOnClickListener { openAppSettings() }
         })
         content.addView(Button(this).apply {
             text = "종료"
@@ -13446,6 +14253,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             updateStatus("로그인과 안전교육 확인 필요", "현재 계정의 로그인과 안전교육 상태를 확인하세요.")
             return false
         }
+        developmentGuidanceStartRequested = true
         if (!firstRunOnboardingComplete()) {
             updateStatus("기기 재점검 필요", "현재 기기의 권한과 실제 호출어·진동 점검을 다시 완료하세요.")
             if (postLoginDeviceCheckSnapshot.state in setOf(
@@ -13456,7 +14264,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             return false
         }
         if (isWalkSessionRuntimeActive()) return true
-        if (nativePrewalkDialog?.isShowing == true || nativePrewalkStartEpoch != null) return false
+        if (developmentGuidanceStartBypassEnabled) {
+            cancelNativePrewalkPreparation(cancelFeatureEntry = false)
+        } else if (nativePrewalkDialog?.isShowing == true || nativePrewalkStartEpoch != null) {
+            return false
+        }
         var walk = walkSessionLifecycle.snapshot()
         if (walk.state in setOf(WalkSessionState.SAFE_STOP, WalkSessionState.ENDED)) {
             startFreshWalk("native_home_requested_new_walk")
@@ -13466,6 +14278,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             cancelNativePendingFeatureEntry()
             updateStatus("보행 준비 상태 확인 필요", "현재 보행을 안전하게 정리한 뒤 다시 시작하세요.")
             return false
+        }
+        if (developmentGuidanceStartBypassEnabled) {
+            beginDevelopmentGuidanceImmediately(walk)
+            return isWalkSessionRuntimeActive()
         }
         if (activeEnvironmentProfiles == null || activeOfficialEnvironmentProfile == null ||
             (cameraAnalysisFeaturesEnabled() && activePhoneMountingProfile == null)) {
@@ -13496,6 +14312,40 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         confirmOfficialEnvironmentConditions()
         renderMainUi()
         return false
+    }
+
+    private fun beginDevelopmentGuidanceImmediately(walk: WalkSessionSnapshot) {
+        if (!isActivityForeground || gatewayWalkStartConfirmationToken != null) return
+        cancelDeviceRuntimeCalibration("guidance_start_requested")
+        invalidateOfficialEnvironmentEvidence("debug_guidance_start")
+        invalidatePhoneMountingEvidence("debug_guidance_start")
+        startupCapabilityConfirmationPending = false
+        startupCapabilityRetryRequiresUserAction = false
+        walkSessionResumePromptPending = false
+        walkSessionResumeRetryRequiresUserAction = false
+        walkSessionResumeConfirmationToken = null
+        developmentGuidanceResumeRequestedEpoch = walk.epoch.takeIf {
+            walk.state == WalkSessionState.PAUSED
+        }
+        // NewWalkRequested resets the lifecycle foreground flag even when the activity is visible.
+        if (!walk.isForeground) transitionWalkSession(WalkSessionEvent.EnteredForeground)
+        val decision = resolveCurrentStartupCapabilityDecision()
+        startupCapabilityDecision = decision
+        // Replace an earlier non-debug readiness/mode before issuing the real server start.
+        when {
+            walk.state == WalkSessionState.READY -> transitionWalkSession(
+                WalkSessionEvent.InitialCheckCompleted(
+                    captureWalkSessionReadiness(decision, WalkSessionAction.START_WALK),
+                ),
+            )
+            walk.recoveryStage == WalkSessionRecoveryStage.RECHECK_REQUIRED -> transitionWalkSession(
+                WalkSessionEvent.RecoveryRecheckCompleted(
+                    captureWalkSessionReadiness(decision, WalkSessionAction.RESUME_WALK),
+                ),
+            )
+        }
+        updateStatus("안내 시작 중", "선택한 목적지의 안내를 시작하고 있습니다.")
+        refreshStartupCapabilityUi()
     }
 
     private fun continueNativePrewalkIfReady() {
@@ -13648,7 +14498,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun startNativeDestinationGuidance() {
         val destination = pendingUiDestination ?: return
-        if (nativeUiPage != NativeUiPage.GUIDANCE) showNativeUiPage(NativeUiPage.GUIDANCE)
+        // Preserve the selected destination and pending start while returning to the home screen.
+        // showNativeUiPage(HOME) intentionally clears searches, so it is not used for this transition.
+        nativeUiPage = NativeUiPage.HOME
+        destinationQueryInput.clearFocus()
+        (getSystemService(INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager)
+            ?.hideSoftInputFromWindow(destinationQueryInput.windowToken, 0)
         if (!isWalkSessionRuntimeActive()) {
             if (nativePrewalkStartEpoch != null &&
                 (officialEnvironmentPreflightPhase in setOf(
@@ -13663,12 +14518,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             return
         }
         clearPendingExplicitRouteStart()
-        if (!onDestinationSelected(
+        onDestinationSelected(
                 destination,
                 retainExplicitStartUntilTrustedLocation = true,
             )
-        ) return
-        // onDestinationSelected already cancels search work; keep the selected destination on screen.
         renderMainUi()
     }
 
@@ -13711,7 +14564,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val cameraReason = when {
             !hasCameraPermission() -> "카메라 권한이 없어 객체인식을 사용할 수 없습니다."
             !cameraAnalysisFeaturesEnabled() -> "현재 기기 기능 설정에서 카메라 안내를 사용할 수 없습니다."
-            !mounting.canStartOrResumeDetection ->
+            !developmentGuidanceStartBypassEnabled && !mounting.canStartOrResumeDetection ->
                 mounting.accessibleReasonKo + "\n" + mounting.accessibleActionKo
             !detectorAvailable -> "객체인식 모델이 아직 준비되지 않았습니다."
             cameraEngineStarted && !cameraOutputAvailable ->
@@ -13748,7 +14601,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             presentation.titleKo,
             presentation.routeMessageKo,
             presentation.cameraMessageKo,
-            if (isWalkSessionRuntimeActive())
+            if (developmentGuidanceStartBypassEnabled)
+                "시험 모드: 환경·장착·성능 기준으로 안내 시작을 차단하지 않습니다."
+            else if (isWalkSessionRuntimeActive())
                 officialEnvironmentMeasurementDetail(currentOfficialEnvironmentAssessment()).trim()
             else nativeDestinationPreparationMessage(),
         ).filter { it.isNotBlank() }.joinToString("\n\n")
@@ -13793,7 +14648,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             showNativeUiPage(NativeUiPage.HOME)
             true
         }
-        NativeUiPage.HOME -> false
+        NativeUiPage.HOME -> if (cameraScreenVisible) {
+            closeLiveCameraScreen()
+            true
+        } else false
     }
 
     private var runtimeSectionDivider: View? = null
@@ -14800,6 +15658,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         ViewCompat.setAccessibilityHeading(priorityUserOnboardingStatusText, true)
+        priorityUserEducationProgressText = TextView(this).apply {
+            id = View.generateViewId()
+            textSize = 18f
+            setLineSpacing(0f, 1.4f)
+            setTextColor(WS_COLOR_EMPHASIS)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        priorityUserEducationBodyText = TextView(this).apply {
+            id = View.generateViewId()
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            textSize = 18f
+            setLineSpacing(0f, 1.4f)
+            setTextColor(WS_COLOR_BUTTON_TEXT)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
         priorityUserAgeButtons.clear()
         listOf(
             PriorityUserAgeBand.ADULT_18_PLUS,
@@ -15029,9 +15906,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             addView(priorityUserOnboardingStatusText)
+            addView(priorityUserEducationProgressText)
+            addView(priorityUserEducationBodyText)
             addView(firstRunPhonePostureControls)
             addView(priorityUserEducationButton)
             addView(priorityUserPracticeNecessityButton)
+            addView(priorityUserSafePlaceButton)
+            PriorityUserPractice.entries.forEach { addView(priorityUserPracticeButtons.getValue(it)) }
             addView(priorityUserEducationAgreeButton)
         }
         linkPriorityUserAccessibilityTraversal()
@@ -15342,6 +16223,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             authorityProvider = ::currentUserReportAuthorityOrNull,
             observer = ::renderUserReportState,
             deletionTracker = AndroidReportDeletionTrackerStore(applicationContext),
+            networkAllowedProvider = ::isGatewayFeatureNetworkAllowed,
         )
         userReportController.onAuthorityChanged()
         if (currentUserReportAuthorityOrNull() != null) {
@@ -15655,6 +16537,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             privacySettingsControls = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(privacyConsentStatusText)
+                addView(mobileNetworkPreferenceButton)
+                addView(accessiblePriorityUserButton(
+                    label = "고정 자료 성능 확인",
+                    spokenLabel = "카메라를 사용하지 않고 내장 고정 자료로 성능을 확인합니다.",
+                    onClick = ::runFixedFixturePerformanceCheck,
+                ))
+                addView(TextView(this@MainActivity).apply {
+                    text = "검색·경로·서버 음성·신고 통신에 적용됩니다. 계정 로그인·인증·동의 변경·계정 삭제·외부 개인정보 권리 요청에는 모바일 데이터가 사용될 수 있습니다."
+                    contentDescription = text
+                    textSize = 18f
+                    setTextColor(WS_COLOR_EMPHASIS)
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                })
                 addView(automaticReportConsentButton)
                 addView(reportPrivacyConsentButton)
             }
@@ -15680,14 +16575,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(nativeSettingsLogoutButton)
             addView(nativeSettingsHomeButton)
         }
-        runtimeDebugControlsToggleButton = accessiblePriorityUserButton(
-            label = "개발자 도구 펼치기",
-            spokenLabel = "개발자 도구, 접힘. 두 번 탭하여 펼치기",
-            onClick = {
-                runtimeDebugControlsExpanded = !runtimeDebugControlsExpanded
-                updateRuntimeDebugControlsVisibility()
-            },
-        )
         runtimeDebugControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -15803,7 +16690,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             onClick = ::cancelNativeVoiceCommandAndReturnHome,
         )
         nativeDestinationControls = walkSection(
-            "목적지 검색",
+            "길라잡이",
             wsFieldGroup(destinationQueryInput, "목적지"),
             destinationSearchButton,
             destinationCancelButton,
@@ -15918,7 +16805,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             firstRunNoticeToggleButton,
             privacySectionToggleButton,
             walkReadinessToggleButton,
-            runtimeDebugControlsToggleButton,
             gatewaySessionControlsToggleButton,
             accountSignupToggleButton,
             accountSignupBackButton,
@@ -15972,6 +16858,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         renderMainUi()
 
+        cameraScreenStatus = TextView(this).apply {
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 15f
+            setPadding(16, 12, 16, 12)
+            setBackgroundColor(0xcc000000.toInt())
+            text = "카메라 준비 중 · 객체와 깊이 데이터를 기다리고 있습니다."
+        }
+        cameraScreenControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            addView(accessiblePriorityUserButton(
+                label = "카메라 닫기",
+                onClick = ::closeLiveCameraScreen,
+            ))
+            addView(ScrollView(this@MainActivity).apply { addView(cameraScreenStatus) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    (220 * resources.displayMetrics.density).roundToInt()))
+        }
         return FrameLayout(this).apply {
             addView(surfaceView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             addView(cameraFallbackPreviewView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -15984,6 +16888,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 walkSafetyScroll,
                 FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.TOP),
             )
+            addView(cameraScreenControls,
+                FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
         }
     }
 
@@ -16345,6 +17252,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun firstRunOnboardingComplete(): Boolean {
         if (initialAppPermissionExitRequired) return false
+        if (developmentGuidanceStartBypassEnabled && shouldShowNativeHome()) return true
         if (developmentQuickStartEnabled) return developmentQuickStartSessionOrNull() != null
         if (
             !::firstRunOnboardingSnapshot.isInitialized ||
@@ -16409,10 +17317,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (developmentQuickStartEnabled) {
             return isActivityForeground && developmentQuickStartSessionOrNull() != null
         }
-        if (!isActivityForeground || !postLoginDeviceCheckSnapshot.passesFeatureGate) return false
-        val binding = postLoginDeviceCheckSnapshot.bindingOrNull ?: return false
+        if (!isActivityForeground ||
+            (!developmentPostLoginDeviceCheckBypassed &&
+                !postLoginDeviceCheckSnapshot.passesFeatureGate)
+        ) return false
         val process = GatewaySessionProcessCoordinator.snapshot()
         val session = process.session ?: return false
+        val binding = postLoginDeviceCheckSnapshot.bindingOrNull
+        if (binding == null && developmentPostLoginDeviceCheckBypassed) {
+            return session.verificationState == GatewaySessionVerificationState.VERIFIED &&
+                session.isUsableFor(session.actorId) && !process.storageBlocked &&
+                !process.deletionRecoveryOnly
+        }
+        binding ?: return false
         return binding.actorId == session.actorId &&
             binding.sessionGeneration == process.generation &&
             session.verificationState == GatewaySessionVerificationState.VERIFIED &&
@@ -16579,6 +17496,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         maybeStartStoredDeviceCheckBindingValidation()
         maybeStartStoredMetricDepthRefresh()
         if (::startupCapabilityText.isInitialized) refreshStartupCapabilityUi()
+        if (postLoginDeviceCheckSnapshot.passesFeatureGate) scheduleDeviceRuntimeCalibration()
     }
 
     private fun prepareStoredMetricDepthRefresh(
@@ -16795,30 +17713,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun updateRuntimeDebugControlsVisibility() {
-        if (
-            !::runtimeDebugControlsToggleButton.isInitialized ||
-            !::runtimeDebugControls.isInitialized
-        ) return
-        val expanded = BuildConfig.DEBUG && runtimeDebugControlsExpanded
-        runtimeDebugControls.visibility = if (expanded) View.VISIBLE else View.GONE
-        runtimeDebugControlsToggleButton.text =
-            if (expanded) "개발자 도구 접기" else "개발자 도구 펼치기"
-        runtimeDebugControlsToggleButton.contentDescription =
-            if (expanded) {
-                "개발자 도구, 펼침. 두 번 탭하여 접기"
-            } else {
-                "개발자 도구, 접힘. 두 번 탭하여 펼치기"
-            }
-        if (expanded) {
-            debugUploadButton.post {
-                debugUploadButton.requestFocus()
-                debugUploadButton.performAccessibilityAction(
-                    android.view.accessibility.AccessibilityNodeInfo
-                        .ACTION_ACCESSIBILITY_FOCUS,
-                    null,
-                )
-            }
-        }
+        if (!::runtimeDebugControls.isInitialized) return
+        runtimeDebugControls.visibility = View.GONE
     }
 
     private fun firstRunDeviceCheckAllowsPreflight(): Boolean =
@@ -16860,10 +17756,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         walkSessionResourceProbeStarted = false
     }
 
+    private var postLoginResourceWaitThermal: Boolean? = null
+    private val postLoginResourceWaitNotice: String?
+        get() = postLoginResourceWaitThermal?.let { thermal ->
+            if (postLoginDeviceCheckSnapshot.state == PostLoginDeviceCheckState.FAIL) {
+                if (thermal) "발열 상태가 해소되지 않았습니다. 휴대전화가 식은 뒤 다시 점검하세요."
+                else "배터리·저장공간·발열 상태를 확인하지 못했습니다. 다시 점검하세요."
+            } else {
+                if (thermal) "발열로 점검을 기다리고 있습니다. 휴대전화가 식은 뒤 계속합니다."
+                else "배터리·저장공간·발열 상태를 확인하고 있습니다."
+            }
+        }
+
     private fun startPostLoginDeviceCheckRuntime(
         binding: PostLoginDeviceCheckBinding,
     ) {
         if (!isPostLoginDeviceCheckBindingCurrent(binding)) return
+        postLoginResourceWaitThermal = null
         storedDeviceCheckBindingValidationPending = false
         if (::startupCapabilityProbe.isInitialized) startupCapabilityProbe.close()
         startupCapabilityProbe = AndroidStartupCapabilityProbe(this) {
@@ -16913,6 +17822,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val binding = expectedBinding ?: postLoginDeviceCheckSnapshot.bindingOrNull ?: return
         if (!isPostLoginDeviceCheckBindingCurrent(binding)) return
         val observation = currentPostLoginDeviceCheckObservation()
+        val resources = walkSessionResourceProbe.snapshot()
+        postLoginResourceWaitThermal = if (
+            resources.measurementReadinessStatus == WalkSessionReadinessStatus.PENDING
+        ) resources.thermalThrottled == true else null
         evaluatePostLoginDeviceCheck(binding, observation)
         if (postLoginDeviceCheckSnapshot.state != PostLoginDeviceCheckState.RUNNING) return
         val automaticPrerequisitesPending = listOf(
@@ -17051,7 +17964,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 PostLoginDeviceCheckSignal.UNAVAILABLE
             },
             locationFix = postLoginLocationFixSignal,
-            deviceResources = when (resources.readinessStatus) {
+            deviceResources = when (resources.measurementReadinessStatus) {
                 WalkSessionReadinessStatus.READY,
                 WalkSessionReadinessStatus.NOT_REQUIRED,
                 -> PostLoginDeviceCheckSignal.READY
@@ -17075,7 +17988,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             blockingFailure = when {
                 startup.androidVersionSupported == false ->
                     PostLoginDeviceCheckFailure.MINIMUM_ANDROID_VERSION
-                resources.readinessStatus == WalkSessionReadinessStatus.UNAVAILABLE ->
+                resources.measurementReadinessStatus == WalkSessionReadinessStatus.UNAVAILABLE ->
                     PostLoginDeviceCheckFailure.DEVICE_RESOURCE
                 koreanTextToSpeechAvailable == false ->
                     PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE
@@ -17209,6 +18122,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         }
         refreshStartupCapabilityUi()
+        scheduleDeviceRuntimeCalibration()
     }
 
     private fun failPostLoginDeviceCheckForSessionChange() {
@@ -17228,6 +18142,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun cancelPostLoginDeviceCheckRuntime(reason: String) {
+        cancelDeviceRuntimeCalibration("device_check_$reason")
         clearPostLoginDeviceCheckOverallTimeout()
         cancelPostLoginDeviceCheckFunctionalProbes()
         if (
@@ -17273,6 +18188,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }.getOrDefault(false)
     }
 
+    private fun locationFixUnavailability(): DeviceCheckLocationFixUnavailability {
+        if (!isLocationServiceEnabledForDeviceCheck()) {
+            return DeviceCheckLocationFixUnavailability.LOCATION_SERVICE_OFF
+        }
+        val activeProviders = runCatching {
+            getSystemService(LocationManager::class.java)?.getProviders(true)
+        }.getOrNull()
+        return if (activeProviders != null &&
+            activeProviders.none { it != LocationManager.PASSIVE_PROVIDER }
+        ) DeviceCheckLocationFixUnavailability.PROVIDER_DISABLED
+        else DeviceCheckLocationFixUnavailability.NO_FIX_RECEIVED
+    }
+
     @SuppressLint("MissingPermission")
     private fun startPostLoginLocationFixProbe(binding: PostLoginDeviceCheckBinding) {
         cancelPostLoginLocationFixProbe()
@@ -17283,6 +18211,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             !hasLocationPermission() ||
             !isLocationServiceEnabledForDeviceCheck()
         ) {
+            if (!isLocationServiceEnabledForDeviceCheck()) {
+                postLoginLocationFixDecision = DeviceCheckLocationFixPolicy.unavailable(
+                    DeviceCheckLocationFixUnavailability.LOCATION_SERVICE_OFF,
+                )
+            }
             postLoginLocationFixTerminalFailure =
                 PostLoginLocationFixTerminalFailure.REQUEST_FAILED
             postLoginLocationFixSignal = PostLoginDeviceCheckSignal.UNAVAILABLE
@@ -17304,7 +18237,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 val decisions = result.locations.map(::evaluatePostLoginLocationFix)
                 decisions.forEach(::recordPostLoginLocationFixDiagnostic)
                 val decision = DeviceCheckLocationFixPolicy.selectBatch(decisions)
-                postLoginLocationFixDecision = decision
+                if (decision != null) postLoginLocationFixDecision = decision
                 if (decision?.reason == DeviceCheckLocationFixReason.MOCK_LOCATION) {
                     finishPostLoginLocationFixProbe(
                         binding = binding,
@@ -17450,6 +18383,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         terminalFailure: PostLoginLocationFixTerminalFailure?,
     ) {
         if (!isPostLoginLocationFixProbeCurrent(binding, generation, callback)) return
+        if (!passed && postLoginLocationFixDecision == null &&
+            terminalFailure == PostLoginLocationFixTerminalFailure.TIMED_OUT
+        ) {
+            postLoginLocationFixDecision = DeviceCheckLocationFixPolicy.unavailable(locationFixUnavailability())
+        }
         if (BuildConfig.DEBUG && !passed) {
             android.util.Log.d(
                 GPS_PREFLIGHT_LOG_TAG,
@@ -17478,9 +18416,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val accuracy = postLoginLocationFixDecision?.accuracyMeters
         val accuracyBucket = when {
             accuracy == null || !accuracy.isFinite() -> "unknown"
-            accuracy <= 25f -> "0_25m"
-            accuracy <= 50f -> "26_50m"
-            accuracy <= DeviceCheckLocationFixPolicy.MAX_ACCURACY_METERS -> "51_100m"
+            accuracy <= DeviceCheckLocationFixPolicy.MAX_ACCURACY_METERS -> "0_15m"
+            accuracy <= 25f -> "over_15_to_25m"
+            accuracy <= 50f -> "over_25_to_50m"
+            accuracy <= 100f -> "over_50_to_100m"
             else -> "over_100m"
         }
         val ageMs = postLoginLocationFixDecision?.ageMs
@@ -17845,8 +18784,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun postLoginDeviceFeatureEnabled(feature: PostLoginDeviceCheckFeature): Boolean =
-        (developmentQuickStartEnabled || postLoginDeviceCheckSnapshot.passesFeatureGate) &&
-            feature !in currentPostLoginDisabledFeatures()
+        developmentGuidanceStartBypassEnabled ||
+            ((developmentQuickStartEnabled || postLoginDeviceCheckPassesFeatureGate()) &&
+                feature !in currentPostLoginDisabledFeatures())
 
     private fun deferredCameraDependentChecksCanBeRetried(): Boolean =
         postLoginDeviceCheckSnapshot.passesFeatureGate &&
@@ -17974,6 +18914,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             "위치\t$locationText",
             "한국어 음성\t${label(observation.koreanTextToSpeech, "확인 중")}",
             "호출어\t$microphoneText",
+            "기기 상태\t${postLoginResourceWaitNotice ?: label(observation.deviceResources, "상태 확인 중", "배터리·저장공간·발열 확인 필요")}",
         ).joinToString(separator = "\n")
     }
 
@@ -18040,7 +18981,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         PostLoginDeviceCheckFailure.DEPTH_TIMEOUT ->
             "거리 측정 점검 시간이 초과되었습니다. 전경에서 다시 점검하세요."
         PostLoginDeviceCheckFailure.CHECK_TIMEOUT ->
-            "기기 점검을 완료하지 못했습니다. 화면의 대기 중 항목을 확인하고 다시 점검하세요."
+            postLoginResourceWaitNotice?.let { "기기 점검 시간이 초과되었습니다. $it" }
+                ?: "기기 점검을 완료하지 못했습니다. 화면의 대기 중 항목을 확인하고 다시 점검하세요."
         PostLoginDeviceCheckFailure.RESULT_SAVE_FAILED ->
             "기기 점검 결과를 저장하지 못했습니다. 저장공간을 확인하고 다시 점검하세요."
         PostLoginDeviceCheckFailure.SESSION_CHANGED,
@@ -18049,6 +18991,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun postLoginLocationFixFailureMessage(): String {
+        DeviceCheckLocationFixUnavailability.entries
+            .firstOrNull { it.reason == postLoginLocationFixDecision?.reason }
+            ?.let { return it.userActionKo }
         if (
             postLoginLocationFixTerminalFailure ==
             PostLoginLocationFixTerminalFailure.REQUEST_FAILED
@@ -18063,7 +19008,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     ?.takeIf { it.isFinite() }
                     ?.let { String.format(Locale.US, "%.0f", it) }
                     ?: "확인 불가"
-                "새 위치는 받았지만 정확도가 약 ${accuracy}미터로 기능 점검 기준 " +
+                "새 위치는 받았지만 추정 오차 범위가 약 ${accuracy}미터로 기능 점검 기준 " +
                     "${DeviceCheckLocationFixPolicy.MAX_ACCURACY_METERS.toInt()}미터를 넘었습니다. " +
                     "창가나 실외에서 다시 점검하세요."
             }
@@ -18076,6 +19021,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             -> "수신한 위치값이 유효하지 않았습니다. 위치 서비스를 껐다 켠 뒤 다시 점검하세요."
             DeviceCheckLocationFixReason.PASS ->
                 "위치 수신 뒤 점검 상태가 변경되었습니다. 기기 점검을 다시 실행하세요."
+            DeviceCheckLocationFixReason.LOCATION_SERVICE_OFF,
+            DeviceCheckLocationFixReason.PROVIDER_DISABLED,
+            DeviceCheckLocationFixReason.NO_FIX_RECEIVED,
+            -> DeviceCheckLocationFixUnavailability.entries
+                .first { it.reason == postLoginLocationFixDecision?.reason }
+                .userActionKo
             null ->
                 "점검 시간 안에 새 위치를 받지 못했습니다. 정확한 위치를 켜고 창가나 실외에서 다시 점검하세요."
         }
@@ -18174,6 +19125,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         .build()
                     val frameClaimed = AtomicBoolean(false)
                     val attemptedFrames = AtomicInteger(0)
+                    val passedFrames = AtomicInteger(0)
                     analysis.setAnalyzer(detectorExecutor) { imageProxy ->
                         if (!isPostLoginCameraPipelinePreflightCurrent(binding, generation)) {
                             imageProxy.close()
@@ -18206,15 +19158,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         } finally {
                             imageProxy.close()
                         }
-                        val terminal = detectorSucceeded ||
-                            attemptedFrames.incrementAndGet() >=
-                            POST_LOGIN_CAMERA_PIPELINE_MAX_FRAMES
-                        if (terminal) {
-                            if (BuildConfig.DEBUG && !detectorSucceeded) {
+                        // Count successful camera/model invocations, not detection accuracy.
+                        val attempts = attemptedFrames.incrementAndGet()
+                        val passes = if (detectorSucceeded) {
+                            passedFrames.incrementAndGet()
+                        } else {
+                            passedFrames.get()
+                        }
+                        val verdict = DeviceCheckCameraSamplingPolicy.evaluate(attempts, passes)
+                        if (verdict != DeviceCheckCameraSampleVerdict.CONTINUE) {
+                            val sampleSucceeded =
+                                verdict == DeviceCheckCameraSampleVerdict.PASSED
+                            if (BuildConfig.DEBUG && !sampleSucceeded) {
                                 android.util.Log.d(
                                     CAMERA_PREFLIGHT_LOG_TAG,
-                                    "postLogin generation=$generation attempts=" +
-                                        "${attemptedFrames.get()} reason=$frameFailure",
+                                    "postLogin generation=$generation attempts=$attempts " +
+                                        "passes=$passes reason=$frameFailure",
                                 )
                             }
                             if (terminalClaim.compareAndSet(false, true)) {
@@ -18222,8 +19181,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                     finishPostLoginCameraPipelinePreflight(
                                         binding = binding,
                                         generation = generation,
-                                        detectorSucceeded = detectorSucceeded,
-                                        failure = if (detectorSucceeded) null else frameFailure,
+                                        detectorSucceeded = sampleSucceeded,
+                                        failure = if (sampleSucceeded) null else frameFailure,
                                     )
                                 }
                             }
@@ -18395,6 +19354,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val runtimeEpoch = expectedEpoch ?: walkSessionLifecycle.currentRuntimeEpochOrNull()
             ?: return true
         val resources = walkSessionResourceProbe.snapshot()
+        latestInferenceThermalThrottled = resources.thermalThrottled
         return walkRuntimeSafetyCoordinator.observe(
             WalkRuntimeSafetyObservation(
                 epoch = runtimeEpoch,
@@ -18621,26 +19581,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             requiredPostLoginDeviceCheckPermissions()
         }
 
+    // Retained through Activity recreation; a fresh launch may recover expired one-time grants.
+    private var initialAppPermissionReRequestedThisLaunch = false
+
     private fun requestInitialAppEntryPermissionsIfNeeded() {
         if (!::stepLengthPrefs.isInitialized) return
-        if (stepLengthPrefs.getBoolean(PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED, false)) {
-            val missing = requiredPostLoginDeviceCheckPermissions()
-            if (missing.isNotEmpty()) showInitialAppPermissionLimitations(missing.toSet())
-            return
-        }
-        if (
-            permissionRequestLeases.values.any {
+        if (permissionRequestLeases.values.any {
                 it.purpose == PermissionRequestPurpose.INITIAL_APP_ENTRY
             }
         ) return
-        if (
-            stepLengthPrefs.getBoolean(
-                PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED,
-                false,
-            )
-        ) {
-            // The permission Activity can recreate this Activity. Finish the saved attempt from
-            // the OS-observed state instead of opening the same permission flow again.
+        if (stepLengthPrefs.getBoolean(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED, false)) {
+            initialAppPermissionReRequestedThisLaunch = true
             handleInitialAppEntryPermissionResult()
             return
         }
@@ -18650,8 +19601,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 .putBoolean(PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED, true)
                 .remove(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED)
                 .commit()
+            clearInitialAppPermissionLimitationsIfResolved()
             return
         }
+        if (stepLengthPrefs.getBoolean(PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED, false) &&
+            initialAppPermissionReRequestedThisLaunch
+        ) {
+            showInitialAppPermissionLimitations(missing.toSet())
+            return
+        }
+        launchInitialAppEntryPermissionRequest(missing)
+    }
+
+    private fun launchInitialAppEntryPermissionRequest(missing: List<String>) {
+        initialAppPermissionReRequestedThisLaunch = true
         val attemptSaved = stepLengthPrefs.edit()
             .putBoolean(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED, true)
             .commit()
@@ -18706,10 +19669,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val missing = requiredPostLoginDeviceCheckPermissions()
         if (missing.isEmpty()) {
+            clearInitialAppPermissionLimitationsIfResolved()
             updateStatus("앱 권한 확인 완료", "필요한 Android 권한이 모두 허용되었습니다.")
             return
         }
         showInitialAppPermissionLimitations(missing.toSet())
+    }
+
+    private fun clearInitialAppPermissionLimitationsIfResolved() {
+        if (requiredPostLoginDeviceCheckPermissions().isNotEmpty()) return
+        val wasBlocked = initialAppPermissionExitRequired
+        initialAppPermissionExitRequired = false
+        initialAppPermissionExitDialog?.dismiss()
+        initialAppPermissionExitDialog = null
+        if (wasBlocked) renderMainUi()
     }
 
     private fun showInitialAppPermissionLimitations(missing: Set<String>) {
@@ -19081,11 +20054,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ) return
         if (firstRunActorId != null) {
             val process = GatewaySessionProcessCoordinator.snapshot()
-            GatewaySessionProcessCoordinator.updateFirstRunSnapshot(
+            val published = GatewaySessionProcessCoordinator.updateFirstRunSnapshot(
                 expectedGeneration = process.generation,
                 expectedActorId = firstRunActorId,
                 firstRunSnapshot = firstRunOnboardingSnapshot,
             )
+            if (published && process.session?.isBackendAccountDeviceBound == true) {
+                val stored = gatewaySessionStore.updateBackendDeviceFirstRunSnapshot(
+                    requireNotNull(process.session.versionOrNull), firstRunOnboardingSnapshot,
+                )
+                if (stored == GatewaySessionStoreResult.BLOCKED ||
+                    stored == GatewaySessionStoreResult.STORAGE_FAILURE
+                ) {
+                    GatewaySessionProcessCoordinator.markStorageBlocked(process.generation)
+                }
+            }
         }
         maybeStartFirstRunDeviceCheckProbes()
         updateFirstRunOnboardingUi()
@@ -19099,7 +20082,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun advanceEmailStagesWithRestoredDeviceCheck(): Boolean {
         if (
             firstRunOnboardingSnapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ||
-            !postLoginDeviceCheckSnapshot.passesFeatureGate
+            !postLoginDeviceCheckPassesFeatureGate()
         ) return false
         var current = firstRunOnboardingSnapshot
         var advanced = false
@@ -19130,15 +20113,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun focusCurrentFirstRunStage(stage: FirstRunOnboardingStage) {
         val target = when (stage) {
             FirstRunOnboardingStage.FP004_TRAINING ->
-                if (shouldShowFirstRunPhonePosture()) firstRunPhonePostureText
+                if (shouldShowFirstRunPhonePosture()) priorityUserEducationProgressText
                 else priorityUserOnboardingStatusText
             FirstRunOnboardingStage.COMPLETE -> return
             else -> return
         }
         val firstAction = when (stage) {
             FirstRunOnboardingStage.FP004_TRAINING ->
-                if (shouldShowFirstRunPhonePosture()) firstRunPhonePostureButton
-                else priorityUserEducationButton
+                if (shouldShowFirstRunPhonePosture()) {
+                    when {
+                        firstRunPhonePostureButton.isEnabled -> firstRunPhonePostureButton
+                        !priorityUserOnboardingPolicy.snapshot().appUsageReviewed -> priorityUserEducationButton
+                        priorityUserSafePlaceButton.isEnabled -> priorityUserSafePlaceButton
+                        else -> priorityUserPracticeButtons.values.firstOrNull { it.isEnabled }
+                            ?: priorityUserEducationAgreeButton
+                    }
+                } else priorityUserEducationButton
             FirstRunOnboardingStage.COMPLETE -> null
             else -> null
         }
@@ -19208,6 +20198,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 } else {
                     emptySet()
                 },
+                hazardResponseConfirmed = compatible && restored.hazardResponseConfirmed,
             ),
         )
         if (firstRunOnboardingSnapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 &&
@@ -19341,7 +20332,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val chunks = message.chunked(TextToSpeech.getMaxSpeechInputLength())
         val actuator = ensureFeedbackActuator()
         val handler = android.os.Handler(Looper.getMainLooper())
-        val initializationDeadlineMs = SystemClock.elapsedRealtime() + 8_000L
+        val initializationDeadlineMs = SystemClock.elapsedRealtime() +
+            AndroidFeedbackActuator.INITIALIZATION_READINESS_TIMEOUT_MS
         fun ownsPlayback(): Boolean = generation == accountConsentSpeechGeneration &&
             accountConsentSpeechKey == key
         fun finish(completed: Boolean) {
@@ -19456,7 +20448,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 otpEntered &&
                 !busy &&
                 !emailEnrollmentStorageBlocked
-        accountLoginButton.isEnabled = emailEntered && passwordEntered && !busy
+        accountLoginButton.isEnabled = if (backendDeviceRestorePending) {
+            !busy && GatewaySessionProcessCoordinator.snapshot().inFlightOperationId == null
+        } else {
+            emailEntered && passwordEntered && !busy
+        }
     }
 
     private fun currentAccountConsentSelections(): SignupConsentSelections =
@@ -19543,6 +20539,38 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountSessionLogoutButton.text =
             if (staleGeneralSession) "이전 로그인 상태 정리" else "현재 계정 로그아웃"
         accountSessionLogoutButton.contentDescription = accountSessionLogoutButton.text
+        accountLoginButton.text = "로그인"
+        accountLoginButton.contentDescription = "이메일과 비밀번호로 로그인"
+        if (backendDeviceRestorePending && !authenticated &&
+            !process.storageBlocked && !process.deletionRecoveryOnly
+        ) {
+            accountAccessControls.visibility = View.VISIBLE
+            accountAccessStatusText.visibility = View.VISIBLE
+            wsFieldGroupOf(accountEmailInput).visibility = View.GONE
+            wsFieldGroupOf(accountPasswordInput).visibility = View.GONE
+            accountLandingHeader.visibility = View.GONE
+            accountSignupControls.visibility = View.GONE
+            accountSignupToggleButton.visibility = View.GONE
+            accountSignupBackButton.visibility = View.GONE
+            accountLoginButton.visibility = View.VISIBLE
+            accountLoginButton.text = "저장된 로그인 다시 확인"
+            accountLoginButton.contentDescription = accountLoginButton.text
+            val verifying = process.inFlightOperationId != null
+            accountLoginButton.isEnabled = !verifying
+            if (accountSessionLogoutButton.parent == null) {
+                accountAccessControls.addView(accountSessionLogoutButton)
+            }
+            accountSessionLogoutButton.visibility = View.VISIBLE
+            accountSessionLogoutButton.isEnabled = !verifying
+            accountSessionLogoutButton.text = "저장된 로그인 해제"
+            accountSessionLogoutButton.contentDescription = accountSessionLogoutButton.text
+            val message = if (verifying) "저장된 로그인을 확인하고 있습니다." else
+                "인터넷에 연결한 뒤 저장된 로그인을 다시 확인하세요. 비밀번호를 다시 입력하지 않아도 됩니다."
+            accountAccessStatusText.text = message
+            accountAccessStatusText.contentDescription = message
+            return
+        }
+        accountSessionLogoutButton.isEnabled = process.inFlightOperationId == null
         if (authenticated) {
             wsFieldGroupOf(accountEmailInput).visibility = View.GONE
             wsFieldGroupOf(accountPasswordInput).visibility = View.GONE
@@ -19934,13 +20962,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (::officialEnvironmentStatusText.isInitialized) {
             officialEnvironmentStatusText.visibility =
-                if (showWalkPreparation) View.VISIBLE else View.GONE
+                if (showWalkPreparation && !developmentGuidanceStartBypassEnabled) View.VISIBLE else View.GONE
             officialEnvironmentConfirmButton.visibility =
-                if (showWalkPreparation) View.VISIBLE else View.GONE
+                if (showWalkPreparation && !developmentGuidanceStartBypassEnabled) View.VISIBLE else View.GONE
             phoneMountingStatusText.visibility =
-                if (showWalkPreparation) View.VISIBLE else View.GONE
+                if (showWalkPreparation && !developmentGuidanceStartBypassEnabled) View.VISIBLE else View.GONE
             phoneMountingChestConfirmButton.visibility =
-                if (showPhoneMountingPreparation &&
+                if (showPhoneMountingPreparation && !developmentGuidanceStartBypassEnabled &&
                     (!developmentQuickStartEnabled || walkState != WalkSessionState.READY)
                 ) View.VISIBLE else View.GONE
             phoneMountingNecklaceConfirmButton.visibility = View.GONE
@@ -19949,7 +20977,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             startupCapabilityText.visibility =
                 if (mayCheckDevice) View.VISIBLE else View.GONE
             startupCapabilityConfirmButton.visibility =
-                if (showWalkPreparation) View.VISIBLE else View.GONE
+                if (showWalkPreparation && !developmentGuidanceStartBypassEnabled) View.VISIBLE else View.GONE
         }
         if (::fieldSessionLogButton.isInitialized) {
             fieldSessionLogButton.visibility =
@@ -20012,6 +21040,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun linkPriorityUserAccessibilityTraversal() {
         val controls = buildList<View> {
             add(priorityUserOnboardingStatusText)
+            add(priorityUserEducationProgressText)
+            add(priorityUserEducationBodyText)
             add(loginUserIdInput)
             add(loginSaveButton)
             add(accountLogoutButton)
@@ -20078,6 +21108,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             return
         }
         firstRunPhonePostureControls.visibility = View.GONE
+        priorityUserEducationBodyText.visibility = View.GONE
+        priorityUserEducationProgressText.visibility = View.GONE
         priorityUserPracticeNecessityButton.visibility = View.GONE
         priorityUserEducationAgreeButton.visibility = View.GONE
         val environment = currentPriorityUserSupportEnvironment(capabilityDecision)
@@ -20144,7 +21176,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val accountEligible =
             accountBound && deviceGateOpen && decision.mayActivateAccount
-        priorityUserEducationButton.text = if (priorityUserEducationInFlight) {
+        priorityUserEducationButton.text = if (priorityUserPracticeInFlight != null) {
+            "이번 연습 중지"
+        } else if (priorityUserEducationInFlight) {
             "안전교육 듣기 중지"
         } else if (snapshot.educationReviewed) {
             "1. 안전 제한 안내 다시 듣기"
@@ -20152,21 +21186,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             "1. 안전 제한 안내 듣기"
         }
         priorityUserEducationButton.contentDescription = priorityUserEducationButton.text
-        priorityUserEducationButton.isEnabled = priorityUserEducationInFlight ||
+        priorityUserEducationButton.isEnabled = priorityUserPracticeInFlight != null || priorityUserEducationInFlight ||
             (accountEligible && !trainingDeliveryInFlight)
         priorityUserSafePlaceButton.isEnabled =
             accountEligible &&
                 snapshot.educationReviewed &&
                 !trainingDeliveryInFlight
         priorityUserPracticeButtons.forEach { (practice, button) ->
+            val awaitingHazardResponse = practice == PriorityUserPractice.HAZARD_ALERT &&
+                priorityUserPracticeAttemptToken?.let(priorityUserOnboardingPolicy::isHazardResponseReady) == true
             button.isEnabled =
                 accountEligible &&
                     snapshot.safePracticePlaceConfirmed &&
+                    !snapshot.requiresPracticeRestart &&
                     snapshot.nextRequiredPractice == practice &&
-                    !trainingDeliveryInFlight
+                    (!trainingDeliveryInFlight || awaitingHazardResponse)
             val completed = practice in snapshot.completedPractices
             val current = snapshot.nextRequiredPractice == practice
-            button.text = practice.actionLabelKo +
+            button.text = if (awaitingHazardResponse) PriorityUserEducationPresentation.hazardResponseActionKo else practice.actionLabelKo +
                 when {
                     completed -> " · 완료"
                     current -> " · 다음"
@@ -20235,6 +21272,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun reviewPriorityUserSafetyEducation() {
+        if (priorityUserPracticeInFlight != null) {
+            cancelPendingPriorityUserTrainingFeedback()
+            updateStatus("이번 연습 중지", "이번 연습은 완료하지 않았습니다. 같은 연습 버튼으로 다시 시도하세요. 이전 완료 기록은 유지됩니다.")
+            return
+        }
         if (priorityUserEducationInFlight) {
             if (priorityUserEducationPlaybackIsPracticeNecessity) return
             cancelPendingPriorityUserTrainingFeedback()
@@ -20351,8 +21393,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!requireDeviceCheckForPriorityUserTraining()) return
         val before = priorityUserOnboardingPolicy.snapshot()
         if (
-            before.safePracticePlaceConfirmed ||
+            (before.safePracticePlaceConfirmed && !before.requiresPracticeRestart) ||
             !before.educationReviewed ||
+            (shouldShowFirstRunPhonePosture() &&
+                (!before.usageConditionsAcknowledged || !before.appUsageReviewed)) ||
+            priorityUserEducationInFlight || priorityUserPracticeInFlight != null ||
             priorityUserOnboardingPolicy.accountBlockReason() != null
         ) {
             val notice = priorityUserOnboardingPolicy.evaluate(
@@ -20385,6 +21430,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun performPriorityUserPractice(practice: PriorityUserPractice) {
         if (!requireDeviceCheckForPriorityUserTraining()) return
+        if (practice == PriorityUserPractice.HAZARD_ALERT &&
+            priorityUserPracticeInFlight == PriorityUserPractice.HAZARD_ALERT) {
+            confirmPriorityUserHazardResponse()
+            return
+        }
         val actorId = reporterUserId
         val environment = currentPriorityUserSupportEnvironment()
         val voiceGuidanceEnabled =
@@ -20399,6 +21449,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             currentDecision.accountBlockReason != null ||
             !before.educationReviewed ||
             !before.safePracticePlaceConfirmed ||
+            before.requiresPracticeRestart ||
+            (shouldShowFirstRunPhonePosture() &&
+                (!before.usageConditionsAcknowledged || !before.appUsageReviewed)) ||
             priorityUserEducationInFlight ||
             priorityUserPracticeInFlight != null
         ) {
@@ -20412,7 +21465,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             return
         }
         val policy = priorityUserOnboardingPolicy
-        val token = policy.beginPractice(practice)
+        val requiredDeliverySignals = buildSet {
+            if (voiceGuidanceEnabled) add(PriorityUserPracticeDeliverySignal.SPEECH_PLAYBACK_COMPLETED)
+            if (hapticFeedbackEnabled) add(PriorityUserPracticeDeliverySignal.VIBRATION_REQUEST_WINDOW_ELAPSED)
+        }
+        if (requiredDeliverySignals.isEmpty()) {
+            updateStatus("연습 안내 수단 확인 필요", "음성 또는 진동을 사용할 수 있도록 기기 점검을 다시 완료하세요.")
+            return
+        }
+        val token = policy.beginPractice(practice, requiredDeliverySignals)
         if (token == null) {
             val next = before.nextRequiredPractice
             speakInteraction(
@@ -20423,6 +21484,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val generation = ++priorityUserTrainingGeneration
         priorityUserPracticeInFlight = practice
+        priorityUserPracticeAttemptToken = token
+        stopAccountConsentSpeech()
+        if (voiceRecognitionActive) cancelVoiceCommandRecognition()
         updatePriorityUserOnboardingUi()
         updateStatus(
             "${practice.actionLabelKo} 진행 중",
@@ -20456,14 +21520,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 failed()
                 return
             }
-        } else {
-            recordPriorityUserPracticeDelivery(
-                generation = generation,
-                actorId = actorId,
-                policy = policy,
-                token = token,
-                signal = PriorityUserPracticeDeliverySignal.VIBRATION_REQUEST_WINDOW_ELAPSED,
-            )
         }
         if (voiceGuidanceEnabled) {
             val speech = actuator.speakPriorityUserTraining(
@@ -20482,15 +21538,28 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (speech != NavigationSpeechDispatchResult.ACCEPTED) {
                 failed()
             }
-        } else {
-            recordPriorityUserPracticeDelivery(
-                generation = generation,
-                actorId = actorId,
-                policy = policy,
-                token = token,
-                signal = PriorityUserPracticeDeliverySignal.SPEECH_PLAYBACK_COMPLETED,
-            )
         }
+    }
+
+    private fun confirmPriorityUserHazardResponse() {
+        val actorId = reporterUserId ?: return
+        val policy = priorityUserOnboardingPolicy
+        val token = priorityUserPracticeAttemptToken ?: return
+        if (priorityUserPracticeInFlight != PriorityUserPractice.HAZARD_ALERT ||
+            !isPriorityUserTrainingDeliveryCurrent(priorityUserTrainingGeneration, actorId, policy) ||
+            !policy.isHazardResponseReady(token)) return
+        if (!beginPriorityUserProfileMutationOrFailClosed()) {
+            cancelPendingPriorityUserTrainingFeedback()
+            updateStatus("멈춤 확인 저장 실패", "연습 결과를 저장할 수 없어 이번 연습을 완료하지 않았습니다.")
+            return
+        }
+        val after = policy.confirmHazardResponse(token)
+        if (!persistPriorityUserOnboardingOrFailClosed()) {
+            cancelPendingPriorityUserTrainingFeedback()
+            updateStatus("멈춤 확인 저장 실패", "멈춤 확인을 저장하지 못했습니다. 저장 상태를 확인한 뒤 다시 연습하세요.")
+            return
+        }
+        if (after.hazardResponseConfirmed) completePriorityUserPracticeStep(after, actorId)
     }
 
     private fun recordPriorityUserPracticeDelivery(
@@ -20520,6 +21589,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (!beginPriorityUserProfileMutationOrFailClosed()) {
                 priorityUserTrainingGeneration += 1L
                 priorityUserPracticeInFlight = null
+                priorityUserPracticeAttemptToken = null
                 policy.cancelPractice(token)
                 feedbackActuator?.cancelPriorityUserTrainingFeedback()
                 updateStatus(
@@ -20537,6 +21607,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (!persisted) {
                 priorityUserTrainingGeneration += 1L
                 priorityUserPracticeInFlight = null
+                priorityUserPracticeAttemptToken = null
                 policy.cancelPractice(token)
                 feedbackActuator?.cancelPriorityUserTrainingFeedback()
                 updateStatus(
@@ -20550,24 +21621,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 return@runOnUiThread
             }
             if (after.completedPractices == before.completedPractices) {
+                if (policy.isHazardResponseReady(token)) updatePriorityUserOnboardingUi()
                 return@runOnUiThread
             }
-            val completedPractice = priorityUserPracticeInFlight
-            priorityUserTrainingGeneration += 1L
-            priorityUserPracticeInFlight = null
-            updateStatus(
-                "연습 완료",
-                "${completedPractice?.actionLabelKo ?: "필수 조작 연습"}을 완료했습니다.",
-            )
-            updatePriorityUserOnboardingUi()
-            val firstRunCompleted =
-                after.trainingComplete &&
-                    completeFirstRunFp004TrainingIfReady(actorId)
-            if (after.trainingComplete && !firstRunCompleted) {
-                speakInteraction("최초 보행 전 교육과 네 가지 조작 연습을 완료했습니다.")
-            }
-            if (::startupCapabilityProbe.isInitialized) refreshStartupCapabilityUi()
+            completePriorityUserPracticeStep(after, actorId)
         }
+    }
+
+    private fun completePriorityUserPracticeStep(after: PriorityUserOnboardingSnapshot, actorId: String) {
+        val completedPractice = priorityUserPracticeInFlight
+        priorityUserTrainingGeneration += 1L
+        priorityUserPracticeInFlight = null
+        priorityUserPracticeAttemptToken = null
+        updateStatus(
+            "연습 완료",
+            "${completedPractice?.actionLabelKo ?: "필수 조작 연습"}을 완료했습니다.",
+        )
+        updatePriorityUserOnboardingUi()
+        if (firstRunOnboardingSnapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4) {
+            if (after.interactivePracticeComplete) completeFirstRunFp004TrainingIfReady(actorId)
+        }
+        if (::startupCapabilityProbe.isInitialized) refreshStartupCapabilityUi()
     }
 
     private fun completeFirstRunFp004TrainingIfReady(actorId: String): Boolean {
@@ -20661,6 +21735,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             priorityUserTrainingGeneration += 1L
             priorityUserEducationInFlight = false
             priorityUserPracticeInFlight = null
+            priorityUserPracticeAttemptToken = null
             policy.cancelPractice(token)
             feedbackActuator?.cancelPriorityUserTrainingFeedback()
             updateStatus("교육·연습 다시 필요", detail)
@@ -20693,6 +21768,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         priorityUserTrainingGeneration += 1L
         priorityUserEducationInFlight = false
         priorityUserPracticeInFlight = null
+        priorityUserPracticeAttemptToken = null
         policy.cancelPractice(token)
         feedbackActuator?.cancelPriorityUserTrainingFeedback()
         updateStatus(
@@ -20707,7 +21783,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         actorId: String,
         policy: PriorityUserOnboardingPolicy,
     ): Boolean =
-        generation == priorityUserTrainingGeneration &&
+        isActivityForeground &&
+            generation == priorityUserTrainingGeneration &&
             actorId == reporterUserId &&
             actorId == priorityUserOnboardingActorId &&
             policy === priorityUserOnboardingPolicy &&
@@ -20720,6 +21797,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         priorityUserTrainingGeneration += 1L
         priorityUserEducationInFlight = false
         priorityUserPracticeInFlight = null
+        priorityUserPracticeAttemptToken = null
         if (::priorityUserOnboardingPolicy.isInitialized) {
             priorityUserOnboardingPolicy.cancelPractice()
             priorityUserOnboardingPolicy.cancelAppUsageEducationPlayback()
@@ -20789,6 +21867,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun confirmOfficialEnvironmentConditions() {
+        if (developmentGuidanceStartBypassEnabled) return
         if (!isActivityForeground || !::walkSessionLifecycle.isInitialized) return
         if (!requireFirstRunOnboardingComplete("official_environment_confirmation")) return
         if (!developmentQuickStartEnabled &&
@@ -21424,6 +22503,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         epoch: WalkRuntimeEpoch = walkSessionLifecycle.snapshot().epoch,
         nowElapsedRealtimeMs: Long = SystemClock.elapsedRealtime(),
     ): OfficialEnvironmentAssessment {
+        if (walkSessionLifecycle.isRuntimeEpochCurrent(epoch)) {
+            runtimeGpsQualityGate.current(nowElapsedRealtimeMs)?.let {
+                officialEnvironmentGpsEvidence = it
+            }
+            synchronized(phoneMountingObservationLock) {
+                runtimeCameraQualityGate.current(nowElapsedRealtimeMs)?.let { evidence ->
+                    officialEnvironmentCameraEvidence = evidence
+                    latestRuntimeRawCameraAssessment?.takeIf {
+                        it.epoch == evidence.epoch &&
+                            it.observedAtElapsedRealtimeMs == evidence.observedAtElapsedRealtimeMs &&
+                            it.status == evidence.status
+                    }?.let { latestPhoneMountingCameraAssessment = it }
+                }
+            }
+        }
         val assessed = OfficialEnvironmentPolicy.assess(
             currentEpoch = epoch,
             nowElapsedRealtimeMs = nowElapsedRealtimeMs,
@@ -21435,25 +22529,34 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 reporterUserId != null && priorityUserOnboardingActorId == reporterUserId &&
                 priorityUserOnboardingPolicy.snapshot().nativeEducationComplete,
         )
-        val featureAdjusted = assessed.factorStatuses.toMutableMap()
-        if (
-            !postLoginDeviceFeatureEnabled(
-                PostLoginDeviceCheckFeature.LOCATION_GUIDANCE,
-            )
-        ) {
-            featureAdjusted[OfficialEnvironmentFactor.GPS_QUALITY] =
-                EnvironmentEvidenceStatus.PASS
+        val enabledMeasuredFactors = buildSet {
+            if (postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)) {
+                add(OfficialEnvironmentFactor.GPS_QUALITY)
+            }
+            if (cameraAnalysisFeaturesEnabled()) {
+                add(OfficialEnvironmentFactor.CAMERA_QUALITY)
+            }
         }
-        if (!cameraAnalysisFeaturesEnabled()) {
-            featureAdjusted[OfficialEnvironmentFactor.CAMERA_QUALITY] =
-                EnvironmentEvidenceStatus.PASS
+        val runtimeUnavailableMeasuredFactors = synchronized(phoneMountingObservationLock) {
+            if (OfficialEnvironmentFactor.CAMERA_QUALITY in enabledMeasuredFactors &&
+                walkSessionLifecycle.isRuntimeEpochCurrent(epoch) &&
+                phoneMountingRuntimeState?.epoch == epoch && !phoneMountingOutputsAllowed
+            ) {
+                setOf(OfficialEnvironmentFactor.CAMERA_QUALITY)
+            } else {
+                emptySet()
+            }
         }
-        return assessed.copy(factorStatuses = featureAdjusted)
+        return assessed.copy(
+            enabledMeasuredFactors = enabledMeasuredFactors,
+            runtimeUnavailableMeasuredFactors = runtimeUnavailableMeasuredFactors,
+        )
     }
 
     private fun officialEnvironmentReadiness(
         epoch: WalkRuntimeEpoch,
     ): Pair<WalkSessionReadinessStatus, String> {
+        if (developmentGuidanceStartBypassEnabled) return WalkSessionReadinessStatus.READY to ""
         val snapshot = walkSessionLifecycle.snapshot()
         val runtimeGuard = officialEnvironmentRuntimeGuard
         if (
@@ -21609,6 +22712,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun officialEnvironmentStatusMessage(
         assessment: OfficialEnvironmentAssessment,
     ): String {
+        if (developmentGuidanceStartBypassEnabled) return "안내 시작 전 환경 점검을 생략합니다."
         if (activeOfficialEnvironmentProfile == null) {
             return "$OFFICIAL_ENVIRONMENT_SUPPORT_NOTICE_KO\n사용 불가\n" +
                 "원인: 실제 기기·현장시험으로 승인된 카메라·환경 품질 프로필이 없습니다.\n" +
@@ -21804,6 +22908,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         officialEnvironmentReadyGraceGeneration = -1L
         prewalkGuidanceStage = 0
         officialEnvironmentRuntimeGuard = null
+        runtimeGpsQualityGate.reset()
+        runtimeCameraQualityGate.reset()
+        latestRuntimeRawCameraAssessment = null
+        lastOfficialEnvironmentRuntimeAction = null
+        lastOfficialEnvironmentUnavailableFactors = emptySet()
         officialEnvironmentOutputsAllowed = false
         if (::fieldSessionLog.isInitialized) {
             fieldSessionLog.recordEvent(
@@ -21817,6 +22926,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun confirmPhoneMounting(method: PhoneMountingMethod) {
+        if (developmentGuidanceStartBypassEnabled) return
         if (!isActivityForeground || !::walkSessionLifecycle.isInitialized) return
         if (!requireFirstRunOnboardingComplete("phone_mounting_confirmation")) return
         if (!cameraAnalysisFeaturesEnabled()) {
@@ -21958,6 +23068,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun resetPrewalkCameraEvidenceForNewAttempt() {
         synchronized(phoneMountingObservationLock) {
+            runtimeCameraQualityGate.reset()
+            latestRuntimeRawCameraAssessment = null
             phoneMountingObservationGeneration += 1L
             officialEnvironmentCameraStabilityGate.reset()
             officialEnvironmentCameraDiagnosticObservation = null
@@ -22002,6 +23114,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun phoneMountingReadiness(
         epoch: WalkRuntimeEpoch,
     ): Pair<WalkSessionReadinessStatus, String> {
+        if (developmentGuidanceStartBypassEnabled) return WalkSessionReadinessStatus.READY to ""
         if (!cameraAnalysisFeaturesEnabled()) {
             return WalkSessionReadinessStatus.READY to ""
         }
@@ -22013,17 +23126,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             runtimeState.epoch == epoch &&
             walkSessionLifecycle.isRuntimeEpochCurrent(epoch)
         ) {
-            val runtimeAssessment = currentPhoneMountingAssessment(
-                epoch = epoch,
-                phase = PhoneMountingAssessmentPhase.ACTIVE,
-                previousState = runtimeState,
-            )
-            return if (runtimeAssessment.requiresSafetyStop) {
-                WalkSessionReadinessStatus.UNAVAILABLE to
-                    "phone_mounting:${runtimeAssessment.reason.name.lowercase(Locale.US)}"
-            } else {
-                WalkSessionReadinessStatus.READY to ""
-            }
+            // A mounting fault restricts camera outputs; GPS guidance has its own gate.
+            return WalkSessionReadinessStatus.READY to ""
         }
         val assessment = currentPhoneMountingAssessment(epoch)
         if (activePhoneMountingProfile == null) {
@@ -22058,6 +23162,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             !::walkSessionLifecycle.isInitialized
         ) return
         val snapshot = walkSessionLifecycle.snapshot()
+        if (developmentGuidanceStartBypassEnabled) {
+            phoneMountingStatusText.visibility = View.GONE
+            phoneMountingChestConfirmButton.visibility = View.GONE
+            phoneMountingNecklaceConfirmButton.visibility = View.GONE
+            return
+        }
         if (!cameraAnalysisFeaturesEnabled()) {
             val message =
                 "카메라 분석 기능이 제한되어 휴대전화 장착 점검을 생략합니다."
@@ -22142,6 +23252,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun phoneMountingStatusMessage(
         assessment: PhoneMountingAssessment,
     ): String {
+        if (developmentGuidanceStartBypassEnabled) return "안내 시작 전 장착·교정 점검을 생략합니다."
         val status = when (assessment.status) {
             PhoneMountingStatus.SUITABLE -> "적합"
             PhoneMountingStatus.CORRECTION_REQUIRED -> "교정 필요"
@@ -22165,6 +23276,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun invalidatePhoneMountingEvidence(reason: String) {
         cancelRuntimeCameraHandoff()
         synchronized(phoneMountingObservationLock) {
+            runtimeCameraQualityGate.reset()
+            latestRuntimeRawCameraAssessment = null
             phoneMountingObservationGeneration += 1L
             latestPhoneMountingCameraAssessment = null
             phoneMountingObservationSequence = 0L
@@ -22238,6 +23351,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         observation: CameraFrameQualityObservation,
         expectedCameraPreflightGeneration: Long? = null,
     ): CameraFrameQualityObservation? {
+        if (developmentGuidanceStartBypassEnabled) return observation
         val epoch = observation.epoch
         val observedAtElapsedRealtimeMs = observation.observedAtElapsedRealtimeMs
         val observationGeneration = phoneMountingObservationGeneration
@@ -22251,9 +23365,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     )
                 )
         ) return null
-        val cameraAssessment = CameraFrameQualityPolicy.assess(
+        var cameraAssessment = CameraFrameQualityPolicy.assess(
             currentEpoch = epoch,
-            nowElapsedRealtimeMs = observedAtElapsedRealtimeMs,
+            nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
             observation = observation,
             approvedProfile = activeCameraFrameQualityProfile,
         )
@@ -22296,10 +23410,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             )
         }
         val mountingProfile = activePhoneMountingProfile
-        val mountingFault =
-            cameraAssessment.status != EnvironmentEvidenceStatus.PASS ||
-                mountingProfile == null ||
-                cameraAssessment.profileId != mountingProfile.cameraFrameQualityProfileId
+        var mountingFault = false
         val rawEvidence = cameraAssessment.asMeasuredEnvironmentEvidence()
         val commit = synchronized(phoneMountingObservationLock) {
             if (
@@ -22332,7 +23443,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 } else {
                     CameraPreflightStabilityDecision.ACCEPT
                 }
-                val evidence = when (stabilityDecision) {
+                val preflightEvidence = when (stabilityDecision) {
                     CameraPreflightStabilityDecision.STABILIZING -> rawEvidence.copy(
                         status = EnvironmentEvidenceStatus.UNKNOWN,
                         detail = "CAMERA_STABILIZING",
@@ -22342,6 +23453,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             ?: rawEvidence
                     CameraPreflightStabilityDecision.ACCEPT -> rawEvidence
                 }
+                val evidence = if (expectedCameraPreflightGeneration == null &&
+                    walkSessionLifecycle.isRuntimeEpochCurrent(epoch)
+                ) {
+                    latestRuntimeRawCameraAssessment = cameraAssessment
+                    runtimeCameraQualityGate.observe(rawEvidence, SystemClock.elapsedRealtime())
+                } else {
+                    preflightEvidence
+                }
+                if (evidence !== rawEvidence &&
+                    evidence.status == EnvironmentEvidenceStatus.PASS
+                ) {
+                    latestPhoneMountingCameraAssessment?.takeIf {
+                        it.status == EnvironmentEvidenceStatus.PASS &&
+                            it.epoch == evidence.epoch &&
+                            it.profileId == evidence.measurementProfileId &&
+                            it.observedAtElapsedRealtimeMs == evidence.observedAtElapsedRealtimeMs
+                    }?.let { cameraAssessment = it }
+                }
+                mountingFault = cameraAssessment.status != EnvironmentEvidenceStatus.PASS ||
+                    mountingProfile == null ||
+                    cameraAssessment.profileId != mountingProfile.cameraFrameQualityProfileId
                 phoneMountingObservationSequence += 1L
                 val sequence = phoneMountingObservationSequence
                 val latestObservedAt =
@@ -22450,8 +23582,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         }
                     }
                 }
-                if (shouldReassessRuntime && walkSessionLifecycle.isRuntimeEpochCurrent(epoch)) {
+                if ((shouldReassessRuntime || runtimeRetryRequested && assessment != null) &&
+                    walkSessionLifecycle.isRuntimeEpochCurrent(epoch)
+                ) {
                     applyCurrentOfficialEnvironmentRuntimeAssessment()
+                } else if (runtimeCameraQualityGate.pendingFailureDeadlineElapsedRealtimeMs() != null) {
+                    scheduleOfficialEnvironmentRuntimeWatchdog(epoch)
                 }
             } else {
                 updatePhoneMountingUi()
@@ -22481,9 +23617,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     ) {
         if (walkSessionLifecycle.snapshot().epoch != epoch) return
         val previous = officialEnvironmentGpsEvidence
-        val evidence = OfficialEnvironmentPolicy.assessGpsQuality(
+        val nowMs = SystemClock.elapsedRealtime()
+        val rawEvidence = OfficialEnvironmentPolicy.assessGpsQuality(
             currentEpoch = epoch,
-            nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            nowElapsedRealtimeMs = nowMs,
             observation = GpsQualityObservation(
                 epoch = epoch,
                 observedAtElapsedRealtimeMs = observedAtElapsedRealtimeMs,
@@ -22492,6 +23629,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ),
             approvedProfile = activeOfficialEnvironmentProfile,
         )
+        val evidence = if (walkSessionLifecycle.isRuntimeEpochCurrent(epoch)) {
+            runtimeGpsQualityGate.observe(rawEvidence, nowMs)
+        } else {
+            rawEvidence
+        }
         officialEnvironmentGpsEvidence = evidence
         val shouldReassessRuntime =
             (
@@ -22503,10 +23645,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             )
         if (isWalkSessionRuntimeActive() && shouldReassessRuntime) {
             applyCurrentOfficialEnvironmentRuntimeAssessment()
+        } else if (isWalkSessionRuntimeActive() &&
+            runtimeGpsQualityGate.pendingFailureDeadlineElapsedRealtimeMs() != null
+        ) {
+            scheduleOfficialEnvironmentRuntimeWatchdog(epoch)
         }
     }
 
     private fun activateOfficialEnvironmentRuntime(): Boolean {
+        if (developmentGuidanceStartBypassEnabled) {
+            officialEnvironmentOutputsAllowed = true
+            return true
+        }
         val epoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return false
         val guard = OfficialEnvironmentRuntimeGuard(
             epoch = epoch,
@@ -22514,6 +23664,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
         officialEnvironmentRuntimeGuard = guard
         val nowMs = SystemClock.elapsedRealtime()
+        runtimeGpsQualityGate.reset()
+        runtimeCameraQualityGate.reset()
+        officialEnvironmentGpsEvidence?.let { runtimeGpsQualityGate.observe(it, nowMs) }
+        officialEnvironmentCameraEvidence?.let { runtimeCameraQualityGate.observe(it, nowMs) }
+        latestRuntimeRawCameraAssessment = latestPhoneMountingCameraAssessment
+        lastOfficialEnvironmentRuntimeAction = null
+        lastOfficialEnvironmentUnavailableFactors = emptySet()
         val runtimeDecision = guard.onAssessment(
             assessment = currentOfficialEnvironmentAssessment(epoch, nowMs),
             nowElapsedRealtimeMs = nowMs,
@@ -22523,6 +23680,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun activatePhoneMountingRuntime(): Boolean {
+        if (developmentGuidanceStartBypassEnabled) {
+            phoneMountingOutputsAllowed = true
+            return true
+        }
         val epoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return false
         if (!cameraAnalysisFeaturesEnabled()) {
             cancelRuntimeCameraHandoff()
@@ -22542,14 +23703,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             return true
         }
         if (!phoneMountingSensorProbe.start()) {
-            enterWalkSessionSafetyStopAndCancelOutputs(
-                "phone_mounting_sensor_start_failed",
+            phoneMountingRuntimeState = PhoneMountingPolicy.initialState(
+                epoch = epoch,
+                approvedProfile = activePhoneMountingProfile,
+            )
+            observeOfficialEnvironmentCameraFrame(
+                epoch = epoch,
+                observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                frameAvailable = false,
             )
             updateStatus(
                 "장착 센서 시작 실패",
-                "자이로·중력 센서를 사용할 수 없어 보행 안내를 시작하지 않습니다.",
+                "자이로·중력 센서를 사용할 수 없어 카메라 인식과 거리 안내를 제한합니다. 위치 품질이 확인되면 경로 안내는 계속됩니다.",
             )
-            return false
+            return walkSessionLifecycle.isRuntimeEpochCurrent(epoch)
         }
         val initialState = PhoneMountingPolicy.initialState(
             epoch = epoch,
@@ -22568,19 +23735,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 assessment.status == PhoneMountingStatus.CORRECTION_REQUIRED,
             outputsAlreadyRevoked = false,
         )
-        return (assessment.status != PhoneMountingStatus.UNUSABLE).also { usable ->
-            if (!usable) phoneMountingSensorProbe.stop()
-        }
+        return walkSessionLifecycle.isRuntimeEpochCurrent(epoch)
     }
 
     private fun beginRuntimeCameraHandoff(epoch: WalkRuntimeEpoch) {
+        if (developmentGuidanceStartBypassEnabled) {
+            phoneMountingOutputsAllowed = true
+            return
+        }
         val startedAtMs = SystemClock.elapsedRealtime()
         val generation = synchronized(phoneMountingObservationLock) {
             runtimeCameraHandoffEpoch = epoch
             runtimeCameraHandoffStartedAtElapsedRealtimeMs = startedAtMs
             officialEnvironmentCameraEvidence = null
             latestPhoneMountingCameraAssessment = null
-            officialEnvironmentOutputsAllowed = false
+            runtimeCameraQualityGate.reset()
+            latestRuntimeRawCameraAssessment = null
             phoneMountingOutputsAllowed = false
             phoneMountingObservationSequence = 0L
             phoneMountingPendingFaultSequence = 0L
@@ -22590,6 +23760,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         officialEnvironmentWatchdogGeneration += 1L
         phoneMountingWatchdogGeneration += 1L
+        applyCurrentOfficialEnvironmentRuntimeAssessment()
         statusText.postDelayed(
             {
                 val timedOut = synchronized(phoneMountingObservationLock) {
@@ -22685,6 +23856,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun revokePhoneMountingReportOutputLease() {
+        if (developmentGuidanceStartBypassEnabled) return
         synchronized(phoneMountingObservationLock) {
             phoneMountingOutputsAllowed = false
             synchronized(reportUploadSafetyLock) {
@@ -22699,6 +23871,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         announceCorrection: Boolean,
         outputsAlreadyRevoked: Boolean,
     ) {
+        if (developmentGuidanceStartBypassEnabled) {
+            phoneMountingOutputsAllowed = true
+            return
+        }
         val epoch = assessment.nextState.epoch
         if (!walkSessionLifecycle.isRuntimeEpochCurrent(epoch)) return
         if (
@@ -22731,8 +23907,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     invalidatePhoneMountingDetectionOutputs(epoch)
                 }
                 clearExplicitReportFrameState("phone_mounting_correction")
-                cancelActiveRouteRequest()
-                cancelDestinationSearch()
                 latestFeedbackDeliveryState = FeedbackDeliveryState()
                 feedbackPolicy.cancelPendingFeedbackDeliveries()
                 if (announceCorrection) {
@@ -22747,23 +23921,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     )
                     ensureFeedbackActuator().playPhoneMountingCorrectionVibration()
                     speakStatusExplanation(
-                        "휴대전화 장착을 교정하세요. " +
-                            "${assessment.accessibleReasonKo} ${assessment.accessibleActionKo}",
+                        "휴대전화 장착을 교정하세요. ${assessment.spokenGuidanceKo}",
                     )
                 }
                 updatePhoneMountingUi()
             }
             PhoneMountingStatus.UNUSABLE -> {
                 phoneMountingOutputsAllowed = false
-                enterWalkSessionSafetyStopAndCancelOutputs(
-                    "phone_mounting_retry_exhausted",
-                )
                 val detail =
                     "${assessment.accessibleReasonKo} ${assessment.accessibleActionKo} " +
-                        "전체 상태를 다시 확인하고 새 보행을 시작하세요."
-                updateStatus("휴대전화 장착 · 안전 중지", detail)
-                ensureFeedbackActuator().playPhoneMountingSafetyStopVibration()
-                speakStatusExplanation(detail)
+                        "카메라 인식·거리·위험 안내를 제한합니다. 위치 품질이 확인되면 경로 안내는 계속됩니다."
+                if (announceCorrection) {
+                    invalidatePhoneMountingDetectionOutputs(epoch)
+                    updateStatus("휴대전화 장착 · 카메라 기능 제한", detail)
+                    ensureFeedbackActuator().playPhoneMountingSafetyStopVibration()
+                    speakStatusExplanation(detail)
+                }
+                updatePhoneMountingUi()
             }
         }
     }
@@ -22772,17 +23946,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         synchronized(frameStateLock) {
             if (!walkSessionLifecycle.isRuntimeEpochCurrent(epoch)) return
             detectorGeneration += 1
+            resetVisualTrackingState()
             latestDetectionSnapshot = DetectionSnapshot.empty()
-            latestTactileOverlaySnapshot = DetectionSnapshot.empty()
-            lastNonEmptyOverlaySnapshot = DetectionSnapshot.empty()
             latestExplicitReportOutput = null
             latestExplicitReportImage = null
             latestExplicitReportGateState = null
             latestExplicitReportCapturedAtMs = 0L
-            lastDetectionRunMs = 0L
+            adaptiveInferencePacing.reset()
             lastOverlayUpdateMs = 0L
             lastUiUpdateMs = 0L
-            tactileOverlayStabilizer.clear()
             captureLog.clear()
             objectDepthPipeline = ObjectDepthRuntimePipeline().also { pipeline ->
                 pipeline.setUserStepLength(stepLengthEstimator.stepLengthM)
@@ -22902,17 +24074,35 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun walkSafetyOutputsAllowed(): Boolean =
-        firstRunOnboardingComplete() &&
-            officialEnvironmentOutputsAllowed &&
-            (!cameraAnalysisFeaturesEnabled() || phoneMountingOutputsAllowed)
+        navigationEnvironmentOutputsAllowed() && cameraEnvironmentOutputsAllowed()
+
+    private fun navigationEnvironmentOutputsAllowed(): Boolean =
+        developmentGuidanceStartBypassEnabled || (firstRunOnboardingComplete() && officialEnvironmentOutputsAllowed &&
+            postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE) &&
+            officialEnvironmentRuntimeGuard?.decision()?.navigationOutputsAllowed == true)
+
+    private fun cameraEnvironmentOutputsAllowed(): Boolean =
+        (developmentGuidanceStartBypassEnabled && hasCameraPermission()) || (firstRunOnboardingComplete() && officialEnvironmentOutputsAllowed &&
+            cameraAnalysisFeaturesEnabled() && hasCameraPermission() &&
+            officialEnvironmentRuntimeGuard?.decision()?.cameraOutputsAllowed == true &&
+            phoneMountingOutputsAllowed)
 
     private fun applyCurrentOfficialEnvironmentRuntimeAssessment() {
+        if (developmentGuidanceStartBypassEnabled) return
         val guard = officialEnvironmentRuntimeGuard ?: return
         if (!walkSessionLifecycle.isRuntimeEpochCurrent(guard.epoch)) return
         val nowMs = SystemClock.elapsedRealtime()
+        val assessment = currentOfficialEnvironmentAssessment(guard.epoch, nowMs)
+        if (cameraAnalysisFeaturesEnabled() &&
+            runtimeCameraHandoffEpoch != guard.epoch &&
+            assessment.factorStatuses[OfficialEnvironmentFactor.CAMERA_QUALITY] !=
+            EnvironmentEvidenceStatus.PASS
+        ) {
+            applyCurrentPhoneMountingRuntimeAssessment(runtimeRetryRequested = false)
+        }
         applyOfficialEnvironmentRuntimeDecision(
             guard.onAssessment(
-                assessment = currentOfficialEnvironmentAssessment(guard.epoch, nowMs),
+                assessment = assessment,
                 nowElapsedRealtimeMs = nowMs,
             ),
         )
@@ -22921,16 +24111,45 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun applyOfficialEnvironmentRuntimeDecision(
         decision: kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentRuntimeDecision,
     ) {
+        if (developmentGuidanceStartBypassEnabled) return
         if (!walkSessionLifecycle.isRuntimeEpochCurrent(decision.epoch)) return
         when (decision.action) {
             OfficialEnvironmentRuntimeAction.CONTINUE -> {
                 officialEnvironmentOutputsAllowed = true
+                val newlyUnavailable = decision.unavailableFactors -
+                    lastOfficialEnvironmentUnavailableFactors
+                if (newlyUnavailable.isNotEmpty()) {
+                    clearExplicitReportFrameState("measured_environment_feature_limited")
+                    synchronized(reportUploadSafetyLock) {
+                        reportUploadSafetyGeneration += 1L
+                        reportPrivacyConsentSession.cancelActiveCalls()
+                    }
+                }
+                if (OfficialEnvironmentFactor.GPS_QUALITY in newlyUnavailable) {
+                    directionGuidancePauseReason = "environment_gps_quality"
+                    cancelVoiceCommandRecognition()
+                    feedbackLifecycleGeneration += 1
+                    feedbackActuator?.close()
+                    feedbackActuator = null
+                    updateStatus(
+                        "위치 안내 제한",
+                        "위치 품질을 확인할 수 없어 경로 방향 안내와 위치가 필요한 신고를 제한합니다. 카메라 상태가 정상이면 장애물 인식은 계속됩니다.",
+                    )
+                    speakStatusExplanation(
+                        "위치 품질을 확인할 수 없어 경로 방향 안내를 잠시 제한합니다. 안전한 곳에서 위치가 회복될 때까지 기다리세요.",
+                    )
+                } else if (decision.navigationOutputsAllowed &&
+                    OfficialEnvironmentFactor.GPS_QUALITY in lastOfficialEnvironmentUnavailableFactors
+                ) {
+                    if (directionGuidancePauseReason == "environment_gps_quality") {
+                        directionGuidancePauseReason = null
+                    }
+                    startNavigationServicesIfNeeded()
+                }
                 scheduleOfficialEnvironmentRuntimeWatchdog(decision.epoch)
             }
             OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY -> {
-                val newlySuppressed =
-                    officialEnvironmentOutputsAllowed ||
-                        decision.consecutiveDegradations == 1
+                val newlySuppressed = lastOfficialEnvironmentRuntimeAction != decision.action
                 officialEnvironmentOutputsAllowed = false
                 clearExplicitReportFrameState("official_environment_retry")
                 synchronized(reportUploadSafetyLock) {
@@ -22965,24 +24184,30 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 speakStatusExplanation(detail)
             }
         }
+        lastOfficialEnvironmentRuntimeAction = decision.action
+        lastOfficialEnvironmentUnavailableFactors = decision.unavailableFactors
     }
 
     private fun scheduleOfficialEnvironmentRuntimeWatchdog(epoch: WalkRuntimeEpoch) {
         val profile = activeOfficialEnvironmentProfile ?: return
         if (!walkSessionLifecycle.isRuntimeEpochCurrent(epoch)) return
         val generation = ++officialEnvironmentWatchdogGeneration
+        val unavailableFactors = officialEnvironmentRuntimeGuard?.decision()?.unavailableFactors
+            ?: emptySet()
         val locationRequired = postLoginDeviceFeatureEnabled(
             PostLoginDeviceCheckFeature.LOCATION_GUIDANCE,
         )
         val cameraRequired = cameraAnalysisFeaturesEnabled()
         if (!locationRequired && !cameraRequired) return
         val nowMs = SystemClock.elapsedRealtime()
-        val delayMs = if (officialEnvironmentOutputsAllowed) {
+        val evidenceDelayMs = if (officialEnvironmentOutputsAllowed) {
             listOfNotNull(
                 officialEnvironmentGpsEvidence.takeIf { locationRequired },
                 officialEnvironmentCameraEvidence.takeIf { cameraRequired },
             ).filter { evidence ->
                 evidence.epoch == epoch &&
+                    evidence.status == EnvironmentEvidenceStatus.PASS &&
+                    evidence.factor !in unavailableFactors &&
                     evidence.observedAtElapsedRealtimeMs != null &&
                     evidence.maximumEvidenceAgeMs != null
             }.minOfOrNull { evidence ->
@@ -23000,10 +24225,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         else -> remainingMs + 1L
                     }
                 }
-            } ?: 1L
+            } ?: profile.runtimeRetryIntervalMs
         } else {
-            profile.maximumMeasuredEvidenceAgeMs.coerceAtLeast(1L)
+            profile.runtimeRetryIntervalMs
         }
+        val qualityFailureDelayMs = listOfNotNull(
+            runtimeGpsQualityGate.pendingFailureDeadlineElapsedRealtimeMs(),
+            runtimeCameraQualityGate.pendingFailureDeadlineElapsedRealtimeMs(),
+        ).minOfOrNull { deadlineMs -> (deadlineMs - nowMs).coerceAtLeast(1L) }
+        val delayMs = minOf(
+            evidenceDelayMs,
+            profile.runtimeRetryIntervalMs,
+            qualityFailureDelayMs ?: evidenceDelayMs,
+        )
         statusText.postDelayed(
             {
                 if (
@@ -23028,6 +24262,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 approvedDeviceProfileRequired = false,
             ),
         )
+        if (developmentGuidanceStartBypassEnabled) {
+            return decision.copy(
+                tier = if (metricDistanceOverride == false) WalkSafeStartupCapabilityTier.LIMITED
+                    else WalkSafeStartupCapabilityTier.FULL,
+                unavailableRequirements = if (metricDistanceOverride == false)
+                    listOf(WalkSafeStartupRequirement.METRIC_DISTANCE) else emptyList(),
+                pendingRequirements = emptyList(),
+                noticeKo = "개발 전용: 안내 시작 제한을 통과 처리합니다. 실제 카메라·Depth·위치 결과는 별도 점검 화면에서 확인하세요.",
+            )
+        }
         if (!developmentQuickStartEnabled) return decision
         val requiredCapabilityUnavailable =
             WalkSafeStartupRequirement.ANDROID_VERSION in decision.unavailableRequirements ||
@@ -23616,6 +24860,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             null
         }
         val transition = walkSessionLifecycle.handle(event)
+        if (transition.current.state !in setOf(WalkSessionState.READY, WalkSessionState.ENDED)) {
+            cancelDeviceRuntimeCalibration("walk_transition")
+        }
         if (
             transition.changed &&
             (
@@ -24262,7 +25509,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun maybeAdvanceWalkSessionAfterCapabilityCheck() {
-        if (permissionRecoveryGate.blocksAutomaticResourceStart) {
+        if (gatewayWalkStartConfirmationToken != null) return
+        if (permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled) {
             completePermissionRecoveryRecheckIfPossible()
             if (permissionRecoveryGate.blocksAutomaticResourceStart) return
         }
@@ -24377,7 +25625,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             session.state == WalkSessionState.PAUSED &&
                 session.recoveryStage == WalkSessionRecoveryStage.AWAITING_RESUME_CONFIRMATION -> {
-                if (isStartupCapabilityConfirmed()) {
+                if (developmentGuidanceStartBypassEnabled &&
+                    developmentGuidanceResumeRequestedEpoch == session.epoch
+                ) {
+                    developmentGuidanceResumeRequestedEpoch = null
+                    confirmWalkSessionResumeFromButton()
+                } else if (isStartupCapabilityConfirmed()) {
                     requestWalkSessionResumeConfirmation()
                 } else {
                     updateStatus(
@@ -24704,7 +25957,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             null
         }
         if (
-            permissionRecoveryGate.blocksAutomaticResourceStart ||
+            (permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled) ||
             currentReadiness == null ||
             gatewayWalkAuthorityController.activeLeaseOrNull(snapshot.epoch) == null
         ) {
@@ -24951,7 +26204,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val deviceResources = walkSessionResourceProbe.snapshot()
         val collector = WalkSessionReadinessCollector(epoch = epoch, plan = plan)
         plan.requiredRequirements.forEach { requirement ->
-            val (status, reason) = when (requirement) {
+            val (status, reason) = if (
+                developmentGuidanceStartBypassEnabled &&
+                requirement !in setOf(
+                    WalkSessionReadinessRequirement.GATEWAY,
+                    WalkSessionReadinessRequirement.ROUTE_SERVICE,
+                )
+            ) {
+                WalkSessionReadinessStatus.READY to "debug_guidance_start_bypass"
+            } else when (requirement) {
                 WalkSessionReadinessRequirement.FIRST_RUN_ONBOARDING -> {
                     if (firstRunOnboardingComplete()) {
                         WalkSessionReadinessStatus.READY to ""
@@ -25153,6 +26414,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!firstRunOnboardingComplete()) {
             return "첫 실행 등록과 안전교육이 완료될 때까지 보행 안내를 시작하지 않습니다."
         }
+        if (developmentGuidanceStartBypassEnabled) return null
         if (!decision.mayConfirmAndStart) return decision.noticeKo
         if (
             !postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE) ||
@@ -25296,7 +26558,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!::walkSessionLifecycle.isInitialized) return false
         val snapshot = walkSessionLifecycle.snapshot()
         return firstRunOnboardingComplete() &&
-            !permissionRecoveryGate.blocksAutomaticResourceStart &&
+            (!permissionRecoveryGate.blocksAutomaticResourceStart || developmentGuidanceStartBypassEnabled) &&
             isActivityForeground &&
             snapshot.state == WalkSessionState.ACTIVE &&
             snapshot.isForeground &&
@@ -25514,6 +26776,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (isWalkSessionRuntimeActive()) {
             activateWalkSessionRuntime()
             updateStatus("보행 안내 재개", "필수 기능 재검사와 사용자 확인을 마쳐 새 판단으로 재개했습니다.")
+            // A walker who cannot see the screen has no other way to know guidance is back, and
+            // this is the sentence the practice screen rehearsed.
+            speakInteraction(PriorityUserPractice.RESUME.instructionKo)
         } else {
             val detail = when (response) {
                 WalkSessionResumeConfirmation.CANCEL -> "사용자가 취소해 일시중지를 유지합니다."
@@ -25563,6 +26828,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "보행 안내 재개",
                 "화면의 재개 버튼 확인으로 보행 안내를 다시 시작했습니다.",
             )
+            speakInteraction(PriorityUserPractice.RESUME.instructionKo)
         }
     }
 
@@ -25884,6 +27150,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             acquisitionDiagnostics = frameProvider?.preflightDiagnostics() ?: "not_started"
             val ownedSession = session
             session = null
+            frameProvider?.close()
             frameProvider = null
             arSessionPurpose = ArSessionPurpose.NONE
             arSessionGeneration += 1
@@ -26009,6 +27276,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             runtimeMetricLastFrameTimestampNanos = 0L
             if (wasPreflight || wasRuntime) {
                 session = null
+                frameProvider?.close()
                 frameProvider = null
                 arSessionPurpose = ArSessionPurpose.NONE
                 arSessionGeneration += 1
@@ -26239,7 +27507,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun persistStartupCapabilityDecision(decision: WalkSafeStartupCapabilityDecision) {
-        if (developmentQuickStartEnabled) return
+        if (developmentQuickStartEnabled || developmentGuidanceStartBypassEnabled) return
         if (lastPersistedStartupCapabilityDecision == decision) return
         lastPersistedStartupCapabilityDecision = decision
         val profileMatch = startupCapabilityProbe.deviceProfileMatch()
@@ -26319,6 +27587,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun isStartupCapabilityConfirmed(): Boolean {
         val decision = startupCapabilityDecision ?: return false
+        if (developmentGuidanceStartBypassEnabled && firstRunOnboardingComplete() &&
+            currentReporterUserId() != null) return true
         return decision.mayConfirmAndStart && confirmedStartupCapabilityDecision == decision
     }
 
@@ -26770,7 +28040,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun gatewaySessionOrNull(reason: String, speak: Boolean = true): GatewayFieldSession? {
         val session = gatewayFieldSession
         if (isGatewaySessionReadyForCurrentActor(session)) return session
-        if (session != null) clearGatewaySession(logoutRemote = false, expectedSession = session)
+        if (session != null) clearExpiredGatewaySessionIfCurrent(session)
         if (speak) {
             updateNavigationStatus("gateway=session_required reason=$reason")
             speakInteraction("현장 게이트웨이에 먼저 로그인하세요.")
@@ -26837,12 +28107,40 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun currentLocationCollectionAllowsWork(): Boolean {
-        if (currentPositionFieldCollectionAllowsWork()) return true
-        if (!firstRunOnboardingComplete()) return false
-        if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)) return false
-        if (!isWalkSessionRuntimeActive() || !isStartupCapabilityConfirmed()) return false
-        val guard = officialEnvironmentRuntimeGuard ?: return false
-        return walkSessionLifecycle.isRuntimeEpochCurrent(guard.epoch)
+        return currentLocationCollectionOwnerOrNull() != null
+    }
+
+    private fun currentLocationCollectionOwnerOrNull(): LocationCollectionOwner? {
+        if (!isActivityForeground || !hasLocationPermission()) return null
+        if (!isLocationServiceEnabledForDeviceCheck()) return null
+        val process = GatewaySessionProcessCoordinator.snapshot()
+        if (
+            process.storageBlocked || process.deletionRecoveryOnly ||
+            accountDeletionStateMachine.processingBlocked()
+        ) return null
+        val session = process.session
+        val actorId = if (developmentQuickStartEnabled) {
+            developmentQuickStartSessionOrNull()?.actorId
+        } else {
+            firstRunOnboardingSnapshot.verifiedActorBinding?.value
+        }
+        if (
+            actorId != null && session != null &&
+            session.actorId == actorId &&
+            session.sessionScope == GatewaySessionScope.GENERAL &&
+            session.verificationState == GatewaySessionVerificationState.VERIFIED &&
+            session.isUsableFor(actorId)
+        ) {
+            return LocationCollectionOwner(actorId, session, process.generation)
+        }
+        if (!currentPositionFieldCollectionAllowsWork()) return null
+        return LocationCollectionOwner(
+            actorId = null,
+            gatewaySession = session,
+            gatewayGeneration = process.generation,
+            fieldWalkEpoch = positionFieldWalkEpoch,
+            fieldScopeId = positionFieldLeaseScopeId,
+        )
     }
 
     private fun currentStepTrackingCollectionAllowsWork(): Boolean {
@@ -26850,8 +28148,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!firstRunOnboardingComplete()) return false
         if (!isWalkSessionRuntimeActive()) return false
         if (!isStartupCapabilityConfirmed()) return false
-        if (!officialEnvironmentOutputsAllowed) return false
-        if (cameraAnalysisFeaturesEnabled() && !phoneMountingOutputsAllowed) return false
+        if (!navigationEnvironmentOutputsAllowed()) return false
         return true
     }
 
@@ -27200,6 +28497,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
             }
         }
+        startLocationUpdatesIfAllowed()
     }
 
     private fun isRouteLocationPermissionReady(): Boolean = hasLocationPermission()
@@ -27228,7 +28526,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             PackageManager.PERMISSION_GRANTED
 
     private fun runtimeCameraStartBlockedByAnotherOwner(): Boolean =
-        cameraXReleaseBlocked ||
+        runtimeCalibration != null || unknownCalibration != null || unknownLoadingService != null || unknownRuntimeClosing ||
+            runtimeTuningPreparing || runtimeOldDetectorReleasePending ||
+            cameraXReleaseBlocked ||
             officialEnvironmentCameraPreflightActive ||
             officialEnvironmentCameraCleanupPending ||
             postLoginCameraPipelinePreflightActive ||
@@ -27474,6 +28774,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val sessionToStop = synchronized(runtimeMetricStateLock) {
             val ownedSession = session
             session = null
+            frameProvider?.close()
             frameProvider = null
             arSessionPurpose = ArSessionPurpose.NONE
             arSessionGeneration += 1
@@ -27497,11 +28798,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         latestTactileRouteState = "localRoute=tmap:tactile_not_visible"
         latestReportCandidateStatus = "reportCandidate=blocked"
         detectorGeneration += 1
+        resetVisualTrackingState()
         latestDetectionSnapshot = DetectionSnapshot.empty()
-        latestTactileOverlaySnapshot = DetectionSnapshot.empty()
-        lastNonEmptyOverlaySnapshot = DetectionSnapshot.empty()
-        tactileOverlayStabilizer.clear()
-        lastDetectionRunMs = 0L
+        adaptiveInferencePacing.reset()
         captureLog.clear()
         if (::metadataLogUploader.isInitialized) {
             metadataLogUploader.setEnabled(false)
@@ -27713,7 +29012,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     cameraFallbackRunning = true
                     syncActiveSessionScreenPolicy()
                     cameraFallbackPreviewView.visibility = View.VISIBLE
-                    lastCameraFallbackAnalysisMs = 0L
+                    adaptiveInferencePacing.reset()
                     cameraFallbackFrameAnalyzedGeneration = -1
                     fieldSessionLog.recordEvent(
                         "camera_non_metric_session_started",
@@ -27815,7 +29114,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (::cameraFallbackPreviewView.isInitialized) {
             cameraFallbackPreviewView.visibility = View.GONE
         }
-        lastCameraFallbackAnalysisMs = 0L
+        adaptiveInferencePacing.reset()
         cameraFallbackFrameAnalyzedGeneration = -1
         nonMetricAdvisoryPolicy.reset()
         if (wasRequested && ::fieldSessionLog.isInitialized) {
@@ -27913,6 +29212,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         expectedWalkEpoch: WalkRuntimeEpoch,
         expectedFallbackGeneration: Int,
     ) {
+        var pacingTicket: InferencePacingTicket? = null
+        var detectorInvoked = false
+        var inferenceDurationMs: Long? = null
+        var detectorSucceeded = false
         try {
             if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.OBSTACLE_DETECTION)) {
                 return
@@ -27926,8 +29229,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     requireRunning = true,
                 )
             ) return
-            if (nowMs - lastCameraFallbackAnalysisMs < CAMERA_FALLBACK_ANALYSIS_INTERVAL_MS) return
-            lastCameraFallbackAnalysisMs = nowMs
+            runtimeCameraFrameBudgetMs = null
+            runtimeLoadFrameScope = RuntimeFeatureScope.CAMERA_TRACKING
+            runtimeLoadNormalFrameAtMs = if (cameraEnvironmentOutputsAllowed()) nowMs else null
+            runtimeLoadObservationSource.recordFrame(
+                imageProxy.imageInfo.timestamp, nowMs, null, null, null, runtimeLoadEnvironmentKey(),
+            )
+            observeRuntimeInferenceLoad(inputObserved = true)
+            pacingTicket = tryStartDetectionWork(nowMs) ?: return
             val lifecycleGeneration = feedbackLifecycleGeneration
             val detectorFrameGeneration = detectorGeneration
             val mediaImage = imageProxy.image ?: return
@@ -27944,8 +29253,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     yPlanePixelStride = yPlane?.pixelStride,
                 ),
             ) ?: return
-            if (!walkSafetyOutputsAllowed()) return
-            var detectorSucceeded = false
+            if (!cameraEnvironmentOutputsAllowed()) return
             var detectorStartedAtElapsedRealtimeMs = nowMs
             var result = AndroidDetectionResult.empty()
             val admission = CameraDetectorAdmissionPolicy.admit(
@@ -27954,11 +29262,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 observation = qualityObservation,
                 approvedProfile = activeCameraFrameQualityProfile,
             ) {
+                detectorInvoked = true
                 detectorStartedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
                 result = try {
-                    frameDetector.detect(
+                    frameDetector.detectOriented(
                         cameraImage = mediaImage,
                         timestampMs = imageProxy.imageInfo.timestamp / NANOS_PER_MILLISECOND,
+                        quarterTurns = (imageProxy.imageInfo.rotationDegrees / 90) % 4,
                     ).also {
                         if (
                             isCurrentFrameGeneration(
@@ -27977,9 +29287,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         expectedWalkEpoch,
                     )
                     AndroidDetectionResult.empty()
+                } finally {
+                    inferenceDurationMs = SystemClock.elapsedRealtime() - detectorStartedAtElapsedRealtimeMs
                 }
             }
             if (!admission.detectorInvocationAllowed) return
+            inferenceDurationMs = result.timing.totalMs ?: inferenceDurationMs
             if (detectorSucceeded) {
                 val completedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
                 val inferenceLatencyMs = result.timing.totalMs
@@ -28004,7 +29317,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     detectorFrameGeneration,
                     expectedWalkEpoch,
                 ) ||
-                !walkSafetyOutputsAllowed() ||
+                !cameraEnvironmentOutputsAllowed() ||
                 !isActivityForeground
             ) return
             if (detectorSucceeded) {
@@ -28046,7 +29359,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     detectorFrameGeneration,
                     expectedWalkEpoch,
                 ) ||
-                !walkSafetyOutputsAllowed() ||
+                !cameraEnvironmentOutputsAllowed() ||
                 !isActivityForeground
             ) {
                 nonMetricAdvisoryPolicy.reset()
@@ -28063,7 +29376,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
             }
         } finally {
-            imageProxy.close()
+            try {
+                imageProxy.close()
+            } finally {
+                pacingTicket?.let { ticket ->
+                    finishDetectionWork(ticket, detectorInvoked, inferenceDurationMs, validCompletion = detectorSucceeded)
+                }
+            }
         }
     }
 
@@ -28245,7 +29564,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     ): Boolean {
         val nowMs = SystemClock.elapsedRealtime()
         return nowMs <= action.validUntilMs &&
-            officialEnvironmentOutputsAllowed &&
+            cameraEnvironmentOutputsAllowed() &&
             phoneMountingOutputsAllowed &&
             isCameraFallbackLeaseCurrent(
                 expectedWalkEpoch,
@@ -28304,6 +29623,116 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             location.accuracyM.isFinite()
     }
 
+    /** ARCore and CameraX share one physical detector and never enqueue replacement frames. */
+    private fun tryStartDetectionWork(nowElapsedRealtimeMs: Long): InferencePacingTicket? =
+        synchronized(frameStateLock) {
+            if (detectionInFlight.get()) {
+                if (nowElapsedRealtimeMs >= adaptiveInferencePacing.snapshot().nextEligibleAtElapsedRealtimeMs) {
+                    rawDetectionDueButInFlightDropCount.incrementAndGet()
+                }
+                return@synchronized null
+            }
+            if (!adaptiveInferencePacing.isDue(nowElapsedRealtimeMs)) return@synchronized null
+            if (!detectionInFlight.compareAndSet(false, true)) {
+                rawDetectionDueButInFlightDropCount.incrementAndGet()
+                return@synchronized null
+            }
+            adaptiveInferencePacing.tryStart(nowElapsedRealtimeMs) ?: run {
+                detectionInFlight.set(false)
+                null
+            }
+        }
+
+    private fun finishDetectionWork(
+        ticket: InferencePacingTicket,
+        detectorInvoked: Boolean,
+        inferenceDurationMs: Long? = null,
+        validCompletion: Boolean = false,
+    ) = synchronized(frameStateLock) {
+        try {
+            if (detectorInvoked) {
+                val completedAt = SystemClock.elapsedRealtime()
+                val loadObservation = runtimeLoadObservationSource.latestObservation(completedAt)
+                latestUnknownLoadObservation = loadObservation
+                val accepted = adaptiveInferencePacing.complete(
+                    ticket = ticket,
+                    completedAtElapsedRealtimeMs = completedAt,
+                    inferenceDurationMs = inferenceDurationMs,
+                    thermalThrottled = latestInferenceThermalThrottled,
+                    loadObservation = loadObservation,
+                )
+                if (accepted && validCompletion) {
+                    val endToEnd = completedAt - ticket.startedAtElapsedRealtimeMs
+                    observeRuntimeInferenceLoad(completion = RuntimeLoadCompletion(
+                        endToEndMs = endToEnd,
+                        staleOrDropped = endToEnd > MAX_DEPTH_DETECTION_SOURCE_AGE_MS,
+                    ))
+                }
+            } else {
+                adaptiveInferencePacing.cancel(ticket)
+            }
+        } finally {
+            detectionInFlight.set(false)
+        }
+    }
+
+    private fun runtimeLoadEnvironmentKey(): String =
+        "${runtimeSelectionBinding ?: "unmeasured"}:${runtimeActiveCandidate}:${runtimeLoadFrameScope}:${detectorGeneration}:${visualGeometryVersion}"
+
+    private fun observeRuntimeInferenceLoad(inputObserved: Boolean = false, completion: RuntimeLoadCompletion? = null) {
+        val now = SystemClock.elapsedRealtime()
+        val lastNormal = runtimeLoadNormalFrameAtMs
+        val normal = detectorAvailable && !runtimeTuningPreparing && runtimeCalibration == null && unknownCalibration == null &&
+            isActivityForeground && isWalkSessionRuntimeActive() &&
+            latestInferenceThermalThrottled == false &&
+            runCatching { !getSystemService(android.os.PowerManager::class.java).isPowerSaveMode }.getOrDefault(false) &&
+            lastNormal != null && now - lastNormal in 0L..1_000L
+        val observation = runtimeLoadMonitor.observe(now, runtimeLoadEnvironmentKey(), normal, inputObserved, completion)
+        observeUnknownRuntimeLoad(now, normal, inputObserved, primaryCompletion = completion)
+        val binding = runtimeSelectionBinding
+        if (observation.pendingReason != null && binding != null && runtimeLoadPendingRecordedBinding != binding) {
+            runtimeLoadPendingRecordedBinding = binding
+            deviceTuningExecutor.execute {
+                if (runtimeSelectionBinding == binding) {
+                    val saved = deviceTuningStore.markAttemptFinished(binding, DeviceTuningRecheckReason.PERSISTENT_DEGRADATION)
+                    if (!saved) runtimeLoadPendingRecordedBinding = null
+                }
+            }
+        }
+    }
+
+    private fun observeUnknownRuntimeLoad(
+        nowMs: Long,
+        normal: Boolean,
+        inputObserved: Boolean = false,
+        primaryCompletion: RuntimeLoadCompletion? = null,
+        auxiliaryCompletion: RuntimeLoadCompletion? = null,
+    ) {
+        val binding = unknownRuntimeBinding ?: return
+        val service = unknownRuntimeService ?: return
+        val key = binding.hashOrNull() ?: return
+        val pending = unknownLoadControl.observe(nowMs, "$key:${service.sessionEpoch}", normal,
+            inputObserved, primaryCompletion, auxiliaryCompletion)
+        if (pending && !unknownLoadRecheckRecorded) {
+            unknownLoadRecheckRecorded = true
+            runCatching { deviceTuningExecutor.execute {
+                if (unknownRuntimeBinding == binding && !unknownTuningStore.markPending(
+                        binding, DeviceTuningRecheckReason.PERSISTENT_DEGRADATION,
+                    )) unknownLoadRecheckRecorded = false
+            } }
+        }
+    }
+
+    private fun adaptiveInferencePacingStatusText(): String {
+        val pacing = adaptiveInferencePacing.snapshot()
+        return "pacing=${pacing.targetIntervalMs}ms idle=${pacing.cooldownMs}ms " +
+            "e2e=${pacing.lastEndToEndMs ?: "unknown"}ms " +
+            "detectorTotal=${pacing.lastInferenceMs ?: "unknown"}ms " +
+            "thermal=${pacing.thermalThrottled ?: "unknown"} " +
+            "loadPressure=${pacing.observedLoadPressure} workHeadroom=${pacing.workHeadroomMultiplier} " +
+            "overFreshnessBudget=${pacing.overFreshnessBudget ?: "unknown"} reason=${pacing.reason}"
+    }
+
     /**
      * Runs inference off the GL thread. Published snapshots retain both capture and completion
      * timestamps so a fast partial result cannot be mistaken for a fresh current-frame result.
@@ -28318,105 +29747,123 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         frameGeneration: Int,
         expectedWalkEpoch: WalkRuntimeEpoch,
         expectedArSessionGeneration: Long,
+        visualFrameKey: VisualFrameKey? = null,
     ) {
         if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.OBSTACLE_DETECTION)) return
-        val shouldCaptureFrame = synchronized(frameStateLock) {
+        val (pacingTicket, shouldCaptureFrame) = synchronized(frameStateLock) {
             if (!isCurrentFrameGeneration(frameGeneration, expectedWalkEpoch)) return
             if (!detectorAvailable) return
-            if (elapsedRealtimeMs - lastDetectionRunMs < DETECTION_INTERVAL_MS) return
-            if (!detectionInFlight.compareAndSet(false, true)) {
-                rawDetectionDueButInFlightDropCount.incrementAndGet()
-                return
-            }
-            lastDetectionRunMs = elapsedRealtimeMs
-            frameCaptureRequested.getAndSet(false)
+            if (frame.timestamp <= 0L) return
+            if (
+                lastDetectionCaptureGeneration == frameGeneration &&
+                lastDetectionCaptureArSessionGeneration == expectedArSessionGeneration &&
+                frame.timestamp <= lastDetectionCaptureFrameId
+            ) return
+            val ticket = tryStartDetectionWork(elapsedRealtimeMs) ?: return
+            ticket to frameCaptureRequested.getAndSet(false)
         }
-        val cameraImage = provider.acquireCameraImageOrNull(frame)
-        if (cameraImage == null) {
-            detectionInFlight.set(false)
-            return
-        }
-        val generation = frameGeneration
-        val imageWidth = cameraImage.width
-        val imageHeight = cameraImage.height
-        val detectionIdentity = AndroidDetectionSnapshotFrameIdentity(
-            captureFrameId = frame.timestamp,
-            frameTimestampMs = timestampMs,
-        )
-        val frameEvidence = DetectionFrameEvidence(
-            frameId = frame.timestamp,
-            frameTimestampMs = timestampMs,
-            depthSnapshot = capturedDepthSnapshot,
-            depthMapper = createFrozenDepthMapper(
-                frame = frame,
-                frameId = frame.timestamp,
-                imageWidth = imageWidth,
-                imageHeight = imageHeight,
-                snapshot = capturedDepthSnapshot,
-            ),
-            tactileContext = buildTactileProjectionContext(frame, elapsedRealtimeMs),
-            motionContext = buildDepthMotionContext(elapsedRealtimeMs),
-            navigationActive = isRouteActive && !routeRequestInFlight.get(),
-            tmapOnRoute = latestTmapOnRoute,
-        )
+        var acquiredImage: android.media.Image? = null
+        var submittedToWorker = false
         try {
+            val cameraImage = provider.acquireCameraImageOrNull(frame) ?: return
+            acquiredImage = cameraImage
+            synchronized(frameStateLock) {
+                if (!isCurrentFrameGeneration(frameGeneration, expectedWalkEpoch)) {
+                    return
+                }
+                lastDetectionCaptureFrameId = frame.timestamp
+                lastDetectionCaptureGeneration = frameGeneration
+                lastDetectionCaptureArSessionGeneration = expectedArSessionGeneration
+            }
+            val generation = frameGeneration
+            val imageWidth = cameraImage.width
+            val imageHeight = cameraImage.height
+            val orientationBasis = FloatArray(6)
+            frame.transformCoordinates2d(Coordinates2d.IMAGE_NORMALIZED,
+                floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f), Coordinates2d.VIEW, orientationBasis)
+            val imageQuarterTurns = UprightCameraImage.quarterTurns(orientationBasis)
+            val detectionIdentity = AndroidDetectionSnapshotFrameIdentity(
+                captureFrameId = frame.timestamp,
+                frameTimestampMs = timestampMs,
+            )
+            val frameEvidence = DetectionFrameEvidence(
+                frameId = frame.timestamp,
+                frameTimestampMs = timestampMs,
+                depthSnapshot = capturedDepthSnapshot,
+                depthMapper = createFrozenDepthMapper(
+                    frame = frame,
+                    frameId = frame.timestamp,
+                    imageWidth = imageWidth,
+                    imageHeight = imageHeight,
+                    snapshot = capturedDepthSnapshot,
+                ),
+                tactileContext = buildTactileProjectionContext(frame, elapsedRealtimeMs),
+                motionContext = buildDepthMotionContext(elapsedRealtimeMs),
+                imageQuarterTurns = imageQuarterTurns,
+                navigationActive = isRouteActive && !routeRequestInFlight.get(),
+                tmapOnRoute = latestTmapOnRoute,
+                visualFrameKey = visualFrameKey?.takeIf {
+                    it.frameId == frame.timestamp && it.cameraTimestampNs == cameraImage.timestamp &&
+                        it.cameraTimestampNs == capturedDepthSnapshot.cameraImageTimestampNs
+                },
+            )
             detectorExecutor.execute {
-                if (!isCurrentFrameGeneration(generation, expectedWalkEpoch)) {
-                    cameraImage.close()
-                    detectionInFlight.set(false)
-                    return@execute
-                }
-                val yPlane = cameraImage.planes.firstOrNull()
-                val qualityObservation = cameraFrameQualityObservation(
-                    epoch = expectedWalkEpoch,
-                    observedAtElapsedRealtimeMs = elapsedRealtimeMs,
-                    frameAvailable = true,
-                    width = cameraImage.width,
-                    height = cameraImage.height,
-                    yPlaneBuffer = yPlane?.buffer,
-                    yPlaneRowStride = yPlane?.rowStride,
-                    yPlanePixelStride = yPlane?.pixelStride,
-                )
-                observeOfficialEnvironmentCameraFrame(qualityObservation)
-                if (!currentRuntimeMetricOutputAllowsWork(expectedArSessionGeneration)) {
-                    cameraImage.close()
-                    detectionInFlight.set(false)
-                    return@execute
-                }
-                val rawCollectionAllowed = integratedConsentSession.isAllowed(
-                    IntegratedConsentItem.RAW_SOURCE_COLLECTION,
-                )
-                val reportJpeg = if (reportPrivacyConsentSession.isGranted()) {
-                    encodeReportFrameJpeg(cameraImage)
-                } else {
-                    null
-                }
-                val captureJpeg = if (
-                    shouldCaptureFrame &&
-                    rawCollectionAllowed &&
-                    sensitiveDebugTransferAllowed()
-                ) {
-                    encodeDebugFrameJpeg(cameraImage) ?: reportJpeg
-                } else {
-                    null
-                }
-                val startedAtMs = System.currentTimeMillis()
-                var completedAtMs = startedAtMs
-                var detectorStartedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
+                var detectorInvoked = false
+                var inferenceDurationMs: Long? = null
                 var detectorSucceeded = false
-                var result = AndroidDetectionResult.empty()
-                val admission = CameraDetectorAdmissionPolicy.admit(
-                    currentEpoch = expectedWalkEpoch,
-                    nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
-                    observation = qualityObservation,
-                    approvedProfile = activeCameraFrameQualityProfile,
-                ) {
-                    detectorStartedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
-                    result = try {
-                        cameraImage.use { image ->
-                            frameDetector.detect(
-                                image,
+                try {
+                    if (!isCurrentFrameGeneration(generation, expectedWalkEpoch)) {
+                        return@execute
+                    }
+                    val yPlane = cameraImage.planes.firstOrNull()
+                    val qualityObservation = cameraFrameQualityObservation(
+                        epoch = expectedWalkEpoch,
+                        observedAtElapsedRealtimeMs = elapsedRealtimeMs,
+                        frameAvailable = true,
+                        width = cameraImage.width,
+                        height = cameraImage.height,
+                        yPlaneBuffer = yPlane?.buffer,
+                        yPlaneRowStride = yPlane?.rowStride,
+                        yPlanePixelStride = yPlane?.pixelStride,
+                    )
+                    observeOfficialEnvironmentCameraFrame(qualityObservation)
+                    if (!currentRuntimeMetricOutputAllowsWork(expectedArSessionGeneration)) {
+                        return@execute
+                    }
+                    val rawCollectionAllowed = integratedConsentSession.isAllowed(
+                        IntegratedConsentItem.RAW_SOURCE_COLLECTION,
+                    )
+                    val reportJpeg = if (reportPrivacyConsentSession.isGranted()) {
+                        encodeReportFrameJpeg(cameraImage)
+                    } else {
+                        null
+                    }
+                    val captureJpeg = if (
+                        shouldCaptureFrame &&
+                        rawCollectionAllowed &&
+                        sensitiveDebugTransferAllowed()
+                    ) {
+                        encodeDebugFrameJpeg(cameraImage) ?: reportJpeg
+                    } else {
+                        null
+                    }
+                    val startedAtMs = System.currentTimeMillis()
+                    var completedAtMs = startedAtMs
+                    var detectorStartedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
+                    var result = AndroidDetectionResult.empty()
+                    val admission = CameraDetectorAdmissionPolicy.admit(
+                        currentEpoch = expectedWalkEpoch,
+                        nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                        observation = qualityObservation,
+                        approvedProfile = activeCameraFrameQualityProfile,
+                    ) {
+                        detectorInvoked = true
+                        detectorStartedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
+                        result = try {
+                            frameDetector.detectOriented(
+                                cameraImage,
                                 timestampMs = timestampMs,
+                                quarterTurns = imageQuarterTurns,
                             ) { partialResult ->
                                 val observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
                                 val inferenceLatencyMs = partialResult.timing.totalMs
@@ -28444,6 +29891,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                         reportImageJpeg = reportJpeg,
                                         frameEvidence = frameEvidence,
                                         expectedWalkEpoch = expectedWalkEpoch,
+                                        capturedAtElapsedRealtimeMs = elapsedRealtimeMs,
                                     )
                                 }
                             }.also {
@@ -28452,87 +29900,110 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                 }
                                 detectorSucceeded = true
                             }
+                        } catch (error: RuntimeException) {
+                            handleDetectorRuntimeFailure(error, generation, expectedWalkEpoch)
+                            AndroidDetectionResult.empty()
+                        } finally {
+                            completedAtMs = System.currentTimeMillis()
+                            inferenceDurationMs = SystemClock.elapsedRealtime() - detectorStartedAtElapsedRealtimeMs
                         }
-                    } catch (error: RuntimeException) {
-                        handleDetectorRuntimeFailure(error, generation, expectedWalkEpoch)
-                        AndroidDetectionResult.empty()
-                    } finally {
+                    }
+                    if (!admission.detectorInvocationAllowed) {
                         completedAtMs = System.currentTimeMillis()
-                        detectionInFlight.set(false)
+                        return@execute
                     }
-                }
-                if (!admission.detectorInvocationAllowed) {
-                    cameraImage.close()
-                    completedAtMs = System.currentTimeMillis()
-                    detectionInFlight.set(false)
-                    return@execute
-                }
-                if (detectorSucceeded) {
-                    val observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
-                    val inferenceLatencyMs = result.timing.totalMs
-                        ?: (observedAtElapsedRealtimeMs - detectorStartedAtElapsedRealtimeMs)
-                    if (
-                        !observeWalkRuntimeDetectorTiming(
-                            epoch = expectedWalkEpoch,
-                            frameCapturedAtElapsedRealtimeMs = elapsedRealtimeMs,
-                            observedAtElapsedRealtimeMs = observedAtElapsedRealtimeMs,
-                            inferenceLatencyMs = inferenceLatencyMs,
+                    if (detectorSucceeded && !result.partial) {
+                        submitUnknownObjectFrame(
+                            cameraImage, frameEvidence, generation, expectedWalkEpoch,
+                            expectedArSessionGeneration, elapsedRealtimeMs,
                         )
-                    ) return@execute
-                }
-                val published = this@MainActivity.publishDetectionSnapshot(
-                    result = result,
-                    generation = generation,
-                    detectionIdentity = detectionIdentity,
-                    capturedAtMs = capturedAtMs,
-                    startedAtMs = startedAtMs,
-                    completedAtMs = completedAtMs,
-                    imageWidth = imageWidth,
-                    imageHeight = imageHeight,
-                    reportImageJpeg = reportJpeg,
-                    frameEvidence = frameEvidence,
-                    expectedWalkEpoch = expectedWalkEpoch,
-                )
-                if (published != null) {
-                    recordRawCollectionDetectionMetadata(
+                    }
+                    inferenceDurationMs = result.timing.totalMs ?: inferenceDurationMs
+                    if (detectorSucceeded) {
+                        val observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
+                        val inferenceLatencyMs = result.timing.totalMs
+                            ?: (observedAtElapsedRealtimeMs - detectorStartedAtElapsedRealtimeMs)
+                        if (
+                            !observeWalkRuntimeDetectorTiming(
+                                epoch = expectedWalkEpoch,
+                                frameCapturedAtElapsedRealtimeMs = elapsedRealtimeMs,
+                                observedAtElapsedRealtimeMs = observedAtElapsedRealtimeMs,
+                                inferenceLatencyMs = inferenceLatencyMs,
+                            )
+                        ) return@execute
+                    }
+                    val published = this@MainActivity.publishDetectionSnapshot(
+                        result = result,
+                        generation = generation,
+                        detectionIdentity = detectionIdentity,
+                        capturedAtMs = capturedAtMs,
+                        startedAtMs = startedAtMs,
+                        completedAtMs = completedAtMs,
+                        imageWidth = imageWidth,
+                        imageHeight = imageHeight,
+                        reportImageJpeg = reportJpeg,
+                        frameEvidence = frameEvidence,
                         expectedWalkEpoch = expectedWalkEpoch,
-                        detectionCount = result.detections.size,
-                        inferenceMs = result.timing.totalMs
-                            ?: (completedAtMs - startedAtMs),
-                        modelRevision = result.timing.modelKey ?: detectorLoadedModelKey,
+                        capturedAtElapsedRealtimeMs = elapsedRealtimeMs,
                     )
-                    synchronized(frameStateLock) {
-                        if (!isCurrentFrameGeneration(generation, expectedWalkEpoch)) {
-                            return@synchronized
+                    if (published != null) {
+                        recordRawCollectionDetectionMetadata(
+                            expectedWalkEpoch = expectedWalkEpoch,
+                            detectionCount = result.detections.size,
+                            inferenceMs = result.timing.totalMs
+                                ?: (completedAtMs - startedAtMs),
+                            modelRevision = result.timing.modelKey ?: detectorLoadedModelKey,
+                        )
+                        synchronized(frameStateLock) {
+                            if (!isCurrentFrameGeneration(generation, expectedWalkEpoch)) {
+                                return@synchronized
+                            }
+                            if (captureJpeg != null) {
+                                runIfActivityOriginalUploadAllowed {
+                                    frameCaptureUploader.upload(
+                                        imageJpeg = captureJpeg,
+                                        metadataJson = buildFrameCaptureMetadataJson(
+                                            frameTimestampMs = timestampMs,
+                                            imageWidth = imageWidth,
+                                            imageHeight = imageHeight,
+                                            detectDurationMs = completedAtMs - startedAtMs,
+                                            result = result,
+                                            forcedCustom = shouldCaptureFrame,
+                                        ),
+                                    )
+                                }
+                            }
                         }
-                        if (captureJpeg != null) {
-                            runIfActivityOriginalUploadAllowed {
-                                frameCaptureUploader.upload(
-                                    imageJpeg = captureJpeg,
-                                    metadataJson = buildFrameCaptureMetadataJson(
-                                        frameTimestampMs = timestampMs,
-                                        imageWidth = imageWidth,
-                                        imageHeight = imageHeight,
-                                        detectDurationMs = completedAtMs - startedAtMs,
-                                        result = result,
-                                        forcedCustom = shouldCaptureFrame,
-                                    ),
-                                )
+                        if (shouldCaptureFrame) {
+                            runOnUiThread {
+                                if (isCurrentFrameGeneration(generation, expectedWalkEpoch)) {
+                                    updateFrameCaptureButton()
+                                }
                             }
                         }
                     }
-                    if (shouldCaptureFrame) {
-                        runOnUiThread {
-                            if (isCurrentFrameGeneration(generation, expectedWalkEpoch)) {
-                                updateFrameCaptureButton()
-                            }
-                        }
+                } finally {
+                    try {
+                        cameraImage.close()
+                    } finally {
+                        finishDetectionWork(
+                            pacingTicket, detectorInvoked, inferenceDurationMs,
+                            validCompletion = detectorSucceeded && isCurrentFrameGeneration(generation, expectedWalkEpoch),
+                        )
                     }
                 }
             }
+            submittedToWorker = true
         } catch (_: RejectedExecutionException) {
-            cameraImage.close()
-            detectionInFlight.set(false)
+            Unit
+        } finally {
+            if (!submittedToWorker) {
+                try {
+                    acquiredImage?.close()
+                } finally {
+                    finishDetectionWork(pacingTicket, detectorInvoked = false)
+                }
+            }
         }
     }
 
@@ -28569,6 +30040,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         reportImageJpeg: ByteArray?,
         frameEvidence: DetectionFrameEvidence,
         expectedWalkEpoch: WalkRuntimeEpoch? = null,
+        capturedAtElapsedRealtimeMs: Long? = null,
     ): DetectionSnapshot? = synchronized(frameStateLock) {
         if (
             generation != detectorGeneration ||
@@ -28576,7 +30048,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 expectedWalkEpoch != null &&
                     (
                         !walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch) ||
-                            !walkSafetyOutputsAllowed()
+                            !cameraEnvironmentOutputsAllowed()
                     )
             )
         ) return@synchronized null
@@ -28590,11 +30062,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             imageHeight = imageHeight,
             reportImageJpeg = reportImageJpeg,
             frameEvidence = frameEvidence,
+            capturedAtElapsedRealtimeMs = capturedAtElapsedRealtimeMs,
         ).also { snapshot ->
             latestDetectionSnapshot = snapshot
-            if (snapshot.hasTactileDetection()) {
-                latestTactileOverlaySnapshot = snapshot.copy(detections = snapshot.tactileDetections())
-            }
         }
     }
 
@@ -28621,96 +30091,23 @@ generation != cameraFallbackGeneration
         nowMs: Long,
         currentFrameTimestampMs: Long,
     ): OverlayDetectionSelection {
-        val overlaySourceAgeLimitMs = if (detectionSnapshot.hasTactileDetection()) {
-            MAX_TACTILE_OVERLAY_SOURCE_AGE_MS
-        } else {
-            MAX_OVERLAY_DETECTION_SOURCE_AGE_MS
-        }
-        val overlayFrameDeltaLimitMs = if (detectionSnapshot.hasTactileDetection()) {
-            MAX_TACTILE_OVERLAY_FRAME_DELTA_MS
-        } else {
-            MAX_OVERLAY_DETECTION_FRAME_DELTA_MS
-        }
-        val freshOverlayDetections = detectionSnapshot.freshDetections(
-            nowMs = nowMs,
-            currentFrameTimestampMs = currentFrameTimestampMs,
-            maxSourceAgeMs = overlaySourceAgeLimitMs,
-            maxFrameDeltaMs = overlayFrameDeltaLimitMs,
+        val staleReason = detectionSnapshot.staleReason(
+            nowMs, currentFrameTimestampMs,
+            MAX_OVERLAY_DETECTION_SOURCE_AGE_MS, MAX_OVERLAY_DETECTION_FRAME_DELTA_MS,
         )
-        val latestOverlayStaleReason = detectionSnapshot.staleReason(
-            nowMs = nowMs,
-            currentFrameTimestampMs = currentFrameTimestampMs,
-            maxSourceAgeMs = overlaySourceAgeLimitMs,
-            maxFrameDeltaMs = overlayFrameDeltaLimitMs,
-        )
-        if (freshOverlayDetections.isNotEmpty()) {
-            lastNonEmptyOverlaySnapshot = detectionSnapshot
-        }
-
-        val tactileOverlaySnapshot = latestTactileOverlaySnapshot
-        val heldTactileDetections = tactileOverlaySnapshot.freshDetections(
-            nowMs = nowMs,
-            currentFrameTimestampMs = currentFrameTimestampMs,
-            maxSourceAgeMs = MAX_TACTILE_OVERLAY_HOLD_SOURCE_AGE_MS,
-            maxFrameDeltaMs = MAX_TACTILE_OVERLAY_HOLD_FRAME_DELTA_MS,
-        ).filter { it.isTactileDetection() }
-        val mergedFreshDetections = mergeOverlayDetections(
-            currentDetections = freshOverlayDetections,
-            heldTactileDetections = heldTactileDetections,
-        )
-        if (mergedFreshDetections.isNotEmpty()) {
-            val mappingSnapshot = when {
-                detectionSnapshot.hasImageSize() -> detectionSnapshot
-                tactileOverlaySnapshot.hasImageSize() -> tactileOverlaySnapshot
-                else -> lastNonEmptyOverlaySnapshot
-            }
-            return OverlayDetectionSelection(
-                detections = mergedFreshDetections,
-                mappingSnapshot = mappingSnapshot,
-                debugState = buildOverlayDebugState(
-                    selection = if (freshOverlayDetections.size == mergedFreshDetections.size) {
-                        "fresh_latest"
-                    } else {
-                        "fresh_plus_held_tactile"
-                    },
-                    detections = mergedFreshDetections,
-                    mappingSnapshot = mappingSnapshot,
-                    nowMs = nowMs,
-                    currentFrameTimestampMs = currentFrameTimestampMs,
-                    staleReason = latestOverlayStaleReason,
-                    holdApplied = freshOverlayDetections.size != mergedFreshDetections.size,
-                ),
-            )
-        }
-
-        val overlaySnapshot = lastNonEmptyOverlaySnapshot
-        val holdSourceAgeLimitMs = if (overlaySnapshot.hasTactileDetection()) {
-            MAX_TACTILE_OVERLAY_HOLD_SOURCE_AGE_MS
-        } else {
-            MAX_OVERLAY_HOLD_SOURCE_AGE_MS
-        }
-        val holdFrameDeltaLimitMs = if (overlaySnapshot.hasTactileDetection()) {
-            MAX_TACTILE_OVERLAY_HOLD_FRAME_DELTA_MS
-        } else {
-            MAX_OVERLAY_HOLD_FRAME_DELTA_MS
-        }
-        val heldOverlayDetections = overlaySnapshot.freshDetections(
-            nowMs = nowMs,
-            currentFrameTimestampMs = currentFrameTimestampMs,
-            maxSourceAgeMs = holdSourceAgeLimitMs,
-            maxFrameDeltaMs = holdFrameDeltaLimitMs,
-        )
+        // Keep one capture identity. An empty/new result must not resurrect boxes from an older frame.
+        val detections = if (staleReason == null) detectionSnapshot.detections else emptyList()
         return OverlayDetectionSelection(
-            detections = heldOverlayDetections,
-            mappingSnapshot = overlaySnapshot,
+            detections = detections,
+            mappingSnapshot = detectionSnapshot,
             debugState = buildOverlayDebugState(
-                selection = if (heldOverlayDetections.isEmpty()) "empty" else "hold_last_non_empty",
-                detections = heldOverlayDetections,
-                mappingSnapshot = overlaySnapshot,
+                selection = if (detections.isEmpty()) "empty" else "fresh_latest",
+                detections = detections,
+                mappingSnapshot = detectionSnapshot,
                 nowMs = nowMs,
                 currentFrameTimestampMs = currentFrameTimestampMs,
-                staleReason = latestOverlayStaleReason ?: "latest_empty",
-                holdApplied = heldOverlayDetections.isNotEmpty(),
+                staleReason = staleReason,
+                holdApplied = false,
             ),
         )
     }
@@ -28734,15 +30131,6 @@ generation != cameraFallbackGeneration
             holdApplied = holdApplied && detections.isNotEmpty(),
             snapshotPartial = mappingSnapshot.partial,
         )
-    }
-
-    private fun mergeOverlayDetections(
-        currentDetections: List<DetectionCandidate>,
-        heldTactileDetections: List<DetectionCandidate>,
-    ): List<DetectionCandidate> {
-        if (heldTactileDetections.isEmpty()) return currentDetections
-        if (currentDetections.any { it.isTactileDetection() }) return currentDetections
-        return currentDetections + heldTactileDetections
     }
 
     private fun ArgbImage.toScaledJpeg(maxDimension: Int, quality: Int): ByteArray? {
@@ -28838,10 +30226,9 @@ generation != cameraFallbackGeneration
         frame: Frame,
         detections: List<DetectionCandidate>,
         bestOutput: TrackedObjectDepth?,
-        detectionSnapshot: DetectionSnapshot,
+        imageWidth: Int?,
+        imageHeight: Int?,
     ): List<DebugBboxOverlayView.DebugOverlayBox> {
-        val imageWidth = detectionSnapshot.imageWidth
-        val imageHeight = detectionSnapshot.imageHeight
         if (imageWidth == null || imageHeight == null) {
             return emptyList()
         }
@@ -28870,6 +30257,14 @@ generation != cameraFallbackGeneration
                         output.riskDistanceM?.let { distance -> append(" · ${meters(distance)}") }
                         append(" · samples ")
                         append(output.validSampleCount)
+                        append(" · motion=${output.motionEstimate.direction}")
+                        output.motionEstimate.objectSpeedMps?.let {
+                            append(" · 물체 ${String.format(Locale.US, "%.1f", it)}m/s")
+                        }
+                        output.motionEstimate.relativeClosingSpeedMps?.let {
+                            val direction = if (it >= 0f) "상대 접근" else "멀어짐"
+                            append(" · $direction ${String.format(Locale.US, "%.1f", kotlin.math.abs(it))}m/s")
+                        }
                     },
                     best = true,
                     className = output.className,
@@ -28998,10 +30393,253 @@ generation != cameraFallbackGeneration
         )
     }
 
+    /** Copies only admitted auxiliary frames while this worker still owns the open CPU Image. */
+    private fun submitUnknownObjectFrame(
+        image: android.media.Image,
+        evidence: DetectionFrameEvidence,
+        generation: Int,
+        epoch: WalkRuntimeEpoch,
+        arGeneration: Long,
+        capturedElapsedMs: Long,
+    ) {
+        val service = unknownRuntimeService ?: return
+        if (service.stats().stopping) {
+            latestUnknownFeedback = null
+            unknownRuntimeStatus = "추가 물체 인식 확인 필요"
+            return
+        }
+        if (!isCurrentFrameGeneration(generation, epoch) ||
+            !currentRuntimeMetricOutputAllowsWork(arGeneration) || !isActivityForeground
+        ) return
+        val geometryId = "$arGeneration:$visualGeometryVersion:${image.width}x${image.height}"
+        val context = synchronized(frameStateLock) {
+            if (unknownRuntimeService !== service || !isCurrentFrameGeneration(generation, epoch)) return
+            unknownProcessingContext?.takeIf {
+                it.service === service && it.detectorGeneration == generation && it.walkEpoch == epoch &&
+                    it.arSessionGeneration == arGeneration && it.geometryId == geometryId
+            } ?: UnknownProcessingContext(
+                unknownContextSequence.incrementAndGet(), service, generation, epoch,
+                arGeneration, geometryId, stepLengthEstimator.stepLengthM,
+            ).also { unknownProcessingContext = it; latestUnknownFeedback = null }
+        }
+        // A service can discard an expired capture without calling the depth consumer. Do not let
+        // its old pacing ticket prevent all later fresh work; never cancel an active native flight.
+        context.activeTicket?.let { old ->
+            val state = service.stats()
+            if (!state.inflight && !state.pending && !state.copying &&
+                SystemClock.elapsedRealtime() - old.startedAtElapsedRealtimeMs > MAX_DEPTH_DETECTION_SOURCE_AGE_MS
+            ) {
+                context.pacing.cancel(old)
+                context.activeTicket = null
+            }
+        }
+        val ticket = context.pacing.tryStart(capturedElapsedMs) ?: return
+        context.activeTicket = ticket
+        context.activeFrameId = evidence.frameId
+        var submitted = false
+        try {
+            val token = FastSamFrameToken(
+                FastSamFrameToken.Source.LIVE_CAMERA, service.sessionEpoch, evidence.frameId,
+                evidence.depthSnapshot.frameTimestampNs, image.timestamp, capturedElapsedMs * 1_000_000L,
+                geometryId, image.width, image.height,
+            )
+            val capture = FrozenUnknownDepthCapture.freeze(
+                token, evidence.depthSnapshot,
+                evidence.depthMapper?.imagePixelsToDepthUvMatrix(image.width, image.height),
+                evidence.depthMapper?.frameId ?: evidence.frameId,
+                evidence.motionContext,
+                imageQuarterTurns = evidence.imageQuarterTurns,
+            ) ?: return
+            if (!isUnknownContextCurrent(context)) return
+            val admission = service.submit(image, token, UnknownFrameAttachment(context, capture, ticket))
+            submitted = admission == FastSamRuntimeService.Admission.ACCEPTED ||
+                admission == FastSamRuntimeService.Admission.REPLACED_PENDING
+        } catch (error: RuntimeException) {
+            if (isUnknownContextCurrent(context)) {
+                unknownRuntimeStatus = "추가 물체 프레임 확인 실패: ${error.javaClass.simpleName}"
+            }
+        } finally {
+            if (!submitted) {
+                context.pacing.cancel(ticket)
+                if (context.activeTicket === ticket) context.activeTicket = null
+            }
+        }
+    }
+
+    /** Runs on FastSAM's CPU post owner, including the complete mask/depth/consumer flight. */
+    private fun consumeUnknownObjectResult(result: FastSamResult<UnknownRuntimeAttachment>) {
+        val attachment = result.attachment as? UnknownFrameAttachment ?: return
+        val context = attachment.context
+        val started = SystemClock.elapsedRealtime()
+        try {
+            if (!isUnknownContextCurrent(context)) return
+            val processed = context.pipeline.process(
+                attachment.capture, result.token, result.masks, started,
+            )
+            val completed = SystemClock.elapsedRealtime()
+            if (!isUnknownContextCurrent(context)) return
+            val batch = context.feedback.admit(
+                outputs = processed.objects.map { output ->
+                    output.copy(trackId = "unknown:${context.identity}:${output.trackId}")
+                },
+                sourceFrameId = result.token.frameId,
+                sourceTimestampMs = attachment.capture.frameTimestampMs,
+                sourceCapturedAtElapsedRealtimeNs = result.token.capturedElapsedNs,
+                completedAtElapsedRealtimeMs = completed,
+                sourceEpoch = context.walkEpoch,
+                currentEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull(),
+                nowElapsedRealtimeMs = completed,
+            )
+            synchronized(frameStateLock) {
+                if (!isUnknownContextCurrent(context)) return
+                latestUnknownFeedback = batch?.let { UnknownFeedbackObservation(context, it) }
+                val measured = processed.objects.count { it.source.metric && it.riskDistanceM != null }
+                unknownRuntimeStatus = "추가 영역 ${result.masks.size}개 · 유효 거리 ${measured}개 · " +
+                    "${completed - result.token.capturedElapsedNs / 1_000_000L}ms · ${result.runtime.actualBackend}"
+            }
+        } finally {
+            context.pacing.complete(
+                attachment.ticket, SystemClock.elapsedRealtime(),
+                inferenceDurationMs = result.inferenceMs.toLong().coerceAtLeast(0L),
+                thermalThrottled = latestInferenceThermalThrottled,
+                loadObservation = latestUnknownLoadObservation?.takeIf {
+                    SystemClock.elapsedRealtime() - it.observedAtElapsedRealtimeMs in 0L..1_000L
+                },
+            )
+            if (isUnknownContextCurrent(context)) {
+                val now = SystemClock.elapsedRealtime()
+                val age = now - result.token.capturedElapsedNs / 1_000_000L
+                val normal = latestInferenceThermalThrottled == false &&
+                    runCatching { !getSystemService(android.os.PowerManager::class.java).isPowerSaveMode }.getOrDefault(false)
+                observeUnknownRuntimeLoad(now, normal, auxiliaryCompletion = RuntimeLoadCompletion(
+                    age, staleOrDropped = age > MAX_DEPTH_DETECTION_SOURCE_AGE_MS,
+                ))
+            }
+            if (context.activeTicket === attachment.ticket) context.activeTicket = null
+        }
+    }
+
+    private fun isUnknownContextCurrent(context: UnknownProcessingContext): Boolean =
+        unknownProcessingContext === context && unknownRuntimeService === context.service &&
+            isActivityForeground && !detectorClosing &&
+            isCurrentFrameGeneration(context.detectorGeneration, context.walkEpoch) &&
+            arSessionGeneration == context.arSessionGeneration &&
+            currentRuntimeMetricOutputAllowsWork(context.arSessionGeneration)
+
+    private fun freshUnknownFeedbackBatches(nowMs: Long): List<UnknownObjectFeedbackBatch> {
+        val observation = latestUnknownFeedback ?: return emptyList()
+        return if (isUnknownContextCurrent(observation.context) && observation.batch.isFreshAt(nowMs) &&
+            observation.batch.sourceEpoch == walkSessionLifecycle.currentRuntimeEpochOrNull()
+        ) listOf(observation.batch) else emptyList()
+    }
+
+    private fun invalidateUnknownObjectObservations() {
+        unknownProcessingContext = null
+        latestUnknownFeedback = null
+        unknownRuntimeService?.discardPending("runtime_evidence_invalidated")
+    }
+
     /** Loads unified first and records an explicit legacy fallback reason for report provenance. */
     private fun loadDetectorAfterCameraGate() {
         if (!firstRunOnboardingComplete()) return
         loadDetectorForCurrentProcess()
+        prepareRuntimeServices()
+    }
+
+    /** Loading execution services must not depend on opening a performance-check camera. */
+    private fun prepareRuntimeServices() {
+        if (runtimeServicesPreparing || isDestroyed || detectorClosing || !detectorAvailable) return
+        val config = reportRuntimeConfig ?: return
+        val baseline = frameDetector as? TfliteAndroidFrameDetector ?: return
+        if (configuredRuntimeWarmupAttempted || config.unifiedWalksafe?.runtime?.delegate != "gpu") {
+            startUnknownRuntimeForWalk()
+            return
+        }
+        configuredRuntimeWarmupAttempted = true
+        runtimeServicesPreparing = true
+        val loadGeneration = detectorLoadGeneration
+        deviceTuningExecutor.execute {
+            var replacement: TfliteAndroidFrameDetector? = null
+            try {
+                val loaded = TfliteAndroidFrameDetector.createWithStatus(applicationContext, config)
+                replacement = requireNotNull(loaded.detector) { loaded.reason }
+                val fixtures = RuntimeCalibrationFixtures(applicationContext)
+                val fixture = fixtures.loadManifest().fixtures.first { it.required }
+                val result = replacement.detectCalibrationImage(fixtures.loadArgb(fixture))
+                val ready = replacement
+                val runtime = requireNotNull(result.timing.modelRuntime)
+                detectorExecutor.execute {
+                    val adopted = synchronized(frameStateLock) {
+                        if (isDestroyed || detectorClosing || detectorLoadGeneration != loadGeneration || frameDetector !== baseline) false
+                        else {
+                            frameDetector = ready
+                            detectorLoadGeneration++
+                            runtimeActiveCandidate = RuntimeCandidate(
+                                if (runtime.activeDelegate == "gpu") RuntimeBackend.GPU else RuntimeBackend.CPU,
+                                runtime.numThreads)
+                            true
+                        }
+                    }
+                    if (adopted) baseline.close() else ready.close()
+                    runOnUiThread {
+                        runtimeServicesPreparing = false
+                        if (adopted) {
+                            detectorStatusText = "객체 모델 · ${runtime.activeDelegate} · RGB bilinear"
+                            startUnknownRuntimeForWalk()
+                        }
+                    }
+                }
+                replacement = null // The detector executor now owns adoption or release.
+            } catch (error: Exception) {
+                replacement?.close()
+                runOnUiThread {
+                    runtimeServicesPreparing = false
+                    if (!isDestroyed && !detectorClosing) {
+                        detectorStatusText = "객체 모델 · CPU 유지 · GPU 준비 ${error.javaClass.simpleName}"
+                        startUnknownRuntimeForWalk()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun startUnknownRuntimeForWalk() {
+        if (isDestroyed || detectorClosing || !isActivityForeground || !detectorAvailable ||
+            unknownRuntimeService != null || unknownLoadingService != null || unknownRuntimeClosing) return
+        val config = reportRuntimeConfig ?: return
+        val candidate = runtimeActiveCandidate ?: return
+        val scope = if (postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE))
+            RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH else RuntimeFeatureScope.CAMERA_TRACKING
+        val binding = AndroidUnknownRuntimeProfileStore.createBinding(applicationContext, config, candidate, scope)
+        val selected = binding?.let { unknownTuningStore.load(it) }?.candidate
+        val epoch = unknownServiceSequence.incrementAndGet()
+        val service = FastSamRuntimeService(applicationContext, epoch,
+            FastSamRuntimeOptions(
+                if (selected?.backend == RuntimeBackend.CPU) FastSamRuntimeOptions.Backend.CPU else FastSamRuntimeOptions.Backend.GPU,
+                (selected?.numThreads ?: candidate.numThreads).coerceIn(1, Runtime.getRuntime().availableProcessors().coerceAtLeast(1)),
+                true, SystemClock.elapsedRealtimeNanos() + 60_000_000_000L,
+                MAX_DEPTH_DETECTION_SOURCE_AGE_MS, false, false, true),
+            object : FastSamRuntimeService.Listener<UnknownRuntimeAttachment> {
+                override fun onResult(result: FastSamResult<UnknownRuntimeAttachment>) = consumeUnknownObjectResult(result)
+                override fun onError(error: Throwable) { runOnUiThread {
+                    if (!isDestroyed && !detectorClosing) handleUnknownRuntimeError(epoch, error)
+                } }
+            })
+        unknownLoadingService = service
+        unknownRuntimeStatus = "이름 없는 물체 인식 준비 중"
+        service.start().whenComplete { info, error -> runOnUiThread {
+            if (unknownLoadingService !== service) return@runOnUiThread
+            if (error == null && info != null && !isDestroyed && !detectorClosing) {
+                unknownRuntimeService = service
+                unknownLoadingService = null
+                unknownRuntimeBinding = binding
+                unknownLoadControl.reset()
+                unknownRuntimeStatus = "이름 없는 물체 인식 · ${info.actualBackend}"
+            } else {
+                releaseUnknownLoadingService(service)
+                unknownRuntimeStatus = "이름 없는 물체 준비 실패: ${error?.javaClass?.simpleName ?: "closed"}"
+            }
+        } }
     }
 
     private fun loadDetectorForPostLoginDeviceCheck() {
@@ -29016,9 +30654,28 @@ generation != cameraFallbackGeneration
         )
         detectorLoadAttempted = true
         val runtimeConfig = reportRuntimeConfig ?: loadReportRuntimeConfig().also { reportRuntimeConfig = it }
-        val detectorLoad = runtimeConfig
-            ?.let { TfliteAndroidFrameDetector.createWithStatus(this, it) }
-            ?: TfliteAndroidFrameDetector.createWithStatus(this)
+        val gpuRuntime = runtimeConfig?.unifiedWalksafe?.runtime?.takeIf {
+            runtimeConfig.primaryModelKey == TwoModelRuntimeConfig.UNIFIED_MODEL_KEY &&
+                it.delegate.equals("gpu", ignoreCase = true) && it.fallbackToCpu
+        }
+        // Keep the synchronous readiness contract while native GPU kernels prepare off the UI thread.
+        val bootstrapRuntime = gpuRuntime?.copy(
+            delegate = "cpu",
+            numThreads = gpuRuntime.numThreads.coerceAtMost(Runtime.getRuntime().availableProcessors().coerceAtLeast(1)),
+        )
+        val bootstrapConfig = runtimeConfig?.let { original ->
+            if (bootstrapRuntime == null) original else original.copy(
+                unifiedWalksafe = original.unifiedWalksafe?.copy(runtime = bootstrapRuntime),
+            )
+        }
+        val detectorLoad = bootstrapConfig
+            ?.let { TfliteAndroidFrameDetector.createWithStatus(
+                applicationContext, it,
+                preprocessingStrategy = YuvPreprocessingStrategy.FUSED_YUV_TO_TENSOR,
+            ) }
+            ?: TfliteAndroidFrameDetector.createWithStatus(
+                applicationContext, preprocessingStrategy = YuvPreprocessingStrategy.FUSED_YUV_TO_TENSOR,
+            )
         detectorConfigLoaded = detectorLoad.configLoaded
         detectorAvailable = detectorLoad.detectorAvailable
         detectorLoadedModelKey = detectorLoad.modelKey
@@ -29027,6 +30684,12 @@ generation != cameraFallbackGeneration
         detectorModelKeyForReports = detectorLoad.modelKey?.toReportModelKey()
         detectorStatusText = "detector=${detectorLoad.reason} model=${detectorLoad.modelKey ?: "-"} fallback=${detectorLoad.fallbackUsed}"
         detectorLoad.detector?.let { detector -> frameDetector = detector }
+        val initialRuntime = bootstrapConfig?.unifiedWalksafe?.runtime
+        runtimeActiveCandidate = initialRuntime?.takeIf {
+            detectorLoad.modelKey == TwoModelRuntimeConfig.UNIFIED_MODEL_KEY && !detectorLoad.fallbackUsed
+        }?.let { RuntimeCandidate(
+            if (it.delegate.equals("gpu", true)) RuntimeBackend.GPU else RuntimeBackend.CPU, it.numThreads,
+        ) }
         if (
             postLoginDeviceCheckSnapshot.passesFeatureGate &&
             !detectorAvailable
@@ -29034,6 +30697,568 @@ generation != cameraFallbackGeneration
             runtimeObstacleDetectionCapabilityOverride = false
             if (metricDistanceWasEnabled) {
                 metricDistanceCapabilityOverride = false
+            }
+        }
+    }
+
+    /**
+     * Measures the installed model with the versioned in-app calibration images only. This is a
+     * device load check, not an ARCore or camera check, so users do not need to aim the phone.
+     */
+    private fun runFixedFixturePerformanceCheck() {
+        if (fixedFixturePerformanceCheckRunning) return
+        val detector = frameDetector as? TfliteAndroidFrameDetector
+        if (detector == null || !detectorAvailable) {
+            loadDetectorForCurrentProcess()
+            updateStatus("고정 자료 성능 확인 대기", "객체 인식 모델을 준비한 뒤 다시 눌러 주세요.")
+            return
+        }
+        val generation = detectorLoadGeneration
+        fixedFixturePerformanceCheckRunning = true
+        updateStatus("고정 자료 성능 확인 중", "카메라를 사용하지 않고 내장 768×768 자료 4종을 반복 실행합니다.")
+        detectorExecutor.execute {
+            val result = runCatching {
+                val fixtures = RuntimeCalibrationFixtures(applicationContext)
+                val required = fixtures.loadManifest().fixtures.filter { it.required }
+                check(required.isNotEmpty())
+                // Warm-up is deliberately excluded. Each measured item is a real production
+                // detector call on an immutable app asset, with no camera frame involved.
+                detector.detectCalibrationImage(fixtures.loadArgb(required.first()))
+                val totalMs = mutableListOf<Long>()
+                val inferenceMs = mutableListOf<Long>()
+                val detectedObjects = mutableListOf<Int>()
+                repeat(3) {
+                    required.forEach { fixture ->
+                        val detection = detector.detectCalibrationImage(fixtures.loadArgb(fixture))
+                        totalMs += requireNotNull(detection.timing.totalMs)
+                        inferenceMs += requireNotNull(detection.timing.modelInferenceMs)
+                        detectedObjects += detection.detections.size
+                    }
+                }
+                FixedFixturePerformanceResult(
+                    fixtureCount = required.size,
+                    samples = totalMs.size,
+                    medianTotalMs = totalMs.sorted()[totalMs.size / 2],
+                    medianInferenceMs = inferenceMs.sorted()[inferenceMs.size / 2],
+                    activeDelegate = detector.detectCalibrationImage(
+                        fixtures.loadArgb(required.first()),
+                    ).timing.modelRuntime?.activeDelegate ?: "unknown",
+                    totalDetectedObjects = detectedObjects.sum(),
+                )
+            }
+            runOnUiThread {
+                fixedFixturePerformanceCheckRunning = false
+                if (generation != detectorLoadGeneration || frameDetector !== detector) return@runOnUiThread
+                result.onSuccess { value ->
+                    updateStatus(
+                        "고정 자료 성능 확인 완료",
+                        "카메라 미사용 · 자료 ${value.fixtureCount}종 · 측정 ${value.samples}회 · " +
+                            "중앙 전체 ${value.medianTotalMs}ms · 추론 ${value.medianInferenceMs}ms · " +
+                            "실행 ${value.activeDelegate} · 객체 출력 ${value.totalDetectedObjects}건",
+                    )
+                }.onFailure {
+                    updateStatus("고정 자료 성능 확인 실패", "내장 시험 자료 또는 객체 인식 모델 실행을 완료하지 못했습니다.")
+                }
+            }
+        }
+    }
+
+    private data class FixedFixturePerformanceResult(
+        val fixtureCount: Int,
+        val samples: Int,
+        val medianTotalMs: Long,
+        val medianInferenceMs: Long,
+        val activeDelegate: String,
+        val totalDetectedObjects: Int,
+    )
+
+    private fun openLiveCameraScreen() {
+        if (!shouldShowNativeHome() || !isActivityForeground) return
+        cancelDeviceRuntimeCalibration("live_camera_requested")
+        if (BuildConfig.DEBUG) startActivity(Intent().setClassName(
+            this, "$packageName.CameraTestActivity"))
+    }
+
+    private fun closeLiveCameraScreen() {
+        cameraScreenVisible = false
+        val stopOwnedWalk = cameraScreenOwnsWalk
+        cameraScreenOwnsWalk = false
+        if (stopOwnedWalk) {
+            if (walkSessionLifecycle.snapshot().state == WalkSessionState.READY) {
+                transitionWalkSession(WalkSessionEvent.EndRequested)
+            }
+            cancelNativeGuidanceAndReturnHome()
+            developmentGuidanceStartRequested = false
+        }
+        updateLiveCameraScreenVisibility()
+        renderMainUi()
+    }
+
+    private fun updateLiveCameraScreenVisibility() {
+        if (!::cameraScreenControls.isInitialized || !::controlsScroll.isInitialized) return
+        if (!shouldShowNativeHome()) cameraScreenVisible = false
+        controlsScroll.visibility = if (cameraScreenVisible) View.GONE else View.VISIBLE
+        cameraScreenControls.visibility = if (cameraScreenVisible) View.VISIBLE else View.GONE
+        debugBboxOverlay.visibility = if (cameraScreenVisible) View.VISIBLE else View.GONE
+    }
+
+    private fun deviceRuntimeCalibrationContextAvailable(): Boolean =
+        isActivityForeground && !isFinishing && !isDestroyed && !detectorClosing &&
+            postLoginDeviceCheckSnapshot.passesFeatureGate &&
+            postLoginDeviceCheckSnapshot.bindingOrNull == currentPostLoginDeviceCheckSessionBinding() &&
+            currentPostLoginDeviceCheckSessionBinding() != null && hasCameraPermission() &&
+            nativeUiPage in setOf(NativeUiPage.HOME, NativeUiPage.SETTINGS) &&
+            nativePrewalkStartEpoch == null && !priorityUserEducationInFlight &&
+            !permissionRecoveryGate.blocksAutomaticResourceStart &&
+            (!::walkSessionLifecycle.isInitialized || walkSessionLifecycle.snapshot().state !in setOf(
+                WalkSessionState.ACTIVE, WalkSessionState.PAUSED, WalkSessionState.SAFE_STOP,
+            ))
+
+    private fun calibrationCameraOwnerAvailable(): Boolean =
+        session == null && arSessionPurpose == ArSessionPurpose.NONE &&
+            !cameraFallbackRequested && !cameraFallbackRunning && !cameraFallbackCleanupPending &&
+            cameraFallbackCamera == null && !runtimeCameraStartBlockedByAnotherOwner() &&
+            metricPreflightOwner == RuntimeMetricPreflightOwner.NONE
+
+    /** Wait only for owners already draining. This never polls or benchmarks during a walk. */
+    private fun scheduleDeviceRuntimeCalibration(
+        manual: Boolean = false,
+        requestDeadlineMs: Long = SystemClock.elapsedRealtime() + 300_000L,
+    ) {
+        runtimeTuningSchedule?.let(cameraReleaseHandler::removeCallbacks)
+        runtimeTuningSchedule = null
+        // User-facing performance checks use fixed assets. Do not seize the camera on home entry.
+        if (manual && SystemClock.elapsedRealtime() < requestDeadlineMs) runFixedFixturePerformanceCheck()
+    }
+
+    private fun cancelDeviceRuntimeCalibration(reason: String) {
+        runtimeTuningSchedule?.let(cameraReleaseHandler::removeCallbacks)
+        runtimeTuningSchedule = null
+        runtimeTuningGeneration += 1L
+        runtimeCalibration?.cancel(reason)
+        unknownCalibration?.cancel(reason)
+        unknownLoadingService?.let(::releaseUnknownLoadingService)
+    }
+
+    private fun prepareDeviceRuntimeCalibration(manual: Boolean, requestDeadlineMs: Long) {
+        if (!deviceRuntimeCalibrationContextAvailable() || !calibrationCameraOwnerAvailable()) return
+        loadDetectorForCurrentProcess()
+        val baseline = frameDetector as? TfliteAndroidFrameDetector ?: return
+        val config = reportRuntimeConfig ?: return
+        val candidate = runtimeActiveCandidate ?: return
+        if (detectorLoadedModelKey != TwoModelRuntimeConfig.UNIFIED_MODEL_KEY || detectorModelFallbackUsed) return
+        val scope = if (postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE))
+            RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH else RuntimeFeatureScope.CAMERA_TRACKING
+        val accountBinding = currentPostLoginDeviceCheckSessionBinding() ?: return
+        val firstRunLease = currentFirstRunAsyncLease()
+        val page = nativeUiPage
+        val deviceCheck = postLoginDeviceCheckSnapshot
+        val generation = ++runtimeTuningGeneration
+        runtimeTuningPreparing = true
+        val deadlineMs = requestDeadlineMs
+        val flowCurrent = {
+            generation == runtimeTuningGeneration && !detectorClosing &&
+                deviceRuntimeCalibrationContextAvailable() &&
+                accountBinding == currentPostLoginDeviceCheckSessionBinding() &&
+                firstRunLease == currentFirstRunAsyncLease() && page == nativeUiPage &&
+                deviceCheck == postLoginDeviceCheckSnapshot
+        }
+        val current = { flowCurrent() && frameDetector === baseline && SystemClock.elapsedRealtime() < deadlineMs }
+        deviceTuningExecutor.execute {
+            val binding = AndroidDeviceTuningProfileStore.createBinding(applicationContext, config, scope)
+            val profile = binding?.let(deviceTuningStore::load)
+            val attempt = binding?.let(deviceTuningStore::loadAttempt)
+            var recheck = binding != null && deviceTuningStore.needsRecheck(binding, manual)
+            if (binding == null || !current()) {
+                runOnUiThread { runtimeTuningPreparing = false }
+                return@execute
+            }
+            runtimeSelectionBinding = binding
+            // The stored preference is not active until this executor-serialized swap succeeds.
+            if (!manual && unknownRuntimeService == null && profile != null && runtimeRestoreAttemptedBinding != binding && profile.candidate != candidate) {
+                runtimeRestoreAttemptedBinding = binding
+                val unified = requireNotNull(config.unifiedWalksafe)
+                val selectedConfig = config.copy(
+                    unifiedWalksafe = unified.copy(runtime = unified.runtime.copy(
+                        delegate = profile.candidate.backend.delegate, numThreads = profile.candidate.numThreads,
+                        fallbackToCpu = false,
+                    )), fallbackModelKey = null, customTactile = null, cocoGeneral = null,
+                )
+                val load = runCatching { TfliteAndroidFrameDetector.createWithStatus(
+                    applicationContext, selectedConfig, preprocessingStrategy = YuvPreprocessingStrategy.FUSED_YUV_TO_TENSOR,
+                ) }.getOrNull()
+                val replacement = load?.detector
+                if (replacement != null && !load.fallbackUsed && load.modelKey == TwoModelRuntimeConfig.UNIFIED_MODEL_KEY && current()) {
+                    try {
+                        detectorExecutor.execute {
+                            val swapped = synchronized(frameStateLock) {
+                                if (!current()) false else {
+                                    frameDetector = replacement
+                                    detectorLoadGeneration += 1L
+                                    runtimeActiveCandidate = profile.candidate
+                                    runtimeActiveProfile = profile
+                                    adaptiveInferencePacing.reset()
+                                    runtimeLoadMonitor.reset()
+                                    runtimeLoadPendingRecordedBinding = null
+                                    detectorStatusText = "detector=measured_profile runtime=${profile.candidate.backend} threads=${profile.candidate.numThreads}"
+                                    true
+                                }
+                            }
+                            if (swapped) {
+                                closePreviousRuntimeDetector(baseline) {
+                                    runtimeTuningPreparing = false
+                                    scheduleDeviceRuntimeCalibration(requestDeadlineMs = deadlineMs)
+                                }
+                            } else {
+                                runtimeRestoreAttemptedBinding = null
+                                closePreviousRuntimeDetector(replacement) { runtimeTuningPreparing = false }
+                            }
+                        }
+                    } catch (_: RejectedExecutionException) {
+                        replacement.close()
+                        runOnUiThread { runtimeTuningPreparing = false }
+                    }
+                    return@execute
+                }
+                replacement?.close()
+                if (!current()) {
+                    runtimeRestoreAttemptedBinding = null
+                    runOnUiThread { runtimeTuningPreparing = false }
+                    return@execute
+                }
+                deviceTuningStore.markAttemptStarted(binding, DeviceTuningRecheckReason.EXECUTION_RECOVERY)
+                recheck = true
+            } else if (profile?.candidate == candidate) {
+                runtimeActiveProfile = profile
+            }
+            // Recheck the primary when required, then compare the supplementary workload.
+            // Both stages retain the original request deadline and never share a candidate slot.
+            if (!recheck) {
+                prepareUnknownCompositionCalibration(config, baseline, candidate, scope, manual, deadlineMs, current)
+                return@execute
+            }
+            if (unknownLoadingService != null || unknownRuntimeClosing) {
+                runOnUiThread { runtimeTuningPreparing = false }
+                return@execute
+            }
+            val auxiliaryToClose = unknownRuntimeService
+            unknownRuntimeClosing = auxiliaryToClose != null
+            unknownRuntimeService = null
+            invalidateUnknownObjectObservations()
+            if (auxiliaryToClose != null) {
+                auxiliaryToClose.closeAsync()
+                try { auxiliaryToClose.releasedFuture().get() } catch (_: Exception) {
+                    unknownRuntimeStatus = "추가 물체 인식 정리 확인 필요"
+                    runOnUiThread { runtimeTuningPreparing = false }
+                    return@execute
+                }
+            }
+            unknownRuntimeClosing = false
+            if (!current() || !deviceTuningStore.markAttemptStarted(binding, cursor = attempt?.cursor)) {
+                runOnUiThread { runtimeTuningPreparing = false }
+                return@execute
+            }
+            runOnUiThread {
+                runtimeTuningPreparing = false
+                if (!current() || !calibrationCameraOwnerAvailable()) return@runOnUiThread
+                cancelForegroundHomeWakeListening()
+                var ownedSession: AndroidRuntimeCalibrationSession? = null
+                // Leave preparation time for the second model (76 s GPU cold load on the S20).
+                // Unfinished primary comparisons keep their cursor for the next device check.
+                val primaryBudgetMs = ((deadlineMs - SystemClock.elapsedRealtime()) / 3L)
+                    .coerceIn(1L, 100_000L)
+                val controller = AndroidRuntimeCalibrationSession(
+                    activity = this, featureScope = scope, bindingHash = binding,
+                    budgetMs = primaryBudgetMs,
+                    speechActive = { voiceRecognitionActive || feedbackActuator?.isAppSpeechActive() == true },
+                    runnerFactory = { environmentProvider, progress, finished, liveDetection ->
+                        AndroidRuntimeCalibrationRunner(
+                            context = applicationContext, config = config, baselineDetector = baseline,
+                            baselineExecutor = detectorExecutor, baselineCandidate = candidate,
+                            bindingHash = binding, featureScope = scope,
+                            preprocessingStrategy = YuvPreprocessingStrategy.FUSED_YUV_TO_TENSOR,
+                            environmentProvider = environmentProvider,
+                            isCurrent = { current() && runtimeCalibration === ownedSession },
+                            callbackExecutor = java.util.concurrent.Executor { runOnUiThread(it) },
+                            onProgress = progress, onFinished = finished, onLiveDetection = liveDetection,
+                            speechActive = { voiceRecognitionActive || feedbackActuator?.isAppSpeechActive() == true },
+                            baselinePreviouslyConfirmed = profile?.candidate == candidate,
+                            restoredQueue = attempt?.cursor,
+                            budgetMs = primaryBudgetMs,
+                            onSelectionReady = { selection ->
+                                adoptDeviceRuntimeSelection(selection, baseline, current)
+                            },
+                        )
+                    },
+                    onClosed = { result ->
+                        val finishOwner: () -> Unit = {
+                        if (runtimeCalibration === ownedSession) runtimeCalibration = null
+                        deviceTuningExecutor.execute {
+                            val pending = when {
+                                result?.adopted == true -> null
+                                result?.status == RuntimeSelectionStatus.INCONCLUSIVE -> DeviceTuningRecheckReason.INCONCLUSIVE
+                                else -> DeviceTuningRecheckReason.INCOMPLETE_COMPARISON
+                            }
+                            deviceTuningStore.markAttemptFinished(binding, pending,
+                                if (pending == null) null else result?.queueSnapshot)
+                        }
+                        if (detectorCloseAfterCalibration) {
+                            detectorCloseAfterCalibration = false
+                            closeDetectorAsync()
+                        } else if (flowCurrent()) {
+                            // Rebind after adoption: the previous primary identity is now obsolete.
+                            val selectedPrimary = frameDetector as? TfliteAndroidFrameDetector
+                            val selectedCandidate = runtimeActiveCandidate
+                            if (selectedPrimary != null && selectedCandidate != null &&
+                                SystemClock.elapsedRealtime() < deadlineMs) {
+                                runtimeTuningPreparing = true
+                                deviceTuningExecutor.execute {
+                                    val nextCurrent = { flowCurrent() && frameDetector === selectedPrimary &&
+                                        SystemClock.elapsedRealtime() < deadlineMs }
+                                    prepareUnknownCompositionCalibration(config, selectedPrimary,
+                                        selectedCandidate, scope, manual, deadlineMs, nextCurrent)
+                                }
+                            } else {
+                                refreshStartupCapabilityUi()
+                                speakInteraction("성능 확인 시간이 끝났습니다. 확인된 설정을 유지합니다.")
+                            }
+                        }
+                        }
+                        if (runtimeOldDetectorReleasePending) runtimeAfterOldDetectorRelease = finishOwner
+                        else finishOwner()
+                    },
+                )
+                ownedSession = controller
+                runtimeCalibration = controller
+                controller.start()
+            }
+        }
+    }
+
+    /** Called on the tuning worker; all cold loads and comparisons share the original deadline. */
+    private fun prepareUnknownCompositionCalibration(
+        config: TwoModelRuntimeConfig,
+        primary: TfliteAndroidFrameDetector,
+        primaryCandidate: RuntimeCandidate,
+        scope: RuntimeFeatureScope,
+        manual: Boolean,
+        deadlineMs: Long,
+        current: () -> Boolean,
+    ) {
+        if (unknownLoadingService != null || unknownRuntimeClosing) {
+            runOnUiThread { runtimeTuningPreparing = false }
+            return
+        }
+        val binding = AndroidUnknownRuntimeProfileStore.createBinding(applicationContext, config, primaryCandidate, scope)
+        if (binding == null || !current()) {
+            runOnUiThread { runtimeTuningPreparing = false }
+            return
+        }
+        val profile = unknownTuningStore.load(binding)
+        val recheck = unknownTuningStore.needsRecheck(binding, manual)
+        val existing = unknownRuntimeService
+        if (!recheck && existing != null && unknownRuntimeBinding == binding && !existing.stats().stopping) {
+            runOnUiThread { runtimeTuningPreparing = false }
+            return
+        }
+        // Native release is awaited off the UI and before allocating the next auxiliary owner.
+        unknownRuntimeClosing = existing != null
+        unknownRuntimeService = null
+        invalidateUnknownObjectObservations()
+        if (existing != null) {
+            existing.closeAsync()
+            try { existing.releasedFuture().get() } catch (_: Exception) {
+                unknownRuntimeStatus = "추가 물체 인식 정리 확인 필요"
+                runOnUiThread { runtimeTuningPreparing = false }
+                return
+            }
+        }
+        unknownRuntimeClosing = false
+        if (!current()) {
+            runOnUiThread { runtimeTuningPreparing = false }
+            return
+        }
+        val serviceEpoch = unknownServiceSequence.incrementAndGet()
+        if (!recheck) {
+            val selected = profile?.candidate ?: RuntimeCandidate(RuntimeBackend.GPU, primaryCandidate.numThreads)
+            lateinit var restored: FastSamRuntimeService<UnknownRuntimeAttachment>
+            restored = FastSamRuntimeService(applicationContext, serviceEpoch,
+                FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.valueOf(selected.backend.name), selected.numThreads,
+                    profile == null, deadlineMs * 1_000_000L, MAX_DEPTH_DETECTION_SOURCE_AGE_MS, false, false, true),
+                object : FastSamRuntimeService.Listener<UnknownRuntimeAttachment> {
+                    override fun onResult(result: FastSamResult<UnknownRuntimeAttachment>) = consumeUnknownObjectResult(result)
+                    override fun onError(error: Throwable) { handleUnknownRuntimeError(serviceEpoch, error) }
+                })
+            unknownLoadingService = restored
+            if (!current()) {
+                releaseUnknownLoadingService(restored)
+                runOnUiThread { runtimeTuningPreparing = false }
+                return
+            }
+            restored.start().whenComplete { info, error ->
+                runOnUiThread {
+                    runtimeTuningPreparing = false
+                    if (error == null && info != null && current() && unknownLoadingService === restored && !unknownRuntimeClosing) {
+                        unknownRuntimeService = restored
+                        unknownLoadingService = null
+                        unknownRuntimeBinding = binding
+                        unknownLoadControl.reset()
+                        unknownLoadRecheckRecorded = false
+                        unknownRuntimeStatus = if (profile != null && !info.fallbackUsed)
+                            "추가 물체 인식 · 저장된 ${info.actualBackend} 설정" else "추가 물체 인식 · ${info.actualBackend} 임시 설정"
+                    } else {
+                        if (error != null && current() && unknownLoadingService === restored && !unknownRuntimeClosing) {
+                            deviceTuningExecutor.execute {
+                                unknownTuningStore.markPending(binding, DeviceTuningRecheckReason.EXECUTION_RECOVERY)
+                            }
+                        }
+                        releaseUnknownLoadingService(restored)
+                        unknownRuntimeStatus = "추가 물체 인식 준비 미완료"
+                    }
+                }
+            }
+            return
+        }
+        runOnUiThread {
+            runtimeTuningPreparing = false
+            if (!current() || !calibrationCameraOwnerAvailable()) return@runOnUiThread
+            cancelForegroundHomeWakeListening()
+            val calibrationDepth = UnknownObjectDepthPipeline(
+                maximumSourceAgeMs = MAX_DEPTH_DETECTION_SOURCE_AGE_MS, elapsedRealtimeMs = SystemClock::elapsedRealtime,
+            )
+            lateinit var calibration: UnknownRuntimeCalibration
+            calibration = UnknownRuntimeCalibration(
+                activity = this, binding = binding, primaryDetector = primary, primaryExecutor = detectorExecutor,
+                sessionEpoch = serviceEpoch, requestDeadlineMs = deadlineMs,
+                isCurrent = { current() && unknownCalibration === calibration },
+                speechActive = { voiceRecognitionActive || feedbackActuator?.isAppSpeechActive() == true },
+                onSelected = { selection ->
+                    selection.tryAdopt {
+                        if (!current() || unknownCalibration !== calibration || unknownRuntimeService != null) false else {
+                            unknownRuntimeService = selection.readyService
+                            unknownRuntimeBinding = binding
+                            unknownLoadControl.reset()
+                            unknownLoadRecheckRecorded = false
+                            unknownRuntimeStatus = if (selection.profile != null) "추가 물체 인식 · 조합 성능 확인됨"
+                                else "추가 물체 인식 · ${selection.candidate.backend} 임시 설정, 성능 비교 미확정"
+                            true
+                        }
+                    }
+                },
+                onClosed = { result ->
+                    if (unknownCalibration === calibration) unknownCalibration = null
+                    if (detectorCloseAfterCalibration) {
+                        detectorCloseAfterCalibration = false
+                        closeDetectorAsync()
+                    } else if (isActivityForeground && !isDestroyed && !isFinishing) {
+                        refreshStartupCapabilityUi()
+                        if (result?.adopted == true) speakInteraction("추가 물체 인식 준비를 마쳤습니다.")
+                        else unknownRuntimeStatus = "추가 물체 인식 점검 미완료 · 설정에서 다시 확인 가능"
+                    }
+                },
+                onProductionResult = ::consumeUnknownObjectResult,
+                onProductionError = { handleUnknownRuntimeError(serviceEpoch, it) },
+                onCalibrationResult = { result, evidence ->
+                    val snapshot = evidence.depthSnapshot
+                    val mapperFrame = evidence.mapperFrameId
+                    val capture = if (snapshot != null && mapperFrame != null) FrozenUnknownDepthCapture.freeze(
+                        result.token, snapshot, evidence.imageToDepthUv, mapperFrame,
+                    ) else null
+                    if (capture == null) false else {
+                        val outputs = calibrationDepth.process(capture, result.token, result.masks, SystemClock.elapsedRealtime())
+                        outputs.rejectionReason == null && snapshot!!.hasFreshMetricRawDepth &&
+                            evidence.positiveDepthSamples > 0 && evidence.poseValid
+                    }
+                },
+            )
+            unknownCalibration = calibration
+            if (!calibration.start()) unknownCalibration = null
+        }
+    }
+
+    private fun handleUnknownRuntimeError(serviceEpoch: Long, error: Throwable) {
+        val failed = unknownRuntimeService?.takeIf { it.sessionEpoch == serviceEpoch } ?: return
+        val failedBinding = unknownRuntimeBinding
+        if (failedBinding != null) deviceTuningExecutor.execute {
+            unknownTuningStore.markPending(failedBinding, DeviceTuningRecheckReason.EXECUTION_RECOVERY)
+        }
+        unknownRuntimeService = null
+        invalidateUnknownObjectObservations()
+        unknownRuntimeStatus = "추가 물체 인식 중지 · ${error.javaClass.simpleName}"
+        unknownRuntimeClosing = true
+        failed.closeAsync()
+        failed.releasedFuture().whenComplete { _, releaseError ->
+            if (releaseError == null) unknownRuntimeClosing = false
+        }
+    }
+
+    private fun releaseUnknownLoadingService(service: FastSamRuntimeService<UnknownRuntimeAttachment>) {
+        if (unknownLoadingService !== service) return
+        unknownRuntimeClosing = true
+        service.closeAsync()
+        service.releasedFuture().whenComplete { _, error ->
+            runOnUiThread {
+                if (unknownLoadingService === service && error == null) {
+                    unknownLoadingService = null
+                    unknownRuntimeClosing = false
+                }
+            }
+        }
+    }
+
+    private fun adoptDeviceRuntimeSelection(
+        selection: RuntimeCalibrationSelection,
+        baseline: TfliteAndroidFrameDetector,
+        current: () -> Boolean,
+    ) {
+        deviceTuningExecutor.execute {
+            if (!current() || !deviceTuningStore.save(selection.profile)) {
+                selection.reject()
+                return@execute
+            }
+            try {
+                detectorExecutor.execute {
+                    val adopted = selection.tryAdopt { load ->
+                        synchronized(frameStateLock) {
+                            if (!current() || load.detector == null) false else {
+                                if (!selection.isBaseline) runtimeOldDetectorReleasePending = true
+                                frameDetector = load.detector
+                                runtimeActiveCandidate = selection.profile.candidate
+                                runtimeActiveProfile = selection.profile
+                                detectorLoadGeneration += 1L
+                                adaptiveInferencePacing.reset()
+                                runtimeLoadMonitor.reset()
+                                runtimeLoadPendingRecordedBinding = null
+                                detectorStatusText = "detector=measured_profile runtime=${selection.profile.candidate.backend} threads=${selection.profile.candidate.numThreads}"
+                                true
+                            }
+                        }
+                    }
+                    if (adopted && !selection.isBaseline) {
+                        closePreviousRuntimeDetector(baseline) {
+                            runtimeOldDetectorReleasePending = false
+                            val finish = runtimeAfterOldDetectorRelease
+                            runtimeAfterOldDetectorRelease = null
+                            finish?.invoke()
+                        }
+                    }
+                }
+            } catch (_: RejectedExecutionException) { selection.reject() }
+        }
+    }
+
+    /** A native close failure must never be reported as a released execution slot. */
+    private fun closePreviousRuntimeDetector(detector: TfliteAndroidFrameDetector, afterRelease: () -> Unit) {
+        try {
+            detector.close()
+            runOnUiThread(afterRelease)
+        } catch (error: RuntimeException) {
+            runtimeOldDetectorReleasePending = true
+            android.util.Log.e("WalkSafeRuntimeTuning", "Previous detector release failed", error)
+            runOnUiThread {
+                if (isActivityForeground && !isDestroyed && !isFinishing) {
+                    updateStatus("성능 작업 정리 확인 필요", "실행 작업을 닫지 못했습니다. 앱을 다시 시작한 뒤 기기 점검을 진행하세요.")
+                }
             }
         }
     }
@@ -29110,6 +31335,8 @@ generation != cameraFallbackGeneration
                 (frameDetector as? Closeable)?.close()
                 frameDetector = NoopAndroidFrameDetector()
                 detectorGeneration += 1
+                resetVisualTrackingState()
+                adaptiveInferencePacing.reset()
                 detectorAvailable = false
                 detectorLoadReason = "runtime_failed_unavailable"
                 detectorStatusText =
@@ -29151,8 +31378,6 @@ generation != cameraFallbackGeneration
         val expectedDetectorGeneration = synchronized(frameStateLock) {
             if (!walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch)) return
             latestDetectionSnapshot = DetectionSnapshot.empty()
-            latestTactileOverlaySnapshot = DetectionSnapshot.empty()
-            lastNonEmptyOverlaySnapshot = DetectionSnapshot.empty()
             detectorGeneration
         }
         runOnUiThread {
@@ -29230,10 +31455,13 @@ generation != cameraFallbackGeneration
             var vibrationAccepted = false
             val dispatch = actuator.emit(
                 action = action,
+                isStillValidAtStart = {
+                    isFeedbackLifecycleCurrent(speechGeneration) && isFeedbackActionStillDeliverable(action)
+                },
                 onSpeechCompleted = {
                     runOnUiThread {
                         if (isFeedbackLifecycleCurrent(speechGeneration)) {
-                            confirmFeedbackDelivery(action, policyEvaluatedAtMs)
+                            confirmFeedbackDelivery(action, policyEvaluatedAtMs, speechCompleted = true)
                         } else {
                             feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
                         }
@@ -29276,6 +31504,7 @@ generation != cameraFallbackGeneration
             val speechGeneration = generation
             val speech = actuator.speakNavigation(
                 message = action.message,
+                requiresExplicitTerminalCallback = true,
                 onCompleted = {
                     runOnUiThread {
                         if (isFeedbackLifecycleCurrent(speechGeneration)) {
@@ -29298,6 +31527,13 @@ generation != cameraFallbackGeneration
     private fun isFeedbackActionStillDeliverable(action: FeedbackAction): Boolean {
         val current = latestFeedbackDeliveryState
         val nowMs = SystemClock.elapsedRealtime()
+        if (action.trackId.startsWith("unknown:") && freshUnknownFeedbackBatches(nowMs).none { batch ->
+                batch.validUntilElapsedRealtimeMs == action.validUntilMs && batch.outputs.any { output ->
+                    output.trackId == action.trackId && output.userFacing.message == action.message &&
+                        output.userFacing.messageLevel == action.level
+                }
+            }
+        ) return false
         return nowMs <= action.validUntilMs &&
             action.deliveryKey in current.activeFeedbackDeliveryKeys &&
             current.deviceGateAllowsAlerts &&
@@ -29322,7 +31558,7 @@ generation != cameraFallbackGeneration
         }
         return isActivityForeground &&
             isWalkSessionRuntimeActive() &&
-            officialEnvironmentOutputsAllowed &&
+            cameraEnvironmentOutputsAllowed() &&
             phoneMountingOutputsAllowed &&
             capabilityGate &&
             hasCameraPermission() &&
@@ -29373,8 +31609,14 @@ generation != cameraFallbackGeneration
         )
     }
 
-    private fun confirmFeedbackDelivery(action: FeedbackAction, policyEvaluatedAtMs: Long) {
-        if (!isFeedbackActionStillDeliverable(action)) {
+    private fun confirmFeedbackDelivery(
+        action: FeedbackAction,
+        policyEvaluatedAtMs: Long,
+        speechCompleted: Boolean = false,
+    ) {
+        // Capture freshness is the deadline to START speech. A real onDone may arrive after that
+        // deadline; the caller's lifecycle fence and the policy's claimed lease still apply.
+        if (!speechCompleted && !isFeedbackActionStillDeliverable(action)) {
             feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
             return
         }
@@ -29405,32 +31647,52 @@ generation != cameraFallbackGeneration
         )
     }
 
-    private fun speakNavigation(message: String, onCompleted: (() -> Unit)? = null): Boolean {
+    private fun speakNavigation(message: String, onCompleted: (() -> Unit)? = null): Boolean =
+        dispatchNavigationSpeech(message, onCompleted = onCompleted)
+
+    private fun dispatchNavigationSpeech(
+        message: String,
+        onCompleted: (() -> Unit)? = null,
+        onFailed: (() -> Unit)? = null,
+    ): Boolean {
         val generation = feedbackLifecycleGeneration
         if (Looper.myLooper() != Looper.getMainLooper()) {
             runOnUiThread {
-                if (!isFeedbackLifecycleCurrent(generation)) return@runOnUiThread
-                speakNavigation(message, onCompleted)
+                if (!isFeedbackLifecycleCurrent(generation)) {
+                    onFailed?.invoke()
+                    return@runOnUiThread
+                }
+                dispatchNavigationSpeech(message, onCompleted, onFailed)
             }
             return true
         }
-        if (!isFeedbackLifecycleCurrent(generation)) return false
-        if (!isWalkSessionRuntimeActive() || !walkSafetyOutputsAllowed()) return false
-        if (shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)) return false
+        if (!isFeedbackLifecycleCurrent(generation) ||
+            !isWalkSessionRuntimeActive() || !navigationEnvironmentOutputsAllowed() ||
+            shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)
+        ) {
+            onFailed?.invoke()
+            return false
+        }
         val mainThreadCompletion = onCompleted?.let { completion ->
             {
                 runOnUiThread {
-                    if (!isWalkSessionRuntimeActive() || !walkSafetyOutputsAllowed()) {
-                        return@runOnUiThread
-                    }
-                    if (isFeedbackLifecycleCurrent(generation)) completion()
+                    if (isFeedbackLifecycleCurrent(generation) &&
+                        isWalkSessionRuntimeActive() && navigationEnvironmentOutputsAllowed()
+                    ) completion() else onFailed?.invoke()
                 }
             }
         }
-        return ensureFeedbackActuator().speakNavigation(
+        val mainThreadFailure = onFailed?.let { failure ->
+            { runOnUiThread { failure() } }
+        }
+        val accepted = ensureFeedbackActuator().speakNavigation(
             message = message,
             onCompleted = mainThreadCompletion,
+            onFailed = mainThreadFailure,
+            requiresExplicitTerminalCallback = onCompleted != null || onFailed != null,
         ) == NavigationSpeechDispatchResult.ACCEPTED
+        if (!accepted) onFailed?.invoke()
+        return accepted
     }
 
     private fun showWalkLastResult(message: String) {
@@ -29502,7 +31764,9 @@ generation != cameraFallbackGeneration
             responseGeneration == commandSpeechResponseGeneration &&
                 isFeedbackLifecycleCurrent(lifecycleGeneration) && isActivityForeground &&
                 recognitionGeneration == voiceRecognitionGeneration &&
-                responseActor == reporterUserId && nativeUiPage == responsePage &&
+                responseActor == reporterUserId &&
+                (nativeUiPage == responsePage ||
+                    (nativeUiPage.isVoiceInteractionPage() && responsePage.isVoiceInteractionPage())) &&
                 GatewaySessionProcessCoordinator.snapshot().generation == gatewayGeneration &&
                 !voiceRecognitionActive && gatewayVoiceRecorder?.isRecording != true &&
                 (responseEpoch == null || (::walkSessionLifecycle.isInitialized &&
@@ -29561,7 +31825,8 @@ generation != cameraFallbackGeneration
             }
         }
         val actuator = ensureFeedbackActuator()
-        val readinessDeadlineMs = SystemClock.elapsedRealtime() + 8_000L
+        val readinessDeadlineMs = SystemClock.elapsedRealtime() +
+            AndroidFeedbackActuator.INITIALIZATION_READINESS_TIMEOUT_MS
         val readinessHandler = android.os.Handler(android.os.Looper.getMainLooper())
         var waitingForReadiness = false
         fun dispatchWhenReady(): Boolean {
@@ -29958,6 +32223,11 @@ generation != cameraFallbackGeneration
     }
 
     private fun isHandsFreeVoiceOutputActive(): Boolean {
+        if (foregroundHomeWakeAcknowledgement?.isPlaying() == true) return true
+        return isHandsFreeVoiceSpeechOutputActive()
+    }
+
+    private fun isHandsFreeVoiceSpeechOutputActive(): Boolean {
         if (feedbackActuator?.isAppSpeechActive() == true) return true
         if (!isScreenReaderActive()) return false
         val nowMs = SystemClock.elapsedRealtime()
@@ -29975,6 +32245,12 @@ generation != cameraFallbackGeneration
     }
 
     private fun handleHandsFreeVoiceCommandListeningStarted() {
+        if (isWalkSessionRuntimeActive()) {
+            handsFreeVoiceOwnsCommandPage = true
+            if (nativeUiPage != NativeUiPage.DESTINATION_SEARCH) {
+                showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)
+            }
+        }
         runCatching { ensureFeedbackActuator().playVoiceListeningStartVibration() }
         updateGatewayVoiceStatus("호출어를 인식했습니다. 음성 명령을 듣고 있습니다.")
         updateNavigationStatus("voice_hands_free=listening_command")
@@ -30033,7 +32309,7 @@ generation != cameraFallbackGeneration
         refreshForegroundHomeWakeListening()
         if (foregroundHomeWakeProbe != null) return
         if (!isActivityForeground ||
-            nativeUiPage == NativeUiPage.VOICE_COMMAND ||
+            (nativeUiPage == NativeUiPage.VOICE_COMMAND && !handsFreeVoiceOwnsCommandPage) ||
             pendingNativeUiPage == NativeUiPage.VOICE_COMMAND
         ) return
         if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.HANDS_FREE_VOICE)) {
@@ -30065,7 +32341,7 @@ generation != cameraFallbackGeneration
             handsFreeVoiceController == null ||
             handsFreeVoiceModelDirectory?.isDirectory != true ||
             !hasRecordAudioPermission() ||
-            voiceRecognitionActive ||
+            voiceRecognitionActive || voiceCommandPromptPending ||
             gatewayVoiceRecorder?.isRecording == true ||
             activeGatewaySpeechInteraction != null ||
             !isWalkSessionRuntimeActive()
@@ -30112,7 +32388,11 @@ generation != cameraFallbackGeneration
 
     private fun closeHandsFreeVoice() {
         if (handsFreeVoiceDestroyed) return
+        handsFreeVoiceOwnsCommandPage = false
         handsFreeVoiceDestroyed = true
+        cancelForegroundHomeWakeAcknowledgement()
+        foregroundHomeWakeAcknowledgement?.close()
+        foregroundHomeWakeAcknowledgement = null
         handsFreeVoiceModelGeneration += 1L
         stopHandsFreeVoiceService()
         val controller = handsFreeVoiceController
@@ -30200,7 +32480,12 @@ generation != cameraFallbackGeneration
         latestStepCount = 0
         tmapFailureGuard.reset()
         if (::stepTracker.isInitialized) stepTracker.resetForNewWalk()
-        clearTrustedLocation()
+        if (currentLocationCollectionAllowsWork()) {
+            freshTrustedLocationOrNull()
+            clearLocationDerivedState()
+        } else {
+            clearTrustedLocation()
+        }
         pendingVoiceDestinationQuery = null
         feedbackPolicy.resetForNewWalk()
         nonMetricAdvisoryPolicy.reset()
@@ -30260,7 +32545,8 @@ generation != cameraFallbackGeneration
             resetRouteState()
         }
         invalidateFrameStateForPause()
-        stopLocationUpdates()
+        stopActivePositionFieldSession()
+        if (!currentLocationCollectionAllowsWork()) stopLocationUpdates()
         stopStepTracking()
         if (::phoneMountingSensorProbe.isInitialized) phoneMountingSensorProbe.stop()
         if (::earthOrientationTracker.isInitialized) earthOrientationTracker.stop()
@@ -30290,6 +32576,7 @@ generation != cameraFallbackGeneration
                 mapOf("reason" to reason),
             )
         }
+        startLocationUpdatesIfAllowed()
     }
 
     private fun handleOneShotSpeechRecognitionFailure(
@@ -30476,10 +32763,14 @@ generation != cameraFallbackGeneration
         }
         val reporterId = currentReporterUserId() ?: return "reportCandidate=blocked:login_required"
         val output = reportOutput ?: return "reportCandidate=blocked:no_depth_object"
-        if (output.className != AndroidReportCandidatePolicy.DAMAGED_TACTILE_BLOCK) {
+        if (!AndroidReportCandidatePolicy.isReportableDamageClass(output.className)) {
             return "reportCandidate=blocked:not_reportable_class"
         }
-        val modelKey = detectorModelKeyForReports ?: return "reportCandidate=blocked:model_unavailable"
+        val loadedReportModel = detectorModelKeyForReports
+            ?: return "reportCandidate=blocked:model_unavailable"
+        val modelKey = reportRuntimeConfig?.modelKeyForReportClass(output.className)
+            ?.takeIf { loadedReportModel == reportRuntimeConfig?.primaryModelKey }
+            ?: loadedReportModel
         if (modelKey !in AndroidReportCandidatePolicy.ALLOWED_MODEL_KEYS) {
             return "reportCandidate=blocked:model_not_allowed"
         }
@@ -30571,7 +32862,7 @@ generation != cameraFallbackGeneration
         if (currentReporterUserId() != expectedReporterActorId) {
             return "reportCandidate=blocked:reporter_changed"
         }
-        if (!officialEnvironmentOutputsAllowed || !phoneMountingOutputsAllowed) {
+        if (!walkSafetyOutputsAllowed()) {
             return "reportCandidate=blocked:environment_changed"
         }
         if (!reportPrivacyConsentSession.isGranted()) {
@@ -30795,8 +33086,7 @@ generation != cameraFallbackGeneration
         val status = try {
             if (
                 !ensureExplicitReportAuthorityPreconditions() ||
-                !officialEnvironmentOutputsAllowed ||
-                !phoneMountingOutputsAllowed ||
+                !walkSafetyOutputsAllowed() ||
                 currentExplicitReportConfirmationContextOrNull() != confirmed.context
             ) {
                 "reportCandidate=blocked:confirmation_context_changed"
@@ -31049,7 +33339,7 @@ generation != cameraFallbackGeneration
         if (
             !snapshot.isForeground ||
             (snapshot.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
-                !(nativeUiPage == NativeUiPage.VOICE_COMMAND && homeVoiceCommandAvailable()))
+                !(nativeUiPage.isVoiceInteractionPage() && homeVoiceCommandAvailable()))
         ) {
             updateGatewayVoiceStatus("화면 음성 명령은 초기 설정과 기기 점검을 완료한 뒤 앱 화면에서 사용할 수 있습니다.")
             return
@@ -31086,7 +33376,9 @@ generation != cameraFallbackGeneration
 
     private fun startGatewayVoiceCapture(): Boolean {
         if (activeGatewaySpeechInteraction != null || voiceRecognitionActive) return false
+        if (!isGatewayNetworkAllowed(reason = "server_speech")) return false
         val (session, sessionGeneration) = currentGatewaySpeechSessionOrNull() ?: return false
+        val networkTicket = gatewaySpeechNetworkGate.capture() ?: return false
         val walk = walkSessionLifecycle.snapshot()
         if (
             !walk.isForeground ||
@@ -31104,6 +33396,7 @@ generation != cameraFallbackGeneration
                 interactionGeneration = interactionGeneration,
             ),
             session = session,
+            networkTicket = networkTicket,
             expectedWalkEpoch = walk.epoch,
             expectedNavigationDecisionToken = routeNavigator.pendingDecisionToken(),
         )
@@ -31157,9 +33450,17 @@ generation != cameraFallbackGeneration
         active: ActiveGatewaySpeechInteraction,
         audioFile: File,
     ) {
+        if (!isGatewaySpeechInteractionCurrent(active)) {
+            audioFile.delete()
+            finishGatewaySpeechInteraction(active)
+            return
+        }
         val requestId = UUID.randomUUID().toString()
         val call = runCatching {
-            gatewaySpeechClient.transcribeCall(active.session, audioFile, requestId)
+            gatewaySpeechNetworkGate.bind(
+                active.networkTicket,
+                gatewaySpeechClient.transcribeCall(active.session, audioFile, requestId),
+            )
         }.getOrElse {
             audioFile.delete()
             finishGatewaySpeechInteraction(active)
@@ -31228,7 +33529,10 @@ generation != cameraFallbackGeneration
         }
         val requestId = UUID.randomUUID().toString()
         val call = runCatching {
-            gatewaySpeechClient.synthesizeCall(active.session, message, requestId, cacheDir)
+            gatewaySpeechNetworkGate.bind(
+                active.networkTicket,
+                gatewaySpeechClient.synthesizeCall(active.session, message, requestId, cacheDir),
+            )
         }.getOrElse {
             finishGatewaySpeechInteraction(active)
             speakInteraction(message)
@@ -31280,6 +33584,7 @@ generation != cameraFallbackGeneration
 
     private fun currentGatewaySpeechSessionOrNull(): Pair<GatewayFieldSession, Long>? {
         if (
+            !isGatewayFeatureNetworkAllowed() ||
             !isActivityForeground ||
             !::firstRunOnboardingSnapshot.isInitialized ||
             firstRunOnboardingSnapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ||
@@ -31300,6 +33605,7 @@ generation != cameraFallbackGeneration
         active: ActiveGatewaySpeechInteraction,
     ): Boolean {
         if (activeGatewaySpeechInteraction !== active) return false
+        if (!gatewaySpeechNetworkGate.isCurrent(active.networkTicket)) return false
         val process = GatewaySessionProcessCoordinator.snapshot()
         return walkSessionLifecycle.snapshot().let { walk ->
             walk.epoch == active.expectedWalkEpoch &&
@@ -31375,6 +33681,8 @@ generation != cameraFallbackGeneration
         purpose: VoiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND,
         expectedGatewayWalkOperationId: String? = null,
     ): Boolean {
+        handsFreeVoiceOwnsCommandPage = false
+        cancelForegroundHomeWakeAcknowledgement()
         cancelForegroundHomeWakeListening()
         val promptCompletedForThisRequest = voiceCommandPromptReadyGeneration == voiceRecognitionGeneration
         voiceCommandPromptReadyGeneration = null
@@ -31412,7 +33720,7 @@ generation != cameraFallbackGeneration
                         WalkSessionState.ACTIVE -> requireStartupCapabilityConfirmation()
                         WalkSessionState.PAUSED -> voiceResumeConfirmationAvailable()
                         WalkSessionState.READY, WalkSessionState.SAFE_STOP, WalkSessionState.ENDED ->
-                            nativeUiPage == NativeUiPage.VOICE_COMMAND && homeVoiceCommandAvailable()
+                            nativeUiPage.isVoiceInteractionPage() && homeVoiceCommandAvailable()
                         else -> false
                     }
             }
@@ -31547,6 +33855,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun cancelVoiceCommandRecognition() {
+        cancelForegroundHomeWakeAcknowledgement()
         cancelGatewaySpeechInteraction("voice_cancelled")
         voiceRecognitionGeneration += 1
         cancelCommandSpeechResponse()
@@ -31735,7 +34044,7 @@ generation != cameraFallbackGeneration
                     snapshot.epoch == expectedWalkEpoch &&
                         snapshot.isForeground &&
                         (snapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) ||
-                            (nativeUiPage == NativeUiPage.VOICE_COMMAND && homeVoiceCommandAvailable()))
+                            (nativeUiPage.isVoiceInteractionPage() && homeVoiceCommandAvailable()))
                 }
             VoiceRecognitionPurpose.WALK_SESSION_RESUME -> {
                 val snapshot = walkSessionLifecycle.snapshot()
@@ -31773,7 +34082,7 @@ generation != cameraFallbackGeneration
         resultBackend: OfflineSpeechEngine? = null,
         hasAdditionalAlternatives: Boolean = false,
     ) {
-        val recognized = phrases.firstOrNull { it.isNotBlank() }.orEmpty()
+        val recognized = phrases.firstOrNull().orEmpty()
         val snapshot = walkSessionLifecycle.snapshot()
         val walkDecision = walkSessionVoiceControlPolicy.evaluate(
             phrase = recognized,
@@ -31879,6 +34188,16 @@ generation != cameraFallbackGeneration
             }
             return
         }
+        if (platformCandidate?.disposition == PlatformVoiceCandidateDisposition.UNRECOGNIZED) {
+            // Saying it again cannot help; nothing said was a command. Same wording as the scored
+            // path's miss below, so one dead end does not survive in a second place.
+            val message = "못 알아들었습니다. ${unrecognizedCommandHintKo()}"
+            updateGatewayVoiceStatus(message)
+            if (!retryHomeDestinationVoiceDialog(message)) {
+                speakInteraction(message)
+            }
+            return
+        }
         if (platformCandidate?.disposition in setOf(
                 PlatformVoiceCandidateDisposition.AMBIGUOUS,
                 PlatformVoiceCandidateDisposition.INVALID_FINAL,
@@ -31901,7 +34220,7 @@ generation != cameraFallbackGeneration
             )
         }
         if (snapshot.state == WalkSessionState.PAUSED &&
-            action != AndroidVoiceAction.SpeakVoiceHelp) {
+            action !in setOf(AndroidVoiceAction.SpeakVoiceHelp, AndroidVoiceAction.OpenSettings)) {
             logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.COMMAND_GATE_BLOCKED)
             updateNavigationStatus("voice=paused_command_unmatched")
             speakInteraction("일시정지 중에는 보행 재개 또는 보행 종료라고 말씀해 주세요.")
@@ -31916,7 +34235,7 @@ generation != cameraFallbackGeneration
                 },
             )
             if (!retryHomeDestinationVoiceDialog("명령을 이해하지 못했습니다.")) {
-                speakInteraction("명령을 이해하지 못했습니다. 다시 말씀해 주세요.")
+                speakInteraction("못 알아들었습니다. ${unrecognizedCommandHintKo()}")
             }
             return
         }
@@ -32051,13 +34370,21 @@ generation != cameraFallbackGeneration
                 AndroidVoiceAction.StartNavigation,
                 AndroidVoiceAction.SpeakCurrentGuidance,
                 AndroidVoiceAction.SpeakVoiceHelp,
+                AndroidVoiceAction.OpenSettings,
             )
         ) {
             updateNavigationStatus("voice=walk_action_requires_active_walk")
             speakInteraction("보행을 시작한 뒤 사용할 수 있는 명령입니다. 목적지를 먼저 검색해 주세요.")
             return
         }
+        val commandPage = when (action.uiDestination()) {
+            VoiceCommandUiDestination.VOICE_COMMAND -> NativeUiPage.VOICE_COMMAND
+            VoiceCommandUiDestination.DESTINATION_SEARCH -> NativeUiPage.DESTINATION_SEARCH
+            VoiceCommandUiDestination.SETTINGS -> NativeUiPage.SETTINGS
+        }
+        showNativeUiPage(commandPage, preserveVoiceInteraction = true)
         when (action) {
+            AndroidVoiceAction.OpenSettings -> speakStatusExplanation("설정 화면을 열었습니다.")
             AndroidVoiceAction.StartNavigation -> {
                 if (pendingUiDestination != null) startNativeDestinationGuidance()
                 else speakInteraction(
@@ -32074,7 +34401,7 @@ generation != cameraFallbackGeneration
                     "일시정지 중에는 보행 재개 또는 보행 종료라고 말해 주세요. 종료할 때는 확인을 한 번 더 받습니다."
                 } else {
                     "목적지는 서울역으로 안내해줘처럼 말해 주세요. 후보 안내 뒤에는 1번 또는 첫 번째라고 선택할 수 있습니다. " +
-                        "더 듣기, 목적지 취소, 안내 시작을 사용할 수 있습니다. " +
+                        "더 듣기, 목적지 취소, 안내 시작, 설정을 사용할 수 있습니다. " +
                         "보행 중에는 다음 안내 알려줘, 다시 말해줘, 경로 다시 찾아줘, 위치 다시 확인, " +
                         "도착했어, 아직 도착 아니야, 길안내 종료, 신고해, 보행 일시정지, 보행 종료를 말할 수 있습니다. " +
                         "신고와 보행 종료는 확인 안내를 따라 주세요."
@@ -32097,6 +34424,26 @@ generation != cameraFallbackGeneration
             AndroidVoiceAction.RejectArrival -> rejectArrivalFromVoice()
             AndroidVoiceAction.StopNavigation -> stopNavigationFromVoice()
         }
+    }
+
+    /**
+     * "다시 말씀해 주세요" asks a walker who cannot read the screen to guess. The destination
+     * dialog already re-offers its numbers instead; everywhere else ended in a dead end. Each
+     * hint names commands the parser accepts in the state the walk is actually in.
+     */
+    private fun unrecognizedCommandHintKo(): String = when {
+        voiceEndConfirmationPromptPending -> "보행 종료 확인 또는 보행 종료 취소라고 말씀해 주세요."
+        walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED ->
+            "보행 재개 또는 보행 종료라고 말씀해 주세요."
+        routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION ->
+            "도착했어 또는 아직 도착 아니야라고 말씀해 주세요."
+        routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.REROUTE ->
+            "새 경로 요청, 위치 다시 확인, 길안내 종료 중에서 말씀해 주세요."
+        routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.LOCATION_RECHECK ->
+            "위치 다시 확인이라고 말씀해 주세요."
+        isRouteActive -> "다음 안내 알려줘 또는 길안내 종료라고 말씀해 주세요."
+        pendingUiDestination != null -> "안내 시작 또는 목적지 취소라고 말씀해 주세요."
+        else -> "목적지를 말하거나 도움말이라고 말씀해 주세요."
     }
 
     private var homeDestinationVoiceDialogLease: HomeDestinationVoiceDialogLease? = null
@@ -32125,7 +34472,7 @@ generation != cameraFallbackGeneration
             query = destinationSearchQuery,
             state = destinationSearchVoiceState,
             homeContextAvailable = nativeHomeFeatureContextAvailable(),
-            voicePage = nativeUiPage == NativeUiPage.VOICE_COMMAND,
+            voicePage = nativeUiPage.isVoiceInteractionPage(),
         )
 
     private fun retryHomeDestinationVoiceDialog(message: String): Boolean {
@@ -32160,7 +34507,7 @@ generation != cameraFallbackGeneration
     ): Boolean {
         clearHomeDestinationVoiceDialog()
         if (!nativeHomeFeatureContextAvailable() ||
-            nativeUiPage != NativeUiPage.VOICE_COMMAND || state.results.isEmpty()
+            !nativeUiPage.isVoiceInteractionPage() || state.results.isEmpty()
         ) return speakInteraction(message)
         val actorId = reporterUserId ?: return false
         val lease = HomeDestinationVoiceDialogLease(
@@ -32376,7 +34723,34 @@ generation != cameraFallbackGeneration
         pendingVoiceDestinationPageIndex = null
         destinationSearchVoiceState = null
         updateNavigationStatus("voice=destination_candidate_selected index=$oneBasedIndex")
-        speakInteraction("${selected.name} 목적지를 선택했습니다. TMAP 경로를 확인합니다.")
+        speakInteraction("${selected.name} 목적지를 선택했습니다. 경로를 확인합니다.")
+    }
+
+    /**
+     * Says what the walk is doing rather than why the command was refused.
+     *
+     * The walker cannot see the screen, so the state is the one thing they need and the one thing
+     * the old wording buried. It only names a command where exactly one is left; the three-way
+     * choice was already read out when the deviation was announced, and repeating it costs seconds
+     * mid-walk.
+     */
+    private fun explainRouteCommandUnavailable(
+        onRouteKo: String = "경로를 따라가는 중입니다.",
+    ) {
+        speakInteraction(
+            when {
+                !isRouteActive -> "길안내 중이 아닙니다."
+                routeNavigator.pendingUserDecision() ==
+                    RouteNavigatorUserDecision.LOCATION_RECHECK ->
+                    "위치 다시 확인만 할 수 있습니다."
+                routeNavigator.pendingUserDecision() ==
+                    RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION ->
+                    "도착 확인을 기다리고 있습니다."
+                routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.REROUTE ->
+                    "경로를 벗어난 상태입니다."
+                else -> onRouteKo
+            },
+        )
     }
 
     private fun requestRerouteFromVoice() {
@@ -32390,7 +34764,7 @@ generation != cameraFallbackGeneration
             !isRouteActive ||
             routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE
         ) {
-            speakInteraction("지금은 새 경로를 요청할 이탈 상태가 아닙니다.")
+            explainRouteCommandUnavailable()
             return
         }
         val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.NEW_ROUTE)
@@ -32415,7 +34789,7 @@ generation != cameraFallbackGeneration
                 RouteNavigatorUserDecision.REROUTE,
             )
         ) {
-            speakInteraction("지금은 위치를 다시 확인할 이탈 상태가 아닙니다.")
+            explainRouteCommandUnavailable()
             return
         }
         val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
@@ -32432,7 +34806,7 @@ generation != cameraFallbackGeneration
             !isRouteActive ||
             routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE
         ) {
-            speakInteraction("지금은 종료 선택을 기다리는 경로 이탈 상태가 아닙니다.")
+            explainRouteCommandUnavailable()
             return
         }
         val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.END_NAVIGATION)
@@ -32456,7 +34830,7 @@ generation != cameraFallbackGeneration
     private fun confirmArrivalFromVoice() {
         val decision = routeNavigator.confirmArrival()
         if (!decision.arrived) {
-            speakInteraction("지금은 확인할 도착 후보가 없습니다.")
+            explainRouteCommandUnavailable("아직 도착 안내가 없습니다.")
             return
         }
         resetRouteState()
@@ -32484,7 +34858,7 @@ generation != cameraFallbackGeneration
     private fun rejectArrivalFromVoice() {
         val decision = routeNavigator.rejectArrival()
         if (decision.reason != "arrival_rejected_route_retained") {
-            speakInteraction("지금은 거절할 도착 후보가 없습니다.")
+            explainRouteCommandUnavailable("아직 도착 안내가 없습니다.")
             return
         }
         updateRouteDeviationActions(decision.pendingUserDecision)
@@ -32523,7 +34897,7 @@ generation != cameraFallbackGeneration
         }
         val message = when {
             !isRouteActive -> "진행 중인 길안내가 없습니다."
-            !latestTmapOnRoute -> "현재 TMAP 경로를 다시 확인하고 있습니다. 안전한 위치에서 잠시 기다려 주세요."
+            !latestTmapOnRoute -> "현재 경로를 다시 확인하고 있습니다. 안전한 위치에서 잠시 기다려 주세요."
             location == null -> "현재 위치를 확인한 뒤 다음 경로를 안내합니다."
             else -> routeInstruction ?: "다음 경로 안내를 확인할 수 없습니다."
         }
@@ -32629,46 +35003,44 @@ generation != cameraFallbackGeneration
 
     @SuppressLint("MissingPermission")
     private fun startLocationUpdatesIfAllowed(forceRestart: Boolean = false) {
-        if (!currentLocationCollectionAllowsWork()) {
+        val owner = currentLocationCollectionOwnerOrNull() ?: run {
             stopLocationUpdates()
             return
         }
-        if (!::fusedLocationClient.isInitialized || !hasLocationPermission()) {
-            stopActivePositionFieldSession()
-            updateNavigationStatus("navigation=gps_permission_missing hazard_only")
-            pauseDirectionGuidance(
-                reason = "location_permission_missing",
-                message = "정확한 위치 권한이 없어 방향 안내를 중지했습니다.",
-            )
+        if (!::fusedLocationClient.isInitialized) return
+        if (!forceRestart && locationCallback != null && locationCollectionOwner == owner) {
+            startPositioningObservationSources()
             return
         }
-        val walkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: run {
-            stopLocationUpdates()
-            return
+        if (locationCallback != null) {
+            stopLocationUpdates(stopFieldSession = false)
         }
-        startPositioningObservationSources()
-        if (!forceRestart && locationCallback != null) return
-        locationCallback?.let(fusedLocationClient::removeLocationUpdates)
         val generation = ++locationCallbackGeneration
+        locationCollectionOwner = owner
         lateinit var callback: LocationCallback
         callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                if (!isLocationCallbackCurrent(walkEpoch, generation, callback)) return
+                if (!isLocationCallbackCurrent(owner, generation, callback)) return
                 result.lastLocation?.let { location ->
-                    handleLocationUpdate(location, walkEpoch, generation)
+                    handleLocationUpdate(location, owner, generation)
                 }
             }
 
             override fun onLocationAvailability(availability: LocationAvailability) {
-                if (!isLocationCallbackCurrent(walkEpoch, generation, callback)) return
+                if (!isLocationCallbackCurrent(owner, generation, callback)) return
                 if (!availability.isLocationAvailable) {
-                    recordOfficialEnvironmentGpsObservation(
-                        epoch = walkEpoch,
-                        observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
-                        trustedFixAvailable = false,
-                        horizontalAccuracyMeters = null,
-                    )
+                    walkSessionLifecycle.currentRuntimeEpochOrNull()?.let { walkEpoch ->
+                        recordOfficialEnvironmentGpsObservation(
+                            epoch = walkEpoch,
+                            observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                            trustedFixAvailable = false,
+                            horizontalAccuracyMeters = null,
+                        )
+                    }
                     clearTrustedLocation()
+                    if (!currentNavigationCollectionAllowsWork() &&
+                        !currentPositionFieldCollectionAllowsWork()
+                    ) return
                     val positionDecisionRequired = handlePositioningUnavailable(
                         elapsedRealtimeMs = SystemClock.elapsedRealtime(),
                     )
@@ -32683,6 +35055,7 @@ generation != cameraFallbackGeneration
             }
         }
         locationCallback = callback
+        startPositioningObservationSources()
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, LOCATION_UPDATE_INTERVAL_MS)
             .setMinUpdateIntervalMillis(LOCATION_FASTEST_INTERVAL_MS)
             .setGranularity(Granularity.GRANULARITY_FINE)
@@ -32691,7 +35064,9 @@ generation != cameraFallbackGeneration
         try {
             fusedLocationClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
         } catch (_: SecurityException) {
+            val navigationWasAllowed = currentNavigationCollectionAllowsWork()
             stopLocationUpdates()
+            if (!navigationWasAllowed) return
             val positionDecisionRequired = handlePositioningUnavailable(
                 elapsedRealtimeMs = SystemClock.elapsedRealtime(),
             )
@@ -32705,18 +35080,21 @@ generation != cameraFallbackGeneration
         }
     }
 
-    private fun stopLocationUpdates() {
-        stopActivePositionFieldSession()
+    private fun stopLocationUpdates(stopFieldSession: Boolean = true) {
+        if (stopFieldSession) stopActivePositionFieldSession()
         locationCallbackGeneration += 1
         val callback = locationCallback
         locationCallback = null
+        locationCollectionOwner = null
         if (::fusedLocationClient.isInitialized) {
             callback?.let { registeredCallback ->
                 runCatching { fusedLocationClient.removeLocationUpdates(registeredCallback) }
             }
         }
-        gnssQualityObserver?.stop()
-        pedestrianMotionTracker?.stop()
+        gnssQualityObserver?.close()
+        gnssQualityObserver = null
+        pedestrianMotionTracker?.close()
+        pedestrianMotionTracker = null
         latestGnssQualitySnapshot = null
         latestWalkingSpeedObservation = null
         latestGpsCourseObservation = null
@@ -32731,25 +35109,33 @@ generation != cameraFallbackGeneration
     }
 
     private fun isLocationCallbackCurrent(
-        walkEpoch: WalkRuntimeEpoch,
+        owner: LocationCollectionOwner,
         generation: Int,
         callback: LocationCallback,
     ): Boolean =
         locationCallback === callback &&
             generation == locationCallbackGeneration &&
-            walkSessionLifecycle.isRuntimeEpochCurrent(walkEpoch) &&
-            currentLocationCollectionAllowsWork()
+            locationCollectionOwner == owner &&
+            currentLocationCollectionOwnerOrNull() == owner
 
     private fun freshTrustedLocationOrNull(
         nowElapsedRealtimeMs: Long = SystemClock.elapsedRealtime(),
     ): TrustedLocation? {
+        if (locationCollectionOwner == null ||
+            currentLocationCollectionOwnerOrNull() != locationCollectionOwner
+        ) {
+            clearTrustedLocation()
+            return null
+        }
         val current = latestTrustedLocation
         val fresh = LocationTrustPolicy.freshOrNull(current, nowElapsedRealtimeMs)
         if (current != null && fresh == null) {
             latestTrustedLocation = null
             latestRawRouteLocation = null
             clearLocationDerivedState()
-            if (!handlePositioningUnavailable(nowElapsedRealtimeMs)) {
+            if (currentNavigationCollectionAllowsWork() &&
+                !handlePositioningUnavailable(nowElapsedRealtimeMs)
+            ) {
                 pauseDirectionGuidance(
                     reason = "gps_stale",
                     message = "GPS 위치가 오래되어 방향 안내를 중지했습니다.",
@@ -32782,10 +35168,14 @@ generation != cameraFallbackGeneration
     }
 
     private fun clearLocationDerivedState() {
+        latestGpsMotionInputs = null
+        gpsMotionInputHistory.clear()
+        lastPositionZuptAtElapsedMs = null
+        lastPositionFieldTelemetryAtElapsedMs = null
+        latestWalkingSpeedObservation = null
+        latestGpsCourseObservation = null
         latestHeadingDeg = null
-        lastCalibrationLocation = null
-        lastCalibrationStepCount = 0
-        lastCalibrationAtMs = 0L
+        walkingCalibrationSegments.reset()
     }
 
     private fun startStepTrackingIfAllowed() {
@@ -32834,6 +35224,10 @@ generation != cameraFallbackGeneration
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED
         ) return
+        val owner = locationCollectionOwner ?: return
+        val generation = locationCallbackGeneration
+        val callback = locationCallback ?: return
+        if (!isLocationCallbackCurrent(owner, generation, callback)) return
         ensurePositioningProfileForCurrentActor()
         ensureEarthOrientationForLocation()
         if (gnssQualityObserver == null) {
@@ -32844,15 +35238,25 @@ generation != cameraFallbackGeneration
                     executor = ContextCompat.getMainExecutor(this),
                 ),
                 onSnapshot = { snapshot ->
-                    if (currentLocationCollectionAllowsWork()) {
+                    if (isLocationCallbackCurrent(owner, generation, callback)) {
                         latestGnssQualitySnapshot = snapshot
                     }
                 },
             )
         }
         runCatching { gnssQualityObserver?.start() }
+        if (!currentNavigationCollectionAllowsWork() &&
+            !currentPositionFieldCollectionAllowsWork()
+        ) {
+            pedestrianMotionTracker?.stop()
+            return
+        }
         if (pedestrianMotionTracker == null) {
-            pedestrianMotionTracker = AndroidPedestrianMotionTracker(this) { decision ->
+            pedestrianMotionTracker = AndroidPedestrianMotionTracker(this) motion@{ decision ->
+                if (!isLocationCallbackCurrent(owner, generation, callback)) return@motion
+                if (!currentNavigationCollectionAllowsWork() &&
+                    !currentPositionFieldCollectionAllowsWork()
+                ) return@motion
                 val nowMs = SystemClock.elapsedRealtime()
                 if (decision.accepted) {
                     latestPositionStationaryState = when (decision.state.name) {
@@ -32868,13 +35272,18 @@ generation != cameraFallbackGeneration
                         else -> nowMs
                     }
                 }
+                if (decision.accepted && !decision.shouldApplyZeroVelocityUpdate) {
+                    lastPositionZuptAtElapsedMs = null
+                }
+                val zuptDue = lastPositionZuptAtElapsedMs?.let { nowMs - it >= 1_000L } ?: true
                 val zuptSnapshot = if (
-                    decision.shouldApplyZeroVelocityUpdate &&
+                    decision.shouldApplyZeroVelocityUpdate && zuptDue &&
                     (
                         currentNavigationCollectionAllowsWork() ||
                             currentPositionFieldLeaseOrNull() != null
                     )
                 ) {
+                    lastPositionZuptAtElapsedMs = nowMs
                     positioningCoordinator.observeZupt(
                         ZuptObservation(nowMs),
                     )
@@ -32882,26 +35291,31 @@ generation != cameraFallbackGeneration
                     null
                 }
                 zuptSnapshot?.let(::applyPositioningMotionSnapshot)
-                appendPositionFieldMotionTrace(
-                    snapshot = zuptSnapshot,
-                    stepDetected = false,
-                    zuptApplied = zuptSnapshot != null,
-                    measurementElapsedRealtimeMs = nowMs,
-                )
+                val telemetryDue = lastPositionFieldTelemetryAtElapsedMs
+                    ?.let { nowMs - it >= 1_000L } ?: true
+                if (currentPositionFieldCollectionAllowsWork() &&
+                    (zuptSnapshot != null || decision.stateChanged || telemetryDue)
+                ) {
+                    lastPositionFieldTelemetryAtElapsedMs = nowMs
+                    appendPositionFieldMotionTrace(
+                        snapshot = zuptSnapshot,
+                        stepDetected = false,
+                        zuptApplied = zuptSnapshot != null,
+                        measurementElapsedRealtimeMs = nowMs,
+                    )
+                }
             }
         }
         runCatching { pedestrianMotionTracker?.start() }
     }
 
     private fun ensurePositioningProfileForCurrentActor() {
-        val actorId = currentReporterUserId()
+        val actorId = locationCollectionOwner?.actorId ?: currentReporterUserId()
         if (positioningProfileLoaded && actorId == positioningProfileActorId) return
         positioningCoordinator = PositioningCoordinator()
         positioningProfileActorId = actorId
         positioningProfileLoaded = true
-        lastCalibrationLocation = null
-        lastCalibrationStepCount = 0
-        lastCalibrationAtMs = 0L
+        walkingCalibrationSegments.reset()
         if (pedestrianProfileStore == null && ::stepLengthPrefs.isInitialized) {
             pedestrianProfileStore = runCatching {
                 AndroidPedestrianProfileStore(stepLengthPrefs)
@@ -32914,6 +35328,7 @@ generation != cameraFallbackGeneration
         val stepLengthM = positioningCoordinator.currentProfile().stepLengthM.toFloat()
         stepLengthEstimator.setStepLengthM(stepLengthM)
         objectDepthPipeline.setUserStepLength(stepLengthM)
+        currentObjectDepthPipeline.setUserStepLength(stepLengthM)
     }
 
     private fun persistPositioningProfileForCurrentActor() {
@@ -32924,6 +35339,9 @@ generation != cameraFallbackGeneration
     }
 
     private fun updatePositioningHeadingInputs(location: Location, elapsedRealtimeMs: Long) {
+        if (latestGpsMotionInputs?.evidence?.observedAtElapsedRealtimeMs
+                ?.let { elapsedRealtimeMs <= it } == true
+        ) return
         val speedAccuracy = if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && location.hasSpeedAccuracy()
         ) location.speedAccuracyMetersPerSecond.toDouble() else null
@@ -32957,6 +35375,23 @@ generation != cameraFallbackGeneration
                     elapsedRealtimeMs = elapsedRealtimeMs,
                 )
             }
+        // Publish one immutable fix to the GL thread; speed/course may never come from different fixes.
+        val inputs = GpsMotionInputs(
+            speed = latestWalkingSpeedObservation,
+            course = latestGpsCourseObservation,
+            evidence = UserMotionLocationEvidence(
+                observedAtElapsedRealtimeMs = elapsedRealtimeMs,
+                horizontalAccuracyM = location.accuracy.toDouble().takeIf { location.hasAccuracy() },
+                isMock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) location.isMock
+                    else location.isFromMockProvider,
+            ),
+        )
+        latestGpsMotionInputs = inputs
+        gpsMotionInputHistory.addLast(inputs)
+        while (gpsMotionInputHistory.size > 64 || gpsMotionInputHistory.firstOrNull()?.let {
+                elapsedRealtimeMs - it.evidence.observedAtElapsedRealtimeMs > 5_000L
+            } == true
+        ) gpsMotionInputHistory.removeFirst()
     }
 
     private fun handlePositioningStepEvent(event: StepEvent) {
@@ -32966,22 +35401,38 @@ generation != cameraFallbackGeneration
         ) return
         ensurePositioningProfileForCurrentActor()
         pedestrianMotionTracker?.recordStep(event.timestampMs)
+        walkingCalibrationSegments.onStep(
+            timestampMs = event.timestampMs,
+            deltaSteps = event.deltaSteps,
+            individualStepDetector = event.source == StepEventSource.STEP_DETECTOR &&
+                event.confidence == StepEventConfidence.HIGH,
+            receivedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+        ).forEach(::applyWalkingCalibrationSample)
         val quality = when (event.confidence) {
             StepEventConfidence.HIGH -> PdrStepQuality.HIGH
             StepEventConfidence.MEDIUM -> PdrStepQuality.MEDIUM
             StepEventConfidence.LOW -> PdrStepQuality.LOW
         }
         val chestHeading = chestMountedHeadingForStep(event.timestampMs)
+        val gpsAtStep = gpsMotionInputHistory.lastOrNull {
+            it.evidence.observedAtElapsedRealtimeMs <= event.timestampMs
+        }
+        val courseAtStep = gpsAtStep?.course
+        val chestAtCourse = if (chestHeading != null && courseAtStep != null) {
+            chestMountedHeadingForStep(courseAtStep.elapsedRealtimeMs, maximumAgeMs = 100L)
+        } else null
         val snapshot = positioningCoordinator.observeStep(
                 stepCount = event.deltaSteps,
                 headingInput = PedestrianHeadingInput(
                     nowElapsedRealtimeMs = event.timestampMs,
-                    speed = latestWalkingSpeedObservation,
-                    gpsCourse = latestGpsCourseObservation,
+                    speed = gpsAtStep?.speed,
+                    gpsCourse = courseAtStep,
                     magneticTrueHeading = chestHeading,
+                    magneticTrueHeadingAtGpsCourse = chestAtCourse,
                     phoneForwardMounted = chestHeading != null,
                 ),
                 quality = quality,
+                receivedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
             )
         applyPositioningMotionSnapshot(snapshot)
         appendPositionFieldMotionTrace(
@@ -32998,7 +35449,10 @@ generation != cameraFallbackGeneration
         earthOrientationTracker.start()
     }
 
-    private fun chestMountedHeadingForStep(timestampMs: Long): HeadingObservation? {
+    private fun chestMountedHeadingForStep(
+        timestampMs: Long,
+        maximumAgeMs: Long = 500L,
+    ): HeadingObservation? {
         if (!::earthOrientationTracker.isInitialized) return null
         val walkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return null
         val explicitFieldConfirmation = positionFieldExplicitChestConfirmed &&
@@ -33008,16 +35462,7 @@ generation != cameraFallbackGeneration
             phoneMountingUserConfirmation?.epoch == walkEpoch &&
             phoneMountingUserConfirmation?.method == PhoneMountingMethod.CHEST_FORWARD
         if (!explicitFieldConfirmation && !existingChestMount) return null
-        val result = earthOrientationTracker.latestChestMountedHeading(timestampMs)
-        if (!result.isValid) return null
-        val heading = result.trueHeadingDegrees ?: return null
-        val accuracy = result.accuracyDegrees ?: return null
-        val observedAtMs = result.observedAtMs ?: return null
-        return HeadingObservation(
-            headingDegreesTrueNorth = heading,
-            accuracyDegrees = accuracy,
-            elapsedRealtimeMs = observedAtMs,
-        )
+        return earthOrientationTracker.chestMountedHeadingAt(timestampMs, maximumAgeMs)
     }
 
     private fun applyPositioningMotionSnapshot(snapshot: PositioningSnapshot) {
@@ -33175,11 +35620,12 @@ generation != cameraFallbackGeneration
 
     private fun handleLocationUpdate(
         location: Location,
-        walkEpoch: WalkRuntimeEpoch,
+        owner: LocationCollectionOwner,
         locationGeneration: Int,
     ) {
         if (
-            !walkSessionLifecycle.isRuntimeEpochCurrent(walkEpoch) ||
+            locationCollectionOwner != owner ||
+            currentLocationCollectionOwnerOrNull() != owner ||
             locationGeneration != locationCallbackGeneration ||
             !currentLocationCollectionAllowsWork()
         ) return
@@ -33225,14 +35671,29 @@ generation != cameraFallbackGeneration
         val filtered = positioningSnapshot.filtered
         val hardRejected = positioningSnapshot.gnssUpdate?.disposition ==
             GnssObservationDisposition.HARD_REJECTED
-        recordOfficialEnvironmentGpsObservation(
-            epoch = walkEpoch,
-            observedAtElapsedRealtimeMs = elapsedMs,
-            trustedFixAvailable = !hardRejected && filtered != null,
-            horizontalAccuracyMeters = accuracy?.toDouble(),
-        )
+        if (BuildConfig.DEBUG) {
+            positioningSnapshot.gnssUpdate?.let { update ->
+                android.util.Log.d(
+                    "WalkSafePositioning",
+                    "gnss disposition=${update.disposition} reason=${update.hardRejectReason} " +
+                        "ageMs=${SystemClock.elapsedRealtime() - elapsedMs} lagMs=${update.measurementLagMs} " +
+                        "replayedMotion=${update.replayedMotionEventCount}",
+                )
+            }
+        }
+        walkSessionLifecycle.currentRuntimeEpochOrNull()?.let { walkEpoch ->
+            recordOfficialEnvironmentGpsObservation(
+                epoch = walkEpoch,
+                observedAtElapsedRealtimeMs = elapsedMs,
+                trustedFixAvailable = !hardRejected && filtered != null,
+                horizontalAccuracyMeters = accuracy?.toDouble(),
+            )
+        }
         if (hardRejected || filtered == null) {
-            if (mock) latestTrustedLocation = null
+            clearTrustedLocation()
+            if (!currentNavigationCollectionAllowsWork() &&
+                !currentPositionFieldCollectionAllowsWork()
+            ) return
             val positionDecisionRequired = applyPositionConfidenceDecision(positioningSnapshot)
             val rejectedReason = if (mock) "gps_mock_rejected" else "gps_invalid_rejected"
             updateNavigationStatus(
@@ -33271,22 +35732,22 @@ generation != cameraFallbackGeneration
         )
         latestTrustedLocation = filteredTrusted
         latestRawRouteLocation = rawRouteLocation
-        val positionGuidancePaused = applyPositionConfidenceDecision(positioningSnapshot)
         if (!currentNavigationCollectionAllowsWork()) {
-            appendPositionFieldGnssTrace(
-                snapshot = positioningSnapshot,
-                location = location,
-                matchedEvidenceCurrent = false,
-            )
+            if (currentPositionFieldCollectionAllowsWork()) {
+                applyPositionConfidenceDecision(positioningSnapshot)
+                appendPositionFieldGnssTrace(
+                    snapshot = positioningSnapshot,
+                    location = location,
+                    matchedEvidenceCurrent = false,
+                )
+            }
             return
         }
+        val positionGuidancePaused = applyPositionConfidenceDecision(positioningSnapshot)
         continuePendingExplicitRouteStartIfReady()
         reportLocationStartScheduled.set(false)
         latestHeadingDeg = latestGpsCourseObservation?.headingDegreesTrueNorth?.toFloat()
-        attemptStepCalibration(
-            trusted = filteredTrusted,
-            trustedPositionSegment = positioningSnapshot.quality == PositionQuality.HIGH,
-        )
+        attemptStepCalibration(location, positioningSnapshot)
         updateNavigationStatus(
             "navigation=position_${positioningSnapshot.quality.name.lowercase(Locale.US)} accuracy=${filteredTrusted.accuracyM.toInt()}m steps=$latestStepCount heading=${latestHeadingDeg?.let { String.format(Locale.US, "%.1f", it) } ?: "null"}",
         )
@@ -33324,6 +35785,22 @@ generation != cameraFallbackGeneration
         )
     }
 
+    private fun currentUserMotionStatusText(): String {
+        val nowMs = SystemClock.elapsedRealtime()
+        val inputs = latestGpsMotionInputs
+        val motion = UserMotionEstimateFactory.estimate(
+            nowElapsedRealtimeMs = nowMs,
+            speed = inputs?.speed,
+            course = inputs?.course,
+            phoneHeading = chestMountedHeadingForStep(nowMs),
+            locationEvidence = inputs?.evidence,
+        )
+        fun number(value: Double?): String = value?.let { String.format(Locale.US, "%.1f", it) } ?: "unknown"
+        return "userSpeed=${number(motion.speedMps)}m/s " +
+            "travelCourse=${number(motion.courseDegreesTrueNorth)}deg " +
+            "phoneHeading=${number(motion.phoneHeadingDegreesTrueNorth)}deg"
+    }
+
     private fun buildDepthMotionContext(elapsedRealtimeMs: Long): MotionContext {
         // General obstacle confidence is independent of destination and route state. Route-bound
         // tactile guidance validates heading and corridor separately in TactileRoutePolicy.
@@ -33336,8 +35813,16 @@ generation != cameraFallbackGeneration
                 else -> 0.45f
             }
         } ?: 0.7f
+        val gpsMotion = latestGpsMotionInputs
         return MotionContext(
             freshnessQuality = freshness,
+            userMotion = UserMotionEstimateFactory.estimate(
+                nowElapsedRealtimeMs = elapsedRealtimeMs,
+                speed = gpsMotion?.speed,
+                course = gpsMotion?.course,
+                phoneHeading = chestMountedHeadingForStep(elapsedRealtimeMs),
+                locationEvidence = gpsMotion?.evidence,
+            ),
         )
     }
 
@@ -33348,8 +35833,9 @@ generation != cameraFallbackGeneration
         maxDetectionSourceAgeMs: Long,
         maxDetectionFrameDeltaMs: Long,
         detectionAgeMs: Long?,
+        coordinator: AndroidTactileFrameCoordinator = tactileFrameCoordinator,
         processDepth: (DetectionFrameEvidence, List<DetectionCandidate>) -> List<TrackedObjectDepth>,
-    ): TactileSnapshotFrameResult = tactileFrameCoordinator.processSnapshot(
+    ): TactileSnapshotFrameResult = coordinator.processSnapshot(
         detectionSnapshot = detectionSnapshot,
         nowMs = nowMs,
         currentFrameTimestampMs = currentFrameTimestampMs,
@@ -33369,6 +35855,7 @@ generation != cameraFallbackGeneration
         maxDetectionSourceAgeMs: Long,
         maxDetectionFrameDeltaMs: Long,
         detectionAgeMs: Long?,
+        coordinator: AndroidTactileFrameCoordinator = tactileFrameCoordinator,
         processDepth: (DetectionFrameEvidence, List<DetectionCandidate>) -> List<TrackedObjectDepth>,
     ): PreparedTactileFrameDispatch = ProductionPreparedTactileFrameDispatch(
         frame = this.processTactileSnapshotFrame(
@@ -33378,6 +35865,7 @@ generation != cameraFallbackGeneration
             maxDetectionSourceAgeMs = maxDetectionSourceAgeMs,
             maxDetectionFrameDeltaMs = maxDetectionFrameDeltaMs,
             detectionAgeMs = detectionAgeMs,
+            coordinator = coordinator,
             processDepth = processDepth,
         ),
     )
@@ -33392,12 +35880,14 @@ generation != cameraFallbackGeneration
         deviceGateAllowsAlerts: Boolean,
         nowMs: Long,
         feedbackActuatorOverride: TactileFrameFeedbackActuator? = null,
+        independentFreshOutputs: List<UnknownObjectFeedbackBatch> = emptyList(),
     ): TactileFrameFeedbackDispatch = tactileFrameCoordinator.dispatchFeedback(
         frame = frame,
         stale = stale,
         deviceGateAllowsAlerts = deviceGateAllowsAlerts,
         nowMs = nowMs,
         feedbackActuatorOverride = feedbackActuatorOverride,
+        independentFreshOutputs = independentFreshOutputs,
     )
 
     internal fun <T> matchingFrameEvidenceOrNull(
@@ -33440,60 +35930,47 @@ generation != cameraFallbackGeneration
         )
     }
 
-    private fun attemptStepCalibration(
-        trusted: TrustedLocation,
-        trustedPositionSegment: Boolean = true,
-    ) {
-        if (!trustedPositionSegment) {
-            lastCalibrationLocation = null
-            lastCalibrationStepCount = 0
-            lastCalibrationAtMs = 0L
-            return
+    private fun attemptStepCalibration(location: Location, snapshot: PositioningSnapshot) {
+        val raw = snapshot.raw ?: return walkingCalibrationSegments.reset()
+        val receivedAtMs = SystemClock.elapsedRealtime()
+        val freshMovingEvidence = latestPositionStationaryState == PositionStationaryState.MOVING &&
+            latestPositionStationarySinceMs?.let { receivedAtMs - it in 0L..2_000L } == true
+        val disposition = snapshot.gnssUpdate?.disposition
+        if (disposition == GnssObservationDisposition.REINITIALIZED) {
+            walkingCalibrationSegments.reset()
         }
-        if (lastCalibrationLocation == null || lastCalibrationStepCount == 0) {
-            lastCalibrationLocation = trusted
-            lastCalibrationStepCount = latestStepCount
-            lastCalibrationAtMs = trusted.elapsedRealtimeMs
-            return
-        }
-        val deltaSteps = latestStepCount - lastCalibrationStepCount
-        if (deltaSteps < 0) {
-            lastCalibrationLocation = trusted
-            lastCalibrationStepCount = latestStepCount
-            lastCalibrationAtMs = trusted.elapsedRealtimeMs
-            return
-        }
-        val elapsedMs = trusted.elapsedRealtimeMs - lastCalibrationAtMs
-        val distanceM = haversineMeters(
-            lastCalibrationLocation!!.latitude,
-            lastCalibrationLocation!!.longitude,
-            trusted.latitude,
-            trusted.longitude,
-        ).toFloat()
-        if (deltaSteps >= MIN_STEP_CALIBRATION_STEPS && distanceM >= MIN_STEP_CALIBRATION_DISTANCE_M && elapsedMs >= MIN_STEP_CALIBRATION_DURATION_MS) {
-            val calibration = positioningCoordinator.calibrateProfile(
-                WalkingCalibrationSample(
-                    distanceM = distanceM.toDouble(),
-                    stepCount = deltaSteps,
-                    durationMs = elapsedMs,
-                    trustedPositionSegment = trustedPositionSegment,
-                ),
-            )
-            if (calibration.rejectionReason == null) {
-                val stepLengthM = positioningCoordinator.currentProfile().stepLengthM.toFloat()
-                stepLengthEstimator.setStepLengthM(stepLengthM)
-                objectDepthPipeline.setUserStepLength(stepLengthM)
-                persistPositioningProfileForCurrentActor()
-                val stepLengthText = String.format(Locale.US, "%.2f", stepLengthM)
-                updateNavigationStatus("navigation=step_length_updated=${stepLengthText}m")
-            }
-            lastCalibrationLocation = trusted
-            lastCalibrationStepCount = latestStepCount
-            lastCalibrationAtMs = trusted.elapsedRealtimeMs
-        } else if (elapsedMs >= MAX_STEP_CALIBRATION_GAP_MS) {
-            lastCalibrationLocation = trusted
-            lastCalibrationStepCount = latestStepCount
-            lastCalibrationAtMs = trusted.elapsedRealtimeMs
+        val acceptedRawFix = disposition == GnssObservationDisposition.INITIALIZED ||
+            disposition == GnssObservationDisposition.REINITIALIZED ||
+            disposition == GnssObservationDisposition.APPLIED
+        walkingCalibrationSegments.onFix(
+            fix = RawWalkingCalibrationFix(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                horizontalAccuracyM = raw.effectiveHorizontalAccuracyM,
+                elapsedRealtimeMs = raw.elapsedRealtimeMs,
+                receivedAtElapsedRealtimeMs = receivedAtMs,
+                speedMps = location.speed.toDouble().takeIf { location.hasSpeed() },
+                speedAccuracyMps = location.speedAccuracyMetersPerSecond.toDouble()
+                    .takeIf { location.hasSpeedAccuracy() },
+                courseDegrees = location.bearing.toDouble().takeIf { location.hasBearing() },
+                courseAccuracyDegrees = location.bearingAccuracyDegrees.toDouble()
+                    .takeIf { location.hasBearingAccuracy() },
+                trustedRawFix = acceptedRawFix && !isMockLocationCompat(location) &&
+                    freshMovingEvidence,
+            ),
+        ).forEach(::applyWalkingCalibrationSample)
+    }
+
+    private fun applyWalkingCalibrationSample(sample: WalkingCalibrationSample) {
+        val calibration = positioningCoordinator.calibrateProfile(sample)
+        if (calibration.rejectionReason == null) {
+            val stepLengthM = positioningCoordinator.currentProfile().stepLengthM.toFloat()
+            stepLengthEstimator.setStepLengthM(stepLengthM)
+            objectDepthPipeline.setUserStepLength(stepLengthM)
+            currentObjectDepthPipeline.setUserStepLength(stepLengthM)
+            persistPositioningProfileForCurrentActor()
+            val stepLengthText = String.format(Locale.US, "%.2f", stepLengthM)
+            updateNavigationStatus("navigation=step_length_updated=${stepLengthText}m")
         }
     }
 
@@ -33710,7 +36187,8 @@ generation != cameraFallbackGeneration
     private fun destinationSearchLocationLeaseOrNull(): DestinationSearchLocationLease? {
         if (!isActivityForeground || !currentDestinationSearchAllowsWork() ||
             !hasLocationPermission() || !isLocationServiceEnabledForDeviceCheck() ||
-            permissionRecoveryGate.blocksAutomaticResourceStart
+            (permissionRecoveryGate.blocksAutomaticResourceStart &&
+                !(BuildConfig.DEBUG && BuildConfig.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS))
         ) return null
         val actorId = currentReporterUserId()?.takeIf { it.isNotBlank() } ?: return null
         val snapshot = GatewaySessionProcessCoordinator.snapshot()
@@ -34048,7 +36526,7 @@ generation != cameraFallbackGeneration
     ): Boolean =
         expectedRequestId == destinationSearchGeneration &&
             ((walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch) &&
-                (!isWalkSessionRuntimeActive() || walkSafetyOutputsAllowed())) ||
+                (!isWalkSessionRuntimeActive() || navigationEnvironmentOutputsAllowed())) ||
                 (nativeHomeFeatureContextAvailable() &&
                     walkSessionLifecycle.snapshot().epoch == expectedWalkEpoch &&
                     nativeUiPage in setOf(
@@ -34374,7 +36852,7 @@ generation != cameraFallbackGeneration
                                 routeRequestInFlight.set(false)
                                 latestTmapOnRoute = false
                                 retainRouteAfterRerouteFailure(
-                                    "Gateway가 새 TMAP 경로를 아직 확인하지 못해 방향 안내를 중지했습니다.",
+                                    "새 TMAP 경로를 아직 확인하지 못해 방향 안내를 중지했습니다.",
                                 )
                                 updateRouteButtonText()
                             } else {
@@ -34486,6 +36964,9 @@ generation != cameraFallbackGeneration
                         updateNavigationStatus(
                             "navigation=route_ready distance=${route.summary.distanceM}m priority=${route.priority}",
                         )
+                        freshTrustedLocationOrNull()?.let { trusted ->
+                            updateRouteGuidance(trusted, latestRawRouteLocation ?: trusted)
+                        }
                     }
                 } catch (_: CancellationException) {
                     completeRouteRequest(routeCall)
@@ -34599,7 +37080,7 @@ generation != cameraFallbackGeneration
     ): Boolean =
         walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch) &&
             expectedRequestId == routeRequestGeneration &&
-            (!isWalkSessionRuntimeActive() || walkSafetyOutputsAllowed())
+            (!isWalkSessionRuntimeActive() || navigationEnvironmentOutputsAllowed())
 
     private fun updateRouteGuidance(
         location: TrustedLocation,
@@ -34637,10 +37118,12 @@ generation != cameraFallbackGeneration
             ),
         )
         applyRouteDeviationSafetyUpdate(update)
-        if (!update.userDecisionRequired && !update.offRoute && update.reason !in setOf("route_missing", "polyline_missing")) {
+        val acceptedPosition = routeNavigator.currentAcceptedRouteMatchFor(location.elapsedRealtimeMs) != null &&
+            update.reason !in setOf("route_match_untrusted", "location_sample_not_newer")
+        if (acceptedPosition && !update.userDecisionRequired && !update.offRoute) {
             directionGuidancePauseReason = null
         }
-        latestTmapOnRoute = isRouteActive &&
+        latestTmapOnRoute = acceptedPosition && isRouteActive &&
             !routeRequestInFlight.get() &&
             update.reason != "route_missing" &&
             update.reason != "polyline_missing" &&
@@ -34650,7 +37133,7 @@ generation != cameraFallbackGeneration
             !update.userDecisionRequired
         maybePlayProgressBeep(
             nowMs,
-            offRoute = update.offRoute || update.userDecisionRequired,
+            offRoute = !acceptedPosition || update.offRoute || update.userDecisionRequired,
             arrived = update.arrived,
         )
         updateNavigationStatus(
@@ -34665,20 +37148,24 @@ generation != cameraFallbackGeneration
         }
         val instruction = update.instruction ?: return
         if (update.userDecisionRequired) return
-        if (feedbackPolicy.canSpeakNavigation(nowMs)) {
+        if (feedbackPolicy.canSpeakNavigation(nowMs) && routeNavigator.reserveInstruction(update)) {
             val requestGeneration = routeRequestGeneration
-            speakNavigation(instruction) {
-                runOnUiThread {
-                    if (
-                        !walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch) ||
-                        !isWalkSessionRuntimeActive() ||
-                        !walkSafetyOutputsAllowed() ||
-                        !isRouteActive ||
-                        requestGeneration != routeRequestGeneration
-                    ) return@runOnUiThread
-                    routeNavigator.acknowledgeInstruction(update, SystemClock.elapsedRealtime())
-                }
-            }
+            dispatchNavigationSpeech(
+                instruction,
+                onCompleted = {
+                    if (walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch) &&
+                        isWalkSessionRuntimeActive() && navigationEnvironmentOutputsAllowed() &&
+                        isRouteActive && requestGeneration == routeRequestGeneration
+                    ) {
+                        routeNavigator.acknowledgeInstruction(update, SystemClock.elapsedRealtime())
+                    } else {
+                        routeNavigator.releaseInstruction(update, SystemClock.elapsedRealtime())
+                    }
+                },
+                onFailed = {
+                    routeNavigator.releaseInstruction(update, SystemClock.elapsedRealtime())
+                },
+            )
         }
     }
 
@@ -34904,18 +37391,19 @@ generation != cameraFallbackGeneration
         mobileNetworkPreferenceButton.text =
             when (state) {
                 PurposeConsentSyncState.CONFIRMED_GRANTED ->
-                    "서버 통신: Wi-Fi + 이동통신"
+                    "모바일 데이터 사용: 허용 · Wi-Fi와 이동통신"
                 PurposeConsentSyncState.GRANT_PENDING ->
-                    "서버 통신: Wi-Fi만 · 이동통신 허용 확인 중 (아직 활성 아님)"
+                    "모바일 데이터 사용: 허용 확인 중 (아직 활성 아님) · 현재 Wi-Fi만"
                 PurposeConsentSyncState.WITHDRAWAL_PENDING,
                 PurposeConsentSyncState.WITHDRAWAL_RETRY,
-                -> "서버 통신: Wi-Fi만 · 이동통신 철회 확인 중"
+                -> "모바일 데이터 사용: 끄는 중 · 현재 Wi-Fi만"
                 PurposeConsentSyncState.FAIL_CLOSED ->
                     "서버 통신: 개인정보 처리 잠김"
                 PurposeConsentSyncState.UNCONFIRMED,
                 PurposeConsentSyncState.CONFIRMED_DENIED,
-                -> "서버 통신: Wi-Fi만"
-            }
+                -> "모바일 데이터 사용: 꺼짐 · Wi-Fi만"
+        }
+        mobileNetworkPreferenceButton.contentDescription = mobileNetworkPreferenceButton.text
         mobileNetworkPreferenceButton.isEnabled =
             !integratedConsentRequestInFlight &&
                 state !in setOf(
@@ -34982,6 +37470,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun updateIntegratedConsentUi() {
+        refreshGatewayFeatureNetworkPolicy()
         updateReportPrivacyConsentUi()
         updateAutomaticReportConsentUi()
         updateMobileNetworkPreferenceUi()
@@ -35271,7 +37760,7 @@ generation != cameraFallbackGeneration
 
     private fun maybePlayProgressBeep(nowMs: Long, offRoute: Boolean, arrived: Boolean) {
         if (!isActivityForeground) return
-        if (!isWalkSessionRuntimeActive() || !walkSafetyOutputsAllowed()) return
+        if (!isWalkSessionRuntimeActive() || !navigationEnvironmentOutputsAllowed()) return
         if (!progressBeepEnabled || progressBeepVolumePercent <= 0) return
         if (!isRouteActive || offRoute || arrived) return
         if (shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)) return
@@ -35445,7 +37934,9 @@ generation != cameraFallbackGeneration
         startLocationUpdatesIfAllowed()
         startStepTrackingIfAllowed()
         updatePositionFieldControls()
-        speakInteraction("위치 평가 기록을 시작했습니다.")
+        lastPositionFieldTelemetryAtElapsedMs = null
+        syncActiveSessionScreenPolicy()
+        speakInteraction("위치 평가 기록을 시작했습니다. 화면을 잠그거나 다른 앱으로 전환하면 기록이 종료됩니다.")
     }
 
     private fun currentPositionFieldLeaseOrNull(): PositionFieldSessionLease? {
@@ -35488,6 +37979,7 @@ generation != cameraFallbackGeneration
         latestPositionStationaryState = PositionStationaryState.UNKNOWN
         latestPositionStationarySinceMs = null
         updatePositionFieldControls()
+        syncActiveSessionScreenPolicy()
         return true
     }
 
@@ -35543,6 +38035,7 @@ generation != cameraFallbackGeneration
         pendingPositionFieldExportSessionId = null
         pendingPositionFieldExportGeneration = null
         pendingPositionFieldExportBinding = null
+        pendingPositionFieldExportAuthority = null
         updatePositionFieldControls()
         positionFieldExportGeneration += 1L
         val replacement = UUID.randomUUID().toString()
@@ -35597,6 +38090,25 @@ generation != cameraFallbackGeneration
         return RecorderBinding(scope, epoch.recoveryGeneration)
     }
 
+    private fun currentPositionFieldExportAuthorityOrNull(): PositionFieldExportAuthority? {
+        if (!BuildConfig.DEBUG || positionFieldStorageBlocked ||
+            accountDeletionStateMachine.processingBlocked()
+        ) return null
+        val scope = positionFieldLocalScopeId ?: return null
+        val actor = currentReporterUserId() ?: return null
+        val gateway = GatewaySessionProcessCoordinator.snapshot()
+        val authenticated = gateway.session ?: return null
+        if (gateway.storageBlocked || gateway.deletionRecoveryOnly ||
+            authenticated.sessionScope != GatewaySessionScope.GENERAL ||
+            authenticated.verificationState != GatewaySessionVerificationState.VERIFIED ||
+            !authenticated.isUsableFor(actor) ||
+            !permissionSessionPolicy.isAuthenticatedFor(actor)
+        ) return null
+        return PositionFieldExportAuthority(
+            scope, walkSessionLifecycle.snapshot().epoch.walkSessionId, actor, gateway.generation,
+        )
+    }
+
     private fun surfacePositionFieldStorageFailure(message: String) {
         if (::statusText.isInitialized) {
             updateStatus("위치 평가 기록 저장소 오류", message)
@@ -35627,7 +38139,12 @@ generation != cameraFallbackGeneration
                 speakInteraction("내보낼 완료된 위치 평가 세션이 없습니다.")
                 return
             }
+        val authority = currentPositionFieldExportAuthorityOrNull() ?: run {
+            speakInteraction("같은 로그인 계정에서 위치 기록을 내보내세요.")
+            return
+        }
         val generation = ++positionFieldExportGeneration
+        pendingPositionFieldExportAuthority = authority
         pendingPositionFieldExportSessionId = summary.sessionId
         pendingPositionFieldExportGeneration = generation
         pendingPositionFieldExportBinding = binding
@@ -35642,6 +38159,7 @@ generation != cameraFallbackGeneration
                 pendingPositionFieldExportSessionId = null
                 pendingPositionFieldExportGeneration = null
                 pendingPositionFieldExportBinding = null
+                pendingPositionFieldExportAuthority = null
                 updatePositionFieldControls()
                 speakInteraction("위치 평가 기록 내보내기를 시작하지 못했습니다.")
             }
@@ -35651,6 +38169,8 @@ generation != cameraFallbackGeneration
         val sessionId = pendingPositionFieldExportSessionId
         val generation = pendingPositionFieldExportGeneration
         val pendingBinding = pendingPositionFieldExportBinding
+        val pendingAuthority = pendingPositionFieldExportAuthority
+        pendingPositionFieldExportAuthority = null
         pendingPositionFieldExportSessionId = null
         pendingPositionFieldExportGeneration = null
         pendingPositionFieldExportBinding = null
@@ -35667,8 +38187,12 @@ generation != cameraFallbackGeneration
             deleteOrTruncatePositionFieldDestination(destination)
             return
         }
-        val currentBinding = currentPositionFieldRecorderBindingOrNull()
-        if (currentBinding == null || currentBinding != pendingBinding) {
+        val currentAuthority = currentPositionFieldExportAuthorityOrNull()
+        val currentBinding = pendingBinding
+        if (currentBinding == null || pendingAuthority == null || currentAuthority == null ||
+            currentAuthority != pendingAuthority ||
+            currentBinding.localAccountScopeId != currentAuthority.localScopeId
+        ) {
             deleteOrTruncatePositionFieldDestination(destination)
             return
         }
@@ -35804,7 +38328,14 @@ generation != cameraFallbackGeneration
 
     private fun appendPositionFieldRecord(record: PositioningTraceRecord) {
         val lease = currentPositionFieldLeaseOrNull() ?: return
-        positionFieldRecorder?.append(lease, record)
+        if (positionFieldRecorder?.append(lease, record) != true) {
+            val stopped = stopActivePositionFieldSession()
+            surfacePositionFieldStorageFailure(if (stopped) {
+                "위치 기록 저장에 실패해 기록을 종료했습니다. 완료된 기록을 내보내고 저장 공간을 확인하세요."
+            } else {
+                "위치 기록 저장과 종료에 실패했습니다. 기록 종료를 다시 시도하세요."
+            })
+        }
     }
 
     private fun appendPositionFieldGnssTrace(
@@ -35813,13 +38344,19 @@ generation != cameraFallbackGeneration
         matchedEvidenceCurrent: Boolean,
     ) {
         val raw = snapshot.raw ?: return
-        val filtered = snapshot.filtered ?: return
+        // A replayed live state may be later than this GNSS measurement.
+        val filtered = snapshot.filteredAtGnssMeasurement
+            ?: snapshot.filtered?.takeIf { it.elapsedRealtimeMs == raw.elapsedRealtimeMs }
+            ?: return
         val measurementElapsedRealtimeNs = location.elapsedRealtimeNanos
             .takeIf { it >= 0L } ?: return
         val measurementUtcEpochMs = location.time.takeIf { it >= 0L } ?: return
-        positionFieldGnssAnchorElapsedNs = measurementElapsedRealtimeNs
-        positionFieldGnssAnchorUtcEpochMs = measurementUtcEpochMs
-        val routeMatch = if (matchedEvidenceCurrent) {
+        // Keep one session mapping so replaying a sensor timestamp cannot change its UTC rounding.
+        if (positionFieldGnssAnchorElapsedNs == null || positionFieldGnssAnchorUtcEpochMs == null) {
+            positionFieldGnssAnchorElapsedNs = measurementElapsedRealtimeNs
+            positionFieldGnssAnchorUtcEpochMs = measurementUtcEpochMs
+        }
+        val routeMatch = if (matchedEvidenceCurrent && snapshot.filtered?.elapsedRealtimeMs == filtered.elapsedRealtimeMs) {
             routeNavigator.currentAcceptedRouteMatchFor(filtered.elapsedRealtimeMs)
         } else {
             null
@@ -35887,6 +38424,23 @@ generation != cameraFallbackGeneration
                 stationary = currentPositionStationaryTrace(zuptApplied = false),
             ),
         )
+        snapshot.filtered?.takeIf { it.elapsedRealtimeMs > filtered.elapsedRealtimeMs }?.let { current ->
+            val currentMatch = if (matchedEvidenceCurrent) {
+                routeNavigator.currentAcceptedRouteMatchFor(current.elapsedRealtimeMs)
+            } else {
+                null
+            }
+            appendPositionFieldMotionTrace(
+                snapshot = snapshot,
+                stepDetected = false,
+                zuptApplied = false,
+                measurementElapsedRealtimeMs = current.elapsedRealtimeMs,
+                matchedCoordinate = currentMatch?.matchedPoint?.let {
+                    PositionTraceCoordinate(it.latitude, it.longitude)
+                },
+                routeMatchEvaluated = true,
+            )
+        }
     }
 
     private fun appendPositionFieldMotionTrace(
@@ -35894,6 +38448,8 @@ generation != cameraFallbackGeneration
         stepDetected: Boolean,
         zuptApplied: Boolean,
         measurementElapsedRealtimeMs: Long,
+        matchedCoordinate: PositionTraceCoordinate? = null,
+        routeMatchEvaluated: Boolean = false,
     ) {
         val measurementElapsedRealtimeNs = measurementElapsedRealtimeMs
             .takeIf { it >= 0L && it <= Long.MAX_VALUE / 1_000_000L }
@@ -35919,6 +38475,8 @@ generation != cameraFallbackGeneration
                 filteredPosition = snapshot?.filtered?.coordinate?.let {
                     PositionTraceCoordinate(it.latitude, it.longitude)
                 },
+                matchedPosition = matchedCoordinate,
+                routeMatchEvaluated = true.takeIf { routeMatchEvaluated },
                 stepProfile = PositionStepProfileTrace(
                     stepCount = latestStepCount.toLong().coerceAtLeast(0L),
                     stepDetected = stepDetected,
@@ -36081,7 +38639,7 @@ generation != cameraFallbackGeneration
             ::walkSafetyOverlay.isInitialized &&
             ::walkSafetyScroll.isInitialized
         ) {
-            controlsScroll.visibility = View.VISIBLE
+            controlsScroll.visibility = if (cameraScreenVisible) View.GONE else View.VISIBLE
             walkSafetyOverlay.visibility = View.GONE
             walkSafetyScroll.visibility = View.GONE
             if (walkSessionScreenVisible && ::firstRunOnboardingControls.isInitialized) {
@@ -36093,7 +38651,8 @@ generation != cameraFallbackGeneration
         }
         updateWalkSafetySummary()
         val activeForegroundSession = isWalkSessionRuntimeActive() &&
-            (session != null || cameraFallbackRunning || isRouteActive || isFieldSessionActive())
+            (session != null || cameraFallbackRunning || isRouteActive || isFieldSessionActive() ||
+                positionFieldLease != null)
         if (activeForegroundSession) {
             window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
@@ -36141,15 +38700,33 @@ generation != cameraFallbackGeneration
     }
 
     private fun closeDetectorAsync() {
-        val closeableDetector = frameDetector as? Closeable
-        if (closeableDetector != null && !detectorExecutor.isShutdown) {
-            try {
-                detectorExecutor.execute { closeableDetector.close() }
-            } catch (_: RejectedExecutionException) {
-                closeableDetector.close()
+        unknownLoadingService?.let(::releaseUnknownLoadingService)
+        if (runtimeCalibration != null || unknownCalibration != null) {
+            detectorCloseAfterCalibration = true
+            cancelDeviceRuntimeCalibration("detector_close")
+            return
+        }
+        val auxiliary = unknownRuntimeService
+        unknownRuntimeService = null
+        invalidateUnknownObjectObservations()
+        auxiliary?.closeAsync()
+        synchronized(frameStateLock) {
+            detectorClosing = true
+            detectorLoadGeneration += 1L
+        }
+        val detachAndClose = Runnable {
+            val detector = synchronized(frameStateLock) {
+                frameDetector.also { frameDetector = NoopAndroidFrameDetector() }
             }
+            (detector as? Closeable)?.close()
+        }
+        try {
+            detectorExecutor.execute(detachAndClose)
+        } catch (_: RejectedExecutionException) {
+            // An already shut down executor owns any queued teardown; never close during an invoke.
         }
         detectorExecutor.shutdown()
+        deviceTuningExecutor.shutdown()
     }
 
     private fun createExternalCameraTexture(): Int {
@@ -36167,6 +38744,9 @@ generation != cameraFallbackGeneration
     private fun updateStatus(status: String, detail: String) {
         statusText.text = status
         detailText.text = detail
+        if (::cameraScreenStatus.isInitialized && cameraScreenVisible) {
+            cameraScreenStatus.text = "$status\n$detail"
+        }
         statusText.contentDescription = "WalkSafe 상태. $status. $detail"
         if (nativeUiPage == NativeUiPage.GUIDANCE) renderMainUi()
     }
@@ -36200,149 +38780,7 @@ generation != cameraFallbackGeneration
         val sourceAgeMs: Long?,
         val frameDeltaMs: Long?,
         val staleReason: String?,
-    ) {
-        fun withStabilizer(result: TactileOverlayStabilizer.Result): OverlayDebugState {
-            return copy(
-                boxCount = result.boxes.size,
-                tactileBoxCount = result.tactileBoxCount,
-                heldTactileBoxCount = result.heldTactileBoxCount,
-                smoothedTactileBoxCount = result.smoothedTactileBoxCount,
-                holdApplied = holdApplied || result.heldTactileBoxCount > 0,
-            )
-        }
-    }
-
-    private class TactileOverlayStabilizer {
-        private val tracks = mutableListOf<Track>()
-
-        fun update(
-            boxes: List<DebugBboxOverlayView.DebugOverlayBox>,
-            nowMs: Long,
-        ): Result {
-            val output = mutableListOf<DebugBboxOverlayView.DebugOverlayBox>()
-            val matchedTracks = mutableSetOf<Track>()
-            var smoothedCount = 0
-
-            for (box in boxes) {
-                if (!box.best && box.isTactileOverlayBox()) {
-                    val track = findBestTrack(box)
-                    if (track == null) {
-                        val newTrack = Track(
-                            className = box.className,
-                            rectPx = RectF(box.rectPx),
-                            label = box.label,
-                            lastSeenMs = nowMs,
-                        )
-                        tracks += newTrack
-                        matchedTracks += newTrack
-                        output += box
-                    } else {
-                        val smoothedRect = smoothRect(track.rectPx, box.rectPx)
-                        track.rectPx = RectF(smoothedRect)
-                        track.label = box.label
-                        track.lastSeenMs = nowMs
-                        matchedTracks += track
-                        smoothedCount += 1
-                        output += box.copy(rectPx = smoothedRect, smoothed = true)
-                    }
-                } else {
-                    output += box
-                }
-            }
-
-            val heldBoxes = tracks
-                .filter { it !in matchedTracks }
-                .mapNotNull { track ->
-                    val ageMs = nowMs - track.lastSeenMs
-                    if (ageMs > TACTILE_OVERLAY_VISUAL_HOLD_MS) {
-                        null
-                    } else {
-                        DebugBboxOverlayView.DebugOverlayBox(
-                            rectPx = RectF(track.rectPx),
-                            label = track.label,
-                            best = false,
-                            className = track.className,
-                            held = true,
-                            ageMs = ageMs,
-                        )
-                    }
-                }
-            tracks.removeAll { nowMs - it.lastSeenMs > TACTILE_OVERLAY_VISUAL_HOLD_MS }
-
-            val stabilizedBoxes = output + heldBoxes
-            return Result(
-                boxes = stabilizedBoxes,
-                tactileBoxCount = stabilizedBoxes.count { it.isTactileOverlayBox() },
-                heldTactileBoxCount = heldBoxes.size,
-                smoothedTactileBoxCount = smoothedCount,
-            )
-        }
-
-        fun clear() {
-            tracks.clear()
-        }
-
-        private fun DebugBboxOverlayView.DebugOverlayBox.isTactileOverlayBox(): Boolean {
-            val name = className ?: label
-            return name.lowercase(Locale.US).contains("tactile") || name.contains("점자")
-        }
-
-        private fun smoothRect(previous: RectF, current: RectF): RectF {
-            val alpha = TACTILE_OVERLAY_SMOOTHING_ALPHA
-            val inverse = 1f - alpha
-            return RectF(
-                previous.left * inverse + current.left * alpha,
-                previous.top * inverse + current.top * alpha,
-                previous.right * inverse + current.right * alpha,
-                previous.bottom * inverse + current.bottom * alpha,
-            )
-        }
-
-        private fun findBestTrack(box: DebugBboxOverlayView.DebugOverlayBox): Track? {
-            return tracks
-                .filter { it.className == box.className }
-                .maxByOrNull { track -> track.matchScore(box.rectPx) }
-                ?.takeIf { it.matchScore(box.rectPx) >= TACTILE_OVERLAY_MIN_MATCH_SCORE }
-        }
-
-        private fun Track.matchScore(rect: RectF): Float {
-            val iou = rectPx.iou(rect)
-            val distance = centerDistance(rectPx, rect)
-            val maxSide = maxOf(rectPx.width(), rectPx.height(), rect.width(), rect.height()).coerceAtLeast(1f)
-            val distanceScore = (1f - (distance / maxSide)).coerceIn(0f, 1f)
-            return maxOf(iou, distanceScore)
-        }
-
-        private fun RectF.iou(other: RectF): Float {
-            val left = maxOf(left, other.left)
-            val top = maxOf(top, other.top)
-            val right = minOf(right, other.right)
-            val bottom = minOf(bottom, other.bottom)
-            val intersection = (right - left).coerceAtLeast(0f) * (bottom - top).coerceAtLeast(0f)
-            val union = width() * height() + other.width() * other.height() - intersection
-            return if (union <= 0f) 0f else intersection / union
-        }
-
-        private fun centerDistance(first: RectF, second: RectF): Float {
-            val dx = first.centerX() - second.centerX()
-            val dy = first.centerY() - second.centerY()
-            return kotlin.math.sqrt(dx * dx + dy * dy)
-        }
-
-        private class Track(
-            val className: String?,
-            var rectPx: RectF,
-            var label: String,
-            var lastSeenMs: Long,
-        )
-
-        data class Result(
-            val boxes: List<DebugBboxOverlayView.DebugOverlayBox>,
-            val tactileBoxCount: Int,
-            val heldTactileBoxCount: Int,
-            val smoothedTactileBoxCount: Int,
-        )
-    }
+    )
 
     internal data class TactileSnapshotFrameResult(
         val matchedEvidence: DetectionFrameEvidence?,
@@ -36385,6 +38823,8 @@ generation != cameraFallbackGeneration
         val motionContext: MotionContext,
         val navigationActive: Boolean,
         val tmapOnRoute: Boolean,
+        val visualFrameKey: kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey? = null,
+        val imageQuarterTurns: Int = 0,
     ) {
         fun tactileFrameIdentity(): AndroidTactileEvidenceFrameIdentity = AndroidTactileEvidenceFrameIdentity(
             frameId = frameId,
@@ -36407,6 +38847,7 @@ generation != cameraFallbackGeneration
         val reportImage: ByteArray? = null,
         val partial: Boolean,
         val frameEvidence: DetectionFrameEvidence?,
+        val capturedAtElapsedRealtimeMs: Long? = null,
     ) {
         val captureFrameId: Long? get() = identity.captureFrameId
 
@@ -36503,6 +38944,7 @@ generation != cameraFallbackGeneration
                 imageHeight: Int,
                 reportImageJpeg: ByteArray?,
                 frameEvidence: DetectionFrameEvidence,
+                capturedAtElapsedRealtimeMs: Long? = null,
             ): DetectionSnapshot = DetectionSnapshot(
                 detections = result.detections,
                 identity = identity,
@@ -36516,6 +38958,7 @@ generation != cameraFallbackGeneration
                 detectorTiming = result.timing,
                 partial = result.partial,
                 frameEvidence = frameEvidence,
+                capturedAtElapsedRealtimeMs = capturedAtElapsedRealtimeMs,
             )
 
             fun empty(): DetectionSnapshot = DetectionSnapshot(
@@ -36764,7 +39207,6 @@ generation != cameraFallbackGeneration
         const val POST_LOGIN_LOCATION_FIX_INTERVAL_MS = 1_000L
         const val POST_LOGIN_LOCATION_FIX_MIN_INTERVAL_MS = 500L
         const val POST_LOGIN_CAMERA_PIPELINE_TIMEOUT_MS = 15_000L
-        const val POST_LOGIN_CAMERA_PIPELINE_MAX_FRAMES = 5
         const val CAMERA_ANALYZER_RELEASE_BARRIER_TIMEOUT_MS = 2_000L
         const val CAMERA_X_RELEASE_POLL_INTERVAL_MS = 50L
         const val CAMERA_X_RELEASE_TIMEOUT_MS = 10_000L
@@ -36793,6 +39235,7 @@ generation != cameraFallbackGeneration
         const val PREF_STEP_LENGTH_KEY = "step_length_m"
         const val PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED =
             "initial_app_permission_request_completed_v1"
+        const val STATE_INITIAL_APP_PERMISSION_RE_REQUESTED = "initial_app_permission_re_requested"
         const val PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED =
             "initial_app_permission_request_started_v1"
         const val PREF_PROGRESS_BEEP_ENABLED_KEY = "progress_beep_enabled"
@@ -36959,10 +39402,6 @@ generation != cameraFallbackGeneration
         )
         const val DEFAULT_PROGRESS_BEEP_VOLUME_PERCENT = 20
         const val PROGRESS_BEEP_INTERVAL_MS = 3_000L
-        const val MIN_STEP_CALIBRATION_STEPS = 8
-        const val MIN_STEP_CALIBRATION_DISTANCE_M = 4.0f
-        const val MIN_STEP_CALIBRATION_DURATION_MS = 8_000L
-        const val MAX_STEP_CALIBRATION_GAP_MS = 45_000L
         const val DESTINATION_SEARCH_PAGE_SIZE = 3
         const val DESTINATION_SEARCH_MAX_RESULTS = 10
         const val ANDROID_TTS_SETTINGS_ACTION = "com.android.settings.TTS_SETTINGS"
@@ -36973,10 +39412,8 @@ generation != cameraFallbackGeneration
         const val TALKBACK_NAVIGATION_DUP_WINDOW_MS = 2_000L
         const val TALKBACK_ADVISORY_DUP_WINDOW_MS = 4_000L
         const val OVERLAY_UPDATE_INTERVAL_MS = 100L
-        const val DETECTION_INTERVAL_MS = 250L
         const val RAW_COLLECTION_CAPTURE_INTERVAL_MS = 30_000L
         val RAW_COLLECTION_MODEL_REVISION = Regex("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
-        const val CAMERA_FALLBACK_ANALYSIS_INTERVAL_MS = 500L
         const val CAMERA_FALLBACK_IMU_MAX_AGE_MS = 1_500L
         const val CAMERA_FALLBACK_WIDTH = 640
         const val CAMERA_FALLBACK_HEIGHT = 480
@@ -36989,15 +39426,6 @@ generation != cameraFallbackGeneration
         const val MAX_DEPTH_DETECTION_SOURCE_AGE_MS = 800L
         const val MAX_OVERLAY_DETECTION_FRAME_DELTA_MS = 1_200L
         const val MAX_DEPTH_DETECTION_FRAME_DELTA_MS = 800L
-        const val MAX_OVERLAY_HOLD_SOURCE_AGE_MS = 1_500L
-        const val MAX_OVERLAY_HOLD_FRAME_DELTA_MS = 1_500L
-        const val MAX_TACTILE_OVERLAY_SOURCE_AGE_MS = 2_300L
-        const val MAX_TACTILE_OVERLAY_FRAME_DELTA_MS = 2_300L
-        const val MAX_TACTILE_OVERLAY_HOLD_SOURCE_AGE_MS = 3_000L
-        const val MAX_TACTILE_OVERLAY_HOLD_FRAME_DELTA_MS = 3_000L
-        const val TACTILE_OVERLAY_VISUAL_HOLD_MS = 700L
-        const val TACTILE_OVERLAY_SMOOTHING_ALPHA = 0.65f
-        const val TACTILE_OVERLAY_MIN_MATCH_SCORE = 0.20f
         const val FRAME_TIMESTAMP_TOLERANCE_MS = 100L
         const val MAX_OVERLAY_DETECTION_BOXES = 5
         const val MAX_FRAME_CAPTURE_DETECTIONS = 20
@@ -37022,6 +39450,7 @@ generation != cameraFallbackGeneration
     private data class ActiveGatewaySpeechInteraction(
         val fence: GatewaySpeechCallbackFence,
         val session: GatewayFieldSession,
+        val networkTicket: GatewaySpeechNetworkGate.Ticket,
         val expectedWalkEpoch: WalkRuntimeEpoch,
         val expectedNavigationDecisionToken: RouteNavigatorDecisionToken?,
     )
@@ -37146,6 +39575,9 @@ internal class FrozenImageToTextureCoordinateMapper(
     private val transform: FrozenImageToDepthTransform,
     private val depthSize: ImageSize,
 ) : CoordinateMapper {
+    fun imagePixelsToDepthUvMatrix(imageWidth: Int, imageHeight: Int): DoubleArray? =
+        if (frameId == transform.frameId) transform.imagePixelsToDepthUvMatrix(imageWidth, imageHeight) else null
+
     override fun modelToImage(point: Point2): Point2 = normalize(point)
 
     override fun imageToModel(point: Point2): Point2 = normalize(point)

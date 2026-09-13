@@ -45,6 +45,7 @@ internal data class PositioningSnapshot(
     val selectedHeading: SelectedPedestrianHeading? = null,
     val selectedHeadingAccuracyDegrees: Double? = null,
     val motionTrigger: PositioningMotionTrigger? = null,
+    val filteredAtGnssMeasurement: PositioningFilteredFix? = null,
 )
 
 internal enum class PositioningMotionTrigger {
@@ -63,6 +64,7 @@ internal class PositioningCoordinator(
     private var localFrame: SessionLocalFrame? = null
     private var lastConfidenceDecision: PositionConfidenceDecision? = null
     private var lastConfidenceSampleAtMs: Long? = null
+    private var lastMotionConfidenceSampleAtMs: Long? = null
 
     init {
         applyProfileDynamics(motionProfile.currentSnapshot())
@@ -103,7 +105,13 @@ internal class PositioningCoordinator(
         )
         val confidence = when {
             update.disposition != GnssObservationDisposition.HARD_REJECTED && update.estimate != null ->
-                observeConfidence(update.estimate.quality, update.estimate.estimatedAtElapsedRealtimeMs, observation.receivedAtElapsedRealtimeMs)
+                observeConfidence(
+                    update.estimate.quality,
+                    observation.elapsedRealtimeMs,
+                    observation.receivedAtElapsedRealtimeMs,
+                    informativeGnss = update.estimateAtGnssMeasurement
+                        ?.lastInformativeGnssAtElapsedRealtimeMs == observation.elapsedRealtimeMs,
+                )
             observation.elapsedRealtimeMs > (lastConfidenceSampleAtMs ?: -1L) ->
                 observeConfidence(PositionQuality.UNAVAILABLE, observation.elapsedRealtimeMs, observation.receivedAtElapsedRealtimeMs)
             else -> currentOrUnavailableConfidence(observation.receivedAtElapsedRealtimeMs)
@@ -122,9 +130,10 @@ internal class PositioningCoordinator(
         headingInput: PedestrianHeadingInput,
         quality: PdrStepQuality,
         stepLengthSigmaM: Double = 0.08,
+        receivedAtElapsedRealtimeMs: Long = headingInput.nowElapsedRealtimeMs,
     ): PositioningSnapshot {
         val selectedHeading = headingSelector.select(headingInput)
-        val selectedAccuracy = when (selectedHeading?.source) {
+        val selectedAccuracy = selectedHeading?.accuracyDegrees ?: when (selectedHeading?.source) {
             PedestrianHeadingSource.GPS_COURSE -> headingInput.gpsCourse?.accuracyDegrees
             PedestrianHeadingSource.MAGNETIC_TRUE -> headingInput.magneticTrueHeading?.accuracyDegrees
             null -> null
@@ -147,6 +156,7 @@ internal class PositioningCoordinator(
             motionTrigger = PositioningMotionTrigger.STEP,
             selectedHeading = selectedHeading,
             selectedHeadingAccuracyDegrees = selectedAccuracy,
+            receivedAtMs = receivedAtElapsedRealtimeMs,
         )
     }
 
@@ -187,6 +197,7 @@ internal class PositioningCoordinator(
         localFrame = null
         lastConfidenceDecision = null
         lastConfidenceSampleAtMs = null
+        lastMotionConfidenceSampleAtMs = null
         applyProfileDynamics(motionProfile.currentSnapshot())
     }
 
@@ -196,16 +207,17 @@ internal class PositioningCoordinator(
         motionTrigger: PositioningMotionTrigger,
         selectedHeading: SelectedPedestrianHeading? = null,
         selectedHeadingAccuracyDegrees: Double? = null,
+        receivedAtMs: Long = eventAtMs,
     ): PositioningSnapshot {
         val confidence = update.estimate?.let { estimate ->
             if (estimate.quality == PositionQuality.HIGH) {
-                currentOrUnavailableConfidence(eventAtMs)
-            } else if (estimate.estimatedAtElapsedRealtimeMs > (lastConfidenceSampleAtMs ?: -1L)) {
-                observeConfidence(estimate.quality, estimate.estimatedAtElapsedRealtimeMs, eventAtMs)
+                currentOrUnavailableConfidence(receivedAtMs)
+            } else if (estimate.estimatedAtElapsedRealtimeMs > (lastMotionConfidenceSampleAtMs ?: -1L)) {
+                observeMotionConfidence(estimate.quality, estimate.estimatedAtElapsedRealtimeMs, receivedAtMs)
             } else {
-                currentOrUnavailableConfidence(eventAtMs)
+                currentOrUnavailableConfidence(receivedAtMs)
             }
-        } ?: currentOrUnavailableConfidence(eventAtMs)
+        } ?: currentOrUnavailableConfidence(receivedAtMs)
         return snapshot(
             raw = null,
             estimate = update.estimate,
@@ -229,7 +241,7 @@ internal class PositioningCoordinator(
         selectedHeadingAccuracyDegrees: Double? = null,
         motionTrigger: PositioningMotionTrigger? = null,
     ): PositioningSnapshot {
-        val filtered = estimate?.let { estimated ->
+        fun filteredFix(estimated: EstimatedLocation?): PositioningFilteredFix? = estimated?.let {
             localFrame?.let { frame ->
                 val enu = frame.toLocal(PositionCoordinate(estimated.latitude, estimated.longitude))
                 val coordinate = frame.toCoordinate(enu)
@@ -245,7 +257,7 @@ internal class PositioningCoordinator(
         }
         return PositioningSnapshot(
             raw = raw,
-            filtered = filtered,
+            filtered = filteredFix(estimate),
             quality = estimate?.quality ?: PositionQuality.UNAVAILABLE,
             confidence = confidence,
             gnssQuality = gnssQuality,
@@ -254,6 +266,7 @@ internal class PositioningCoordinator(
             selectedHeading = selectedHeading,
             selectedHeadingAccuracyDegrees = selectedHeadingAccuracyDegrees,
             motionTrigger = motionTrigger,
+            filteredAtGnssMeasurement = filteredFix(gnssUpdate?.estimateAtGnssMeasurement),
         )
     }
 
@@ -261,15 +274,27 @@ internal class PositioningCoordinator(
         quality: PositionQuality,
         sampleAtMs: Long,
         nowMs: Long,
+        informativeGnss: Boolean = true,
     ): PositionConfidenceDecision {
-        val decision = confidencePolicy.observe(quality, sampleAtMs, nowMs)
+        val decision = confidencePolicy.observe(quality, sampleAtMs, nowMs, informativeGnss)
         lastConfidenceDecision = decision
         if (sampleAtMs >= 0L) lastConfidenceSampleAtMs = maxOf(lastConfidenceSampleAtMs ?: -1L, sampleAtMs)
         return decision
     }
 
     private fun currentOrUnavailableConfidence(nowMs: Long): PositionConfidenceDecision =
-        lastConfidenceDecision ?: observeConfidence(PositionQuality.UNAVAILABLE, nowMs, nowMs)
+        lastConfidenceDecision ?: observeMotionConfidence(PositionQuality.UNAVAILABLE, nowMs, nowMs)
+
+    private fun observeMotionConfidence(
+        quality: PositionQuality,
+        sampleAtMs: Long,
+        nowMs: Long,
+    ): PositionConfidenceDecision {
+        val decision = confidencePolicy.observeMotion(quality, sampleAtMs, nowMs)
+        lastConfidenceDecision = decision
+        if (sampleAtMs >= 0L) lastMotionConfidenceSampleAtMs = maxOf(lastMotionConfidenceSampleAtMs ?: -1L, sampleAtMs)
+        return decision
+    }
 
     private fun applyProfileDynamics(profile: PedestrianMotionProfileSnapshot) {
         estimator.setPedestrianDynamics(

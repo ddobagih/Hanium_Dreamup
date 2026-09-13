@@ -3,7 +3,7 @@ package kr.co.hanium.dreamup.walksafe.inference
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
 
 /**
- * Legacy and unified output-index contracts. Class order must remain identical to the exported
+ * Legacy and WalkMate primary output-index contracts. Class order must remain identical to the exported
  * model metadata; changing labels here without re-exporting the model silently relabels detections.
  */
 object TwoModelClassMap {
@@ -128,7 +128,30 @@ object TwoModelClassMap {
 
     val unifiedCustomClasses = unifiedTactileClasses
 
-    val unifiedWalksafeClasses = unifiedCocoClasses + unifiedCustomClasses
+    /** Exact model/best.pt class order; raw names remain visible to downstream semantic mapping. */
+    val unifiedWalksafeClasses = listOf(
+        "linear_tactile_paving",
+        "damaged_linear_tactile_paving",
+        "dot_tactile_paving",
+        "damaged_dot_tactile_paving",
+        "passenger_car",
+        "bus",
+        "truck",
+        "motorcycle",
+        "bicycle",
+        "abandoned_e_scooter",
+        "moving_e_scooter",
+        "traffic_light",
+        "crosswalk",
+        "construction_fence",
+        "barricade",
+        "traffic_cone",
+        "bollard",
+        "utility_or_streetlight_pole",
+        "trash_bin",
+        "portable_sign",
+        "person",
+    )
 
     val unifiedWalksafeAllowlist = unifiedWalksafeClasses.toSet()
 

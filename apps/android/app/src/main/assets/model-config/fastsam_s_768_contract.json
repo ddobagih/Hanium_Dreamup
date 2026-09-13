@@ -1,0 +1,47 @@
+{
+  "schema": "walksafe-fastsam-runtime-v1",
+  "modelId": "fastsam_s_768",
+  "role": "unknown_proposals",
+  "asset": "models/fastsam_s_768_float32.tflite",
+  "sha256": "7e65b23c52bc4a78f45c7a26ac49a8b0a3f9fc8b8ba8c98ef40f2bf45f738609",
+  "input": {
+    "dtype": "FLOAT32",
+    "shape": [
+      1,
+      768,
+      768,
+      3
+    ],
+    "preprocessor": "RGB_u8_OpenCV_4_13_INTER_LINEAR_fixed11_letterbox114_div255"
+  },
+  "outputs": [
+    {
+      "dtype": "FLOAT32",
+      "shape": [
+        1,
+        37,
+        12096
+      ],
+      "layout": "channel_major"
+    },
+    {
+      "dtype": "FLOAT32",
+      "shape": [
+        1,
+        192,
+        192,
+        32
+      ],
+      "layout": "NHWC"
+    }
+  ],
+  "decoder": {
+    "confidenceExclusive": 0.25,
+    "nmsIouExclusive": 0.7,
+    "maxInstances": 100,
+    "finiteCheck": "all_detection_and_prototype_values"
+  },
+  "primaryModelReplaced": false,
+  "fallback640Allowed": false,
+  "cpuFallback": "explicit initialization option with actual backend provenance"
+}

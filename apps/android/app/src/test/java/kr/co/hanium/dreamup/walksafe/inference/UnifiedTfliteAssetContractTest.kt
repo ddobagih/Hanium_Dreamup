@@ -16,7 +16,7 @@ class UnifiedTfliteAssetContractTest {
     fun unified768ModelMatchesAndroidTensorAndArtifactContract() {
         val model = System.getenv("WALKSAFE_TFLITE_CANDIDATE")
             ?.let(::File)
-            ?: File("src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite")
+            ?: File("src/main/assets/models/walkmate_yolo11n_21cls_768_float32.tflite")
         require(model.isFile) { "unified TFLite model not found: $model" }
         assertEquals(EXPECTED_ARTIFACT_SHA256, model.sha256())
         val configured = JSONObject(File("src/main/assets/model-config/two_model_runtime.json").readText())
@@ -26,8 +26,10 @@ class UnifiedTfliteAssetContractTest {
         assertEquals(768, configured.getInt("input_size"))
         val export = configured.getJSONObject("export")
         assertEquals("8.4.48", export.getString("ultralytics_version"))
-        assertEquals("2.19.0", export.getString("tensorflow_version"))
-        assertTrue(export.getBoolean("end_to_end_output_verified"))
+        assertEquals("2.19.1", export.getString("tensorflow_version"))
+        assertEquals(false, export.getBoolean("nms_requested"))
+        assertEquals("yolo_raw_xywh_normalized", configured.getString("output_format"))
+        assertEquals("model_input_normalized", export.getString("coordinate_units"))
         assertEquals(model.length(), export.getLong("artifact_size_bytes"))
         assertEquals("float32", export.getString("input_dtype"))
         assertEquals("float32", export.getString("output_dtype"))
@@ -42,21 +44,25 @@ class UnifiedTfliteAssetContractTest {
         assertEquals(TensorType.FLOAT32, input.type())
         assertEquals(TensorType.FLOAT32, output.type())
         assertArrayEquals(intArrayOf(1, 768, 768, 3), IntArray(input.shapeLength(), input::shape))
-        assertArrayEquals(intArrayOf(1, 300, 6), IntArray(output.shapeLength(), output::shape))
+        assertArrayEquals(intArrayOf(1, 25, 12096), IntArray(output.shapeLength(), output::shape))
         assertEquals(export.getInt("flatbuffer_operator_count"), graph.operatorsLength())
     }
 
     @Test
-    fun packagedFallbackAssetsMatchDeclaredHashesAndTensorContracts() {
+    fun configuredModelsAndPreservedRollbackAssetsMatchDeclaredContracts() {
         val modelsRoot = File("src/main/assets/models")
         val configuredModels = JSONObject(File("src/main/assets/model-config/two_model_runtime.json").readText())
             .getJSONObject("models")
         val expected = mapOf(
-            "unified_walksafe" to "walksafe_unified_yolo26n_768_float32.tflite",
+            "unified_walksafe" to "walkmate_yolo11n_21cls_768_float32.tflite",
             "custom_tactile" to "custom_tactile_yolo26s_float32.tflite",
             "coco_general" to "coco_yolo26n_float32.tflite",
         )
-        assertEquals(expected.values.toSet(), modelsRoot.listFiles().orEmpty().filter { it.extension == "tflite" }.map { it.name }.toSet())
+        val originalReference = "walksafe_unified_yolo26n_768_float32.tflite"
+        assertEquals("92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19", File(modelsRoot, originalReference).sha256())
+        val rollback = "walksafe_unified_yolo26n_768_float32_gpu_compatible.tflite"
+        assertEquals("25ef119d4f07e1bffbd4ac6827fa46a44a0fa3deaaedfb0c867e7c655f813559", File(modelsRoot, rollback).sha256())
+        assertTrue(modelsRoot.listFiles().orEmpty().map { it.name }.containsAll(expected.values + originalReference + rollback))
 
         expected.forEach { (modelKey, fileName) ->
             val configured = configuredModels.getJSONObject(modelKey)
@@ -71,7 +77,8 @@ class UnifiedTfliteAssetContractTest {
             assertEquals(TensorType.FLOAT32, input.type())
             assertEquals(TensorType.FLOAT32, output.type())
             assertArrayEquals(intArrayOf(1, inputSize, inputSize, 3), IntArray(input.shapeLength(), input::shape))
-            assertArrayEquals(intArrayOf(1, 300, 6), IntArray(output.shapeLength(), output::shape))
+            val outputShape = if (modelKey == "unified_walksafe") intArrayOf(1, 25, 12096) else intArrayOf(1, 300, 6)
+            assertArrayEquals(outputShape, IntArray(output.shapeLength(), output::shape))
         }
     }
 
@@ -89,6 +96,6 @@ class UnifiedTfliteAssetContractTest {
     }
 
     private companion object {
-        const val EXPECTED_ARTIFACT_SHA256 = "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19"
+        const val EXPECTED_ARTIFACT_SHA256 = "d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57"
     }
 }

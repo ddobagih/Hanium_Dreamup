@@ -10,6 +10,8 @@ import java.io.Closeable
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+import kr.co.hanium.dreamup.walksafe.voice.selectInstalledOfflineKoreanVoice
+import kr.co.hanium.dreamup.walksafe.voice.KoreanOfflineVoiceSelection
 
 enum class KoreanTextToSpeechSynthesisProbeResult {
     AVAILABLE,
@@ -21,6 +23,7 @@ enum class KoreanTextToSpeechSynthesisProbeResult {
     SYNTHESIS_ERROR,
     SYNTHESIS_STOPPED,
     EMPTY_OUTPUT,
+    OUTPUT_TOO_SHORT,
     TIMEOUT_SCHEDULING_FAILED,
     TIMED_OUT,
     CANCELLED,
@@ -33,7 +36,8 @@ enum class KoreanTextToSpeechSynthesisProbeResult {
 
 /**
  * Verifies Korean TTS by selecting a local voice and producing a private temporary audio file.
- * Voice metadata alone never passes: the callback must complete with a non-empty output file.
+ * Voice metadata alone never passes: the callback must complete with a structurally complete
+ * PCM WAV containing at least one second of audio. This does not verify audible speech.
  */
 class AndroidKoreanTextToSpeechSynthesisProbe(
     context: Context,
@@ -222,14 +226,18 @@ internal class KoreanTextToSpeechSynthesisProbeSession(
                                 state == ProbeState.RUNNING && engine === initializedEngine
                             }
                         } ?: return
-                        val hasAudio = runCatching {
-                            completedOutput.isFile && completedOutput.length() > 0L
-                        }.getOrDefault(false)
+                        val outputVerdict = runCatching {
+                            KoreanTtsOutputDurationPolicy.verify(completedOutput.readBytes())
+                        }.getOrDefault(KoreanTtsOutputDurationVerdict.UNREADABLE)
                         finish(
-                            if (hasAudio) {
-                                KoreanTextToSpeechSynthesisProbeResult.AVAILABLE
-                            } else {
-                                KoreanTextToSpeechSynthesisProbeResult.EMPTY_OUTPUT
+                            when (outputVerdict) {
+                                KoreanTtsOutputDurationVerdict.SUFFICIENT ->
+                                    KoreanTextToSpeechSynthesisProbeResult.AVAILABLE
+                                KoreanTtsOutputDurationVerdict.TOO_SHORT ->
+                                    KoreanTextToSpeechSynthesisProbeResult.OUTPUT_TOO_SHORT
+                                KoreanTtsOutputDurationVerdict.EMPTY,
+                                KoreanTtsOutputDurationVerdict.UNREADABLE ->
+                                    KoreanTextToSpeechSynthesisProbeResult.EMPTY_OUTPUT
                             },
                         )
                     }
@@ -364,22 +372,9 @@ private class AndroidKoreanTextToSpeechProbeEngine(
             if (textToSpeech.setLanguage(Locale.KOREAN) < TextToSpeech.LANG_AVAILABLE) {
                 return@runCatching false
             }
-            val selected = textToSpeech.voice?.takeIf(::isOfflineKoreanVoice)
-            if (selected != null) return@runCatching true
-            val offlineKoreanVoice = textToSpeech.voices.orEmpty()
-                .asSequence()
-                .filter(::isOfflineKoreanVoice)
-                .sortedBy { it.name }
-                .firstOrNull()
-                ?: return@runCatching false
-            textToSpeech.setVoice(offlineKoreanVoice) == TextToSpeech.SUCCESS &&
-                textToSpeech.voice?.let(::isOfflineKoreanVoice) == true
+            selectInstalledOfflineKoreanVoice(textToSpeech) == KoreanOfflineVoiceSelection.SELECTED
         }.getOrDefault(false)
     }
-
-    private fun isOfflineKoreanVoice(voice: android.speech.tts.Voice): Boolean =
-        voice.locale.language.equals(Locale.KOREAN.language, ignoreCase = true) &&
-            !voice.isNetworkConnectionRequired
 
     override fun setProgressListener(listener: KoreanTextToSpeechProbeProgressListener): Boolean {
         if (isClosed()) return false

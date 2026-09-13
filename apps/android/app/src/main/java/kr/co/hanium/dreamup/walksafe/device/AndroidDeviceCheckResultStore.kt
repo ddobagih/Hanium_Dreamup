@@ -4,7 +4,7 @@ import android.content.SharedPreferences
 import java.security.MessageDigest
 
 const val POST_LOGIN_DEVICE_CHECK_RESULT_POLICY_VERSION = "4"
-const val POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION = "20260905-interactive-v1"
+const val POST_LOGIN_DEVICE_CHECK_PROBE_POLICY_VERSION = "20260912-device-function-v1"
 const val POST_LOGIN_METRIC_DEPTH_PROBE_POLICY_VERSION = "20260905-support-only-v1"
 
 data class PostLoginDeviceCheckResultBinding(

@@ -1,0 +1,6 @@
+# Preserve hash-pinned model and image fixtures byte-for-byte.
+*.tflite binary
+*.gray binary
+model/artifacts/candidates/walkmate_21cls_yolo11n_img768_20260912/data.yaml -text whitespace=cr-at-eol
+# The final empty TSV field is intentional and used by the fixture reader.
+apps/android/app/src/androidTest/assets/tracking-validation/vot2016-bag/evaluation-gt.tsv -text whitespace=-blank-at-eol

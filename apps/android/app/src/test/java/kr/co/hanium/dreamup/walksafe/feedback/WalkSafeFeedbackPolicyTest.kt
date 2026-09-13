@@ -99,6 +99,37 @@ class WalkSafeFeedbackPolicyTest {
     }
 
     @Test
+    fun interruptedInformationSpeechReleasesClaimAndIgnoresLateCompletion() {
+        val policy = WalkSafeFeedbackPolicy()
+        val info = candidate(level = MessageLevel.INFO, message = "점자블록을 따라 이동하세요.")
+        val action = requireNotNull(policy.evaluate(info, true, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(action.trackId, 1_000L))
+        val callbacks = UtteranceCallbackRegistry()
+        var completed = 0
+        var failures = 0
+        callbacks.register(
+            "info",
+            onCompleted = {
+                completed += 1
+                policy.confirmFeedbackDelivery(action.trackId, 1_000L)
+            },
+            onFailed = {
+                failures += 1
+                policy.rejectUndeliveredFeedback(action.trackId, 1_000L)
+            },
+        )
+        assertNull(policy.evaluate(info, true, 6_000L))
+
+        callbacks.takeTerminalCallback("info", completed = false, notifyFailure = true)?.invoke()
+        callbacks.takeTerminalCallback("info", completed = true, notifyFailure = true)?.invoke()
+        callbacks.takeTerminalCallback("info", completed = false, notifyFailure = true)?.invoke()
+
+        assertEquals(0, completed)
+        assertEquals(1, failures)
+        assertNotNull(policy.evaluate(info, true, 6_100L))
+    }
+
+    @Test
     fun fallsThroughToAnotherTrackWhenHighestPriorityTrackIsRateLimited() {
         val policy = WalkSafeFeedbackPolicy()
         val highest = candidate(trackId = "stop-track", level = MessageLevel.STOP, message = "멈추세요.")

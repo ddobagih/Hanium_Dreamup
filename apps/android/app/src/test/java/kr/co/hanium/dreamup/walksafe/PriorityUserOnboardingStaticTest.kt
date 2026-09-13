@@ -53,8 +53,8 @@ class PriorityUserOnboardingStaticTest {
             "restorePermissionSessionStateFromPrefs()",
             "restorePriorityUserOnboardingFromPrefs()",
             "GatewaySessionProcessCoordinator.attach(",
-            "scheduleGatewaySessionRestoreAfterPrivacyStartupInspection()",
             "enforcePriorityUserAccountEligibility()",
+            "scheduleGatewaySessionRestoreAfterPrivacyStartupInspection()",
         )
         val restore = functionBlock("private fun restoreGatewaySessionFromPrefs()")
         assertInOrder(
@@ -75,6 +75,31 @@ class PriorityUserOnboardingStaticTest {
             ),
         )
         assertTrue(source.contains("sensitivePrefs.edit().remove(profileKey).commit()"))
+    }
+
+    @Test
+    fun startupEligibilityCannotRevokeAnUnboundOrRestoringSession() {
+        val eligibility = functionBlock("private fun enforcePriorityUserAccountEligibility()")
+        assertInOrder(eligibility,
+            "val session = process.session ?: return",
+            "reporterUserId != session.actorId",
+            "process.inFlightOperationId != null",
+            "process.storageBlocked",
+            "process.deletionRecoveryOnly",
+            "session.sessionScope != GatewaySessionScope.GENERAL",
+            "session.verificationState != GatewaySessionVerificationState.VERIFIED",
+            "priorityUserOnboardingPolicy.accountBlockReason()",
+            "clearGatewaySession(",
+            "expectedSession = session",
+            "expectedProcessGeneration = process.generation",
+        )
+        val observer = functionBlock("private fun onGatewayProcessSessionChanged(")
+        assertInOrder(observer,
+            "reporterUserId = actorId",
+            "restorePriorityUserOnboardingFromPrefs()",
+            "if (verifiedActorSession != null)",
+            "enforcePriorityUserAccountEligibility()",
+        )
     }
 
     @Test
@@ -165,9 +190,7 @@ class PriorityUserOnboardingStaticTest {
         val practice = functionBlock("private fun performPriorityUserPractice(")
         val hapticDelivery = practice.substringAfter("if (hapticFeedbackEnabled) {")
             .substringBefore("if (voiceGuidanceEnabled) {")
-        val hapticFallback = hapticDelivery.substringAfter("} else {")
         val speechDelivery = practice.substringAfter("if (voiceGuidanceEnabled) {")
-        val speechFallback = speechDelivery.substringAfter("} else {")
 
         assertFalse(practiceButtons.contains("environment.offlineKoreanVoiceAvailable"))
         assertFalse(practiceButtons.contains("environment.vibrationAvailable"))
@@ -191,18 +214,13 @@ class PriorityUserOnboardingStaticTest {
             ),
         )
         assertTrue(hapticDelivery.contains("playPriorityUserTrainingVibration("))
-        assertTrue(
-            hapticFallback.contains(
-                "PriorityUserPracticeDeliverySignal.VIBRATION_REQUEST_WINDOW_ELAPSED",
-            ),
-        )
-        assertFalse(hapticFallback.contains("return"))
+        assertFalse(hapticDelivery.contains("} else {"))
         assertTrue(speechDelivery.contains("speakPriorityUserTraining("))
-        assertTrue(
-            speechFallback.contains(
-                "PriorityUserPracticeDeliverySignal.SPEECH_PLAYBACK_COMPLETED",
-            ),
-        )
+        assertFalse(speechDelivery.contains("} else {"))
+        assertTrue(practice.contains("if (voiceGuidanceEnabled) add(PriorityUserPracticeDeliverySignal.SPEECH_PLAYBACK_COMPLETED)"))
+        assertTrue(practice.contains("if (hapticFeedbackEnabled) add(PriorityUserPracticeDeliverySignal.VIBRATION_REQUEST_WINDOW_ELAPSED)"))
+        assertTrue(practice.contains("requiredDeliverySignals.isEmpty()"))
+        assertTrue(practice.contains("policy.beginPractice(practice, requiredDeliverySignals)"))
     }
 
     @Test
@@ -313,7 +331,7 @@ class PriorityUserOnboardingStaticTest {
         val practice = functionBlock("private fun performPriorityUserPractice(")
         val terminal = functionBlock("private fun recordPriorityUserPracticeDelivery(")
 
-        assertTrue(practice.contains("policy.beginPractice(practice)"))
+        assertTrue(practice.contains("policy.beginPractice(practice, requiredDeliverySignals)"))
         assertTrue(practice.contains("playPriorityUserTrainingVibration("))
         assertTrue(practice.contains("speakPriorityUserTraining("))
         assertTrue(
@@ -429,16 +447,17 @@ class PriorityUserOnboardingStaticTest {
     fun nativeEducationKeepsPostureListeningAndConsentInAccessibleOrder() {
         val content = functionBlock("private fun buildContentView()")
         val controls = content.substringAfter("priorityUserOnboardingControls =").substringBefore("linkPriorityUserAccessibilityTraversal()")
-        assertInOrder(controls, "addView(priorityUserOnboardingStatusText)", "addView(firstRunPhonePostureControls)", "addView(priorityUserEducationButton)", "addView(priorityUserPracticeNecessityButton)", "addView(priorityUserEducationAgreeButton)")
+        assertInOrder(controls, "addView(priorityUserOnboardingStatusText)", "addView(priorityUserEducationProgressText)", "addView(priorityUserEducationBodyText)", "addView(firstRunPhonePostureControls)", "addView(priorityUserEducationButton)", "addView(priorityUserPracticeNecessityButton)", "addView(priorityUserSafePlaceButton)", "PriorityUserPractice.entries.forEach { addView(priorityUserPracticeButtons.getValue(it)) }", "addView(priorityUserEducationAgreeButton)")
         assertFalse(controls.contains("addView(loginUserIdInput)"))
         val update = functionBlock("private fun updateNativeSafetyEducationUi()")
         assertTrue(update.contains("val heading = if (showPosture) \"사전 연습\" else \"안전 교육\""))
-        assertTrue(update.contains("firstRunPhonePostureButton.accessibilityTraversalAfter = firstRunPhonePostureText.id"))
+        assertTrue(update.contains("priorityUserEducationBodyText.accessibilityTraversalAfter = priorityUserEducationProgressText.id"))
+        assertTrue(update.contains("firstRunPhonePostureButton.accessibilityTraversalAfter = priorityUserEducationBodyText.id"))
         assertTrue(update.contains("priorityUserPracticeNecessityButton.accessibilityTraversalAfter = priorityUserEducationButton.id"))
         assertTrue(update.contains("priorityUserEducationAgreeButton.accessibilityTraversalAfter ="))
-        assertTrue(update.contains("if (showPosture) priorityUserEducationButton.id else priorityUserPracticeNecessityButton.id"))
-        assertTrue(update.contains("if (showPosture) firstRunPhonePostureButton.id else priorityUserOnboardingStatusText.id"))
-        assertTrue(update.contains("state.usageConditionsAcknowledged && state.appUsageReviewed"))
+        assertTrue(update.contains("if (showPosture) previousPracticeControl.id else priorityUserPracticeNecessityButton.id"))
+        assertTrue(update.contains("if (showPosture) firstRunPhonePostureButton.id else priorityUserEducationBodyText.id"))
+        assertTrue(update.contains("state.usageConditionsAcknowledged && state.appUsageReviewed && state.interactivePracticeComplete"))
         val safetyStep = source.substringAfter("private fun shouldShowFirstRunEducation()")
             .substringBefore("private fun ")
         val usageStep = source.substringAfter("private fun shouldShowFirstRunPhonePosture()")
@@ -464,6 +483,68 @@ class PriorityUserOnboardingStaticTest {
             "persistPriorityUserOnboardingOrFailClosed")
         assertTrue(update.contains("state.educationReviewed && state.practiceNecessityReviewed"))
         assertTrue(content.contains("onClick = ::acceptNativeSafetyEducation"))
+    }
+
+    @Test
+    fun nativeEducationDisplaysSharedSpeechAndProgressWithoutTruncatingLargeText() {
+        val update = functionBlock("private fun updateNativeSafetyEducationUi()")
+        val playback = functionBlock("private fun playNativeSafetyEducation(")
+        val body = source.substringAfter("priorityUserEducationBodyText = TextView(this).apply {")
+            .substringBefore("priorityUserAgeButtons.clear()")
+        assertTrue(update.contains("PriorityUserEducationPresentation.screenText(state)"))
+        assertTrue(update.contains("PriorityUserEducationPresentation.progressNotice("))
+        assertTrue(playback.contains("PriorityUserEducationPresentation.speechText(playback)"))
+        assertTrue(playback.contains("AndroidFeedbackActuator.INITIALIZATION_READINESS_TIMEOUT_MS"))
+        assertFalse(playback.contains("+ 8_000L"))
+        assertTrue(body.contains("ViewGroup.LayoutParams.WRAP_CONTENT"))
+        assertTrue(body.contains("textSize = 18f"))
+        assertTrue(body.contains("setLineSpacing(0f, 1.4f)"))
+        assertFalse(body.contains("maxLines"))
+        assertFalse(body.contains("ellipsize"))
+    }
+
+    @Test
+    fun hazardPracticeNeedsASeparateCurrentUserResponseAfterRealDelivery() {
+        val practice = functionBlock("private fun performPriorityUserPractice(")
+        val delivery = functionBlock("private fun recordPriorityUserPracticeDelivery(")
+        val confirmation = functionBlock("private fun confirmPriorityUserHazardResponse()")
+        val update = functionBlock("private fun updateNativeSafetyEducationUi()")
+        val current = functionBlock("private fun isPriorityUserTrainingDeliveryCurrent(")
+        assertTrue(practice.contains("confirmPriorityUserHazardResponse()"))
+        assertFalse(delivery.contains("policy.confirmHazardResponse"))
+        assertTrue(delivery.contains("if (policy.isHazardResponseReady(token)) updatePriorityUserOnboardingUi()"))
+        assertTrue(confirmation.contains("!policy.isHazardResponseReady(token)"))
+        assertInOrder(confirmation, "isPriorityUserTrainingDeliveryCurrent", "beginPriorityUserProfileMutationOrFailClosed", "policy.confirmHazardResponse(token)", "persistPriorityUserOnboardingOrFailClosed")
+        assertTrue(current.contains("isActivityForeground &&"))
+        assertTrue(update.contains("PriorityUserEducationPresentation.hazardResponseActionKo"))
+        assertTrue(update.contains("state.requiresPracticeRestart"))
+        assertTrue(update.contains("priorityUserPracticeInFlight != null -> \"이번 연습 중지\""))
+        val stop = functionBlock("private fun reviewPriorityUserSafetyEducation()")
+            .substringBefore("if (priorityUserEducationInFlight)")
+        assertInOrder(stop, "priorityUserPracticeInFlight != null", "cancelPendingPriorityUserTrainingFeedback()")
+        assertFalse(stop.contains("resetTraining"))
+        assertFalse(practice.contains("startLocationUpdates"))
+        assertFalse(practice.contains("beginNativeWalkFromHome"))
+        assertFalse(practice.contains("startCamera"))
+        listOf("private fun failPriorityUserTrainingDelivery(", "private fun clearPriorityUserTrainingDeliveryIfOwned(", "private fun cancelPendingPriorityUserTrainingFeedback()").forEach {
+            assertTrue(functionBlock(it).contains("priorityUserPracticeAttemptToken = null"))
+        }
+    }
+
+    @Test
+    fun restoredEducationKeepsConsentAndReturnsOnlyMissingPracticeToTraining() {
+        val restore = functionBlock("private fun restorePriorityUserOnboardingFromPrefs()")
+        val persist = functionBlock("private fun persistPriorityUserOnboarding()")
+        val bind = functionBlock("private fun bindFirstRunVerifiedActorForTraining()")
+        assertTrue(restore.contains("profile.optBoolean(\"hazard_response_confirmed\", false)"))
+        assertTrue(persist.contains(".put(\"hazard_response_confirmed\", snapshot.hazardResponseConfirmed)"))
+        assertTrue(bind.contains("hazardResponseConfirmed = compatible && restored.hazardResponseConfirmed"))
+        assertTrue(bind.contains("educationReviewed = compatible && restored.educationReviewed"))
+        assertTrue(bind.contains("appUsageAccepted = compatible && restored.appUsageAccepted"))
+        assertTrue(bind.contains("FirstRunOnboardingPolicy.restartFp004Training(firstRunOnboardingSnapshot)"))
+        assertFalse(bind.substringAfter("val restart =").contains("clearGatewaySession"))
+        val accept = functionBlock("private fun acceptNativeSafetyEducation()")
+        assertTrue(accept.contains("!state.interactivePracticeComplete"))
     }
 
     private fun functionBlock(signature: String): String {

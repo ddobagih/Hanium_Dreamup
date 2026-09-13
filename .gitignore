@@ -113,6 +113,9 @@ model/artifacts/candidates/
 !apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite
 !apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite
 !apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite
+!apps/android/app/src/main/assets/models/walkmate_yolo11n_21cls_768_float32.tflite
+!apps/android/app/src/main/assets/models/fastsam_s_768_float32.tflite
+!apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32_gpu_compatible.tflite
 
 # Goal execution logs are content-addressed evidence, not local runtime logs.
 !docs/control/execution/goal-results/**/*.log

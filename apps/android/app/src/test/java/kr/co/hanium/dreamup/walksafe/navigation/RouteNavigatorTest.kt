@@ -580,7 +580,7 @@ class RouteNavigatorTest {
     }
 
     @Test
-    fun passedTurnIsNotConsumedUntilItsSpeechIsAcknowledged() {
+    fun passedTurnAdvancesEvenWhenItsSpeechWasNeverDelivered() {
         val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
         val base = route().copy(
             guidePoints = listOf(
@@ -607,9 +607,9 @@ class RouteNavigatorTest {
             requestInFlight = false,
         )
 
-        assertTrue(unacknowledged.instruction?.contains("지난 회전") == true)
-        assertTrue(repeated.instruction?.contains("지난 회전") == true)
-        assertTrue(afterSpeech.instruction?.contains("다음 회전") == true)
+        assertTrue(unacknowledged.instruction?.contains("다음 회전") == true)
+        assertTrue(repeated.instruction?.contains("다음 회전") == true)
+        assertEquals("guidance_already_completed", afterSpeech.reason)
     }
 
     @Test
@@ -629,7 +629,8 @@ class RouteNavigatorTest {
 
         val stillBefore = navigator.update(beforeGuide, nowMs = 1_001L, requestInFlight = false)
 
-        assertTrue(stillBefore.instruction?.contains("첫 회전") == true)
+        assertEquals("guidance_already_completed", stillBefore.reason)
+        assertTrue(navigator.currentInstruction(beforeGuide)?.contains("첫 회전") == true)
     }
 
     @Test
@@ -790,7 +791,8 @@ class RouteNavigatorTest {
 
         assertFalse(first.arrived)
         assertFalse(second.arrived)
-        assertTrue(second.instruction?.contains("최종 접근") == true)
+        assertEquals("guidance_already_completed", second.reason)
+        assertTrue(navigator.currentInstruction(TrustedLocation(endpoint.latitude, endpoint.longitude, 2f, 2_000L))?.contains("최종 접근") == true)
     }
 
     @Test

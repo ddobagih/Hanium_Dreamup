@@ -17,6 +17,7 @@ object ResultJson {
         downloads: List<StrictHttpsTransport.Download> = emptyList(),
         generatedAtUtc: Instant? = null,
         truthInsufficient: Boolean = false,
+        manualBaseArtifacts: List<ImportedArtifact> = emptyList(),
     ): String {
         val root = JSONObject()
             .put("schema_version", "walksafe.ppk_evaluation.v1")
@@ -32,7 +33,7 @@ object ResultJson {
         if (station != null) root.put("reference_station", station(station))
         root.put("downloads", downloads(downloads))
             .put("evaluation_policy", evaluationPolicy())
-            .put("reference_provenance", referenceProvenance())
+            .put("reference_provenance", referenceProvenance(manualBaseArtifacts))
             .put("components", components())
         return canonicalJson(root) + "\n"
     }
@@ -45,6 +46,7 @@ object ResultJson {
         downloads: List<StrictHttpsTransport.Download>,
         ppk: ParsedPpk? = null,
         generatedAtUtc: Instant? = null,
+        manualBaseArtifacts: List<ImportedArtifact> = emptyList(),
     ): String {
         val root = JSONObject()
             .put("schema_version", "walksafe.ppk_evaluation.v1")
@@ -84,7 +86,7 @@ object ResultJson {
                 }
             })
             .put("evaluation_policy", evaluationPolicy())
-            .put("reference_provenance", referenceProvenance())
+            .put("reference_provenance", referenceProvenance(manualBaseArtifacts))
             .put("components", components())
         return canonicalJson(root) + "\n"
     }
@@ -128,7 +130,13 @@ object ResultJson {
         .put("time_policy_version", PpkPosParser.TIME_POLICY_VERSION)
         .put("time_policy_supported_end_exclusive_utc", PpkPosParser.SUPPORTED_END_EXCLUSIVE_UTC)
 
-    private fun referenceProvenance() = JSONObject()
+    private fun referenceProvenance(manualBaseArtifacts: List<ImportedArtifact>) = JSONObject()
+        .put("base_input_mode", if (manualBaseArtifacts.isEmpty()) "NGII_AUTOMATIC_DOWNLOAD" else "USER_SELECTED_RINEX_HEADER_VALIDATED")
+        .put("base_input_files", JSONArray().apply {
+            manualBaseArtifacts.forEach { value ->
+                put(JSONObject().put("sha256", value.sha256).put("byte_count", value.byteCount))
+            }
+        })
         .put("method", "SAME_PHONE_POSTPROCESSED_PPK")
         .put("independence", "NOT_INDEPENDENT")
         .put("intended_use", "DEVELOPMENT_EVALUATION_ONLY")

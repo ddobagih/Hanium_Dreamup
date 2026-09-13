@@ -157,6 +157,10 @@ val reportQueueBuildTestOrigin =
     if (reportQueueEnabled) verifiedReportQueueTestOrigin!! else "disabled"
 val debugLongLivedLoginEnabled =
     providers.gradleProperty("walksafe.longLivedLoginEnabled").orNull == "true"
+val debugPostLoginDeviceCheckRequired =
+    providers.gradleProperty("walksafe.postLoginDeviceCheckRequired").orNull != "false"
+val debugGuidanceStartBypass =
+    providers.gradleProperty("walksafe.guidanceStartBypass").orNull != "false"
 val validateWalkSafeSourceCommit by tasks.registering {
     doLast {
         check(verifiedSourceCommit != null) {
@@ -284,6 +288,12 @@ android {
             buildConfigField("String", "WALKSAFE_GATEWAY_ORIGIN", "\"$debugGatewayOrigin\"")
             buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walksafe-debug-v1\"")
             buildConfigField("boolean", "WALKSAFE_LONG_LIVED_LOGIN_ENABLED", "$debugLongLivedLoginEnabled")
+            buildConfigField(
+                "boolean",
+                "WALKSAFE_POST_LOGIN_DEVICE_CHECK_REQUIRED",
+                "$debugPostLoginDeviceCheckRequired",
+            )
+            buildConfigField("boolean", "WALKSAFE_DEBUG_GUIDANCE_START_BYPASS", "$debugGuidanceStartBypass")
             buildConfigField("boolean", "DEVELOPMENT_QUICK_START", "$developmentQuickStart")
             buildConfigField("String", "DEVELOPMENT_QUICK_START_EMAIL", buildConfigString(developmentQuickStartEmail))
             buildConfigField("String", "DEVELOPMENT_QUICK_START_PASSWORD", buildConfigString(developmentQuickStartPassword))
@@ -293,6 +303,8 @@ android {
             buildConfigField("String", "WALKSAFE_GATEWAY_ORIGIN", "\"${verifiedReleaseGatewayOrigin ?: "invalid-release-origin"}\"")
             buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walksafe-release-v1\"")
             buildConfigField("boolean", "WALKSAFE_LONG_LIVED_LOGIN_ENABLED", "false")
+            buildConfigField("boolean", "WALKSAFE_POST_LOGIN_DEVICE_CHECK_REQUIRED", "true")
+            buildConfigField("boolean", "WALKSAFE_DEBUG_GUIDANCE_START_BYPASS", "false")
             buildConfigField("boolean", "DEVELOPMENT_QUICK_START", "false")
             buildConfigField("String", "DEVELOPMENT_QUICK_START_EMAIL", "\"\"")
             buildConfigField("String", "DEVELOPMENT_QUICK_START_PASSWORD", "\"\"")
@@ -332,7 +344,10 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.ai.edge.litert:litert:1.4.0")
+    implementation("com.google.ai.edge.litert:litert-gpu:1.4.0")
+    implementation("com.google.ai.edge.litert:litert-gpu-api:1.4.0")
     implementation("com.alphacephei:vosk-android:0.3.75")
+    implementation("org.opencv:opencv:4.13.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

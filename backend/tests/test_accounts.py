@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from email.utils import parsedate_to_datetime
 import importlib
 from types import SimpleNamespace
 import uuid
@@ -541,6 +542,7 @@ def test_smtp_sender_requires_verified_tls_without_plaintext_fallback(
     security: str,
 ) -> None:
     events: list[object] = []
+    messages = []
     context = object()
 
     class FakeSmtp:
@@ -564,6 +566,7 @@ def test_smtp_sender_requires_verified_tls_without_plaintext_fallback(
 
         def send_message(self, message):
             events.append(("send", message["To"]))
+            messages.append(message)
 
     monkeypatch.setattr(accounts_service.ssl, "create_default_context", lambda: context)
     monkeypatch.setattr(accounts_service.smtplib, "SMTP", FakeSmtp)
@@ -593,6 +596,9 @@ def test_smtp_sender_requires_verified_tls_without_plaintext_fallback(
         assert "context" not in connect[3]
         assert ("starttls", context) in events
     assert ("send", "recipient@example.com") in events
+    assert parsedate_to_datetime(messages[0]["Date"]).tzinfo is UTC
+    assert messages[0]["Message-ID"].startswith("<")
+    assert messages[0]["Message-ID"].endswith("@example.com>")
 
 
 def test_missing_smtp_fails_closed_without_network() -> None:

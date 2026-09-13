@@ -12,9 +12,12 @@ import kr.co.hanium.dreamup.walksafe.navigation.positioning.ChestMountedHeading
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.ChestMountedHeadingResult
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.ChestMountedMagneticFieldSample
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.ChestMountedRotationSample
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.HeadingObservation
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.HeadingObservationHistory
 
 /** Fresh, accuracy-bounded magnetic East-North-Up orientation from TYPE_ROTATION_VECTOR. */
 class AndroidEarthOrientationTracker(context: Context) {
+    private val chestHeadingHistory = HeadingObservationHistory()
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
     private val magneticFieldSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
@@ -43,6 +46,7 @@ class AndroidEarthOrientationTracker(context: Context) {
         latestOrientation = null
         latestRotationSample = null
         latestMagneticFieldSample = null
+        chestHeadingHistory.clear()
         chestMountedHeading.reset()
         val generation = ++registrationGeneration
         lateinit var listener: SensorEventListener
@@ -55,6 +59,8 @@ class AndroidEarthOrientationTracker(context: Context) {
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
                 if (!isCurrentRegistration(listener, generation)) return
                 val mappedAccuracy = accuracy.toEarthOrientationAccuracy()
+                // Never replay headings accepted under a superseded quality assessment.
+                chestHeadingHistory.clear()
                 when (sensor?.type) {
                     Sensor.TYPE_ROTATION_VECTOR -> {
                         latestRotationSample = latestRotationSample?.let { sample ->
@@ -87,6 +93,7 @@ class AndroidEarthOrientationTracker(context: Context) {
         started = rotationRegistered
         if (!rotationRegistered) {
             if (currentListener === listener) currentListener = null
+            chestHeadingHistory.clear()
             chestMountedHeading.reset()
             return false
         }
@@ -113,6 +120,7 @@ class AndroidEarthOrientationTracker(context: Context) {
         latestRotationSample = null
         latestMagneticFieldSample = null
         magneticSensorRegistered = false
+        chestHeadingHistory.clear()
         chestMountedHeading.reset()
     }
 
@@ -128,6 +136,9 @@ class AndroidEarthOrientationTracker(context: Context) {
         magneticSensorAvailable = magneticSensorRegistered,
     )
 
+    fun chestMountedHeadingAt(timestampMs: Long, maximumAgeMs: Long = 500L): HeadingObservation? =
+        chestHeadingHistory.atOrBefore(timestampMs, maximumAgeMs)
+
     fun isMagneticFieldAvailable(): Boolean = magneticSensorRegistered
 
     fun updateGeomagneticReference(
@@ -141,7 +152,7 @@ class AndroidEarthOrientationTracker(context: Context) {
             !longitudeDegrees.isFinite() || longitudeDegrees !in -180.0..180.0 ||
             !altitudeMeters.isFinite()
         ) {
-            geomagneticReference = null
+            clearGeomagneticReference()
             return false
         }
         val field = runCatching {
@@ -152,7 +163,7 @@ class AndroidEarthOrientationTracker(context: Context) {
                 timeMillis,
             )
         }.getOrNull() ?: run {
-            geomagneticReference = null
+            clearGeomagneticReference()
             return false
         }
         val reference = ChestMountedGeomagneticReference(
@@ -166,7 +177,7 @@ class AndroidEarthOrientationTracker(context: Context) {
             !reference.expectedFieldStrengthMicrotesla.isFinite() ||
             reference.expectedFieldStrengthMicrotesla <= 0.0
         ) {
-            geomagneticReference = null
+            clearGeomagneticReference()
             return false
         }
         geomagneticReference = reference
@@ -175,6 +186,7 @@ class AndroidEarthOrientationTracker(context: Context) {
 
     fun clearGeomagneticReference() {
         geomagneticReference = null
+        chestHeadingHistory.clear()
     }
 
     // Kept as text so the frozen FP-017 trace can identify the superseded
@@ -196,6 +208,16 @@ started = false
         when (event.sensor.type) {
             Sensor.TYPE_ROTATION_VECTOR -> handleRotationVectorChanged(event)
             Sensor.TYPE_MAGNETIC_FIELD -> handleMagneticFieldChanged(event)
+        }
+        // Save already-gated observations at sensor time, before delayed step callbacks consume them.
+        val result = latestChestMountedHeading(SystemClock.elapsedRealtime())
+        val heading = result.trueHeadingDegrees
+        val accuracy = result.accuracyDegrees
+        val observedAt = result.observedAtMs
+        if (result.isValid && heading != null && accuracy != null && observedAt != null) {
+            chestHeadingHistory.add(HeadingObservation(heading, accuracy, observedAt))
+        } else {
+            chestHeadingHistory.clear()
         }
     }
 

@@ -3,8 +3,11 @@ package kr.co.hanium.dreamup.walksafe.navigation
 import kr.co.hanium.dreamup.walksafe.AndroidRiskSelectionPolicy
 import kr.co.hanium.dreamup.walksafe.MainActivity
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
+import kr.co.hanium.dreamup.walksafe.depth.CurrentTrackedFrameObservation
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
+import kr.co.hanium.dreamup.walksafe.depth.UnknownObjectFeedbackBatch
 import kr.co.hanium.dreamup.walksafe.feedback.FeedbackAction
+import kr.co.hanium.dreamup.walksafe.feedback.FeedbackCandidate
 import kr.co.hanium.dreamup.walksafe.feedback.WalkSafeFeedbackPolicy
 import kr.co.hanium.dreamup.walksafe.feedback.toFeedbackCandidate
 
@@ -97,15 +100,59 @@ internal class AndroidTactileFrameCoordinator(
         activeRouteId = input.activeRouteId,
     )
 
+    /** Uses a verified current observation without publishing it as another detector snapshot. */
+    fun processTrackedObservation(
+        frame: CurrentTrackedFrameEvidence?,
+        nowElapsedRealtimeMs: Long,
+        navigationActiveNow: Boolean,
+        tmapOnRouteNow: Boolean,
+        activeRouteId: String?,
+        processDepth: (CurrentTrackedFrameObservation, MainActivity.DetectionFrameEvidence) -> List<TrackedObjectDepth>,
+    ): MainActivity.TactileSnapshotFrameResult {
+        val current = frame?.takeIf { it.observation.isFreshAt(nowElapsedRealtimeMs) }
+        val evidence = current?.currentEvidence
+        val detections = current?.observation?.trackedObservations.orEmpty().mapNotNull { it.geometry }
+        // An all-LOST observation still reaches the visual pipeline to invalidate its track state.
+        val outputs = if (current != null) processDepth(current.observation, current.currentEvidence) else emptyList()
+        val guidance = tactileRouteGuidance.apply(
+            outputs = outputs,
+            context = current?.let { it.currentEvidence.tactileContext.copy(detectionAgeMs = it.sourceAgeMs(nowElapsedRealtimeMs)) },
+            navigationActive = evidence?.navigationActive == true && navigationActiveNow,
+            tmapOnRoute = evidence?.tmapOnRoute == true && tmapOnRouteNow,
+            activeRouteId = activeRouteId,
+        )
+        return MainActivity.TactileSnapshotFrameResult(
+            matchedEvidence = evidence,
+            depthDetections = detections,
+            depthProcessingAttempted = current != null && detections.isNotEmpty(),
+            guidance = guidance,
+        )
+    }
+
     fun dispatchFeedback(
         frame: MainActivity.TactileSnapshotFrameResult,
         stale: Boolean,
         deviceGateAllowsAlerts: Boolean,
         nowMs: Long,
         feedbackActuatorOverride: TactileFrameFeedbackActuator? = null,
+        independentFreshOutputs: List<UnknownObjectFeedbackBatch> = emptyList(),
     ): TactileFrameFeedbackDispatch {
-        val candidates = AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(frame.guidance.outputs).mapNotNull { output ->
+        val currentCandidates = AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(frame.guidance.outputs).mapNotNull { output ->
             output.toFeedbackCandidate(stale = stale)
+        }
+        val independentCandidates = independentFreshOutputs.filter { it.isFreshAt(nowMs) }.flatMap { batch ->
+            AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(batch.outputs).mapNotNull { output ->
+                output.toFeedbackCandidate()?.let { it to batch.validUntilElapsedRealtimeMs }
+            }
+        }
+        val candidates = (currentCandidates + independentCandidates.map { it.first })
+            .sortedWith(compareByDescending<FeedbackCandidate> { it.level.ordinal }.thenByDescending { it.confidence })
+        val sourceDeadlines = independentCandidates.groupBy({ it.first.deliveryKey }, { it.second })
+            .mapValues { (_, deadlines) -> deadlines.min() }
+        val action = feedbackPolicy.evaluateCandidates(candidates, deviceGateAllowsAlerts, nowMs)?.let { selected ->
+            sourceDeadlines[selected.deliveryKey]?.let { sourceDeadline ->
+                selected.copy(validUntilMs = minOf(selected.validUntilMs, sourceDeadline))
+            } ?: selected
         }
         val dispatch = TactileFrameFeedbackDispatch(
             activeRiskTrackIds = feedbackPolicy.activeRiskTrackIds(
@@ -117,11 +164,7 @@ internal class AndroidTactileFrameCoordinator(
                 deviceGateAllowsAlerts = deviceGateAllowsAlerts,
             ),
             deviceGateAllowsAlerts = deviceGateAllowsAlerts,
-            action = feedbackPolicy.evaluateCandidates(
-                candidates = candidates,
-                deviceGateAllowsAlerts = deviceGateAllowsAlerts,
-                nowMs = nowMs,
-            ),
+            action = action,
             policyEvaluatedAtMs = nowMs,
         )
         (feedbackActuatorOverride ?: feedbackActuator).emit(dispatch)

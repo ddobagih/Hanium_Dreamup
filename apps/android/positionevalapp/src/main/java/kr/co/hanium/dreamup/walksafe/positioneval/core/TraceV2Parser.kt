@@ -17,6 +17,7 @@ object TraceV2Parser {
     private const val MAX_LINE_CHARS = 1_048_576
     private const val MAX_RECORDS = 100_000
     private const val MAX_OFFSET_SPREAD_MS = 100.0
+    private const val MAX_UTC_QUANTIZATION_MS = 1L
     private const val MOUNT = "PORTRAIT_BACK_OUT_TOP_UP_CHEST_CENTER"
     private const val SOURCE_KIND = "ANDROID_DEBUG_RECORDER"
     private const val TIMEBASE = "ANDROID_ELAPSED_REALTIME_NANOS"
@@ -31,6 +32,7 @@ object TraceV2Parser {
 
         val digest = MessageDigest.getInstance("SHA-256")
         val samples = mutableListOf<TraceSample>()
+        val utcAnchors = mutableListOf<MeasurementUtcAnchor>()
         var headerSeen = false
         var footerSeen = false
         var expectedHash: String? = null
@@ -39,7 +41,6 @@ object TraceV2Parser {
         var lineNumber = 0
         var previousSequence = 0L
         var previousElapsed = -1L
-        var previousUtc: Long? = null
         var nextCheckpointOrdinal = 1L
 
         try {
@@ -91,9 +92,6 @@ object TraceV2Parser {
                     val source = strictString(record, "source")
                     val utc = optionalStrictLong(record, "measurement_utc_epoch_ms")
                     if (utc != null && utc <= 0L) fail("TIME_ALIGNMENT_FAILED", "UTC 측정 시각이 잘못되었습니다.")
-                    if (utc != null && previousUtc != null && utc < previousUtc!!) {
-                        fail("TIME_ALIGNMENT_FAILED", "UTC 측정 시각이 역순입니다.")
-                    }
 
                     when (recordType) {
                         "position_sample" -> {
@@ -102,7 +100,10 @@ object TraceV2Parser {
                             val filtered = optionalPoint(record, "filtered_position")
                             val matched = optionalPoint(record, "matched_position")
                             if (utc != null) {
-                                samples += TraceSample(sequence, utc, measurementElapsed, source, raw, filtered, matched)
+                                samples += TraceSample(
+                                    sequence, utc, measurementElapsed, source, raw, filtered, matched,
+                                    routeMatchEvaluated = optionalBoolean(record, "route_match_evaluated") ?: (source == "gnss"),
+                                )
                             }
                         }
                         "checkpoint_mark" -> {
@@ -111,7 +112,7 @@ object TraceV2Parser {
                         }
                         else -> fail("TRACE_RECORD_UNSUPPORTED", "trace v2에 알 수 없는 레코드가 있습니다.")
                     }
-                    if (utc != null) previousUtc = utc
+                    if (utc != null) utcAnchors += MeasurementUtcAnchor(measurementElapsed, utc)
                     previousSequence = sequence
                     previousElapsed = elapsed
                     updateDigest(digest, line)
@@ -131,11 +132,13 @@ object TraceV2Parser {
         if (actualHash != expectedHash) fail("TRACE_HASH_MISMATCH", "WalkSafe 기록의 내용 해시가 맞지 않습니다.")
         if (samples.isEmpty()) fail("INSUFFICIENT_REFERENCE", "GNSS에 연결된 UTC 위치가 필요합니다.")
 
-        val offsetsMs = samples.map { it.utcEpochMs - it.elapsedRealtimeNs / 1_000_000.0 }
+        // Check the original sealed timestamps before deriving millisecond-normalized join times.
+        val offsetsMs = utcAnchors.map { it.utcEpochMs - it.elapsedRealtimeNs / 1_000_000.0 }
         val spread = offsetsMs.maxOrNull()!! - offsetsMs.minOrNull()!!
         if (spread > MAX_OFFSET_SPREAD_MS) {
             fail("TIME_ALIGNMENT_FAILED", "UTC와 단조 시각의 차이가 100ms 넘게 흔들립니다.")
         }
+        val normalizedUtcByMeasurement = normalizeMeasurementUtc(utcAnchors)
         val centerPoints = samples.mapNotNull(TraceSample::filtered).ifEmpty {
             samples.mapNotNull(TraceSample::raw)
         }
@@ -143,7 +146,43 @@ object TraceV2Parser {
             fail("INSUFFICIENT_REFERENCE", "기준국 선택에는 GNSS 시각에 연결된 filtered 또는 raw 위치가 필요합니다.")
         }
         val center = robustMedianPoint(centerPoints)
-        return TraceSession(samples, samples.first().utcEpochMs, samples.last().utcEpochMs, center, spread)
+        // Exact measurement ties retain receipt order, including replay corrections of the same state.
+        val chronologicalSamples = samples.map { sample ->
+            sample.copy(utcEpochMs = normalizedUtcByMeasurement.getValue(sample.elapsedRealtimeNs))
+        }.sortedWith(
+            compareBy<TraceSample> { it.utcEpochMs }.thenBy { it.elapsedRealtimeNs }.thenBy { it.sequence },
+        )
+        return TraceSession(
+            chronologicalSamples,
+            chronologicalSamples.first().utcEpochMs,
+            chronologicalSamples.last().utcEpochMs,
+            center,
+            spread,
+        )
+    }
+
+    private data class MeasurementUtcAnchor(val elapsedRealtimeNs: Long, val utcEpochMs: Long)
+
+    /**
+     * Nanosecond measurements may round to neighboring UTC milliseconds after GNSS reanchoring.
+     * Equal measurements share one derived UTC; a reversal may move forward by at most 1ms from
+     * every original timestamp. Comparing with the prior derived time prevents cumulative drift
+     * from being hidden by repeated 1ms clamps. Sealed input bytes and coordinates are untouched.
+     */
+    private fun normalizeMeasurementUtc(anchors: List<MeasurementUtcAnchor>): Map<Long, Long> {
+        val normalized = mutableMapOf<Long, Long>()
+        var previousDerivedUtc: Long? = null
+        for ((measurementNs, group) in anchors.groupBy { it.elapsedRealtimeNs }.toSortedMap()) {
+            val minimumUtc = group.minOf { it.utcEpochMs }
+            val maximumUtc = group.maxOf { it.utcEpochMs }
+            val derivedUtc = maxOf(maximumUtc, previousDerivedUtc ?: maximumUtc)
+            if (derivedUtc - minimumUtc > MAX_UTC_QUANTIZATION_MS) {
+                fail("TIME_ALIGNMENT_FAILED", "측정 UTC 시각의 역행 또는 동일 측정 시각 차이가 1ms를 넘습니다.")
+            }
+            normalized[measurementNs] = derivedUtc
+            previousDerivedUtc = derivedUtc
+        }
+        return normalized
     }
 
     private fun validateHeader(record: JSONObject) {
@@ -180,6 +219,7 @@ object TraceV2Parser {
             else -> fail("TRACE_SOURCE_INVALID", "position_sample source가 잘못되었습니다.")
         }
         if ((utc != null) != carriesUtc) fail("TRACE_SOURCE_INVALID", "source와 UTC 측정 시각이 일치하지 않습니다.")
+        optionalBoolean(record, "route_match_evaluated")
         optionalFinite(record, "accuracy_m", 0.0, null)
         optionalFinite(record, "speed_mps", 0.0, null)
         optionalFinite(record, "bearing_deg", 0.0, 360.0)
@@ -368,6 +408,7 @@ object TraceV2Parser {
     private val POSITION_REQUIRED_KEYS =
         setOf("record_type", "seq", "elapsed_realtime_ns", "measurement_elapsed_realtime_ns", "source")
     private val POSITION_KEYS = POSITION_REQUIRED_KEYS + setOf(
+        "route_match_evaluated",
         "measurement_utc_epoch_ms", "raw_position", "filtered_position", "matched_position", "accuracy_m",
         "speed_mps", "bearing_deg", "gnss", "step_profile", "heading", "stationary",
     )

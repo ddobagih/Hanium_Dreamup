@@ -38,7 +38,7 @@ object AndroidRiskSelectionPolicy {
 
     private fun reportableDamageOutputs(outputs: List<TrackedObjectDepth>): List<TrackedObjectDepth> {
         return outputs.filter { output ->
-            output.className == AndroidReportCandidatePolicy.DAMAGED_TACTILE_BLOCK &&
+            AndroidReportCandidatePolicy.isReportableDamageClass(output.className) &&
                 output.source.metric &&
                 output.confidence.finalScore >= REPORT_MIN_DEPTH_CONFIDENCE
         }

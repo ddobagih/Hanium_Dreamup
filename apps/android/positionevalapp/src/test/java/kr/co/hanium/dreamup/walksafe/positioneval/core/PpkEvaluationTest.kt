@@ -81,6 +81,70 @@ class PpkEvaluationTest {
     }
 
     @Test
+    fun filteredCorrectionAtSameTimePreservesRawAndUsesLatestValueForItsOwnChannel() {
+        val start = 1_735_787_045_000L
+        val samples = (0..30).flatMap { index ->
+            val at = start + index * 1_000L
+            listOf(
+                sample(index * 2, at, POINT).copy(filtered = GeoPoint(37.001, 127.0)),
+                sample(index * 2 + 1, at, null).copy(
+                    measurementTimeSource = "sensor_gnss_anchored",
+                    routeMatchEvaluated = false,
+                    raw = null,
+                ),
+            )
+        }
+
+        val result = evaluateSamples(samples, start)
+
+        assertEquals(EvaluationStatus.EVALUATED, result.status)
+        PositionChannel.entries.forEach { channel ->
+            val metrics = result.metrics.single { it.channel == channel }
+            assertEquals(31, metrics.availableCount)
+            assertEquals(0.0, requireNotNull(metrics.maxErrorM), 0.001)
+        }
+    }
+
+    @Test
+    fun rawChannelUsesNoFutureSampleAndExpiresAtItsOwnTwoSecondAge() {
+        val start = 1_735_787_045_000L
+        val samples = (0..30).map { index ->
+            sample(index, start + index * 1_000L, null).copy(
+                measurementTimeSource = if (index == 1) "gnss" else "sensor_gnss_anchored",
+                routeMatchEvaluated = index == 1,
+                raw = POINT.takeIf { index == 1 },
+            )
+        }
+
+        val result = evaluateSamples(samples, start)
+
+        assertEquals(3, result.metrics.single { it.channel == PositionChannel.RAW }.availableCount)
+        assertEquals(31, result.metrics.single { it.channel == PositionChannel.FILTERED }.availableCount)
+        assertEquals(0, result.metrics.single { it.channel == PositionChannel.MATCHED }.availableCount)
+    }
+
+    @Test
+    fun unmatchedGnssInvalidatesPriorMatchEvenWhenFollowedByFilteredOnlyCorrection() {
+        val start = 1_735_787_045_000L
+        val samples = (0..30).flatMap { index ->
+            val at = start + index * 1_000L
+            listOf(
+                sample(index * 2, at, POINT.takeIf { index < 10 }),
+                sample(index * 2 + 1, at, null).copy(
+                    measurementTimeSource = "sensor_gnss_anchored",
+                    routeMatchEvaluated = false,
+                    raw = null,
+                ),
+            )
+        }
+
+        val result = evaluateSamples(samples, start)
+
+        assertEquals(10, result.metrics.single { it.channel == PositionChannel.MATCHED }.availableCount)
+        assertEquals(31, result.metrics.single { it.channel == PositionChannel.RAW }.availableCount)
+    }
+
+    @Test
     fun noFixedTruthAndForgedFixedCountFailClosed() {
         val start = 1_735_787_045_000L
         val samples = (0..30).map { index -> sample(index, start + index * 1_000L, POINT) }
@@ -124,6 +188,14 @@ class PpkEvaluationTest {
     )
 
     private fun epoch(utc: Long, quality: Int) = PpkEpoch(utc, POINT, 10.0, quality, 15, 0.1, 0.1, 5.0)
+
+    private fun evaluateSamples(samples: List<TraceSample>, start: Long): EvaluationOutcome {
+        val epochs = (0..30).map { index -> epoch(start + index * 1_000L, 1) }
+        return PositionEvaluator.evaluate(
+            TraceSession(samples, start, start + 30_000L, POINT, 0.0),
+            ParsedPpk("UTC", epochs, epochs.size),
+        )
+    }
 
     private companion object { val POINT = GeoPoint(37.0, 127.0) }
 }

@@ -180,6 +180,36 @@ class HandsFreeVoiceIntegrationStaticTest {
     }
 
     @Test
+    fun homeWakeCommandUsesTheSameHandlerWithoutStartingASecondRecording() {
+        val home = functionBlock("private fun refreshForegroundHomeWakeListening")
+        val available = home.substringAfter("result.availability == VoskWakePhraseProbeAvailability.AVAILABLE")
+            .substringBefore("// A passive render")
+        val acknowledgement = functionBlock("private fun acknowledgeForegroundHomeWake")
+        val command = acknowledgement.substringAfter("} else {")
+        assertTrue(acknowledgement.contains("if (command == null)"))
+        assertTrue(acknowledgement.contains("startVoiceCommandRecognition()"))
+        assertTrue(command.contains("handleVoiceCommandPhrases("))
+        assertTrue(command.contains("phrases = listOf(command.text)"))
+        assertTrue(command.contains("confidenceScores = floatArrayOf(command.confidence ?: Float.NaN)"))
+        assertTrue(command.contains("includeRecognizedTextInStatus = false"))
+        assertTrue(command.contains("resultBackend = OfflineSpeechEngine.VOSK"))
+        assertFalse(command.contains("startVoiceCommandRecognition()"))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            available,
+            "cancelForegroundHomeWakeListening()",
+            "acknowledgeForegroundHomeWake(result.commandTranscript)",
+        ))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            acknowledgement,
+            "showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)",
+            "val isCurrent =",
+            "player.play",
+            "if (!isCurrent()) return@play",
+            "if (command == null)",
+        ))
+    }
+
+    @Test
     fun staleStartupAndTerminalErrorsCannotLeaveAFalseListeningService() {
         val controller = File(
             "src/main/java/kr/co/hanium/dreamup/walksafe/voice/HandsFreeVoiceController.kt",
@@ -295,19 +325,55 @@ class HandsFreeVoiceIntegrationStaticTest {
     }
 
     @Test
-    fun wakePhraseImmediatelySignalsCommandListeningWithHapticAndLiveStatus() {
+    fun automaticVoicePageCanRecoverWithoutTakingOverAnExplicitButtonCapture() {
+        val start = functionBlock("private fun maybeStartHandsFreeVoiceService")
+        val automaticPage = functionBlock("private fun handleHandsFreeVoiceCommandListeningStarted")
+        val manualPage = functionBlock("private fun showNativeUiPage")
+        val capture = functionBlock("private fun startVoiceCommandRecognition")
+        val stop = functionBlock("private fun stopHandsFreeVoiceService")
+        val close = functionBlock("private fun closeHandsFreeVoice")
+
+        assertTrue(start.replace(Regex("\\s+"), "").contains(
+            "(nativeUiPage==NativeUiPage.VOICE_COMMAND&&!handsFreeVoiceOwnsCommandPage)",
+        ))
+        assertTrue(start.contains("voiceCommandPromptPending"))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            automaticPage,
+            "handsFreeVoiceOwnsCommandPage = true",
+            "showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)",
+        ))
+        assertTrue(manualPage.contains("handsFreeVoiceOwnsCommandPage = false"))
+        assertTrue(capture.contains("handsFreeVoiceOwnsCommandPage = false"))
+        assertTrue(close.contains("handsFreeVoiceOwnsCommandPage = false"))
+        assertFalse(stop.contains("handsFreeVoiceOwnsCommandPage = false"))
+        assertTrue(start.contains("!isWalkSessionRuntimeActive()"))
+        assertTrue(start.contains("isHandsFreeVoiceDisclosureAccepted()"))
+        assertTrue(start.contains("!hasRecordAudioPermission()"))
+    }
+
+    @Test
+    fun wakeAcknowledgementFinishesBeforeCommandListeningWithHapticAndLiveStatus() {
         val controller = File(
             "src/main/java/kr/co/hanium/dreamup/walksafe/voice/HandsFreeVoiceController.kt",
         ).readText()
         val openWindow = functionBlockFrom(controller, "private fun openCommandWindow")
+        val acknowledgeWake = functionBlockFrom(controller, "private fun acknowledgeWake")
         val callback = functionBlock("private fun handleHandsFreeVoiceCommandListeningStarted")
 
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 openWindow,
-                "stateMachine.onWakeWordDetected",
+                "stateMachine.onWakeAcknowledgementFinished",
                 "runCatching(onCommandListeningStarted)",
                 "scheduleCommandTimeout",
+            ),
+        )
+        assertTrue(
+            ReportStaticSourceInspector.appearsInOrder(
+                acknowledgeWake,
+                "stateMachine.onWakeWordDetected",
+                "wakeAcknowledgementPlayer.play",
+                "openCommandWindow(acknowledging.generation, runId, command, confidence)",
             ),
         )
         assertTrue(callback.contains("playVoiceListeningStartVibration()"))

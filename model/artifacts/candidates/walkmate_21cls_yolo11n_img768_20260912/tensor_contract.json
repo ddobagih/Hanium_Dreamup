@@ -1,0 +1,96 @@
+{
+  "inputs": [
+    {
+      "name": "images",
+      "shape": [
+        1,
+        768,
+        768,
+        3
+      ],
+      "dtype": "FLOAT32"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Identity",
+      "shape": [
+        1,
+        25,
+        12096
+      ],
+      "dtype": "FLOAT32"
+    }
+  ],
+  "operator_count": 366,
+  "opcodes": [
+    {
+      "op": "PAD",
+      "version": 1
+    },
+    {
+      "op": "CONV_2D",
+      "version": 6
+    },
+    {
+      "op": "LOGISTIC",
+      "version": 1
+    },
+    {
+      "op": "MUL",
+      "version": 1
+    },
+    {
+      "op": "STRIDED_SLICE",
+      "version": 1
+    },
+    {
+      "op": "ADD",
+      "version": 1
+    },
+    {
+      "op": "CONCATENATION",
+      "version": 1
+    },
+    {
+      "op": "MAX_POOL_2D",
+      "version": 1
+    },
+    {
+      "op": "TRANSPOSE",
+      "version": 1
+    },
+    {
+      "op": "RESHAPE",
+      "version": 1
+    },
+    {
+      "op": "SPLIT",
+      "version": 1
+    },
+    {
+      "op": "FULLY_CONNECTED",
+      "version": 1
+    },
+    {
+      "op": "PACK",
+      "version": 1
+    },
+    {
+      "op": "SOFTMAX",
+      "version": 1
+    },
+    {
+      "op": "RESIZE_NEAREST_NEIGHBOR",
+      "version": 3
+    },
+    {
+      "op": "DEPTHWISE_CONV_2D",
+      "version": 1
+    },
+    {
+      "op": "SUB",
+      "version": 1
+    }
+  ]
+}

@@ -2,17 +2,20 @@
 <resources>
     <string name="app_name">WalkSafe 위치 정답지</string>
     <string name="title">위치 테스트 정답지</string>
-    <string name="intro">같은 테스트에서 저장한 WalkSafe 위치 기록과 GnssLogger 원시 기록을 선택하세요. 앱이 가까운 기준국 자료를 찾아 정답 위치를 계산할 준비를 합니다.</string>
+    <string name="intro">같은 테스트의 WalkSafe trace와 GNSS Raw TXT를 선택하세요. 야외 테스트에서 함께 저장한 두 파일 또는 같은 시간대의 GnssLogger TXT를 사용할 수 있습니다. 홈페이지에서 받은 기준국 파일이 있으면 다운로드 키 없이 분석할 수 있습니다.</string>
     <string name="key_label">국토지리정보원 다운로드 키</string>
     <string name="key_hint">키는 이 기기의 보안 저장소로 보호되며 결과 JSON에는 들어가지 않습니다.</string>
     <string name="save_key">키 안전하게 저장</string>
     <string name="select_trace">1. WalkSafe trace v2 선택</string>
-    <string name="select_gnss">2. GnssLogger TXT 선택</string>
-    <string name="start_analysis">3. 자동 분석 시작</string>
+    <string name="select_gnss">2. GNSS Raw TXT 선택 (야외 테스트·GnssLogger)</string>
+    <string name="start_analysis">키로 기준국 자동 다운로드·분석</string>
+    <string name="select_base">3. 홈페이지에서 받은 기준국 파일 선택</string>
+    <string name="base_empty">기준국: 선택 안 됨\n테스트 날짜·시간의 같은 기준국 Hourly RINEX2 관측(O)·GPS 항법(N)을 함께 선택하세요. ZIP 또는 .Z/.gz/압축 없는 파일을 여러 개 고를 수 있습니다. 파일 선택 화면에서 길게 눌러 다중선택하세요. trace를 먼저 선택해야 합니다.</string>
+    <string name="start_manual_analysis">4. 선택 파일로 분석 (키 불필요)</string>
     <string name="export_result">진단·결과 JSON 저장</string>
     <string name="clear_private_data">가져온 기록과 다운로드 키 삭제</string>
     <string name="trace_empty">WalkSafe 기록: 선택 안 됨</string>
-    <string name="gnss_empty">GnssLogger 기록: 선택 안 됨</string>
+    <string name="gnss_empty">GNSS Raw TXT: 선택 안 됨 (야외 테스트 또는 GnssLogger)</string>
     <string name="status_ready">입력 파일을 선택해 주세요.</string>
     <string name="truth_notice">정답이 부족하면 점수를 0으로 표시하지 않습니다. 충분한 PPK FIX가 없으면 ‘정답 부족’으로 끝납니다.</string>
 </resources>

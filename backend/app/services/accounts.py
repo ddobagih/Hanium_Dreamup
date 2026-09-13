@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from email.message import EmailMessage
+from email.utils import formatdate, make_msgid
 import hashlib
 import hmac
 import json
@@ -444,6 +445,8 @@ class SmtpOtpSender:
         message["From"] = self.from_address
         message["To"] = recipient
         message["Subject"] = "WalkSafe account verification code"
+        message["Date"] = formatdate(usegmt=True)
+        message["Message-ID"] = make_msgid(domain=self.from_address.rsplit("@", 1)[1])
         minutes = max(1, (expires_in_seconds + 59) // 60)
         message.set_content(
             "Your WalkSafe verification code is "

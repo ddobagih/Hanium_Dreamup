@@ -18,6 +18,29 @@ enum class DeviceCheckLocationFixReason {
     ACCURACY_OUTSIDE_FUNCTIONAL_RANGE,
     FUTURE_TIMESTAMP,
     STALE,
+    LOCATION_SERVICE_OFF,
+    PROVIDER_DISABLED,
+    NO_FIX_RECEIVED,
+}
+
+/** Observed no-fix conditions; provider state does not identify a vendor-specific setting. */
+enum class DeviceCheckLocationFixUnavailability(
+    val reason: DeviceCheckLocationFixReason,
+    val userActionKo: String,
+) {
+    LOCATION_SERVICE_OFF(
+        DeviceCheckLocationFixReason.LOCATION_SERVICE_OFF,
+        "휴대전화 설정에서 위치를 켠 뒤 다시 점검하세요.",
+    ),
+    PROVIDER_DISABLED(
+        DeviceCheckLocationFixReason.PROVIDER_DISABLED,
+        "사용 가능한 위치 제공자를 확인하지 못했습니다. 휴대전화의 위치 서비스 설정을 확인하고 " +
+            "창가나 실외에서 다시 점검하세요.",
+    ),
+    NO_FIX_RECEIVED(
+        DeviceCheckLocationFixReason.NO_FIX_RECEIVED,
+        "위치 신호를 받지 못했습니다. 창가나 실외에서 다시 점검하세요.",
+    ),
 }
 
 data class DeviceCheckLocationFixDecision(
@@ -27,10 +50,14 @@ data class DeviceCheckLocationFixDecision(
     val ageMs: Long,
 )
 
-/** Functional fused-location proof; the stricter walking-quality gate remains separate. */
+/**
+ * Checks a current location fix against the supported environment's 15 m uncertainty limit.
+ * Android's reported accuracy is an uncertainty estimate, not a measured positioning error;
+ * the runtime walking-quality assessment remains separate.
+ */
 object DeviceCheckLocationFixPolicy {
     const val MAX_AGE_MS = 30_000L
-    const val MAX_ACCURACY_METERS = 100f
+    const val MAX_ACCURACY_METERS = 15f
 
     fun evaluate(observation: DeviceCheckLocationFixObservation): DeviceCheckLocationFixDecision {
         val ageMs = observation.nowElapsedRealtimeMs - observation.observedAtElapsedRealtimeMs
@@ -58,6 +85,16 @@ object DeviceCheckLocationFixPolicy {
     }
 
     fun passes(observation: DeviceCheckLocationFixObservation): Boolean = evaluate(observation).passed
+
+    /** Used only when no fix was delivered, rather than replacing a rejected fix's reason. */
+    fun unavailable(
+        cause: DeviceCheckLocationFixUnavailability,
+    ): DeviceCheckLocationFixDecision = DeviceCheckLocationFixDecision(
+        passed = false,
+        reason = cause.reason,
+        accuracyMeters = null,
+        ageMs = 0L,
+    )
 
     /** Rejects any mock sample in a delivered batch before selecting the freshest pass. */
     fun selectBatch(

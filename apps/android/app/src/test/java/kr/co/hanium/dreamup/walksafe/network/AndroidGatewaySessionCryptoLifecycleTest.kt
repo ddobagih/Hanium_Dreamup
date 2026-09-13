@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.network
 
 import android.content.SharedPreferences
+import java.util.Base64
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
@@ -29,6 +30,164 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AndroidGatewaySessionCryptoLifecycleTest {
+    @Test
+    fun passwordLoginSurvivesStoreRecreationWithoutGrantingUnverifiedAccess() {
+        val fixture = Fixture("password-restart")
+        val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
+        val session = backendSession(deviceId)
+        val firstRun = backendFirstRun()
+
+        assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().saveBackendDeviceIfAbsent(
+            session, firstRun, GATEWAY_ORIGIN, NOW_EPOCH_MS,
+        ))
+        val encrypted = fixture.preferences.getString(BACKEND_DEVICE_PREF_KEY, null).orEmpty()
+        assertFalse(encrypted.contains(BACKEND_ACTOR_ID))
+        assertFalse(encrypted.contains(deviceId))
+        assertFalse(encrypted.contains("walksafe_field_session"))
+
+        val restored = requireNotNull(fixture.store().restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        assertEquals(GatewaySessionVerificationState.RESTORED_UNVERIFIED, restored.session.verificationState)
+        assertEquals(BACKEND_ACTOR_ID, restored.firstRunSnapshot.verifiedActorBinding?.value)
+        assertEquals(firstRun.stage, restored.firstRunSnapshot.stage)
+        assertFalse(restored.session.isUsableFor(BACKEND_ACTOR_ID, NOW_EPOCH_MS))
+        assertFalse(restored.session.isLongLived)
+        assertFalse(fixture.store().isStorageBlocked())
+    }
+
+    @Test
+    fun completedPasswordOnboardingReceiptsSurviveStoreRecreation() {
+        val fixture = Fixture("password-complete")
+        val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
+        val completed = completedReturningEmailFirstRun(BACKEND_ACTOR_ID)
+        assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().saveBackendDeviceIfAbsent(
+            backendSession(deviceId), completed, GATEWAY_ORIGIN, NOW_EPOCH_MS,
+        ))
+        val restored = requireNotNull(fixture.store().restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        assertTrue(restored.firstRunSnapshot.isComplete)
+        assertEquals(completed.completedReceiptHashes, restored.firstRunSnapshot.completedReceiptHashes)
+        assertEquals(BACKEND_ACTOR_ID, restored.firstRunSnapshot.reporterActorBinding?.value)
+        assertFalse(restored.session.isUsableFor(BACKEND_ACTOR_ID, NOW_EPOCH_MS))
+    }
+
+    @Test
+    fun passwordOnboardingProgressCommitsWithoutAllowingStaleOrDeletedLoginWrites() {
+        val fixture = Fixture("password-progress")
+        val store = fixture.store()
+        val deviceId = requireNotNull(store.getOrCreateInstallDeviceId())
+        val session = backendSession(deviceId)
+        val initial = backendFirstRun(epoch = 10L)
+        val version = requireNotNull(session.versionOrNull)
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
+            session, initial, GATEWAY_ORIGIN, NOW_EPOCH_MS,
+        ))
+        val completed = completedReturningEmailFirstRun(BACKEND_ACTOR_ID)
+        assertEquals(GatewaySessionStoreResult.COMMITTED,
+            store.updateBackendDeviceFirstRunSnapshot(version, completed))
+        assertTrue(store.restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS)?.firstRunSnapshot?.isComplete == true)
+        assertEquals(GatewaySessionStoreResult.STALE,
+            store.updateBackendDeviceFirstRunSnapshot(version, initial))
+        assertEquals(GatewaySessionStoreResult.STALE,
+            store.updateBackendDeviceFirstRunSnapshot(version.copy(rotation = version.rotation + 1), completed))
+        assertEquals(GatewaySessionStoreResult.STALE,
+            store.updateBackendDeviceFirstRunSnapshot(version, completedReturningEmailFirstRun()))
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.removeBackendDeviceIfCurrent(version))
+        assertEquals(GatewaySessionStoreResult.NOT_FOUND,
+            store.updateBackendDeviceFirstRunSnapshot(version, completed))
+        assertNull(store.restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+    }
+
+    @Test
+    fun stalePasswordSessionCleanupCannotRemoveANewerLogin() {
+        val fixture = Fixture("password-cas")
+        val store = fixture.store()
+        val deviceId = requireNotNull(store.getOrCreateInstallDeviceId())
+        val first = backendSession(deviceId)
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
+            first, backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS,
+        ))
+        val firstVersion = requireNotNull(first.versionOrNull)
+        val second = backendSession(deviceId, sessionId = "j".repeat(43))
+        assertEquals(GatewaySessionStoreResult.STALE, store.saveBackendDeviceIfAbsent(
+            second, backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS,
+        ))
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.removeBackendDeviceIfCurrent(firstVersion))
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
+            second, backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS,
+        ))
+        assertEquals(GatewaySessionStoreResult.STALE, store.removeBackendDeviceIfCurrent(firstVersion))
+        assertEquals(second.versionOrNull, store.restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS)?.version)
+    }
+
+    @Test
+    fun passwordSessionExpiryAndExplicitLogoutStayRemovedAfterRestart() {
+        val fixture = Fixture("password-expiry")
+        val store = fixture.store()
+        val deviceId = requireNotNull(store.getOrCreateInstallDeviceId())
+        val session = backendSession(deviceId)
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
+            session, backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS,
+        ))
+        assertNull(fixture.store().restoreBackendDevice(GATEWAY_ORIGIN, session.expiresAtEpochMs))
+        assertFalse(fixture.preferences.contains(BACKEND_DEVICE_PREF_KEY))
+        assertFalse(store.isStorageBlocked())
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
+            session, backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS,
+        ))
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.removeBackendDeviceIfCurrent(
+            requireNotNull(session.versionOrNull),
+        ))
+        assertNull(fixture.store().restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        assertEquals(deviceId, store.getOrCreateInstallDeviceId())
+    }
+
+    @Test
+    fun passwordSessionOriginMismatchFailsClosedAndAccountDeletionPurgesIt() {
+        val fixture = Fixture("password-binding")
+        val store = fixture.store()
+        val deviceId = requireNotNull(store.getOrCreateInstallDeviceId())
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
+            backendSession(deviceId), backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS,
+        ))
+        assertNull(store.restoreBackendDevice("https://other.example.test", NOW_EPOCH_MS))
+        assertTrue(store.isStorageBlocked())
+        assertFalse(fixture.preferences.contains(BACKEND_DEVICE_PREF_KEY))
+        assertTrue(store.resetInstallationAfterConfirmedAccountDeletion())
+        val newDeviceId = requireNotNull(store.getOrCreateInstallDeviceId())
+        assertNotEquals(deviceId, newDeviceId)
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
+            backendSession(newDeviceId), backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS,
+        ))
+        assertTrue(store.resetInstallationAfterConfirmedAccountDeletion())
+        assertFalse(fixture.preferences.contains(BACKEND_DEVICE_PREF_KEY))
+        assertNull(fixture.store().restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+    }
+
+    private fun backendFirstRun(epoch: Long = 12L): FirstRunOnboardingSnapshot =
+        FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
+            FirstRunOnboardingPolicy.initialEmailAccount(epoch),
+            FirstRunOpaqueActorBinding.fromProvider(BACKEND_ACTOR_ID),
+            receipt(1),
+        ).current
+
+    private fun backendSession(
+        deviceId: String,
+        sessionId: String = "i".repeat(43),
+    ): GatewayFieldSession {
+        val expiresAt = NOW_EPOCH_MS + 60_000L
+        fun base64(value: String): String = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(value.toByteArray(Charsets.UTF_8))
+        val cookie = listOf(
+            "v7", base64(BACKEND_ACTOR_ID), "7", "3", base64(deviceId), "general",
+            (expiresAt / 1_000L).toString(), sessionId, "s".repeat(43),
+        ).joinToString(".")
+        return GatewayFieldSession.backendAccountDeviceSession(
+            GATEWAY_ORIGIN,
+            BackendAccountDeviceCookieBinding(BACKEND_ACTOR_ID, 7L, 3L, deviceId, sessionId, expiresAt),
+            "${GatewayFieldSession.COOKIE_NAME}=$cookie",
+            expiresAt,
+        )
+    }
+
     @Test
     fun confirmedDeletionCreatesANewInstallGenerationWithoutFailClosedMarkers() {
         val fixture = Fixture("happy")
@@ -372,10 +531,10 @@ class AndroidGatewaySessionCryptoLifecycleTest {
             KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
     }
 
-    private fun completedReturningEmailFirstRun(): FirstRunOnboardingSnapshot {
+    private fun completedReturningEmailFirstRun(actorId: String = ACTOR_ID): FirstRunOnboardingSnapshot {
         val loggedIn = FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
             snapshot = FirstRunOnboardingPolicy.initialEmailAccount(10L),
-            actorBinding = FirstRunOpaqueActorBinding.fromProvider(ACTOR_ID),
+            actorBinding = FirstRunOpaqueActorBinding.fromProvider(actorId),
             receiptHash = receipt(1),
         ).current
         val safety = FirstRunOnboardingPolicy.acknowledgePurposeAndSafety(
@@ -471,11 +630,13 @@ class AndroidGatewaySessionCryptoLifecycleTest {
     private companion object {
         const val INSTALL_ID_PREF_KEY = "gateway_install_id_encrypted_v1"
         const val V4_STATE_PREF_KEY = "gateway_login_bundle_encrypted_v4"
+        const val BACKEND_DEVICE_PREF_KEY = "gateway_backend_device_encrypted_v1"
         const val V3_STATE_PREF_KEY = "gateway_login_bundle_encrypted_v3"
         const val FAIL_CLOSED_PREF_KEY = "gateway_login_bundle_fail_closed_v4"
         const val KEY_RESET_PENDING_PREF_KEY = "gateway_key_reset_pending_v1"
         const val GATEWAY_ORIGIN = "https://gateway.example.test"
         const val ACTOR_ID = "actor_0123456789abcdef0123456789abcdef"
+        const val BACKEND_ACTOR_ID = "123e4567-e89b-42d3-a456-426614174000"
         const val NOW_EPOCH_MS = 1_000_000L
         val V3_STATE_AAD =
             "kr.co.hanium.dreamup.walksafe|USER|gateway-session|payload=3"

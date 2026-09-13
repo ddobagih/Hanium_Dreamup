@@ -166,11 +166,28 @@ class MainActivityOfficialEnvironmentStaticTest {
     @Test
     fun runtimeRetrySuppressesOutputsWithoutStoppingMeasurement() {
         val decision = functionBlock("private fun applyOfficialEnvironmentRuntimeDecision(")
+        val measuredFeatures = decision
+            .substringAfter("OfficialEnvironmentRuntimeAction.CONTINUE ->")
+            .substringBefore("OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY ->")
         val retry = decision
             .substringAfter("OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY ->")
             .substringBefore("OfficialEnvironmentRuntimeAction.SAFE_STOP ->")
         val terminal = decision.substringAfter("OfficialEnvironmentRuntimeAction.SAFE_STOP ->")
 
+        assertTrue(measuredFeatures.contains("officialEnvironmentOutputsAllowed = true"))
+        assertTrue(measuredFeatures.contains("decision.unavailableFactors"))
+        assertTrue(measuredFeatures.contains("reportPrivacyConsentSession.cancelActiveCalls()"))
+        assertTrue(measuredFeatures.contains("OfficialEnvironmentFactor.GPS_QUALITY in newlyUnavailable"))
+        assertTrue(measuredFeatures.contains("decision.navigationOutputsAllowed"))
+        assertTrue(measuredFeatures.contains("startNavigationServicesIfNeeded()"))
+        assertTrue(measuredFeatures.contains("scheduleOfficialEnvironmentRuntimeWatchdog(decision.epoch)"))
+        assertFalse(measuredFeatures.contains("officialEnvironmentOutputsAllowed = false"))
+        assertFalse(measuredFeatures.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertFalse(measuredFeatures.contains("cancelActiveRouteRequest()"))
+        assertFalse(measuredFeatures.contains("cancelDestinationSearch()"))
+        assertFalse(measuredFeatures.contains("stopLocationUpdates("))
+        assertFalse(measuredFeatures.contains("stopCameraFallbackSession("))
+        assertFalse(measuredFeatures.contains("stopDepthSession("))
         assertTrue(retry.contains("officialEnvironmentOutputsAllowed = false"))
         assertTrue(retry.contains("reportPrivacyConsentSession.cancelActiveCalls()"))
         assertTrue(retry.contains("scheduleOfficialEnvironmentRuntimeWatchdog"))
@@ -213,12 +230,12 @@ class MainActivityOfficialEnvironmentStaticTest {
         assertFalse(functionBlock("private fun emitFeedbackAction(").contains("speakStatusExplanation("))
         assertTrue(
             functionBlock("private fun isCameraFallbackAdvisoryStillDeliverable(")
-                .contains("officialEnvironmentOutputsAllowed"),
+                .contains("cameraEnvironmentOutputsAllowed()"),
         )
         assertTrue(
             functionBlock("private fun processReportCandidate(")
                 .contains(
-                    "if (!officialEnvironmentOutputsAllowed || !phoneMountingOutputsAllowed)",
+                    "if (!walkSafetyOutputsAllowed())",
                 ),
         )
         val preflightFrame = functionBlock("private fun handleRuntimeMetricPreflightFrame(")
@@ -235,6 +252,31 @@ class MainActivityOfficialEnvironmentStaticTest {
                 "minOf(profile.maximumMeasuredEvidenceAgeMs, evidenceMaximumAgeMs)",
             ),
         )
+    }
+
+    @Test
+    fun runtimeCameraHandoffRevokesCameraEvidenceWithoutStoppingNavigation() {
+        val handoff = functionBlock("private fun beginRuntimeCameraHandoff(")
+
+        assertTrue(handoff.contains("synchronized(phoneMountingObservationLock)"))
+        assertTrue(handoff.contains("officialEnvironmentCameraEvidence = null"))
+        assertTrue(handoff.contains("latestPhoneMountingCameraAssessment = null"))
+        assertTrue(handoff.contains("runtimeCameraQualityGate.reset()"))
+        assertTrue(handoff.contains("phoneMountingOutputsAllowed = false"))
+        assertTrue(handoff.contains("applyCurrentOfficialEnvironmentRuntimeAssessment()"))
+        assertTrue(handoff.contains("generation != runtimeCameraHandoffGeneration"))
+        assertTrue(handoff.contains("!walkSessionLifecycle.isRuntimeEpochCurrent(epoch)"))
+        assertInOrder(
+            handoff.substringAfter("if (!timedOut) return@postDelayed"),
+            "observeOfficialEnvironmentCameraFrame(",
+            "epoch = epoch",
+            "frameAvailable = false",
+        )
+        assertFalse(handoff.contains("officialEnvironmentOutputsAllowed = false"))
+        assertFalse(handoff.contains("officialEnvironmentGpsEvidence = null"))
+        assertFalse(handoff.contains("cancelActiveRouteRequest()"))
+        assertFalse(handoff.contains("cancelDestinationSearch()"))
+        assertFalse(handoff.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
     }
 
     @Test

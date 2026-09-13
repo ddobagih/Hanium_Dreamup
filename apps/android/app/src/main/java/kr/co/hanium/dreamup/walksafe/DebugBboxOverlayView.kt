@@ -2,14 +2,16 @@ package kr.co.hanium.dreamup.walksafe
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.RectF
+import android.os.SystemClock
 import android.view.View
-import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 
 /**
  * Debug-only overlay. [DebugOverlayBox.rectPx] must already be mapped into this View's pixel space;
- * this class deliberately performs no camera, texture or display-rotation transform.
+ * this class deliberately performs no camera, texture or display-rotation transform. Short screen
+ * interpolation smooths detector updates; it is not camera-motion compensation or new evidence.
  */
 class DebugBboxOverlayView(context: Context) : View(context) {
     private val detectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -27,6 +29,12 @@ class DebugBboxOverlayView(context: Context) : View(context) {
         style = Paint.Style.STROKE
         strokeWidth = 4f
     }
+    private val interpolatedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xff40c4ff.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+        pathEffect = DashPathEffect(floatArrayOf(12f, 8f), 0f)
+    }
     private val centerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xffff5252.toInt()
         style = Paint.Style.FILL
@@ -39,43 +47,92 @@ class DebugBboxOverlayView(context: Context) : View(context) {
         color = 0xaa000000.toInt()
         style = Paint.Style.FILL
     }
-    private var boxes: List<DebugBox> = emptyList()
+    private val continuity = DebugOverlayContinuity()
+    private val drawingRect = RectF()
+    private val expireOverlay = Runnable { invalidate() }
+    private var legacySequence = 0L
 
     init {
         setWillNotDraw(false)
     }
 
+    /** Compatibility for diagnostic callers without capture metadata: bounded, without animation. */
     fun updateMapped(boxes: List<DebugOverlayBox>) {
-        this.boxes = boxes.map {
-            DebugBox(
-                bbox = null,
-                rectPx = RectF(it.rectPx),
-                label = it.displayLabel(),
-                best = it.best,
-                held = it.held,
-            )
-        }
+        val nowMs = SystemClock.elapsedRealtime()
+        continuity.clear()
+        continuity.update(
+            boxes = boxes.map { it.toPresentationBox() },
+            sourceFrameId = ++legacySequence,
+            sourceCapturedAtElapsedRealtimeMs = nowMs,
+            nowElapsedRealtimeMs = nowMs,
+            animate = false,
+        )
+        removeCallbacks(expireOverlay)
+        postInvalidateOnAnimation()
+    }
+
+    fun updateMapped(
+        boxes: List<DebugOverlayBox>,
+        sourceFrameId: Long,
+        sourceCapturedAtElapsedRealtimeMs: Long,
+        sourceComplete: Boolean = true,
+        animate: Boolean = true,
+    ) {
+        continuity.update(
+            boxes = boxes.map { it.toPresentationBox() },
+            sourceFrameId = sourceFrameId,
+            sourceCapturedAtElapsedRealtimeMs = sourceCapturedAtElapsedRealtimeMs,
+            nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            sourceComplete = sourceComplete,
+            animate = animate,
+        )
+        removeCallbacks(expireOverlay)
         postInvalidateOnAnimation()
     }
 
     fun clear() {
-        boxes = emptyList()
+        continuity.clear()
+        removeCallbacks(expireOverlay)
         postInvalidateOnAnimation()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w != oldw || h != oldh) clear()
+    }
+
+    override fun onDetachedFromWindow() {
+        continuity.clear()
+        removeCallbacks(expireOverlay)
+        super.onDetachedFromWindow()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (boxes.isEmpty()) return
-        for (box in boxes) {
-            val rect = box.rectPx ?: box.bbox?.toScreenRect(width.toFloat(), height.toFloat()) ?: continue
+        val rendered = continuity.render(SystemClock.elapsedRealtime())
+        for (presentation in rendered.boxes) {
+            val box = presentation.box
+            val rect = drawingRect
+            rect.set(box.rect.left, box.rect.top, box.rect.right, box.rect.bottom)
             val paint = when {
+                presentation.interpolated -> interpolatedPaint
                 box.best -> bestPaint
                 box.held -> heldPaint
                 else -> detectionPaint
             }
             canvas.drawRect(rect, paint)
             canvas.drawCircle(rect.centerX(), rect.centerY(), CENTER_RADIUS, centerPaint)
-            drawLabel(canvas, box.label, rect.left, rect.top)
+            val label = if (presentation.interpolated) "${box.label} · interp" else box.label
+            drawLabel(canvas, label, rect.left, rect.top)
+        }
+        removeCallbacks(expireOverlay)
+        rendered.nextRedrawDelayMs?.let { delayMs ->
+            if (delayMs == 0L) {
+                postInvalidateOnAnimation()
+            } else {
+                // Expire even when detector/camera callbacks stop arriving.
+                postDelayed(expireOverlay, delayMs)
+            }
         }
     }
 
@@ -93,20 +150,13 @@ class DebugBboxOverlayView(context: Context) : View(context) {
         canvas.drawText(label, safeLeft + LABEL_PADDING, baseline, textPaint)
     }
 
-    private fun RectNorm.toScreenRect(screenWidth: Float, screenHeight: Float): RectF {
-        val left = (x * screenWidth).coerceIn(0f, screenWidth)
-        val top = (y * screenHeight).coerceIn(0f, screenHeight)
-        val right = ((x + width) * screenWidth).coerceIn(left, screenWidth)
-        val bottom = ((y + height) * screenHeight).coerceIn(top, screenHeight)
-        return RectF(left, top, right, bottom)
-    }
-
-    private data class DebugBox(
-        val bbox: RectNorm?,
-        val rectPx: RectF? = null,
-        val label: String,
-        val best: Boolean,
-        val held: Boolean = false,
+    private fun DebugOverlayBox.toPresentationBox(): DebugOverlayContinuity.Box = DebugOverlayContinuity.Box(
+        rect = DebugOverlayContinuity.Rect(rectPx.left, rectPx.top, rectPx.right, rectPx.bottom),
+        label = displayLabel(),
+        best = best,
+        className = className,
+        held = held,
+        smoothed = smoothed,
     )
 
     data class DebugOverlayBox(

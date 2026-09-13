@@ -21,7 +21,7 @@ internal data class WalkSessionVoiceDecision(
     val endToken: PendingVoiceEndToken? = null,
 )
 
-/** Exact-phrase, confidence-gated voice policy for reversible walk controls. */
+/** Whole-command, confidence-gated voice policy with shared recognizer phrase normalization. */
 internal class WalkSessionVoiceControlPolicy(
     private val minimumConfidence: Float = DEFAULT_MINIMUM_CONFIDENCE,
 ) {
@@ -46,7 +46,7 @@ internal class WalkSessionVoiceControlPolicy(
         if (!confidence.isFinite() || confidence !in minimumConfidence..1f) {
             return NO_OP_DECISION
         }
-        return when (phrase) {
+        return when (compactVoicePhrase(phrase)) {
             PAUSE_PHRASE -> if (state == WalkSessionState.ACTIVE) {
                 pendingEnd = null
                 WalkSessionVoiceDecision(WalkSessionVoiceAction.PAUSE)
@@ -88,11 +88,11 @@ internal class WalkSessionVoiceControlPolicy(
 
     private companion object {
         const val DEFAULT_MINIMUM_CONFIDENCE = 0.80f
-        const val PAUSE_PHRASE = "보행 일시정지"
-        const val RESUME_PHRASE = "보행 재개"
-        const val REQUEST_END_PHRASE = "보행 종료"
-        const val CONFIRM_END_PHRASE = "보행 종료 확인"
-        const val CANCEL_END_PHRASE = "보행 종료 취소"
+        const val PAUSE_PHRASE = "보행일시정지"
+        const val RESUME_PHRASE = "보행재개"
+        const val REQUEST_END_PHRASE = "보행종료"
+        const val CONFIRM_END_PHRASE = "보행종료확인"
+        const val CANCEL_END_PHRASE = "보행종료취소"
         val CONTROLLABLE_STATES = setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
         val NO_OP_DECISION = WalkSessionVoiceDecision(WalkSessionVoiceAction.NO_OP)
     }

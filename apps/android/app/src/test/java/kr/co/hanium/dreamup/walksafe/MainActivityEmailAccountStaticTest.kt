@@ -46,12 +46,12 @@ class MainActivityEmailAccountStaticTest {
     }
 
     @Test
-    fun loginPublishesBeforeLocalCommitAndCanResumeBoundAdvancedProgress() {
+    fun loginPersistsBeforePublishingAndCanResumeBoundAdvancedProgress() {
         val login = functionBlock("private fun loginEmailAccount(")
         assertTrue(login.contains("gatewaySessionClient.loginWithPassword("))
         assertTrue(login.contains("gatewaySessionStore.getOrCreateInstallDeviceId()"))
         assertTrue(login.contains("deviceId = installationDeviceId"))
-        assertTrue(login.contains("rememberMe = false"))
+        assertTrue(login.contains("rememberMe = true"))
         assertFalse(login.contains("val rememberMe"))
         assertFalse(login.contains("rememberMeOverride"))
         assertFalse(login.contains("accountRememberMeCheck"))
@@ -66,12 +66,80 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(login.contains("restorePriorityUserOnboardingFromPrefs()"))
         assertInOrder(
             login,
+            "gatewaySessionStore.saveBackendDeviceIfAbsent(",
             "GatewaySessionProcessCoordinator.publishVerified(",
             "firstRunOnboardingSnapshot = nextFirstRunSnapshot",
         )
         assertFalse(login.contains("PriorityUserAgeBand.AGE_14_TO_17"))
         assertFalse(login.contains("VERIFIED_SMS"))
         assertFalse(login.contains("LOCAL_CREDENTIAL_PHONE_SUBMISSION"))
+    }
+
+    @Test
+    fun passwordSessionRestoresBeforeLegacyFeatureToggleAndNeedsServerVerification() {
+        val restore = functionBlock("private fun restoreGatewaySessionFromPrefs()")
+        assertInOrder(restore,
+            "gatewaySessionStore.restoreBackendDevice(expectedOrigin)",
+            "restoreBackendDeviceSession(backendDevice, operation)",
+            "if (!BuildConfig.WALKSAFE_LONG_LIVED_LOGIN_ENABLED)",
+        )
+        val backend = functionBlock("private fun restoreBackendDeviceSession(")
+        assertInOrder(backend,
+            "GatewaySessionProcessCoordinator.publishRestoredUnverified(",
+            "gatewaySessionClient.revalidateBackendAccountDeviceSession(",
+            "GatewaySessionProcessCoordinator.publishVerified(",
+        )
+        assertFalse(backend.contains("accountBlockReason()"))
+        assertFalse(backend.contains("stageRestoredGatewayRevocation("))
+        assertTrue(backend.contains("gateway_backend_device_restore_unavailable"))
+        assertTrue(backend.contains("gatewaySessionStore.removeBackendDeviceIfCurrent(restored.version)"))
+    }
+
+    @Test
+    fun pendingPasswordRestoreHasRetryAndExplicitLogoutWithoutNewCredentials() {
+        val login = functionBlock("private fun loginEmailAccount(")
+        assertInOrder(login, "if (backendDeviceRestorePending)", "restoreGatewaySessionFromPrefs()",
+            "GatewayAccountInputPolicy.validEmail(email)")
+        val ui = functionBlock("private fun updateEmailAccountAccessUi(")
+        assertTrue(ui.contains("저장된 로그인 다시 확인"))
+        assertTrue(ui.contains("저장된 로그인 해제"))
+        assertTrue(ui.contains("accountSessionLogoutButton.isEnabled = !verifying"))
+        val rendered = functionBlock("private fun applyNativePreviewPresentation(")
+        assertInOrder(rendered, "show(accountSessionLogoutButton,",
+            "!accountSession.storageBlocked", "!accountSession.deletionRecoveryOnly",
+            "backendDeviceRestorePending ||",
+            "accountSession.session?.sessionScope == GatewaySessionScope.GENERAL")
+        assertFalse(rendered.contains("accountSessionLogoutButton.text =="))
+        val resumed = functionBlock("private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()")
+        assertTrue(resumed.contains("retryPendingBackendDeviceRestore()"))
+        val clear = functionBlock("private fun clearGatewaySession(")
+        assertInOrder(clear, "gatewaySessionStore.removeBackendDeviceIfCurrent(version)",
+            "GatewaySessionProcessCoordinator.publishPendingRevocation(operation)")
+        val progress = functionBlock("private fun onFirstRunOnboardingStateChanged(")
+        assertTrue(progress.contains("gatewaySessionStore.updateBackendDeviceFirstRunSnapshot("))
+    }
+
+    @Test
+    fun featureReadinessLookupKeepsUsableLoginWhileActorAndOnboardingAreStillBinding() {
+        listOf("private fun integratedConsentRefreshSessionOrNull()",
+            "private fun gatewaySessionOrNull(").forEach { marker ->
+            val lookup = functionBlock(marker)
+            assertTrue(lookup.contains("isGatewaySessionReadyForCurrentActor(session)"))
+            assertTrue(lookup.contains("clearExpiredGatewaySessionIfCurrent(session)"))
+            assertFalse(lookup.contains("clearGatewaySession("))
+        }
+        val expiry = functionBlock("private fun clearExpiredGatewaySessionIfCurrent(")
+        assertInOrder(expiry,
+            "session.verificationState != GatewaySessionVerificationState.VERIFIED",
+            "session.isUsableFor(session.actorId)",
+            ") return",
+            "GatewaySessionProcessCoordinator.snapshot()",
+            "clearGatewaySession(",
+            "expectedSession = session",
+            "expectedProcessGeneration = process.generation",
+        )
+        assertFalse(expiry.contains("currentReporterUserId()"))
+        assertFalse(expiry.contains("permissionSessionPolicy"))
     }
 
     @Test

@@ -20,6 +20,7 @@ import kr.co.hanium.dreamup.walksafe.positioneval.core.ExtractedEntry
 import kr.co.hanium.dreamup.walksafe.positioneval.core.GnssLoggerConversionException
 import kr.co.hanium.dreamup.walksafe.positioneval.core.GnssLoggerValidator
 import kr.co.hanium.dreamup.walksafe.positioneval.core.ImportedArtifact
+import kr.co.hanium.dreamup.walksafe.positioneval.core.ManualBaseRinexImporter
 import kr.co.hanium.dreamup.walksafe.positioneval.core.NgiiException
 import kr.co.hanium.dreamup.walksafe.positioneval.core.NgiiFileKeyVault
 import kr.co.hanium.dreamup.walksafe.positioneval.core.NgiiPortalClient
@@ -45,6 +46,8 @@ data class AnalysisSnapshot(
     val keyStored: Boolean = false,
     val traceSummary: String? = null,
     val gnssSummary: String? = null,
+    val manualBaseSummary: String? = null,
+    val manualBaseReady: Boolean = false,
     val status: String = "입력 파일을 선택해 주세요.",
     val busy: Boolean = false,
     val cancelling: Boolean = false,
@@ -53,6 +56,7 @@ data class AnalysisSnapshot(
     val inputsReady: Boolean = false,
 ) {
     val canAnalyze: Boolean get() = inputsReady && keyStored && !busy
+    val canAnalyzeManual: Boolean get() = inputsReady && manualBaseReady && !busy
 }
 
 internal data class BaseRinexInputs(val observations: List<File>, val navigations: List<File>)
@@ -182,7 +186,10 @@ internal object AnalysisStatePolicy {
 }
 
 object AnalysisCoordinator {
-    private data class Inputs(val trace: ImportedArtifact, val traceSession: TraceSession, val gnss: ImportedArtifact)
+    private data class Inputs(
+        val trace: ImportedArtifact, val traceSession: TraceSession, val gnss: ImportedArtifact,
+        val manualBase: List<ImportedArtifact> = emptyList(),
+    )
     private data class AnalysisRun(
         val generation: Long,
         val cancellation: AnalysisCancellation,
@@ -200,6 +207,7 @@ object AnalysisCoordinator {
     private var traceArtifact: ImportedArtifact? = null
     private var traceSession: TraceSession? = null
     private var gnssArtifact: ImportedArtifact? = null
+    private var manualBaseArtifacts = emptyList<ImportedArtifact>()
     private var lastJson: String? = null
     private var activeRun: AnalysisRun? = null
     private val cancellingRuns = mutableSetOf<Long>()
@@ -265,7 +273,98 @@ object AnalysisCoordinator {
         }
     }
 
-    fun startAnalysis() {
+    fun importBaseDocuments(uris: List<Uri>) {
+        val session: TraceSession
+        val old: List<ImportedArtifact>
+        val run: AnalysisRun
+        synchronized(guard) {
+            if (snapshot.busy || snapshot.cancelling) return
+            session = traceSession ?: return
+            old = manualBaseArtifacts
+            manualBaseArtifacts = emptyList()
+            lastJson = null
+            run = AnalysisRun(AnalysisRunGeneration.next(), AnalysisCancellation())
+            activeRun = run
+        }
+        change {
+            it.copy(
+                busy = true, analysisRunning = true, hasResult = false, manualBaseReady = false, manualBaseSummary = null,
+                status = "기준국 파일을 복사하고 관측소·시간·관측·항법 자료를 확인하는 중입니다.",
+            )
+        }
+        val future = worker.submit {
+            val imported = mutableListOf<ImportedArtifact>()
+            val staging = File(evaluatorRoot(requireContext()), "work/manual-check-${UUID.randomUUID()}")
+            var committed = false
+            try {
+                old.forEach { deleteFileChecked(it.file) }
+                if (uris.size !in 1..ManualBaseRinexImporter.MAX_INPUT_FILES) {
+                    throw NgiiException("BASE_DATA_INVALID", "기준국 파일은 1~32개를 선택해 주세요.")
+                }
+                uris.distinct().forEach { uri ->
+                    val remaining = ManualBaseRinexImporter.MAX_INPUT_BYTES - imported.sumOf { it.byteCount }
+                    if (remaining <= 0L) throw NgiiException("BASE_DATA_INVALID", "기준국 입력 전체 크기가 제한을 넘습니다.")
+                    imported += PrivateFileImporter(requireContext()).import(
+                        uri, minOf(PrivateFileImporter.MAX_INPUT_BYTES, remaining), run.cancellation,
+                    )
+                }
+                val prepared = ManualBaseRinexImporter.prepare(imported, session, staging, run.cancellation)
+                run.cancellation.throwIfCancelled()
+                committed = finishBaseImport(
+                    run, imported.toList(),
+                    "기준국 ${prepared.station.code} · 선택 파일 ${imported.size}개\n" +
+                        "관측·항법 ${prepared.rinexEntries.size}개 확인 · 키 없이 분석 가능",
+                    "수동 기준국 자료 확인 완료\n같은 테스트의 GnssLogger TXT를 선택한 뒤 선택 파일로 분석하세요.",
+                )
+            } catch (error: Throwable) {
+                if (error !is AnalysisCancelledException && !run.cancellation.isCancelled()) {
+                    val code = if (error is NgiiException) error.reasonCode else "BASE_DATA_INVALID"
+                    finishBaseImport(run, emptyList(), null, "입력 확인 필요 · $code\n${AnalysisFailurePolicy.publicMessage(code)}")
+                }
+            } finally {
+                val cleanupFailed = runCatching {
+                    deleteTreeChecked(staging)
+                    if (!committed) imported.forEach { deleteFileChecked(it.file) }
+                }.isFailure
+                if (run.cancellation.isCancelled()) {
+                    finishCancellation(run, if (cleanupFailed) "\n임시 사본 삭제 상태를 확인해 주세요." else "")
+                } else if (cleanupFailed) {
+                    change { it.copy(status = it.status + "\n주의: 임시 사본을 완전히 삭제하지 못했습니다.") }
+                }
+            }
+        }
+        run.future = future
+        if (run.cancellation.isCancelled()) future.cancel(true)
+        // A queued Future may be cancelled before its body/finally starts; retire old copies anyway.
+        worker.execute {
+            val failed = runCatching { old.forEach { deleteFileChecked(it.file) } }.isFailure
+            if (run.cancellation.isCancelled()) {
+                finishCancellation(run, if (failed) "\n이전 기준국 사본을 완전히 삭제하지 못했습니다." else "")
+            }
+        }
+    }
+
+    private fun finishBaseImport(
+        run: AnalysisRun, artifacts: List<ImportedArtifact>, summary: String?, message: String,
+    ): Boolean {
+        val next: AnalysisSnapshot
+        val callback: ((AnalysisSnapshot) -> Unit)?
+        synchronized(guard) {
+            if (!acceptsAnalysisCallback(activeRun?.generation, run.generation, run.cancellation.isCancelled())) return false
+            manualBaseArtifacts = artifacts
+            activeRun = null
+            next = snapshot.copy(
+                busy = false, analysisRunning = false, manualBaseReady = artifacts.isNotEmpty(),
+                manualBaseSummary = summary, status = message,
+            )
+            snapshot = next
+            callback = observer.get()
+        }
+        callback?.invoke(next)
+        return true
+    }
+
+    fun startAnalysis(useManualBase: Boolean = false) {
         val inputs: Inputs
         val run: AnalysisRun
         val firstState: AnalysisSnapshot
@@ -274,8 +373,9 @@ object AnalysisCoordinator {
             val trace = traceArtifact
             val session = traceSession
             val gnss = gnssArtifact
-            if (snapshot.busy || trace == null || session == null || gnss == null || !snapshot.keyStored) return
-            inputs = Inputs(trace, session, gnss)
+            if (snapshot.busy || trace == null || session == null || gnss == null) return
+            if (if (useManualBase) manualBaseArtifacts.isEmpty() else !snapshot.keyStored) return
+            inputs = Inputs(trace, session, gnss, if (useManualBase) manualBaseArtifacts.toList() else emptyList())
             val precedingCancellation = activeRun?.cancellation?.isCancelled() == true
             run = AnalysisRun(AnalysisRunGeneration.next(), AnalysisCancellation())
             activeRun = run
@@ -344,7 +444,7 @@ object AnalysisCoordinator {
         if (!begin("가져온 위치 기록과 다운로드 키를 삭제하는 중입니다.")) return
         worker.execute {
             runCatching {
-                val artifacts = synchronized(guard) { listOfNotNull(traceArtifact, gnssArtifact) }
+                val artifacts = synchronized(guard) { listOfNotNull(traceArtifact, gnssArtifact) + manualBaseArtifacts }
                 artifacts.map(ImportedArtifact::file).distinct().forEach(::deleteFileChecked)
                 NgiiFileKeyVault(requireContext()).clear()
                 deleteTreeChecked(evaluatorRoot(requireContext()).resolve("imports"))
@@ -354,6 +454,7 @@ object AnalysisCoordinator {
                     traceArtifact = null
                     traceSession = null
                     gnssArtifact = null
+                    manualBaseArtifacts = emptyList()
                     lastJson = null
                 }
             }.onSuccess {
@@ -367,11 +468,14 @@ object AnalysisCoordinator {
                         traceSession = null
                     }
                     if (!gnssPresent) gnssArtifact = null
+                    manualBaseArtifacts = manualBaseArtifacts.filter { artifact -> artifact.file.isFile }
                     lastJson = null
                     AnalysisSnapshot(
                         keyStored = NgiiFileKeyVault(requireContext()).isStored(),
                         traceSummary = it.traceSummary.takeIf { tracePresent },
                         gnssSummary = it.gnssSummary.takeIf { gnssPresent },
+                        manualBaseReady = false,
+                        manualBaseSummary = "일부 삭제 후에는 기준국 파일을 다시 선택해 주세요.".takeIf { manualBaseArtifacts.isNotEmpty() },
                         status = "처리 실패\n일부 비공개 데이터를 삭제하지 못했습니다.",
                         inputsReady = tracePresent && gnssPresent,
                     )
@@ -397,18 +501,23 @@ object AnalysisCoordinator {
             val conversion = converter.convert(inputs.gnss.file, File(workRoot, "rover"))
             run.cancellation.throwIfCancelled()
 
-            progress(run, "2/6 RINEX 변환 완료\n3/6 가장 가까운 정상 기준국과 시간별 자료를 찾는 중입니다.")
-            val key = runCatching { NgiiFileKeyVault(requireContext()).load() }
-                .getOrElse { throw PipelineException("KEY_NOT_AVAILABLE") }
-            val base = try {
-                NgiiPortalClient(
-                    stationCatalogCache = NgiiStationCatalogCache(
-                        File(evaluatorRoot(requireContext()), "cache/ngii-stations-v1.json"),
-                    ),
-                    cancellation = run.cancellation,
-                ).downloadNearestCompleteBase(inputs.traceSession, key, workRoot)
-            } finally {
-                key.fill('\u0000')
+            val base = if (inputs.manualBase.isNotEmpty()) {
+                progress(run, "2/6 RINEX 변환 완료\n3/6 선택한 기준국 파일의 무결성·시간 범위를 다시 확인하는 중입니다.")
+                ManualBaseRinexImporter.prepare(inputs.manualBase, inputs.traceSession, File(workRoot, "base"), run.cancellation)
+            } else {
+                progress(run, "2/6 RINEX 변환 완료\n3/6 가장 가까운 정상 기준국과 시간별 자료를 찾는 중입니다.")
+                val key = runCatching { NgiiFileKeyVault(requireContext()).load() }
+                    .getOrElse { throw PipelineException("KEY_NOT_AVAILABLE") }
+                try {
+                    NgiiPortalClient(
+                        stationCatalogCache = NgiiStationCatalogCache(
+                            File(evaluatorRoot(requireContext()), "cache/ngii-stations-v1.json"),
+                        ),
+                        cancellation = run.cancellation,
+                    ).downloadNearestCompleteBase(inputs.traceSession, key, File(workRoot, "base"))
+                } finally {
+                    key.fill('\u0000')
+                }
             }
             station = base.station
             downloads = base.downloads
@@ -445,6 +554,7 @@ object AnalysisCoordinator {
                 downloads,
                 parsed,
                 Instant.now(),
+                manualBaseArtifacts = inputs.manualBase.map(AnalysisFailurePolicy::redacted),
             )
             val message = if (outcome.status == EvaluationStatus.TRUTH_INSUFFICIENT) {
                 "정답 부족 · ${outcome.reasonCodes.joinToString(", ")}\n" +
@@ -471,6 +581,7 @@ object AnalysisCoordinator {
                 downloads,
                 Instant.now(),
                 truthInsufficient,
+                manualBaseArtifacts = inputs.manualBase.map(AnalysisFailurePolicy::redacted),
             )
             val category = if (truthInsufficient) "정답 부족" else "처리 실패"
             complete(
@@ -583,6 +694,9 @@ object AnalysisCoordinator {
     }
 
     private fun commitTrace(artifact: ImportedArtifact, session: TraceSession) {
+        val previousBase = synchronized(guard) { manualBaseArtifacts }
+        previousBase.forEach { deleteFileChecked(it.file) }
+        synchronized(guard) { manualBaseArtifacts = emptyList() }
         val old = synchronized(guard) { traceArtifact }
         if (old?.file != null && old.file != artifact.file) deleteFileChecked(old.file)
         synchronized(guard) {
@@ -596,6 +710,7 @@ object AnalysisCoordinator {
         change {
             it.copy(
                 traceSummary = summary, status = "WalkSafe 파일 확인 완료", busy = false, hasResult = false,
+                manualBaseReady = false, manualBaseSummary = null,
                 inputsReady = traceArtifact != null && gnssArtifact != null,
             )
         }

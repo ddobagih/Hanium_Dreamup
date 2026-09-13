@@ -8,6 +8,46 @@ import org.junit.Test
 
 class AndroidVoiceCommandTest {
     @Test
+    fun explicitSettingsCommandsOpenSettings() {
+        listOf("설정", "설정 열어줘", "설정으로 이동").forEach { phrase ->
+            assertEquals(phrase, AndroidVoiceCommand.OpenSettings, parseAndroidVoiceCommand(phrase))
+            assertEquals(
+                phrase, AndroidVoiceAction.OpenSettings,
+                selectAndroidVoiceAction(listOf(phrase), floatArrayOf(0.9f)),
+            )
+        }
+    }
+
+    @Test
+    fun settingsPlaceNamesAndDestinationConfigurationStillSearchForThePlace() {
+        val cases = mapOf(
+            "설정역으로 안내해줘" to "설정역",
+            "설정역 찾아줘" to "설정역",
+            "목적지 서울역 설정해" to "서울역",
+        )
+        cases.forEach { (phrase, query) ->
+            assertEquals(
+                phrase, AndroidVoiceAction.SearchDestination(query),
+                selectAndroidVoiceAction(listOf(phrase), floatArrayOf(0.9f)),
+            )
+        }
+    }
+
+    @Test
+    fun settingsCommandsKeepWholeCommandTopHypothesisAndConfidenceRequirements() {
+        listOf("설정 열지 마", "설정으로 이동하지 마", "설정 열어줘 그리고 신고해줘").forEach { phrase ->
+            assertNull(phrase, parseAndroidVoiceCommand(phrase))
+            assertNull(
+                phrase,
+                selectAndroidVoiceAction(listOf(phrase, "설정"), floatArrayOf(0.9f, 0.99f)),
+            )
+        }
+        listOf(0.3f, -1f, Float.NaN, Float.POSITIVE_INFINITY).forEach { confidence ->
+            assertNull(selectAndroidVoiceAction(listOf("설정", "신고해줘"), floatArrayOf(confidence, 0.99f)))
+        }
+    }
+
+    @Test
     fun parsesReportCommandWithoutChangingTheExistingAction() {
         listOf("신고해줘", "신고해주세요", "여기 신고 접수").forEach { phrase ->
             assertEquals(AndroidVoiceCommand.CreateReport, parseAndroidVoiceCommand(phrase))

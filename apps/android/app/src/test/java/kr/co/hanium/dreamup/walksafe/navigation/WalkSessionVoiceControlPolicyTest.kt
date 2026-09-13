@@ -100,13 +100,47 @@ class WalkSessionVoiceControlPolicyTest {
     }
 
     @Test
-    fun negatedInexactOrLowConfidencePhrasesAreNoOp() {
+    fun recognizerSpacingAndTrailingPunctuationDoNotChangeWholeCommandMeaning() {
+        listOf("보행일시정지", "  보행 일시 정지.  ", "보행\t일시정지!").forEach { phrase ->
+            assertAction(
+                WalkSessionVoiceAction.PAUSE,
+                WalkSessionVoiceControlPolicy().evaluate(phrase, 0.90f, WalkSessionState.ACTIVE, EPOCH_1),
+            )
+        }
+        assertAction(
+            WalkSessionVoiceAction.RESUME,
+            WalkSessionVoiceControlPolicy().evaluate("보행재개?", 0.90f, WalkSessionState.PAUSED, EPOCH_1),
+        )
+        listOf("보행종료", " 보행 종료 ", "보행 종료.").forEach { phrase ->
+            val policy = WalkSessionVoiceControlPolicy()
+            assertAction(
+                WalkSessionVoiceAction.REQUEST_END,
+                policy.evaluate(phrase, 0.90f, WalkSessionState.ACTIVE, EPOCH_1),
+            )
+            assertAction(
+                WalkSessionVoiceAction.CONFIRM_END,
+                policy.evaluate("보행종료확인!", 0.90f, WalkSessionState.ACTIVE, EPOCH_1),
+            )
+        }
+        val cancelled = WalkSessionVoiceControlPolicy()
+        cancelled.evaluate("보행종료", 0.90f, WalkSessionState.PAUSED, EPOCH_1)
+        assertAction(
+            WalkSessionVoiceAction.CANCEL_END,
+            cancelled.evaluate("보행 종료 취소.", 0.90f, WalkSessionState.PAUSED, EPOCH_1),
+        )
+    }
+
+    @Test
+    fun negatedCompoundIncompleteOrLowConfidencePhrasesAreNoOp() {
         val policy = WalkSessionVoiceControlPolicy()
         listOf(
             "보행 종료하지 마" to 0.99f,
-            " 보행 종료" to 0.99f,
-            "보행 종료 " to 0.99f,
-            "보행종료" to 0.99f,
+            "보행 종료 하지 마." to 0.99f,
+            "보행 일시정지하고 보행 종료" to 0.99f,
+            "보행 종료. 확인" to 0.99f,
+            "보행 종료 취소하지 마" to 0.99f,
+            "종료" to 0.99f,
+            "보행" to 0.99f,
             "보행 종료" to 0.79f,
             "보행 종료" to Float.NaN,
             "보행 종료" to 1.01f,

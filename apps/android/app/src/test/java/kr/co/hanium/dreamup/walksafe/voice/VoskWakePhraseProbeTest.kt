@@ -51,6 +51,7 @@ class VoskWakePhraseProbeTest {
 
         assertEquals(VoskWakePhraseProbeAvailability.AVAILABLE, harness.results.single().availability)
         assertNull(harness.results.single().failure)
+        assertNull("Capability checks must not dispatch spoken commands", harness.results.single().commandTranscript)
     }
 
     @Test
@@ -438,6 +439,47 @@ class VoskWakePhraseProbeTest {
         assertTrue(harness.resultCallbacksWereOnMain.single())
         assertEquals(1, harness.stream.stopCount)
         assertEquals(1, harness.stream.closeCount)
+    }
+
+    @Test
+    fun homeHandsOffTrustedFinalCommandOnlyAfterReleasingTheMicrophone() {
+        val harness = ProbeHarness(listenUntilWake = true)
+        harness.probe.start()
+        harness.listener.onReady(137L)
+        harness.dispatcher.runPosted()
+        harness.listener.onTranscript(137L, transcript("길라잡이 서울역으로 안내해줘", 0.93f))
+        harness.listener.onTranscript(137L, transcript("길라잡이 목적지 취소", 0.99f))
+        assertTrue(harness.results.isEmpty())
+        assertEquals(0, harness.stream.stopCount)
+
+        harness.dispatcher.runPosted()
+
+        val result = harness.results.single()
+        assertEquals(transcript("서울역으로 안내해줘", 0.93f), result.commandTranscript)
+        assertTrue(harness.resourcesClosedAtResult.single())
+        assertTrue(harness.resultCallbacksWereOnMain.single())
+        assertEquals(1, harness.stream.stopCount)
+        assertEquals(1, harness.stream.closeCount)
+    }
+
+    @Test
+    fun homeNeverHandsOffPartialLowConfidenceUnaddressedOrCancelledCommands() {
+        val harness = ProbeHarness(listenUntilWake = true)
+        harness.probe.start()
+        harness.listener.onReady(139L)
+        harness.dispatcher.runPosted()
+        harness.listener.onTranscript(139L, transcript("길라잡이 서울역으로 안내해줘", 0.99f, isFinal = false))
+        harness.listener.onTranscript(139L, transcript("길라잡이 서울역으로 안내해줘", 0.59f))
+        harness.listener.onTranscript(139L, transcript("서울역으로 안내해줘", 0.99f))
+        harness.listener.onTranscript(149L, transcript("길라잡이 서울역으로 안내해줘", 0.99f))
+        harness.dispatcher.runPosted()
+        assertTrue(harness.results.isEmpty())
+
+        harness.listener.onTranscript(139L, transcript("길라잡이 서울역으로 안내해줘", 0.99f))
+        harness.probe.cancel()
+        harness.dispatcher.runPosted()
+        assertEquals(VoskWakePhraseProbeFailure.CANCELLED, harness.results.single().failure)
+        assertNull(harness.results.single().commandTranscript)
     }
 
     @Test

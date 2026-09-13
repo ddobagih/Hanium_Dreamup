@@ -75,7 +75,7 @@ class PlatformVoiceCandidatePolicyTest {
         )
         assertEquals(
             PlatformVoiceCandidateDisposition.INVALID_FINAL,
-            assess(List(4) { "도움말" }).disposition,
+            assess(List(4) { "도움말" }, floatArrayOf(0f, 0f, 0f)).disposition,
         )
     }
 

@@ -60,6 +60,7 @@ object WalkSafeEnvironmentProfiles {
             maximumGpsHorizontalAccuracyMeters = 15.0,
             maximumMeasuredEvidenceAgeMs = 10_000L,
             maximumRuntimeRetryAttempts = 2,
+            runtimeRetryIntervalMs = 3_000L,
         ),
         phoneMounting = ApprovedPhoneMountingProfile(
             profileId = "phone-mounting-test-candidate-r001",

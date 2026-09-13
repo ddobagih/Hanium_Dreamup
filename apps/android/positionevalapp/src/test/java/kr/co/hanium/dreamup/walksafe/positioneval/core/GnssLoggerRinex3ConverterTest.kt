@@ -82,6 +82,88 @@ class GnssLoggerRinex3ConverterTest {
     }
 
     @Test
+    fun receiverUptimeLongerThanGpsWeekPreservesTheSameObservations() {
+        val shifted = fixture().readLines().map { line ->
+            if (!line.startsWith("Raw,")) line else line.split(',').toMutableList().also { fields ->
+                val sevenWeeksNanos = 7L * 604_800_000_000_000L
+                fields[2] = (fields[2].toLong() + sevenWeeksNanos).toString()
+                fields[5] = (fields[5].toLong() + sevenWeeksNanos).toString()
+            }.joinToString(",")
+        }
+        val baseline = File(temporaryDirectory(), "baseline.obs")
+        val output = File(temporaryDirectory(), "long-uptime.obs")
+
+        GnssLoggerRinex3Converter.convert(fixture(), baseline, GENERATED_AT)
+        val summary = GnssLoggerRinex3Converter.convert(temporaryLog(shifted), output, GENERATED_AT)
+
+        assertEquals(8, summary.carrierPhaseCount)
+        assertEquals(baseline.readText(), output.readText())
+    }
+
+    @Test
+    fun acceptsNanosecondFullBiasUpdatesBetweenEpochsWithoutInventingDiscontinuity() {
+        val lines = fixture().readLines().map { line ->
+            if (!line.startsWith("Raw,")) line else line.split(',').toMutableList().also { fields ->
+                if (fields[2] == "3499506000000") fields[5] = (fields[5].toLong() + 29L).toString()
+            }.joinToString(",")
+        }
+
+        val summary = GnssLoggerRinex3Converter.convert(
+            temporaryLog(lines), File(temporaryDirectory(), "rover.obs"), GENERATED_AT,
+        )
+
+        assertEquals(8, summary.acceptedMeasurementCount)
+        assertEquals(8, summary.carrierPhaseCount)
+        assertEquals(2, summary.epochCount)
+    }
+
+    @Test
+    fun rejectsLargeUnannouncedClockJumpEvenWhenRecordedUtcFollowsIt() {
+        val lines = fixture().readLines().map { line ->
+            if (!line.startsWith("Raw,")) line else line.split(',').toMutableList().also { fields ->
+                if (fields[2] == "3499506000000") {
+                    fields[5] = (fields[5].toLong() + 1_000_000_000L).toString()
+                    fields[1] = (fields[1].toLong() - 1_000L).toString()
+                }
+            }.joinToString(",")
+        }
+
+        assertReason("CLOCK_BIAS_CHANGED_WITHOUT_DISCONTINUITY", temporaryLog(lines))
+    }
+
+    @Test
+    fun stillRejectsDeviceUtcMismatchWithAContinuousReceiverClock() {
+        assertReason("UTC_GPS_TIME_MISMATCH", mutateRaw(4, 1, "1638904973849"))
+    }
+
+    @Test
+    fun rejectsHundredNanosecondDifferenceInsideAnEpoch() {
+        // Whole-GPS-time Double arithmetic collapses these two corrected times to one value.
+        assertReason("INCONSISTENT_EPOCH", mutateRaw(1, 12, "100.0"))
+    }
+
+    @Test
+    fun retainsSeparateHundredNanosecondEpochsAndExactRinexFractions() {
+        val fixtureLines = fixture().readLines()
+        val firstEpoch = fixtureLines.filter { it.startsWith("Raw,") }.take(4)
+        val nextEpoch = firstEpoch.map { line ->
+            line.split(',').toMutableList().also { fields ->
+                fields[2] = (fields[2].toLong() + 100L).toString()
+                fields[14] = (fields[14].toLong() + 100L).toString()
+            }.joinToString(",")
+        }
+        val input = temporaryLog(fixtureLines.filterNot { it.startsWith("Raw,") } + firstEpoch + nextEpoch)
+        val output = File(temporaryDirectory(), "nanosecond-epochs.obs")
+
+        val summary = GnssLoggerRinex3Converter.convert(input, output, GENERATED_AT)
+        val epochs = output.readLines().filter { it.startsWith("> ") }
+
+        assertEquals(2, summary.epochCount)
+        assertTrue(epochs[0].contains("10.4492394"))
+        assertTrue(epochs[1].contains("10.4492395"))
+    }
+
+    @Test
     fun clockSegmentSuppressesPhaseAndMarksNextValidPhaseWithLli() {
         val lines = fixture().readLines().toMutableList()
         val rawIndices = lines.indices.filter { lines[it].startsWith("Raw,") }

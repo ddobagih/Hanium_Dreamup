@@ -14,16 +14,20 @@ class MainActivity : Activity() {
         private const val REQUEST_TRACE = 10
         private const val REQUEST_GNSS = 11
         private const val REQUEST_EXPORT = 12
+        private const val REQUEST_BASE_RINEX = 13
     }
 
     private lateinit var keyInput: EditText
     private lateinit var keyState: TextView
     private lateinit var traceState: TextView
     private lateinit var gnssState: TextView
+    private lateinit var baseState: TextView
     private lateinit var status: TextView
     private lateinit var saveKeyButton: Button
     private lateinit var selectTraceButton: Button
     private lateinit var selectGnssButton: Button
+    private lateinit var selectBaseButton: Button
+    private lateinit var analyzeManualButton: Button
     private lateinit var analyzeButton: Button
     private lateinit var cancelButton: Button
     private lateinit var exportButton: Button
@@ -40,10 +44,13 @@ class MainActivity : Activity() {
         keyState = findViewById(R.id.keyState)
         traceState = findViewById(R.id.traceState)
         gnssState = findViewById(R.id.gnssState)
+        baseState = findViewById(R.id.baseState)
         status = findViewById(R.id.status)
         saveKeyButton = findViewById(R.id.saveKeyButton)
         selectTraceButton = findViewById(R.id.selectTraceButton)
         selectGnssButton = findViewById(R.id.selectGnssButton)
+        selectBaseButton = findViewById(R.id.selectBaseButton)
+        analyzeManualButton = findViewById(R.id.analyzeManualButton)
         analyzeButton = findViewById(R.id.analyzeButton)
         cancelButton = findViewById(R.id.cancelButton)
         exportButton = findViewById(R.id.exportButton)
@@ -54,6 +61,8 @@ class MainActivity : Activity() {
         saveKeyButton.setOnClickListener { saveKey() }
         selectTraceButton.setOnClickListener { openDocument(REQUEST_TRACE) }
         selectGnssButton.setOnClickListener { openDocument(REQUEST_GNSS) }
+        selectBaseButton.setOnClickListener { openDocument(REQUEST_BASE_RINEX) }
+        analyzeManualButton.setOnClickListener { AnalysisCoordinator.startAnalysis(useManualBase = true) }
         analyzeButton.setOnClickListener { AnalysisCoordinator.startAnalysis() }
         cancelButton.setOnClickListener { AnalysisCoordinator.cancelAnalysis() }
         exportButton.setOnClickListener { createResultDocument() }
@@ -92,7 +101,12 @@ class MainActivity : Activity() {
     private fun openDocument(requestCode: Int) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = if (requestCode == REQUEST_GNSS) "text/plain" else "application/json"
+            type = when (requestCode) {
+                REQUEST_BASE_RINEX -> "*/*"
+                REQUEST_GNSS -> "text/plain"
+                else -> "application/json"
+            }
+            if (requestCode == REQUEST_BASE_RINEX) putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
             putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "application/x-ndjson", "text/plain", "*/*"))
         }
         startActivityForResult(intent, requestCode)
@@ -101,7 +115,16 @@ class MainActivity : Activity() {
     @Deprecated("Activity result API requires an AndroidX dependency that this isolated module does not need.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != RESULT_OK || data?.data == null) return
+        if (resultCode != RESULT_OK || data == null) return
+        if (requestCode == REQUEST_BASE_RINEX) {
+            val uris = buildList {
+                data.data?.let(::add)
+                data.clipData?.let { clip -> for (index in 0 until clip.itemCount) add(clip.getItemAt(index).uri) }
+            }.distinct()
+            if (uris.isNotEmpty()) AnalysisCoordinator.importBaseDocuments(uris)
+            return
+        }
+        if (data.data == null) return
         when (requestCode) {
             REQUEST_TRACE -> AnalysisCoordinator.importDocument(data.data!!, ArtifactKind.TRACE)
             REQUEST_GNSS -> AnalysisCoordinator.importDocument(data.data!!, ArtifactKind.GNSS)
@@ -126,9 +149,12 @@ class MainActivity : Activity() {
         }
         traceState.text = snapshot.traceSummary ?: getString(R.string.trace_empty)
         gnssState.text = snapshot.gnssSummary ?: getString(R.string.gnss_empty)
+        baseState.text = snapshot.manualBaseSummary ?: getString(R.string.base_empty)
         saveKeyButton.isEnabled = !snapshot.busy && !snapshot.cancelling
         selectTraceButton.isEnabled = !snapshot.busy && !snapshot.cancelling
         selectGnssButton.isEnabled = !snapshot.busy && !snapshot.cancelling
+        selectBaseButton.isEnabled = snapshot.traceSummary != null && !snapshot.busy && !snapshot.cancelling
+        analyzeManualButton.isEnabled = snapshot.canAnalyzeManual
         analyzeButton.isEnabled = snapshot.canAnalyze
         cancelButton.isEnabled = snapshot.analysisRunning
         exportButton.isEnabled = snapshot.hasResult && !snapshot.busy

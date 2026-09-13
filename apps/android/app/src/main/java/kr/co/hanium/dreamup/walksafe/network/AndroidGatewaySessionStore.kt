@@ -52,6 +52,7 @@ internal class AndroidGatewaySessionStore(
         firstRunSnapshot: FirstRunOnboardingSnapshot,
         expectedGatewayBaseUrl: String,
     ): GatewaySessionStoreResult = synchronized(PROCESS_LOCK) {
+        if (preferences.contains(BACKEND_DEVICE_PREF_KEY)) return GatewaySessionStoreResult.BLOCKED
         val installDeviceId = runCatching {
             readInstallDeviceIdLocked(createIfMissing = false)
         }.getOrNull() ?: return GatewaySessionStoreResult.BLOCKED
@@ -268,6 +269,228 @@ internal class AndroidGatewaySessionStore(
             reset
         }
 
+    fun isStorageBlocked(): Boolean = synchronized(PROCESS_LOCK) {
+        !reconcileKeyResetLocked() || processStorageBlocked || failClosedMarkerPresentLocked()
+    }
+
+    fun saveBackendDeviceIfAbsent(
+        session: GatewayFieldSession,
+        firstRunSnapshot: FirstRunOnboardingSnapshot,
+        expectedGatewayBaseUrl: String,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): GatewaySessionStoreResult = synchronized(PROCESS_LOCK) {
+        val current = loadStateOrBlockedLocked() ?: return GatewaySessionStoreResult.BLOCKED
+        if (current.state != null) return GatewaySessionStoreResult.BLOCKED
+        val persisted = session.backendDevicePersistenceSnapshotOrNull(nowEpochMs)
+            ?: return GatewaySessionStoreResult.BLOCKED
+        val deviceId = runCatching { readInstallDeviceIdLocked(false) }.getOrNull()
+            ?: return GatewaySessionStoreResult.BLOCKED
+        if (
+            persisted.gatewayBaseUrl != expectedGatewayBaseUrl ||
+            persisted.deviceId != deviceId ||
+            firstRunSnapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ||
+            firstRunSnapshot.verifiedActorBinding?.value != persisted.actorId
+        ) return GatewaySessionStoreResult.BLOCKED
+        val payload = runCatching {
+            encodeBackendDevice(persisted, firstRunSnapshot).also {
+                decodeBackendDevice(it)
+            }
+        }.getOrNull() ?: return GatewaySessionStoreResult.BLOCKED
+        val existing = loadBackendDeviceLocked()
+        if (processStorageBlocked) return GatewaySessionStoreResult.BLOCKED
+        if (existing != null) {
+            return if (existing.first == persisted) {
+                GatewaySessionStoreResult.ALREADY_COMMITTED
+            } else {
+                GatewaySessionStoreResult.STALE
+            }
+        }
+        if (writeBackendDeviceLocked(payload.toString().toByteArray(Charsets.UTF_8))) {
+            GatewaySessionStoreResult.COMMITTED
+        } else {
+            markFailClosedLocked()
+            GatewaySessionStoreResult.STORAGE_FAILURE
+        }
+    }
+
+    fun restoreBackendDevice(
+        expectedGatewayBaseUrl: String,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): RestoredGatewayLoginBundle? = synchronized(PROCESS_LOCK) {
+        val current = loadStateOrBlockedLocked() ?: return null
+        if (current.state != null) return null
+        val (persisted, firstRun) = loadBackendDeviceLocked() ?: return null
+        val deviceId = runCatching { readInstallDeviceIdLocked(false) }.getOrNull()
+        if (persisted.gatewayBaseUrl != expectedGatewayBaseUrl || persisted.deviceId != deviceId) {
+            markFailClosedLocked()
+            return null
+        }
+        val version = persisted.version()
+        if (nowEpochMs >= persisted.expiresAtEpochMs) {
+            removeBackendDeviceIfCurrent(version)
+            return null
+        }
+        val session = GatewayFieldSession.restoreBackendAccountDevice(
+            persisted, expectedGatewayBaseUrl, persisted.actorId, persisted.deviceId, nowEpochMs,
+        ) ?: run {
+            markFailClosedLocked()
+            return null
+        }
+        RestoredGatewayLoginBundle(firstRun, session, version)
+    }
+
+    fun removeBackendDeviceIfCurrent(
+        expectedVersion: GatewaySessionVersion,
+    ): GatewaySessionStoreResult = synchronized(PROCESS_LOCK) {
+        val current = loadStateOrBlockedLocked() ?: return GatewaySessionStoreResult.BLOCKED
+        if (current.state != null) return GatewaySessionStoreResult.STALE
+        val persisted = loadBackendDeviceLocked()?.first
+        if (processStorageBlocked) return GatewaySessionStoreResult.BLOCKED
+        if (persisted == null) return GatewaySessionStoreResult.NOT_FOUND
+        if (persisted.version() != expectedVersion) return GatewaySessionStoreResult.STALE
+        if (runCatching { preferences.edit().remove(BACKEND_DEVICE_PREF_KEY).commit() }
+                .getOrDefault(false)
+        ) {
+            GatewaySessionStoreResult.COMMITTED
+        } else {
+            markFailClosedLocked()
+            GatewaySessionStoreResult.STORAGE_FAILURE
+        }
+    }
+
+    fun updateBackendDeviceFirstRunSnapshot(
+        expectedVersion: GatewaySessionVersion,
+        firstRunSnapshot: FirstRunOnboardingSnapshot,
+    ): GatewaySessionStoreResult = synchronized(PROCESS_LOCK) {
+        val current = loadStateOrBlockedLocked() ?: return GatewaySessionStoreResult.BLOCKED
+        if (current.state != null) return GatewaySessionStoreResult.STALE
+        val existing = loadBackendDeviceLocked()
+        if (processStorageBlocked) return GatewaySessionStoreResult.BLOCKED
+        val (persisted, previous) = existing ?: return GatewaySessionStoreResult.NOT_FOUND
+        if (
+            persisted.version() != expectedVersion ||
+            firstRunSnapshot.flow != FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 ||
+            firstRunSnapshot.verifiedActorBinding?.value != persisted.actorId ||
+            firstRunSnapshot.epoch < previous.epoch ||
+            (firstRunSnapshot.epoch == previous.epoch && firstRunSnapshot.revision < previous.revision)
+        ) return GatewaySessionStoreResult.STALE
+        if (
+            firstRunSnapshot.epoch == previous.epoch &&
+            firstRunSnapshot.completedReceiptHashes == previous.completedReceiptHashes
+        ) return GatewaySessionStoreResult.ALREADY_COMMITTED
+        val payload = runCatching {
+            encodeBackendDevice(persisted, firstRunSnapshot).also { decodeBackendDevice(it) }
+        }.getOrNull() ?: return GatewaySessionStoreResult.BLOCKED
+        if (writeBackendDeviceLocked(payload.toString().toByteArray(Charsets.UTF_8))) {
+            GatewaySessionStoreResult.COMMITTED
+        } else {
+            markFailClosedLocked()
+            GatewaySessionStoreResult.STORAGE_FAILURE
+        }
+    }
+
+    private fun encodeBackendDevice(
+        session: GatewayBackendDeviceSessionPersistence,
+        firstRun: FirstRunOnboardingSnapshot,
+    ): JSONObject {
+        val receipts = firstRun.completedReceiptHashes
+        val evidence = buildList {
+            receipts[FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT]?.let {
+                add(FirstRunOnboardingEvidence.EmailOtpEnrollment(FirstRunAgeBand.VERIFIED_14_PLUS, it))
+            }
+            receipts[FirstRunOnboardingStage.ACCOUNT_CREATED]?.let {
+                add(FirstRunOnboardingEvidence.AccountCreated(it))
+            }
+            add(FirstRunOnboardingEvidence.VerifiedLogin(
+                requireNotNull(firstRun.verifiedActorBinding),
+                requireNotNull(receipts[FirstRunOnboardingStage.VERIFIED_LOGIN]),
+            ))
+            receipts[FirstRunOnboardingStage.PURPOSE_AND_SAFETY]?.let {
+                add(FirstRunOnboardingEvidence.PurposeAndSafety(it))
+            }
+            receipts[FirstRunOnboardingStage.FP004_TRAINING]?.let {
+                add(FirstRunOnboardingEvidence.Fp004Training(it))
+            }
+        }
+        return JSONObject()
+            .put("payload_version", 1)
+            .put("epoch", firstRun.epoch)
+            .put("ordered_evidence", JSONArray().also { array ->
+                evidence.forEach { array.put(encodeEvidence(it)) }
+            })
+            .put("session", JSONObject()
+                .put("gateway_base_url", session.gatewayBaseUrl)
+                .put("actor_id", session.actorId)
+                .put("account_generation", session.accountGeneration)
+                .put("auth_epoch", session.authEpoch)
+                .put("device_id", session.deviceId)
+                .put("session_id", session.sessionId)
+                .put("access_cookie_pair", session.accessCookiePair)
+                .put("expires_at_epoch_ms", session.expiresAtEpochMs))
+    }
+
+    private fun decodeBackendDevice(
+        payload: JSONObject,
+    ): Pair<GatewayBackendDeviceSessionPersistence, FirstRunOnboardingSnapshot> {
+        require(payload.jsonKeys() == setOf("payload_version", "epoch", "ordered_evidence", "session"))
+        require(payload.getInt("payload_version") == 1)
+        val encoded = payload.getJSONObject("session")
+        require(encoded.jsonKeys() == setOf(
+            "gateway_base_url", "actor_id", "account_generation", "auth_epoch", "device_id",
+            "session_id", "access_cookie_pair", "expires_at_epoch_ms",
+        ))
+        val session = GatewayBackendDeviceSessionPersistence(
+            encoded.getString("gateway_base_url"), encoded.getString("actor_id"),
+            encoded.getLong("account_generation"), encoded.getLong("auth_epoch"),
+            encoded.getString("device_id"), encoded.getString("session_id"),
+            encoded.getString("access_cookie_pair"), encoded.getLong("expires_at_epoch_ms"),
+        )
+        require(session.expiresAtEpochMs > 0L)
+        require(GatewayFieldSession.restoreBackendAccountDevice(
+            session, session.gatewayBaseUrl, session.actorId, session.deviceId,
+            session.expiresAtEpochMs - 1L,
+        ) != null)
+        val array = payload.getJSONArray("ordered_evidence")
+        require(array.length() in 1..5)
+        val evidence = List(array.length()) { decodeEvidence(array.getJSONObject(it)) }
+        val restored = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+            payload.getLong("epoch"), evidence, AUTHENTICATED_ENVELOPE_EVIDENCE_VERIFIER,
+        )
+        require(restored.fullyRestored && restored.snapshot.verifiedActorBinding?.value == session.actorId)
+        return session to restored.snapshot
+    }
+
+    private fun loadBackendDeviceLocked(): Pair<GatewayBackendDeviceSessionPersistence, FirstRunOnboardingSnapshot>? =
+        runCatching {
+            val envelope = preferences.getString(BACKEND_DEVICE_PREF_KEY, null) ?: return@runCatching null
+            val opened = sessionAead.open(envelope, BACKEND_DEVICE_AAD, STATE_LIMITS)
+                as? AeadOpenResult.Opened ?: error("backend session authentication failed")
+            try {
+                val decoded = decodeBackendDevice(JSONObject(String(opened.plaintext, Charsets.UTF_8)))
+                if (opened.needsRewrap) check(writeBackendDeviceLocked(opened.plaintext.copyOf()))
+                decoded
+            } finally {
+                opened.plaintext.fill(0)
+            }
+        }.getOrElse {
+            markFailClosedLocked()
+            null
+        }
+
+    private fun writeBackendDeviceLocked(payload: ByteArray): Boolean = try {
+        runCatching {
+            val sealed = sessionAead.seal(payload, BACKEND_DEVICE_AAD, STATE_LIMITS)
+                as? AeadSealResult.Sealed ?: return@runCatching false
+            preferences.edit().putString(BACKEND_DEVICE_PREF_KEY, sealed.envelope).commit()
+        }.getOrDefault(false)
+    } finally {
+        payload.fill(0)
+    }
+
+    private fun GatewayBackendDeviceSessionPersistence.version() = GatewaySessionVersion(
+        gatewayBaseUrl, actorId, deviceId, sessionId, authEpoch,
+    )
+
     private fun bundleOrNull(
         session: GatewayFieldSession,
         firstRunSnapshot: FirstRunOnboardingSnapshot,
@@ -475,6 +698,10 @@ internal class AndroidGatewaySessionStore(
         }
         val v4Present = runCatching { preferences.contains(STATE_PREF_KEY) }.getOrDefault(true)
         val v3Present = runCatching { preferences.contains(V3_STATE_PREF_KEY) }.getOrDefault(true)
+        if ((v4Present || v3Present) && preferences.contains(BACKEND_DEVICE_PREF_KEY)) {
+            markFailClosedLocked()
+            return null
+        }
         if (v4Present && v3Present) {
             markFailClosedLocked()
             return null
@@ -1000,6 +1227,7 @@ internal class AndroidGatewaySessionStore(
         processStorageBlocked = true
         val markerStored = runCatching {
             preferences.edit()
+                .remove(BACKEND_DEVICE_PREF_KEY)
                 .remove(STATE_PREF_KEY)
                 .remove(V3_STATE_PREF_KEY)
                 .remove(V3_FAIL_CLOSED_PREF_KEY)
@@ -1021,6 +1249,7 @@ internal class AndroidGatewaySessionStore(
     private fun stageKeyResetLocked(scope: String): Boolean = runCatching {
         require(scope == KEY_RESET_SCOPE_SESSION || scope == KEY_RESET_SCOPE_INSTALLATION)
         preferences.edit()
+            .remove(BACKEND_DEVICE_PREF_KEY)
             .remove(STATE_PREF_KEY)
             .remove(V3_STATE_PREF_KEY)
             .remove(V3_FAIL_CLOSED_PREF_KEY)
@@ -1073,7 +1302,8 @@ internal class AndroidGatewaySessionStore(
     }
 
     private fun gatewayCredentialArtifactsAbsentLocked(): Boolean = runCatching {
-        !preferences.contains(STATE_PREF_KEY) &&
+        !preferences.contains(BACKEND_DEVICE_PREF_KEY) &&
+            !preferences.contains(STATE_PREF_KEY) &&
             !preferences.contains(V3_STATE_PREF_KEY) &&
             !preferences.contains(V3_FAIL_CLOSED_PREF_KEY) &&
             !preferences.contains(V2_STATE_PREF_KEY) &&
@@ -1102,6 +1332,7 @@ internal class AndroidGatewaySessionStore(
         const val V3_STATE_FORMAT_VERSION = 3
         const val INSTALL_ID_FORMAT_VERSION = 1
         const val STATE_PREF_KEY = "gateway_login_bundle_encrypted_v4"
+        const val BACKEND_DEVICE_PREF_KEY = "gateway_backend_device_encrypted_v1"
         const val V3_STATE_PREF_KEY = "gateway_login_bundle_encrypted_v3"
         const val V3_FAIL_CLOSED_PREF_KEY = "gateway_login_bundle_fail_closed_v3"
         const val INSTALL_ID_PREF_KEY = "gateway_install_id_encrypted_v1"
@@ -1128,6 +1359,9 @@ internal class AndroidGatewaySessionStore(
 
         val STATE_AAD =
             "kr.co.hanium.dreamup.walksafe|USER|gateway-session|payload=4"
+                .toByteArray(Charsets.UTF_8)
+        val BACKEND_DEVICE_AAD =
+            "kr.co.hanium.dreamup.walksafe|USER|gateway-backend-device|payload=1"
                 .toByteArray(Charsets.UTF_8)
         val V3_STATE_AAD =
             "kr.co.hanium.dreamup.walksafe|USER|gateway-session|payload=3"

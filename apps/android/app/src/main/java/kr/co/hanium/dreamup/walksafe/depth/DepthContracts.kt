@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.navigation.UserMotionEstimate
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -138,6 +139,11 @@ data class TrackedObjectDepth(
     val userFacing: UserFacingDepth,
     val trackAgeFrames: Int = 0,
     val trackStableMs: Long = 0L,
+    val objectMotion: ObjectMotion = ObjectMotion.UNKNOWN,
+    val motionEstimate: ObjectMotionEstimate = ObjectMotionEstimate(),
+    val userMotion: UserMotionEstimate = UserMotionEstimate(),
+    /** Unnamed masks must pass the captured portrait corridor/near-obstacle selection. */
+    val walkingObstacleCandidate: Boolean = true,
 )
 
 data class UserFacingDepth(

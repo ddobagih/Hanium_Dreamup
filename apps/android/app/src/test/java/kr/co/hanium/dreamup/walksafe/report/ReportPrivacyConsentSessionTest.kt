@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.inference.AdaptiveInferencePacingPolicy
 import kr.co.hanium.dreamup.walksafe.depth.DepthConfidenceBreakdown
 import kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot
 import kr.co.hanium.dreamup.walksafe.depth.DepthSource
@@ -75,14 +76,14 @@ class ReportPrivacyConsentSessionTest {
         activityField("isActivityForeground").setBoolean(activity, true)
         activityField("detectorGeneration").setInt(activity, generationBeforePause)
         activityField("latestDetectionSnapshot").set(activity, detectionSnapshot)
-        activityField("latestTactileOverlaySnapshot").set(activity, detectionSnapshot)
-        activityField("lastNonEmptyOverlaySnapshot").set(activity, detectionSnapshot)
         activityField("latestExplicitReportOutput").set(activity, reportOutput)
         activityField("latestExplicitReportImage").set(activity, byteArrayOf(1, 2, 3))
         activityField("latestExplicitReportGateState").set(activity, reportGate)
         activityField("latestExplicitReportCapturedAtMs").setLong(activity, CAPTURED_AT_MS)
         activityField("latestReportCandidateStatus").set(activity, "reportCandidate=prepared")
-        activityField("lastDetectionRunMs").setLong(activity, 500L)
+        val pacing = activityField("adaptiveInferencePacing").get(activity) as AdaptiveInferencePacingPolicy
+        pacing.complete(requireNotNull(pacing.tryStart(500L)), 1_000L, inferenceDurationMs = 500L)
+        assertEquals(1L, pacing.snapshot().completedSamples)
         activityField("lastOverlayUpdateMs").setLong(activity, 600L)
         activityField("lastUiUpdateMs").setLong(activity, 700L)
         activityField("latestTrustedLocation").set(
@@ -109,8 +110,6 @@ class ReportPrivacyConsentSessionTest {
         assertFalse(activityField("isActivityForeground").getBoolean(activity))
         assertEquals(generationBeforePause + 1, activityField("detectorGeneration").getInt(activity))
         assertEmptyDetectionSnapshot(activity, "latestDetectionSnapshot")
-        assertEmptyDetectionSnapshot(activity, "latestTactileOverlaySnapshot")
-        assertEmptyDetectionSnapshot(activity, "lastNonEmptyOverlaySnapshot")
         assertNull(activityField("latestExplicitReportOutput").get(activity))
         assertNull(activityField("latestExplicitReportImage").get(activity))
         assertNull(activityField("latestExplicitReportGateState").get(activity))
@@ -120,7 +119,7 @@ class ReportPrivacyConsentSessionTest {
             activityField("latestReportCandidateStatus").get(activity),
         )
         assertFalse(pendingCapture.get())
-        assertEquals(0L, activityField("lastDetectionRunMs").getLong(activity))
+        assertEquals(0L, pacing.snapshot().completedSamples)
         assertEquals(0L, activityField("lastOverlayUpdateMs").getLong(activity))
         assertEquals(0L, activityField("lastUiUpdateMs").getLong(activity))
         assertNull(activityField("latestTrustedLocation").get(activity))

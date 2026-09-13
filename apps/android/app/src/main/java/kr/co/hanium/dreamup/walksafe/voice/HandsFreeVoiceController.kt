@@ -68,6 +68,11 @@ internal class HandsFreeVoiceController(
     private val onTerminalFailure: (HandsFreeVoiceTerminalFailure) -> Unit = {},
     private val onSessionEnded: () -> Unit = {},
     private val mainHandler: Handler = Handler(Looper.getMainLooper()),
+    private val wakeAcknowledgementPlayer: WakeAcknowledgementPlayer = WakeAcknowledgementPlayer(
+        context,
+        isAppSpeechActive,
+        mainHandler,
+    ),
 ) : WalkVoiceSessionController, Closeable {
     private val stateMachine = HandsFreeVoiceStateMachine()
     private var activeRunId: Long? = null
@@ -150,6 +155,7 @@ internal class HandsFreeVoiceController(
         cancelScheduledWork()
         stateMachine.stop()
         transcriber.close()
+        wakeAcknowledgementPlayer.close()
     }
 
     private fun handleReady(runId: Long) {
@@ -195,11 +201,10 @@ internal class HandsFreeVoiceController(
                 ) {
                     WakePhraseCommandExtraction.NotAddressed -> Unit
                     WakePhraseCommandExtraction.AwaitingCommand -> {
-                        openCommandWindow()
+                        acknowledgeWake(runId)
                     }
                     is WakePhraseCommandExtraction.Command -> {
-                        openCommandWindow()
-                        dispatchCommand(extraction.text, transcript.confidence)
+                        acknowledgeWake(runId, extraction.text, transcript.confidence)
                     }
                 }
             }
@@ -221,12 +226,47 @@ internal class HandsFreeVoiceController(
         }
     }
 
-    private fun openCommandWindow() {
+    private fun acknowledgeWake(runId: Long, command: String? = null, confidence: Float? = null) {
         val transition = stateMachine.onWakeWordDetected(stateMachine.snapshot().generation)
-        if (transition.state !is HandsFreeVoiceState.WaitingForCommand) return
+        val acknowledging = transition.state as? HandsFreeVoiceState.AcknowledgingWake ?: return
+        if (!transition.accepted) return
+        onStatus("voice_hands_free=acknowledging_wake")
+        if (closed || activeRunId != runId || stateMachine.snapshot() != acknowledging) return
+        wakeAcknowledgementPlayer.play { result ->
+            if (closed || terminalFailureDelivered || activeRunId != runId ||
+                stateMachine.snapshot() != acknowledging
+            ) return@play
+            if (!eligibility().allowsListening()) {
+                endSessionWithoutRestart("eligibility_changed")
+                return@play
+            }
+            if (result == WakeAcknowledgementResult.CANCELLED ||
+                runCatching(isAppSpeechActive).getOrDefault(true)
+            ) {
+                stateMachine.cancel(acknowledging.generation)
+                onStatus("voice_hands_free=waiting_wake_phrase")
+                return@play
+            }
+            if (result == WakeAcknowledgementResult.FAILED) {
+                onStatus("voice_hands_free=wake_acknowledgement_failed")
+            }
+            openCommandWindow(acknowledging.generation, runId, command, confidence)
+        }
+    }
+
+    private fun openCommandWindow(generation: Long, runId: Long, command: String?, confidence: Float?) {
+        val transition = stateMachine.onWakeAcknowledgementFinished(generation)
+        if (!transition.accepted || transition.state !is HandsFreeVoiceState.WaitingForCommand) return
         runCatching(onCommandListeningStarted)
+        // A page update can synchronously cancel this owner; it must not revive the microphone.
+        if (closed || activeRunId != runId || stateMachine.snapshot() != transition.state) return
+        if (!eligibility().allowsListening()) {
+            endSessionWithoutRestart("eligibility_changed")
+            return
+        }
         scheduleCommandTimeout(transition.state.generation)
         onStatus("voice_hands_free=waiting_command")
+        if (command != null) dispatchCommand(command, confidence)
     }
 
     private fun dispatchCommand(text: String, confidence: Float?) {
@@ -369,6 +409,7 @@ internal class HandsFreeVoiceController(
         outputPoll?.let(mainHandler::removeCallbacks)
         commandTimeout = null
         outputPoll = null
+        wakeAcknowledgementPlayer.cancel()
     }
 
     private fun endSessionWithoutRestart(reason: String) {

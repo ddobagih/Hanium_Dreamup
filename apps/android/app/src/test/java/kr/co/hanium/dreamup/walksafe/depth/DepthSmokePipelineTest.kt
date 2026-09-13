@@ -13,6 +13,9 @@ class DepthSmokePipelineTest {
             rawDepth = depthImage(millimeters = 1_230),
             rawConfidence = ConfidenceImage8(10, 10, ByteArray(100) { 255.toByte() }),
             fullDepth = depthImage(millimeters = 2_500),
+            rawDepthTimestampNs = 1L,
+            fullDepthTimestampNs = 1L,
+            cameraImageTimestampNs = 1L,
         )
 
         val result = DepthSmokePipeline().sampleCenter(snapshot)!!
@@ -33,6 +36,9 @@ class DepthSmokePipelineTest {
             rawDepth = depthImage(millimeters = 1_230),
             rawConfidence = ConfidenceImage8(10, 10, ByteArray(100) { 0.toByte() }),
             fullDepth = depthImage(millimeters = 1_800),
+            rawDepthTimestampNs = 1L,
+            fullDepthTimestampNs = 1L,
+            cameraImageTimestampNs = 1L,
         )
 
         val result = DepthSmokePipeline().sampleCenter(snapshot)!!
@@ -49,6 +55,8 @@ class DepthSmokePipelineTest {
             rawDepth = null,
             rawConfidence = null,
             fullDepth = depthImage(millimeters = 0),
+            fullDepthTimestampNs = 1L,
+            cameraImageTimestampNs = 1L,
         )
 
         assertNull(DepthSmokePipeline().sampleCenter(snapshot))

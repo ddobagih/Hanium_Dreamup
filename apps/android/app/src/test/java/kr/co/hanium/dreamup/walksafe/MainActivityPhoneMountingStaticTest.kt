@@ -59,8 +59,10 @@ class MainActivityPhoneMountingStaticTest {
         assertTrue(nativePanel.contains("ARCore Depth"))
         assertFalse(nativePanel.contains("진동"))
         assertTrue(nativePresentation.contains("firstRunPhonePostureText.text = nativePhonePostureNotice"))
-        val scopeNotice = source.substringAfter("private val nativePhonePostureNotice: String")
-            .substringBefore("private fun ")
+        assertTrue(source.contains("get() = PriorityUserEducationPresentation.phonePostureNoticeKo"))
+        val scopeNotice = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/PriorityUserEducationPresentation.kt")
+            .readText().substringAfter("const val phonePostureNoticeKo =")
+            .substringBefore("fun speechText(")
         assertTrue(scopeNotice.contains("몸 앞에 세로로 흔들리지 않게 고정"))
         assertTrue(scopeNotice.contains("카메라 앞 시야를 가리지 마세요"))
         assertFalse(scopeNotice.contains("가슴"))
@@ -171,19 +173,29 @@ class MainActivityPhoneMountingStaticTest {
         )
         assertTrue(runtimeActivation.contains("phase = PhoneMountingAssessmentPhase.ACTIVE"))
         assertTrue(runtimeActivation.contains("phoneMountingSensorProbe.start()"))
-        assertTrue(runtimeActivation.contains("phone_mounting_sensor_start_failed"))
-        assertTrue(
-            runtimeActivation.indexOf("phoneMountingSensorProbe.start()") <
-                runtimeActivation.indexOf("phone_mounting_sensor_start_failed"),
+        val sensorFailure = blockStartingAt(
+            runtimeActivation,
+            "if (!phoneMountingSensorProbe.start())",
         )
-        assertTrue(
-            runtimeActivation.indexOf("phone_mounting_sensor_start_failed") <
-                runtimeActivation.indexOf(
-                    "return false",
-                    runtimeActivation.indexOf("phone_mounting_sensor_start_failed"),
-                ),
+        assertInOrder(
+            sensorFailure,
+            "phoneMountingRuntimeState = PhoneMountingPolicy.initialState(",
+            "observeOfficialEnvironmentCameraFrame(",
+            "frameAvailable = false",
+            "return walkSessionLifecycle.isRuntimeEpochCurrent(epoch)",
         )
-        assertTrue(runtimeActivation.contains("if (!usable) phoneMountingSensorProbe.stop()"))
+        assertTrue(sensorFailure.substringAfter("observeOfficialEnvironmentCameraFrame(")
+            .contains("epoch = epoch"))
+        assertFalse(sensorFailure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertFalse(sensorFailure.contains("cancelActiveRouteRequest()"))
+        assertFalse(sensorFailure.contains("cancelDestinationSearch()"))
+        assertFalse(sensorFailure.contains("return false"))
+        assertInOrder(
+            runtimeActivation.substringAfter("val initialState = PhoneMountingPolicy.initialState("),
+            "applyPhoneMountingRuntimeAssessment(",
+            "return walkSessionLifecycle.isRuntimeEpochCurrent(epoch)",
+        )
+        assertFalse(runtimeActivation.contains("if (!usable) phoneMountingSensorProbe.stop()"))
         assertTrue(runtimeReassessment.contains("phase = PhoneMountingAssessmentPhase.ACTIVE"))
         assertTrue(
             currentAssessment.contains(
@@ -277,8 +289,8 @@ class MainActivityPhoneMountingStaticTest {
         assertTrue(reportRevocation.contains("reportUploadSafetyGeneration += 1L"))
         assertTrue(reportRevocation.contains("reportPrivacyConsentSession.cancelActiveCalls()"))
         assertTrue(correction.contains("invalidatePhoneMountingDetectionOutputs(epoch)"))
-        assertTrue(correction.contains("cancelActiveRouteRequest()"))
-        assertTrue(correction.contains("cancelDestinationSearch()"))
+        assertFalse(correction.contains("cancelActiveRouteRequest()"))
+        assertFalse(correction.contains("cancelDestinationSearch()"))
         assertTrue(correction.contains("phoneMountingWatchdogGeneration += 1L"))
         assertTrue(correction.contains("playPhoneMountingCorrectionVibration()"))
         assertInOrder(
@@ -293,12 +305,16 @@ class MainActivityPhoneMountingStaticTest {
         assertFalse(correction.contains("stopCameraFallbackSession("))
         assertFalse(correction.contains("stopDepthSession("))
         assertTrue(unusable.contains("phoneMountingOutputsAllowed = false"))
-        assertTrue(unusable.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertFalse(unusable.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertFalse(unusable.contains("cancelActiveRouteRequest()"))
+        assertFalse(unusable.contains("cancelDestinationSearch()"))
+        assertTrue(unusable.contains("invalidatePhoneMountingDetectionOutputs(epoch)"))
+        assertTrue(unusable.contains("updatePhoneMountingUi()"))
         assertTrue(unusable.contains("playPhoneMountingSafetyStopVibration()"))
         assertInOrder(
             unusable,
             "phoneMountingOutputsAllowed = false",
-            "enterWalkSessionSafetyStopAndCancelOutputs(",
+            "invalidatePhoneMountingDetectionOutputs(epoch)",
             "speakStatusExplanation(",
         )
         assertFalse(unusable.contains("phoneMountingOutputsAllowed = true"))
@@ -340,12 +356,12 @@ class MainActivityPhoneMountingStaticTest {
         assertInOrder(
             fallback,
             "observeOfficialEnvironmentCameraFrame(",
-            "if (!walkSafetyOutputsAllowed()) return",
-            "frameDetector.detect(",
+            "if (!cameraEnvironmentOutputsAllowed()) return",
+            "frameDetector.detectOriented(",
         )
         val afterEvaluation = fallback.substringAfter("nonMetricAdvisoryPolicy.evaluate(")
         assertTrue(afterEvaluation.contains("isCurrentFrameGeneration("))
-        assertTrue(afterEvaluation.contains("!walkSafetyOutputsAllowed()"))
+        assertTrue(afterEvaluation.contains("!cameraEnvironmentOutputsAllowed()"))
         assertTrue(afterEvaluation.contains("nonMetricAdvisoryPolicy.reset()"))
         assertInOrder(
             afterEvaluation,
@@ -362,33 +378,56 @@ class MainActivityPhoneMountingStaticTest {
         )
         assertTrue(
             declarationRegion("internal fun publishDetectionSnapshot(")
-                .contains("!walkSafetyOutputsAllowed()"),
+                .contains("!cameraEnvironmentOutputsAllowed()"),
         )
     }
 
     @Test
-    fun asynchronousWalkOutputsUseTheCombinedSafetyGate() {
+    fun asynchronousWalkOutputsUseTheirFeatureGateAndReportsRequireBoth() {
         val combinedGate = declarationRegion("private fun walkSafetyOutputsAllowed()")
+        val navigationGate = declarationRegion("private fun navigationEnvironmentOutputsAllowed()")
+        val cameraGate = declarationRegion("private fun cameraEnvironmentOutputsAllowed()")
         val feedbackCompletion = functionBlock("private fun confirmFeedbackDelivery(")
-        val navigationSpeech = functionBlock("private fun speakNavigation(")
+        val navigationSpeech = functionBlock("private fun dispatchNavigationSpeech(")
         val routeGuidance = functionBlock("private fun updateRouteGuidance(")
 
-        assertTrue(combinedGate.contains("officialEnvironmentOutputsAllowed"))
-        assertTrue(combinedGate.contains("phoneMountingOutputsAllowed"))
+        assertTrue(combinedGate.contains("navigationEnvironmentOutputsAllowed() && cameraEnvironmentOutputsAllowed()"))
+        assertTrue(navigationGate.contains("officialEnvironmentOutputsAllowed"))
+        assertTrue(navigationGate.contains("navigationOutputsAllowed == true"))
+        assertFalse(navigationGate.contains("phoneMountingOutputsAllowed"))
+        assertFalse(navigationGate.contains("cameraEnvironmentOutputsAllowed()"))
+        assertTrue(cameraGate.contains("officialEnvironmentOutputsAllowed"))
+        assertTrue(cameraGate.contains("cameraOutputsAllowed == true"))
+        assertTrue(cameraGate.contains("phoneMountingOutputsAllowed"))
+        assertFalse(cameraGate.contains("navigationEnvironmentOutputsAllowed()"))
         assertTrue(
             functionBlock("private fun currentNavigationCollectionAllowsWork()")
                 .contains("currentStepTrackingCollectionAllowsWork()"),
         )
         listOf(
             "private fun currentStepTrackingCollectionAllowsWork()",
-            "private fun isCameraFallbackAdvisoryStillDeliverable(",
-            "private fun currentFeedbackDeviceGateAllowsAlerts()",
-            "private fun speakNavigation(",
+            "private fun dispatchNavigationSpeech(",
             "private fun maybePlayProgressBeep(",
             "private fun isDestinationSearchLeaseCurrent(",
             "private fun isRouteRequestLeaseCurrent(",
         ).forEach { signature ->
-            assertUsesCombinedSafetyGate(functionBlock(signature), signature)
+            val output = declarationRegion(signature)
+            assertTrue("$signature must use the navigation gate", output.contains("navigationEnvironmentOutputsAllowed()"))
+            assertFalse(output.contains("walkSafetyOutputsAllowed()"))
+            assertFalse(output.contains("phoneMountingOutputsAllowed"))
+            assertFalse(output.contains("cameraEnvironmentOutputsAllowed()"))
+        }
+        listOf(
+            "private fun currentRuntimeMetricOutputAllowsWork(",
+            "private fun analyzeCameraFallbackFrame(",
+            "internal fun publishDetectionSnapshot(",
+            "private fun isCameraFallbackAdvisoryStillDeliverable(",
+            "private fun currentFeedbackDeviceGateAllowsAlerts()",
+        ).forEach { signature ->
+            val output = declarationRegion(signature)
+            assertTrue("$signature must use the camera gate", output.contains("cameraEnvironmentOutputsAllowed()"))
+            assertFalse(output.contains("walkSafetyOutputsAllowed()"))
+            assertFalse(output.contains("navigationEnvironmentOutputsAllowed()"))
         }
         assertTrue(feedbackCompletion.contains("isFeedbackActionStillDeliverable(action)"))
         assertTrue(feedbackCompletion.contains("synchronized(phoneMountingObservationLock)"))
@@ -405,10 +444,10 @@ class MainActivityPhoneMountingStaticTest {
         )
         assertTrue(fallbackConfirmation.contains("if (!phoneMountingOutputsAllowed)"))
         assertTrue(navigationSpeech.substringAfter("val mainThreadCompletion")
-            .contains("walkSafetyOutputsAllowed()"))
+            .contains("navigationEnvironmentOutputsAllowed()"))
         assertInOrder(
-            routeGuidance.substringAfter("speakNavigation(instruction)"),
-            "!walkSafetyOutputsAllowed()",
+            routeGuidance.substringAfter("dispatchNavigationSpeech("),
+            "navigationEnvironmentOutputsAllowed()",
             "routeNavigator.acknowledgeInstruction(",
         )
 
@@ -416,8 +455,16 @@ class MainActivityPhoneMountingStaticTest {
         assertInOrder(
             report,
             "walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch)",
-            "!officialEnvironmentOutputsAllowed || !phoneMountingOutputsAllowed",
+            "!walkSafetyOutputsAllowed()",
             "integratedConsentSession.currentConfirmationOrNull()",
+            "reportQueueStore.enqueue(",
+        )
+        val explicitReport = functionBlock("private fun submitFrozenExplicitReportAfterConfirmation(")
+        assertInOrder(
+            explicitReport,
+            "!ensureExplicitReportAuthorityPreconditions()",
+            "!walkSafetyOutputsAllowed()",
+            "currentExplicitReportConfirmationContextOrNull() != confirmed.context",
             "reportQueueStore.enqueue(",
         )
         assertFalse(report.contains("uploadCall("))
@@ -527,17 +574,6 @@ class MainActivityPhoneMountingStaticTest {
             assertTrue("missing or out of order: $fragment", index > previous)
             previous = index
         }
-    }
-
-    private fun assertUsesCombinedSafetyGate(text: String, boundary: String) {
-        val usesHelper = text.contains("walkSafetyOutputsAllowed()")
-        val usesBothInputs =
-            text.contains("officialEnvironmentOutputsAllowed") &&
-                text.contains("phoneMountingOutputsAllowed")
-        assertTrue(
-            "$boundary must combine official environment and phone mounting output gates",
-            usesHelper || usesBothInputs,
-        )
     }
 
     private fun String.countOccurrences(fragment: String): Int =
