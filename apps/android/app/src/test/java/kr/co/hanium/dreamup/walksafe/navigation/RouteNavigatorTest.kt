@@ -12,6 +12,20 @@ import org.junit.Test
 
 class RouteNavigatorTest {
     @Test
+    fun remainingDistanceRequiresTrustedProgressAndClearsOnLocationLoss() {
+        val navigator = RouteNavigator()
+        assertEquals(null, navigator.remainingDistanceM())
+        navigator.setRoute(route())
+        assertEquals(null, navigator.remainingDistanceM())
+        navigator.update(locationNearStart(), nowMs = 1_000L, requestInFlight = false)
+        val distance = navigator.remainingDistanceM()
+        assertNotNull(distance)
+        assertTrue(distance!! >= 0.0 && distance <= route().summary.distanceM)
+        navigator.onUntrustedLocation()
+        assertEquals(null, navigator.remainingDistanceM())
+    }
+
+    @Test
     fun preservesLegacyUpdateDefaultArgumentJvmBridge() {
         val expectedParameterTypes = listOf(
             RouteNavigator::class.java,

@@ -267,6 +267,14 @@ class RouteNavigator(
     @Synchronized
     fun currentRouteId(): String? = activeRouteId
 
+    @Synchronized
+    fun remainingDistanceM(): Double? {
+        val current = route ?: return null
+        if (positioningEvidenceInterrupted || !latestRouteMatchUsableForGuidance ||
+            offRouteGuidanceSuspended || pendingDecision != null) return null
+        return progressDistanceM?.let { (current.summary.distanceM - it).coerceAtLeast(0.0) }
+    }
+
     /** Latest route-corridor evidence. Its filtered and matched coordinates remain separate. */
     @Synchronized
     fun currentRouteMatch(): RouteCorridorMatchResult? = latestRouteMatch
