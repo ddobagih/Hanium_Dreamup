@@ -913,7 +913,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var explicitReportButton: Button
     private lateinit var explicitReportConfirmationText: TextView
     private lateinit var voiceReportButton: Button
-    private var voiceHelpDialog: android.app.AlertDialog? = null
+    private var voiceHelpScreen: View? = null
+    private val voiceHelpCoveredViews = mutableListOf<Pair<View, Int>>()
     private var voiceHelpSummary: TextView? = null
     private var voiceHelpRecovery: Button? = null
     private var voiceHelpGeneration = 0L
@@ -11191,6 +11192,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun handleWalkScreenBackPressed(): Boolean {
+        if (voiceHelpScreen != null) {
+            closeVoiceHelp(announce = true)
+            return true
+        }
         if (handleNativeFeatureBackPressed()) return true
         cancelNativePendingFeatureEntry()
         val state = walkSessionLifecycle.snapshot().state
@@ -12761,12 +12766,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 onOpen = ::openVoiceHelp,
             ),
             wsHomeCard(
-                title = "손상 점자블록 신고",
-                subtitle = "신고 가능 상태를 확인하고 손상 점자블록 신고를 준비합니다",
-                lockTitle = "", lockDetail = "", unlocked = { true },
-                onOpen = ::openReportPanel,
-            ),
-            wsHomeCard(
                 title = "카메라 테스트",
                 subtitle = "안내 시작 없이 객체 인식과 깊이를 확인합니다",
                 lockTitle = "", lockDetail = "",
@@ -12951,7 +12950,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var nativeVoiceCancelButton: Button
 
     private fun foregroundHomeWakeContextAvailable(): Boolean =
-        reportPanelDialog == null && voiceHelpDialog == null &&
+        reportPanelDialog == null && voiceHelpScreen == null &&
         !handsFreeVoiceDestroyed &&
             nativeUiPage == NativeUiPage.HOME && pendingNativeUiPage == null &&
             homeVoiceCommandAvailable() && isHandsFreeVoiceDisclosureAccepted() &&
@@ -13166,7 +13165,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 cancelNativePendingFeatureEntry()
             }
             showNativeUiPage(page)
-            if (page == NativeUiPage.VOICE_COMMAND) ensureVoicePermissionThenListen()
+            ensureVoicePermissionThenListen()
             return
         }
         if (nativeFeatureAvailable(page)) {
@@ -13200,7 +13199,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun NativeUiPage.isVoiceInteractionPage(): Boolean =
         this == NativeUiPage.VOICE_COMMAND || this == NativeUiPage.DESTINATION_SEARCH ||
             this == NativeUiPage.GUIDANCE ||
-            (this == NativeUiPage.HOME && (voiceHelpDialog != null || reportPanelDialog != null))
+            (this == NativeUiPage.HOME && (voiceHelpScreen != null || reportPanelDialog != null))
 
     private fun showNativeUiPage(page: NativeUiPage) {
         handsFreeVoiceOwnsCommandPage = false
@@ -32345,7 +32344,7 @@ generation != cameraFallbackGeneration
         val preparationGeneration = voiceRecognitionGeneration
         stopHandsFreeVoiceService()
         return speakCommandResponse(
-            message = "안내가 끝나면 말씀해 주세요.",
+            message = "안내가 끝나면 말해주세요.",
             preparingInput = true,
             onCompleted = {
                 if (voiceCommandPromptPending && voiceRecognitionGeneration == preparationGeneration) {
@@ -32826,7 +32825,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun scheduleHandsFreeVoiceRestart() {
-        if (reportPanelDialog != null || voiceHelpDialog != null || nativeGuidanceConfirmationAction != null) return
+        if (reportPanelDialog != null || voiceHelpScreen != null || nativeGuidanceConfirmationAction != null) return
         if (!::statusText.isInitialized || handsFreeVoiceDestroyed) return
         handsFreeVoiceRestartRunnable?.let(statusText::removeCallbacks)
         lateinit var restart: Runnable
@@ -34458,7 +34457,7 @@ generation != cameraFallbackGeneration
                     reportPanelStatus?.append("\n\n음성을 확인하지 못했습니다. 다시 듣기를 눌러 재시도하거나 아래 버튼을 선택해 주세요.")
                     return
                 }
-                if (voiceHelpDialog != null && purpose == VoiceRecognitionPurpose.COMMAND) {
+                if (voiceHelpScreen != null && purpose == VoiceRecognitionPurpose.COMMAND) {
                     if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                         handleVoiceHelpInput(emptyList())
                     } else {
@@ -34632,7 +34631,7 @@ generation != cameraFallbackGeneration
             handleReportPanelInput(phrases, confidenceScores?.getOrNull(0), hasAdditionalAlternatives)
             return
         }
-        if (voiceHelpDialog != null) {
+        if (voiceHelpScreen != null) {
             // SDK span alternatives are not another complete command. Help cannot start navigation
             // or submit a report, so use its own top-candidate policy instead of the action gate.
             handleVoiceHelpInput(phrases)
@@ -35176,7 +35175,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun openVoiceHelp() {
-        if (voiceHelpDialog != null) {
+        if (voiceHelpScreen != null) {
             speakVoiceHelp(kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.MENU)
             return
         }
@@ -35184,103 +35183,105 @@ generation != cameraFallbackGeneration
         stopHandsFreeVoiceService()
         cancelForegroundHomeWakeListening()
         val density = resources.displayMetrics.density
-        val padding = (24 * density).roundToInt()
+        fun dp(value: Int) = (value * density).roundToInt()
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(padding, padding, padding, (12 * density).roundToInt())
-            background = GradientDrawable().apply {
-                setColor(WS_COLOR_GROUND)
-                cornerRadius = 24 * density
-            }
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            setBackgroundColor(WS_COLOR_GROUND)
         }
         val title = TextView(this).apply {
             id = View.generateViewId()
-            text = "음성 도움말"
+            text = "도움말"
             textSize = 28f
             typeface = wsTypeface(Typeface.BOLD)
             setTextColor(WS_COLOR_EMPHASIS)
             ViewCompat.setAccessibilityHeading(this, true)
         }
         content.addView(title)
-        voiceHelpSummary = TextView(this).apply {
-            id = View.generateViewId()
-            text = "안내 후 번호를 말씀해 주세요."
-            textSize = 18f
-            setTextColor(WS_COLOR_NOTICE_TEXT)
-            setPadding(0, (8 * density).roundToInt(), 0, (20 * density).roundToInt())
-            accessibilityTraversalAfter = title.id
-        }
-        // Only the menu scrolls: the heading and close action stay in predictable positions.
-        // The scroll area also accommodates the system's larger text settings.
         val items = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         var previousId = title.id
         kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.titles.forEachIndexed { index, label ->
             val button = voiceHelpButton("${index + 1}번  $label") {
                 handleVoiceHelpInput(listOf("${index + 1}번"))
+            }.apply {
+                // Use the same large outlined card style as the main menu.
+                applyWsSecondaryButtonStyle(this)
+                textSize = 24f
+                accessibilityTraversalAfter = previousId
             }
-            button.accessibilityTraversalAfter = previousId
             previousId = button.id
             items.addView(button)
         }
-        // Keep changing status inside the scroll area so long recovery messages cannot hide Close.
-        voiceHelpSummary?.let { summary ->
-            summary.accessibilityTraversalAfter = previousId
-            items.addView(summary)
-            previousId = summary.id
-        }
+        voiceHelpSummary = TextView(this).apply {
+            id = View.generateViewId()
+            text = "안내 후 번호를 말씀하거나 버튼을 눌러 주세요."
+            textSize = 18f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            setPadding(0, dp(8), 0, dp(12))
+            accessibilityTraversalAfter = previousId
+        }.also { items.addView(it); previousId = it.id }
         voiceHelpRecovery = voiceHelpButton("다시 시도") {
             speakVoiceHelp(voiceHelpLastText)
         }.apply {
             visibility = View.GONE
             accessibilityTraversalAfter = previousId
-        }.also(items::addView)
-        val scroll = ScrollView(this).apply {
-            isFillViewport = false
-            clipToPadding = false
-            setPadding(0, (20 * density).roundToInt(), 0, 0)
+        }.also { items.addView(it); previousId = it.id }
+        content.addView(ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = true
+            setPadding(0, dp(16), 0, 0)
             addView(items)
-        }
-        content.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        content.addView(voiceHelpButton("도움말 닫기", primary = true) {
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        val close = voiceHelpButton("도움말 닫기", primary = true) {
             closeVoiceHelp(announce = true)
-        })
-        voiceHelpDialog = android.app.AlertDialog.Builder(this)
-            .setView(content)
-            .create().also { dialog ->
-                dialog.setView(content, 0, 0, 0, 0)
-                dialog.setOnCancelListener { closeVoiceHelp(announce = true) }
-                dialog.setCanceledOnTouchOutside(false)
-                dialog.show()
-                dialog.window?.apply {
-                    setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-                    val bounds = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        windowManager.currentWindowMetrics.bounds
-                    } else {
-                        android.graphics.Rect(0, 0, resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels)
-                    }
-                    setLayout(minOf(bounds.width() - (32 * density).roundToInt(), (560 * density).roundToInt()),
-                        (bounds.height() * 0.85f).roundToInt())
-                    setDimAmount(0.65f)
-                }
-            }
+        }.apply { accessibilityTraversalAfter = previousId }
+        content.addView(close, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(16) })
+        // A normal activity view covers the whole content area: no dialog window or dimmed backdrop.
+        val host = findViewById<ViewGroup>(android.R.id.content)
+        voiceHelpCoveredViews.clear()
+        for (index in 0 until host.childCount) {
+            val child = host.getChildAt(index)
+            voiceHelpCoveredViews += child to child.importantForAccessibility
+            child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        voiceHelpScreen = insetNativeContent(content).apply {
+            isClickable = true
+            isFocusable = true
+            ViewCompat.setAccessibilityPaneTitle(this, "도움말")
+        }.also { host.addView(it, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        )) }
+        title.requestFocus()
         speakVoiceHelp(kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.MENU)
     }
 
     private fun closeVoiceHelp(announce: Boolean) {
-        val dialog = voiceHelpDialog ?: return
-        voiceHelpDialog = null
+        val screen = voiceHelpScreen ?: return
+        voiceHelpScreen = null
         voiceHelpGeneration += 1L
         voiceHelpCue?.close()
         voiceHelpCue = null
         voiceHelpSummary = null
         voiceHelpRecovery = null
-        dialog.dismiss()
+        (screen.parent as? ViewGroup)?.removeView(screen)
+        voiceHelpCoveredViews.forEach { (view, importance) -> view.importantForAccessibility = importance }
+        voiceHelpCoveredViews.clear()
         cancelVoiceCommandRecognition()
-        if (announce) speakStatusExplanation("도움말을 닫았습니다.")
+        if (announce) {
+            if (nativeUiPage == NativeUiPage.HOME && ::homeCardGrid.isInitialized) {
+                homeCardGrid.getChildAt(0)?.let { homeHelp ->
+                    homeHelp.requestFocus()
+                    homeHelp.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+                }
+            }
+            speakStatusExplanation("도움말을 닫았습니다.")
+        }
     }
 
     private fun handleVoiceHelpInput(phrases: List<String>) {
-        if (voiceHelpDialog == null) return
+        if (voiceHelpScreen == null) return
         val choice = kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.parse(phrases)
         if (BuildConfig.DEBUG) android.util.Log.d(
             "WalkSafeVoiceInput",
@@ -35303,14 +35304,14 @@ generation != cameraFallbackGeneration
     }
 
     private fun showVoiceHelpRecovery(message: String) {
-        if (voiceHelpDialog == null) return
+        if (voiceHelpScreen == null) return
         voiceHelpSummary?.text = message
         voiceHelpSummary?.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         voiceHelpRecovery?.visibility = View.VISIBLE
     }
 
     private fun speakVoiceHelp(text: String, remember: Boolean = true) {
-        if (voiceHelpDialog == null) return
+        if (voiceHelpScreen == null) return
         // Invalidate old playback and input before a touch selection or repeat starts another turn.
         val generation = ++voiceHelpGeneration
         voiceHelpCue?.cancel()
@@ -35321,7 +35322,7 @@ generation != cameraFallbackGeneration
         val epoch = walkSessionLifecycle.snapshot().epoch
         val lifecycle = feedbackLifecycleGeneration
         val helpPage = nativeUiPage
-        fun current() = voiceHelpDialog != null && generation == voiceHelpGeneration &&
+        fun current() = voiceHelpScreen != null && generation == voiceHelpGeneration &&
             isActivityForeground && nativeUiPage == helpPage &&
             epoch == walkSessionLifecycle.snapshot().epoch && lifecycle == feedbackLifecycleGeneration
         val started = speakCommandResponse(text, preparingInput = true, statusExplanation = true, onCompleted = {
