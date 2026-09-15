@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.inference.tracking
 
+import kr.co.hanium.dreamup.walksafe.UprightCameraImage
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
 import kr.co.hanium.dreamup.walksafe.depth.Point2
 import kr.co.hanium.dreamup.walksafe.depth.RectNorm
@@ -24,6 +25,7 @@ class InterFrameDetectionTracker(
     private var acceptedEpoch: Long? = null
     private var acceptedGeometryVersion: Long? = null
     private var acceptedDimensions: FrameDimensions? = null
+    private var coverageCursor = 0
 
     @Synchronized
     fun initialize(): Boolean = estimator.initialize()
@@ -32,6 +34,7 @@ class InterFrameDetectionTracker(
     fun clear() {
         history.clear()
         batch = null
+        coverageCursor = 0
     }
 
     @Synchronized
@@ -90,8 +93,13 @@ class InterFrameDetectionTracker(
         /** Live callers pass current elapsed realtime; the default also supports offline replay. */
         observedAtElapsedRealtimeMs: Long = targetKey.capturedAtElapsedRealtimeMs,
         executionBudgetNs: Long = config.maxExecutionNs,
+        /** Sensor-to-upright rotation used for this detector capture, not an inferred distance. */
+        uprightQuarterTurns: Int = 0,
+        /** Fresh source-frame hazard indexes in risk order; fixed when this batch is first admitted. */
+        prioritySourceIndices: List<Int> = emptyList(),
     ): VisualTrackingResult {
         require(executionBudgetNs in 1L..100_000_000L)
+        require(uprightQuarterTurns in 0..3)
         val started = clockNanos()
         val budget = TrackingWorkBudget(config, clockNanos, started, executionBudgetNs)
         var edges = 0
@@ -129,7 +137,7 @@ class InterFrameDetectionTracker(
             (targetKey.cameraTimestampNs - sourceKey.cameraTimestampNs) / 1_000_000L > config.maxDetectionAgeMs
         ) return failed(VisualTrackingFailure.SOURCE_EXPIRED)
         if (detectionRevision < 0L) return failed(VisualTrackingFailure.DETECTION_REVISION_OLD)
-        if (!initialize()) return failed(VisualTrackingFailure.NATIVE_INITIALIZATION_FAILED)
+        if (sourceKey != targetKey && !initialize()) return failed(VisualTrackingFailure.NATIVE_INITIALIZATION_FAILED)
 
         val previous = batch
         if (previous != null && previous.sourceKey != sourceKey &&
@@ -137,6 +145,9 @@ class InterFrameDetectionTracker(
             return failed(VisualTrackingFailure.DETECTOR_SOURCE_OUT_OF_ORDER)
         }
         if (previous?.sourceKey == sourceKey) {
+            if (previous.uprightQuarterTurns != uprightQuarterTurns) {
+                return failed(VisualTrackingFailure.DETECTION_IDENTITY_CONFLICT)
+            }
             if (detectionRevision < previous.revision || (previous.completed && !completed)) {
                 return failed(VisualTrackingFailure.DETECTION_REVISION_OLD)
             }
@@ -146,11 +157,13 @@ class InterFrameDetectionTracker(
         }
         if (previous == null || previous.sourceKey != sourceKey || previous.revision != detectionRevision) {
             val frozen = detections.map { it.copy(polygonNorm = it.polygonNorm.toList()) }
-            batch = Batch(sourceKey, detectionRevision, completed, frozen, frozen.mapIndexed { index, detection ->
+            val selectedIndexes = selectTrackingIndexes(frozen, uprightQuarterTurns, prioritySourceIndices)
+            val initialIndexes = selectedIndexes.take(config.maxTrackedObjects).toSet()
+            batch = Batch(sourceKey, detectionRevision, completed, uprightQuarterTurns, frozen, selectedIndexes, frozen.mapIndexed { index, detection ->
                 State(
                     lastKey = sourceKey,
+                    admitted = index in initialIndexes,
                     failure = when {
-                        index >= config.maxTrackedObjects -> VisualTrackingFailure.OBJECT_BUDGET_EXCEEDED
                         !valid(detection) -> VisualTrackingFailure.INVALID_GEOMETRY
                         else -> null
                     },
@@ -160,11 +173,19 @@ class InterFrameDetectionTracker(
         val current = requireNotNull(batch)
         val source = frames[sourceIndex]
         var budgetFailure: VisualTrackingFailure? = null
-        for (index in current.states.indices) {
+        var activeSlots = current.states.count { it.admitted && it.failure == null }
+        // Preserve priority in execution order as well as admission when the call budget is tight.
+        for (index in current.selectedIndexes) {
             val state = current.states[index]
-            if (state.failure != null || state.lastKey == targetKey) continue
+            if (sourceKey == targetKey || state.failure != null) continue
+            if (!state.admitted && activeSlots >= config.maxTrackedObjects) continue
+            if (state.admitted && state.lastKey == targetKey) continue
             if (budgetFailure != null) continue
             val detection = current.detections[index]
+            if (!state.admitted) {
+                state.admitted = true
+                activeSlots++
+            }
             try {
                 budget.charge()
                 if (state.features == null) {
@@ -213,14 +234,26 @@ class InterFrameDetectionTracker(
                 }
             } catch (exceeded: TrackingBudgetExceeded) {
                 budgetFailure = exceeded.failure
+            } finally {
+                // Terminal failures free a slot immediately; the next candidate uses this same
+                // call's remaining time and pixel budget. Pending work retains its own slot.
+                if (budgetFailure == null) rejectCompetingObjects(current, targetKey)
+                activeSlots = current.states.count { it.admitted && it.failure == null }
             }
         }
-        val reachedTarget = current.states.all { it.failure != null || it.lastKey == targetKey }
+        val reachedTarget = current.states.all { !it.admitted || it.failure != null || it.lastKey == targetKey }
         val completedAfterDeadline = budgetFailure == VisualTrackingFailure.TIME_BUDGET_EXCEEDED && reachedTarget
         val incompleteBatch = budgetFailure != null && !completedAfterDeadline
         if (!incompleteBatch) rejectCompetingObjects(current, targetKey)
         val observations = current.states.mapIndexed { index, state ->
-            val failure = state.failure ?: if (incompleteBatch || state.lastKey != targetKey) budgetFailure else null
+            // An exact detector capture already measures its own geometry; flow admission only
+            // limits propagation to a later image. Never reuse these untracked boxes on later frames.
+            val failure = state.failure ?: when {
+                sourceKey == targetKey -> null
+                !state.admitted -> VisualTrackingFailure.OBJECT_BUDGET_EXCEEDED
+                incompleteBatch || state.lastKey != targetKey -> budgetFailure
+                else -> null
+            }
             if (failure != null) {
                 lost(index, sourceKey, targetKey, failure, state.originalCount, state.features?.size ?: 0)
             } else {
@@ -310,13 +343,14 @@ class InterFrameDetectionTracker(
     }
 
     private fun rejectCompetingObjects(batch: Batch, target: VisualFrameKey) {
-        val count = minOf(batch.states.size, config.maxTrackedObjects)
+        val indexes = batch.selectedIndexes.filter { batch.states[it].admitted && batch.states[it].failure == null }
+        val count = indexes.size
         for (i in 0 until count) for (j in i + 1 until count) {
-            val first = batch.states[i]
-            val second = batch.states[j]
+            val first = batch.states[indexes[i]]
+            val second = batch.states[indexes[j]]
             if (first.failure != null || second.failure != null || first.lastKey != target || second.lastKey != target) continue
-            val originalFirst = batch.detections[i]
-            val originalSecond = batch.detections[j]
+            val originalFirst = batch.detections[indexes[i]]
+            val originalSecond = batch.detections[indexes[j]]
             if (iou(originalFirst.bboxNorm, originalSecond.bboxNorm) >= 0.30f) continue
             if (iou(transform(originalFirst, first.transform).bboxNorm,
                     transform(originalSecond, second.transform).bboxNorm) > 0.65f) {
@@ -324,6 +358,38 @@ class InterFrameDetectionTracker(
                 second.failure = VisualTrackingFailure.OBJECT_COMPETITION
             }
         }
+    }
+
+    private fun selectTrackingIndexes(
+        detections: List<DetectionCandidate>, turns: Int, prioritySourceIndices: List<Int>,
+    ): List<Int> {
+        val validIndexes = detections.indices.filter { valid(detections[it]) }
+        // Screen geometry is a priority heuristic, not metric depth or a calibrated risk score.
+        val uprightRects = validIndexes.associateWith {
+            UprightCameraImage.toSensor(detections[it].bboxNorm, (4 - turns) % 4)
+        }
+        val geometryRanked = validIndexes.sortedWith(compareByDescending<Int> {
+            val rect = uprightRects.getValue(it)
+            rect.x < 0.65f && rect.x + rect.width > 0.35f && rect.y + rect.height >= 0.5f
+        }.thenByDescending { uprightRects.getValue(it).let { rect -> rect.y + rect.height } }
+            .thenByDescending { uprightRects.getValue(it).area }
+            .thenByDescending { detections[it].detectionConfidence }
+            .thenBy { it })
+        val preferred = prioritySourceIndices.take(config.maxInputDetections).distinct().filter { it in validIndexes }
+        val ranked = preferred + geometryRanked.filter { it !in preferred }
+        if (ranked.size <= config.maxTrackedObjects) return ranked
+        // Confirmed hazards may fill every slot; coverage must never evict a supplied hazard.
+        val priorityCount = maxOf((config.maxTrackedObjects - 1).coerceAtLeast(1),
+            preferred.size.coerceAtMost(config.maxTrackedObjects))
+        val priority = ranked.take(priorityCount)
+        if (priorityCount == config.maxTrackedObjects) return priority + ranked.filter { it !in priority }
+        // Keep one bounded coverage slot, advancing only when a new detector batch is admitted.
+        // Repeated calls on the same revision keep the same identities and backfill state.
+        val remaining = validIndexes.filter { it !in priority }
+        val coverage = remaining[coverageCursor % remaining.size]
+        coverageCursor = (coverageCursor + 1) % config.maxInputDetections
+        val selected = priority + coverage
+        return selected + ranked.filter { it !in selected }
     }
 
     private fun iou(a: RectNorm, b: RectNorm): Float {
@@ -338,12 +404,15 @@ class InterFrameDetectionTracker(
         val sourceKey: VisualFrameKey,
         val revision: Long,
         val completed: Boolean,
+        val uprightQuarterTurns: Int,
         val detections: List<DetectionCandidate>,
+        val selectedIndexes: List<Int>,
         val states: MutableList<State>,
     )
 
     private data class State(
         var lastKey: VisualFrameKey,
+        var admitted: Boolean = false,
         var features: List<VisualMotionFeature>? = null,
         var originalCount: Int = 0,
         var transform: VisualAffineTransform = VisualAffineTransform(),

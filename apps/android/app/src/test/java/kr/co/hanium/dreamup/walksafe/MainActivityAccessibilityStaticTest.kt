@@ -385,8 +385,8 @@ class MainActivityAccessibilityStaticTest {
 
         assertTrue(source.contains("private fun speakInteraction(message: String)"))
         assertTrue(voice.contains("speakInteraction(message)"))
-        assertTrue(voice.contains("speakNavigation(message)"))
-        assertTrue(voice.contains("routeNavigator.acknowledgeCurrentInstruction"))
+        assertTrue(voice.contains("routeNavigator.currentGuidance(nowMs, currentRouteFacingObservation(nowMs))"))
+        assertTrue(voice.contains("tryDispatchRouteInstruction(update, expectedWalkEpoch)"))
         assertTrue(route.contains("dispatchNavigationSpeech("))
         assertTrue(route.contains("routeNavigator.reserveInstruction(update)"))
         assertTrue(route.contains("routeNavigator.releaseInstruction(update, SystemClock.elapsedRealtime())"))

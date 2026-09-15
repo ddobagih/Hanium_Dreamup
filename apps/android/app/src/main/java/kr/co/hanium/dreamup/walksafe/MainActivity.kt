@@ -153,6 +153,7 @@ import kr.co.hanium.dreamup.walksafe.device.AndroidWalkSessionResourceProbe
 import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyCoordinator
 import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyObservation
 import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyStop
+import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyStopCause
 import kr.co.hanium.dreamup.walksafe.device.CameraFrameQualityAssessment
 import kr.co.hanium.dreamup.walksafe.device.CameraFrameQualityObservation
 import kr.co.hanium.dreamup.walksafe.device.CameraFrameQualityPolicy
@@ -221,6 +222,9 @@ import kr.co.hanium.dreamup.walksafe.depth.CoordinateMapper
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
 import kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot
 import kr.co.hanium.dreamup.walksafe.depth.assessRuntimeDepthFrame
+import kr.co.hanium.dreamup.walksafe.depth.allowsRuntimeDepthGapProcessing
+import kr.co.hanium.dreamup.walksafe.depth.PredictedDepthEstimate
+import kr.co.hanium.dreamup.walksafe.depth.DepthPredictionPresentation
 import kr.co.hanium.dreamup.walksafe.depth.ImageSize
 import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
 import kr.co.hanium.dreamup.walksafe.depth.MotionContext
@@ -312,9 +316,14 @@ import kr.co.hanium.dreamup.walksafe.navigation.EncryptedRouteSnapshotStore
 import kr.co.hanium.dreamup.walksafe.navigation.FrozenImageToDepthTransform
 import kr.co.hanium.dreamup.walksafe.navigation.GatewayProxyHttpException
 import kr.co.hanium.dreamup.walksafe.navigation.LocationTrustPolicy
+import kr.co.hanium.dreamup.walksafe.navigation.NavigationTestLocationPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.NavigationBackendErrorKind
 import kr.co.hanium.dreamup.walksafe.navigation.haversineMeters
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigator
+import kr.co.hanium.dreamup.walksafe.navigation.RouteFacingObservation
+import kr.co.hanium.dreamup.walksafe.navigation.RouteFacingSource
+import kr.co.hanium.dreamup.walksafe.navigation.RouteCompassLocationReference
+import kr.co.hanium.dreamup.walksafe.navigation.RouteCompassHeadingReason
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorDecisionToken
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorUpdate
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorUserDecision
@@ -942,7 +951,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var cameraFallbackStartReason: CameraFallbackStartReason? = null
     private var cameraFallbackAvailability: ArCoreApk.Availability? = null
     private val nonMetricAdvisoryPolicy = AndroidNonMetricObstacleAdvisoryPolicy()
-    private var objectDepthPipeline = ObjectDepthRuntimePipeline()
+    private var objectDepthPipeline = ObjectDepthRuntimePipeline(rawDepthMotionOnly = true)
     private val visualFrameTracker = InterFrameDetectionTracker(
         VisualTrackingConfig(
             backend = VisualTrackingBackend.OPENCV_PYRAMIDAL_LK,
@@ -956,6 +965,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var lastVisualFrameKey: VisualFrameKey? = null
     private var lastRuntimeCameraFrameId = 0L
     private var currentObjectDepthPipeline = ObjectDepthRuntimePipeline(
+        rawDepthMotionOnly = true,
         tracker = ObjectTracker(trackIdPrefix = "visual-0-track-"),
     )
     private var latestVisualOverlayFrameId = 0L
@@ -976,6 +986,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var commandSpeechResponseGeneration = 0L
     private var voiceCommandPromptPending = false
     private var voiceCommandPromptReadyGeneration: Int? = null
+    private var deferredVoiceRecognitionStart: Runnable? = null
+    private var deferredVoiceRecognitionFailure: (() -> Unit)? = null
     private var voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
     private var handsFreeVoiceController: HandsFreeVoiceController? = null
     @Volatile
@@ -1084,6 +1096,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var latestWalkingSpeedObservation: WalkingSpeedObservation? = null
     private var latestGpsCourseObservation: HeadingObservation? = null
     private var latestRawRouteLocation: TrustedLocation? = null
+    private var latestNavigationTestLocation: TrustedLocation? = null
+    private var navigationSpeechRetryRunnable: Runnable? = null
+    private var routeLocationStatusResponseGeneration: Long? = null
     private data class GpsMotionInputs(
         val speed: WalkingSpeedObservation?,
         val course: HeadingObservation?,
@@ -1216,7 +1231,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val gatewayWalkRenewalRunnable = Runnable {
         requestGatewayWalkRenewal()
     }
-    private val routeNavigator = RouteNavigator()
+    private val routeNavigator = RouteNavigator(
+        allowDegradedRouteGuidance = BuildConfig.DEBUG && BuildConfig.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS,
+    )
     private val tmapFailureGuard = ConsecutiveTmapFailureGuard(safetyStopThreshold = 2)
     private val reportCleanupExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "walksafe-report-cleanup").apply {
@@ -1420,7 +1437,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     @Volatile
     private var latestTmapOnRoute = false
     private var directionGuidancePauseReason: String? = null
+    private var lastRouteCompassStatusKey: String? = null
+    private var lastRouteAlignmentDiagnosticKey: String? = null
+    private var lastRouteAlignmentDiagnosticAtMs = 0L
+    private var pendingRouteCompassRefresh: Runnable? = null
     private var lastAnnouncedRouteDecisionToken: RouteNavigatorDecisionToken? = null
+    private var pendingRouteDecisionSpeechToken: RouteNavigatorDecisionToken? = null
+    private var routeDecisionSpeechAttempt = 0L
+    private var routeDecisionSpeechResponseGeneration: Long? = null
+    private var routeDecisionSpeechRetryRunnable: Runnable? = null
     private var renderedArrivalDecisionToken: RouteNavigatorDecisionToken? = null
     private var routeDeviationHapticDecision: RouteNavigatorUserDecision? = null
     private var routeSnapshotPurgeFailed = false
@@ -1493,6 +1518,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
     private val detectionInFlight = AtomicBoolean(false)
+    private val unknownFrameCopyInFlight = AtomicBoolean(false)
     @Volatile private var unknownRuntimeService: FastSamRuntimeService<UnknownRuntimeAttachment>? = null
     @Volatile private var unknownLoadingService: FastSamRuntimeService<UnknownRuntimeAttachment>? = null
     @Volatile private var unknownProcessingContext: UnknownProcessingContext? = null
@@ -1532,11 +1558,29 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val context: UnknownProcessingContext,
         val capture: FrozenUnknownDepthCapture,
         val ticket: InferencePacingTicket,
+        val processingLease: UnknownCaptureProcessingLease,
     ) : UnknownRuntimeAttachment
+
+    private data class UnknownCaptureProcessingLease(
+        val arLease: ArSessionLease,
+        val frameId: Long,
+        val capturedAtElapsedRealtimeMs: Long,
+        // A gap capture keeps its original deadline even if measured depth later recovers.
+        val gapDeadlineElapsedRealtimeMs: Long?,
+    )
+
+    private data class UnknownCaptureEvidence(
+        val frameId: Long,
+        val depthSnapshot: DepthFrameSnapshot,
+        val depthMapper: FrozenImageToTextureCoordinateMapper?,
+        val motionContext: MotionContext,
+        val imageQuarterTurns: Int,
+        val processingLease: UnknownCaptureProcessingLease,
+    )
 
     private data class UnknownFeedbackObservation(
         val context: UnknownProcessingContext,
-        val batch: UnknownObjectFeedbackBatch,
+        val batches: List<UnknownObjectFeedbackBatch>,
     )
     private var detectorLoadGeneration = 0L
     private var detectorClosing = false
@@ -1735,7 +1779,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         get() = BuildConfig.DEBUG && !BuildConfig.WALKSAFE_POST_LOGIN_DEVICE_CHECK_REQUIRED
     private val developmentGuidanceStartBypassEnabled: Boolean
         get() = BuildConfig.DEBUG && BuildConfig.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS &&
-            developmentGuidanceStartRequested
+            (developmentGuidanceStartRequested || shouldShowNativeHome())
     private var developmentQuickStartStatusText: TextView? = null
     private var developmentQuickStartButton: Button? = null
     private var developmentQuickStartRequested = false
@@ -1771,6 +1815,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var runtimeMetricLastValidFrameAtMs = 0L
     @Volatile
     private var runtimeMetricLastFrameTimestampNanos = 0L
+    @Volatile
+    private var runtimeVisualDepthFrameTracking = false
     private var runtimeMetricInitialNavigationStartPending = false
     private var onDeviceSpeechRecognitionCapabilityOverride: Boolean? = null
     private var oneShotSpeechRecognitionLimited = false
@@ -9355,6 +9401,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val preference = permissionSessionPolicy.snapshot().mobileNetworkPreference
         if (AndroidNetworkTransferPolicy.isAllowed(preference, transport)) return true
+        if (developmentGuidanceStartBypassEnabled &&
+            reason in setOf("destination_search", "walking_route") &&
+            transport != ActiveNetworkTransport.OFFLINE
+        ) return true
         val publishBlockedState = {
             updateNavigationStatus(
                 "network=blocked reason=$reason transport=${transport.name.lowercase(Locale.US)} " +
@@ -10913,14 +10963,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     internal fun cancelNavigationRequestsForDestinationSelection(): AndroidNavigationCancellation {
+        cancelNavigationSpeechRetry()
+        cancelRouteLocationStatusSpeech()
+        cancelRouteDecisionSpeech()
         return handleNavigationRequestEvent(AndroidNavigationRequestEvent.DESTINATION_SELECTED)
     }
 
     internal fun cancelNavigationRequestsForPause(): AndroidNavigationCancellation {
+        cancelNavigationSpeechRetry()
+        cancelRouteLocationStatusSpeech()
+        cancelRouteDecisionSpeech()
         return handleNavigationRequestEvent(AndroidNavigationRequestEvent.ACTIVITY_PAUSED)
     }
 
     internal fun cancelNavigationRequestsForDestroy(): AndroidNavigationCancellation {
+        cancelNavigationSpeechRetry()
+        cancelRouteLocationStatusSpeech()
+        cancelRouteDecisionSpeech()
         return handleNavigationRequestEvent(AndroidNavigationRequestEvent.ACTIVITY_DESTROYED)
     }
 
@@ -10929,6 +10988,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun clearGatewayNavigationState() {
+        cancelNavigationSpeechRetry()
+        cancelRouteDecisionSpeech()
         routeRequestGeneration += 1
         routeRequestInFlight.set(false)
         destinationSearchGeneration += 1
@@ -10942,6 +11003,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         currentDestination = null
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
+        cancelRouteLocationStatusSpeech()
+        feedbackActuator?.cancelNavigationSpeech()
         routeStartStepCount = null
         destinationSearchResults.clear()
         updateDestinationSearchUi()
@@ -11361,7 +11424,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             lastOverlayUpdateMs = 0L
             lastUiUpdateMs = 0L
             latestTactileRouteState = "localRoute=tmap:tactile_not_visible"
-            objectDepthPipeline = ObjectDepthRuntimePipeline().also { pipeline ->
+            objectDepthPipeline = ObjectDepthRuntimePipeline(rawDepthMotionOnly = true).also { pipeline ->
                 pipeline.setUserStepLength(stepLengthEstimator.stepLengthM)
             }
             captureLog.clear()
@@ -11712,7 +11775,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun handleNavigationPermissionResult() {
-        if (permissionRecoveryGate.blocksAutomaticResourceStart) return
+        if (permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled) return
         if (hasLocationPermission()) {
             if (isRouteActive || navigationPermissionsRequestedForRoute || navigationPermissionsRequestedForReport || isFieldSessionActive()) {
                 startLocationUpdatesIfAllowed(forceRestart = true)
@@ -11773,6 +11836,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         latestVisualOverlayFrameId = 0L
         latestVisualTrackingStatus = "visual=waiting_for_new_capture"
         currentObjectDepthPipeline = ObjectDepthRuntimePipeline(
+            rawDepthMotionOnly = true,
             tracker = ObjectTracker(trackIdPrefix = "visual-$visualGeometryVersion-track-"),
         ).also { it.setUserStepLength(stepLengthEstimator.stepLengthM) }
     }
@@ -11822,6 +11886,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (!admission.accepted) return null
             if (admission.reset) {
                 currentObjectDepthPipeline = ObjectDepthRuntimePipeline(
+                    rawDepthMotionOnly = true,
                     tracker = ObjectTracker(trackIdPrefix = "visual-$geometryVersion-${gray.key.frameId}-track-"),
                 ).also { it.setUserStepLength(stepLengthEstimator.stepLengthM) }
             }
@@ -11898,7 +11963,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 detectorAvailable &&
                     !detectionInFlight.get() &&
                     adaptiveInferencePacing.isDue(elapsedRealtimeMs)
-            } || hasFreshVisualSource(elapsedRealtimeMs)
+            } || unknownFrameCaptureIsDue(elapsedRealtimeMs) || hasFreshVisualSource(elapsedRealtimeMs)
         val depthProcessingStartedMs = SystemClock.elapsedRealtime()
         val snapshot = if (arLease.purpose == ArSessionPurpose.PREFLIGHT) {
             provider.acquirePreflightDepthBundle(frame).toSnapshotAndClose()
@@ -11951,6 +12016,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val grayFrame = captureVisualTrackingFrame(
             provider, frame, snapshot, elapsedRealtimeMs, frameGeneration, walkEpoch, arLease.generation,
         )
+        scheduleUnknownDetectionIfDue(
+            provider, frame, snapshot, elapsedRealtimeMs, frameGeneration, walkEpoch, arLease,
+        )
         scheduleDetectionIfDue(
             provider,
             frame,
@@ -11963,7 +12031,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             arLease.generation,
             grayFrame?.key,
         )
-        if (!runtimeMetricOutputAllowed || !currentRuntimeMetricOutputAllowsWork(arLease.generation)) {
+        val currentFrameTracking = frame.camera.trackingState == TrackingState.TRACKING
+        if (!currentRuntimeVisualDepthProcessingAllowsWork(arLease, frame.timestamp, currentFrameTracking)) {
             if (cameraScreenVisible && elapsedRealtimeMs - lastCameraScreenFrameUiMs >= 250L) {
                 lastCameraScreenFrameUiMs = elapsedRealtimeMs
                 val observed = latestDetectionSnapshot
@@ -11993,55 +12062,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
             selectOverlayDetections(detectionSnapshot, nowMs, timestampMs)
         }
-        val trackingProcessingStartedMs = SystemClock.elapsedRealtime()
-        val trackingResult = synchronized(frameStateLock) {
-            val sourceKey = detectionSnapshot.frameEvidence?.visualFrameKey
-            if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
-            if (grayFrame == null || sourceKey == null || detectionSnapshot.partial) null
-            else visualFrameTracker.trackFrom(
-                sourceKey, detectionSnapshot.detections, grayFrame.key, completed = true,
-                observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
-                executionBudgetNs = currentVisualTrackingBudgetNs,
-            )
-        }
-        runtimeLoadObservationSource.recordFrame(
-            cameraTimestampNs = snapshot.cameraImageTimestampNs ?: frame.timestamp,
-            observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
-            depthProcessingMs = depthProcessingMs,
-            trackingProcessingMs = if (grayFrame != null) SystemClock.elapsedRealtime() - trackingProcessingStartedMs else null,
-            trackingBudgetMs = kotlin.math.ceil(currentVisualTrackingBudgetNs / 1_000_000.0).toLong(),
-            environmentKey = runtimeLoadEnvironmentKey(),
-        )
-        val currentEvidence = if (grayFrame != null && trackingResult != null) DetectionFrameEvidence(
-            frameId = frame.timestamp,
-            frameTimestampMs = timestampMs,
-            depthSnapshot = snapshot,
-            depthMapper = createFrozenDepthMapper(frame, frame.timestamp, grayFrame.sourceWidth, grayFrame.sourceHeight, snapshot),
-            tactileContext = buildTactileProjectionContext(frame, elapsedRealtimeMs),
-            motionContext = buildDepthMotionContext(elapsedRealtimeMs),
-            navigationActive = isRouteActive && !routeRequestInFlight.get(),
-            tmapOnRoute = latestTmapOnRoute,
-            visualFrameKey = grayFrame.key,
-        ) else null
-        val currentObservation = if (trackingResult != null && currentEvidence != null) {
-            CurrentTrackedFrameEvidence.fromTrackingResult(
-                detectionSnapshot, trackingResult, currentEvidence, SystemClock.elapsedRealtime(),
-            )
-        } else null
-        val overlayDetections = currentObservation?.observation?.trackedObservations.orEmpty().mapNotNull { it.geometry }
-        var overlayDebugState = overlaySelection.debugState.copy(
-            selection = "current_visual_observation",
-            detectionCount = overlayDetections.size,
-            holdApplied = false,
-        )
-        latestVisualTrackingStatus = trackingResult?.let { result ->
-            "visual=${overlayDetections.size}/${result.observations.size} " +
-                "cost=${result.metrics.durationNs / 1_000_000L}ms " +
-                "budget=${result.metrics.executionBudgetNs / 1_000_000L}ms overrun=${result.metrics.executionBudgetOverrun} " +
-                "lost=${result.observations.mapNotNull { it.failure }.distinct().joinToString()}"
-        } ?: "visual=source_or_current_image_unavailable"
-        if (!currentRuntimeMetricOutputAllowsWork(arLease.generation)) return
-        val frozenPreparedFrame = this.prepareTactileFrameDispatch(
+        val frozenPreparedFrame = if (currentRuntimeMetricOutputAllowsWork(arLease.generation)) this.prepareTactileFrameDispatch(
             detectionSnapshot = detectionSnapshot,
             nowMs = nowMs,
             currentFrameTimestampMs = timestampMs,
@@ -12063,10 +12084,74 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         detectionCompleted = true,
                         mapper = requireNotNull(evidence.depthMapper),
                         motionContext = evidence.motionContext,
+                        imageQuarterTurns = evidence.imageQuarterTurns,
                     )
                 }
             }
+        } else null
+        val frozenReportOutputs = frozenPreparedFrame?.frame?.guidance?.outputs.orEmpty()
+        val trackingPriority = PrimaryTrackingPriorityPolicy.sourceIndices(
+            detectionSnapshot.detections, frozenReportOutputs,
+            detectionSnapshot.frameEvidence?.frameId ?: 0L, detectionSnapshot.sourceAgeMs(nowMs))
+        val trackingProcessingStartedMs = SystemClock.elapsedRealtime()
+        val trackingResult = synchronized(frameStateLock) {
+            val sourceKey = detectionSnapshot.frameEvidence?.visualFrameKey
+            if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
+            if (grayFrame == null || sourceKey == null || detectionSnapshot.partial) null
+            else visualFrameTracker.trackFrom(
+                sourceKey, detectionSnapshot.detections, grayFrame.key, completed = true,
+                observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                executionBudgetNs = currentVisualTrackingBudgetNs,
+                uprightQuarterTurns = detectionSnapshot.frameEvidence?.imageQuarterTurns ?: 0,
+                prioritySourceIndices = trackingPriority,
+            )
         }
+        runtimeLoadObservationSource.recordFrame(
+            cameraTimestampNs = snapshot.cameraImageTimestampNs ?: frame.timestamp,
+            observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            depthProcessingMs = depthProcessingMs,
+            trackingProcessingMs = if (grayFrame != null) SystemClock.elapsedRealtime() - trackingProcessingStartedMs else null,
+            trackingBudgetMs = kotlin.math.ceil(currentVisualTrackingBudgetNs / 1_000_000.0).toLong(),
+            environmentKey = runtimeLoadEnvironmentKey(),
+        )
+        val currentEvidence = if (grayFrame != null && trackingResult != null) {
+            val currentViewBasis = FloatArray(6)
+            frame.transformCoordinates2d(Coordinates2d.IMAGE_NORMALIZED,
+                floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f), Coordinates2d.VIEW, currentViewBasis)
+            DetectionFrameEvidence(
+                frameId = frame.timestamp,
+                frameTimestampMs = timestampMs,
+                depthSnapshot = snapshot,
+                depthMapper = createFrozenDepthMapper(
+                    frame, frame.timestamp, grayFrame.sourceWidth, grayFrame.sourceHeight, snapshot,
+                    allowMissingDepth = true,
+                ),
+                tactileContext = buildTactileProjectionContext(frame, elapsedRealtimeMs),
+                motionContext = buildDepthMotionContext(elapsedRealtimeMs),
+                navigationActive = isRouteActive && !routeRequestInFlight.get(),
+                tmapOnRoute = latestTmapOnRoute,
+                visualFrameKey = grayFrame.key,
+                imageQuarterTurns = UprightCameraImage.quarterTurns(currentViewBasis),
+            )
+        } else null
+        val currentObservation = if (trackingResult != null && currentEvidence != null) {
+            CurrentTrackedFrameEvidence.fromTrackingResult(
+                detectionSnapshot, trackingResult, currentEvidence, SystemClock.elapsedRealtime(),
+            )
+        } else null
+        val overlayDetections = currentObservation?.observation?.trackedObservations.orEmpty().mapNotNull { it.geometry }
+        var overlayDebugState = overlaySelection.debugState.copy(
+            selection = "current_visual_observation",
+            detectionCount = overlayDetections.size,
+            holdApplied = false,
+        )
+        latestVisualTrackingStatus = trackingResult?.let { result ->
+            "visual=${overlayDetections.size}/${result.observations.size} " +
+                "cost=${result.metrics.durationNs / 1_000_000L}ms " +
+                "budget=${result.metrics.executionBudgetNs / 1_000_000L}ms overrun=${result.metrics.executionBudgetOverrun} " +
+                "lost=${result.observations.mapNotNull { it.failure }.distinct().joinToString()}"
+        } ?: "visual=source_or_current_image_unavailable"
+        if (!currentRuntimeVisualDepthProcessingAllowsWork(arLease, frame.timestamp, currentFrameTracking)) return
         val currentFrame = tactileFrameCoordinator.processTrackedObservation(
             frame = currentObservation,
             nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
@@ -12076,7 +12161,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ) { observation, evidence ->
             synchronized(frameStateLock) {
                 if (!isCurrentFrameGeneration(frameGeneration, walkEpoch) ||
-                    !currentRuntimeMetricOutputAllowsWork(arLease.generation)) emptyList()
+                    !currentRuntimeVisualDepthProcessingAllowsWork(arLease, frame.timestamp, currentFrameTracking)) emptyList()
                 else currentObjectDepthPipeline.processTrackedObservation(
                     snapshot = evidence.depthSnapshot,
                     observation = observation,
@@ -12084,12 +12169,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     mapperFrameId = evidence.depthMapper.frameId,
                     nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
                     motionContext = evidence.motionContext,
+                    imageQuarterTurns = evidence.imageQuarterTurns,
                 )
             }
         }
         val preparedTactileFrame = ProductionPreparedTactileFrameDispatch(currentFrame)
         val tactileFrame = preparedTactileFrame.frame
-        val frozenReportOutputs = frozenPreparedFrame.frame.guidance.outputs
         synchronized(frameStateLock) {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
             latestTactileRouteState =
@@ -12101,6 +12186,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val depthInputDetections = if (depthMapper == null) emptyList() else depthDetections
         val guidanceOutputs = tactileFrame.guidance.outputs
         val bestOutput = AndroidRiskSelectionPolicy.selectBestOutput(guidanceOutputs)
+        val currentCapturedAtElapsedMs = grayFrame?.key?.capturedAtElapsedRealtimeMs
         val reportOutput = AndroidRiskSelectionPolicy.selectReportOutput(frozenReportOutputs)
         val automaticReportOutput = AndroidRiskSelectionPolicy.selectAutomaticReportOutput(frozenReportOutputs)
         val independentFeedbackBatches = freshUnknownFeedbackBatches(SystemClock.elapsedRealtime())
@@ -12123,6 +12209,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 bestOutput?.takeIf { it.frameId == grayFrame?.key?.frameId },
                 grayFrame?.sourceWidth, grayFrame?.sourceHeight,
             )
+            val overlayPrediction = bestOutput?.takeIf { it.frameId == grayFrame?.key?.frameId }?.prediction
+            val unpredictedOverlayBoxes = if (overlayPrediction == null) overlayBoxes else buildDebugOverlayBoxes(
+                frame, overlayDetections, bestOutput?.copy(prediction = null),
+                grayFrame?.sourceWidth, grayFrame?.sourceHeight,
+            )
             synchronized(frameStateLock) {
                 if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
                 lastOverlayUpdateMs = elapsedRealtimeMs
@@ -12140,16 +12231,66 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     if (sourceFrameId == null || sourceCapturedAt == null) {
                         debugBboxOverlay.clear()
                     } else {
+                        val predictionRemainingMs = predictionDisplayRemainingMs(
+                            overlayPrediction, currentCapturedAtElapsedMs, SystemClock.elapsedRealtime(),
+                        )?.takeIf {
+                            currentRuntimeVisualDepthProcessingAllowsWork(arLease, frame.timestamp, currentFrameTracking)
+                        }
                         debugBboxOverlay.updateMapped(
-                            overlayBoxes, sourceFrameId, sourceCapturedAt,
+                            if (predictionRemainingMs != null) overlayBoxes else unpredictedOverlayBoxes,
+                            sourceFrameId, sourceCapturedAt,
                             sourceComplete = true,
                             animate = false,
                         )
+                        if (predictionRemainingMs != null) debugBboxOverlay.postDelayed({
+                            if (isCurrentFrameGeneration(frameGeneration, walkEpoch) && isArSessionLeaseCurrent(arLease) &&
+                                synchronized(frameStateLock) { latestVisualOverlayFrameId == sourceFrameId }
+                            ) debugBboxOverlay.updateMapped(
+                                unpredictedOverlayBoxes, sourceFrameId, sourceCapturedAt,
+                                sourceComplete = true, animate = false,
+                            )
+                        }, predictionRemainingMs + 1L)
                     }
                 }
             }
         }
         if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
+        if (!currentRuntimeMetricOutputAllowsWork(arLease.generation)) {
+            if (cameraScreenVisible && elapsedRealtimeMs - lastCameraScreenFrameUiMs >= 250L) {
+                lastCameraScreenFrameUiMs = elapsedRealtimeMs
+                var renderedGapStatus: String? = null
+                fun renderGapStatus() {
+                    if (cameraScreenVisible && isCurrentFrameGeneration(frameGeneration, walkEpoch) &&
+                        isArSessionLeaseCurrent(arLease) && lastCameraScreenFrameUiMs == elapsedRealtimeMs &&
+                        currentCapturedAtElapsedMs != null
+                    ) {
+                        if (renderedGapStatus != null && cameraScreenStatus.text.toString() != renderedGapStatus) return
+                        val displayAtMs = SystemClock.elapsedRealtime()
+                        val metricRecovered = currentRuntimeMetricOutputAllowsWork(arLease.generation)
+                        val predictions = if (metricRecovered || !currentRuntimeVisualDepthProcessingAllowsWork(
+                            arLease, frame.timestamp, currentFrameTracking,
+                        )) emptyList() else guidanceOutputs.mapNotNull { output ->
+                            val predicted = output.prediction ?: return@mapNotNull null
+                            val remaining = predictionDisplayRemainingMs(predicted, currentCapturedAtElapsedMs, displayAtMs)
+                                ?: return@mapNotNull null
+                            remaining to String.format(Locale.US, "%s · 예측 %.2fm ±%.2fm · 공백 %dms",
+                                output.className, predicted.distanceM, predicted.errorBoundM, predicted.horizonMs - remaining)
+                        }.take(3)
+                        val status = (if (metricRecovered) "Depth 재수신 · 거리 갱신 대기\n" else
+                            "Depth 일시 공백 · 현재 추적 ${overlayDetections.size}개\n") +
+                            predictions.joinToString("\n") { it.second }.ifEmpty { "예측 근거 부족 · 거리 확인 대기" } +
+                            "\n$latestVisualTrackingStatus\n$unknownRuntimeStatus"
+                        cameraScreenStatus.text = status
+                        renderedGapStatus = status
+                        predictions.minOfOrNull { it.first }?.let { remaining ->
+                            cameraScreenStatus.postDelayed({ renderGapStatus() }, remaining + 1L)
+                        }
+                    }
+                }
+                runOnUiThread { renderGapStatus() }
+            }
+            return
+        }
         val captureLogEntry = buildCaptureLogEntry(
             frameTimestampMs = timestampMs,
             nowMs = nowMs,
@@ -12240,6 +12381,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             deviceGateAllowsAlerts = deviceGateState.alertsAllowed,
             nowMs = SystemClock.elapsedRealtime(),
             independentFreshOutputs = freshUnknownFeedbackBatches(SystemClock.elapsedRealtime()),
+            warningContext = grayFrame?.let { current ->
+                kr.co.hanium.dreamup.walksafe.navigation.WarningRegionContext(
+                    epoch = walkEpoch,
+                    geometryId = "${arLease.generation}:${current.key.geometryVersion}:${current.sourceWidth}x${current.sourceHeight}",
+                    detectorGeneration = frameGeneration,
+                )
+            },
         )
         val shouldUpdateUi = synchronized(frameStateLock) {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
@@ -12342,6 +12490,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             walkSessionLifecycle.snapshot().epoch != expectedWalkEpoch
         ) return
         runtimeMetricOutputAllowed = false
+        runtimeVisualDepthFrameTracking = false
         if (
             expectedPurpose == ArSessionPurpose.RUNTIME &&
             firstRunOnboardingComplete()
@@ -12398,6 +12547,47 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 isStartupCapabilityConfirmed()
         }
 
+    /** Allows only current visual observations through a short depth gap, never metric consumers. */
+    private fun currentRuntimeVisualDepthProcessingAllowsWork(
+        lease: ArSessionLease,
+        frameTimestampNanos: Long,
+        tracking: Boolean,
+    ): Boolean = synchronized(runtimeMetricStateLock) {
+        if (!tracking || frameTimestampNanos <= 0L ||
+            frameTimestampNanos != runtimeMetricLastFrameTimestampNanos || !isArSessionLeaseCurrent(lease)
+        ) return@synchronized false
+        if (currentRuntimeMetricOutputAllowsWork(lease.generation)) return@synchronized true
+        firstRunOnboardingComplete() &&
+            isWalkSessionRuntimeActive() &&
+            isActivityForeground &&
+            cameraEnvironmentOutputsAllowed() &&
+            phoneMountingOutputsAllowed &&
+            arSessionPurpose == ArSessionPurpose.RUNTIME &&
+            session != null && frameProvider != null &&
+            runtimeMetricActivationSession == null &&
+            startupCapabilityDecision?.allowsMetricDistance() == true &&
+            isStartupCapabilityConfirmed() &&
+            allowsRuntimeDepthGapProcessing(
+                frameTimestampNanos = frameTimestampNanos,
+                latestFrameTimestampNanos = runtimeMetricLastFrameTimestampNanos,
+                observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                lastValidFrameAtElapsedRealtimeMs = runtimeMetricLastValidFrameAtMs,
+                tracking = tracking,
+            )
+    }
+
+    /** Prediction age uses camera time; only its remaining duration crosses to elapsed UI time. */
+    private fun predictionDisplayRemainingMs(
+        prediction: PredictedDepthEstimate?,
+        capturedAtElapsedRealtimeMs: Long?,
+        displayAtElapsedRealtimeMs: Long,
+    ): Long? {
+        val predicted = prediction ?: return null
+        val capturedAtMs = capturedAtElapsedRealtimeMs ?: return null
+        if (!DepthPredictionPresentation.isCurrent(predicted, capturedAtMs, displayAtElapsedRealtimeMs)) return null
+        return DepthPredictionPresentation.validUntilMs(predicted, capturedAtMs)?.minus(displayAtElapsedRealtimeMs)
+    }
+
     private fun updateRuntimeMetricOutputGate(
         frame: Frame,
         snapshot: DepthFrameSnapshot,
@@ -12416,6 +12606,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 !isStartupCapabilityConfirmed()
             ) {
                 runtimeMetricOutputAllowed = false
+                runtimeVisualDepthFrameTracking = false
                 return
             }
             runtimeMetricActivationSession
@@ -12455,6 +12646,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         runtimeMetricLastValidFrameAtMs = observedAtElapsedRealtimeMs
                         activated = runtimeMetricInitialNavigationStartPending
                     }
+                    runtimeVisualDepthFrameTracking = frameEvidence.tracking && runtimeMetricOutputAllowed
                 } else {
                     runtimeMetricOutputAllowed = false
                     lost = result.status == RuntimeMetricPreflightStatus.UNKNOWN
@@ -12486,6 +12678,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     isStartupCapabilityConfirmed()
             if (!stillCurrent) {
                 runtimeMetricOutputAllowed = false
+                runtimeVisualDepthFrameTracking = false
                 return
             }
             val assessment = assessRuntimeDepthFrame(
@@ -12501,6 +12694,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             shouldStartNavigation = assessment.outputAllowed && runtimeMetricInitialNavigationStartPending
             runtimeMetricOutputAllowed = assessment.outputAllowed
+            runtimeVisualDepthFrameTracking = frameEvidence.tracking && frame.timestamp > 0L &&
+                frame.timestamp == runtimeMetricLastFrameTimestampNanos
             if (assessment.refreshesLastValidTime) {
                 runtimeMetricLastValidFrameAtMs = observedAtElapsedRealtimeMs
             }
@@ -12850,6 +13045,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var nativeDeviceCheckPanel: LinearLayout
     private val nativeDeviceCheckValues = linkedMapOf<String, TextView>()
     private lateinit var nativeHomeRestrictionText: TextView
+    private lateinit var nativeHomeCompassText: TextView
+    private lateinit var nativeHomeRouteStatusText: TextView
     private var nativeUiPage = NativeUiPage.HOME
     private var pendingNativeUiPage: NativeUiPage? = null
     private var nativeUiRendering = false
@@ -12875,7 +13072,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         !handsFreeVoiceDestroyed &&
             nativeUiPage == NativeUiPage.HOME && pendingNativeUiPage == null &&
             homeVoiceCommandAvailable() && isHandsFreeVoiceDisclosureAccepted() &&
-            !voiceRecognitionActive && !voiceCommandPromptPending &&
+            !voiceRecognitionActive && !voiceCommandPromptPending && deferredVoiceRecognitionStart == null &&
             foregroundHomeWakeAcknowledgement?.isPlaying() != true &&
             gatewayVoiceRecorder?.isRecording != true && activeGatewaySpeechInteraction == null
 
@@ -12956,8 +13153,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             return
         }
         if (foregroundHomeWakeFailed) return
-        if (isHandsFreeVoiceOutputActive()) {
+        if (isHandsFreeVoiceRecognitionBlocked()) {
             cancelForegroundHomeWakeListening()
+            scheduleHandsFreeVoiceRestart()
             return
         }
         if (foregroundHomeWakeOwnerIsCurrent?.invoke() == true) return
@@ -12992,11 +13190,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             listenUntilWake = true,
             isInputSuppressed = {
                 !isActivityForeground || nativeUiPage != NativeUiPage.HOME ||
-                    voiceRecognitionActive || isHandsFreeVoiceOutputActive()
+                    voiceRecognitionActive || isHandsFreeVoiceRecognitionBlocked()
             },
             onReady = {
                 if (isCurrent() && foregroundHomeWakeProbe === probe) {
-                    if (isHandsFreeVoiceOutputActive()) {
+                    if (isHandsFreeVoiceRecognitionBlocked()) {
                         cancelForegroundHomeWakeListening()
                     } else if (BuildConfig.DEBUG) {
                         android.util.Log.d("WalkSafeVoiceInput", "event=HOME_WAKE_READY backend=VOSK")
@@ -13005,7 +13203,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             },
             onResult = { result ->
                 if (isCurrent() && foregroundHomeWakeProbe === probe) {
-                    if (isHandsFreeVoiceOutputActive()) {
+                    if (isHandsFreeVoiceRecognitionBlocked()) {
                         cancelForegroundHomeWakeListening()
                     } else if (result.availability == VoskWakePhraseProbeAvailability.AVAILABLE) {
                         // HOME opt-in probe delivers only after main-thread stop/close.
@@ -13038,7 +13236,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun nativeHomeFeatureContextAvailable(): Boolean {
         if (!::walkSessionLifecycle.isInitialized || !shouldShowNativeHome() ||
             !firstRunOnboardingComplete() || !isActivityForeground ||
-            permissionRecoveryGate.blocksAutomaticResourceStart
+            (permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled)
         ) return false
         val snapshot = walkSessionLifecycle.snapshot()
         return snapshot.isForeground && snapshot.state in setOf(
@@ -13195,7 +13393,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             nativeHomeRestrictionText.visibility == View.VISIBLE
         val gap = (16f * resources.displayMetrics.density).roundToInt()
         val minimum = (144f * resources.displayMetrics.density).roundToInt() * 3 + gap * 2
-        val available = viewport - overlay.paddingTop - overlay.paddingBottom
+        val compassHeight = if (::nativeHomeCompassText.isInitialized &&
+            nativeHomeCompassText.visibility == View.VISIBLE
+        ) nativeHomeCompassText.measuredHeight else 0
+        val routeStatusHeight = if (::nativeHomeRouteStatusText.isInitialized &&
+            nativeHomeRouteStatusText.visibility == View.VISIBLE
+        ) nativeHomeRouteStatusText.measuredHeight else 0
+        val available = viewport - overlay.paddingTop - overlay.paddingBottom - compassHeight - routeStatusHeight
         val target = if (limited) ViewGroup.LayoutParams.WRAP_CONTENT else maxOf(minimum, available)
         if (params.height != target) {
             params.height = target
@@ -13627,6 +13831,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
         show(homeCardGrid, homeVisible && !deviceScreen)
         show(nativeHomeRestrictionText, limitedHome)
+        show(nativeHomeCompassText, (homeVisible || guidanceVisible) && !deviceScreen)
+        show(nativeHomeRouteStatusText, homeVisible && !deviceScreen)
+        refreshRouteCompassPresentation()
         show(privacyConsentStatusText, false)
         if (settingsVisible) {
             nativeSettingsTitle.text = when {
@@ -14175,6 +14382,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun showRequiredAppPermissionExit(missing: Set<String>) {
         if (missing.isEmpty() || isFinishing || isDestroyed) return
+        if (BuildConfig.DEBUG && BuildConfig.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS) {
+            initialAppPermissionExitRequired = false
+            updateNavigationStatus("permissions=missing features_waiting count=${missing.size}")
+            return
+        }
         initialAppPermissionExitRequired = true
         cancelNativePrewalkPreparation(cancelFeatureEntry = true)
         if (isWalkSessionRuntimeActive()) {
@@ -14498,6 +14710,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun startNativeDestinationGuidance() {
         val destination = pendingUiDestination ?: return
+        clearDestinationVoiceInputForGuidance()
         // Preserve the selected destination and pending start while returning to the home screen.
         // showNativeUiPage(HOME) intentionally clears searches, so it is not used for this transition.
         nativeUiPage = NativeUiPage.HOME
@@ -14525,6 +14738,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         renderMainUi()
     }
 
+    private fun clearDestinationVoiceInputForGuidance() {
+        clearHomeDestinationVoiceDialog(VoiceDialogDiagnosticReason.PAGE_CHANGED)
+        cancelVoiceCommandRecognition()
+        stopHandsFreeVoiceService()
+        handsFreeVoiceOwnsCommandPage = false
+    }
+
     private fun currentNativeGuidancePresentation(): DestinationGuidancePresentation {
         val runtimeActive = isWalkSessionRuntimeActive()
         val environment = currentOfficialEnvironmentAssessment()
@@ -14544,9 +14764,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val backendReason = if (routeFailed) NavigationBackendErrorKind.values().firstOrNull { kind ->
             routeStatus.any { it == kind.statusToken || it == "kind=${kind.statusToken}" }
         }?.userMessage ?: "경로 요청을 완료하지 못했습니다. 표시된 상태를 확인한 뒤 다시 시도하세요." else null
-        val trustedLocationReady = freshTrustedLocationOrNull() != null
+        val trustedLocationReady = currentRouteLocationOrNull() != null
         val routeReady = runtimeActive && currentNavigationCollectionAllowsWork() &&
-            isRouteActive && !routePending && latestTmapOnRoute && trustedLocationReady &&
+            isRouteActive && !routePending &&
+            (latestTmapOnRoute || (developmentGuidanceStartBypassEnabled && routeNavigator.hasRoute())) &&
+            trustedLocationReady &&
             pendingUiDestination?.point == currentDestination
         val locationReason = when {
             !isRouteLocationPermissionReady() -> "경로 안내에 필요한 정확한 위치 권한이 없습니다."
@@ -16791,6 +17013,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             applyNativeNoticeStyle(this, "warning")
         }
         overlay.addView(nativeHomeRestrictionText, overlay.indexOfChild(walkStatusSection))
+        nativeHomeCompassText = TextView(this).apply {
+            text = "나침반 방향을 준비하고 있습니다."
+            textSize = 18f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            setPadding(16, 12, 16, 12)
+            // Direction changes must not interrupt route speech or TalkBack every half second.
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
+            visibility = View.GONE
+        }
+        overlay.addView(nativeHomeCompassText, overlay.indexOfChild(walkStatusSection))
+        nativeHomeRouteStatusText = TextView(this).apply {
+            text = homeRouteStatusMessage()
+            textSize = 18f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            setPadding(16, 0, 16, 12)
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
+            visibility = View.GONE
+        }
+        overlay.addView(nativeHomeRouteStatusText, overlay.indexOfChild(walkStatusSection))
         overlay.addView(homeCardGrid, overlay.indexOfChild(walkStatusSection))
         applyWsButtonStyle(actionButton, WS_TOUCH_WALK_PRIMARY_DP, primary = true)
         applyWsButtonStyle(
@@ -19355,6 +19596,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ?: return true
         val resources = walkSessionResourceProbe.snapshot()
         latestInferenceThermalThrottled = resources.thermalThrottled
+        if (developmentGuidanceStartBypassEnabled) {
+            return walkSessionLifecycle.isRuntimeEpochCurrent(runtimeEpoch)
+        }
         return walkRuntimeSafetyCoordinator.observe(
             WalkRuntimeSafetyObservation(
                 epoch = runtimeEpoch,
@@ -23956,7 +24200,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             lastOverlayUpdateMs = 0L
             lastUiUpdateMs = 0L
             captureLog.clear()
-            objectDepthPipeline = ObjectDepthRuntimePipeline().also { pipeline ->
+            objectDepthPipeline = ObjectDepthRuntimePipeline(rawDepthMotionOnly = true).also { pipeline ->
                 pipeline.setUserStepLength(stepLengthEstimator.stepLengthM)
             }
         }
@@ -24129,6 +24373,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     directionGuidancePauseReason = "environment_gps_quality"
                     cancelVoiceCommandRecognition()
                     feedbackLifecycleGeneration += 1
+                    feedbackPolicy.cancelPendingFeedbackDeliveries()
+                    cancelPendingFeedbackTerminalResolution()
+                    latestFeedbackDeliveryState = FeedbackDeliveryState()
                     feedbackActuator?.close()
                     feedbackActuator = null
                     updateStatus(
@@ -25674,11 +25921,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         try {
             gatewaySessionExecutor.execute {
                 val outcome = runCatching {
-                    gatewayWalkSessionClient.start(
+                    gatewayWalkSessionClient.startWithOwnedWalkRecovery(
                         session = gatewaySession,
                         walkId = operation.epoch.walkSessionId,
                         requestId = operation.requestId,
-                        localNowElapsedMs = SystemClock.elapsedRealtime(),
+                        nowElapsedMs = { SystemClock.elapsedRealtime() },
+                        isCurrent = {
+                            val check = java.util.concurrent.FutureTask {
+                                isGatewayWalkOperationCurrent(operation, token, gatewaySession)
+                            }
+                            runOnUiThread(check)
+                            runCatching {
+                                check.get(2, java.util.concurrent.TimeUnit.SECONDS)
+                            }.getOrDefault(false)
+                        },
                     )
                 }
                 runOnUiThread {
@@ -25785,7 +26041,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         gatewayWalkTakeoverPromptPending = true
         gatewayWalkTakeoverPromptOperationId = operation.operationId
-        val prompt = "다른 기기에서 보행 중입니다. 이전 보행을 종료하고 이 기기에서 시작할까요? 예 또는 아니요라고 말해 주세요."
+        val sameDevice = activeDeviceId == gatewaySession.deviceId
+        val conflictTitle = if (sameDevice) "이전 로그인에서 보행 중" else "다른 기기에서 보행 중"
+        val prompt = "${conflictTitle}입니다. 이전 보행을 종료하고 이 기기에서 시작할까요? 예 또는 아니요라고 말해 주세요."
         val delivered = {
             runOnUiThread {
                 if (
@@ -25816,8 +26074,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         }
         updateStatus(
-            "다른 기기에서 보행 중",
-            "기기 $activeDeviceId 의 이전 보행 종료 여부를 음성으로 확인합니다.",
+            conflictTitle,
+            "이전 보행 종료 여부를 음성으로 확인합니다.",
         )
         val accepted = ensureFeedbackActuator().speakInteraction(
             message = prompt,
@@ -26590,6 +26848,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         walkSessionResumeRetryRequiresUserAction = false
         if (!activateOfficialEnvironmentRuntime()) return
         if (!activatePhoneMountingRuntime()) return
+        if (developmentGuidanceStartBypassEnabled) {
+            // Navigation is independent of camera teardown, ARCore and detector readiness.
+            startNavigationServicesIfNeeded()
+            maybeStartHandsFreeVoiceService()
+        }
         if (cameraAnalysisFeaturesEnabled()) {
             beginRuntimeCameraHandoff(runtimeEpoch)
         } else {
@@ -26601,6 +26864,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 startWalkSessionRuntimeAfterCameraRelease(runtimeEpoch)
             },
         )
+        if (developmentGuidanceStartBypassEnabled) refreshStartupCapabilityUi()
     }
 
     private fun startWalkSessionRuntimeAfterCameraRelease(
@@ -26658,7 +26922,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             syncGlSurfaceRenderMode(forceFrame = true)
             surfaceView.onPause()
         }
-        if (::earthOrientationTracker.isInitialized) earthOrientationTracker.stop()
+        retainLocationCompassOrStop()
         startNavigationServicesIfNeeded()
         maybeStartHandsFreeVoiceService()
         syncActiveSessionScreenPolicy()
@@ -27237,6 +27501,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun invalidateRuntimeMetricEvidence(reason: String) {
+        if (BuildConfig.DEBUG) runCatching {
+            android.util.Log.d("WalkSafeNavigation", "output=metric_evidence_invalidated reason=$reason")
+        }
         val runtimeFailureRequiresSafetyStop =
             reason.startsWith("runtime_") &&
                 ::walkSessionLifecycle.isInitialized &&
@@ -28525,8 +28792,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
 
+    // FastSAM load/release owns its inference engine, not the camera. Its readiness must not
+    // consume a camera start request; calibration and camera cleanup still retain their leases.
     private fun runtimeCameraStartBlockedByAnotherOwner(): Boolean =
-        runtimeCalibration != null || unknownCalibration != null || unknownLoadingService != null || unknownRuntimeClosing ||
+        runtimeCalibration != null || unknownCalibration != null ||
             runtimeTuningPreparing || runtimeOldDetectorReleasePending ||
             cameraXReleaseBlocked ||
             officialEnvironmentCameraPreflightActive ||
@@ -28856,6 +29125,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     ) {
         val walkBeforeChange = walkSessionLifecycle.snapshot()
         val decisionBeforeChange = startupCapabilityDecision
+        // Test guidance can have a valid confirmation without a stored confirmation object.
+        // Capture the same admission decision before changing the available feature set.
+        val capabilityWasConfirmed = isStartupCapabilityConfirmed()
         metricDistanceCapabilityOverride = false
         val distanceLimitedDecision = resolveCurrentStartupCapabilityDecision(
             metricDistanceOverride = false,
@@ -28864,7 +29136,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             reason == CameraFallbackStartReason.RUNTIME_METRIC_LOST &&
                 walkBeforeChange.state == WalkSessionState.ACTIVE &&
                 decisionBeforeChange != null &&
-                confirmedStartupCapabilityDecision == decisionBeforeChange &&
+                capabilityWasConfirmed &&
                 decisionBeforeChange.allowsMetricDistance() &&
                 distanceLimitedDecision.mayConfirmAndStart &&
                 distanceLimitedDecision.pendingRequirements.isEmpty() &&
@@ -29442,6 +29714,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         observedAtElapsedRealtimeMs: Long,
         inferenceLatencyMs: Long,
     ): Boolean {
+        if (developmentGuidanceStartBypassEnabled) {
+            return walkSessionLifecycle.isRuntimeEpochCurrent(epoch) &&
+                frameCapturedAtElapsedRealtimeMs >= 0L &&
+                observedAtElapsedRealtimeMs >= frameCapturedAtElapsedRealtimeMs &&
+                inferenceLatencyMs >= 0L
+        }
         return walkRuntimeSafetyCoordinator.observe(
             WalkRuntimeSafetyObservation(
                 epoch = epoch,
@@ -29626,6 +29904,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     /** ARCore and CameraX share one physical detector and never enqueue replacement frames. */
     private fun tryStartDetectionWork(nowElapsedRealtimeMs: Long): InferencePacingTicket? =
         synchronized(frameStateLock) {
+            if (unknownFrameCopyInFlight.get()) return@synchronized null
             if (detectionInFlight.get()) {
                 if (nowElapsedRealtimeMs >= adaptiveInferencePacing.snapshot().nextEligibleAtElapsedRealtimeMs) {
                     rawDetectionDueButInFlightDropCount.incrementAndGet()
@@ -29911,12 +30190,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     if (!admission.detectorInvocationAllowed) {
                         completedAtMs = System.currentTimeMillis()
                         return@execute
-                    }
-                    if (detectorSucceeded && !result.partial) {
-                        submitUnknownObjectFrame(
-                            cameraImage, frameEvidence, generation, expectedWalkEpoch,
-                            expectedArSessionGeneration, elapsedRealtimeMs,
-                        )
                     }
                     inferenceDurationMs = result.timing.totalMs ?: inferenceDurationMs
                     if (detectorSucceeded) {
@@ -30255,6 +30528,10 @@ generation != cameraFallbackGeneration
                         append(" · ")
                         append(output.source.name)
                         output.riskDistanceM?.let { distance -> append(" · ${meters(distance)}") }
+                        output.prediction?.let { predicted ->
+                            append(String.format(Locale.US, " · 예측 %.2fm ±%.2fm · 공백 %dms",
+                                predicted.distanceM, predicted.errorBoundM, predicted.predictionAgeMs))
+                        }
                         append(" · samples ")
                         append(output.validSampleCount)
                         append(" · motion=${output.motionEstimate.direction}")
@@ -30271,7 +30548,8 @@ generation != cameraFallbackGeneration
                 )
             }
         }
-        val boxes = if (bestBox == null) mappedDetectionBoxes else listOf(bestBox) + mappedDetectionBoxes
+        val boxes = if (bestBox == null) mappedDetectionBoxes else listOf(bestBox) +
+            mappedDetectionBoxes.filterNot { it.className == bestBox.className && it.rectPx == bestBox.rectPx }
         return boxes
     }
 
@@ -30282,11 +30560,18 @@ generation != cameraFallbackGeneration
         imageWidth: Int,
         imageHeight: Int,
         snapshot: DepthFrameSnapshot,
+        allowMissingDepth: Boolean = false,
     ): FrozenImageToTextureCoordinateMapper? {
         if (imageWidth <= 0 || imageHeight <= 0) return null
-        val depthWidth = snapshot.rawDepth?.width ?: snapshot.fullDepth?.width
-        val depthHeight = snapshot.rawDepth?.height ?: snapshot.fullDepth?.height
-        if (depthWidth == null || depthHeight == null || depthWidth <= 0 || depthHeight <= 0) return null
+        val depthSize = when {
+            snapshot.rawDepth != null -> ImageSize(snapshot.rawDepth.width, snapshot.rawDepth.height)
+            snapshot.fullDepth != null -> ImageSize(snapshot.fullDepth.width, snapshot.fullDepth.height)
+            // The mapper returns normalized UVs. With no depth samples this neutral size permits
+            // current geometry validation only; it does not create pixels or reuse an old mapping.
+            allowMissingDepth -> ImageSize(1, 1)
+            else -> return null
+        }
+        if (depthSize.width <= 0 || depthSize.height <= 0) return null
         val input = floatArrayOf(
             0f, 0f,
             imageWidth.toFloat(), 0f,
@@ -30311,7 +30596,7 @@ generation != cameraFallbackGeneration
             FrozenImageToTextureCoordinateMapper(
                 frameId = frameId,
                 transform = transform,
-                depthSize = ImageSize(depthWidth, depthHeight),
+                depthSize = depthSize,
             )
         } catch (_: RuntimeException) {
             null
@@ -30393,14 +30678,142 @@ generation != cameraFallbackGeneration
         )
     }
 
+    private fun unknownFrameCaptureIsDue(nowMs: Long): Boolean {
+        if (detectionInFlight.get() || unknownFrameCopyInFlight.get()) return false
+        val service = unknownRuntimeService ?: return false
+        val state = service.stats()
+        if (state.stopping || state.inflight || state.pending || state.copying) return false
+        val context = unknownProcessingContext?.takeIf { it.service === service } ?: return true
+        // Backstop for an owner that terminated without a result callback. Do not invent a latency
+        // sample; normal discards carry their actual completion time through onDiscard below.
+        synchronized(frameStateLock) {
+            context.activeTicket?.takeIf {
+                nowMs - it.startedAtElapsedRealtimeMs > MAX_DEPTH_DETECTION_SOURCE_AGE_MS
+            }?.let {
+                context.pacing.cancel(it)
+                if (context.activeTicket === it) context.activeTicket = null
+            }
+        }
+        return context.pacing.isDue(nowMs)
+    }
+
+    private fun currentUnknownCaptureProcessingAllowsWork(capture: UnknownCaptureProcessingLease): Boolean =
+        synchronized(runtimeMetricStateLock) {
+            val nowMs = SystemClock.elapsedRealtime()
+            capture.frameId > 0L && capture.frameId <= runtimeMetricLastFrameTimestampNanos &&
+                nowMs - capture.capturedAtElapsedRealtimeMs in 0L..MAX_DEPTH_DETECTION_SOURCE_AGE_MS &&
+                (capture.gapDeadlineElapsedRealtimeMs == null || nowMs <= capture.gapDeadlineElapsedRealtimeMs) &&
+                runtimeVisualDepthFrameTracking &&
+                currentRuntimeVisualDepthProcessingAllowsWork(
+                    capture.arLease, runtimeMetricLastFrameTimestampNanos, runtimeVisualDepthFrameTracking,
+                )
+        }
+
+    /** Capture on the GL owner, then copy off-thread before releasing the Image. No primary result
+     * or old primary capture waits in front of this auxiliary frame. Native inference/postprocessing
+     * retain the service's one-flight bound and may overlap the next primary invocation. */
+    private fun scheduleUnknownDetectionIfDue(
+        provider: ArCoreFrameProvider,
+        frame: Frame,
+        snapshot: DepthFrameSnapshot,
+        capturedElapsedMs: Long,
+        generation: Int,
+        epoch: WalkRuntimeEpoch,
+        arLease: ArSessionLease,
+    ) {
+        if (provider !== arLease.provider ||
+            !postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.OBSTACLE_DETECTION) ||
+            !currentRuntimeVisualDepthProcessingAllowsWork(
+                arLease, frame.timestamp, frame.camera.trackingState == TrackingState.TRACKING,
+            )
+        ) return
+        val arGeneration = arLease.generation
+        val processingLease = synchronized(runtimeMetricStateLock) {
+            UnknownCaptureProcessingLease(
+                arLease, frame.timestamp, capturedElapsedMs,
+                if (runtimeMetricOutputAllowed) null else runtimeMetricLastValidFrameAtMs + 600L,
+            )
+        }
+        if (!currentUnknownCaptureProcessingAllowsWork(processingLease)) return
+        val service = unknownRuntimeService ?: return
+        val geometryVersion = synchronized(frameStateLock) {
+            if (!isCurrentFrameGeneration(generation, epoch) ||
+                !unknownFrameCaptureIsDue(capturedElapsedMs) ||
+                !unknownFrameCopyInFlight.compareAndSet(false, true)
+            ) return
+            visualGeometryVersion
+        }
+        var image: android.media.Image? = null
+        var queued = false
+        try {
+            val owned = provider.acquireCameraImageOrNull(frame) ?: return
+            image = owned
+            if (owned.timestamp <= 0L || owned.timestamp != snapshot.cameraImageTimestampNs) return
+            val basis = FloatArray(6)
+            frame.transformCoordinates2d(Coordinates2d.IMAGE_NORMALIZED,
+                floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f), Coordinates2d.VIEW, basis)
+            val evidence = UnknownCaptureEvidence(
+                frameId = frame.timestamp,
+                depthSnapshot = snapshot,
+                depthMapper = createFrozenDepthMapper(
+                    frame, frame.timestamp, owned.width, owned.height, snapshot, allowMissingDepth = true,
+                ),
+                motionContext = buildDepthMotionContext(capturedElapsedMs),
+                imageQuarterTurns = UprightCameraImage.quarterTurns(basis),
+                processingLease = processingLease,
+            )
+            detectorExecutor.execute {
+                try {
+                    if (unknownRuntimeService !== service || !isCurrentFrameGeneration(generation, epoch) ||
+                        synchronized(frameStateLock) { visualGeometryVersion != geometryVersion }
+                    ) return@execute
+                    val yPlane = owned.planes.firstOrNull()
+                    val qualityObservation = cameraFrameQualityObservation(
+                        epoch = epoch,
+                        observedAtElapsedRealtimeMs = capturedElapsedMs,
+                        frameAvailable = true,
+                        width = owned.width,
+                        height = owned.height,
+                        yPlaneBuffer = yPlane?.buffer,
+                        yPlaneRowStride = yPlane?.rowStride,
+                        yPlanePixelStride = yPlane?.pixelStride,
+                    )
+                    observeOfficialEnvironmentCameraFrame(qualityObservation)
+                    if (!currentUnknownCaptureProcessingAllowsWork(processingLease)) return@execute
+                    CameraDetectorAdmissionPolicy.admit(
+                        currentEpoch = epoch,
+                        nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                        observation = qualityObservation,
+                        approvedProfile = activeCameraFrameQualityProfile,
+                    ) {
+                        submitUnknownObjectFrame(owned, evidence, generation, epoch, arGeneration,
+                            capturedElapsedMs, geometryVersion)
+                    }
+                } finally {
+                    try { owned.close() } finally { unknownFrameCopyInFlight.set(false) }
+                }
+            }
+            queued = true
+        } catch (error: RuntimeException) {
+            if (isCurrentFrameGeneration(generation, epoch)) {
+                unknownRuntimeStatus = "추가 물체 프레임 대기: ${error.javaClass.simpleName}"
+            }
+        } finally {
+            if (!queued) {
+                try { image?.close() } finally { unknownFrameCopyInFlight.set(false) }
+            }
+        }
+    }
+
     /** Copies only admitted auxiliary frames while this worker still owns the open CPU Image. */
     private fun submitUnknownObjectFrame(
         image: android.media.Image,
-        evidence: DetectionFrameEvidence,
+        evidence: UnknownCaptureEvidence,
         generation: Int,
         epoch: WalkRuntimeEpoch,
         arGeneration: Long,
         capturedElapsedMs: Long,
+        geometryVersion: Long,
     ) {
         val service = unknownRuntimeService ?: return
         if (service.stats().stopping) {
@@ -30409,11 +30822,13 @@ generation != cameraFallbackGeneration
             return
         }
         if (!isCurrentFrameGeneration(generation, epoch) ||
-            !currentRuntimeMetricOutputAllowsWork(arGeneration) || !isActivityForeground
+            !currentUnknownCaptureProcessingAllowsWork(evidence.processingLease) || !isActivityForeground
         ) return
-        val geometryId = "$arGeneration:$visualGeometryVersion:${image.width}x${image.height}"
+        val geometryId = "$arGeneration:$geometryVersion:${image.width}x${image.height}"
         val context = synchronized(frameStateLock) {
-            if (unknownRuntimeService !== service || !isCurrentFrameGeneration(generation, epoch)) return
+            if (unknownRuntimeService !== service || !isCurrentFrameGeneration(generation, epoch) ||
+                visualGeometryVersion != geometryVersion
+            ) return
             unknownProcessingContext?.takeIf {
                 it.service === service && it.detectorGeneration == generation && it.walkEpoch == epoch &&
                     it.arSessionGeneration == arGeneration && it.geometryId == geometryId
@@ -30443,6 +30858,10 @@ generation != cameraFallbackGeneration
                 evidence.depthSnapshot.frameTimestampNs, image.timestamp, capturedElapsedMs * 1_000_000L,
                 geometryId, image.width, image.height,
             )
+            if (!token.isFreshAt(SystemClock.elapsedRealtimeNanos(), MAX_DEPTH_DETECTION_SOURCE_AGE_MS)) {
+                handleUnknownFrameDiscard(token, "stale_before_copy")
+                return
+            }
             val capture = FrozenUnknownDepthCapture.freeze(
                 token, evidence.depthSnapshot,
                 evidence.depthMapper?.imagePixelsToDepthUvMatrix(image.width, image.height),
@@ -30450,12 +30869,15 @@ generation != cameraFallbackGeneration
                 evidence.motionContext,
                 imageQuarterTurns = evidence.imageQuarterTurns,
             ) ?: return
-            if (!isUnknownContextCurrent(context)) return
-            val admission = service.submit(image, token, UnknownFrameAttachment(context, capture, ticket))
+            if (!isUnknownCaptureContextCurrent(context, evidence.processingLease)) return
+            val admission = service.submit(image, token, UnknownFrameAttachment(context, capture, ticket, evidence.processingLease))
             submitted = admission == FastSamRuntimeService.Admission.ACCEPTED ||
                 admission == FastSamRuntimeService.Admission.REPLACED_PENDING
+            if (admission == FastSamRuntimeService.Admission.STALE) {
+                handleUnknownFrameDiscard(token, "stale_during_copy")
+            }
         } catch (error: RuntimeException) {
-            if (isUnknownContextCurrent(context)) {
+            if (isUnknownCaptureContextCurrent(context, evidence.processingLease)) {
                 unknownRuntimeStatus = "추가 물체 프레임 확인 실패: ${error.javaClass.simpleName}"
             }
         } finally {
@@ -30472,14 +30894,18 @@ generation != cameraFallbackGeneration
         val context = attachment.context
         val started = SystemClock.elapsedRealtime()
         try {
-            if (!isUnknownContextCurrent(context)) return
+            if (!isUnknownCaptureContextCurrent(context, attachment.processingLease)) return
             val processed = context.pipeline.process(
                 attachment.capture, result.token, result.masks, started,
             )
             val completed = SystemClock.elapsedRealtime()
-            if (!isUnknownContextCurrent(context)) return
+            if (!isUnknownCaptureContextCurrent(context, attachment.processingLease)) return
+            if (!isUnknownContextCurrent(context)) {
+                unknownRuntimeStatus = "추가 영역 ${result.masks.size}개 · Depth 일시 공백 · 거리 안내 대기"
+                return
+            }
             val batch = context.feedback.admit(
-                outputs = processed.objects.map { output ->
+                outputs = (processed.objects + processed.proximityObjects).map { output ->
                     output.copy(trackId = "unknown:${context.identity}:${output.trackId}")
                 },
                 sourceFrameId = result.token.frameId,
@@ -30492,8 +30918,18 @@ generation != cameraFallbackGeneration
             )
             synchronized(frameStateLock) {
                 if (!isUnknownContextCurrent(context)) return
-                latestUnknownFeedback = batch?.let { UnknownFeedbackObservation(context, it) }
-                val measured = processed.objects.count { it.source.metric && it.riskDistanceM != null }
+                val batches = UnknownObjectFeedbackPolicy.mergeRetainedRegions(
+                    previous = latestUnknownFeedback?.takeIf { it.context === context }?.batches.orEmpty(),
+                    fresh = batch,
+                    retainedTrackIds = processed.retainedProximityRegionIds.mapTo(hashSetOf()) {
+                        "unknown:${context.identity}:$it"
+                    },
+                    currentEpoch = context.walkEpoch,
+                    nowMs = completed,
+                )
+                // Each retained region keeps its original capture and deadline alongside new depth.
+                latestUnknownFeedback = batches.takeIf { it.isNotEmpty() }?.let { UnknownFeedbackObservation(context, it) }
+                val measured = (processed.objects + processed.proximityObjects).count { it.source.metric && it.riskDistanceM != null }
                 unknownRuntimeStatus = "추가 영역 ${result.masks.size}개 · 유효 거리 ${measured}개 · " +
                     "${completed - result.token.capturedElapsedNs / 1_000_000L}ms · ${result.runtime.actualBackend}"
             }
@@ -30506,7 +30942,7 @@ generation != cameraFallbackGeneration
                     SystemClock.elapsedRealtime() - it.observedAtElapsedRealtimeMs in 0L..1_000L
                 },
             )
-            if (isUnknownContextCurrent(context)) {
+            if (isUnknownCaptureContextCurrent(context, attachment.processingLease)) {
                 val now = SystemClock.elapsedRealtime()
                 val age = now - result.token.capturedElapsedNs / 1_000_000L
                 val normal = latestInferenceThermalThrottled == false &&
@@ -30519,6 +30955,34 @@ generation != cameraFallbackGeneration
         }
     }
 
+    private fun handleUnknownFrameDiscard(token: FastSamFrameToken, reason: String) {
+        if (token.source != FastSamFrameToken.Source.LIVE_CAMERA) return
+        val now = SystemClock.elapsedRealtime()
+        val context = synchronized(frameStateLock) {
+            val active = unknownProcessingContext ?: return
+            val ticket = active.activeTicket ?: return
+            if (active.service.sessionEpoch != token.sessionEpoch || active.activeFrameId != token.frameId ||
+                ticket.startedAtElapsedRealtimeMs != token.capturedElapsedNs / 1_000_000L
+            ) return
+            if (reason.startsWith("stale")) {
+                active.pacing.complete(ticket, now, thermalThrottled = latestInferenceThermalThrottled,
+                    loadObservation = latestUnknownLoadObservation?.takeIf {
+                        now - it.observedAtElapsedRealtimeMs in 0L..1_000L
+                    })
+            } else active.pacing.cancel(ticket)
+            if (active.activeTicket === ticket) active.activeTicket = null
+            active
+        }
+        if (reason.startsWith("stale") && isUnknownContextCurrent(context)) {
+            unknownRuntimeStatus = "추가 물체 입력 지연 · 다음 촬영 프레임으로 재시도"
+            observeUnknownRuntimeLoad(now,
+                normal = latestInferenceThermalThrottled == false &&
+                    runCatching { !getSystemService(android.os.PowerManager::class.java).isPowerSaveMode }.getOrDefault(false),
+                auxiliaryCompletion = RuntimeLoadCompletion(
+                    now - token.capturedElapsedNs / 1_000_000L, staleOrDropped = true))
+        }
+    }
+
     private fun isUnknownContextCurrent(context: UnknownProcessingContext): Boolean =
         unknownProcessingContext === context && unknownRuntimeService === context.service &&
             isActivityForeground && !detectorClosing &&
@@ -30526,16 +30990,37 @@ generation != cameraFallbackGeneration
             arSessionGeneration == context.arSessionGeneration &&
             currentRuntimeMetricOutputAllowsWork(context.arSessionGeneration)
 
+    private fun isUnknownCaptureContextCurrent(
+        context: UnknownProcessingContext,
+        capture: UnknownCaptureProcessingLease,
+    ): Boolean = unknownProcessingContext === context && unknownRuntimeService === context.service &&
+        isActivityForeground && !detectorClosing &&
+        isCurrentFrameGeneration(context.detectorGeneration, context.walkEpoch) &&
+        context.arSessionGeneration == capture.arLease.generation &&
+        currentUnknownCaptureProcessingAllowsWork(capture)
+
     private fun freshUnknownFeedbackBatches(nowMs: Long): List<UnknownObjectFeedbackBatch> {
         val observation = latestUnknownFeedback ?: return emptyList()
-        return if (isUnknownContextCurrent(observation.context) && observation.batch.isFreshAt(nowMs) &&
-            observation.batch.sourceEpoch == walkSessionLifecycle.currentRuntimeEpochOrNull()
-        ) listOf(observation.batch) else emptyList()
+        if (!isUnknownContextCurrent(observation.context)) return emptyList()
+        val epoch = walkSessionLifecycle.currentRuntimeEpochOrNull()
+        return observation.batches.filter { it.sourceEpoch == epoch && it.isFreshAt(nowMs) }
     }
 
     private fun invalidateUnknownObjectObservations() {
+        val invalidatedContext = unknownProcessingContext
         unknownProcessingContext = null
         latestUnknownFeedback = null
+        invalidatedContext?.let { context ->
+            val trackPrefix = "unknown:${context.identity}:"
+            feedbackPolicy.cancelFeedbackForTrackPrefix(trackPrefix)
+            // A producer restart invalidates its accepted output, while a reused depth frame
+            // merely retains old evidence until its original deadline.
+            runOnUiThread {
+                if (pendingFeedbackTerminalResolution?.action?.trackId?.startsWith(trackPrefix) == true) {
+                    cancelPendingFeedbackTerminalResolution()
+                }
+            }
+        }
         unknownRuntimeService?.discardPending("runtime_evidence_invalidated")
     }
 
@@ -30621,6 +31106,7 @@ generation != cameraFallbackGeneration
                 MAX_DEPTH_DETECTION_SOURCE_AGE_MS, false, false, true),
             object : FastSamRuntimeService.Listener<UnknownRuntimeAttachment> {
                 override fun onResult(result: FastSamResult<UnknownRuntimeAttachment>) = consumeUnknownObjectResult(result)
+                override fun onDiscard(token: FastSamFrameToken, reason: String) = handleUnknownFrameDiscard(token, reason)
                 override fun onError(error: Throwable) { runOnUiThread {
                     if (!isDestroyed && !detectorClosing) handleUnknownRuntimeError(epoch, error)
                 } }
@@ -31087,6 +31573,7 @@ generation != cameraFallbackGeneration
                     profile == null, deadlineMs * 1_000_000L, MAX_DEPTH_DETECTION_SOURCE_AGE_MS, false, false, true),
                 object : FastSamRuntimeService.Listener<UnknownRuntimeAttachment> {
                     override fun onResult(result: FastSamResult<UnknownRuntimeAttachment>) = consumeUnknownObjectResult(result)
+                    override fun onDiscard(token: FastSamFrameToken, reason: String) = handleUnknownFrameDiscard(token, reason)
                     override fun onError(error: Throwable) { handleUnknownRuntimeError(serviceEpoch, error) }
                 })
             unknownLoadingService = restored
@@ -31158,6 +31645,7 @@ generation != cameraFallbackGeneration
                 },
                 onProductionResult = ::consumeUnknownObjectResult,
                 onProductionError = { handleUnknownRuntimeError(serviceEpoch, it) },
+                onProductionDiscard = ::handleUnknownFrameDiscard,
                 onCalibrationResult = { result, evidence ->
                     val snapshot = evidence.depthSnapshot
                     val mapperFrame = evidence.mapperFrameId
@@ -31289,6 +31777,10 @@ generation != cameraFallbackGeneration
                 }
             }
             DetectorRuntimeFailureAction.SAFE_STOP -> {
+                if (developmentGuidanceStartBypassEnabled) {
+                    disableDetectorAfterRuntimeFailure(error, expectedDetectorGeneration, expectedWalkEpoch)
+                    return
+                }
                 val safetyDecision = walkRuntimeSafetyCoordinator.observe(
                     WalkRuntimeSafetyObservation(
                         epoch = expectedWalkEpoch,
@@ -31366,8 +31858,10 @@ generation != cameraFallbackGeneration
             latestReportCandidateStatus = "reportCandidate=blocked:camera_non_metric_unavailable"
             setActionButton("카메라 보조 경고 사용 불가", ActionMode.START, enabled = false)
             updateStatus(
-                status = "객체 탐지 중지 · 안전 중지",
-                detail = "detector 실행 오류로 보행 기능을 안전 중지했습니다.",
+                status = if (developmentGuidanceStartBypassEnabled) "객체 탐지 중지" else "객체 탐지 중지 · 안전 중지",
+                detail = if (developmentGuidanceStartBypassEnabled)
+                    "객체 탐지를 실행하지 못했습니다. 길안내 테스트는 계속합니다."
+                else "detector 실행 오류로 보행 기능을 안전 중지했습니다.",
             )
         }
     }
@@ -31461,7 +31955,7 @@ generation != cameraFallbackGeneration
                 onSpeechCompleted = {
                     runOnUiThread {
                         if (isFeedbackLifecycleCurrent(speechGeneration)) {
-                            confirmFeedbackDelivery(action, policyEvaluatedAtMs, speechCompleted = true)
+                            confirmFeedbackDelivery(action, policyEvaluatedAtMs, outputCompleted = true)
                         } else {
                             feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
                         }
@@ -31528,7 +32022,7 @@ generation != cameraFallbackGeneration
         val current = latestFeedbackDeliveryState
         val nowMs = SystemClock.elapsedRealtime()
         if (action.trackId.startsWith("unknown:") && freshUnknownFeedbackBatches(nowMs).none { batch ->
-                batch.validUntilElapsedRealtimeMs == action.validUntilMs && batch.outputs.any { output ->
+                batch.outputs.any { output ->
                     output.trackId == action.trackId && output.userFacing.message == action.message &&
                         output.userFacing.messageLevel == action.level
                 }
@@ -31586,7 +32080,9 @@ generation != cameraFallbackGeneration
             if (pendingFeedbackTerminalResolution?.runnable !== resolution) return@Runnable
             pendingFeedbackTerminalResolution = null
             if (isFeedbackLifecycleCurrent(generation)) {
-                confirmFeedbackDelivery(action, policyEvaluatedAtMs)
+                // Only an accepted, uncancelled waveform owns this timer. Its completion can
+                // outlive the capture deadline, which was checked before output started.
+                confirmFeedbackDelivery(action, policyEvaluatedAtMs, outputCompleted = true)
             } else {
                 feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
             }
@@ -31612,11 +32108,16 @@ generation != cameraFallbackGeneration
     private fun confirmFeedbackDelivery(
         action: FeedbackAction,
         policyEvaluatedAtMs: Long,
-        speechCompleted: Boolean = false,
+        outputCompleted: Boolean = false,
     ) {
-        // Capture freshness is the deadline to START speech. A real onDone may arrive after that
-        // deadline; the caller's lifecycle fence and the policy's claimed lease still apply.
-        if (!speechCompleted && !isFeedbackActionStillDeliverable(action)) {
+        // Capture freshness limits output START, not completion of accepted speech/vibration.
+        // Completion still requires the caller's lifecycle fence and the policy's claimed lease.
+        val unknownContextCurrent = if (action.trackId.startsWith("unknown:")) {
+            unknownProcessingContext?.let { context ->
+                action.trackId.startsWith("unknown:${context.identity}:") && isUnknownContextCurrent(context)
+            } == true
+        } else true
+        if (!unknownContextCurrent || (!outputCompleted && !isFeedbackActionStillDeliverable(action))) {
             feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
             return
         }
@@ -31668,6 +32169,7 @@ generation != cameraFallbackGeneration
         }
         if (!isFeedbackLifecycleCurrent(generation) ||
             !isWalkSessionRuntimeActive() || !navigationEnvironmentOutputsAllowed() ||
+            deferredVoiceRecognitionStart != null ||
             shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)
         ) {
             onFailed?.invoke()
@@ -31751,6 +32253,9 @@ generation != cameraFallbackGeneration
         }
         // New output owns the visible response; cancellation of an older TTS cannot overwrite it.
         val responseGeneration = ++commandSpeechResponseGeneration
+        // registerLatest retires old callbacks silently. Preserve retry for an interrupted
+        // route decision before its callback is retired, without changing other response policy.
+        failInterruptedRouteDecisionSpeech(responseGeneration - 1L)
         val responseId = "command-response-$responseGeneration"
         val recognitionGeneration = voiceRecognitionGeneration
         val responseActor = reporterUserId
@@ -32086,6 +32591,12 @@ generation != cameraFallbackGeneration
         pendingInteraction.run()
     }
 
+    private fun navigationSpeechCapabilityAllowed(): Boolean =
+        developmentGuidanceStartBypassEnabled ||
+            startupCapabilityDecision?.allowsRequirement(
+                WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS,
+            ) != false
+
     private fun ensureFeedbackActuator(): AndroidFeedbackActuator {
         val current = feedbackActuator
         if (current != null) return current
@@ -32115,13 +32626,10 @@ generation != cameraFallbackGeneration
                     refreshStartupCapabilityUi()
                     updatePriorityUserOnboardingUi()
                     updateVoiceCommandButton(active = voiceRecognitionActive)
+                    scheduleNavigationSpeechRetry(delayMs = 0L)
                 }
             },
-            speechAllowed = {
-                startupCapabilityDecision?.allowsRequirement(
-                    WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS,
-                ) != false
-            },
+            speechAllowed = ::navigationSpeechCapabilityAllowed,
             hapticAllowed = {
                 startupCapabilityDecision?.allowsRequirement(
                     WalkSafeStartupRequirement.VIBRATION,
@@ -32212,6 +32720,7 @@ generation != cameraFallbackGeneration
             onCommandListeningStarted = ::handleHandsFreeVoiceCommandListeningStarted,
             onTerminalFailure = ::handleHandsFreeVoiceTerminalFailure,
             onSessionEnded = ::handleHandsFreeVoiceSessionEnded,
+            isSpeechRecognitionBlocked = ::isHandsFreeVoiceRecognitionBlocked,
         )
         handsFreeVoiceController = controller
         (application as? WalkSafeApplication)?.attachWalkVoiceSessionController(controller)
@@ -32227,7 +32736,11 @@ generation != cameraFallbackGeneration
         return isHandsFreeVoiceSpeechOutputActive()
     }
 
+    private fun isHandsFreeVoiceRecognitionBlocked(): Boolean =
+        isHandsFreeVoiceOutputActive() || feedbackActuator?.isSpeechRecognitionBlocked() == true
+
     private fun isHandsFreeVoiceSpeechOutputActive(): Boolean {
+        if (commandSpeechResponseCallbacks.size() > 0 || gatewaySpeechPlayer != null) return true
         if (feedbackActuator?.isAppSpeechActive() == true) return true
         if (!isScreenReaderActive()) return false
         val nowMs = SystemClock.elapsedRealtime()
@@ -32341,7 +32854,7 @@ generation != cameraFallbackGeneration
             handsFreeVoiceController == null ||
             handsFreeVoiceModelDirectory?.isDirectory != true ||
             !hasRecordAudioPermission() ||
-            voiceRecognitionActive || voiceCommandPromptPending ||
+            voiceRecognitionActive || voiceCommandPromptPending || deferredVoiceRecognitionStart != null ||
             gatewayVoiceRecorder?.isRecording == true ||
             activeGatewaySpeechInteraction != null ||
             !isWalkSessionRuntimeActive()
@@ -32406,6 +32919,11 @@ generation != cameraFallbackGeneration
 
     private fun onWalkRuntimeSafetyStop(stop: WalkRuntimeSafetyStop) {
         runOnUiThread {
+            if (developmentGuidanceStartBypassEnabled && stop.causes.none {
+                    it == WalkRuntimeSafetyStopCause.EPOCH_MISMATCH ||
+                        it == WalkRuntimeSafetyStopCause.INVALID_TIME
+                }
+            ) return@runOnUiThread
             if (
                 !::walkSessionLifecycle.isInitialized ||
                 !walkSessionLifecycle.isRuntimeEpochCurrent(stop.epoch)
@@ -32426,6 +32944,14 @@ generation != cameraFallbackGeneration
         reason: String,
         persistInterruptionMarker: Boolean = true,
     ) {
+        if (developmentGuidanceStartBypassEnabled && reason in setOf(
+                "camera_release_timed_out", "detector_runtime_failed",
+                "offline_korean_tts_runtime_failure", "required_app_permission_denied",
+            )
+        ) {
+            updateNavigationStatus("navigation=test_continues unavailable=$reason")
+            return
+        }
         val walkSnapshot = if (::walkSessionLifecycle.isInitialized) {
             walkSessionLifecycle.snapshot()
         } else {
@@ -32506,6 +33032,9 @@ generation != cameraFallbackGeneration
     }
 
     private fun enterWalkSessionForegroundRecheckAndCancelOutputs(reason: String) {
+        if (BuildConfig.DEBUG) runCatching {
+            android.util.Log.d("WalkSafeNavigation", "output=foreground_recheck reason=$reason")
+        }
         if (::walkSessionLifecycle.isInitialized) {
             transitionWalkSession(WalkSessionEvent.RecheckRequested)
             persistWalkSessionInterruptionMarker()
@@ -32521,6 +33050,9 @@ generation != cameraFallbackGeneration
     }
 
     private fun cancelWalkSessionOutputs(reason: String) {
+        if (BuildConfig.DEBUG) runCatching {
+            android.util.Log.d("WalkSafeNavigation", "output=session_outputs_cancelled reason=$reason")
+        }
         feedbackLifecycleGeneration += 1
         invalidatePendingExplicitReport()
         invalidateArCoreAvailabilityRecheck()
@@ -32549,7 +33081,7 @@ generation != cameraFallbackGeneration
         if (!currentLocationCollectionAllowsWork()) stopLocationUpdates()
         stopStepTracking()
         if (::phoneMountingSensorProbe.isInitialized) phoneMountingSensorProbe.stop()
-        if (::earthOrientationTracker.isInitialized) earthOrientationTracker.stop()
+        retainLocationCompassOrStop()
         feedbackPolicy.cancelPendingFeedbackDeliveries()
         if (::statusText.isInitialized) {
             pendingTalkBackInteraction?.let(statusText::removeCallbacks)
@@ -33385,7 +33917,12 @@ generation != cameraFallbackGeneration
             walk.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
         ) return false
         if (!feedbackPolicy.canSpeakNavigation(SystemClock.elapsedRealtime())) return false
-        if (feedbackActuator?.prepareForSpeechRecognition() == false) return false
+        if (isHandsFreeVoiceRecognitionBlocked() ||
+            feedbackActuator?.prepareForSpeechRecognition() == false
+        ) {
+            updateGatewayVoiceStatus("음성 안내가 끝난 뒤 녹음 버튼을 다시 눌러 주세요.")
+            return false
+        }
         stopHandsFreeVoiceService()
         val interactionGeneration = ++gatewaySpeechInteractionGeneration
         val active = ActiveGatewaySpeechInteraction(
@@ -33685,7 +34222,6 @@ generation != cameraFallbackGeneration
         cancelForegroundHomeWakeAcknowledgement()
         cancelForegroundHomeWakeListening()
         val promptCompletedForThisRequest = voiceCommandPromptReadyGeneration == voiceRecognitionGeneration
-        voiceCommandPromptReadyGeneration = null
         if (!hasRecordAudioPermission()) {
             updateNavigationStatus("voice_command=microphone_permission_missing")
             return false
@@ -33750,14 +34286,14 @@ generation != cameraFallbackGeneration
         }
         if (!mayListen) return false
         if (voiceRecognitionActive || voiceCommandPromptPending) return false
-        if (!feedbackPolicy.canSpeakNavigation(SystemClock.elapsedRealtime())) {
-            updateNavigationStatus("voice=blocked_by_active_feedback")
-            return false
+        if (isHandsFreeVoiceRecognitionBlocked() ||
+            !feedbackPolicy.canSpeakNavigation(SystemClock.elapsedRealtime()) ||
+            feedbackActuator?.prepareForSpeechRecognition() == false
+        ) {
+            return deferVoiceRecognitionUntilOutputIdle(purpose, expectedGatewayWalkOperationId)
         }
-        if (feedbackActuator?.prepareForSpeechRecognition() == false) {
-            updateNavigationStatus("voice=blocked_by_risk_speech")
-            return false
-        }
+        clearDeferredVoiceRecognitionStart(notifyFailure = false)
+        voiceCommandPromptReadyGeneration = null
         fun unavailable(detail: String, permanentlyLimit: Boolean): Boolean {
             updateNavigationStatus("voice=recognizer_unavailable")
             handleOneShotSpeechRecognitionFailure(detail, permanentlyLimit)
@@ -33846,8 +34382,116 @@ generation != cameraFallbackGeneration
         }
     }
 
+    private fun cancelDeferredVoiceRecognitionStart() {
+        clearDeferredVoiceRecognitionStart(notifyFailure = true)
+    }
+
+    private fun clearDeferredVoiceRecognitionStart(notifyFailure: Boolean) {
+        val pending = deferredVoiceRecognitionStart ?: return
+        val failure = deferredVoiceRecognitionFailure
+        deferredVoiceRecognitionStart = null
+        deferredVoiceRecognitionFailure = null
+        reportCleanupCallbackHandler.removeCallbacks(pending)
+        if (notifyFailure) failure?.invoke()
+        updateVoiceCommandButton(active = voiceRecognitionActive)
+    }
+
+    private fun deferVoiceRecognitionUntilOutputIdle(
+        purpose: VoiceRecognitionPurpose,
+        expectedGatewayWalkOperationId: String?,
+    ): Boolean {
+        if (deferredVoiceRecognitionStart != null) return true
+        stopHandsFreeVoiceService()
+        val generation = voiceRecognitionGeneration
+        val responseGeneration = commandSpeechResponseGeneration
+        val lifecycleGeneration = feedbackLifecycleGeneration
+        val epoch = walkSessionLifecycle.snapshot().epoch
+        val actor = reporterUserId
+        val sessionGeneration = GatewaySessionProcessCoordinator.snapshot().generation
+        val page = nativeUiPage
+        val routeGeneration = routeRequestGeneration
+        val deadline = SystemClock.elapsedRealtime() + DEFERRED_VOICE_INPUT_MAX_WAIT_MS
+        val resumeToken = walkSessionResumeConfirmationToken
+        val inputNotStarted: () -> Unit = {
+            if (reporterUserId == actor &&
+                GatewaySessionProcessCoordinator.snapshot().generation == sessionGeneration &&
+                walkSessionLifecycle.snapshot().epoch == epoch
+            ) {
+                // Output/input generations fence execution; confirmation tokens own cleanup.
+                // A newer status message must not leave the old confirmation permanently pending.
+                if (voiceRecognitionGeneration == generation &&
+                    commandSpeechResponseGeneration == responseGeneration
+                ) voiceCommandPromptReadyGeneration = null
+                when (purpose) {
+                    VoiceRecognitionPurpose.COMMAND -> {
+                        if (voiceRecognitionGeneration == generation &&
+                            commandSpeechResponseGeneration == responseGeneration
+                        ) clearVoiceEndConfirmation()
+                    }
+                    VoiceRecognitionPurpose.WALK_SESSION_RESUME -> {
+                        if (resumeToken != null && walkSessionResumeConfirmationToken == resumeToken) {
+                            handleWalkSessionResumeRecognizerNotStarted()
+                        }
+                    }
+                    VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER -> {
+                        if (expectedGatewayWalkOperationId != null &&
+                            gatewayWalkTakeoverPromptOperationId == expectedGatewayWalkOperationId
+                        ) {
+                            cancelGatewayWalkTakeoverConfirmation(epoch, "takeover_voice_not_started")
+                        }
+                    }
+                }
+            }
+        }
+        updateGatewayVoiceStatus("현재 음성 안내가 끝나면 명령을 듣겠습니다.")
+        updateNavigationStatus("voice=input_waiting_for_output")
+        lateinit var pending: Runnable
+        pending = Runnable {
+            if (deferredVoiceRecognitionStart !== pending) return@Runnable
+            val current = voiceRecognitionGeneration == generation &&
+                commandSpeechResponseGeneration == responseGeneration &&
+                isFeedbackLifecycleCurrent(lifecycleGeneration) && nativeUiPage == page &&
+                reporterUserId == actor && routeRequestGeneration == routeGeneration &&
+                GatewaySessionProcessCoordinator.snapshot().generation == sessionGeneration &&
+                walkSessionLifecycle.snapshot().epoch == epoch &&
+                !voiceRecognitionActive && !voiceCommandPromptPending
+            if (!current) {
+                cancelDeferredVoiceRecognitionStart()
+                scheduleHandsFreeVoiceRestart()
+                return@Runnable
+            }
+            if (SystemClock.elapsedRealtime() >= deadline) {
+                cancelDeferredVoiceRecognitionStart()
+                updateGatewayVoiceStatus("음성 안내가 끝난 뒤 음성 명령을 다시 눌러 주세요.")
+                updateNavigationStatus("voice=input_wait_expired")
+                scheduleHandsFreeVoiceRestart()
+                return@Runnable
+            }
+            if (isHandsFreeVoiceRecognitionBlocked() ||
+                !feedbackPolicy.canSpeakNavigation(SystemClock.elapsedRealtime())
+            ) {
+                reportCleanupCallbackHandler.postDelayed(pending, DEFERRED_VOICE_INPUT_POLL_MS)
+                return@Runnable
+            }
+            deferredVoiceRecognitionStart = null
+            deferredVoiceRecognitionFailure = null
+            if (!startVoiceCommandRecognition(purpose, expectedGatewayWalkOperationId)) {
+                inputNotStarted()
+                updateVoiceCommandButton(active = false)
+                scheduleHandsFreeVoiceRestart()
+            }
+        }
+        deferredVoiceRecognitionStart = pending
+        deferredVoiceRecognitionFailure = inputNotStarted
+        updateVoiceCommandButton(active = false)
+        reportCleanupCallbackHandler.postDelayed(pending, DEFERRED_VOICE_INPUT_POLL_MS)
+        return true
+    }
+
     private fun cancelCommandSpeechResponse() {
+        cancelDeferredVoiceRecognitionStart()
         commandSpeechResponseGeneration += 1L
+        failInterruptedRouteDecisionSpeech(commandSpeechResponseGeneration - 1L)
         commandSpeechResponseCallbacks.clear()
         voiceCommandPromptPending = false
         voiceCommandPromptReadyGeneration = null
@@ -34711,7 +35355,7 @@ generation != cameraFallbackGeneration
             return
         }
         if (!onDestinationSelected(selected)) {
-            if (currentDestination == selected.point && freshTrustedLocationOrNull() == null) {
+            if (currentDestination == selected.point && currentRouteLocationOrNull() == null) {
                 speakInteraction(
                     "${selected.name} 목적지를 유지했습니다. GPS 위치를 확인한 뒤 " +
                         "같은 후보 번호를 다시 말하거나 경로 시작을 선택해 주세요.",
@@ -34889,32 +35533,35 @@ generation != cameraFallbackGeneration
             return
         }
         val expectedWalkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return
-        val location = freshTrustedLocationOrNull()
-        val routeInstruction = if (isRouteActive && latestTmapOnRoute && location != null) {
-            routeNavigator.currentInstruction(location)
-        } else {
-            null
-        }
-        val message = when {
-            !isRouteActive -> "진행 중인 길안내가 없습니다."
-            !latestTmapOnRoute -> "현재 경로를 다시 확인하고 있습니다. 안전한 위치에서 잠시 기다려 주세요."
-            location == null -> "현재 위치를 확인한 뒤 다음 경로를 안내합니다."
-            else -> routeInstruction ?: "다음 경로 안내를 확인할 수 없습니다."
-        }
         updateNavigationStatus("voice=next_navigation_instruction active=$isRouteActive")
-        if (routeInstruction == null) {
-            speakInteraction(message)
-        } else {
-            val requestGeneration = routeRequestGeneration
-            speakNavigation(message) {
-                if (
-                    walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch) &&
-                    requestGeneration == routeRequestGeneration
-                ) {
-                    routeNavigator.acknowledgeCurrentInstruction(SystemClock.elapsedRealtime())
-                }
-            }
+        if (routeRequestInFlight.get()) {
+            speakInteraction("목적지까지의 경로를 계산하고 있습니다.")
+            return
         }
+        if (!isRouteActive) {
+            speakInteraction("진행 중인 길안내가 없습니다.")
+            return
+        }
+        routeNavigator.pendingDecisionToken()?.let { token ->
+            val message = when (token.decision) {
+                RouteNavigatorUserDecision.REROUTE ->
+                    "경로를 벗어났습니다. 새 경로 요청, 위치 다시 확인, 길안내 종료 중에서 선택해 주세요."
+                RouteNavigatorUserDecision.LOCATION_RECHECK ->
+                    "현재 위치와 경로를 확인해야 합니다. 위치 다시 확인을 선택해 주세요."
+                RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION ->
+                    "목적지에 도착하셨나요? 도착 확인 또는 도착 아님 중에서 선택해 주세요."
+            }
+            speakRouteDecision(message, token, repeatRequested = true)
+            return
+        }
+        // Reuse the fresh automatic context without adding another location/motion observation.
+        val nowMs = SystemClock.elapsedRealtime()
+        val update = routeNavigator.currentGuidance(nowMs, currentRouteFacingObservation(nowMs))
+        if (update == null) {
+            speakInteraction("현재 위치를 확인한 뒤 다음 경로를 안내합니다.")
+            return
+        }
+        tryDispatchRouteInstruction(update, expectedWalkEpoch)
     }
 
     private fun stopNavigationFromVoice() {
@@ -34941,7 +35588,8 @@ generation != cameraFallbackGeneration
         val snapshot = walkSessionLifecycle.snapshot()
         val gatewayRecording = gatewayVoiceRecorder?.isRecording == true
         val gatewayProcessing = activeGatewaySpeechInteraction != null && !gatewayRecording
-        val responsePending = commandSpeechResponseCallbacks.size() > 0 || voiceCommandPromptPending
+        val responsePending = commandSpeechResponseCallbacks.size() > 0 || voiceCommandPromptPending ||
+            deferredVoiceRecognitionStart != null
         val voiceCommandAvailable = hasRecordAudioPermission() &&
             when (snapshot.state) {
                 WalkSessionState.ACTIVE -> !oneShotSpeechRecognitionLimited
@@ -35086,6 +35734,7 @@ generation != cameraFallbackGeneration
         val callback = locationCallback
         locationCallback = null
         locationCollectionOwner = null
+        latestNavigationTestLocation = null
         if (::fusedLocationClient.isInitialized) {
             callback?.let { registeredCallback ->
                 runCatching { fusedLocationClient.removeLocationUpdates(registeredCallback) }
@@ -35101,6 +35750,10 @@ generation != cameraFallbackGeneration
         latestRawRouteLocation = null
         positionGuidancePaused = false
         orientationLocationOwnerActive = false
+        stopRouteCompassPresentationUpdates()
+        refreshRouteCompassPresentation()
+        lastRouteCompassStatusKey = null
+        if (::earthOrientationTracker.isInitialized) earthOrientationTracker.clearGeomagneticReference()
         if (::earthOrientationTracker.isInitialized && session == null && !cameraFallbackRunning) {
             earthOrientationTracker.stop()
         }
@@ -35117,6 +35770,17 @@ generation != cameraFallbackGeneration
             generation == locationCallbackGeneration &&
             locationCollectionOwner == owner &&
             currentLocationCollectionOwnerOrNull() == owner
+
+    private fun currentRouteLocationOrNull(): TrustedLocation? {
+        if (!developmentGuidanceStartBypassEnabled) return freshTrustedLocationOrNull()
+        if (locationCollectionOwner == null ||
+            currentLocationCollectionOwnerOrNull() != locationCollectionOwner
+        ) return null
+        return NavigationTestLocationPolicy.freshOrNull(
+            latestNavigationTestLocation,
+            SystemClock.elapsedRealtime(),
+        )
+    }
 
     private fun freshTrustedLocationOrNull(
         nowElapsedRealtimeMs: Long = SystemClock.elapsedRealtime(),
@@ -35447,6 +36111,147 @@ generation != cameraFallbackGeneration
         if (!::earthOrientationTracker.isInitialized) return
         orientationLocationOwnerActive = true
         earthOrientationTracker.start()
+        scheduleRouteCompassPresentationUpdate()
+    }
+
+    /** A route/camera owner ending must not clear the authenticated location owner's compass. */
+    private fun retainLocationCompassOrStop() {
+        if (!::earthOrientationTracker.isInitialized) return
+        val owner = locationCollectionOwner
+        if (orientationLocationOwnerActive && locationCallback != null && owner != null &&
+            currentLocationCollectionOwnerOrNull() == owner
+        ) {
+            ensureEarthOrientationForLocation()
+        } else {
+            earthOrientationTracker.stop()
+        }
+    }
+
+    private fun scheduleRouteCompassPresentationUpdate() {
+        if (pendingRouteCompassRefresh != null || !::nativeHomeCompassText.isInitialized) return
+        val owner = locationCollectionOwner ?: return
+        val generation = locationCallbackGeneration
+        if (!isActivityForeground || !orientationLocationOwnerActive || locationCallback == null ||
+            currentLocationCollectionOwnerOrNull() != owner
+        ) return
+        lateinit var refresh: Runnable
+        refresh = Runnable {
+            if (pendingRouteCompassRefresh !== refresh) return@Runnable
+            pendingRouteCompassRefresh = null
+            if (!isActivityForeground || !orientationLocationOwnerActive || locationCallback == null ||
+                locationCollectionOwner != owner || locationCallbackGeneration != generation ||
+                currentLocationCollectionOwnerOrNull() != owner
+            ) return@Runnable
+            // Observe even before a route exists; do not start TTS or speech recognition here.
+            currentRouteFacingObservation(SystemClock.elapsedRealtime())
+            refreshRouteCompassPresentation()
+            scheduleRouteCompassPresentationUpdate()
+        }
+        pendingRouteCompassRefresh = refresh
+        if (!nativeHomeCompassText.postDelayed(refresh, 500L)) pendingRouteCompassRefresh = null
+    }
+
+    private fun stopRouteCompassPresentationUpdates() {
+        pendingRouteCompassRefresh?.let { callback ->
+            if (::nativeHomeCompassText.isInitialized) nativeHomeCompassText.removeCallbacks(callback)
+        }
+        pendingRouteCompassRefresh = null
+    }
+
+    private fun refreshRouteCompassPresentation() {
+        if (!::nativeHomeCompassText.isInitialized) return
+        val message = routeCompassStatusMessage()
+        if (nativeHomeCompassText.text.toString() != message) nativeHomeCompassText.text = message
+        refreshHomeRouteStatus()
+        scheduleRouteCompassPresentationUpdate()
+    }
+
+    private fun refreshHomeRouteStatus() {
+        if (!::nativeHomeRouteStatusText.isInitialized) return
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            runOnUiThread { if (isActivityForeground) refreshHomeRouteStatus() }
+            return
+        }
+        val message = homeRouteStatusMessage()
+        if (nativeHomeRouteStatusText.text.toString() != message) nativeHomeRouteStatusText.text = message
+    }
+
+    private fun homeRouteStatusMessage(): String = when {
+        routeRequestInFlight.get() -> "길안내: 목적지까지의 경로를 찾고 있습니다."
+        isRouteActive && routeNavigator.hasRoute() -> "길안내: 목적지까지의 경로가 설정되었습니다."
+        isRouteActive -> "길안내: 경로 확인이 필요합니다. 안내를 다시 시작해 주세요."
+        latestNavigationState in setOf("navigation=route_failed", "navigation=reroute_failed") ->
+            "길안내: 경로 요청을 완료하지 못했습니다. 안내를 다시 시작해 주세요."
+        currentDestination != null || pendingUiDestination != null -> "길안내: 목적지가 선택되었습니다."
+        else -> "길안내: 목적지를 선택해 주세요."
+    }
+
+    /** Route speech follows the rear camera axis; step/PDR mounting confirmation stays separate. */
+    private fun currentRouteFacingObservation(nowMs: Long): RouteFacingObservation? {
+        if (!isActivityForeground || !::earthOrientationTracker.isInitialized ||
+            !orientationLocationOwnerActive || locationCallback == null || locationCollectionOwner == null ||
+            currentLocationCollectionOwnerOrNull() != locationCollectionOwner
+        ) return null
+        val facing = earthOrientationTracker.latestRouteCompassHeading(nowMs)
+        val observation = facing.observation
+        val statusKey = "${facing.reason}:${observation?.source}"
+        if (lastRouteCompassStatusKey != statusKey) {
+            lastRouteCompassStatusKey = statusKey
+            if (BuildConfig.DEBUG) runCatching {
+                android.util.Log.d("WalkSafeNavigation", "compass=$statusKey heading=${observation?.degreesTrueNorth}")
+            }
+            if (::fieldSessionLog.isInitialized) {
+                fieldSessionLog.recordEvent("route_compass_state_changed", mapOf(
+                    "reason" to facing.reason.name,
+                    "source" to observation?.source?.name,
+                    "headingTrueNorthDeg" to observation?.degreesTrueNorth,
+                    "reportedHeadingAccuracyDeg" to observation?.reportedHeadingAccuracyDegrees,
+                    "sampleAgeMs" to observation?.let { nowMs - it.observedAtElapsedRealtimeMs },
+                ))
+            }
+        }
+        return observation
+    }
+
+    private fun routeCompassStatusMessage(): String {
+        if (!isActivityForeground || !::earthOrientationTracker.isInitialized ||
+            !orientationLocationOwnerActive || locationCallback == null || locationCollectionOwner == null ||
+            currentLocationCollectionOwnerOrNull() != locationCollectionOwner
+        ) return "위치 측정과 함께 나침반 방향을 준비합니다."
+        val result = earthOrientationTracker.latestRouteCompassHeading(SystemClock.elapsedRealtime())
+        result.observation?.let { observation ->
+            val labels = listOf("북", "북동", "동", "남동", "남", "남서", "서", "북서")
+            val index = ((observation.degreesTrueNorth + 22.5) / 45.0).toInt() % labels.size
+            val degrees = observation.degreesTrueNorth.roundToInt() % 360
+            val source = if (observation.source == RouteFacingSource.ROTATION_VECTOR) "" else " 보조 나침반 사용 중."
+            return "나침반: 휴대폰 후면은 ${labels[index]}쪽(${degrees}도)을 향하고 있습니다.$source"
+        }
+        return when (result.reason) {
+            RouteCompassHeadingReason.SENSOR_UNAVAILABLE -> "나침반 센서를 시작하지 못했습니다."
+            RouteCompassHeadingReason.HEADING_ACCURACY_UNAVAILABLE -> "나침반 센서가 방향 오차 정보를 아직 제공하지 않습니다."
+            RouteCompassHeadingReason.REFERENCE_MISSING -> "현재 위치를 확인해 나침반의 진북 기준을 맞추고 있습니다."
+            RouteCompassHeadingReason.REAR_AXIS_VERTICAL -> "휴대폰 후면이 바닥이나 하늘을 향하고 있습니다. 후면을 걷는 방향으로 들어 주세요."
+            RouteCompassHeadingReason.GRAVITY_MISSING, RouteCompassHeadingReason.MAGNETIC_FIELD_MISSING ->
+                "보조 나침반에 필요한 센서 값을 기다리고 있습니다."
+            RouteCompassHeadingReason.GRAVITY_UNSTABLE ->
+                "휴대폰 움직임이 커서 방향을 다시 확인하고 있습니다. 잠시 안정적으로 잡아 주세요."
+            RouteCompassHeadingReason.QUALITY_LOW, RouteCompassHeadingReason.HEADING_ACCURACY,
+            RouteCompassHeadingReason.MAGNETIC_FIELD_ANOMALY ->
+                "나침반 방향이 불안정합니다. 자석·금속에서 떨어져 휴대폰을 천천히 움직여 주세요."
+            else -> "새 나침반 방향을 기다리고 있습니다."
+        }
+    }
+
+    private fun updateRouteOrientationReference(location: Location) {
+        if (!::earthOrientationTracker.isInitialized) return
+        ensureEarthOrientationForLocation()
+        earthOrientationTracker.updateGeomagneticReference(
+            latitudeDegrees = location.latitude,
+            longitudeDegrees = location.longitude,
+            altitudeMeters = location.altitude
+                .takeIf { location.hasAltitude() && it.isFinite() } ?: 0.0,
+            timeMillis = System.currentTimeMillis(),
+        )
     }
 
     private fun chestMountedHeadingForStep(
@@ -35485,6 +36290,10 @@ generation != cameraFallbackGeneration
     }
 
     private fun applyPositionConfidenceDecision(snapshot: PositioningSnapshot): Boolean {
+        if (developmentGuidanceStartBypassEnabled) {
+            positionGuidancePaused = false
+            return false
+        }
         val decision = snapshot.confidence
         val pauseReason = "position_quality_${decision.quality.name.lowercase(Locale.US)}"
         val positioningEvidenceInterrupted =
@@ -35593,7 +36402,7 @@ generation != cameraFallbackGeneration
             clearPendingExplicitRouteStart()
             return
         }
-        if (freshTrustedLocationOrNull() == null) return
+        if (currentRouteLocationOrNull() == null) return
         val retained = pendingExplicitRouteStart.consumeIfCurrent(
             current,
             SystemClock.elapsedRealtime(),
@@ -35637,6 +36446,13 @@ generation != cameraFallbackGeneration
             SystemClock.elapsedRealtime()
         }
         val mock = isMockLocationCompat(location)
+        // Declination needs a fresh geographic reference, not a metre-accurate walking fix.
+        // Set it before PDR filtering, including while logged in without an active route.
+        if (RouteCompassLocationReference.accepts(
+                location.latitude, location.longitude, elapsedMs,
+                SystemClock.elapsedRealtime(), mock,
+            )
+        ) updateRouteOrientationReference(location)
         val currentGnssQualitySnapshot = runCatching {
             gnssQualityObserver?.snapshot(SystemClock.elapsedRealtimeNanos())
         }.getOrNull()
@@ -35689,8 +36505,22 @@ generation != cameraFallbackGeneration
                 horizontalAccuracyMeters = accuracy?.toDouble(),
             )
         }
+        val navigationTestFix = if (developmentGuidanceStartBypassEnabled) {
+            NavigationTestLocationPolicy.freshOrNull(
+                TrustedLocation(location.latitude, location.longitude, accuracy ?: Float.MAX_VALUE, elapsedMs),
+                SystemClock.elapsedRealtime(),
+                mock = mock,
+            )
+        } else null
+        latestNavigationTestLocation = navigationTestFix
         if (hardRejected || filtered == null) {
             clearTrustedLocation()
+            if (navigationTestFix != null && currentNavigationCollectionAllowsWork()) {
+                positionGuidancePaused = false
+                continuePendingExplicitRouteStartIfReady()
+                updateRouteGuidance(navigationTestFix, navigationTestFix)
+                return
+            }
             if (!currentNavigationCollectionAllowsWork() &&
                 !currentPositionFieldCollectionAllowsWork()
             ) return
@@ -35710,17 +36540,6 @@ generation != cameraFallbackGeneration
                 )
             }
             return
-        }
-        if (::earthOrientationTracker.isInitialized) {
-            ensureEarthOrientationForLocation()
-            earthOrientationTracker.updateGeomagneticReference(
-                latitudeDegrees = location.latitude,
-                longitudeDegrees = location.longitude,
-                altitudeMeters = location.altitude
-                    .takeIf { location.hasAltitude() && it.isFinite() }
-                    ?: 0.0,
-                timeMillis = System.currentTimeMillis(),
-            )
         }
         updatePositioningHeadingInputs(location, elapsedMs)
         val filteredTrusted = filtered.toTrustedLocation()
@@ -35881,6 +36700,7 @@ generation != cameraFallbackGeneration
         nowMs: Long,
         feedbackActuatorOverride: TactileFrameFeedbackActuator? = null,
         independentFreshOutputs: List<UnknownObjectFeedbackBatch> = emptyList(),
+        warningContext: kr.co.hanium.dreamup.walksafe.navigation.WarningRegionContext? = null,
     ): TactileFrameFeedbackDispatch = tactileFrameCoordinator.dispatchFeedback(
         frame = frame,
         stale = stale,
@@ -35888,6 +36708,7 @@ generation != cameraFallbackGeneration
         nowMs = nowMs,
         feedbackActuatorOverride = feedbackActuatorOverride,
         independentFreshOutputs = independentFreshOutputs,
+        warningContext = warningContext,
     )
 
     internal fun <T> matchingFrameEvidenceOrNull(
@@ -36016,6 +36837,8 @@ generation != cameraFallbackGeneration
     }
 
     private fun routeSnapshotPurgeFenceAllowsRoute(): Boolean {
+        // A failed cleanup remains recorded and retried; test guidance can run in memory.
+        if (developmentGuidanceStartBypassEnabled) return true
         if (!routeSnapshotPurgeFailed) return true
         val detail =
             "암호화 경로 기록을 삭제하지 못해 새 길안내를 시작하지 않습니다. 저장소를 확인하고 새 보행을 시작해 주세요."
@@ -36027,6 +36850,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun resetRouteState(purgeRouteSnapshot: Boolean = true) {
+        cancelNavigationSpeechRetry()
         clearPendingExplicitRouteStart()
         navigationRequests.cancelRoute()
         isRouteActive = false
@@ -36037,8 +36861,10 @@ generation != cameraFallbackGeneration
         currentDestination = null
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
+        cancelRouteLocationStatusSpeech()
+        feedbackActuator?.cancelNavigationSpeech()
         if (purgeRouteSnapshot) purgeEncryptedRouteSnapshot()
-        lastAnnouncedRouteDecisionToken = null
+        cancelRouteDecisionSpeech()
         routeDeviationHapticDecision = null
         updateRouteDeviationActions(null)
         routeStartStepCount = null
@@ -36082,7 +36908,7 @@ generation != cameraFallbackGeneration
             val activeSnapshotExpired = ::walkSessionLifecycle.isInitialized &&
                 walkSessionLifecycle.currentRuntimeEpochOrNull()?.walkSessionId == walkSessionId &&
                 isRouteActive
-            if (activeSnapshotExpired) {
+            if (activeSnapshotExpired && !developmentGuidanceStartBypassEnabled) {
                 enterWalkSessionSafetyStopAndCancelOutputs("route_snapshot_expired")
                 val detail =
                     "암호화 경로 기록의 24시간 보관 시간이 끝나 길안내를 중지했습니다."
@@ -36127,8 +36953,11 @@ generation != cameraFallbackGeneration
         currentDestination = null
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
+        cancelNavigationSpeechRetry()
+        cancelRouteLocationStatusSpeech()
+        feedbackActuator?.cancelNavigationSpeech()
         purgeEncryptedRouteSnapshot()
-        lastAnnouncedRouteDecisionToken = null
+        cancelRouteDecisionSpeech()
         routeDeviationHapticDecision = null
         updateRouteDeviationActions(null)
         routeStartStepCount = null
@@ -36158,7 +36987,10 @@ generation != cameraFallbackGeneration
         latestTactileRouteState = "localRoute=tmap:navigation_inactive"
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
-        lastAnnouncedRouteDecisionToken = null
+        cancelNavigationSpeechRetry()
+        cancelRouteLocationStatusSpeech()
+        feedbackActuator?.cancelNavigationSpeech()
+        cancelRouteDecisionSpeech()
         routeDeviationHapticDecision = null
         updateRouteDeviationActions(null)
         routeStartStepCount = null
@@ -36706,6 +37538,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun updateRouteButtonText() {
+        refreshHomeRouteStatus()
         if (!::routeButton.isInitialized) return
         syncActiveSessionScreenPolicy()
         routeButton.text = when {
@@ -36727,7 +37560,9 @@ generation != cameraFallbackGeneration
         if (!routeSnapshotPurgeFenceAllowsRoute()) return
         val expectedWalkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return
         val deviceResources = walkSessionResourceProbe.snapshot()
-        if (deviceResources.readinessStatus != WalkSessionReadinessStatus.READY) {
+        if (!developmentGuidanceStartBypassEnabled &&
+            deviceResources.readinessStatus != WalkSessionReadinessStatus.READY
+        ) {
             updateNavigationStatus(
                 "navigation=route_blocked device_resources=" +
                     deviceResources.readinessStatus.name.lowercase(Locale.US),
@@ -36757,7 +37592,7 @@ generation != cameraFallbackGeneration
         GatewayCapacityProcessState.fenceSessionGeneration(
             expectedGatewaySessionGeneration,
         )
-        val origin = freshTrustedLocationOrNull()
+        val origin = currentRouteLocationOrNull()
         if (origin == null) {
             latestTmapOnRoute = false
             if (!preserveExistingRoute) {
@@ -36933,7 +37768,7 @@ generation != cameraFallbackGeneration
                         }.getOrNull()?.takeIf {
                             it.walkSessionId == expectedWalkEpoch.walkSessionId
                         }
-                        if (storedRouteSnapshot == null) {
+                        if (storedRouteSnapshot == null && !developmentGuidanceStartBypassEnabled) {
                             routeRequestInFlight.set(false)
                             enterWalkSessionSafetyStopAndCancelOutputs("route_snapshot_store_failed")
                             val detail =
@@ -36946,15 +37781,27 @@ generation != cameraFallbackGeneration
                             speakInteraction(detail)
                             return@runOnUiThread
                         }
-                        routeSnapshotPurgeFailed = false
-                        scheduleEncryptedRouteSnapshotExpiry(
-                            walkSessionId = storedRouteSnapshot.walkSessionId,
-                            expiresAtEpochMs = storedRouteSnapshot.expiresAtEpochMs,
-                        )
+                        if (storedRouteSnapshot != null) {
+                            routeSnapshotPurgeFailed = false
+                            scheduleEncryptedRouteSnapshotExpiry(
+                                walkSessionId = storedRouteSnapshot.walkSessionId,
+                                expiresAtEpochMs = storedRouteSnapshot.expiresAtEpochMs,
+                            )
+                        }
                         tmapFailureGuard.recordSuccess()
                         routeNavigator.setRoute(
                             route,
                             destination = destination,
+                            origin = origin,
+                        )
+                        if (::fieldSessionLog.isInitialized) fieldSessionLog.recordEvent(
+                            "route_installed",
+                            mapOf(
+                                "routeId" to routeNavigator.currentRouteId(),
+                                "points" to route.polyline.size,
+                                "guides" to route.guidePoints.size,
+                                "distanceM" to route.summary.distanceM,
+                            ),
                         )
                         routeStartStepCount = latestStepCount
                         directionGuidancePauseReason = null
@@ -36964,8 +37811,16 @@ generation != cameraFallbackGeneration
                         updateNavigationStatus(
                             "navigation=route_ready distance=${route.summary.distanceM}m priority=${route.priority}",
                         )
-                        freshTrustedLocationOrNull()?.let { trusted ->
-                            updateRouteGuidance(trusted, latestRawRouteLocation ?: trusted)
+                        val routeLocation = currentRouteLocationOrNull()
+                        if (routeLocation != null) {
+                            updateRouteGuidance(routeLocation, latestRawRouteLocation ?: routeLocation)
+                        } else {
+                            val accepted = speakStatusExplanation(
+                                "목적지까지 약 ${route.summary.distanceM}미터의 경로를 찾았습니다. " +
+                                    "현재 위치를 확인하면 이동 방향을 안내하겠습니다.",
+                            )
+                            routeLocationStatusResponseGeneration =
+                                commandSpeechResponseGeneration.takeIf { accepted }
                         }
                     }
                 } catch (_: CancellationException) {
@@ -37011,7 +37866,8 @@ generation != cameraFallbackGeneration
                         }
                         if (
                             countableTmapFailure &&
-                            tmapFailureGuard.recordFailure()
+                            tmapFailureGuard.recordFailure() &&
+                            !developmentGuidanceStartBypassEnabled
                         ) {
                             enterWalkSessionSafetyStopAndCancelOutputs("tmap_consecutive_failures")
                             val safetyStopDetail =
@@ -37086,8 +37942,13 @@ generation != cameraFallbackGeneration
         location: TrustedLocation,
         rawLocation: TrustedLocation = location,
     ) {
+        // A location update may start this request earlier in the very same callback. Loading
+        // has no installed route yet; it must not be treated as a lost/invalid saved route.
+        if (!isRouteActive || routeRequestInFlight.get()) return
         val expectedWalkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return
-        if (positionGuidancePaused || directionGuidancePauseReason == "tmap_unavailable") {
+        if (!developmentGuidanceStartBypassEnabled &&
+            (positionGuidancePaused || directionGuidancePauseReason == "tmap_unavailable")
+        ) {
             latestTmapOnRoute = false
             val pauseReason = if (positionGuidancePaused) {
                 "position_quality"
@@ -37098,11 +37959,13 @@ generation != cameraFallbackGeneration
             return
         }
         val nowMs = SystemClock.elapsedRealtime()
+        val facing = currentRouteFacingObservation(nowMs)
         val update = routeNavigator.update(
             location = rawLocation,
             nowMs = nowMs,
             requestInFlight = routeRequestInFlight.get(),
             stepProgressM = routeStepProgressMOrNull(),
+            facingObservation = facing,
             filteredPosition = FilteredRoutePosition(
                 point = RoutePoint(location.latitude, location.longitude),
                 horizontalAccuracyM = location.accuracyM.toDouble(),
@@ -37117,6 +37980,7 @@ generation != cameraFallbackGeneration
                 },
             ),
         )
+        recordRouteAlignmentDiagnostic(update, facing, location.accuracyM, nowMs)
         applyRouteDeviationSafetyUpdate(update)
         val acceptedPosition = routeNavigator.currentAcceptedRouteMatchFor(location.elapsedRealtimeMs) != null &&
             update.reason !in setOf("route_match_untrusted", "location_sample_not_newer")
@@ -37143,30 +38007,223 @@ generation != cameraFallbackGeneration
         if (update.reason in setOf("route_missing", "polyline_missing")) {
             pauseDirectionGuidance(
                 reason = "route_invalid",
-                message = "저장된 TMAP 경로를 확인할 수 없어 방향 안내를 중지했습니다.",
+                message = "경로 데이터를 확인하지 못했습니다. 안내를 다시 시작해 주세요.",
             )
         }
-        val instruction = update.instruction ?: return
+        tryDispatchRouteInstruction(update, expectedWalkEpoch)
+    }
+
+    private fun recordRouteAlignmentDiagnostic(
+        update: RouteNavigatorUpdate,
+        facing: RouteFacingObservation?,
+        positionUncertaintyM: Float,
+        nowMs: Long,
+    ) {
+        val alignment = update.routeAlignmentDiagnostic ?: return
+        val key = "${routeRequestGeneration}:${alignment.reason}:${alignment.segmentIndex}:${facing?.source}"
+        if (lastRouteAlignmentDiagnosticKey == key && nowMs - lastRouteAlignmentDiagnosticAtMs in 0L..1_999L) return
+        lastRouteAlignmentDiagnosticKey = key
+        lastRouteAlignmentDiagnosticAtMs = nowMs
+        val values = mapOf(
+            "reason" to alignment.reason.name,
+            "segmentIndex" to alignment.segmentIndex,
+            "routeBearingDeg" to alignment.bearingDegreesTrueNorth,
+            "rearHeadingDeg" to facing?.degreesTrueNorth,
+            "compassSource" to facing?.source?.name,
+            "compassAgeMs" to facing?.let { nowMs - it.observedAtElapsedRealtimeMs },
+            "positionUncertaintyM" to positionUncertaintyM,
+        )
+        if (BuildConfig.DEBUG) runCatching {
+            android.util.Log.d("WalkSafeNavigation", "route_alignment=$values")
+        }
+        if (::fieldSessionLog.isInitialized) fieldSessionLog.recordEvent("route_alignment", values)
+    }
+
+    private fun cancelRouteLocationStatusSpeech() {
+        val generation = routeLocationStatusResponseGeneration ?: return
+        routeLocationStatusResponseGeneration = null
+        if (generation == commandSpeechResponseGeneration) cancelCommandSpeechResponse()
+    }
+
+    private fun cancelNavigationSpeechRetry() {
+        val pending = navigationSpeechRetryRunnable ?: return
+        navigationSpeechRetryRunnable = null
+        reportCleanupCallbackHandler.removeCallbacks(pending)
+    }
+
+    private fun isRouteSpeechCurrent(
+        epoch: WalkRuntimeEpoch,
+        requestGeneration: Int,
+        lifecycleGeneration: Int,
+    ): Boolean =
+        isFeedbackLifecycleCurrent(lifecycleGeneration) &&
+            ::walkSessionLifecycle.isInitialized &&
+            walkSessionLifecycle.isRuntimeEpochCurrent(epoch) &&
+            isWalkSessionRuntimeActive() && navigationEnvironmentOutputsAllowed() &&
+            isRouteActive && !routeRequestInFlight.get() &&
+            routeRequestGeneration == requestGeneration
+
+    private fun scheduleNavigationSpeechRetry(delayMs: Long = 250L) {
+        if (!::walkSessionLifecycle.isInitialized || !isRouteActive) return
+        val epoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return
+        val requestGeneration = routeRequestGeneration
+        val lifecycleGeneration = feedbackLifecycleGeneration
+        if (!isRouteSpeechCurrent(epoch, requestGeneration, lifecycleGeneration)) return
+        if (navigationSpeechRetryRunnable != null) {
+            if (delayMs != 0L) return
+            cancelNavigationSpeechRetry()
+        }
+        lateinit var retry: Runnable
+        retry = Runnable {
+            if (navigationSpeechRetryRunnable !== retry) return@Runnable
+            navigationSpeechRetryRunnable = null
+            if (!isRouteSpeechCurrent(epoch, requestGeneration, lifecycleGeneration)) return@Runnable
+            val nowMs = SystemClock.elapsedRealtime()
+            val update = routeNavigator.retryGuidance(
+                nowMs, facingObservation = currentRouteFacingObservation(nowMs),
+            ) ?: return@Runnable
+            tryDispatchRouteInstruction(update, epoch)
+        }
+        navigationSpeechRetryRunnable = retry
+        reportCleanupCallbackHandler.postDelayed(retry, delayMs)
+    }
+
+    private fun tryDispatchRouteInstruction(update: RouteNavigatorUpdate, expectedWalkEpoch: WalkRuntimeEpoch) {
         if (update.userDecisionRequired) return
-        if (feedbackPolicy.canSpeakNavigation(nowMs) && routeNavigator.reserveInstruction(update)) {
-            val requestGeneration = routeRequestGeneration
-            dispatchNavigationSpeech(
-                instruction,
-                onCompleted = {
-                    if (walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch) &&
-                        isWalkSessionRuntimeActive() && navigationEnvironmentOutputsAllowed() &&
-                        isRouteActive && requestGeneration == routeRequestGeneration
-                    ) {
-                        routeNavigator.acknowledgeInstruction(update, SystemClock.elapsedRealtime())
-                    } else {
-                        routeNavigator.releaseInstruction(update, SystemClock.elapsedRealtime())
-                    }
-                },
-                onFailed = {
-                    routeNavigator.releaseInstruction(update, SystemClock.elapsedRealtime())
-                },
-            )
+        val instruction = update.instruction
+        if (instruction == null) {
+            if (update.reason in setOf(
+                    "guidance_retry_wait", "guidance_rate_limited", "guidance_already_completed",
+                )
+            ) {
+                scheduleNavigationSpeechRetry()
+            }
+            return
         }
+        val requestGeneration = routeRequestGeneration
+        val lifecycleGeneration = feedbackLifecycleGeneration
+        if (!isRouteSpeechCurrent(expectedWalkEpoch, requestGeneration, lifecycleGeneration)) return
+        if (deferredVoiceRecognitionStart != null ||
+            !feedbackPolicy.canSpeakNavigation(SystemClock.elapsedRealtime())
+        ) {
+            scheduleNavigationSpeechRetry()
+            return
+        }
+        if (!routeNavigator.reserveInstruction(update)) return
+        cancelNavigationSpeechRetry()
+        cancelRouteLocationStatusSpeech()
+        val accepted = dispatchNavigationSpeech(
+            instruction,
+            onCompleted = {
+                if (isRouteSpeechCurrent(expectedWalkEpoch, requestGeneration, lifecycleGeneration)) {
+                    routeNavigator.acknowledgeInstruction(update, SystemClock.elapsedRealtime())
+                    scheduleNavigationSpeechRetry()
+                    showWalkLastResult(instruction)
+                    if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeNavigation", "speech=completed")
+                } else {
+                    routeNavigator.releaseInstruction(update, SystemClock.elapsedRealtime())
+                }
+            },
+            onFailed = {
+                routeNavigator.releaseInstruction(update, SystemClock.elapsedRealtime())
+                if (isRouteSpeechCurrent(expectedWalkEpoch, requestGeneration, lifecycleGeneration)) {
+                    if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeNavigation", "speech=retry_pending")
+                    scheduleNavigationSpeechRetry()
+                }
+            },
+        )
+        if (BuildConfig.DEBUG) android.util.Log.d(
+            "WalkSafeNavigation",
+            "speech=${if (accepted) "accepted" else "unavailable"} " +
+                "${feedbackActuator?.statusText() ?: "tts=absent"}",
+        )
+    }
+
+    private fun failInterruptedRouteDecisionSpeech(previousResponseGeneration: Long) {
+        if (routeDecisionSpeechResponseGeneration != previousResponseGeneration) return
+        commandSpeechResponseCallbacks.takeTerminalCallback(
+            "command-response-$previousResponseGeneration", completed = false, notifyFailure = true,
+        )?.invoke()
+    }
+
+    private fun cancelRouteDecisionSpeech() {
+        routeDecisionSpeechAttempt += 1L
+        routeDecisionSpeechRetryRunnable?.let(reportCleanupCallbackHandler::removeCallbacks)
+        routeDecisionSpeechRetryRunnable = null
+        pendingRouteDecisionSpeechToken = null
+        lastAnnouncedRouteDecisionToken = null
+        val responseGeneration = routeDecisionSpeechResponseGeneration
+        routeDecisionSpeechResponseGeneration = null
+        if (responseGeneration != null && responseGeneration == commandSpeechResponseGeneration) {
+            cancelCommandSpeechResponse()
+        }
+    }
+
+    private fun speakRouteDecision(
+        message: String,
+        token: RouteNavigatorDecisionToken,
+        repeatRequested: Boolean = false,
+    ): Boolean {
+        if (token != routeNavigator.pendingDecisionToken()) return false
+        if (pendingRouteDecisionSpeechToken == token) return true
+        if (!repeatRequested && lastAnnouncedRouteDecisionToken == token) return true
+        cancelRouteDecisionSpeech()
+        val epoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return false
+        val requestGeneration = routeRequestGeneration
+        val lifecycleGeneration = feedbackLifecycleGeneration
+        if (!isRouteSpeechCurrent(epoch, requestGeneration, lifecycleGeneration)) return false
+        pendingRouteDecisionSpeechToken = token
+        val attempt = ++routeDecisionSpeechAttempt
+        fun current(): Boolean =
+            attempt == routeDecisionSpeechAttempt && pendingRouteDecisionSpeechToken == token &&
+                token == routeNavigator.pendingDecisionToken() &&
+                isRouteSpeechCurrent(epoch, requestGeneration, lifecycleGeneration)
+
+        fun retry() {
+            if (!current() || routeDecisionSpeechRetryRunnable != null) return
+            routeDecisionSpeechResponseGeneration = null
+            lateinit var pending: Runnable
+            pending = Runnable {
+                if (routeDecisionSpeechRetryRunnable !== pending) return@Runnable
+                routeDecisionSpeechRetryRunnable = null
+                if (!current()) return@Runnable
+                pendingRouteDecisionSpeechToken = null
+                speakRouteDecision(message, token, repeatRequested)
+            }
+            routeDecisionSpeechRetryRunnable = pending
+            reportCleanupCallbackHandler.postDelayed(pending, 1_000L)
+        }
+        // A failed decision remains pending, but cannot interrupt a newer command or voice input.
+        if (commandSpeechResponseCallbacks.size() > 0 || voiceRecognitionActive ||
+            gatewayVoiceRecorder?.isRecording == true || deferredVoiceRecognitionStart != null
+        ) {
+            retry()
+            return false
+        }
+        var terminated = false
+        val previousResponseGeneration = commandSpeechResponseGeneration
+        val accepted = speakCommandResponse(
+            message,
+            onCompleted = {
+                terminated = true
+                if (current()) {
+                    routeDecisionSpeechResponseGeneration = null
+                    pendingRouteDecisionSpeechToken = null
+                    lastAnnouncedRouteDecisionToken = token
+                }
+            },
+            onFailed = {
+                terminated = true
+                retry()
+            },
+        )
+        if (accepted && !terminated && current() &&
+            commandSpeechResponseGeneration != previousResponseGeneration
+        ) {
+            routeDecisionSpeechResponseGeneration = commandSpeechResponseGeneration
+        }
+        if (!accepted && !terminated) retry()
+        return accepted
     }
 
     private fun applyRouteDeviationSafetyUpdate(update: RouteNavigatorUpdate): Boolean {
@@ -37176,15 +38233,14 @@ generation != cameraFallbackGeneration
         updateRouteDeviationActions(update.pendingUserDecision)
         maybePlayRouteDeviationHaptic(update.pendingUserDecision)
         if (!update.userDecisionRequired) {
-            lastAnnouncedRouteDecisionToken = null
+            cancelRouteDecisionSpeech()
             return false
         }
         latestTmapOnRoute = false
         directionGuidancePauseReason = update.reason
         val token = routeNavigator.pendingDecisionToken()
-        if (token != null && token != lastAnnouncedRouteDecisionToken) {
-            lastAnnouncedRouteDecisionToken = token
-            update.instruction?.let(::speakInteraction)
+        if (token != null) {
+            update.instruction?.let { speakRouteDecision(it, token) }
         }
         return true
     }
@@ -37236,6 +38292,7 @@ generation != cameraFallbackGeneration
         )
 
     private fun blockRouteMutationWhileDeviationChoicePending(): Boolean {
+        if (developmentGuidanceStartBypassEnabled) return false
         if (!routeDeviationChoicePending()) return false
         updateNavigationStatus("navigation=route_deviation_choice_required")
         speakInteraction("음성 명령으로 현재 경로 상태를 먼저 확인해 주세요.")
@@ -37263,6 +38320,11 @@ generation != cameraFallbackGeneration
     }
 
     private fun retainRouteAfterRerouteFailure(message: String) {
+        if (developmentGuidanceStartBypassEnabled) {
+            directionGuidancePauseReason = null
+            speakInteraction("$message 기존 TMAP 경로를 유지합니다.")
+            return
+        }
         routeNavigator.rerouteRequestFailed()?.let(::applyRouteDeviationSafetyUpdate)
         pauseDirectionGuidance(reason = "tmap_unavailable", message = message)
     }
@@ -37280,7 +38342,11 @@ generation != cameraFallbackGeneration
     private fun updateNavigationStatus(text: String) {
         val state = text.trim().substringBefore(' ').take(FIELD_STATUS_MAX_LENGTH).ifBlank { "navigation=unknown" }
         if (state != latestNavigationState) {
+            if (BuildConfig.DEBUG && state.startsWith("navigation=")) {
+                android.util.Log.d("WalkSafeNavigation", "state=$state")
+            }
             latestNavigationState = state
+            refreshHomeRouteStatus()
             if (::fieldSessionLog.isInitialized) {
                 fieldSessionLog.recordEvent("navigation_state_changed", mapOf("state" to state))
             }
@@ -39263,6 +40329,8 @@ generation != cameraFallbackGeneration
         const val PERSISTENT_REPORT_QUEUE_ENABLED = false
         const val REPORT_QUEUE_PAUSED_STATIONARY_RECHECK_MS = 5_001L
         const val HANDS_FREE_VOICE_RESTART_DELAY_MS = 500L
+        const val DEFERRED_VOICE_INPUT_POLL_MS = 100L
+        const val DEFERRED_VOICE_INPUT_MAX_WAIT_MS = 30_000L
         const val EXPLICIT_REPORT_CONFIRMATION_SUMMARY_KO =
             "신고 확인. 방금 고정한 모자이크하지 않은 JPEG 사진 1장과 정확한 위치, 이동 방향, " +
                 "탐지·시각·모델 정보를 운영 문안 승인 전 빌드에서 승인한 WalkSafe 테스트 서버에만 " +

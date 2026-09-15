@@ -98,16 +98,18 @@ class WalkSafeFeedbackPolicy(
         var candidate: FeedbackCandidate,
         val sequence: Long,
         var lastSeenAtMs: Long,
-    ) {
-        val key: String
-            get() = candidate.deliveryKey
-    }
+    )
 
     private val lastTrackEmitAt = mutableMapOf<String, Long>()
+    private val lastTrackConfirmedAt = mutableMapOf<String, Long>()
+    private val lastTrackDeliveredLevel = mutableMapOf<String, MessageLevel>()
+    private val lastTrackDeliveryOrder = mutableMapOf<String, Long>()
     private val pendingDeliverySnapshots = mutableMapOf<PendingDeliveryKey, CooldownSnapshot>()
     private val queuedFeedback = mutableListOf<QueuedFeedback>()
     private var nextQueueSequence = 0L
+    private var nextDeliveryOrder = 0L
     private var lastGlobalEmitAt: Long? = null
+    private var lastGlobalDeliveredLevel: MessageLevel? = null
     private var lastRiskEmitAt: Long? = null
     private var lastCandidateSeenAt: Long? = null
     private var consecutiveSafeFrames = 0
@@ -154,14 +156,17 @@ class WalkSafeFeedbackPolicy(
         consecutiveSafeFrames = 0
         if (pendingDeliverySnapshots.isNotEmpty()) return null
         val lastGlobalAt = lastGlobalEmitAt
-        if (lastGlobalAt != null && nowMs - lastGlobalAt < config.globalIntervalMs) return null
         val currentTrackIds = stableEligible.mapTo(hashSetOf(), FeedbackCandidate::trackId)
         val queued = queuedFeedback.firstOrNull { queued ->
             val candidate = queued.candidate
             if (candidate.trackId !in currentTrackIds) return@firstOrNull false
             if (nowMs - queued.lastSeenAtMs > config.pendingQueueTtlMs) return@firstOrNull false
+            if (lastGlobalAt != null && nowMs - lastGlobalAt < config.globalIntervalMs &&
+                !isUrgentEscalation(candidate.level, lastGlobalDeliveredLevel)
+            ) return@firstOrNull false
             val lastTrackAt = lastTrackEmitAt[candidate.trackId]
-            lastTrackAt == null || nowMs - lastTrackAt >= config.perTrackIntervalMs
+            lastTrackAt == null || nowMs - lastTrackAt >= config.perTrackIntervalMs ||
+                isUrgentEscalation(candidate.level, lastTrackDeliveredLevel[candidate.trackId])
         } ?: return null
         val candidate = queued.candidate
         val lastTrackAt = lastTrackEmitAt[candidate.trackId]
@@ -190,40 +195,47 @@ class WalkSafeFeedbackPolicy(
         )
     }
 
+    private fun isUrgentEscalation(level: MessageLevel, deliveredLevel: MessageLevel?): Boolean =
+        // Only an urgent warning or stop can interrupt a lower completed alert's cooldown.
+        (level == MessageLevel.WARNING || level == MessageLevel.STOP) &&
+            deliveredLevel != null && level.ordinal > deliveredLevel.ordinal
+
     private fun refreshQueuedFeedback(candidates: List<FeedbackCandidate>, nowMs: Long) {
-        queuedFeedback.removeAll { queued -> nowMs - queued.lastSeenAtMs > config.pendingQueueTtlMs }
+        val currentByTrack = candidates.associateBy(FeedbackCandidate::trackId)
         val pendingTrackId = pendingDeliverySnapshots.keys.firstOrNull()?.trackId
-        queuedFeedback.removeAll { it.candidate.trackId == pendingTrackId }
+        queuedFeedback.removeAll { queued ->
+            nowMs - queued.lastSeenAtMs > config.pendingQueueTtlMs ||
+                queued.candidate.trackId == pendingTrackId
+        }
+        // Refresh existing entries before comparing a new arrival with their current severity.
+        queuedFeedback.forEach { queued ->
+            currentByTrack[queued.candidate.trackId]?.let { current ->
+                queued.candidate = current
+                queued.lastSeenAtMs = nowMs
+            }
+        }
+        // A continuously visible, already delivered track must not reclaim every vacancy before
+        // an unheard peer. Only successful delivery advances this order; reservations do not.
+        // Retain a briefly missing entry's FIFO position until its TTL, but evict it before any
+        // current candidate when capacity is needed. It is never eligible for delivery while absent.
+        val priority = compareBy<QueuedFeedback> { it.candidate.trackId !in currentByTrack }
+            .thenByDescending { it.candidate.level.ordinal }
+            .thenBy { lastTrackDeliveryOrder[it.candidate.trackId] ?: Long.MIN_VALUE }
+            .thenBy(QueuedFeedback::sequence)
         candidates.forEach { candidate ->
             if (candidate.trackId == pendingTrackId) return@forEach
-            val key = candidate.deliveryKey
-            val existing = queuedFeedback.firstOrNull { queued ->
-                queued.candidate.trackId == candidate.trackId || queued.key == key
-            }
-            if (existing != null) {
-                existing.candidate = candidate
-                existing.lastSeenAtMs = nowMs
-                return@forEach
-            }
+            if (queuedFeedback.any { it.candidate.trackId == candidate.trackId }) return@forEach
+            val incoming = QueuedFeedback(candidate, nextQueueSequence, nowMs)
             val occupied = queuedFeedback.size + pendingDeliverySnapshots.size
             if (occupied >= config.pendingQueueCapacity) {
-                val lowest = queuedFeedback.minWithOrNull(
-                    compareBy<QueuedFeedback> { it.candidate.level.ordinal }
-                        .thenByDescending(QueuedFeedback::sequence),
-                ) ?: return@forEach
-                if (candidate.level.ordinal <= lowest.candidate.level.ordinal) return@forEach
+                val lowest = queuedFeedback.maxWithOrNull(priority) ?: return@forEach
+                if (priority.compare(incoming, lowest) >= 0) return@forEach
                 queuedFeedback.remove(lowest)
             }
-            queuedFeedback += QueuedFeedback(
-                candidate = candidate,
-                sequence = nextQueueSequence++,
-                lastSeenAtMs = nowMs,
-            )
+            queuedFeedback += incoming
+            nextQueueSequence++
         }
-        queuedFeedback.sortWith(
-            compareByDescending<QueuedFeedback> { it.candidate.level.ordinal }
-                .thenBy(QueuedFeedback::sequence),
-        )
+        queuedFeedback.sortWith(priority)
     }
 
     @Synchronized
@@ -235,8 +247,16 @@ class WalkSafeFeedbackPolicy(
         val key = PendingDeliveryKey(trackId, evaluatedAtMs)
         val snapshot = pendingDeliverySnapshots.remove(key) ?: return false
         val confirmedAtMs = deliveredAtMs.coerceAtLeast(evaluatedAtMs)
-        if (lastTrackEmitAt[trackId] == evaluatedAtMs) lastTrackEmitAt[trackId] = confirmedAtMs
-        if (lastGlobalEmitAt == evaluatedAtMs) lastGlobalEmitAt = confirmedAtMs
+        if (lastTrackEmitAt[trackId] == evaluatedAtMs) {
+            lastTrackEmitAt[trackId] = confirmedAtMs
+            lastTrackConfirmedAt[trackId] = confirmedAtMs
+            lastTrackDeliveredLevel[trackId] = snapshot.level
+            lastTrackDeliveryOrder[trackId] = nextDeliveryOrder++
+        }
+        if (lastGlobalEmitAt == evaluatedAtMs) {
+            lastGlobalEmitAt = confirmedAtMs
+            lastGlobalDeliveredLevel = snapshot.level
+        }
         if (snapshot.changedRiskEmitAt && lastRiskEmitAt == evaluatedAtMs) lastRiskEmitAt = confirmedAtMs
         return true
     }
@@ -249,6 +269,13 @@ class WalkSafeFeedbackPolicy(
         pendingDeliverySnapshots[key] = snapshot.copy(state = DeliveryState.CLAIMED)
         return true
     }
+
+    /** Read-only ownership check; it neither renews nor transfers the claimed delivery. */
+    @Synchronized
+    fun hasClaimedFeedbackDelivery(trackId: String, level: MessageLevel): Boolean =
+        pendingDeliverySnapshots.any { (key, snapshot) ->
+            key.trackId == trackId && snapshot.state == DeliveryState.CLAIMED && snapshot.level == level
+        }
 
     @Synchronized
     fun rejectUndeliveredFeedback(trackId: String, evaluatedAtMs: Long) {
@@ -267,12 +294,52 @@ class WalkSafeFeedbackPolicy(
     }
 
     @Synchronized
+    fun cancelFeedbackForTracks(trackIds: Set<String>) {
+        pendingDeliverySnapshots.toMap().forEach { (key, snapshot) ->
+            if (key.trackId in trackIds) {
+                pendingDeliverySnapshots.remove(key)
+                rollbackCooldowns(key, snapshot)
+            }
+        }
+        queuedFeedback.removeAll { it.candidate.trackId in trackIds }
+    }
+
+    /** Share only completed history after the caller proves a continuous cross-source region.
+     * A reservation/claim stays with its original source and cannot become a completed delivery.
+     */
+    @Synchronized
+    fun carryCompletedFeedbackHistory(sourceTrackId: String, targetTrackId: String) {
+        val completedAt = lastTrackConfirmedAt[sourceTrackId] ?: return
+        if (completedAt <= (lastTrackConfirmedAt[targetTrackId] ?: Long.MIN_VALUE) ||
+            pendingDeliverySnapshots.keys.any { it.trackId == targetTrackId }
+        ) return
+        lastTrackConfirmedAt[targetTrackId] = completedAt
+        lastTrackEmitAt[targetTrackId] = completedAt
+        lastTrackDeliveredLevel[sourceTrackId]?.let { lastTrackDeliveredLevel[targetTrackId] = it }
+        lastTrackDeliveryOrder[sourceTrackId]?.let { lastTrackDeliveryOrder[targetTrackId] = it }
+    }
+
+    /** Invalidate one producer context without cancelling another source's accepted output. */
+    @Synchronized
+    fun cancelFeedbackForTrackPrefix(trackIdPrefix: String) {
+        require(trackIdPrefix.isNotEmpty())
+        val trackIds = pendingDeliverySnapshots.keys.map { it.trackId } +
+            queuedFeedback.map { it.candidate.trackId }
+        cancelFeedbackForTracks(trackIds.filter { it.startsWith(trackIdPrefix) }.toSet())
+    }
+
+    @Synchronized
     fun resetForNewWalk() {
         pendingDeliverySnapshots.clear()
         queuedFeedback.clear()
         lastTrackEmitAt.clear()
+        lastTrackConfirmedAt.clear()
+        lastTrackDeliveredLevel.clear()
+        lastTrackDeliveryOrder.clear()
         nextQueueSequence = 0L
+        nextDeliveryOrder = 0L
         lastGlobalEmitAt = null
+        lastGlobalDeliveredLevel = null
         lastRiskEmitAt = null
         lastCandidateSeenAt = null
         consecutiveSafeFrames = 0
@@ -370,6 +437,9 @@ class WalkSafeFeedbackPolicy(
             }
         }
         lastTrackEmitAt.keys.retainAll(claimedTracks)
+        lastTrackConfirmedAt.clear()
+        lastTrackDeliveredLevel.clear()
+        lastTrackDeliveryOrder.clear()
         queuedFeedback.clear()
         consecutiveSafeFrames = 0
         lastCandidateSeenAt = null

@@ -391,7 +391,7 @@ class AndroidRuntimeCalibrationRunner(
             val image = fixtures.loadArgb(fixture)
             // Both outputs consume this exact tensor before the reusable preparation buffer can
             // be touched again. Correctness snapshots are separate from the timing blocks below.
-            val input = fixturePreprocessor.preprocess(image, checkNotNull(config.unifiedWalksafe).inputSize)
+            val input = fixturePreprocessor.preprocessBilinear(image, checkNotNull(config.unifiedWalksafe).inputSize)
             val a = correctnessOutput(input, baselineDetector, baselineCandidate, true)
             val b = correctnessOutput(input, detector, candidate, challengerBorrowed)
             if (!RuntimeCalibrationOutputGate.compare(a.rawOutput, b.rawOutput,
@@ -516,7 +516,7 @@ class AndroidRuntimeCalibrationRunner(
         checkMeasurementBudget()
         val before = environmentProvider()
         val startNs = System.nanoTime()
-        val prepared = fixturePreprocessor.preprocess(image, checkNotNull(config.unifiedWalksafe).inputSize)
+        val prepared = fixturePreprocessor.preprocessBilinear(image, checkNotNull(config.unifiedWalksafe).inputSize)
         val preparationMs = (System.nanoTime() - startNs) / 1_000_000L
         val output = invokeDetector(borrowed) {
             detector.inferPreparedUnifiedForCalibration(prepared, preparationMs, preprocessingStrategy, copyRaw)

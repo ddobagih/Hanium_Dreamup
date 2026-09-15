@@ -427,7 +427,7 @@ class InterFrameDetectionTrackerTest {
         val source = offer(tracker, camera(), 0)
         val candidates = listOf(photographDetection(), detection(108, 102, 56, 56))
         val target = offer(tracker, translate(camera(), 3.0, 0.0), 1)
-        val result = tracker.trackFrom(source, candidates, target)
+        val result = tracker.trackFrom(source, candidates, target, prioritySourceIndices = listOf(0))
         tracked(result, 0)
         val rejected = result.observations.single { it.sourceIndex == 1 }
         assertEquals(VisualTrackingStatus.LOST, rejected.status)

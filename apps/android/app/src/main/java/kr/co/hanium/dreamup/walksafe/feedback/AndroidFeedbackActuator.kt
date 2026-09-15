@@ -15,10 +15,12 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import java.io.Closeable
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kr.co.hanium.dreamup.walksafe.BuildConfig
 import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
 import kr.co.hanium.dreamup.walksafe.voice.selectInstalledOfflineKoreanVoice
 import kr.co.hanium.dreamup.walksafe.voice.KoreanOfflineVoiceSelection
@@ -72,6 +74,8 @@ class AndroidFeedbackActuator(
     private var activeAudioFocusListener: AudioManager.OnAudioFocusChangeListener? = null
     private var audioFocusGeneration = 0L
     private val pendingUtterances = mutableSetOf<String>()
+    private var speechRecognitionBlockedUntilMs = 0L
+    private var speechRecognitionWaitLogged = false
     private val pendingUtteranceOrder = mutableListOf<String>()
     private val startedUtterances = mutableSetOf<String>()
     private val utteranceCallbacks = UtteranceCallbackRegistry()
@@ -115,6 +119,7 @@ class AndroidFeedbackActuator(
         private const val UTTERANCE_START_TIMEOUT_MS = 8_000L
         private const val TTS_INITIALIZATION_TIMEOUT_MS = 10_000L
         private const val TTS_RECOVERY_DELAY_MS = 250L
+        private const val SPEECH_RECOGNITION_QUIET_MS = 500L
         // Initial attempt, one recovery attempt, and room for the caller's readiness poll.
         const val INITIALIZATION_READINESS_TIMEOUT_MS =
             2 * TTS_INITIALIZATION_TIMEOUT_MS + TTS_RECOVERY_DELAY_MS + 250L
@@ -190,6 +195,7 @@ class AndroidFeedbackActuator(
             object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
                     postUtteranceCallback(engineGeneration, utteranceId) {
+                        logSpeechEvent("started", utteranceId)
                         if (isUtteranceStillValidAtStart(utteranceId)) {
                             armUtteranceTerminalWatchdog(utteranceId)
                         }
@@ -198,6 +204,7 @@ class AndroidFeedbackActuator(
 
                 override fun onDone(utteranceId: String?) {
                     postUtteranceCallback(engineGeneration, utteranceId) {
+                        logSpeechEvent("done", utteranceId)
                         markUtteranceFinished(utteranceId, completed = true)
                     }
                 }
@@ -217,6 +224,7 @@ class AndroidFeedbackActuator(
 
                 override fun onStop(utteranceId: String?, interrupted: Boolean) {
                     postUtteranceCallback(engineGeneration, utteranceId) {
+                        logSpeechEvent("stopped interrupted=$interrupted", utteranceId)
                         markUtteranceFinished(utteranceId, completed = false)
                     }
                 }
@@ -260,6 +268,7 @@ class AndroidFeedbackActuator(
         errorCode: Int = TextToSpeech.ERROR_SERVICE,
         notifyFailure: Boolean = true,
     ) {
+        logSpeechEvent("runtime_error code=$errorCode", utteranceId)
         val pending = utteranceId != null && synchronized(pendingUtterances) { utteranceId in pendingUtterances }
         when (ttsRuntimeFailureDisposition(errorCode, pending, ttsState == TtsState.READY)) {
             TtsRuntimeFailureDisposition.IGNORE -> Unit
@@ -429,6 +438,9 @@ class AndroidFeedbackActuator(
                 .mapNotNull { utteranceCallbacks.takeTerminalCallback(it, completed = false, notifyFailure = true) }
             strictTrainingFailures = explicitTerminalRequiredUtterances
                 .mapNotNull { utteranceCallbacks.takeTerminalCallback(it, completed = false, notifyFailure = true) }
+            if (pendingUtterances.isNotEmpty()) {
+                speechRecognitionBlockedUntilMs = SystemClock.elapsedRealtime() + SPEECH_RECOGNITION_QUIET_MS
+            }
             pendingUtterances.clear()
             pendingUtteranceOrder.clear()
             startedUtterances.clear()
@@ -475,6 +487,7 @@ class AndroidFeedbackActuator(
         val snapshot = synchronized(pendingUtterances) { pendingUtterances.toList() }
         val navigation = snapshot.filter { it.startsWith("$ANNOUNCE_NAV_PREFIX-") }
         if (navigation.isEmpty()) return queuedNavigationRemoved
+        logSpeechEvent("navigation_cancelled", navigation.firstOrNull())
         if (ttsState == TtsState.READY) textToSpeech.stop()
         navigation.forEach {
             val notifyFailure = synchronized(pendingUtterances) {
@@ -585,42 +598,23 @@ class AndroidFeedbackActuator(
     fun isAppSpeechActive(): Boolean =
         synchronized(pendingUtterances) { pendingUtterances.isNotEmpty() }
 
-    /** Stops ordinary queued speech before STT, but never lets STT interrupt an active risk alert. */
+    /** Includes initialization-time queues and the speaker tail without delaying later TTS. */
+    fun isSpeechRecognitionBlocked(): Boolean =
+        SpeechPriority.entries.any(pendingSpeechQueue::hasPriority) || synchronized(pendingUtterances) {
+            pendingUtterances.isNotEmpty() || SystemClock.elapsedRealtime() < speechRecognitionBlockedUntilMs
+        }
+
+    /** STT waits for every queued utterance and its quiet period instead of cancelling output. */
     fun prepareForSpeechRecognition(): Boolean {
-        val riskPending = pendingSpeechQueue.hasPriority(SpeechPriority.RISK) || synchronized(pendingUtterances) {
-            pendingUtterances.any { it.startsWith("$ANNOUNCE_ASSERTIVE_PREFIX-") }
+        if (isSpeechRecognitionBlocked()) {
+            if (!speechRecognitionWaitLogged) logSpeechEvent("recognition_waiting_for_output")
+            speechRecognitionWaitLogged = true
+            return false
         }
-        if (riskPending) return false
+        if (speechRecognitionWaitLogged) logSpeechEvent("recognition_output_settled")
+        speechRecognitionWaitLogged = false
         progressToneGeneration += 1
-        pendingSpeechQueue.clear()
-        val watchdogs: List<Runnable>
-        val advisoryFailures: List<() -> Unit>
-        val strictTrainingFailures: List<() -> Unit>
-        synchronized(pendingUtterances) {
-            advisoryFailures = pendingUtterances
-                .filter { it.startsWith("$ANNOUNCE_ADVISORY_PREFIX-") }
-                .mapNotNull { utteranceCallbacks.takeTerminalCallback(it, completed = false, notifyFailure = true) }
-            strictTrainingFailures = explicitTerminalRequiredUtterances
-                .mapNotNull { utteranceCallbacks.takeTerminalCallback(it, completed = false, notifyFailure = true) }
-            pendingUtterances.clear()
-            pendingUtteranceOrder.clear()
-            startedUtterances.clear()
-            utteranceCallbacks.clear()
-            watchdogs = utteranceWatchdogs.values.toList()
-            utteranceWatchdogs.clear()
-            utteranceMessageLengths.clear()
-            utteranceRiskRanks.clear()
-            utteranceStartDeadlines.clear()
-            utteranceStartValidators.clear()
-            explicitTerminalRequiredUtterances.clear()
-        }
-        watchdogs.forEach(mainHandler::removeCallbacks)
-        if (ttsState == TtsState.READY) textToSpeech.stop()
-        advisoryFailures.forEach { it() }
-        strictTrainingFailures.forEach { it() }
         progressTone?.stopTone()
-        lastNavMessage = ""
-        lastNavMessageAtMs = 0L
         abandonAudioFocus()
         return true
     }
@@ -799,6 +793,7 @@ class AndroidFeedbackActuator(
             SpeechPriority.ADVISORY -> TextToSpeech.QUEUE_ADD
         }
         if (queueMode == TextToSpeech.QUEUE_FLUSH) {
+            logSpeechEvent("queue_flush priority=$priority")
             cancelQueuedCompletionCallbacks(
                 keepRisk = priority != SpeechPriority.RISK && riskPending,
             )
@@ -967,6 +962,7 @@ class AndroidFeedbackActuator(
             }
         }
         if (releasedRegistration == null) return
+        logSpeechEvent("audio_focus_lost change=$focusChange")
         releaseAudioFocusRegistration(releasedRegistration.first, releasedRegistration.second)
         val interrupted = synchronized(pendingUtterances) { pendingUtterances.toList() }
         val toneGeneration = ++progressToneGeneration
@@ -1101,7 +1097,10 @@ class AndroidFeedbackActuator(
                     pendingUtterances.toList()
                 }
             }
-            if (timedOut.isNotEmpty()) failPendingSpeech(timedOut)
+            if (timedOut.isNotEmpty()) {
+                logSpeechEvent("watchdog_timeout", utteranceId)
+                failPendingSpeech(timedOut)
+            }
         }
         utteranceWatchdogs[utteranceId] = watchdog
         mainHandler.postDelayed(watchdog, delayMs)
@@ -1145,6 +1144,9 @@ class AndroidFeedbackActuator(
                         notifyFailure = notifyFailure,
                     )
                     shouldAbandonFocus = pendingUtterances.isEmpty()
+                    if (shouldAbandonFocus) {
+                        speechRecognitionBlockedUntilMs = SystemClock.elapsedRealtime() + SPEECH_RECOGNITION_QUIET_MS
+                    }
                     armNextUtteranceStartWatchdogLocked()
                 }
             }
@@ -1163,6 +1165,12 @@ class AndroidFeedbackActuator(
         interrupted.forEach { markUtteranceFinished(it, completed = false) }
     }
 
+    private fun logSpeechEvent(event: String, utteranceId: String? = null) {
+        if (!BuildConfig.DEBUG) return
+        // IDs contain only priority, monotonic time and sequence; never record spoken text.
+        Log.d("WalkSafeVoiceOutput", "event=$event utterance=${utteranceId ?: "none"}")
+    }
+
     private fun cancelQueuedCompletionCallbacks(keepRisk: Boolean) {
         var watchdogs: List<Runnable> = emptyList()
         var advisoryFailures: List<() -> Unit> = emptyList()
@@ -1170,6 +1178,9 @@ class AndroidFeedbackActuator(
         synchronized(pendingUtterances) {
             val cancelled = pendingUtterances.filter { utteranceId ->
                 !keepRisk || !utteranceId.startsWith("$ANNOUNCE_ASSERTIVE_PREFIX-")
+            }
+            if (cancelled.isNotEmpty()) {
+                speechRecognitionBlockedUntilMs = SystemClock.elapsedRealtime() + SPEECH_RECOGNITION_QUIET_MS
             }
             advisoryFailures = cancelled
                 .filter { it.startsWith("$ANNOUNCE_ADVISORY_PREFIX-") }
@@ -1195,6 +1206,7 @@ class AndroidFeedbackActuator(
     }
 
     override fun close() {
+        logSpeechEvent("engine_closed", null)
         ready.set(false)
         ttsState = TtsState.CLOSED
         ttsEngineGeneration += 1L

@@ -88,6 +88,70 @@ class GatewayWalkHttpException(
 class GatewayWalkSessionClient(
     private val transport: GatewaySessionTransport = HttpUrlConnectionGatewaySessionTransport(),
 ) {
+    fun startWithOwnedWalkRecovery(
+        session: GatewayFieldSession,
+        walkId: String,
+        requestId: String,
+        nowElapsedMs: () -> Long,
+        isCurrent: () -> Boolean,
+    ): GatewayWalkStartResult {
+        fun requireCurrent() {
+            if (!isCurrent() || !session.isUsableFor(session.actorId)) {
+                throw GatewayWalkHttpException(0, "walk_start_operation_stale")
+            }
+        }
+
+        fun guardedStart(targetWalkId: String, commandRequestId: String): GatewayWalkStartResult {
+            requireCurrent()
+            val result = start(session, targetWalkId, commandRequestId, nowElapsedMs())
+            requireCurrent()
+            return result
+        }
+
+        val initial = guardedStart(walkId, requestId)
+        if (initial !is GatewayWalkStartResult.Conflict) return initial
+        val conflict = initial.conflict
+        if (conflict.activeDeviceId != session.deviceId || conflict.activeWalkId == walkId) {
+            return initial
+        }
+
+        // The device ID alone is not proof of ownership. Starting the old walk also
+        // checks the actor and login family on the gateway before returning its lease.
+        val previous = guardedStart(conflict.activeWalkId, UUID.randomUUID().toString())
+        if (previous !is GatewayWalkStartResult.Granted) return previous
+        val oldLease = previous.lease
+        val originalLease = oldLease.result == "ALREADY_ACTIVE" &&
+            oldLease.fencingToken == conflict.fencingToken
+        // Expiry between requests can acquire an old-ID lease for this operation.
+        // End that exact newly owned lease as well; never activate it in the runtime.
+        val acquiredAfterExpiry = oldLease.result == "ACQUIRED" &&
+            oldLease.fencingToken > conflict.fencingToken
+        if (!originalLease && !acquiredAfterExpiry) {
+            return GatewayWalkStartResult.Conflict(
+                GatewayWalkConflict(
+                    activeWalkId = oldLease.walkId,
+                    activeDeviceId = oldLease.deviceId,
+                    fencingToken = oldLease.fencingToken,
+                    leaseExpiresAtEpochMs = oldLease.leaseExpiresAtEpochMs,
+                    serverTimeEpochMs = oldLease.serverTimeEpochMs,
+                    localDeadlineElapsedMs = oldLease.localDeadlineElapsedMs,
+                ),
+            )
+        }
+
+        requireCurrent()
+        try {
+            end(session, oldLease, UUID.randomUUID().toString())
+        } catch (error: GatewayWalkHttpException) {
+            requireCurrent()
+            // A takeover or expiry may race this CAS. A normal start can observe
+            // the new holder or acquire a vacant lease without ending anyone else.
+            if (error.statusCode != 409 || error.serverCode != "walk_lease_conflict") throw error
+        }
+        requireCurrent()
+        return guardedStart(walkId, UUID.randomUUID().toString())
+    }
+
     fun start(
         session: GatewayFieldSession,
         walkId: String,

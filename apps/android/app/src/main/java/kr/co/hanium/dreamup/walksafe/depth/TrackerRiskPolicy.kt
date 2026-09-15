@@ -11,7 +11,7 @@ import kotlin.math.sqrt
  */
 object ObjectMotionPolicy {
     fun classify(track: TrackState, motionEstimate: ObjectMotionEstimate = estimate(track)): ObjectMotion {
-        val center = track.latestGeometry?.centerNorm ?: return ObjectMotion.UNKNOWN
+        val center = track.latestGeometry?.uprightCenterNorm ?: return ObjectMotion.UNKNOWN
         if (center.x !in 0.35f..0.65f || (motionEstimate.relativeClosingSpeedMps ?: 0f) < 0.25f) {
             return ObjectMotion.UNKNOWN
         }

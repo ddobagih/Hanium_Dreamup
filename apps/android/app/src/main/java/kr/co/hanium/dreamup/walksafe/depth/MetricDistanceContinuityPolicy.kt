@@ -42,20 +42,34 @@ class MetricDistanceContinuityPolicy {
                 MetricDistanceContinuityDecision(true, listOf(observation))
             followsEstablishedTrend(observation, acceptedHistory, maxDepthJumpM) ->
                 MetricDistanceContinuityDecision(true, listOf(observation))
-            else -> confirmPending(requireNotNull(previous), observation, maxDepthJumpM)
+            else -> confirmPending(requireNotNull(previous), observation, last, maxDepthJumpM)
         }
         lastAccepted = decision.accepted
-        pending = if (decision.accepted) null else observation
+        val candidate = pending
+        pending = when {
+            decision.accepted -> null
+            candidate != null && abs(candidate.distanceM - observation.distanceM) <= maxDepthJumpM &&
+                hasContinuousEvidence(listOf(candidate, observation), minimumIntervalMs = 1L) &&
+                (last == null || last == candidate ||
+                    hasContinuousEvidence(listOf(last, observation), minimumIntervalMs = 1L)) -> candidate
+            else -> observation
+        }
         return decision
     }
 
     private fun confirmPending(
         previous: DistanceObservation,
         current: DistanceObservation,
+        last: DistanceObservation?,
         maxDepthJumpM: Float,
     ): MetricDistanceContinuityDecision {
         val candidate = pending ?: return MetricDistanceContinuityDecision(false)
-        if (!hasContinuousEvidence(listOf(previous, candidate, current))) {
+        // Fast frames contribute evidence without restarting the 100 ms confirmation window.
+        if (current.timestampMs - candidate.timestampMs < 100L ||
+            !hasContinuousEvidence(listOf(previous, candidate, current), minimumIntervalMs = 1L) ||
+            (last != null && last != candidate &&
+                !hasContinuousEvidence(listOf(last, current), minimumIntervalMs = 1L))
+        ) {
             return MetricDistanceContinuityDecision(false)
         }
         if (abs(candidate.distanceM - current.distanceM) <= maxDepthJumpM) {
@@ -92,7 +106,10 @@ class MetricDistanceContinuityPolicy {
         return abs(current.distanceM - predicted) <= maxDepthJumpM
     }
 
-    private fun hasContinuousEvidence(observations: List<DistanceObservation>): Boolean {
+    private fun hasContinuousEvidence(
+        observations: List<DistanceObservation>,
+        minimumIntervalMs: Long = 100L,
+    ): Boolean {
         val reference = observations.first().cameraPoseEvidence ?: return false
         if (observations.any { observation ->
                 val pose = observation.cameraPoseEvidence
@@ -106,7 +123,7 @@ class MetricDistanceContinuityPolicy {
             val intervalMs = b.timestampMs - a.timestampMs
             val previous = requireNotNull(a.cameraPoseEvidence)
             val current = requireNotNull(b.cameraPoseEvidence)
-            if (intervalMs !in 100L..1_500L || forwardAlignment(previous, current) < 0.9961947f) {
+            if (intervalMs !in minimumIntervalMs..1_500L || forwardAlignment(previous, current) < 0.9961947f) {
                 false
             } else {
                 val seconds = intervalMs / 1_000f

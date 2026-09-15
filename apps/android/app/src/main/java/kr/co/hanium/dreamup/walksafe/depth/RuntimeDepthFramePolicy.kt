@@ -29,3 +29,15 @@ fun assessRuntimeDepthFrame(
         shouldHandleLoss = regressed || (!outputAllowed && !previousEvidenceFresh),
     )
 }
+
+/** Visual processing only: missing depth cannot refresh metric evidence or authorize feedback. */
+fun allowsRuntimeDepthGapProcessing(
+    frameTimestampNanos: Long,
+    latestFrameTimestampNanos: Long,
+    observedAtElapsedRealtimeMs: Long,
+    lastValidFrameAtElapsedRealtimeMs: Long,
+    tracking: Boolean,
+): Boolean = tracking && frameTimestampNanos > 0L &&
+    frameTimestampNanos == latestFrameTimestampNanos &&
+    lastValidFrameAtElapsedRealtimeMs > 0L &&
+    observedAtElapsedRealtimeMs - lastValidFrameAtElapsedRealtimeMs in 0L..600L

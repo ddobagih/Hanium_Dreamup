@@ -1,0 +1,35 @@
+{
+  "schema": "unknown-selection-synthetic-v1",
+  "label_scope": "Hand-specified selection contracts, not measured physical hazards or model recall. Labels are independent of observed policy decisions.",
+  "extent_scope": "Synthetic observed width/height. Only explicitly verified complete compact nuisance cases allow smallness rejection; a predicted mask alone does not prove whole-object extent.",
+  "defaults": {
+    "width": 640, "height": 640, "quarterTurns": 0,
+    "source": "ARCORE_RAW_DEPTH", "distanceM": 2.5,
+    "depthIqrM": 0.02, "confidence": 0.95,
+    "validSampleCount": 100, "validSampleRatio": 0.95,
+    "trackAgeFrames": 6, "trackStableMs": 1200,
+    "trend": "STABLE", "timeToCollisionMs": null,
+    "fullCoverage": true, "canRejectSmall": false,
+    "rectangles": [[300, 280, 340, 360]]
+  },
+  "cases": [
+    {"id":"thin_pole", "label":"keep_collision_relevant", "rectangles":[[316,210,320,470]], "distanceM":2.0, "extentM":[0.025,0.80], "rationale":"A narrow but tall pole in the path remains an obstacle."},
+    {"id":"low_trip_bar", "label":"keep_collision_relevant", "rectangles":[[240,550,400,558]], "distanceM":1.8, "extentM":[0.50,0.025], "rationale":"Low height does not remove the trip risk of a long transverse object."},
+    {"id":"distant_approaching_small_projection", "label":"keep_collision_relevant", "rectangles":[[316,305,324,315]], "distanceM":6.0, "extentM":[0.10,0.13], "trend":"APPROACHING", "timeToCollisionMs":3000, "rationale":"A distant object with supported near-term collision time must survive a distance or image-area filter."},
+    {"id":"imminent_tiny_single_observation", "label":"keep_collision_relevant", "rectangles":[[318,315,322,319]], "distanceM":0.35, "extentM":[0.012,0.012], "trackAgeFrames":1, "trackStableMs":0, "rationale":"Do not wait for repeated observations when an object is already immediately close."},
+    {"id":"ordinary_obstacle", "label":"keep_collision_relevant", "distanceM":2.8, "extentM":[0.40,0.80], "rationale":"A supported ordinary obstacle in the walking corridor stays eligible."},
+    {"id":"partial_object_mask", "label":"keep_collision_relevant", "rectangles":[[318,315,322,319]], "extentM":[0.01,0.01], "fullCoverage":false, "canRejectSmall":false, "rationale":"Only a small visible fragment of a larger obstacle was segmented; visible extent is not a safe upper bound."},
+    {"id":"verified_compact_nuisance_180cm", "label":"suppress_verified_nuisance", "rectangles":[[318,315,322,319]], "distanceM":1.8, "extentM":[0.008,0.008], "canRejectSmall":true, "rationale":"Scenario stipulates a complete, static, harmless 8 mm speck and reliable whole-mask support."},
+    {"id":"verified_compact_nuisance_250cm", "label":"suppress_verified_nuisance", "rectangles":[[318,315,322,319]], "distanceM":2.5, "extentM":[0.01,0.01], "canRejectSmall":true, "rationale":"Scenario stipulates a complete, static, harmless 1 cm speck and reliable whole-mask support."},
+    {"id":"verified_compact_nuisance_500cm", "label":"suppress_verified_nuisance", "rectangles":[[318,315,322,319]], "distanceM":5.0, "extentM":[0.01,0.01], "canRejectSmall":true, "rationale":"The same stipulated harmless speck is also far away and not approaching."},
+    {"id":"depth_missing", "label":"retain_uncertain", "source":"UNKNOWN", "distanceM":null, "fullCoverage":false, "expectedWarningCandidate":false, "rationale":"Missing depth must not become proof of no obstacle or a fabricated distance."},
+    {"id":"partial_depth_small_support", "label":"retain_uncertain", "rectangles":[[318,315,322,319]], "extentM":[0.01,0.01], "fullCoverage":false, "canRejectSmall":false, "validSampleRatio":0.35, "rationale":"A small measured component does not describe all unmeasured mask components."},
+    {"id":"unverified_small_mask", "label":"retain_uncertain", "rectangles":[[318,315,322,319]], "extentM":[0.01,0.01], "canRejectSmall":false, "rationale":"A compact model proposal without completeness evidence may be a fragment of a hazard."},
+    {"id":"floor_like_without_plane_evidence", "label":"retain_uncertain", "rectangles":[[210,450,430,590]], "extentM":[0.50,0.32], "rationale":"A flat-looking region has no ground-plane or traversability label available to this policy; do not treat its removal as a true negative."},
+    {"id":"nested_box_left_object", "label":"keep_collision_relevant", "rectangles":[[245,200,280,480],[280,445,395,480]], "distanceM":1.7, "extentM":[0.40,0.70], "pairId":"nested_disjoint", "rationale":"L-shaped foreground and another object have nested boxes but disjoint masks; each candidate must remain."},
+    {"id":"nested_box_inner_object", "label":"keep_collision_relevant", "rectangles":[[310,280,360,370]], "distanceM":2.6, "extentM":[0.20,0.36], "pairId":"nested_disjoint", "rationale":"A second real object lies in empty space inside the first mask's box."},
+    {"id":"overlapping_different_depth_front", "label":"keep_collision_relevant", "rectangles":[[290,270,350,390]], "distanceM":1.5, "extentM":[0.18,0.36], "pairId":"overlap_distinct_depth", "rationale":"Projected overlap is insufficient evidence that two supported depths are one surface."},
+    {"id":"overlapping_different_depth_back", "label":"keep_collision_relevant", "rectangles":[[310,290,370,410]], "distanceM":2.7, "extentM":[0.33,0.65], "pairId":"overlap_distinct_depth", "rationale":"The other overlapping object has a distinct supported depth."},
+    {"id":"corridor_box_hole", "label":"outside_scope_control", "rectangles":[[0,150,100,500],[540,150,640,500]], "expectedShow":false, "rationale":"The enclosing box spans the corridor but no foreground enters it."}
+  ]
+}

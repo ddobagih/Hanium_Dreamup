@@ -41,6 +41,12 @@ class UnknownObjectDepthPipelineTest {
             0f, 0f, width.toFloat(), height.toFloat(), .99f, bits) as InstanceMask
     }
     private fun regular() = mask(intArrayOf(5, 5, 29, 27))
+    private fun tightRegular(): InstanceMask {
+        val bits = BitSet(24 * 20).also { it.set(0, 24 * 20) }
+        val constructor = InstanceMask::class.java.declaredConstructors.single().also { it.isAccessible = true }
+        return constructor.newInstance(width, height, 8, 6, 32, 26, 480, 17,
+            8f, 6f, 32f, 26f, .99f, bits) as InstanceMask
+    }
     private fun process(p: UnknownObjectDepthPipeline, t: FastSamFrameToken, c: FrozenUnknownDepthCapture = capture(t),
                         masks: List<InstanceMask> = listOf(regular()), named: List<NamedMaskDepthEvidence> = emptyList()): UnknownDepthFrameResult {
         clock = t.capturedElapsedNs / 1_000_000L + 50L
@@ -57,6 +63,32 @@ class UnknownObjectDepthPipelineTest {
         assertNull(FrozenUnknownDepthCapture.freeze(t, snapshot(t).copy(cameraImageTimestampNs = t.cpuImageTimestampNs + 1), h(), t.frameId))
         assertNull(FrozenUnknownDepthCapture.freeze(t, snapshot(t), h(), t.frameId + 1))
         assertNull(FrozenUnknownDepthCapture.freeze(t, snapshot(t).copy(cameraPoseEvidence = snapshot(t).cameraPoseEvidence!!.copy(timestampMs = 7)), h(), t.frameId))
+    }
+
+    @Test fun extentNeedsItsOwnContinuousStableObservationsAndResetsAfterMissingFrame() {
+        val p = pipeline()
+        val results = (0..4).map { i -> process(p, token(i), masks = listOf(tightRegular())) }
+        assertTrue(results.take(4).all { it.observations.single().metricExtent?.canRejectSmall == false })
+        assertTrue(requireNotNull(results.last().observations.single().metricExtent).canRejectSmall)
+        process(p, token(5), masks = emptyList())
+        val afterGap = process(p, token(6), masks = listOf(tightRegular()))
+        assertFalse(requireNotNull(afterGap.observations.single().metricExtent).canRejectSmall)
+        assertEquals("extent_temporal_support_pending", afterGap.observations.single().metricExtent?.reason)
+    }
+
+    @Test fun changedExtentAndFullFallbackCannotReusePriorExtentConfirmation() {
+        val p = pipeline()
+        (0..4).forEach { i -> process(p, token(i), masks = listOf(tightRegular())) }
+        val t = token(5)
+        val smaller = process(p, t, capture(t, snapshot(t, 1000)), listOf(tightRegular()))
+        assertFalse(requireNotNull(smaller.observations.single().metricExtent).canRejectSmall)
+        val fullToken = token(6)
+        val s = snapshot(fullToken, 0).copy(fullDepthTimestampNs = fullToken.cpuImageTimestampNs)
+        val full = process(p, fullToken, capture(fullToken, s), listOf(tightRegular()))
+        assertFalse(requireNotNull(full.observations.single().metricExtent).canRejectSmall)
+        assertEquals("smoothed_depth_extent_is_diagnostic", full.observations.single().metricExtent?.reason)
+        val raw = process(p, token(7), masks = listOf(tightRegular()))
+        assertFalse(requireNotNull(raw.observations.single().metricExtent).canRejectSmall)
     }
 
     @Test fun partialAndUnknownNeverBecomeWholeDistanceOrMessage() {
@@ -124,6 +156,25 @@ class UnknownObjectDepthPipelineTest {
         assertEquals(DepthSource.ARCORE_RAW_DEPTH, process(pipeline(), t, capture(t, both)).objects.single().source)
     }
 
+    @Test fun fullProximityBetweenFreshRawMasksDoesNotEraseRawMotionSupport() {
+        val p = pipeline()
+        val outputs = (0..12).map { i ->
+            val t = token(i)
+            val s = if (i % 2 == 0) snapshot(t, 5000 - i * 150) else snapshot(t, 0).copy(
+                fullDepth = DepthImage16(width, height, IntArray(width * height) { 5000 - i * 150 }),
+                fullDepthTimestampNs = t.cpuImageTimestampNs)
+            process(p, t, capture(t, s)).objects.single()
+        }
+        assertEquals(1, outputs.map { it.trackId }.distinct().size)
+        assertTrue(outputs.filterIndexed { i, _ -> i % 2 == 1 }.all {
+            it.source == DepthSource.ARCORE_FULL_DEPTH && it.trend == Trend.UNKNOWN &&
+                it.approachSpeedMps == null && it.timeToCollisionMs == null
+        })
+        assertNotNull(outputs.last().approachSpeedMps)
+        assertNotNull(outputs.last().timeToCollisionMs)
+        assertEquals(Trend.APPROACHING, outputs.last().trend)
+    }
+
     @Test fun fullSmoothingCannotOverwriteAmbiguousRawLayers() {
         val t = token(0)
         val s = snapshot(t).copy(fullDepthTimestampNs = t.cpuImageTimestampNs)
@@ -155,14 +206,17 @@ class UnknownObjectDepthPipelineTest {
         assertTrue(result.confidence.depthQuality in 0.75f..0.80f)
     }
 
-    @Test fun noDepthStillShowsRepeatedForwardRegionsWithoutWarning() {
+    @Test fun noDepthKeepsDiagnosticObservationsButCannotEstablishThreeMeterDisplayOrWarning() {
         val p = pipeline()
         val results = (0..4).map { i ->
             val t = token(i)
             process(p, t, capture(t, snapshot(t).copy(rawDepth = null, rawConfidence = null, fullDepth = null)))
         }
         val last = results.last()
-        assertTrue(last.observations.single().walkingSelection!!.show)
+        // Repetition used to permit display without range; it cannot prove the v6 <=3 m boundary.
+        assertTrue(results.all { it.observations.size == 1 })
+        assertTrue(results.all { it.observations.single().walkingSelection?.show == false })
+        assertFalse(last.observations.single().walkingSelection!!.warningCandidate)
         assertEquals("depth_unconfirmed", last.observations.single().walkingSelection!!.reason)
         assertFalse(last.objects.single().walkingObstacleCandidate)
         assertNull(last.objects.single().riskDistanceM)

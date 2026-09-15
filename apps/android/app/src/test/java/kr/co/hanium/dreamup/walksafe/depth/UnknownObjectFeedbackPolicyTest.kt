@@ -21,6 +21,16 @@ class UnknownObjectFeedbackPolicyTest {
         assertNull(admit(output().copy(walkingObstacleCandidate = false)))
     }
     @Test
+    fun admissionRequiresMeasuredRadialRangeWithinThreeMetersEvenWhenAxialDistanceIsNear() {
+        assertNotNull(admit(output().copy(rayDistanceM = 3f)))
+        listOf(null, 3.001f, 4f, Float.NaN, Float.POSITIVE_INFINITY, 0f).forEach { range ->
+            assertNull("radial=$range", admit(output().copy(rayDistanceM = range)))
+        }
+        assertNull(admit(output().copy(depthAvailability = DepthAvailability.PREDICTED,
+            prediction = PredictedDepthEstimate(2f, FRAME_MS - 50L, 50L, .10f, 200L, 2.1f))))
+    }
+
+    @Test
     fun measuredObjectApproachUsesPlainObjectNameAndKeepsFrozenSourceIdentity() {
         val original = output()
         val batch = requireNotNull(admit(original))
@@ -181,6 +191,65 @@ class UnknownObjectFeedbackPolicyTest {
         assertEquals(first.activeFeedbackDeliveryKeys, repeated.activeFeedbackDeliveryKeys)
     }
 
+    @Test
+    fun retainedRegionsKeepOriginalCaptureCompletionEpochAndMeasurements() {
+        val first = requireNotNull(admit(output())).outputs.single()
+        val second = first.copy(trackId = "unknown-second", riskDistanceM = 1f)
+        val original = UnknownObjectFeedbackBatch(FRAME_ID, FRAME_MS, CAPTURED_NS,
+            CAPTURED_MS + 450L, EPOCH, listOf(first, second))
+        val retained = requireNotNull(original.retainRegions(setOf(second.trackId), CAPTURED_MS + 700L))
+        assertEquals(listOf(second), retained.outputs)
+        assertEquals(FRAME_ID, retained.sourceFrameId)
+        assertEquals(FRAME_MS, retained.sourceTimestampMs)
+        assertEquals(CAPTURED_NS, retained.sourceCapturedAtElapsedRealtimeNs)
+        assertEquals(CAPTURED_MS + 450L, retained.completedAtElapsedRealtimeMs)
+        assertEquals(EPOCH, retained.sourceEpoch)
+        assertEquals(CAPTURED_MS + 800L, retained.validUntilElapsedRealtimeMs)
+        assertEquals(listOf(first, second), original.outputs)
+    }
+
+    @Test
+    fun repeatedRegionRetentionNeverExtendsTheOriginalEightHundredMillisecondLease() {
+        var retained = requireNotNull(admit(output()))
+        for (now in CAPTURED_MS + 500L..CAPTURED_MS + 800L step 100L) {
+            retained = requireNotNull(retained.retainRegions(setOf(output().trackId), now))
+            assertEquals(CAPTURED_MS + 800L, retained.validUntilElapsedRealtimeMs)
+        }
+        assertNull(retained.retainRegions(setOf(output().trackId), CAPTURED_MS + 801L))
+    }
+
+    @Test
+    fun unsupportedOrEmptyRegionIdsAndPreCompletionTimeCannotRetainAnyBatch() {
+        val original = requireNotNull(admit(output()))
+        assertNull(original.retainRegions(emptySet(), CAPTURED_MS + 500L))
+        assertNull(original.retainRegions(setOf("unknown-missing"), CAPTURED_MS + 500L))
+        assertNull(original.retainRegions(setOf(output().trackId), CAPTURED_MS + 449L))
+    }
+
+    @Test(expected = UnsupportedOperationException::class)
+    fun retainedRegionOutputListRemainsFrozen() {
+        val retained = requireNotNull(requireNotNull(admit(output())).retainRegions(setOf(output().trackId), CAPTURED_MS + 500L))
+        (retained.outputs as MutableList<TrackedObjectDepth>).clear()
+    }
+
+    @Test
+    fun retainingAnAdmittedRegionPreservesTheExistingClaimAndStartDeliveryKey() {
+        val policy = WalkSafeFeedbackPolicy()
+        val coordinator = AndroidTactileFrameCoordinator(AndroidTactileRouteGuidance(), policy, TactileFrameFeedbackActuator { })
+        val original = requireNotNull(admit(output()))
+        val first = coordinator.dispatchFeedback(frame(emptyList()), false, true, CAPTURED_MS + 500L,
+            independentFreshOutputs = listOf(original))
+        val action = requireNotNull(first.action)
+        assertTrue(policy.claimFeedbackDelivery(action.trackId, CAPTURED_MS + 500L))
+        val retained = requireNotNull(original.retainRegions(setOf(action.trackId), CAPTURED_MS + 700L))
+        val repeated = coordinator.dispatchFeedback(frame(emptyList()), false, true, CAPTURED_MS + 700L,
+            independentFreshOutputs = listOf(retained))
+        assertNull(repeated.action)
+        assertTrue(action.deliveryKey in repeated.activeFeedbackDeliveryKeys)
+        assertEquals(action.validUntilMs, retained.validUntilElapsedRealtimeMs)
+        assertTrue(policy.confirmFeedbackDelivery(action.trackId, CAPTURED_MS + 500L, CAPTURED_MS + 750L))
+    }
+
     private fun admit(output: TrackedObjectDepth, nowMs: Long = CAPTURED_MS + 500L, currentEpoch: WalkRuntimeEpoch? = EPOCH) =
         UnknownObjectFeedbackPolicy().admit(listOf(output), FRAME_ID, FRAME_MS, CAPTURED_NS,
             CAPTURED_MS + 450L, EPOCH, currentEpoch, nowMs)
@@ -198,7 +267,7 @@ class UnknownObjectFeedbackPolicyTest {
         frameId = FRAME_ID, timestampMs = FRAME_MS, trackId = "unknown-synthetic-1", className = "unnamed-obstacle",
         detectionConfidence = 0.95f, bboxNorm = RectNorm(0.4f, 0.2f, 0.2f, 0.4f), polygonNorm = emptyList(),
         maskAreaNorm = 0.08f, centerNorm = Point2(0.5f, 0.4f), bottomContactNorm = null,
-        source = DepthSource.ARCORE_RAW_DEPTH, zDistanceM = 2f, rayDistanceM = null, groundDistanceM = null,
+        source = DepthSource.ARCORE_RAW_DEPTH, zDistanceM = 2f, rayDistanceM = 2f, groundDistanceM = null,
         riskDistanceM = 2f, validSampleCount = 64, validSampleRatio = 1f, depthMedianM = 2f, depthP20M = 2f,
         depthIqrM = 0.1f, trend = Trend.APPROACHING, approachScore = 0.9f, approachSpeedMps = 0.6f,
         timeToCollisionMs = 3_000L, confidence = confidence(),

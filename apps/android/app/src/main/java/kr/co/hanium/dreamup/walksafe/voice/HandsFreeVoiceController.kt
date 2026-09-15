@@ -73,6 +73,7 @@ internal class HandsFreeVoiceController(
         isAppSpeechActive,
         mainHandler,
     ),
+    private val isSpeechRecognitionBlocked: () -> Boolean = isAppSpeechActive,
 ) : WalkVoiceSessionController, Closeable {
     private val stateMachine = HandsFreeVoiceStateMachine()
     private var activeRunId: Long? = null
@@ -97,13 +98,18 @@ internal class HandsFreeVoiceController(
             }
 
             override fun onTranscript(runId: Long, transcript: VoskTranscript) {
-                mainHandler.post { handleTranscript(runId, transcript) }
+                onTranscript(runId, transcript, inputGeneration = null)
+            }
+
+            override fun onTranscript(runId: Long, transcript: VoskTranscript, inputGeneration: Long?) {
+                mainHandler.post { handleTranscript(runId, transcript, inputGeneration) }
             }
 
             override fun onError(runId: Long, error: VoskStreamingError) {
                 mainHandler.post { handleError(runId, error) }
             }
         },
+        inputGeneration = { stateMachine.snapshot().generation },
     )
 
     override fun start(): Boolean {
@@ -180,12 +186,15 @@ internal class HandsFreeVoiceController(
         onStatus("voice_hands_free=waiting_wake_phrase")
     }
 
-    private fun handleTranscript(runId: Long, transcript: VoskTranscript) {
+    private fun handleTranscript(runId: Long, transcript: VoskTranscript, inputGeneration: Long?) {
         if (closed || activeRunId != runId) return
         if (!eligibility().allowsListening()) {
             endSessionWithoutRestart("eligibility_changed")
             return
         }
+        // PCM can finish decoding before a TTS starts, then wait on the main queue. A run ID
+        // alone also cannot distinguish a previous wake/command window in the same stream.
+        if (inputGeneration != stateMachine.snapshot().generation || shouldSuppressInput()) return
         if (!transcript.isFinal) return
         if (!transcript.isTrustedForCommand()) {
             onStatus("voice_hands_free=low_confidence")
@@ -241,7 +250,7 @@ internal class HandsFreeVoiceController(
                 return@play
             }
             if (result == WakeAcknowledgementResult.CANCELLED ||
-                runCatching(isAppSpeechActive).getOrDefault(true)
+                runCatching(isSpeechRecognitionBlocked).getOrDefault(true)
             ) {
                 stateMachine.cancel(acknowledging.generation)
                 onStatus("voice_hands_free=waiting_wake_phrase")
@@ -270,6 +279,7 @@ internal class HandsFreeVoiceController(
     }
 
     private fun dispatchCommand(text: String, confidence: Float?) {
+        if (shouldSuppressInput()) return
         val transition = stateMachine.onCommandRecognized(
             callbackGeneration = stateMachine.snapshot().generation,
             command = text,
@@ -395,7 +405,7 @@ internal class HandsFreeVoiceController(
     }
 
     private fun shouldSuppressInput(): Boolean {
-        if (closed || runCatching(isAppSpeechActive).getOrDefault(true)) return true
+        if (closed || runCatching(isSpeechRecognitionBlocked).getOrDefault(true)) return true
         return when (stateMachine.snapshot()) {
             is HandsFreeVoiceState.WaitingForWakeWord,
             is HandsFreeVoiceState.WaitingForCommand,

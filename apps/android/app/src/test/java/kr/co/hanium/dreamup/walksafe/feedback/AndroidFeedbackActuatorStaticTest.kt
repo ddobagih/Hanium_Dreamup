@@ -23,17 +23,17 @@ class AndroidFeedbackActuatorStaticTest {
     }
 
     @Test
-    fun speechRecognitionPreparationStopsNavigationButNotRiskSpeech() {
+    fun speechRecognitionPreparationPreservesAllPendingSpeechAndItsCallbacks() {
         val preparation = source.substringAfter("fun prepareForSpeechRecognition(): Boolean")
             .substringBefore("fun playProgressBeep(volumePercent: Int)")
 
-        assertTrue(preparation.contains("ANNOUNCE_ASSERTIVE_PREFIX"))
-        assertTrue(preparation.contains("if (riskPending) return false"))
-        assertTrue(preparation.contains("textToSpeech.stop()"))
-        assertTrue(preparation.contains("pendingUtterances.clear()"))
-        assertTrue(preparation.contains("utteranceCallbacks.clear()"))
-        assertTrue(preparation.indexOf("utteranceCallbacks.clear()") < preparation.indexOf("textToSpeech.stop()"))
-        assertTrue(preparation.contains("lastNavMessage = \"\""))
+        assertTrue(preparation.contains("if (isSpeechRecognitionBlocked())"))
+        assertFalse(preparation.contains("textToSpeech.stop()"))
+        assertFalse(preparation.contains("pendingSpeechQueue.clear()"))
+        assertFalse(preparation.contains("pendingUtterances.clear()"))
+        assertFalse(preparation.contains("utteranceCallbacks.clear()"))
+        assertTrue(preparation.contains("progressTone?.stopTone()"))
+        assertTrue(preparation.contains("abandonAudioFocus()"))
     }
 
     @Test
@@ -446,10 +446,10 @@ class AndroidFeedbackActuatorStaticTest {
         assertTrue(navigation.contains("protectsFromFollowingSpeech = false"))
         assertTrue(information.contains("requiresExplicitTerminalCallback = true"))
         assertTrue(information.contains("feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)"))
-        for (cancellation in listOf(preparation, flush)) {
-            assertTrue(cancellation.contains("explicitTerminalRequiredUtterances"))
-            assertTrue(cancellation.contains("takeTerminalCallback(it, completed = false, notifyFailure = true)"))
-        }
+        assertTrue(preparation.contains("if (isSpeechRecognitionBlocked())"))
+        assertFalse(preparation.contains("takeTerminalCallback("))
+        assertTrue(flush.contains("explicitTerminalRequiredUtterances"))
+        assertTrue(flush.contains("takeTerminalCallback(it, completed = false, notifyFailure = true)"))
     }
 
 }

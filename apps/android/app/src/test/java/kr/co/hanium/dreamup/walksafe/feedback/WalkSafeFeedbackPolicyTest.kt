@@ -412,6 +412,140 @@ class WalkSafeFeedbackPolicyTest {
     }
 
     @Test
+    fun stopEscalationBypassesLowerCompletedWarningButNotTheNextStopCooldown() {
+        val policy = WalkSafeFeedbackPolicy()
+        val warning = policy.evaluate(candidate(trackId = "a"), true, 1_000L)!!
+        assertTrue(policy.claimFeedbackDelivery(warning.trackId, 1_000L))
+        assertTrue(policy.confirmFeedbackDelivery(warning.trackId, 1_000L, 4_000L))
+
+        val stop = policy.evaluate(candidate(trackId = "a", level = MessageLevel.STOP), true, 4_100L)!!
+        assertEquals(MessageLevel.STOP, stop.level)
+        assertEquals(5_600L, stop.validUntilMs)
+        assertTrue(policy.claimFeedbackDelivery(stop.trackId, 4_100L))
+        assertTrue(policy.confirmFeedbackDelivery(stop.trackId, 4_100L, 4_200L))
+
+        assertNull(policy.evaluate(candidate(trackId = "a", level = MessageLevel.STOP), true, 4_300L))
+        assertNull(policy.evaluate(candidate(trackId = "b", level = MessageLevel.STOP), true, 4_300L))
+        assertNotNull(policy.evaluate(candidate(trackId = "a", level = MessageLevel.STOP), true, 6_700L))
+    }
+
+    @Test
+    fun onlyWarningAndStopEscalationsBypassCompletedCooldowns() {
+        for (previous in listOf(MessageLevel.INFO, MessageLevel.CAUTION, MessageLevel.WARNING, MessageLevel.STOP)) {
+            for (next in listOf(MessageLevel.INFO, MessageLevel.CAUTION, MessageLevel.WARNING, MessageLevel.STOP)) {
+                val policy = WalkSafeFeedbackPolicy()
+                policy.evaluate(candidate(level = previous), true, 1_000L)!!
+                assertTrue(policy.confirmFeedbackDelivery("track-1", 1_000L, 4_000L))
+                val action = policy.evaluate(candidate(level = next), true, 4_100L)
+                val expected = (next == MessageLevel.WARNING || next == MessageLevel.STOP) && next.ordinal > previous.ordinal
+                assertEquals("$previous -> $next", expected, action != null)
+            }
+        }
+    }
+
+    @Test
+    fun stopOnAnotherTrackCanBypassTheGlobalWarningCooldown() {
+        val policy = WalkSafeFeedbackPolicy()
+        policy.evaluate(candidate(trackId = "warning"), true, 1_000L)!!
+        assertTrue(policy.confirmFeedbackDelivery("warning", 1_000L, 4_000L))
+
+        assertEquals(
+            "stop",
+            policy.evaluate(candidate(trackId = "stop", level = MessageLevel.STOP), true, 4_100L)!!.trackId,
+        )
+    }
+
+    @Test
+    fun previousStopOnTheSameTrackIsNotBypassedBecauseAnotherWarningCompletedLater() {
+        val policy = WalkSafeFeedbackPolicy()
+        policy.evaluate(candidate(trackId = "stop", level = MessageLevel.STOP), true, 1_000L)!!
+        assertTrue(policy.confirmFeedbackDelivery("stop", 1_000L))
+        policy.evaluate(candidate(trackId = "warning"), true, 1_800L)!!
+        assertTrue(policy.confirmFeedbackDelivery("warning", 1_800L))
+
+        assertNull(policy.evaluate(candidate(trackId = "stop", level = MessageLevel.STOP), true, 1_900L))
+    }
+
+    @Test
+    fun failedClaimedEscalationRestoresThePreviousWarningAndAllowsAStopRetry() {
+        val policy = WalkSafeFeedbackPolicy()
+        policy.evaluate(candidate(), true, 1_000L)!!
+        assertTrue(policy.confirmFeedbackDelivery("track-1", 1_000L, 4_000L))
+        policy.evaluate(candidate(level = MessageLevel.STOP), true, 4_100L)!!
+        assertTrue(policy.claimFeedbackDelivery("track-1", 4_100L))
+
+        policy.rejectUndeliveredFeedback("track-1", 4_100L)
+
+        assertFalse(policy.confirmFeedbackDelivery("track-1", 4_100L, 4_150L))
+        assertNotNull(policy.evaluate(candidate(level = MessageLevel.STOP), true, 4_200L))
+    }
+
+    @Test
+    fun cancelledEscalationPreservesTheCompletedCooldownAndLateCallbackCannotCommitIt() {
+        val policy = WalkSafeFeedbackPolicy()
+        policy.evaluate(candidate(), true, 1_000L)!!
+        assertTrue(policy.confirmFeedbackDelivery("track-1", 1_000L, 4_000L))
+        policy.evaluate(candidate(level = MessageLevel.STOP), true, 4_100L)!!
+        assertTrue(policy.claimFeedbackDelivery("track-1", 4_100L))
+
+        policy.cancelPendingFeedbackDeliveries()
+
+        assertFalse(policy.confirmFeedbackDelivery("track-1", 4_100L, 4_150L))
+        assertNull(policy.evaluate(candidate(), true, 4_200L))
+        assertNotNull(policy.evaluate(candidate(level = MessageLevel.STOP), true, 4_300L))
+    }
+
+    @Test
+    fun expiredMissingEscalationCannotBeClaimedAndFreshWalkClearsDeliveredSeverity() {
+        val policy = WalkSafeFeedbackPolicy()
+        policy.evaluate(candidate(), true, 1_000L)!!
+        assertTrue(policy.confirmFeedbackDelivery("track-1", 1_000L, 4_000L))
+        policy.evaluate(candidate(level = MessageLevel.STOP), true, 4_100L)!!
+
+        policy.evaluate(null, true, 5_601L)
+        assertFalse(policy.claimFeedbackDelivery("track-1", 4_100L))
+        policy.resetForNewWalk()
+        assertNotNull(policy.evaluate(candidate(level = MessageLevel.CAUTION), true, 5_602L))
+    }
+
+    @Test
+    fun cancellingUnknownTracksPreservesAPrimaryClaimAndClearsOnlyTheirQueuedEntries() {
+        val policy = WalkSafeFeedbackPolicy(FeedbackPolicyConfig(pendingQueueCapacity = 2))
+        policy.evaluateCandidates(listOf(candidate(trackId = "primary"), candidate(trackId = "unknown")), true, 1_000L)!!
+        assertTrue(policy.claimFeedbackDelivery("primary", 1_000L))
+
+        policy.cancelFeedbackForTracks(setOf("unknown"))
+
+        assertTrue(policy.confirmFeedbackDelivery("primary", 1_000L))
+        assertEquals(
+            "next",
+            policy.evaluateCandidates(listOf(candidate(trackId = "next"), candidate(trackId = "unknown")), true, 1_800L)!!.trackId,
+        )
+    }
+
+    @Test
+    fun cancellingAnUnknownEscalationRestoresItsWarningCooldownAndPreservesAnotherQueuedTrack() {
+        val policy = WalkSafeFeedbackPolicy()
+        policy.evaluate(candidate(trackId = "unknown"), true, 1_000L)!!
+        assertTrue(policy.confirmFeedbackDelivery("unknown", 1_000L, 4_000L))
+        policy.evaluateCandidates(
+            listOf(candidate(trackId = "unknown", level = MessageLevel.STOP), candidate(trackId = "primary")),
+            true,
+            4_100L,
+        )!!
+        assertTrue(policy.claimFeedbackDelivery("unknown", 4_100L))
+
+        policy.cancelFeedbackForTracks(setOf("unknown"))
+
+        assertFalse(policy.confirmFeedbackDelivery("unknown", 4_100L, 4_200L))
+        assertNull(policy.evaluate(candidate(trackId = "unknown"), true, 4_200L))
+        assertEquals(
+            "primary",
+            policy.evaluateCandidates(listOf(candidate(trackId = "third"), candidate(trackId = "primary")), true, 4_700L)!!.trackId,
+        )
+    }
+
+    @Test
     fun rejectedDeliveryDoesNotConsumeTrackOrGlobalCooldown() {
         val policy = WalkSafeFeedbackPolicy()
         val first = policy.evaluate(candidate(trackId = "a", level = MessageLevel.STOP), true, 1_000L)!!

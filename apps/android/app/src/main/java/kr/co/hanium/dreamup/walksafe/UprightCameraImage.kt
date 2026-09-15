@@ -26,11 +26,25 @@ internal object UprightCameraImage {
     }
 
     /** Return detections to sensor coordinates before ARCore screen/depth mapping. */
-    fun toSensor(rect: RectNorm, turns: Int): RectNorm = when (turns) {
-        0 -> rect
-        1 -> RectNorm(rect.y, 1f - rect.x - rect.width, rect.height, rect.width)
-        2 -> RectNorm(1f - rect.x - rect.width, 1f - rect.y - rect.height, rect.width, rect.height)
-        3 -> RectNorm(1f - rect.y - rect.height, rect.x, rect.height, rect.width)
-        else -> error("Invalid quarter turn")
+    fun toSensor(rect: RectNorm, turns: Int): RectNorm {
+        // Subtract the endpoint once: (1 - x) - width can put an edge at -2.98e-8.
+        val rotated = when (turns) {
+            0 -> rect
+            1 -> RectNorm(rect.y, 1f - (rect.x + rect.width), rect.height, rect.width)
+            2 -> RectNorm(1f - (rect.x + rect.width), 1f - (rect.y + rect.height), rect.width, rect.height)
+            3 -> RectNorm(1f - (rect.y + rect.height), rect.x, rect.height, rect.width)
+            else -> error("Invalid quarter turn")
+        }
+        fun boundary(value: Float): Float = when {
+            value in -0.000001f..0f -> 0f
+            value in 1f..1.000001f -> 1f
+            else -> value
+        }
+        val left = boundary(rotated.x)
+        val top = boundary(rotated.y)
+        val right = boundary(rotated.x + rotated.width)
+        val bottom = boundary(rotated.y + rotated.height)
+        // Correct only floating-point boundary noise. Real out-of-frame boxes stay invalid.
+        return RectNorm(left, top, right - left, bottom - top)
     }
 }

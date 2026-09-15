@@ -137,11 +137,16 @@ class MessageMotionPolicyTest {
             for ((distance, expected) in cases) {
                 val decision = evaluate(obstacle(direction).copy(riskDistanceM = distance))
                 assertEquals("$direction at $distance m", expected, decision.userFacing.messageLevel)
+                assertNoSpokenDistanceOrStepCount(decision.userFacing)
                 if (expected == MessageLevel.NONE) {
                     assertNull(decision.userFacing.message)
                 } else {
-                    assertNotNull(decision.userFacing.stepsAhead)
-                    assertNotNull(decision.userFacing.message)
+                    val action = if (expected == MessageLevel.STOP) {
+                        "멈추세요. 주변을 확인하세요."
+                    } else {
+                        "멈출 준비를 하세요."
+                    }
+                    assertTrue(decision.userFacing.message!!.endsWith(action))
                 }
             }
         }
@@ -239,8 +244,10 @@ class MessageMotionPolicyTest {
             assertNull(weak.userFacing.stepsAhead)
             assertFalse(weak.userFacing.message!!.contains("카메라 기준"))
             assertEquals(source.name, MessageLevel.WARNING, admitted.userFacing.messageLevel)
-            assertNotNull(admitted.userFacing.stepsAhead)
+            assertNoSpokenDistanceOrStepCount(weak.userFacing)
+            assertNoSpokenDistanceOrStepCount(admitted.userFacing)
             assertTrue(admitted.userFacing.message!!.contains("카메라 기준 왼쪽"))
+            assertTrue(admitted.userFacing.message!!.endsWith("멈출 준비를 하세요."))
         }
     }
 
@@ -341,6 +348,14 @@ class MessageMotionPolicyTest {
         assertNull(suppressed.userFacing.message)
         assertTrue(suppressed.reason.startsWith("rate limited"))
         assertTrue(allowed.userFacing.message!!.contains("오른쪽"))
+    }
+
+    private fun assertNoSpokenDistanceOrStepCount(userFacing: UserFacingDepth) {
+        // Obstacle alerts retain action and measured motion; route distance guidance is separate.
+        assertNull(userFacing.stepsAhead)
+        userFacing.message?.let { message ->
+            assertFalse(message, Regex("""\d+(?:\.\d+)?\s*(?:보|걸음|m|미터)""").containsMatchIn(message))
+        }
     }
 
     private fun evaluate(result: MetricDepthDecision): MessagePolicyDecision {

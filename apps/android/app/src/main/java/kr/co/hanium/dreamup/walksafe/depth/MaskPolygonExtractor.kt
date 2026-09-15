@@ -18,12 +18,20 @@ class MaskPolygonExtractor(
     private val minPolygonPoints: Int = 3,
     private val fallbackBboxErosionRatio: Float = 0.10f,
 ) {
-    fun extract(candidate: DetectionCandidate): ObjectGeometry {
+    fun extract(candidate: DetectionCandidate, imageQuarterTurns: Int? = 0): ObjectGeometry {
         val bbox = normalizeRect(candidate.bboxNorm)
-        val polygon = sanitizePolygon(candidate.polygonNorm).takeIf { it.size >= minPolygonPoints }
+        val segmentedPolygon = sanitizePolygon(candidate.polygonNorm).takeIf { it.size >= minPolygonPoints }
+        val polygon = segmentedPolygon
             ?: bboxPolygon(bbox, erosionRatio = fallbackBboxErosionRatio)
         val center = polygonCentroid(polygon) ?: bbox.center
-        val bottomContact = bottomContactPoint(polygon)
+        val uprightPolygon = polygon.mapNotNull { sensorPointToUpright(it, imageQuarterTurns) }
+        // Erosion may improve depth sampling, but cannot restore a contact cut off by the screen.
+        val contactBoundary = if (segmentedPolygon != null) uprightPolygon else {
+            bboxPolygon(bbox, erosionRatio = 0f).mapNotNull { sensorPointToUpright(it, imageQuarterTurns) }
+        }
+        val bottomContact = if (contactBoundary.any { it.y >= 0.995f }) null else {
+            bottomContactPoint(uprightPolygon)?.let { uprightPointToSensor(it, imageQuarterTurns) }
+        }
         val maskArea = candidate.maskAreaNorm ?: polygonAreaNorm(polygon).takeIf { it > 0f } ?: bbox.area
         val centerline = if (isTactileBlockClass(candidate.className)) tactileCenterline(polygon) else emptyList()
         val aspectRatio = if (bbox.height > 0f) bbox.width / bbox.height else null
@@ -45,6 +53,7 @@ class MaskPolygonExtractor(
             centerlineNorm = centerline,
             orientationRad = orientation,
             aspectRatio = aspectRatio,
+            imageQuarterTurns = imageQuarterTurns,
         )
     }
 

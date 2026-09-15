@@ -45,6 +45,7 @@ class UnknownRuntimeCalibration(
     private val onProductionResult: (FastSamResult<UnknownRuntimeAttachment>) -> Unit,
     private val onCalibrationResult: (FastSamResult<UnknownRuntimeAttachment>, RuntimeCalibrationLiveEvidence) -> Boolean,
     private val onProductionError: (Throwable) -> Unit = {},
+    private val onProductionDiscard: (FastSamFrameToken, String) -> Unit = { _, _ -> },
 ) {
     @Volatile var isRunning = false
         private set
@@ -355,6 +356,7 @@ class UnknownRuntimeCalibration(
                     override fun onDiscard(token: FastSamFrameToken, reason: String) {
                         fixtureWaiters.remove(token.frameId)?.completeExceptionally(Incomplete())
                         liveTickets.remove(token.frameId)?.let { (live, ticket) -> live.pacing.cancel(ticket) }
+                        if (synchronized(lock) { adopted }) onProductionDiscard(token, reason)
                     }
                 })
             val readiness = synchronized(lock) {

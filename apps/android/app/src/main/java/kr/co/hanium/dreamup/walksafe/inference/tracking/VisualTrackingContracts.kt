@@ -72,7 +72,8 @@ data class VisualTrackingConfig(
     val maxFeaturesPerObject: Int = 40,
     val maxPixelComparisonsPerCall: Long = 80_000_000L,
     val maxExecutionNs: Long = 5_000_000L,
-    val maxInputDetections: Int = 128,
+    /** Parser output is capped at 300; admission does not increase the optical-flow work budget. */
+    val maxInputDetections: Int = 300,
     val backend: VisualTrackingBackend = VisualTrackingBackend.OPENCV_PYRAMIDAL_LK,
     val allowSimilarityTransform: Boolean = false,
 ) {
@@ -82,6 +83,6 @@ data class VisualTrackingConfig(
         require(maxTrackedObjects in 1..5 && maxFeaturesPerObject in 6..40)
         require(maxPixelComparisonsPerCall in 1L..80_000_000L)
         require(maxExecutionNs in 1L..100_000_000L)
-        require(maxInputDetections in 1..128)
+        require(maxInputDetections in 1..300)
     }
 }

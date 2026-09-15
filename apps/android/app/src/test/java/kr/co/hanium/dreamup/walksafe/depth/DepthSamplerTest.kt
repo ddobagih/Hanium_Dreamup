@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -109,7 +110,7 @@ class DepthSamplerTest {
     }
 
     @Test
-    fun messagePolicyUsesStepsOnlyForMetricSources() {
+    fun obstacleWarningUsesActionWithoutStepCountsAndPseudoCautionStaysQualitative() {
         val policy = MessagePolicy(stepLengthM = 0.6f)
         val metric = policy.buildUserFacing(
             MetricDepthDecision(
@@ -130,9 +131,14 @@ class DepthSamplerTest {
             ),
         )
 
-        assertEquals(2, metric.stepsAhead)
-        assertTrue(metric.message!!.contains("2보"))
+        assertEquals(MessageLevel.STOP, metric.messageLevel)
+        assertNull(metric.stepsAhead)
+        assertTrue(metric.message!!.endsWith("멈추세요. 주변을 확인하세요."))
+        assertEquals(MessageLevel.CAUTION, pseudo.messageLevel)
         assertNull(pseudo.stepsAhead)
         assertTrue(pseudo.message!!.contains("줄어드는 것"))
+        for (message in listOf(metric.message!!, pseudo.message!!)) {
+            assertFalse(message, Regex("""\d+(?:\.\d+)?\s*(?:보|걸음|m|미터)""").containsMatchIn(message))
+        }
     }
 }

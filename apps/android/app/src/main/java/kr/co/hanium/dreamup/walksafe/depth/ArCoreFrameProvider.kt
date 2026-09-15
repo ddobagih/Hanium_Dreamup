@@ -4,6 +4,7 @@ import android.media.Image
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
+import com.google.ar.core.Plane
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.DeadlineExceededException
 import com.google.ar.core.exceptions.NotTrackingException
@@ -124,7 +125,8 @@ class ArCoreFrameProvider(private val session: Session) : Closeable {
                 clearCameraMotion()
                 return null
             }
-            val relativePose = anchor.pose.inverse().compose(camera.pose)
+            val worldToAnchor = anchor.pose.inverse()
+            val relativePose = worldToAnchor.compose(camera.pose)
             val x = relativePose.tx()
             val y = relativePose.ty()
             val z = relativePose.tz()
@@ -162,6 +164,23 @@ class ArCoreFrameProvider(private val session: Session) : Closeable {
                     upY = up[1],
                     upZ = up[2],
                 ),
+            ).withCapturedSpatialMetadata(
+                readGravityUpInAnchor = {
+                    val gravityUp = worldToAnchor.rotateVector(floatArrayOf(0f, 1f, 0f))
+                    Vec3(gravityUp[0], gravityUp[1], gravityUp[2])
+                },
+                readPlanes = { session.getAllTrackables(Plane::class.java) },
+                readPolygonInAnchor = { plane ->
+                    if (plane.trackingState != TrackingState.TRACKING ||
+                        plane.type != Plane.Type.HORIZONTAL_UPWARD_FACING || plane.subsumedBy != null
+                    ) {
+                        null
+                    } else {
+                        // Resolve plane and anchor poses in this frame's world coordinates.
+                        val planeToAnchor = worldToAnchor.compose(plane.centerPose)
+                        captureHorizontalPlanePolygon(plane.polygon, planeToAnchor::transformPoint)
+                    }
+                },
             )
         } catch (_: Exception) {
             clearCameraMotion()

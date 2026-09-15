@@ -66,7 +66,7 @@ class RouteNavigatorTest {
     }
 
     @Test
-    fun tmapCrosswalkTurnTypesReplaceRawCommandsWithTheFixedReferenceNotice() {
+    fun tmapCrosswalkTurnTypesKeepReferenceNoticeWithoutRawCrossingCommands() {
         listOf(211, 212, 213).forEach { turnType ->
             val navigator = RouteNavigator()
             val rawCommand = "신호가 초록색이니 지금 건너세요."
@@ -82,15 +82,16 @@ class RouteNavigatorTest {
             val current = navigator.currentInstruction(locationNearStart())
             val update = navigator.update(locationNearStart(), nowMs = 1_000L, requestInFlight = false)
 
-            assertEquals(CROSSWALK_REFERENCE_NOTICE_KO, current)
-            assertEquals(CROSSWALK_REFERENCE_NOTICE_KO, update.instruction)
+            assertTrue(current?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
+            assertTrue(update.instruction?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
+            assertTrue(update.instruction?.contains("m 앞") == true)
             assertFalse(current?.contains(rawCommand) == true)
             assertFalse(current?.contains("지금 건너세요") == true)
         }
     }
 
     @Test
-    fun crosswalkTextMarkersReplaceRawCommandsWithTheFixedReferenceNotice() {
+    fun crosswalkTextMarkersKeepReferenceNoticeWithoutRawCrossingCommands() {
         val cases = listOf(
             Triple("횡단보도를 건너세요.", null, null),
             Triple("CrossWalk ahead, cross now.", null, null),
@@ -114,7 +115,7 @@ class RouteNavigatorTest {
 
             val output = navigator.currentInstruction(locationNearStart())
 
-            assertEquals(CROSSWALK_REFERENCE_NOTICE_KO, output)
+            assertTrue(output?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
             assertFalse(output?.contains("지금 건너세요") == true)
             assertFalse(output?.contains("건너도 됩니다") == true)
             assertFalse(output?.contains("안전합니다") == true)
@@ -156,8 +157,8 @@ class RouteNavigatorTest {
         navigator.setRoute(route())
 
         val pending = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
-        val confirmed = navigator.update(offRouteLocation(), nowMs = 2_000L, requestInFlight = false)
-        val repeated = navigator.update(offRouteLocation(), nowMs = 3_000L, requestInFlight = false)
+        val confirmed = navigator.update(offRouteLocation().copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = false)
+        val repeated = navigator.update(offRouteLocation().copy(elapsedRealtimeMs = 3_000L), nowMs = 3_000L, requestInFlight = false)
 
         assertFalse(pending.shouldReroute)
         assertTrue(pending.userDecisionRequired)
@@ -184,7 +185,7 @@ class RouteNavigatorTest {
         val detected = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
 
         val approved = navigator.approveReroute()
-        val waiting = navigator.update(offRouteLocation(), nowMs = 2_000L, requestInFlight = true)
+        val waiting = navigator.update(offRouteLocation().copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = true)
 
         assertFalse(detected.shouldReroute)
         assertTrue(approved.shouldReroute)
@@ -283,7 +284,7 @@ class RouteNavigatorTest {
         navigator.setRoute(route())
 
         val first = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
-        val second = navigator.update(offRouteLocation(), nowMs = 2_000L, requestInFlight = false)
+        val second = navigator.update(offRouteLocation().copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = false)
 
         assertFalse(first.shouldReroute)
         assertFalse(first.offRoute)
@@ -303,7 +304,7 @@ class RouteNavigatorTest {
 
         val first = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
         navigator.onUntrustedLocation()
-        val afterUntrusted = navigator.update(offRouteLocation(), nowMs = 2_000L, requestInFlight = false)
+        val afterUntrusted = navigator.update(offRouteLocation().copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = false)
 
         assertEquals("off_route_pending", first.reason)
         assertEquals("off_route_pending", afterUntrusted.reason)
@@ -317,10 +318,10 @@ class RouteNavigatorTest {
         navigator.setRoute(route(guideInstruction = "직진하세요."))
 
         val untrusted = navigator.onUntrustedLocation()
-        val recoverySignalOnly = navigator.update(locationNearStart(), nowMs = 2_000L, requestInFlight = false)
+        val recoverySignalOnly = navigator.update(locationNearStart().copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = false)
         val blocked = navigator.currentInstruction(locationNearStart())
         navigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
-        val freshAfterRecheck = navigator.update(locationNearStart(), nowMs = 3_000L, requestInFlight = false)
+        val freshAfterRecheck = navigator.update(locationNearStart().copy(elapsedRealtimeMs = 3_000L), nowMs = 3_000L, requestInFlight = false)
 
         assertEquals("location_untrusted_recheck_required", untrusted?.reason)
         assertEquals(RouteNavigatorUserDecision.LOCATION_RECHECK, untrusted?.pendingUserDecision)
@@ -338,7 +339,7 @@ class RouteNavigatorTest {
         navigator.setRoute(route())
 
         val first = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
-        val afterGap = navigator.update(offRouteLocation(), nowMs = 6_001L, requestInFlight = false)
+        val afterGap = navigator.update(offRouteLocation().copy(elapsedRealtimeMs = 6_001L), nowMs = 6_001L, requestInFlight = false)
 
         assertEquals("off_route_pending", first.reason)
         assertEquals("off_route_pending", afterGap.reason)
@@ -352,10 +353,10 @@ class RouteNavigatorTest {
         navigator.setRoute(route(guideInstruction = "직진하세요."))
         val suspected = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
 
-        val recoverySignalOnly = navigator.update(locationNearStart(), nowMs = 2_000L, requestInFlight = false)
+        val recoverySignalOnly = navigator.update(locationNearStart().copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = false)
         val blockedInstruction = navigator.currentInstruction(locationNearStart())
         val recheck = navigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
-        val freshOnRoute = navigator.update(locationNearStart(), nowMs = 3_000L, requestInFlight = false)
+        val freshOnRoute = navigator.update(locationNearStart().copy(elapsedRealtimeMs = 3_000L), nowMs = 3_000L, requestInFlight = false)
 
         assertEquals("off_route_pending", suspected.reason)
         assertEquals("off_route_location_recheck_required", recoverySignalOnly.reason)
@@ -371,8 +372,8 @@ class RouteNavigatorTest {
         navigator.setRoute(route())
 
         val first = navigator.update(uncertainOffRouteLocation(), nowMs = 1_000L, requestInFlight = false)
-        val second = navigator.update(uncertainOffRouteLocation(), nowMs = 2_000L, requestInFlight = false)
-        val preciseFirst = navigator.update(slightlyOffRouteLocation(accuracyM = 3f), nowMs = 8_000L, requestInFlight = false)
+        val second = navigator.update(uncertainOffRouteLocation().copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = false)
+        val preciseFirst = navigator.update(slightlyOffRouteLocation(accuracyM = 3f).copy(elapsedRealtimeMs = 8_000L), nowMs = 8_000L, requestInFlight = false)
 
         assertFalse(first.shouldReroute)
         assertFalse(first.offRoute)
@@ -425,10 +426,10 @@ class RouteNavigatorTest {
         navigator.setRoute(route())
         val nearEnd = TrustedLocation(37.0009, 127.0, 5f, 1_000L)
         navigator.update(nearEnd, nowMs = 1_000L, requestInFlight = false)
-        val candidate = navigator.update(nearEnd, nowMs = 2_000L, requestInFlight = false)
+        val candidate = navigator.update(nearEnd.copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = false)
 
         val rejected = navigator.rejectArrival()
-        val firstAfterRejection = navigator.update(nearEnd, nowMs = 3_000L, requestInFlight = false)
+        val firstAfterRejection = navigator.update(nearEnd.copy(elapsedRealtimeMs = 3_000L), nowMs = 3_000L, requestInFlight = false)
 
         assertTrue(candidate.arrivalCandidate)
         assertFalse(rejected.arrived)
@@ -469,7 +470,7 @@ class RouteNavigatorTest {
             stepProgressM = 0.0,
         )
         val corroborated = navigator.update(
-            location = nearEnd,
+            location = nearEnd.copy(elapsedRealtimeMs = 2_000L),
             nowMs = 2_000L,
             requestInFlight = false,
             stepProgressM = 100.0,
@@ -729,7 +730,7 @@ class RouteNavigatorTest {
     }
 
     @Test
-    fun crossingRouteProjectionStaysOnTheLaterProgressBranch() {
+    fun overlappingReturnLegsDoNotChooseTravelPhaseFromCourseAlone() {
         val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
         val crossingRoute = WalkingRoute(
             priority = "STAIR_AVOID",
@@ -749,7 +750,9 @@ class RouteNavigatorTest {
         navigator.update(TrustedLocation(37.0005, 127.0, 5f, 2_000L), nowMs = 2_000L, requestInFlight = false)
         navigator.update(TrustedLocation(37.0, 127.0, 5f, 3_000L), nowMs = 3_000L, requestInFlight = false)
 
-        assertEquals(180f, navigator.currentBearingDeg()!!, 2f)
+        assertEquals(RouteMatchQuality.LOW, navigator.currentRouteMatch()?.quality)
+        assertEquals(null, navigator.currentBearingDeg())
+        assertEquals(null, navigator.currentAcceptedRouteMatchFor(3_000L))
     }
 
     @Test
@@ -828,19 +831,18 @@ class RouteNavigatorTest {
         )
         val pending = requireNotNull(navigator.currentRouteMatch())
         navigator.update(
-            location = crossing,
+            location = crossing.copy(elapsedRealtimeMs = 3_000L),
             nowMs = 3_000L,
             requestInFlight = false,
-            filteredPosition = filteredPosition(crossing, headingDeg = 180.0),
+            filteredPosition = filteredPosition(crossing.copy(elapsedRealtimeMs = 3_000L), headingDeg = 180.0),
         )
         val confirmed = requireNotNull(navigator.currentRouteMatch())
 
-        assertEquals(RouteMatchReason.BRANCH_SWITCH_PENDING, pending.reason)
+        assertEquals(RouteMatchReason.AMBIGUOUS_CANDIDATES, pending.reason)
         assertEquals(RouteMatchQuality.LOW, pending.quality)
         assertEquals(null, pendingUpdate.instruction)
         assertEquals("route_match_untrusted", pendingUpdate.reason)
-        assertEquals(2, confirmed.segmentIndex)
-        assertEquals(RouteMatchReason.LOW_CONFIDENCE, confirmed.reason)
+        assertEquals(RouteMatchReason.AMBIGUOUS_CANDIDATES, confirmed.reason)
         assertEquals(RouteMatchQuality.LOW, confirmed.quality)
         assertEquals(null, navigator.currentBearingDeg())
     }
@@ -903,10 +905,10 @@ class RouteNavigatorTest {
         val first = navigator.update(nearEnd, nowMs = 1_000L, requestInFlight = false)
         val duplicate = navigator.update(nearEnd, nowMs = 1_000L, requestInFlight = false)
         val outOfOrder = navigator.update(nearEnd, nowMs = 999L, requestInFlight = false)
-        val secondFresh = navigator.update(nearEnd, nowMs = 2_000L, requestInFlight = false)
+        val secondFresh = navigator.update(nearEnd.copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = false)
 
         assertFalse(first.arrivalCandidate)
-        assertEquals("location_sample_not_newer", duplicate.reason)
+        assertFalse(duplicate.cancelStaleNavigationSpeech)
         assertEquals("location_sample_not_newer", outOfOrder.reason)
         assertFalse(duplicate.arrivalCandidate)
         assertFalse(outOfOrder.arrivalCandidate)
@@ -922,10 +924,11 @@ class RouteNavigatorTest {
         val first = navigator.update(offRoute, nowMs = 1_000L, requestInFlight = false)
         val duplicate = navigator.update(offRoute, nowMs = 1_000L, requestInFlight = false)
         val outOfOrder = navigator.update(offRoute, nowMs = 999L, requestInFlight = false)
-        val secondFresh = navigator.update(offRoute, nowMs = 2_000L, requestInFlight = false)
+        val secondFresh = navigator.update(offRoute.copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = false)
 
         assertEquals("off_route_pending", first.reason)
-        assertEquals("location_sample_not_newer", duplicate.reason)
+        assertEquals("location_sample_duplicate", duplicate.reason)
+        assertFalse(duplicate.cancelStaleNavigationSpeech)
         assertEquals("location_sample_not_newer", outOfOrder.reason)
         assertFalse(duplicate.offRoute)
         assertFalse(outOfOrder.offRoute)
@@ -946,12 +949,12 @@ class RouteNavigatorTest {
         )
         navigator.onPositioningEvidenceInterrupted()
         val firstRecovered = navigator.update(
-            nearEnd,
+            nearEnd.copy(elapsedRealtimeMs = 2_000L),
             nowMs = 2_000L,
             requestInFlight = false,
         )
         val secondRecovered = navigator.update(
-            nearEnd,
+            nearEnd.copy(elapsedRealtimeMs = 3_000L),
             nowMs = 3_000L,
             requestInFlight = false,
         )

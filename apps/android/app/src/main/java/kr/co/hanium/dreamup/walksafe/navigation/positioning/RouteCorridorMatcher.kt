@@ -79,6 +79,7 @@ data class RouteCorridorMatcherConfig(
     val mediumConfidenceThreshold: Double = 0.4,
     val branchSwitchMinimumCostAdvantage: Double = 1.5,
     val branchSwitchConfirmations: Int = 2,
+    val allowReverseTravel: Boolean = false,
 )
 
 /**
@@ -162,25 +163,32 @@ class RouteCorridorMatcher(
         val resolution = resolveBranch(best, eligible)
         val selected = resolution.selected
         val normalConfidence = confidence(selected, eligible)
-        val confidence = if (resolution.forceLowConfidence) {
+        val ambiguousReverseBranch = config.allowReverseTravel && eligible.any { other ->
+            competingBranch(selected, other) &&
+                abs(selected.candidate.bearingDeg - other.candidate.bearingDeg).let { min(it, 360f - it) } > 135f &&
+                other.candidate.crossTrackDistanceM <= max(
+                    selected.candidate.crossTrackSigmaM, other.candidate.crossTrackSigmaM,
+                ) * 2.0
+        }
+        val confidence = if (resolution.forceLowConfidence || ambiguousReverseBranch) {
             min(normalConfidence, config.mediumConfidenceThreshold - 0.001)
         } else {
             normalConfidence
         }.coerceIn(0.0, 1.0)
         val quality = when {
-            resolution.forceLowConfidence -> RouteMatchQuality.LOW
+            resolution.forceLowConfidence || ambiguousReverseBranch -> RouteMatchQuality.LOW
             confidence >= config.highConfidenceThreshold -> RouteMatchQuality.HIGH
             confidence >= config.mediumConfidenceThreshold -> RouteMatchQuality.MEDIUM
             else -> RouteMatchQuality.LOW
         }
-        val reason = resolution.reason ?: when {
+        val reason = if (ambiguousReverseBranch) RouteMatchReason.AMBIGUOUS_CANDIDATES else resolution.reason ?: when {
             quality != RouteMatchQuality.LOW -> RouteMatchReason.MATCHED
             isAmbiguous(selected, eligible) -> RouteMatchReason.AMBIGUOUS_CANDIDATES
             else -> RouteMatchReason.LOW_CONFIDENCE
         }
 
         if (
-            !resolution.forceLowConfidence &&
+            !resolution.forceLowConfidence && !ambiguousReverseBranch &&
             (quality == RouteMatchQuality.HIGH || quality == RouteMatchQuality.MEDIUM)
         ) {
             activeSegmentIndex = selected.candidate.segmentIndex
@@ -264,7 +272,11 @@ class RouteCorridorMatcher(
         }
         if (heading != null) {
             val sigma = max(heading.standardDeviationDeg, config.minimumHeadingSigmaDeg)
-            cost += config.headingWeight * robustSquare(angleDifferenceDeg(heading.degrees, candidate.bearingDeg.toDouble()) / sigma)
+            val difference = angleDifferenceDeg(heading.degrees, candidate.bearingDeg.toDouble())
+            // Corridor membership is still valid while walking back along it. Facing is not
+            // a travel heading and is never an input to this matcher.
+            val travelDifference = if (config.allowReverseTravel) min(difference, 180.0 - difference) else difference
+            cost += config.headingWeight * robustSquare(travelDifference / sigma)
         }
         if (progressReferenceM != null) {
             val sigma = hypot(config.progressSigmaM, candidate.alongTrackSigmaM)
@@ -279,7 +291,7 @@ class RouteCorridorMatcher(
     ): Double {
         val fit = exp(-0.5 * selected.cost.coerceAtMost(40.0))
         val competitor = candidates
-            .filter { abs(it.candidate.segmentIndex - selected.candidate.segmentIndex) > 1 }
+            .filter { competingBranch(selected, it) }
             .minByOrNull(ScoredCandidate::cost)
         val separation = competitor?.let {
             1.0 - exp(-0.5 * (it.cost - selected.cost).coerceAtLeast(0.0))
@@ -292,10 +304,20 @@ class RouteCorridorMatcher(
         candidates: List<ScoredCandidate>,
     ): Boolean {
         val competitor = candidates
-            .filter { abs(it.candidate.segmentIndex - selected.candidate.segmentIndex) > 1 }
+            .filter { competingBranch(selected, it) }
             .minByOrNull(ScoredCandidate::cost)
             ?: return false
         return competitor.cost - selected.cost < config.branchSwitchMinimumCostAdvantage
+    }
+
+    private fun competingBranch(selected: ScoredCandidate, other: ScoredCandidate): Boolean {
+        val a = selected.candidate
+        val b = other.candidate
+        if (abs(a.segmentIndex - b.segmentIndex) > 1) return true
+        // Adjacent return legs can overlap physically while being far apart along the route.
+        return config.allowReverseTravel && a.segmentIndex != b.segmentIndex &&
+            angleDifferenceDeg(a.bearingDeg.toDouble(), b.bearingDeg.toDouble()) > 135.0 &&
+            abs(a.geometricProgressM - b.geometricProgressM) > max(15.0, 3.0 * hypot(a.alongTrackSigmaM, b.alongTrackSigmaM))
     }
 
     private fun buildCandidates(

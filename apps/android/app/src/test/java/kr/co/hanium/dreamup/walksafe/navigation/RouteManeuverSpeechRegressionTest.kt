@@ -69,14 +69,19 @@ class RouteManeuverSpeechRegressionTest {
     }
 
     @Test
-    fun closerStageCancelsOldPendingCueAndIgnoresItsLateCompletion() {
+    fun closerStageWaitsForPendingSentenceAndThenOffersTheLatestDistance() {
         val navigator = navigator()
         val far = navigator.update(fix(0.00055, 1_000L), 1_000L, false)
         assertTrue(navigator.reserveInstruction(far))
         val near = navigator.update(fix(0.00082, 11_000L), 11_000L, false)
-        assertTrue(near.cancelStaleNavigationSpeech)
-        assertTrue(navigator.reserveInstruction(near))
+        assertFalse(near.cancelStaleNavigationSpeech)
+        assertEquals("guidance_in_flight", near.reason)
+        assertNull(near.instruction)
         navigator.acknowledgeInstruction(far, 11_001L)
+        val afterCompletion = requireNotNull(navigator.retryGuidance(11_002L))
+        assertTrue(afterCompletion.instruction?.contains("20m 앞") == true)
+        assertTrue(navigator.reserveInstruction(afterCompletion))
+        navigator.acknowledgeInstruction(far, 11_003L)
         assertEquals("guidance_in_flight", navigator.update(fix(0.00082, 12_000L), 12_000L, false).reason)
     }
 

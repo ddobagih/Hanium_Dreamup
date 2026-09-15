@@ -60,8 +60,10 @@ class MainActivityForegroundLocationWarmupStaticTest {
         assertTrue(cancel.contains("pendingCameraFallbackStart = null"))
         assertTrue(cancel.contains("stopActivePositionFieldSession()"))
         assertTrue(cancel.contains("if (!currentLocationCollectionAllowsWork()) stopLocationUpdates()"))
+        assertTrue(cancel.contains("retainLocationCompassOrStop()"))
+        assertFalse(cancel.contains("earthOrientationTracker.stop()"))
         assertTrue(cancel.indexOf("startLocationUpdatesIfAllowed()") >
-            cancel.indexOf("earthOrientationTracker.stop()"))
+            cancel.indexOf("retainLocationCompassOrStop()"))
         assertTrue(preserve.contains("freshTrustedLocationOrNull()"))
         assertTrue(preserve.contains("clearLocationDerivedState()"))
         assertFalse(preserve.contains("clearTrustedLocation()"))
@@ -145,6 +147,62 @@ class MainActivityForegroundLocationWarmupStaticTest {
         assertTrue(sources.contains("isLocationCallbackCurrent(owner, generation, callback)"))
         assertTrue(sources.contains("!currentNavigationCollectionAllowsWork()"))
         assertTrue(sources.contains("pedestrianMotionTracker?.stop()"))
+    }
+
+    @Test
+    fun compassStartsWithAuthenticatedLocationBeforeNavigationAndKeepsItsLeaseAtStart() {
+        val sources = functionSection("private fun startPositioningObservationSources(")
+        val ensure = functionSection("private fun ensureEarthOrientationForLocation(")
+        val retain = functionSection("private fun retainLocationCompassOrStop(")
+        val camera = functionSection("private fun startWalkSessionRuntimeWithoutCamera(")
+        assertTrue(sources.indexOf("ensureEarthOrientationForLocation()") <
+            sources.indexOf("!currentNavigationCollectionAllowsWork()"))
+        assertTrue(ensure.contains("earthOrientationTracker.start()"))
+        assertFalse(ensure.contains("isRouteActive"))
+        assertTrue(retain.contains("currentLocationCollectionOwnerOrNull() == owner"))
+        assertTrue(retain.contains("locationCallback != null"))
+        assertTrue(camera.contains("retainLocationCompassOrStop()"))
+        assertFalse(camera.contains("earthOrientationTracker.stop()"))
+    }
+
+    @Test
+    fun rawFreshLocationSetsDeclinationBeforePdrRejectionWithoutGrantingRouteTrust() {
+        val location = functionSection("private fun handleLocationUpdate(")
+        val reference = location.indexOf("RouteCompassLocationReference.accepts(")
+        val filtered = location.indexOf("positioningCoordinator.observeGnss(")
+        assertTrue(reference > location.indexOf("currentLocationCollectionOwnerOrNull() != owner"))
+        assertTrue(reference < filtered)
+        assertTrue(location.substring(reference, filtered).contains("updateRouteOrientationReference(location)"))
+        assertFalse(location.substring(reference, filtered).contains("currentNavigationCollectionAllowsWork()"))
+        assertFalse(location.substring(reference, filtered).contains("developmentGuidanceStartBypassEnabled"))
+        assertTrue(location.contains("if (hardRejected || filtered == null)"))
+    }
+
+    @Test
+    fun preRouteCompassRefreshIsSilentAndBoundToTheForegroundLocationGeneration() {
+        val refresh = functionSection("private fun scheduleRouteCompassPresentationUpdate(")
+        val stop = functionSection("private fun stopLocationUpdates(")
+        assertTrue(refresh.contains("!isActivityForeground"))
+        assertTrue(refresh.contains("locationCallbackGeneration != generation"))
+        assertTrue(refresh.contains("currentLocationCollectionOwnerOrNull() != owner"))
+        assertTrue(refresh.contains("pendingRouteCompassRefresh !== refresh"))
+        assertTrue(refresh.contains("currentRouteFacingObservation(SystemClock.elapsedRealtime())"))
+        assertFalse(refresh.contains("isRouteActive"))
+        assertFalse(refresh.contains("speakInteraction("))
+        assertFalse(refresh.contains("speakNavigation("))
+        assertFalse(refresh.contains("startVoiceCommandRecognition("))
+        assertTrue(stop.contains("stopRouteCompassPresentationUpdates()"))
+        assertTrue(stop.indexOf("refreshRouteCompassPresentation()") >
+            stop.indexOf("orientationLocationOwnerActive = false"))
+        assertTrue(stop.contains("clearGeomagneticReference()"))
+        val compassView = source.substringAfter("nativeHomeCompassText = TextView(this).apply")
+            .substringBefore("overlay.addView(nativeHomeCompassText")
+        assertTrue(compassView.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE"))
+        val presentation = functionSection("private fun refreshRouteCompassPresentation(")
+        assertFalse(presentation.contains("nativeGuidanceStatusText"))
+        val liveGuidance = functionSection("private fun nativeGuidanceStatusMessage(")
+        assertFalse(liveGuidance.contains("routeCompassStatusMessage"))
+        assertTrue(source.contains("show(nativeHomeCompassText, (homeVisible || guidanceVisible) && !deviceScreen)"))
     }
 
     private fun functionSection(signature: String): String {

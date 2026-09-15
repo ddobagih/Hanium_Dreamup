@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -12,7 +13,7 @@ import java.util.Objects;
  * No velocity, temporal smoothing, collision classification, or voice behavior.
  */
 public final class MaskDepthEstimator {
-    public static final String POLICY_ID = "MASK_DEPTH_COMPONENT_SCOPE_V2_FIXED_20260909";
+    public static final String POLICY_ID = "MASK_DEPTH_INDEPENDENT_REGION_SUPPORT_V4_20260914";
     public enum Status { KNOWN, PARTIAL, UNKNOWN }
     public enum Scope { ALL_COMPONENTS, DOMINANT_COMPONENT, NONE }
 
@@ -117,7 +118,7 @@ public final class MaskDepthEstimator {
         double z(int i) { return meters!=null?meters[i]:mm[i]/1000.0; }
     }
 
-    /** Frozen v1 component sampler + frozen v2 aggregation policy. */
+    /** Component sampling thresholds; nearer regions must independently meet robust support. */
     public record SamplingPolicy(int minSamples,double minValidFraction,int minRawConfidence,
                                  double minDepthM,double maxDepthM,int erosionPixels,long maxDepthAgeNs,
                                  double dominantFraction,double clusterGapM,double clusterGapRelative,
@@ -139,6 +140,7 @@ public final class MaskDepthEstimator {
         private double[] inlierImageCentroid;
         private Double axialIqrM;
         private int depthWidth;
+        private List<SupportedLayer> nearerLayers = List.of();
         private Component(int id,int[] pixels,int interior,int valid,int inliers,Status status,String reason,
                           Double z,Double range,Double p20,Double p80,Double mad,Double confidence) {
             componentId=id;depthPixelIndices=pixels;maskPixels=pixels.length;interiorPixels=interior;
@@ -150,11 +152,25 @@ public final class MaskDepthEstimator {
         public int[] inlierDepthPixelIndices() { return inlierDepthPixelIndices.clone(); }
         public double[] inlierImageCentroid() { return inlierImageCentroid == null ? null : inlierImageCentroid.clone(); }
         public Double axialIqrM() { return axialIqrM; }
+        public List<SupportedLayer> nearerLayers() { return nearerLayers; }
         public int[] bboxDepthPx() {
             int left=Integer.MAX_VALUE,top=Integer.MAX_VALUE,right=0,bottom=0;
             for(int i:depthPixelIndices){int x=i%depthWidth,y=i/depthWidth;left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+1);bottom=Math.max(bottom,y+1);}
             return new int[]{left,top,right,bottom};
         }
+    }
+    /** A coherent, robust nearer region inside one connected mask, never its whole distance. */
+    public static final class SupportedLayer {
+        public final int componentId, inlierPixels;
+        public final double axialDepthM, axialIqrM, axialMadM, interiorFraction;
+        public final Double euclideanRangeM, rawConfidenceMedian;
+        private final int[] pixels;
+        private SupportedLayer(int componentId,int[] pixels,double z,double iqr,double mad,double fraction,
+                               Double range,Double confidence) {
+            this.componentId=componentId;this.pixels=pixels;inlierPixels=pixels.length;axialDepthM=z;
+            axialIqrM=iqr;axialMadM=mad;interiorFraction=fraction;euclideanRangeM=range;rawConfidenceMedian=confidence;
+        }
+        public int[] inlierDepthPixelIndices() { return pixels.clone(); }
     }
     public record ScopedDistance(int componentId,double axialDepthM,Double euclideanRangeM) {}
     public record Support(int totalMaskPixels,double knownComponentMaskFraction,double unknownComponentMaskFraction,
@@ -173,6 +189,7 @@ public final class MaskDepthEstimator {
         public final Support support;
         public final List<Component> components;
         public final List<Integer> closerComponentIds;
+        public final List<SupportedLayer> nearerLayers;
         /** Number of candidate depth pixels visited for this mask; never an RGB bitmap scan. */
         public final int mappedRoiPixels;
         private Result(Builder b) {
@@ -180,6 +197,8 @@ public final class MaskDepthEstimator {
             status=b.status;distanceScope=b.scope;axialDepthM=b.z;euclideanRangeM=b.range;depthTimestampNs=b.timestamp;
             newDepthInformation=b.fresh;componentDepthConflict=b.conflict;dominantComponentDistance=b.dominant;
             support=b.support;components=List.copyOf(b.components);closerComponentIds=List.copyOf(b.closer);mappedRoiPixels=b.roiPixels;
+            List<SupportedLayer> layers=new ArrayList<>();for(Component c:components)layers.addAll(c.nearerLayers);
+            nearerLayers=List.copyOf(layers);
         }
     }
     private static final class Builder {
@@ -256,7 +275,7 @@ public final class MaskDepthEstimator {
                 if(c.status==Status.KNOWN){knownArea+=c.maskPixels;inlierCount+=c.inlierPixels;minKnown=Math.min(minKnown,c.axialDepthM);maxKnown=Math.max(maxKnown,c.axialDepthM);}
             }
             Component dominant=b.components.get(dominantIndex);
-            b.conflict=maxKnown-minKnown>p.componentAgreementM;
+            b.conflict=maxKnown-minKnown>p.componentAgreementM || b.components.stream().anyMatch(c -> !c.nearerLayers.isEmpty());
             if(dominant.status==Status.KNOWN)for(Component c:b.components)
                 if(c.status==Status.KNOWN&&dominant.axialDepthM-c.axialDepthM>p.componentAgreementM)b.closer.add(c.componentId);
             double represented=0;
@@ -275,7 +294,7 @@ public final class MaskDepthEstimator {
                 b.reason=b.conflict?"dominant_component_supported_with_conflicting_regions":"dominant_component_supported_with_unresolved_regions";
                 b.dominant=new ScopedDistance(dominant.componentId,dominant.axialDepthM,dominant.euclideanRangeM);
                 b.rangeReason="whole_mask_distance_unknown";
-                represented=(double)dominantArea/total;
+                represented=(double)(dominant.nearerLayers.isEmpty()?dominantArea:dominant.inlierPixels)/total;
             }else b.reason=knownArea<total?"one_or_more_components_unknown":"disconnected_components_disagree";
             b.support=new Support(total,(double)knownArea/total,(double)(total-knownArea)/total,(double)inlierCount/total,(double)dominantArea/total,represented);
         }
@@ -406,28 +425,86 @@ public final class MaskDepthEstimator {
         }
         if(n<p.minSamples)return unknown(id,pixels,n,0,0,"insufficient_interior");
         if(validCount<p.minSamples||(double)validCount/n<p.minValidFraction)return unknown(id,pixels,n,validCount,0,"insufficient_valid_confident_depth");
-        double[] sorted=sortedDepths(d,valid,validCount);int start=0,bestStart=0,bestEnd=0;
+        double[] sorted=sortedDepths(d,valid,validCount);int start=0,bestStart=0,bestEnd=0,lastStart=0;
         for(int k=1;k<=validCount;k++){
             if(k==validCount||sorted[k]-sorted[k-1]>Math.max(p.clusterGapM,p.clusterGapRelative*(sorted[k]+sorted[k-1])/2)){
-                if(k-start>bestEnd-bestStart){bestStart=start;bestEnd=k;}start=k;
+                if(k-start>bestEnd-bestStart){bestStart=start;bestEnd=k;}lastStart=start;start=k;
             }
         }
-        if((double)(bestEnd-bestStart)/validCount<p.dominantFraction)return unknown(id,pixels,n,validCount,0,"ambiguous_depth_layers");
+        boolean dominant=(double)(bestEnd-bestStart)/validCount>=p.dominantFraction;
         double med=quantileSorted(sorted,bestStart,bestEnd,.5);
         double mad=medianDeviationSorted(sorted,bestStart,bestEnd,med),band=Math.max(p.outlierBandM,3*1.4826*mad);
         int robustStart=bestStart,robustEnd=bestEnd;
         while(robustStart<robustEnd&&Math.abs(sorted[robustStart]-med)>band)robustStart++;
         while(robustEnd>robustStart&&Math.abs(sorted[robustEnd-1]-med)>band)robustEnd--;
+        // Whole-component certainty and independently measured nearer regions are separate.
+        // Ambiguous mixtures still retain coherent near support; none becomes a whole distance.
+        double referenceDepth=dominant?quantileSorted(sorted,robustStart,robustEnd,.5):quantileSorted(sorted,lastStart,validCount,.5);
+        List<SupportedLayer> nearer=new ArrayList<>();start=0;
+        for(int k=1;k<=validCount;k++) {
+            if(k==validCount||sorted[k]-sorted[k-1]>Math.max(p.clusterGapM,p.clusterGapRelative*(sorted[k]+sorted[k-1])/2)) {
+                nearer.addAll(nearerLayers(id,sorted,start,k,valid,validCount,n,d,g,referenceDepth));
+                start=k;
+            }
+        }
+        if(!dominant)return withNearerLayers(unknown(id,pixels,n,validCount,0,"ambiguous_depth_layers"),nearer);
         int count=robustEnd-robustStart;
-        if(count<p.minSamples||(double)count/n<p.minValidFraction)return unknown(id,pixels,n,validCount,count,"insufficient_robust_support");
-        if(quantileSorted(sorted,robustStart,robustEnd,.75)-quantileSorted(sorted,robustStart,robustEnd,.25)>p.maxIqrM)return unknown(id,pixels,n,validCount,count,"excessive_depth_spread");
+        if(count<p.minSamples||(double)count/n<p.minValidFraction)return withNearerLayers(unknown(id,pixels,n,validCount,count,"insufficient_robust_support"),nearer);
+        if(quantileSorted(sorted,robustStart,robustEnd,.75)-quantileSorted(sorted,robustStart,robustEnd,.25)>p.maxIqrM)return withNearerLayers(unknown(id,pixels,n,validCount,count,"excessive_depth_spread"),nearer);
         int[] kept=new int[count];int pos=0;double low=sorted[robustStart],high=sorted[robustEnd-1];
         for(int k=0;k<validCount;k++){int i=valid[k];double z=d.z(i);if(z>=low&&z<=high)kept[pos++]=i;}
         Double conf=null;if(d.confidence!=null){double[] values=new double[kept.length];for(int k=0;k<kept.length;k++)values[k]=d.confidence[kept[k]]&255;conf=median(values);}
         Component component=new Component(id,pixels,n,validCount,kept.length,Status.KNOWN,"dominant_interior_layer",
             quantileSorted(sorted,robustStart,robustEnd,.5),medianRange(d,g,kept),quantileSorted(sorted,robustStart,robustEnd,.2),quantileSorted(sorted,robustStart,robustEnd,.8),mad,conf);
         component.axialIqrM=quantileSorted(sorted,robustStart,robustEnd,.75)-quantileSorted(sorted,robustStart,robustEnd,.25);
-        return new Sample(component,kept);
+        return withNearerLayers(new Sample(component,kept),nearer);
+    }
+    private static Sample withNearerLayers(Sample sampled,List<SupportedLayer> nearer) {
+        sampled.component.nearerLayers=List.copyOf(nearer);
+        return sampled;
+    }
+    private List<SupportedLayer> nearerLayers(int id,double[] sorted,int start,int end,int[] valid,int validCount,
+                                      int interior,DepthFrame d,Grid g,double dominantDepth) {
+        if(end-start<p.minSamples)return List.of();
+        double median=quantileSorted(sorted,start,end,.5);
+        if(dominantDepth-median<=p.componentAgreementM)return List.of();
+        double mad=medianDeviationSorted(sorted,start,end,median),band=Math.max(p.outlierBandM,3*1.4826*mad);
+        while(start<end&&Math.abs(sorted[start]-median)>band)start++;
+        while(end>start&&Math.abs(sorted[end-1]-median)>band)end--;
+        int count=end-start;
+        if(count<p.minSamples)return List.of();
+        double iqr=quantileSorted(sorted,start,end,.75)-quantileSorted(sorted,start,end,.25);
+        if(iqr>p.maxIqrM)return List.of();
+        // Isolated low-depth noise must not become a near obstacle merely because it is the minimum.
+        HashSet<Integer> remaining=new HashSet<>();double low=sorted[start],high=sorted[end-1];
+        for(int k=0;k<validCount;k++){int pixel=valid[k];if(d.z(pixel)>=low&&d.z(pixel)<=high)remaining.add(pixel);}
+        int[] queue=new int[count];int width=g.c.depthWidth;List<SupportedLayer> regions=new ArrayList<>();
+        while(!remaining.isEmpty()) {
+            int head=0,tail=0;int seed=remaining.iterator().next();remaining.remove(seed);queue[tail++]=seed;
+            while(head<tail) {
+                int pixel=queue[head++],x=pixel%width;
+                for(int adjacent:new int[]{pixel-width,pixel+width,x>0?pixel-1:-1,x+1<width?pixel+1:-1})
+                    if(remaining.remove(adjacent))queue[tail++]=adjacent;
+            }
+            if(tail<p.minSamples)continue;
+            int[] pixels=Arrays.copyOf(queue,tail);
+            double[] values=depths(d,pixels);Arrays.sort(values);
+            double regionIqr=quantileSorted(values,.75)-quantileSorted(values,.25);
+            if(regionIqr>p.maxIqrM)continue;
+            Double confidence=null;if(d.confidence!=null){double[] c=new double[pixels.length];
+                for(int k=0;k<c.length;k++)c[k]=d.confidence[pixels[k]]&255;confidence=median(c);}
+            // A nearby physical patch need not occupy ten percent of a large background mask.
+            // For that exception require substantial connected support and stronger raw confidence;
+            // isolated points still cannot create a layer, and downstream temporal/3m gates remain.
+            int minimumLocalSamples="ARCORE_FULL_DEPTH".equals(d.source)?50:30;
+            boolean strongLocal=tail>=Math.max(p.minSamples,minimumLocalSamples)&&
+                (d.reference||"ARCORE_FULL_DEPTH".equals(d.source)||(confidence!=null&&confidence>=192));
+            if((double)tail/interior<p.minValidFraction&&!strongLocal)continue;
+            regions.add(new SupportedLayer(id,pixels,quantileSorted(values,.5),regionIqr,
+                medianDeviationSorted(values,0,values.length,quantileSorted(values,.5)),
+                (double)pixels.length/interior,medianRange(d,g,pixels),confidence));
+        }
+        return regions;
     }
     /** Produces the identical ascending multiset as Arrays.sort on mm/1000.0.
      * The branch chooses work strategy only; every sample and value is retained.

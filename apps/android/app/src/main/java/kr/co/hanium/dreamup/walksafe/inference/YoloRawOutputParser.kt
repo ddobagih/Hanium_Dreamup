@@ -27,7 +27,11 @@ class YoloRawOutputParser(
 
     private val anchors = listOf(8, 16, 32).sumOf { stride -> (inputSize / stride) * (inputSize / stride) }
 
-    private fun readCandidates(values: FloatArray, acceptScore: (String, Float) -> Boolean): ArrayList<RawDetection> {
+    private fun readCandidates(
+        values: FloatArray,
+        transform: LetterboxTransform? = null,
+        acceptScore: (String, Float) -> Boolean,
+    ): ArrayList<RawDetection> {
         require(values.size == (4 + classCount) * anchors) { "raw YOLO output shape mismatch" }
         val candidates = ArrayList<RawDetection>()
         for (anchor in 0 until anchors) {
@@ -60,6 +64,7 @@ class YoloRawOutputParser(
             if (!box.x.isFinite() || !box.y.isFinite() || !box.width.isFinite() || !box.height.isFinite() ||
                 !box.area.isFinite() || !(box.x + box.width).isFinite() || !(box.y + box.height).isFinite()) continue
             if (box.x >= 1f || box.y >= 1f || box.x + box.width <= 0f || box.y + box.height <= 0f) continue
+            if (transform != null && !transform.intersectsImageContent(box)) continue
             candidates.add(RawDetection(anchor, classId, className, score, box))
         }
         return candidates
@@ -73,8 +78,10 @@ class YoloRawOutputParser(
         }.isNotEmpty()
     }
 
-    fun parse(values: FloatArray): List<DetectionCandidate> {
-        val candidates = readCandidates(values) { className, score -> score >= thresholdForClass(className) }
+    fun parse(values: FloatArray, transform: LetterboxTransform? = null): List<DetectionCandidate> {
+        require(transform == null || transform.modelSize == inputSize) { "letterbox model size mismatch" }
+        // Padding-only candidates cannot suppress visible boxes or consume maxDetections.
+        val candidates = readCandidates(values, transform) { className, score -> score >= thresholdForClass(className) }
         // Anchor index makes equal-confidence suppression deterministic across delegates.
         candidates.sortWith(compareByDescending<RawDetection> { it.score }.thenBy { it.anchor })
         val selected = ArrayList<RawDetection>(maxDetections)

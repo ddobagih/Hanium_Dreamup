@@ -30,7 +30,35 @@ data class LetterboxTransform(
     val scale: Float,
     val padX: Float,
     val padY: Float,
+    val resizedWidth: Int = (imageWidth * scale).roundToInt(),
+    val resizedHeight: Int = (imageHeight * scale).roundToInt(),
 ) {
+    /** Test before NMS in model pixels, without clipping the box used for suppression. */
+    internal fun intersectsImageContent(modelRect: kr.co.hanium.dreamup.walksafe.depth.RectNorm): Boolean {
+        val left = maxOf(modelRect.x * modelSize, padX, 0f)
+        val top = maxOf(modelRect.y * modelSize, padY, 0f)
+        // Integer resize rounding and inverse scaling can end at different subpixel positions.
+        val right = minOf((modelRect.x + modelRect.width) * modelSize,
+            padX + minOf(resizedWidth.toFloat(), imageWidth * scale), modelSize.toFloat())
+        val bottom = minOf((modelRect.y + modelRect.height) * modelSize,
+            padY + minOf(resizedHeight.toFloat(), imageHeight * scale), modelSize.toFloat())
+        // Comparing before division avoids a padding-edge contact becoming a tiny visible box
+        // through floating-point round-off when undoing the scale.
+        return left.isFinite() && top.isFinite() && right.isFinite() && bottom.isFinite() &&
+            right > left && bottom > top
+    }
+
+    /** Drop padding-only and degenerate predictions before they become detector evidence. */
+    fun modelDetectionToImageDetection(
+        candidate: kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate,
+    ): kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate? {
+        if (!intersectsImageContent(candidate.bboxNorm)) return null
+        val rect = modelRectToImageRect(candidate.bboxNorm)
+        if (!rect.x.isFinite() || !rect.y.isFinite() || !rect.width.isFinite() || !rect.height.isFinite() ||
+            rect.width <= 0f || rect.height <= 0f) return null
+        return candidate.copy(bboxNorm = rect)
+    }
+
     fun modelRectToImageRect(modelRect: kr.co.hanium.dreamup.walksafe.depth.RectNorm): kr.co.hanium.dreamup.walksafe.depth.RectNorm {
         val leftPx = modelRect.x * modelSize
         val topPx = modelRect.y * modelSize
@@ -68,7 +96,7 @@ class YuvImagePreprocessor {
         val resizedHeight = Math.rint(image.height * scale).toInt().coerceAtLeast(1)
         return PreprocessedImage(buffer, LetterboxTransform(image.width, image.height, modelSize,
             scale.toFloat(), Math.rint((modelSize - resizedWidth) / 2.0 - 0.1).toFloat(),
-            Math.rint((modelSize - resizedHeight) / 2.0 - 0.1).toFloat()))
+            Math.rint((modelSize - resizedHeight) / 2.0 - 0.1).toFloat(), resizedWidth, resizedHeight))
     }
     private val reusableInputBuffers = mutableMapOf<Int, ByteBuffer>()
     private val reusableRgbRows = mutableMapOf<Int, FloatArray>()

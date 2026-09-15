@@ -86,6 +86,19 @@ internal class MotionObservationWindow {
     fun spatialSamples(atMs: Long): List<DistanceObservation> = sample(spatial, atMs)
     fun spatialHistory(): List<DistanceObservation> = spatial.toList()
 
+    /** A display-only source cannot replace the Raw clock, but can reveal a real frame boundary. */
+    fun observeProximityContext(atMs: Long, poseReferenceId: Long?): Boolean {
+        val retrograde = atMs < 0L || lastInputAtMs?.let { atMs < it } == true
+        val boundary = retrograde ||
+            (referenceId != null && poseReferenceId != null && referenceId != poseReferenceId) ||
+            metric.lastOrNull()?.let { atMs - it.timestampMs > MAX_OBSERVATION_GAP_MS } == true
+        if (retrograde) clear() else if (boundary) clearSamples()
+        if (poseReferenceId != null) referenceId = poseReferenceId
+        prune(metric, atMs)
+        prune(spatial, atMs)
+        return boundary
+    }
+
     fun invalidateAt(atMs: Long) {
         if (atMs < 0L || lastInputAtMs?.let { atMs < it } == true) clear()
         prune(metric, atMs)

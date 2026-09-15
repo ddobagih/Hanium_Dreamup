@@ -59,6 +59,20 @@ class MessagePolicy(
     private val lastEmitAtByKey = mutableMapOf<String, Long>()
     private val activeObstacleLevelByKey = mutableMapOf<String, MessageLevel>()
 
+    /** Final delivery queues own speech cooldowns; every frame must retain its current candidate. */
+    fun forFeedbackQueue(): MessagePolicy = copyPolicy(
+        stepLengthM,
+        config.copy(rateLimit = MessageRateLimitConfig(0L, 0L, 0L)),
+    )
+
+    fun withStepLength(stepLengthM: Float): MessagePolicy = copyPolicy(stepLengthM, config)
+
+    private fun copyPolicy(stepLengthM: Float, config: MessagePolicyConfig): MessagePolicy =
+        MessagePolicy(stepLengthM, config).also {
+            it.lastEmitAtByKey.putAll(lastEmitAtByKey)
+            it.activeObstacleLevelByKey.putAll(activeObstacleLevelByKey)
+        }
+
     fun buildUserFacing(result: MetricDepthDecision, nowMs: Long = System.currentTimeMillis()): UserFacingDepth {
         return evaluate(result, nowMs).userFacing
     }

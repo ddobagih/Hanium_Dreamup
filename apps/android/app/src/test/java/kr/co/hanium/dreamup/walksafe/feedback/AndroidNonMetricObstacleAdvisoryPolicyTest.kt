@@ -29,7 +29,7 @@ class AndroidNonMetricObstacleAdvisoryPolicyTest {
         requireNotNull(action)
         assertEquals(NonMetricObstacleDirection.LEFT, action.direction)
         assertTrue(action.message.contains("왼쪽"))
-        assertTrue(action.message.contains("전동 킥보드"))
+        assertTrue(action.message.contains("킥보드"))
         assertFalse(action.message.contains("TMAP", ignoreCase = true))
         assertTrue(action.validUntilMs > action.observedAtMs)
         listOf(
@@ -159,16 +159,17 @@ class AndroidNonMetricObstacleAdvisoryPolicyTest {
                 perKeyIntervalMs = 0L,
             ),
         )
+        // The current model shares short vehicle/scooter labels across metric and camera-only speech.
         val expectedLabels = mapOf(
             "person" to "사람",
             "bicycle" to "자전거",
-            "car" to "자동차",
-            "motorcycle" to "오토바이",
-            "bus" to "버스",
-            "truck" to "트럭",
+            "car" to "차량",
+            "motorcycle" to "차량",
+            "bus" to "차량",
+            "truck" to "차량",
             "curb_step" to "턱",
             "uneven_sidewalk" to "고르지 않은 보도",
-            "e_scooter_obstruction" to "전동 킥보드",
+            "e_scooter_obstruction" to "킥보드",
         )
 
         expectedLabels.forEach { (className, label) ->

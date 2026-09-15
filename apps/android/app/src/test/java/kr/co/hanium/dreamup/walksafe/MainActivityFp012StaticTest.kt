@@ -39,7 +39,7 @@ class MainActivityFp012StaticTest {
 
         assertTrue(
             request.indexOf("currentGatewayWalkStartReadinessOrNull(token)") <
-                request.indexOf("gatewayWalkSessionClient.start("),
+                request.indexOf("gatewayWalkSessionClient.startWithOwnedWalkRecovery("),
         )
         assertTrue(
             activation.indexOf("currentGatewayWalkStartReadinessOrNull(token)") <

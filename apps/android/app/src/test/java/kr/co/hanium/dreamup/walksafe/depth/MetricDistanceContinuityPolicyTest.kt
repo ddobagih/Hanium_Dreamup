@@ -50,6 +50,87 @@ class MetricDistanceContinuityPolicyTest {
     }
 
     @Test
+    fun denseFullDepthJumpKeepsItsFirstCandidateUntilOneHundredMillisecondsOfConfirmation() {
+        for (gap in listOf(25L, 50L, 75L, 100L, 300L)) {
+            val run = History()
+            fun full(at: Long, distance: Float) = sample(at, distance).copy(source = DepthSource.ARCORE_FULL_DEPTH)
+            run.observe(full(1_900L, 4f))
+            val firstNearAt = 1_900L + gap
+            val expectedAt = firstNearAt + ((100L + gap - 1L) / gap) * gap
+            for (at in firstNearAt until expectedAt step gap) {
+                assertFalse("gap=$gap at=$at", run.observe(full(at, 1f)).accepted)
+            }
+            val confirmed = run.observe(full(expectedAt, 1f))
+            assertTrue("gap=$gap", confirmed.accepted)
+            assertTrue(confirmed.resetHistory)
+            assertEquals(listOf(firstNearAt, expectedAt), confirmed.observationsToAppend.map { it.timestampMs })
+            assertEquals(listOf(1f, 1f), run.distances())
+        }
+    }
+
+    @Test
+    fun denseIsolatedJumpDoesNotReplaceTheAcceptedBaseline() {
+        val run = History()
+        run.observe(sample(0L, 4f))
+        assertFalse(run.observe(sample(50L, 1f)).accepted)
+        assertTrue(run.observe(sample(100L, 4f)).accepted)
+        assertFalse(run.observe(sample(150L, 1f)).accepted)
+        assertFalse(run.observe(sample(200L, 1f)).accepted)
+        assertEquals(listOf(4f, 4f), run.distances())
+    }
+
+    @Test
+    fun denseConfirmationStillRejectsChangedSourceReferenceAndPose() {
+        val invalidCurrent: List<(DistanceObservation) -> DistanceObservation> = listOf(
+            { it.copy(source = DepthSource.ARCORE_FULL_DEPTH) },
+            { it.copy(confidence = 0.54f) },
+            { it.copy(cameraPoseEvidence = null) },
+            { it.copy(cameraPoseEvidence = it.cameraPoseEvidence!!.copy(referenceId = 2L)) },
+            { it.copy(cameraPoseEvidence = it.cameraPoseEvidence!!.copy(timestampMs = 149L)) },
+            { it.copy(cameraPoseEvidence = it.cameraPoseEvidence!!.copy(forwardX = 0.6f, forwardZ = -0.8f)) },
+            { it.copy(cameraPoseEvidence = it.cameraPoseEvidence!!.copy(positionZ = -0.4f)) },
+            { it.copy(cameraPoseEvidence = it.cameraPoseEvidence!!.copy(positionX = 0.04f)) },
+        )
+        for ((index, invalidate) in invalidCurrent.withIndex()) {
+            val run = History()
+            run.observe(sample(0L, 4f))
+            assertFalse(run.observe(sample(50L, 1f)).accepted)
+            assertFalse(run.observe(sample(100L, 1f)).accepted)
+            assertFalse("invalid evidence $index", run.observe(invalidate(sample(150L, 1f))).accepted)
+            assertEquals(listOf(4f), run.distances())
+        }
+    }
+
+    @Test
+    fun interruptedPoseEvidenceRestartsDenseConfirmation() {
+        val run = History()
+        run.observe(sample(0L, 4f))
+        run.observe(sample(50L, 1f))
+        assertFalse(run.observe(sample(100L, 1f).copy(cameraPoseEvidence = null)).accepted)
+        assertFalse(run.observe(sample(150L, 1f)).accepted)
+        assertFalse(run.observe(sample(200L, 1f)).accepted)
+        val confirmed = run.observe(sample(250L, 1f))
+        assertTrue(confirmed.accepted)
+        assertEquals(listOf(150L, 250L), confirmed.observationsToAppend.map { it.timestampMs })
+    }
+
+    @Test
+    fun denseConfirmationChecksTheNewestPoseStepAsWellAsThePreservedAnchor() {
+        val run = History()
+        run.observe(sample(0L, 4f))
+        run.observe(sample(50L, 1f))
+        val intermediate = sample(100L, 1f)
+        assertFalse(run.observe(intermediate.copy(
+            cameraPoseEvidence = intermediate.cameraPoseEvidence!!.copy(positionZ = 0.1f),
+        )).accepted)
+        val current = sample(150L, 1f)
+        assertFalse(run.observe(current.copy(
+            cameraPoseEvidence = current.cameraPoseEvidence!!.copy(positionZ = -0.3f),
+        )).accepted)
+        assertEquals(listOf(4f), run.distances())
+    }
+
+    @Test
     fun confirmedFastApproachAndEstablishedPredictionRetainAllUniqueSamples() {
         val run = History()
         assertTrue(run.observe(sample(0L, 7f)).accepted)

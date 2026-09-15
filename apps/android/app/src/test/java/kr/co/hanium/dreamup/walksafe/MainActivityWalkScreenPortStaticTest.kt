@@ -139,7 +139,9 @@ class MainActivityWalkScreenPortStaticTest {
         assertTrue(routeRequest.contains("retainPendingExplicitRouteStart(destination)"))
         assertTrue(routeRequest.contains("start_request_pending"))
         assertTrue(
-            locationUpdate.indexOf("continuePendingExplicitRouteStartIfReady()") >
+            // The normal filtered-fix path still checks collection readiness first.
+            // Test mode also has an earlier, explicitly gated raw-fix continuation.
+            locationUpdate.lastIndexOf("continuePendingExplicitRouteStartIfReady()") >
                 locationUpdate.indexOf("if (!currentNavigationCollectionAllowsWork())"),
         )
         assertTrue(

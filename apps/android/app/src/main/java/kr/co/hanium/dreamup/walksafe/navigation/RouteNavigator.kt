@@ -6,6 +6,7 @@ import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteCorridorMatcher
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteCorridorMatcherConfig
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteHeadingEstimate
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteMatchQuality
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteMatchReason
 import java.security.MessageDigest
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -23,6 +24,7 @@ data class RouteNavigatorConfig(
     val maximumProgressBacktrackM: Double = 8.0,
     val maximumProgressAdvanceM: Double = 80.0,
     val speechRetryIntervalMs: Long = 2_000L,
+    val periodicGuidanceIntervalMs: Long = 10_000L,
 )
 
 enum class RouteNavigatorUserDecision {
@@ -55,6 +57,7 @@ data class RouteNavigatorUpdate(
     val stepProgressConsistent: Boolean? = null,
     val cancelStaleNavigationSpeech: Boolean = false,
     val speechCueToken: RouteSpeechCueToken? = null,
+    val routeAlignmentDiagnostic: RouteAlignmentDiagnostic? = null,
 ) {
     val userDecisionRequired: Boolean
         get() = pendingUserDecision != null
@@ -79,10 +82,13 @@ data class ActiveRouteProjection(
  */
 class RouteNavigator(
     private val config: RouteNavigatorConfig = RouteNavigatorConfig(),
+    private val allowDegradedRouteGuidance: Boolean = false,
 ) {
+    private val routeAlignmentSelector = RouteAlignmentSelector()
     private val routeCorridorMatcher = RouteCorridorMatcher(
         RouteCorridorMatcherConfig(
             progressSigmaM = config.maximumProgressAdvanceM.coerceAtLeast(1.0),
+            allowReverseTravel = true,
         ),
     )
     private var route: WalkingRoute? = null
@@ -95,6 +101,9 @@ class RouteNavigator(
     private var offRouteSampleCount = 0
     private var lastOffRouteCandidateAtMs: Long? = null
     private var arrivalSampleCount = 0
+    private var arrivalRecheckArmed = true
+    private var arrivalDepartureSampleCount = 0
+    private var arrivalDepartureSampleAtMs: Long? = null
     private var pendingDecision: RouteNavigatorUserDecision? = null
     private var offRouteGuidanceSuspended = false
     private var deviationSuspectedLatched = false
@@ -102,9 +111,15 @@ class RouteNavigator(
     private var locationRecheckAuthorized = false
     private var rerouteApprovedForCurrentDeviation = false
     private var progressDistanceM: Double? = null
+    private var rewindGuideIndex: Int? = null
+    private var rewindSampleCount = 0
+    private var rewindSampleAtMs: Long? = null
     private var matchedGeometricProgressM: Double? = null
     private var latestRouteMatch: RouteCorridorMatchResult? = null
     private var latestRouteMatchUsableForGuidance = false
+    // Speech-only test projection must never become accepted evidence for other consumers.
+    private var latestGuidanceSourceAllowed = false
+    private var latestLocationSample: RouteLocationSample? = null
     private var latestRouteMatchInputElapsedRealtimeMs: Long? = null
     private var latestRouteMatchRouteRevision: Long? = null
     private var positioningEvidenceInterrupted = false
@@ -114,26 +129,37 @@ class RouteNavigator(
     private var guideProgressDistancesM: List<Double?> = emptyList()
     private var cueRevision = 0L
     private var offeredSpeechCue: RouteSpeechCueToken? = null
+    private var offeredFacingMessage: String? = null
+    private var offeredPositionEstimateUncertain: Boolean? = null
     private var pendingSpeechCue: RouteSpeechCueToken? = null
     private var failedSpeechCue: RouteSpeechCueToken? = null
+    private var completedSpeechCue: RouteSpeechCueToken? = null
     private val completedSpeechCues = mutableSetOf<Pair<Int?, Int>>()
     private var speechRetryNotBeforeMs: Long? = null
     private var includeRouteStartSummary = false
+    private var manualGuidancePending = false
+    private var latestGuidanceContext: RouteGuidanceContext? = null
 
     @Synchronized
     fun setRoute(
         route: WalkingRoute,
         destination: RoutePoint? = null,
+        origin: TrustedLocation? = null,
     ) {
         routeRevision += 1L
         this.route = route
         activeRouteId = route.providerRouteId?.trim()?.takeIf(String::isNotEmpty) ?: route.localRouteFingerprint()
         requestedDestination = destination
+        routeAlignmentSelector.reset(origin)
         nextGuideIndex = 0
         lastGuidanceAtMs = null
         offRouteSampleCount = 0
         lastOffRouteCandidateAtMs = null
         arrivalSampleCount = 0
+        arrivalRecheckArmed = true
+        arrivalDepartureSampleCount = 0
+        arrivalDepartureSampleAtMs = null
+        resetRewindEvidence()
         updatePendingDecision(null)
         offRouteGuidanceSuspended = false
         deviationSuspectedLatched = false
@@ -144,6 +170,9 @@ class RouteNavigator(
         matchedGeometricProgressM = null
         latestRouteMatch = null
         latestRouteMatchUsableForGuidance = false
+        latestGuidanceSourceAllowed = false
+        latestLocationSample = null
+        latestGuidanceContext = null
         positioningEvidenceInterrupted = false
         previousFilteredPosition = null
         latestUpdateNowMs = null
@@ -163,11 +192,16 @@ class RouteNavigator(
         route = null
         activeRouteId = null
         requestedDestination = null
+        routeAlignmentSelector.reset()
         nextGuideIndex = 0
         lastGuidanceAtMs = null
         offRouteSampleCount = 0
         lastOffRouteCandidateAtMs = null
         arrivalSampleCount = 0
+        arrivalRecheckArmed = true
+        arrivalDepartureSampleCount = 0
+        arrivalDepartureSampleAtMs = null
+        resetRewindEvidence()
         updatePendingDecision(null)
         offRouteGuidanceSuspended = false
         deviationSuspectedLatched = false
@@ -178,6 +212,9 @@ class RouteNavigator(
         matchedGeometricProgressM = null
         latestRouteMatch = null
         latestRouteMatchUsableForGuidance = false
+        latestGuidanceSourceAllowed = false
+        latestLocationSample = null
+        latestGuidanceContext = null
         positioningEvidenceInterrupted = false
         previousFilteredPosition = null
         latestUpdateNowMs = null
@@ -209,9 +246,14 @@ class RouteNavigator(
     @Synchronized
     fun pendingUserDecision(): RouteNavigatorUserDecision? = pendingDecision
 
-    /** An untrusted fix breaks confirmation evidence but never releases suspended guidance. */
+    /** An untrusted fix breaks evidence; test speech can resume only from a new actual fix. */
     @Synchronized
     fun onUntrustedLocation(): RouteNavigatorUpdate? {
+        routeAlignmentSelector.reset()
+        resetRewindEvidence()
+        arrivalDepartureSampleCount = 0
+        arrivalDepartureSampleAtMs = null
+        latestGuidanceContext = null
         invalidateSpeechCue()
         offRouteSampleCount = 0
         lastOffRouteCandidateAtMs = null
@@ -219,10 +261,17 @@ class RouteNavigator(
         matchedGeometricProgressM = null
         latestRouteMatch = null
         latestRouteMatchUsableForGuidance = false
+        latestGuidanceSourceAllowed = false
         positioningEvidenceInterrupted = true
         previousFilteredPosition = null
         routeCorridorMatcher.reset()
         if (route == null) return null
+        if (allowDegradedRouteGuidance) {
+            return RouteNavigatorUpdate(
+                null, false, false, false, "location_untrusted_waiting_for_fix",
+                cancelStaleNavigationSpeech = true,
+            )
+        }
         offRouteGuidanceSuspended = true
         locationRecheckAuthorized = false
         if (confirmedDeviationLatched) {
@@ -244,6 +293,11 @@ class RouteNavigator(
      */
     @Synchronized
     fun onPositioningEvidenceInterrupted() {
+        routeAlignmentSelector.reset()
+        resetRewindEvidence()
+        arrivalDepartureSampleCount = 0
+        arrivalDepartureSampleAtMs = null
+        latestGuidanceContext = null
         invalidateSpeechCue()
         offRouteSampleCount = 0
         lastOffRouteCandidateAtMs = null
@@ -252,6 +306,7 @@ class RouteNavigator(
             updatePendingDecision(null)
         }
         latestRouteMatchUsableForGuidance = false
+        latestGuidanceSourceAllowed = false
         positioningEvidenceInterrupted = true
         previousFilteredPosition = null
         routeCorridorMatcher.onPositioningEvidenceInterrupted()
@@ -315,7 +370,11 @@ class RouteNavigator(
     @Synchronized
     fun currentInstruction(location: TrustedLocation): String? {
         val currentRoute = route ?: return null
-        if (
+        if (allowDegradedRouteGuidance) {
+            if (!latestGuidanceSourceAllowed ||
+                !location.hasCurrentCoordinates(latestUpdateNowMs ?: return null)
+            ) return null
+        } else if (
             positioningEvidenceInterrupted ||
             (latestRouteMatch != null && !latestRouteMatchUsableForGuidance)
         ) {
@@ -329,9 +388,10 @@ class RouteNavigator(
     @Synchronized
     fun reserveInstruction(update: RouteNavigatorUpdate): Boolean {
         val token = update.speechCueToken ?: return false
-        if (update.instruction == null || token != offeredSpeechCue || pendingSpeechCue != null) return false
-        if (token.routeRevision != routeRevision || positioningEvidenceInterrupted ||
-            !latestRouteMatchUsableForGuidance || offRouteGuidanceSuspended || pendingDecision != null
+        if (update.instruction == null || token != offeredSpeechCue || token == completedSpeechCue ||
+            pendingSpeechCue != null
+        ) return false
+        if (token.routeRevision != routeRevision || !canDeliverRouteGuidance()
         ) return false
         pendingSpeechCue = token
         return true
@@ -356,22 +416,32 @@ class RouteNavigator(
             return
         }
         val token = update.speechCueToken ?: return
-        if (token != offeredSpeechCue || token == failedSpeechCue || token.routeRevision != routeRevision ||
-            positioningEvidenceInterrupted || !latestRouteMatchUsableForGuidance ||
-            offRouteGuidanceSuspended || pendingDecision != null
+        if (token != offeredSpeechCue || token == failedSpeechCue || token == completedSpeechCue ||
+            token.routeRevision != routeRevision ||
+            !canDeliverRouteGuidance()
         ) return
+        completedSpeechCue = token
         completedSpeechCues += token.guideIndex to token.distanceBand
         if (pendingSpeechCue == token) pendingSpeechCue = null
         speechRetryNotBeforeMs = null
+        manualGuidancePending = false
         lastGuidanceAtMs = spokenAtMs
         includeRouteStartSummary = false
     }
 
     @Synchronized
     fun acknowledgeCurrentInstruction(spokenAtMs: Long) {
-        if (route == null || positioningEvidenceInterrupted || offRouteGuidanceSuspended) return
+        if (route == null || offRouteGuidanceSuspended ||
+            (allowDegradedRouteGuidance && !latestGuidanceSourceAllowed) ||
+            (!allowDegradedRouteGuidance && positioningEvidenceInterrupted)
+        ) return
         lastGuidanceAtMs = spokenAtMs
     }
+
+    private fun canDeliverRouteGuidance(): Boolean =
+        latestGuidanceSourceAllowed &&
+            (allowDegradedRouteGuidance || !positioningEvidenceInterrupted) &&
+            !offRouteGuidanceSuspended && pendingDecision == null
 
     @Synchronized
     fun approveReroute(): RouteNavigatorUpdate =
@@ -482,6 +552,9 @@ class RouteNavigator(
         }
         updatePendingDecision(null)
         arrivalSampleCount = 0
+        arrivalRecheckArmed = false
+        arrivalDepartureSampleCount = 0
+        arrivalDepartureSampleAtMs = null
         return RouteNavigatorUpdate(
             instruction = "도착하지 않은 것으로 확인했습니다. 현재 경로를 유지합니다.",
             arrived = false,
@@ -505,6 +578,15 @@ class RouteNavigator(
         nowMs: Long,
         requestInFlight: Boolean,
         stepProgressM: Double? = null,
+    ): RouteNavigatorUpdate = update(location, nowMs, requestInFlight, stepProgressM, facingObservation = null)
+
+    @Synchronized
+    fun update(
+        location: TrustedLocation,
+        nowMs: Long,
+        requestInFlight: Boolean,
+        stepProgressM: Double? = null,
+        facingObservation: RouteFacingObservation?,
     ): RouteNavigatorUpdate {
         return updateInternal(
             location = location,
@@ -512,6 +594,7 @@ class RouteNavigator(
             requestInFlight = requestInFlight,
             stepProgressM = stepProgressM,
             filteredPosition = null,
+            facingObservation = facingObservation,
         )
     }
 
@@ -522,6 +605,7 @@ class RouteNavigator(
         requestInFlight: Boolean,
         filteredPosition: FilteredRoutePosition,
         stepProgressM: Double? = null,
+        facingObservation: RouteFacingObservation? = null,
     ): RouteNavigatorUpdate {
         return updateInternal(
             location = location,
@@ -529,6 +613,7 @@ class RouteNavigator(
             requestInFlight = requestInFlight,
             stepProgressM = stepProgressM,
             filteredPosition = filteredPosition,
+            facingObservation = facingObservation,
         )
     }
 
@@ -538,13 +623,50 @@ class RouteNavigator(
         requestInFlight: Boolean,
         stepProgressM: Double?,
         filteredPosition: FilteredRoutePosition?,
+        facingObservation: RouteFacingObservation?,
     ): RouteNavigatorUpdate {
         val currentRoute = route ?: return RouteNavigatorUpdate(null, false, false, false, "route_missing")
         val routeEndpoint = currentRoute.polyline.lastOrNull()
             ?: return RouteNavigatorUpdate(null, false, false, false, "polyline_missing")
+        val unsnappedPosition = filteredPosition ?: FilteredRoutePosition(
+            point = RoutePoint(location.latitude, location.longitude),
+            horizontalAccuracyM = location.accuracyM.toDouble(),
+            elapsedRealtimeMs = location.elapsedRealtimeMs,
+        )
+        val sample = RouteLocationSample(location, unsnappedPosition)
         val latestUpdateTime = latestUpdateNowMs
-        if (latestUpdateTime != null && nowMs <= latestUpdateTime) {
+        val previousSample = latestLocationSample
+        val timeRegressed = latestUpdateTime != null && nowMs < latestUpdateTime
+        val currentSample = sample.hasCurrentCoordinates(nowMs)
+        if (!timeRegressed && currentSample && sample == previousSample) {
+            // A repeated observation may retry speech, but must not become a new position,
+            // arrival/deviation confirmation, or reason to stop an in-progress sentence.
+            return retryGuidance(nowMs, facingObservation) ?: RouteNavigatorUpdate(
+                null, false, confirmedDeviationLatched, false, "location_sample_duplicate",
+                pendingUserDecision = pendingDecision,
+            )
+        }
+        latestGuidanceContext = null
+        if (!timeRegressed && !currentSample) {
+            onPositioningEvidenceInterrupted()
+            return RouteNavigatorUpdate(
+                null, false, confirmedDeviationLatched, false, "location_sample_invalid_or_stale",
+                cancelStaleNavigationSpeech = true,
+                pendingUserDecision = pendingDecision,
+            )
+        }
+        val sampleNotNewer = previousSample != null && (
+            unsnappedPosition.elapsedRealtimeMs <= previousSample.filteredPosition.elapsedRealtimeMs ||
+                location.elapsedRealtimeMs < previousSample.rawLocation.elapsedRealtimeMs ||
+                (location.elapsedRealtimeMs == previousSample.rawLocation.elapsedRealtimeMs && location != previousSample.rawLocation)
+            )
+        if (timeRegressed || (latestUpdateTime != null && nowMs == latestUpdateTime) || sampleNotNewer) {
+            routeAlignmentSelector.reset()
+            resetRewindEvidence()
+            arrivalDepartureSampleCount = 0
+            arrivalDepartureSampleAtMs = null
             latestRouteMatchUsableForGuidance = false
+            latestGuidanceSourceAllowed = false
             invalidateSpeechCue()
             return RouteNavigatorUpdate(
                 instruction = null,
@@ -556,13 +678,9 @@ class RouteNavigator(
                 pendingUserDecision = pendingDecision,
             )
         }
+        latestLocationSample = sample
         latestUpdateNowMs = nowMs
         val destination = requestedDestination ?: routeEndpoint
-        val unsnappedPosition = filteredPosition ?: FilteredRoutePosition(
-            point = RoutePoint(location.latitude, location.longitude),
-            horizontalAccuracyM = location.accuracyM.toDouble(),
-            elapsedRealtimeMs = location.elapsedRealtimeMs,
-        )
         val matcherPosition = unsnappedPosition
             .withMovementHeading(previousFilteredPosition)
             .copy(elapsedRealtimeMs = nowMs)
@@ -596,20 +714,50 @@ class RouteNavigator(
             ?: fallbackProjection?.distanceToRouteM
             ?: distanceToPolylineMeters(location, currentRoute.polyline)
         val acceptedGeometricProgressM = acceptedMatch?.geometricProgressM
+        val testGuidanceProjection = if (allowDegradedRouteGuidance && acceptedMatch == null &&
+            routeMatch.reason !in setOf(
+                RouteMatchReason.INVALID_INPUT, RouteMatchReason.INVALID_ROUTE, RouteMatchReason.STALE_SAMPLE,
+            )
+        ) {
+            projectToRoute(
+                location = TrustedLocation(
+                    unsnappedPosition.point.latitude,
+                    unsnappedPosition.point.longitude,
+                    unsnappedPosition.horizontalAccuracyM.toFloat(),
+                    unsnappedPosition.elapsedRealtimeMs,
+                ),
+                route = currentRoute,
+                previousDistanceFromStartM = progressDistanceM,
+                maximumBacktrackM = config.maximumProgressAdvanceM,
+                maximumAdvanceM = config.maximumProgressAdvanceM,
+                continuityDistanceToleranceM = 0.0,
+            )
+        } else null
+        val ambiguousGuidanceEstimate = testGuidanceProjection != null && routeMatch.reason in setOf(
+            RouteMatchReason.AMBIGUOUS_CANDIDATES, RouteMatchReason.ACTIVE_BRANCH_RETAINED,
+            RouteMatchReason.BRANCH_SWITCH_PENDING,
+        )
+        latestGuidanceSourceAllowed = acceptedMatch != null || testGuidanceProjection != null
         if (acceptedGeometricProgressM != null) {
             matchedGeometricProgressM = acceptedGeometricProgressM
-            val matchedRouteProgressM = scaleGeometricProgressToRouteSummary(
+            latestRouteBearingDeg = acceptedMatch.bearingDeg
+        }
+        val guidanceProgressM = acceptedGeometricProgressM?.let {
+            scaleGeometricProgressToRouteSummary(
                 route = currentRoute,
-                geometricProgressM = acceptedGeometricProgressM,
+                geometricProgressM = it,
             )
+        } ?: testGuidanceProjection?.distanceFromStartM
+        if (guidanceProgressM != null) {
             val previousProgress = progressDistanceM
             val boundedProgress = if (previousProgress == null) {
-                matchedRouteProgressM
+                guidanceProgressM
             } else {
-                matchedRouteProgressM.coerceAtMost(previousProgress + config.maximumProgressAdvanceM)
+                guidanceProgressM.coerceAtMost(previousProgress + config.maximumProgressAdvanceM)
             }
-            progressDistanceM = maxOf(previousProgress ?: 0.0, boundedProgress)
-            latestRouteBearingDeg = acceptedMatch.bearingDeg
+            // Remaining distance describes the current position, not the furthest point ever
+            // reached. Passed-guide evidence is maintained separately with rewind hysteresis.
+            progressDistanceM = boundedProgress
         }
         val guidanceLocation = acceptedMatch?.matchedPoint?.let { matchedPoint ->
             TrustedLocation(
@@ -646,70 +794,87 @@ class RouteNavigator(
                     )
                 } != false
         }
-        val arrivalEvidence = authoritativeArrivalEvidence && acceptedMatch != null
+        observeArrivalDeparture(location, unsnappedPosition, destination)
+        if (arrivalDepartureSampleCount >= 2) {
+            arrivalRecheckArmed = true
+            if (pendingDecision == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
+                updatePendingDecision(null)
+                arrivalSampleCount = 0
+            }
+        }
+        val arrivalEvidence = authoritativeArrivalEvidence && acceptedMatch != null && arrivalRecheckArmed
         val offRouteCandidate = distanceToRouteM - unsnappedPosition.horizontalAccuracyM > config.offRouteDistanceM
-        if (confirmedDeviationLatched) {
-            offRouteGuidanceSuspended = true
-            if (rerouteApprovedForCurrentDeviation) {
-                return RouteNavigatorUpdate(
-                    instruction = null,
-                    arrived = false,
-                    offRoute = true,
-                    shouldReroute = false,
-                    reason = if (requestInFlight) {
-                        "off_route_reroute_approved_in_flight"
-                    } else {
-                        "off_route_reroute_approved_waiting"
-                    },
-                )
+        if (!allowDegradedRouteGuidance) {
+            if (confirmedDeviationLatched) {
+                offRouteGuidanceSuspended = true
+                if (rerouteApprovedForCurrentDeviation) {
+                    return RouteNavigatorUpdate(
+                        instruction = null,
+                        arrived = false,
+                        offRoute = true,
+                        shouldReroute = false,
+                        reason = if (requestInFlight) {
+                            "off_route_reroute_approved_in_flight"
+                        } else {
+                            "off_route_reroute_approved_waiting"
+                        },
+                    )
+                }
+                updatePendingDecision(RouteNavigatorUserDecision.REROUTE)
+                return deviationDecisionRequiredUpdate()
             }
-            updatePendingDecision(RouteNavigatorUserDecision.REROUTE)
-            return deviationDecisionRequiredUpdate()
-        }
-        if (deviationSuspectedLatched) {
+            if (deviationSuspectedLatched) {
+                observeOffRouteCandidate(offRouteCandidate, nowMs)
+                if (offRouteSampleCount >= config.offRouteConfirmSamples.coerceAtLeast(1)) {
+                    confirmedDeviationLatched = true
+                    locationRecheckAuthorized = false
+                    updatePendingDecision(RouteNavigatorUserDecision.REROUTE)
+                    return deviationDecisionRequiredUpdate()
+                }
+                if (!locationRecheckAuthorized || offRouteCandidate) {
+                    locationRecheckAuthorized = false
+                    updatePendingDecision(RouteNavigatorUserDecision.LOCATION_RECHECK)
+                    return suspectedDeviationUpdate(
+                        if (offRouteCandidate) "off_route_pending" else "off_route_location_recheck_required",
+                    )
+                }
+                deviationSuspectedLatched = false
+                locationRecheckAuthorized = false
+                offRouteGuidanceSuspended = false
+                rerouteApprovedForCurrentDeviation = false
+                updatePendingDecision(null)
+            }
+            if (pendingDecision == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
+                return arrivalConfirmationRequiredUpdate(stepProgressConsistent)
+            }
+            arrivalSampleCount = if (arrivalEvidence) arrivalSampleCount + 1 else 0
+            if (arrivalSampleCount >= config.arrivalConfirmSamples.coerceAtLeast(1)) {
+                updatePendingDecision(RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION)
+                return arrivalConfirmationRequiredUpdate(stepProgressConsistent)
+            }
             observeOffRouteCandidate(offRouteCandidate, nowMs)
-            if (offRouteSampleCount >= config.offRouteConfirmSamples.coerceAtLeast(1)) {
-                confirmedDeviationLatched = true
-                locationRecheckAuthorized = false
-                updatePendingDecision(RouteNavigatorUserDecision.REROUTE)
-                return deviationDecisionRequiredUpdate()
-            }
-            if (!locationRecheckAuthorized || offRouteCandidate) {
-                locationRecheckAuthorized = false
+            val offRoute = offRouteSampleCount >= config.offRouteConfirmSamples.coerceAtLeast(1)
+            if (offRouteCandidate) {
+                offRouteGuidanceSuspended = true
+                deviationSuspectedLatched = true
+                if (offRoute) {
+                    confirmedDeviationLatched = true
+                    updatePendingDecision(RouteNavigatorUserDecision.REROUTE)
+                    return deviationDecisionRequiredUpdate()
+                }
                 updatePendingDecision(RouteNavigatorUserDecision.LOCATION_RECHECK)
-                return suspectedDeviationUpdate(
-                    if (offRouteCandidate) "off_route_pending" else "off_route_location_recheck_required",
-                )
+                return suspectedDeviationUpdate("off_route_pending")
             }
-            deviationSuspectedLatched = false
-            locationRecheckAuthorized = false
-            offRouteGuidanceSuspended = false
-            rerouteApprovedForCurrentDeviation = false
-            updatePendingDecision(null)
+        } else {
+            // Keep diagnostic observations without requiring a decision or claiming arrival.
+            arrivalSampleCount = if (arrivalEvidence) arrivalSampleCount + 1 else 0
+            observeOffRouteCandidate(offRouteCandidate, nowMs)
         }
-        if (pendingDecision == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
-            return arrivalConfirmationRequiredUpdate(stepProgressConsistent)
-        }
-        arrivalSampleCount = if (arrivalEvidence) arrivalSampleCount + 1 else 0
-        if (arrivalSampleCount >= config.arrivalConfirmSamples.coerceAtLeast(1)) {
-            updatePendingDecision(RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION)
-            return arrivalConfirmationRequiredUpdate(stepProgressConsistent)
-        }
-        observeOffRouteCandidate(offRouteCandidate, nowMs)
-        val offRoute = offRouteSampleCount >= config.offRouteConfirmSamples.coerceAtLeast(1)
-        if (offRouteCandidate) {
-            offRouteGuidanceSuspended = true
-            deviationSuspectedLatched = true
-            if (offRoute) {
-                confirmedDeviationLatched = true
-                updatePendingDecision(RouteNavigatorUserDecision.REROUTE)
-                return deviationDecisionRequiredUpdate()
-            }
-            updatePendingDecision(RouteNavigatorUserDecision.LOCATION_RECHECK)
-            return suspectedDeviationUpdate("off_route_pending")
-        }
+        val diagnosticOffRoute = allowDegradedRouteGuidance &&
+            offRouteSampleCount >= config.offRouteConfirmSamples.coerceAtLeast(1)
 
-        if (acceptedMatch == null) {
+        if (!latestGuidanceSourceAllowed) {
+            resetRewindEvidence()
             invalidateSpeechCue()
             return RouteNavigatorUpdate(
                 instruction = null,
@@ -721,50 +886,145 @@ class RouteNavigator(
             )
         }
 
-        val guideAdvanced = advancePassedGuides(currentRoute, guidanceLocation, progressDistanceM)
+        val guideRestored = restorePassedGuides(
+            currentRoute, guidanceLocation, progressDistanceM,
+            minOf(location.elapsedRealtimeMs, unsnappedPosition.elapsedRealtimeMs),
+        )
+        val guideAdvanced = advancePassedGuides(currentRoute, guidanceLocation, progressDistanceM) || guideRestored
         val cancelPassedSpeech = guideAdvanced && pendingSpeechCue != null
         if (guideAdvanced) invalidateSpeechCue()
         val guideInstruction = instructionForCurrentGuide(currentRoute, guidanceLocation)
+        val context = RouteGuidanceContext(
+            routeRevision = routeRevision,
+            rawLocation = location,
+            guidanceLocation = guidanceLocation,
+            instruction = guideInstruction,
+            alignment = routeAlignmentSelector.select(currentRoute, unsnappedPosition, routeMatch, nowMs, config.offRouteDistanceM),
+            positionEstimateUncertain = ambiguousGuidanceEstimate,
+            offRoute = diagnosticOffRoute,
+            stepProgressConsistent = stepProgressConsistent,
+        )
+        latestGuidanceContext = context
+        return offerGuidance(currentRoute, context, nowMs, facingObservation, guideAdvanced, cancelPassedSpeech)
+    }
+
+    /** Retries delivery from existing evidence without observing another position or advancing it. */
+    @Synchronized
+    fun retryGuidance(nowMs: Long, facingObservation: RouteFacingObservation? = null): RouteNavigatorUpdate? {
+        val currentRoute = route ?: return null
+        val context = currentGuidanceContext(nowMs) ?: return null
+        return offerGuidance(currentRoute, context, nowMs, facingObservation)
+    }
+
+    /** A user request bypasses only completed-cue cadence, never evidence or speech ownership. */
+    @Synchronized
+    fun currentGuidance(nowMs: Long, facingObservation: RouteFacingObservation? = null): RouteNavigatorUpdate? {
+        val currentRoute = route ?: return null
+        val context = currentGuidanceContext(nowMs) ?: return null
+        return offerGuidance(currentRoute, context, nowMs, facingObservation, forceRepeat = true)
+    }
+
+    private fun currentGuidanceContext(nowMs: Long): RouteGuidanceContext? {
+        val currentRoute = route ?: return null
+        val context = latestGuidanceContext ?: return null
+        val currentGuideIndex = currentRoute.guidePoints.getOrNull(nextGuideIndex)?.let { nextGuideIndex }
+        if (context.routeRevision != routeRevision || context.instruction.guideIndex != currentGuideIndex ||
+            !canDeliverRouteGuidance() || latestUpdateNowMs?.let { nowMs < it } == true ||
+            !context.rawLocation.hasCurrentCoordinates(nowMs) || !context.guidanceLocation.hasCurrentCoordinates(nowMs)
+        ) {
+            latestGuidanceContext = null
+            invalidateSpeechCue()
+            return null
+        }
+        return context
+    }
+
+    private fun offerGuidance(
+        currentRoute: WalkingRoute,
+        context: RouteGuidanceContext,
+        nowMs: Long,
+        facingObservation: RouteFacingObservation?,
+        guideAdvanced: Boolean = false,
+        cancelPassedSpeech: Boolean = false,
+        forceRepeat: Boolean = false,
+    ): RouteNavigatorUpdate {
+        val guideInstruction = context.instruction
+        // Position/order selects the target. Current compass renders it, including stationary
+        // manual requests and retries; it must never choose the route branch.
+        val facing = RouteFacingGuidance.evaluate(context.alignment.bearingDegrees, facingObservation, nowMs)
+        val alignmentDiagnostic = context.alignment.diagnostic
+        val facingMessage = facingInstruction(
+            facing.direction, RouteFacingGuidance.isUsableObservation(facingObservation, nowMs),
+            context.alignment.bearingDegrees != null,
+            facing.clockHour, alignmentDiagnostic.reason,
+        )
         val distanceBand = routeGuidanceDistanceBand(guideInstruction.distanceM)
         val cueKey = guideInstruction.guideIndex to distanceBand
+        if (pendingSpeechCue?.let {
+                it.routeRevision == context.routeRevision && it.guideIndex == guideInstruction.guideIndex
+            } == true
+        ) {
+            return RouteNavigatorUpdate(null, false, context.offRoute, false, "guidance_in_flight", routeAlignmentDiagnostic = alignmentDiagnostic)
+        }
         val previousCue = offeredSpeechCue
+        if (previousCue?.guideIndex == guideInstruction.guideIndex &&
+            speechRetryNotBeforeMs?.let { nowMs < it } == true
+        ) {
+            return RouteNavigatorUpdate(null, false, context.offRoute, false, "guidance_retry_wait", routeAlignmentDiagnostic = alignmentDiagnostic)
+        }
         val sameCue = previousCue != null && previousCue.guideIndex == guideInstruction.guideIndex &&
-            previousCue.distanceBand == distanceBand
+            previousCue.distanceBand == distanceBand && offeredFacingMessage == facingMessage &&
+            offeredPositionEstimateUncertain == context.positionEstimateUncertain
+        val requestedRepeat = forceRepeat ||
+            (manualGuidancePending && previousCue?.guideIndex == guideInstruction.guideIndex)
         val cancelChangedSpeech = !sameCue && pendingSpeechCue != null
         if (!sameCue) invalidateSpeechCue()
+        manualGuidancePending = requestedRepeat
         val cancelStaleSpeech = cancelPassedSpeech || cancelChangedSpeech
         fun noInstruction(reason: String) = RouteNavigatorUpdate(
-            null, false, false, false, reason,
+            null, false, context.offRoute, false, reason,
             cancelStaleNavigationSpeech = cancelStaleSpeech,
+            routeAlignmentDiagnostic = alignmentDiagnostic,
         )
         if (pendingSpeechCue != null) return noInstruction("guidance_in_flight")
         val lastGuidance = lastGuidanceAtMs
+        // The cadence begins after delivery finishes, and never replaces an in-flight sentence.
+        val periodicGuidanceDue = lastGuidance != null &&
+            nowMs - lastGuidance >= config.periodicGuidanceIntervalMs
         if (lastGuidance != null && nowMs - lastGuidance < config.guidanceIntervalMs &&
-            !guideAdvanced && !(distanceBand in 0..1 && !sameCue)
+            !periodicGuidanceDue && !manualGuidancePending && !guideAdvanced && !(distanceBand in 0..1 && !sameCue)
         ) return noInstruction("guidance_rate_limited")
-        if (cueKey in completedSpeechCues) return noInstruction("guidance_already_completed")
+        if (cueKey in completedSpeechCues && !periodicGuidanceDue && !manualGuidancePending) {
+            return noInstruction("guidance_already_completed")
+        }
         if (speechRetryNotBeforeMs?.let { nowMs < it } == true) {
             return noInstruction("guidance_retry_wait")
         }
-        val token = offeredSpeechCue?.takeUnless { it == failedSpeechCue } ?: RouteSpeechCueToken(
+        val token = offeredSpeechCue?.takeUnless { it == failedSpeechCue || it == completedSpeechCue } ?: RouteSpeechCueToken(
             routeRevision = routeRevision,
             cueRevision = ++cueRevision,
             guideIndex = guideInstruction.guideIndex,
             distanceBand = distanceBand,
         ).also { offeredSpeechCue = it }
+        offeredFacingMessage = facingMessage
+        offeredPositionEstimateUncertain = context.positionEstimateUncertain
         val summary = if (includeRouteStartSummary) {
             "길안내를 시작합니다. 전체 경로는 약 ${currentRoute.summary.distanceM}m입니다. "
         } else ""
+        val positionNotice = if (context.positionEstimateUncertain) {
+            "현재 경로 위치가 불확실하여 남은 거리와 안내 지점을 추정합니다. "
+        } else ""
         return RouteNavigatorUpdate(
-            instruction = summary + guideInstruction.text,
+            instruction = summary + positionNotice + facingMessage + guideInstruction.text,
             arrived = false,
-            offRoute = false,
+            offRoute = context.offRoute,
             shouldReroute = false,
             reason = "route_guidance",
             guideIndex = guideInstruction.guideIndex,
-            stepProgressConsistent = stepProgressConsistent,
+            stepProgressConsistent = context.stepProgressConsistent,
             cancelStaleNavigationSpeech = cancelStaleSpeech,
             speechCueToken = token,
+            routeAlignmentDiagnostic = alignmentDiagnostic,
         )
     }
 
@@ -827,7 +1087,10 @@ class RouteNavigator(
     private fun updatePendingDecision(decision: RouteNavigatorUserDecision?) {
         if (pendingDecision == decision) return
         pendingDecision = decision
-        if (decision != null) invalidateSpeechCue()
+        if (decision != null) {
+            latestGuidanceContext = null
+            invalidateSpeechCue()
+        }
         decisionRevision += 1L
     }
 
@@ -842,9 +1105,107 @@ class RouteNavigator(
 
     private fun invalidateSpeechCue() {
         offeredSpeechCue = null
+        offeredFacingMessage = null
+        offeredPositionEstimateUncertain = null
         pendingSpeechCue = null
         failedSpeechCue = null
+        completedSpeechCue = null
         speechRetryNotBeforeMs = null
+        manualGuidancePending = false
+    }
+
+    private fun facingInstruction(
+        direction: RouteFacingDirection,
+        compassAvailable: Boolean,
+        routeBearingAvailable: Boolean,
+        clockHour: Int?,
+        alignmentReason: RouteAlignmentReason,
+    ): String {
+        val clock = clockHour?.let { "약 ${it}시 방향" }
+        if (clock != null && alignmentReason in setOf(RouteAlignmentReason.DEPARTURE_SEGMENT, RouteAlignmentReason.DEPARTURE_CONNECTOR)) {
+            val subject = if (alignmentReason == RouteAlignmentReason.DEPARTURE_CONNECTOR) "경로 시작점은" else "출발 경로는"
+            val align = when (direction) {
+                RouteFacingDirection.LEFT -> "먼저 왼쪽으로 방향을 맞추세요. "
+                RouteFacingDirection.RIGHT -> "먼저 오른쪽으로 방향을 맞추세요. "
+                RouteFacingDirection.BEHIND -> "몸을 돌려 경로 방향을 맞추세요. "
+                else -> ""
+            }
+            return "$subject ${clock}입니다. $align" + "경로 기준으로 "
+        }
+        val clockNotice = clock?.let { "경로는 ${it}입니다. " } ?: ""
+        return when (direction) {
+            RouteFacingDirection.FRONT -> clockNotice + "현재 바라보는 앞쪽이 경로 진행 방향입니다. 경로 기준으로 "
+            RouteFacingDirection.LEFT -> clockNotice + "먼저 왼쪽 경로 방향으로 몸을 돌리세요. 경로 기준으로 "
+            RouteFacingDirection.RIGHT -> clockNotice + "먼저 오른쪽 경로 방향으로 몸을 돌리세요. 경로 기준으로 "
+            RouteFacingDirection.BEHIND -> clockNotice + "경로 진행 방향이 뒤쪽입니다. 경로 방향으로 몸을 돌리세요. 경로 기준으로 "
+            RouteFacingDirection.UNKNOWN -> when {
+                !routeBearingAvailable -> "현재 위치에서 경로의 진행 방향을 정확히 구분하기 어렵습니다. 다음은 경로 기준 안내입니다. "
+                compassAvailable -> "나침반 방향은 측정되지만 앞뒤와 좌우를 확실히 구분하기 어렵습니다. 다음은 경로 기준 안내입니다. "
+                else -> "현재 바라보는 방향을 확인할 수 없습니다. 다음은 경로 기준 안내입니다. "
+            }
+        }
+    }
+
+    private fun resetRewindEvidence() {
+        rewindGuideIndex = null
+        rewindSampleCount = 0
+        rewindSampleAtMs = null
+    }
+
+    private fun observeArrivalDeparture(raw: TrustedLocation, filtered: FilteredRoutePosition, destination: RoutePoint) {
+        val rawDistanceM = haversineMeters(raw.latitude, raw.longitude, destination.latitude, destination.longitude)
+        val filteredDistanceM = haversineMeters(
+            filtered.point.latitude, filtered.point.longitude, destination.latitude, destination.longitude,
+        )
+        // Leaving the destination area does not require a successful match to the old route.
+        // Both original and filtered observations must independently support that departure.
+        val outside = raw.accuracyM <= config.arrivalMaxAccuracyM &&
+            filtered.horizontalAccuracyM <= config.arrivalMaxAccuracyM &&
+            rawDistanceM - raw.accuracyM > config.arrivalRadiusM + 5.0 &&
+            filteredDistanceM - filtered.horizontalAccuracyM > config.arrivalRadiusM + 5.0
+        if (!outside) {
+            arrivalDepartureSampleCount = 0
+            arrivalDepartureSampleAtMs = null
+            return
+        }
+        val sourceAtMs = minOf(raw.elapsedRealtimeMs, filtered.elapsedRealtimeMs)
+        val previousAtMs = arrivalDepartureSampleAtMs
+        if (previousAtMs != null && sourceAtMs <= previousAtMs) return
+        arrivalDepartureSampleCount = if (previousAtMs != null &&
+            sourceAtMs - previousAtMs <= config.maximumOffRouteSampleGapMs
+        ) arrivalDepartureSampleCount + 1 else 1
+        arrivalDepartureSampleAtMs = sourceAtMs
+    }
+
+    /** A single displaced fix may change distance, but cannot restore a previously passed turn. */
+    private fun restorePassedGuides(route: WalkingRoute, location: TrustedLocation, progressM: Double?, nowMs: Long): Boolean {
+        if (progressM == null || location.accuracyM > LocationTrustConfig().maxAccuracyM || nextGuideIndex == 0) {
+            resetRewindEvidence()
+            return false
+        }
+        val marginM = maxOf(config.maximumProgressBacktrackM, location.accuracyM.toDouble() * 2.0, 5.0)
+        val candidate = (0 until nextGuideIndex).firstOrNull { index ->
+            val guide = route.guidePoints[index]
+            val guideProgress = guideProgressDistancesM.getOrNull(index)
+            guideProgress != null && !isDepartureGuide(guide, guideProgress) && progressM < guideProgress - marginM
+        }
+        if (candidate == null) {
+            resetRewindEvidence()
+            return false
+        }
+        val previousAtMs = rewindSampleAtMs
+        rewindSampleCount = if (rewindGuideIndex == candidate && previousAtMs != null &&
+            nowMs > previousAtMs && nowMs - previousAtMs <= config.maximumOffRouteSampleGapMs
+        ) rewindSampleCount + 1 else 1
+        rewindGuideIndex = candidate
+        rewindSampleAtMs = nowMs
+        if (rewindSampleCount < 2) return false
+        nextGuideIndex = candidate
+        // A reapproach is a new traversal of this guide; old approach completions must not
+        // suppress its fresh maneuver. Speech tokens are retired by the caller.
+        completedSpeechCues.removeAll { (index, _) -> index != null && index >= candidate }
+        resetRewindEvidence()
+        return true
     }
 
     private fun resolveGuideProgressDistances(route: WalkingRoute): List<Double?> {
@@ -879,8 +1240,9 @@ class RouteNavigator(
         while (true) {
             val guide = route.guidePoints.getOrNull(nextGuideIndex) ?: break
             val guideProgressM = guideProgressDistancesM.getOrNull(nextGuideIndex)
+            val passedMarginM = if (allowDegradedRouteGuidance) 3.0 else maxOf(3.0, location.accuracyM.toDouble())
             val passed = progressM != null && guideProgressM != null &&
-                progressM >= guideProgressM + maxOf(3.0, location.accuracyM.toDouble())
+                progressM >= guideProgressM + passedMarginM
             if (!isDepartureGuide(guide, guideProgressM) && !passed) break
             nextGuideIndex += 1
         }
@@ -890,13 +1252,22 @@ class RouteNavigator(
     private fun instructionForCurrentGuide(route: WalkingRoute, location: TrustedLocation): RouteInstruction {
         val guide = route.guidePoints.getOrNull(nextGuideIndex)
         if (guide != null) {
-            CrosswalkReferencePolicy.noticeFor(guide)?.let { notice ->
-                return RouteInstruction(text = notice, guideIndex = nextGuideIndex)
-            }
             val routeDistanceToGuideM = progressDistanceM?.let { progressM ->
                 guideProgressDistancesM.getOrNull(nextGuideIndex)?.let { guideProgressM ->
                     (guideProgressM - progressM).coerceAtLeast(0.0).roundToInt()
                 }
+            }
+            CrosswalkReferencePolicy.noticeFor(guide)?.let { notice ->
+                // Only mapped ordinary maneuvers survive a crossing marker, never provider
+                // crossing commands or signal-based permission to cross.
+                val maneuver = guide.takeIf { it.turnType in setOf(11, 12, 13, 14, 16, 17, 18, 19) }
+                    ?.maneuverInstruction() ?: "횡단보도 안내 지점입니다."
+                val prefix = routeDistanceToGuideM?.let { "${it}m 앞, " } ?: ""
+                return RouteInstruction(
+                    text = "$prefix$maneuver $notice",
+                    guideIndex = nextGuideIndex,
+                    distanceM = routeDistanceToGuideM,
+                )
             }
             val instruction = guide.maneuverInstruction()
             val text = instruction ?: routeDistanceToGuideM?.let { distanceM ->
@@ -935,11 +1306,41 @@ class RouteNavigator(
     }
 }
 
+private fun TrustedLocation.hasCurrentCoordinates(nowMs: Long): Boolean =
+    latitude.isFinite() && latitude in -90.0..90.0 &&
+        longitude.isFinite() && longitude in -180.0..180.0 &&
+        accuracyM.isFinite() && accuracyM >= 0f && elapsedRealtimeMs >= 0L &&
+        nowMs >= elapsedRealtimeMs && nowMs - elapsedRealtimeMs <= LocationTrustConfig().maxAgeMs
+
 private data class RouteInstruction(
     val text: String,
     val guideIndex: Int?,
     val distanceM: Int? = null,
 )
+
+private data class RouteGuidanceContext(
+    val routeRevision: Long,
+    val rawLocation: TrustedLocation,
+    val guidanceLocation: TrustedLocation,
+    val instruction: RouteInstruction,
+    val alignment: RouteAlignmentSelection,
+    val positionEstimateUncertain: Boolean,
+    val offRoute: Boolean,
+    val stepProgressConsistent: Boolean?,
+)
+
+private data class RouteLocationSample(
+    val rawLocation: TrustedLocation,
+    val filteredPosition: FilteredRoutePosition,
+) {
+    fun hasCurrentCoordinates(nowMs: Long): Boolean = rawLocation.hasCurrentCoordinates(nowMs) &&
+        TrustedLocation(
+            filteredPosition.point.latitude,
+            filteredPosition.point.longitude,
+            filteredPosition.horizontalAccuracyM.toFloat(),
+            filteredPosition.elapsedRealtimeMs,
+        ).hasCurrentCoordinates(nowMs)
+}
 
 private data class RouteProjection(
     val distanceToRouteM: Double,
@@ -996,6 +1397,7 @@ private fun projectToRoute(
     previousDistanceFromStartM: Double?,
     maximumBacktrackM: Double,
     maximumAdvanceM: Double,
+    continuityDistanceToleranceM: Double = 25.0,
 ): RouteProjection? {
     if (route.polyline.size < 2) return null
     val segmentLengths = route.polyline.zipWithNext().map { (start, end) ->
@@ -1044,7 +1446,7 @@ private fun projectToRoute(
         }
     }
     val continuous = continuousBest
-    return if (continuous != null && continuous.distanceToRouteM <= globalBest.distanceToRouteM + 25.0) {
+    return if (continuous != null && continuous.distanceToRouteM <= globalBest.distanceToRouteM + continuityDistanceToleranceM) {
         continuous
     } else {
         globalBest

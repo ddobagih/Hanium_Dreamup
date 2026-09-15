@@ -21,6 +21,8 @@ data class ObjectDepthInput(
     val fullDepthTimestampNs: Long? = null,
     val visualTrackingQuality: Float = 1f,
     val requireIndependentDepthObservation: Boolean = false,
+    /** Full Depth may supply proximity while only independent Raw captures supply motion. */
+    val rawDepthMotionOnly: Boolean = false,
 )
 
 /**
@@ -34,6 +36,9 @@ class ObjectDepthEstimator(
     private val tracker: ObjectTracker,
     private val messagePolicy: MessagePolicy = MessagePolicy(),
 ) {
+    /** An observed visual object with unsupported depth; no rectangle resampling or metric sample. */
+    fun estimateUnavailable(input: ObjectDepthInput): TrackedObjectDepth = buildPseudoTrendResult(input)
+
     /** Accepts validated mask statistics without resampling the surrounding bounding rectangle. */
     fun estimateSupportedMask(input: ObjectDepthInput, stats: DepthStats, supportedPositionInAnchor: Vec3? = null,
                               source: DepthSource = DepthSource.ARCORE_RAW_DEPTH): TrackedObjectDepth {
@@ -107,6 +112,7 @@ class ObjectDepthEstimator(
                     else -> false
                 }
         }
+        val proximityOnly = input.rawDepthMotionOnly && source != DepthSource.ARCORE_RAW_DEPTH
         val metricObservationAccepted = tracker.recordDistance(
             track = input.track,
             distanceM = riskDistance,
@@ -120,9 +126,14 @@ class ObjectDepthEstimator(
                 DepthSource.ARCORE_FULL_DEPTH -> input.fullDepthTimestampNs?.takeIf { it > 0L && input.fullDepthMatchesCameraFrame }
                 else -> null
             },
-            requireIndependentDepthObservation = input.requireIndependentDepthObservation,
+            requireIndependentDepthObservation = input.requireIndependentDepthObservation || input.rawDepthMotionOnly,
+            proximityOnly = proximityOnly,
         )
-        val kinematics = tracker.approachKinematics(input.track, riskDistance, source)
+        val kinematics = if (proximityOnly) {
+            ApproachKinematics(Trend.UNKNOWN, 0f, null, null)
+        } else {
+            tracker.approachKinematics(input.track, riskDistance, source)
+        }
         val confidence = computeConfidence(
             source = source,
             stats = stats,
@@ -147,6 +158,12 @@ class ObjectDepthEstimator(
             ),
             nowMs = input.timestampMs,
         )
+        if (metricObservationAccepted) {
+            input.track.depthGap.observe(input, source, stats, riskDistance, confidence.finalScore, cameraPose,
+                supportedPositionInAnchor ?: stats.medianM?.let {
+                    cameraPose?.objectCenterInAnchor(input.geometry.centerNorm, it)
+                }, kinematics.motionEstimate)
+        } else input.track.depthGap.clear()
         return input.toTrackedObjectDepth(
             source = source,
             zDistanceM = stats.medianM,
@@ -157,11 +174,19 @@ class ObjectDepthEstimator(
             kinematics = kinematics,
             confidence = confidence,
             userFacing = userFacing,
+        ).copy(
+            depthObservedAtMs = when (source) {
+                DepthSource.ARCORE_RAW_DEPTH -> input.rawDepthTimestampNs
+                DepthSource.ARCORE_FULL_DEPTH -> input.fullDepthTimestampNs
+                else -> null
+            }?.takeIf { it > 0L }?.div(1_000_000L),
         )
     }
 
     /** Keeps approach/recede context without fabricating metric distance when ARCore depth is unusable. */
     private fun buildPseudoTrendResult(input: ObjectDepthInput, reasonHardGate: Float = 1f): TrackedObjectDepth {
+        if (reasonHardGate <= 0f) input.track.depthGap.clear()
+        val gap = input.track.depthGap.gap(input)
         input.track.invalidateMotionEvidence(input.timestampMs)
         val pseudo = pseudoTrend(input.track, input.motionContext)
         val stats = DepthStats(
@@ -209,7 +234,8 @@ class ObjectDepthEstimator(
             kinematics = pseudo,
             confidence = confidence,
             userFacing = userFacing,
-        )
+        ).copy(depthAvailability = gap.availability, depthObservedAtMs = gap.observedAtMs,
+            prediction = gap.prediction)
     }
 
     private fun computeConfidence(
@@ -276,14 +302,19 @@ class ObjectDepthEstimator(
         if (!track.stable || track.idSwitchSuspected || motionContext.safeMotionQuality < 0.45f) {
             return ApproachKinematics(Trend.UNKNOWN, approachScore = 0f, approachSpeedMps = null, timeToCollisionMs = null)
         }
-        val geometries = track.polygonHistory.takeLast(5)
         val latestGeometry = track.latestGeometry ?: return ApproachKinematics(Trend.UNKNOWN, 0f, null, null)
+        val uprightCenter = latestGeometry.uprightCenterNorm
+            ?: return ApproachKinematics(Trend.UNKNOWN, 0f, null, null)
         val areas = track.bboxHistory.takeLast(5).map { it.area.coerceAtLeast(0.0001f) }
         if (areas.size < 3) return ApproachKinematics(Trend.UNKNOWN, 0f, null, null)
         val logGrowth = ln(areas.last()) - ln(areas.first())
-        val bottomGrowth = track.polygonHistory.takeLast(5).mapNotNull { polygon -> polygon.maxOfOrNull { it.y } }
+        // TrackState clears visual history at rotation boundaries, so every polygon here shares
+        // this captured rotation. Sensor polygons themselves remain unchanged for depth mapping.
+        val bottomGrowth = track.polygonHistory.takeLast(5).mapNotNull { polygon ->
+            polygon.mapNotNull(latestGeometry::sensorPointToUpright).maxOfOrNull { it.y }
+        }
             .let { if (it.size >= 3) it.last() - it.first() else 0f }
-        val centerCorridor = latestGeometry.centerNorm.x in 0.30f..0.70f && latestGeometry.centerNorm.y > 0.35f
+        val centerCorridor = uprightCenter.x in 0.30f..0.70f && uprightCenter.y > 0.35f
         val score = ((logGrowth / 0.35f) * 0.60f + (bottomGrowth / 0.15f) * 0.40f).coerceIn(0f, 1f)
         val trend = when {
             centerCorridor && score >= 0.45f -> Trend.APPROACHING
@@ -294,10 +325,11 @@ class ObjectDepthEstimator(
     }
 
     private fun corridorQuality(geometry: ObjectGeometry): Float {
+        val center = geometry.uprightCenterNorm ?: return 0.30f
         return when {
-            geometry.centerNorm.x in 0.30f..0.70f && geometry.centerNorm.y >= 0.35f -> 1f
-            geometry.screenZone == ScreenZone.LOWER -> 0.75f
-            geometry.screenZone == ScreenZone.LEFT || geometry.screenZone == ScreenZone.RIGHT -> 0.45f
+            center.x in 0.30f..0.70f && center.y >= 0.35f -> 1f
+            geometry.uprightScreenZone == ScreenZone.LOWER -> 0.75f
+            geometry.uprightScreenZone == ScreenZone.LEFT || geometry.uprightScreenZone == ScreenZone.RIGHT -> 0.45f
             else -> 0.30f
         }
     }
@@ -345,6 +377,7 @@ class ObjectDepthEstimator(
             objectMotion = kinematics.objectMotion,
             motionEstimate = kinematics.motionEstimate,
             userMotion = motionContext.userMotion,
+            imageQuarterTurns = geometry.imageQuarterTurns,
         )
     }
 

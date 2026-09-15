@@ -43,14 +43,22 @@ class FrozenUnknownDepthCapture private constructor(
             val full = snapshot.fullDepth?.takeIf { snapshot.hasFreshFullDepth }?.let {
                 DepthImage16(it.width, it.height, it.millimeters.copyOf(it.width * it.height))
             }
-            val copied = snapshot.copy(rawDepth = raw, rawConfidence = confidence, fullDepth = full)
+            val copiedPose = snapshot.cameraPoseEvidence?.let { pose ->
+                pose.copy(horizontalPlaneCandidates = java.util.Collections.unmodifiableList(
+                    pose.horizontalPlaneCandidates.map { plane -> plane.copy(
+                        polygonInAnchor = java.util.Collections.unmodifiableList(plane.polygonInAnchor.toList())) }))
+            }
+            val copied = snapshot.copy(rawDepth = raw, rawConfidence = confidence, fullDepth = full,
+                cameraPoseEvidence = copiedPose)
             val frame = identity(token)
             val intrinsics = copied.cameraPoseEvidence?.imageProjection?.takeIf {
                 it.imageWidth == token.width && it.imageHeight == token.height
             }?.let { MaskDepthEstimator.Intrinsics(it.imageWidth, it.imageHeight, it.fx.toDouble(), it.fy.toDouble(), it.cx.toDouble(), it.cy.toDouble()) }
             val grid = raw ?: full
-            val calibration = if (grid != null && imageToDepthUv != null) MaskDepthEstimator.Calibration(
-                frame, token.width, token.height, grid.width, grid.height, imageToDepthUv,
+            // Current normalized transform still describes coverage when no depth image arrives.
+            // Its unused 1x1 grid cannot produce metric samples because both DepthFrames remain null.
+            val calibration = if (imageToDepthUv != null) MaskDepthEstimator.Calibration(
+                frame, token.width, token.height, grid?.width ?: 1, grid?.height ?: 1, imageToDepthUv,
                 "arcore_transform_coordinates2d", intrinsics,
             ) else null
             val depth = if (raw != null && confidence != null && calibration != null && copied.rawConfidenceMatchesRawDepth) MaskDepthEstimator.DepthFrame.raw(

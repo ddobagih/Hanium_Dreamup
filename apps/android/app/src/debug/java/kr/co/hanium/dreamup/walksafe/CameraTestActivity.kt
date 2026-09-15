@@ -9,6 +9,8 @@ import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
@@ -22,6 +24,20 @@ import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Session
 import kr.co.hanium.dreamup.walksafe.depth.ArCoreFrameProvider
 import kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot
+import kr.co.hanium.dreamup.walksafe.depth.ImageSize
+import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
+import kr.co.hanium.dreamup.walksafe.depth.MessagePolicy
+import kr.co.hanium.dreamup.walksafe.depth.MessagePolicyConfig
+import kr.co.hanium.dreamup.walksafe.depth.MessageRateLimitConfig
+import kr.co.hanium.dreamup.walksafe.depth.ObjectDepthRuntimePipeline
+import kr.co.hanium.dreamup.walksafe.depth.ObjectTracker
+import kr.co.hanium.dreamup.walksafe.depth.Point2
+import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
+import kr.co.hanium.dreamup.walksafe.depth.UnknownObjectFeedbackPolicy
+import kr.co.hanium.dreamup.walksafe.feedback.AndroidFeedbackActuator
+import kr.co.hanium.dreamup.walksafe.feedback.NavigationSpeechDispatchResult
+import kr.co.hanium.dreamup.walksafe.navigation.FrozenImageToDepthTransform
+import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import kr.co.hanium.dreamup.walksafe.inference.TfliteAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.YuvPreprocessingStrategy
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamRuntimeService
@@ -31,21 +47,71 @@ import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamResult
 import kr.co.hanium.dreamup.walksafe.depth.unknown.FrozenUnknownDepthCapture
 import kr.co.hanium.dreamup.walksafe.depth.unknown.UnknownObjectDepthPipeline
 import java.util.Locale
+import kr.co.hanium.dreamup.walksafe.depth.DepthPredictionPresentation
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-/** Local debug viewer: no account, route, walk lease, speech, report, or device-check state. */
+/** Local debug camera and hazard feedback; no account, route, walk lease or report is opened. */
 class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var surface: GLSurfaceView
     private lateinit var boxes: DebugBboxOverlayView
     private lateinit var unknownBoxes: DebugBboxOverlayView
     private lateinit var unknownStatus: TextView
-    private var unknownService: FastSamRuntimeService<UnknownCapture>? = null
+    private lateinit var feedbackStatus: TextView
+    private val feedback = CameraTestFeedbackCoordinator()
+    private val objectPresentation = CameraObjectPresentation()
+    private var primaryOverlayCapture: CameraObjectPresentation.Capture? = null
+    private var unknownOverlay: UnknownOverlay? = null
+    private data class UnknownOverlay(
+        val capture: CameraObjectPresentation.Capture,
+        val regions: List<CameraObjectPresentation.Region>,
+        val boxes: List<DebugBboxOverlayView.DebugOverlayBox>,
+        val predictionDeadlinesMs: List<Long?>,
+        val rawCount: Int,
+        val candidateCount: Int,
+        val detail: String,
+    )
+    private val feedbackHandler = Handler(Looper.getMainLooper())
+    private var feedbackActuator: AndroidFeedbackActuator? = null
+    private var speechReadiness = "한국어 음성 준비 중"
+    private var lastFeedbackEvent = ""
+    private var lastFeedbackLog = ""
+    private var lastFeedbackLogMs = 0L
+    private var unknownFeedbackPolicy = UnknownObjectFeedbackPolicy()
+    private val unknownRuntime = CameraUnknownRuntime<UnknownCapture>(
+        create = ::createUnknownService,
+        dispatch = { action -> runOnUiThread { action() } },
+        changed = ::showUnknownRuntimeStatus,
+    )
     private var unknownPipeline = UnknownObjectDepthPipeline(SystemClock::elapsedRealtime)
+    private var primaryDepth = PrimaryDepthState(0)
+    private class PrimaryDepthState(private val epoch: Int) {
+        private var pipelineGeneration = 0
+        var geometryId: String? = null
+        var pipeline = createPipeline()
+        var sourceGate = CameraTestDepthSourceGate()
+        fun forGeometry(id: String): ObjectDepthRuntimePipeline {
+            if (geometryId != id) { reset(); geometryId = id }
+            return pipeline
+        }
+        fun reset() {
+            geometryId = null
+            pipelineGeneration++
+            pipeline = createPipeline()
+            sourceGate = CameraTestDepthSourceGate()
+        }
+        private fun createPipeline() = ObjectDepthRuntimePipeline(
+            tracker = ObjectTracker(trackIdPrefix = "camera-$epoch-primary-$pipelineGeneration-"),
+            rawDepthMotionOnly = true,
+            messagePolicy = MessagePolicy(config = MessagePolicyConfig(
+                rateLimit = MessageRateLimitConfig(0L, 0L, 0L))),
+        )
+    }
     private data class UnknownCapture(val epoch: Int, val view: FloatArray,
-        val depth: FrozenUnknownDepthCapture, val pipeline: UnknownObjectDepthPipeline)
+        val depth: FrozenUnknownDepthCapture, val pipeline: UnknownObjectDepthPipeline,
+        val feedbackPolicy: UnknownObjectFeedbackPolicy)
     private lateinit var status: TextView
     private val worker = Executors.newSingleThreadExecutor()
     private val busy = AtomicBoolean(false)
@@ -77,6 +143,12 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             setTextColor(Color.YELLOW)
             setBackgroundColor(0xcc000000.toInt())
         }
+        feedbackStatus = TextView(this).apply {
+            text = "위험 조건 충족 시 음성·진동 · 안내 시작 불필요"
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(0xcc000000.toInt())
+        }
         status = TextView(this).apply {
             text = "테스트 카메라 · 모델 준비 중\n안내 시작 없이 실행합니다."
             textSize = 16f
@@ -88,9 +160,10 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             orientation = LinearLayout.VERTICAL
             addView(status)
             addView(unknownStatus)
+            addView(feedbackStatus)
             addView(Button(this@CameraTestActivity).apply {
                 text = "카메라 다시 연결"
-                setOnClickListener { startCamera() }
+                setOnClickListener { startCamera(); unknownRuntime.retry() }
             })
             addView(Button(this@CameraTestActivity).apply {
                 text = "카메라 닫기"
@@ -113,7 +186,13 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 status.text = "카메라 테스트 · 객체 모델 로드 실패: ${loaded?.reason ?: "exception"}"
             }
         }
-        val auxiliary = FastSamRuntimeService(applicationContext, 1L,
+    }
+
+    private fun createUnknownService(epoch: Long): FastSamRuntimeService<UnknownCapture> {
+        // Publish fresh tracker/policy state before the new service becomes visible to the GL worker.
+        unknownPipeline = UnknownObjectDepthPipeline(SystemClock::elapsedRealtime)
+        unknownFeedbackPolicy = UnknownObjectFeedbackPolicy()
+        return FastSamRuntimeService(applicationContext, epoch,
             FastSamRuntimeOptions(FastSamRuntimeOptions.Backend.GPU,
                 minOf(4, Runtime.getRuntime().availableProcessors()).coerceAtLeast(1), true,
                 SystemClock.elapsedRealtimeNanos() + 60_000_000_000L, 1_000L, false, false, true),
@@ -121,20 +200,33 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 override fun onResult(result: FastSamResult<UnknownCapture>) = showUnknownResult(result)
                 override fun onError(error: Throwable) {
                     Log.e("WalkSafeCameraTest", "FastSAM failed", error)
-                    runOnUiThread { if (!isDestroyed) unknownStatus.text = "이름 없는 영역 실패: ${error.javaClass.simpleName}" }
+                    unknownRuntime.failed(epoch)
                 }
             })
-        unknownService = auxiliary
-        auxiliary.start().whenComplete { info, error -> runOnUiThread {
-            if (!isDestroyed) unknownStatus.text = if (error == null) "이름 없는 영역 · ${info.actualBackend} 준비됨"
-                else "이름 없는 영역 모델 준비 실패"
-        } }
+    }
+
+    private fun showUnknownRuntimeStatus() {
+        if (!foreground || isDestroyed || isFinishing) return
+        val state = unknownRuntime.status
+        if (state != CameraUnknownRuntime.Status.READY) {
+            unknownOverlay = null
+            unknownBoxes.clear()
+            feedback.clear(CameraTestFeedbackCoordinator.Source.UNKNOWN)
+        }
+        unknownStatus.text = when (state) {
+            CameraUnknownRuntime.Status.IDLE, CameraUnknownRuntime.Status.LOADING -> "이름 없는 영역 · FastSAM 준비 중"
+            CameraUnknownRuntime.Status.READY -> "이름 없는 영역 · ${unknownRuntime.backendName ?: "FastSAM"} 준비됨"
+            CameraUnknownRuntime.Status.FAILED -> "이름 없는 영역 실패 · 카메라 다시 연결을 눌러 재시도하세요"
+            CameraUnknownRuntime.Status.WAITING_RELEASE -> "이름 없는 영역 · 이전 모델 종료를 기다리는 중"
+            CameraUnknownRuntime.Status.RELEASE_FAILED -> "이름 없는 영역 · 이전 모델 해제 미확인으로 재시작할 수 없습니다"
+        }
     }
 
     override fun onResume() {
         super.onResume()
         foreground = true
         startCamera()
+        unknownRuntime.resume()
     }
 
     private fun startCamera() {
@@ -156,6 +248,12 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
             owned.resume()
             generation++
             unknownPipeline = UnknownObjectDepthPipeline(SystemClock::elapsedRealtime)
+            unknownFeedbackPolicy = UnknownObjectFeedbackPolicy()
+            primaryDepth = PrimaryDepthState(generation)
+            objectPresentation.clear()
+            primaryOverlayCapture = null
+            unknownOverlay = null
+            startFeedback(generation)
             lastFrame = 0L
             provider = source
             session = owned
@@ -177,14 +275,18 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     override fun onPause() {
         foreground = false
         generation++
+        unknownRuntime.pause()
+        stopFeedback()
         surface.onPause() // Stop Session.update before pausing or closing the camera.
         val camera = session
         val source = provider
         session = null
         provider = null
+        objectPresentation.clear()
+        primaryOverlayCapture = null
+        unknownOverlay = null
         boxes.clear()
         unknownBoxes.clear()
-        unknownService?.discardPending("camera_test_paused")
         if (camera != null) {
             closingCamera = true
             runCatching { camera.pause() }
@@ -202,8 +304,10 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     override fun onDestroy() {
-        unknownService?.closeAsync()
-        unknownService = null
+        stopFeedback()
+        foreground = false
+        generation++
+        unknownRuntime.destroy()
         worker.execute { detector?.close(); detector = null }
         worker.shutdown()
         super.onDestroy()
@@ -255,9 +359,10 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 }
                 image = source.acquireCameraImageOrNull(frame) ?: return
                 val ownedImage = image
-                val basis = floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f)
-                val view = FloatArray(6)
-                val depth = FloatArray(6)
+                val capturedSnapshot = snapshot.copy(cameraImageTimestampNs = ownedImage.timestamp)
+                val basis = floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f, 1f, 1f, 0.5f, 0.5f)
+                val view = FloatArray(10)
+                val depth = FloatArray(10)
                 frame.transformCoordinates2d(Coordinates2d.IMAGE_NORMALIZED, basis, Coordinates2d.VIEW, view)
                 frame.transformCoordinates2d(Coordinates2d.IMAGE_NORMALIZED, basis, Coordinates2d.TEXTURE_NORMALIZED, depth)
                 val frameId = frame.timestamp
@@ -265,45 +370,76 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 val tracking = frame.camera.trackingState.name
                 val trackingFailure = frame.camera.trackingFailureReason.name
                 val turns = UprightCameraImage.quarterTurns(view)
-                val auxiliary = unknownService
+                val geometryId = "camera-test:$epoch:${ownedImage.width}x${ownedImage.height}:$turns"
+                val frozenTransform = FrozenImageToDepthTransform.create(frameId,
+                    depth.toList().chunked(2).take(4).map { Point2(it[0], it[1]) }, Point2(depth[8], depth[9]))
+                val grid = capturedSnapshot.rawDepth ?: capturedSnapshot.fullDepth
+                // With no depth pixels, the current normalized transform still lets the tracked
+                // object reach the nonmetric gap estimator. The 1x1 size is never sampled.
+                val mapper = if (frozenTransform != null) FrozenImageToTextureCoordinateMapper(
+                    frameId, frozenTransform, ImageSize(grid?.width ?: 1, grid?.height ?: 1)) else null
+                val auxiliary = unknownRuntime.service
                 val pipeline = unknownPipeline
+                val auxiliaryFeedbackPolicy = unknownFeedbackPolicy
+                val primary = primaryDepth
                 worker.execute {
                     try {
-                        if (auxiliary != null && foreground && epoch == generation) {
+                        if (auxiliary != null && foreground && epoch == generation &&
+                            unknownRuntime.accepts(auxiliary.sessionEpoch)) {
                             val state = auxiliary.stats()
                             if (!state.inflight && !state.pending && !state.stopping) {
                                 val token = FastSamFrameToken(FastSamFrameToken.Source.LIVE_CAMERA,
                                     auxiliary.sessionEpoch, frameId, frameId, ownedImage.timestamp,
-                                    capturedMs * 1_000_000L, "camera-test:$epoch", ownedImage.width, ownedImage.height)
-                                val h = doubleArrayOf(
-                                    (depth[2] - depth[0]).toDouble() / ownedImage.width,
-                                    (depth[4] - depth[0]).toDouble() / ownedImage.height, depth[0].toDouble(),
-                                    (depth[3] - depth[1]).toDouble() / ownedImage.width,
-                                    (depth[5] - depth[1]).toDouble() / ownedImage.height, depth[1].toDouble(),
-                                    0.0, 0.0, 1.0)
+                                    capturedMs * 1_000_000L, geometryId, ownedImage.width, ownedImage.height)
+                                val h = frozenTransform?.imagePixelsToDepthUvMatrix(ownedImage.width, ownedImage.height)
                                 val capture = FrozenUnknownDepthCapture.freeze(token,
-                                    snapshot.copy(cameraImageTimestampNs = ownedImage.timestamp), h, frameId,
+                                    capturedSnapshot, h, frameId,
                                     imageQuarterTurns = turns)
                                 if (capture != null) runCatching {
-                                    auxiliary.submit(ownedImage, token, UnknownCapture(epoch, view, capture, pipeline))
+                                    auxiliary.submit(ownedImage, token, UnknownCapture(epoch, view, capture, pipeline,
+                                        auxiliaryFeedbackPolicy))
                                 }.onFailure { Log.w("WalkSafeCameraTest", "FastSAM frame submission failed", it) }
                             }
                         }
                         val meanLuma = meanLuma(ownedImage)
                         val result = model.detectOriented(ownedImage, frameId / 1_000_000L, turns)
+                        val outputs = if (mapper != null && tracking == "TRACKING") {
+                            val primaryPipeline = primary.forGeometry(geometryId)
+                            primary.sourceGate.qualify(capturedSnapshot)?.let { qualified -> primaryPipeline.process(
+                                snapshot = qualified, frameId = frameId, timestampMs = frameId / 1_000_000L,
+                                detections = result.detections, detectionSequenceId = frameId,
+                                detectionCompleted = !result.partial, mapper = mapper,
+                                imageQuarterTurns = turns,
+                            ) } ?: emptyList()
+                        } else { primary.reset(); emptyList() }
                         val mapped = result.detections.map { item ->
                             val rect = item.bboxNorm
                             val corners = listOf(point(view, rect.x, rect.y),
                                 point(view, rect.x + rect.width, rect.y),
                                 point(view, rect.x, rect.y + rect.height),
                                 point(view, rect.x + rect.width, rect.y + rect.height))
-                            val uv = point(depth, rect.x + rect.width / 2, rect.y + rect.height / 2)
-                            val distance = centerDepth(snapshot, uv.first, uv.second)
+                            val output = outputs.firstOrNull { it.className == item.className && it.bboxNorm == rect }
                             val label = "분류 ${item.className} ${String.format(Locale.US, "%.0f%%", item.detectionConfidence * 100)} · " +
-                                (distance?.let { String.format(Locale.US, "중앙 깊이 %.2fm", it) } ?: "깊이 대기")
+                                (output?.riskDistanceM?.let { String.format(Locale.US, "위험 거리 %.2fm", it) }
+                                    ?: output?.prediction?.let { String.format(Locale.US, "예측 %.2fm ±%.2fm · 공백 %dms",
+                                        it.distanceM, it.errorBoundM, it.predictionAgeMs) }
+                                    ?: if (output?.depthAvailability == kr.co.hanium.dreamup.walksafe.depth.DepthAvailability.TEMPORARILY_UNAVAILABLE)
+                                        "깊이 일시 공백" else "거리 미확인")
                             DebugBboxOverlayView.DebugOverlayBox(RectF(corners.minOf { it.first },
                                 corners.minOf { it.second }, corners.maxOf { it.first }, corners.maxOf { it.second }),
                                 label, false, item.className)
+                        }
+                        val presentationCapture = CameraObjectPresentation.Capture(epoch, frameId, capturedMs, geometryId)
+                        val presentationRegions = result.detections.map { detection ->
+                            val output = outputs.firstOrNull {
+                                it.className == detection.className && it.bboxNorm == detection.bboxNorm
+                            }
+                            CameraObjectPresentation.Region(detection.bboxNorm, output?.trackId,
+                                output.trustedPresentationDistanceM(), detection.detectionConfidence)
+                        }
+                        val predictionDeadlines = result.detections.map { item ->
+                            outputs.firstOrNull { it.className == item.className && it.bboxNorm == item.bboxNorm }
+                                ?.prediction?.let { DepthPredictionPresentation.validUntilMs(it, capturedMs) ?: capturedMs - 1L }
                         }
                         val message = "테스트 카메라 · ARCore $tracking\n" +
                             "객체 ${result.detections.size}개 · 추론 ${result.timing.modelInferenceMs}ms\n" +
@@ -312,8 +448,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                             (if (tracking != "TRACKING") "깊이 추적 대기: $trackingFailure\n" else "") +
                             (depthResult.exceptionOrNull()?.let { "깊이 오류: ${it.javaClass.simpleName} · 객체 추론은 계속합니다.\n" } ?: "") +
                             (if (meanLuma < 25) "입력 영상이 매우 어둡습니다. 렌즈 가림과 조명을 확인하세요.\n"
-                                else if (result.detections.isEmpty()) "모델 실행 정상 · 학습한 21개 클래스 중 검출 없음\n" else "") +
-                            mapped.take(4).joinToString("\n") { it.label }
+                                else if (result.detections.isEmpty()) "모델 실행 정상 · 학습한 21개 클래스 중 검출 없음\n" else "")
                         val now = SystemClock.elapsedRealtime()
                         if (now - lastNoticeMs > 2000) {
                             lastNoticeMs = now
@@ -321,8 +456,28 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                         }
                         runOnUiThread {
                             if (foreground && epoch == generation) {
-                                boxes.updateMapped(mapped, frameId, capturedMs, sourceComplete = true, animate = false)
-                                status.text = message
+                                if (!objectPresentation.recordPrimary(presentationCapture, presentationRegions)) return@runOnUiThread
+                                primaryOverlayCapture = presentationCapture
+                                fun renderPrimaryDepth() {
+                                    if (!foreground || epoch != generation || primaryOverlayCapture != presentationCapture) return
+                                    val displayNow = SystemClock.elapsedRealtime()
+                                    val currentBoxes = mapped.mapIndexed { index, box ->
+                                        if (predictionDeadlines[index]?.let { displayNow > it } == true)
+                                            box.copy(label = "분류 ${result.detections[index].className} · 거리 미확인") else box
+                                    }
+                                    boxes.updateMapped(currentBoxes, frameId, capturedMs, sourceComplete = true, animate = false)
+                                    status.text = message + currentBoxes.take(4).joinToString("\n") { it.label }
+                                }
+                                renderPrimaryDepth()
+                                val displayNow = SystemClock.elapsedRealtime()
+                                predictionDeadlines.filterNotNull().filter { it >= displayNow }.distinct().forEach { deadline ->
+                                    feedbackHandler.postDelayed({ renderPrimaryDepth() }, deadline - displayNow + 1L)
+                                }
+                                renderUnknownObjects(displayNow)
+                                feedback.offer(CameraTestFeedbackCoordinator.Sample(
+                                    CameraTestFeedbackCoordinator.Source.PRIMARY, epoch, frameId,
+                                    capturedMs, now, geometryId, outputs))
+                                updateFeedback()
                             }
                         }
                     } catch (error: Exception) {
@@ -348,60 +503,239 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun showError(epoch: Int, message: String) = runOnUiThread {
-        if (foreground && epoch == generation) { status.text = message; boxes.clear() }
+        if (foreground && epoch == generation) {
+            status.text = message
+            objectPresentation.clear()
+            primaryOverlayCapture = null
+            boxes.clear()
+            renderUnknownObjects(SystemClock.elapsedRealtime())
+        }
+    }
+
+    private fun feedbackLive(epoch: Int): Boolean =
+        foreground && epoch == generation && !isDestroyed && !isFinishing
+
+    private val feedbackTick = object : Runnable {
+        override fun run() {
+            if (!feedbackLive(generation) || feedbackActuator == null) return
+            renderUnknownObjects(SystemClock.elapsedRealtime())
+            updateFeedback()
+            feedbackHandler.postDelayed(this, 200L)
+        }
+    }
+
+    private fun startFeedback(epoch: Int) {
+        stopFeedback()
+        feedback.start(epoch)
+        speechReadiness = "한국어 음성 준비 중"
+        lastFeedbackEvent = ""
+        feedbackActuator = AndroidFeedbackActuator(
+            context = applicationContext,
+            speechAllowed = { feedbackLive(epoch) },
+            hapticAllowed = { feedbackLive(epoch) },
+            onOfflineKoreanSpeechReady = {
+                runOnUiThread { if (feedbackLive(epoch)) speechReadiness = "한국어 음성 준비됨" }
+            },
+            onOfflineKoreanSpeechUnavailable = {
+                runOnUiThread { if (feedbackLive(epoch)) speechReadiness = "한국어 TTS 사용 불가 · 진동 경고 유지" }
+            },
+        )
+        feedbackHandler.post(feedbackTick)
+    }
+
+    private fun stopFeedback() {
+        feedbackHandler.removeCallbacksAndMessages(null)
+        feedback.stop()
+        feedbackActuator?.close() // Stops pending/on-going TTS and vibration on pause/close.
+        feedbackActuator = null
+    }
+
+    private fun updateFeedback() {
+        val epoch = generation
+        if (!feedbackLive(epoch)) return
+        val actuator = feedbackActuator ?: return
+        val now = SystemClock.elapsedRealtime()
+        val delivery = feedback.next(now)
+        if (delivery != null) {
+            if (!feedback.claim(delivery, now)) feedback.reject(delivery)
+            else {
+                var vibrationAccepted = false
+                val dispatch = actuator.emit(
+                    action = delivery.action,
+                    isStillValidAtStart = {
+                        feedbackLive(epoch) && feedback.isDeliverable(delivery, SystemClock.elapsedRealtime())
+                    },
+                    onSpeechCompleted = {
+                        feedbackHandler.post {
+                            if (feedbackLive(epoch)) {
+                                if (feedback.complete(delivery, SystemClock.elapsedRealtime())) {
+                                    lastFeedbackEvent = "음성 완료: ${delivery.action.message}"
+                                }
+                            }
+                        }
+                    },
+                    onSpeechFailed = {
+                        feedbackHandler.post {
+                            if (feedbackLive(epoch)) resolveFailedSpeech(delivery, vibrationAccepted, now)
+                        }
+                    },
+                )
+                vibrationAccepted = dispatch.vibrationAccepted
+                lastFeedbackEvent = if (dispatch.speech == NavigationSpeechDispatchResult.ACCEPTED)
+                    "음성 요청: ${delivery.action.message}"
+                else "음성 ${dispatch.speech} · 진동 ${if (vibrationAccepted) "요청 수락" else "사용 불가"}"
+                if (dispatch.speech != NavigationSpeechDispatchResult.ACCEPTED) {
+                    resolveFailedSpeech(delivery, vibrationAccepted, now)
+                }
+            }
+        }
+        val diagnostic = "$speechReadiness\n${feedback.diagnostic(now)}"
+        feedbackStatus.text = diagnostic + if (lastFeedbackEvent.isBlank()) "" else "\n$lastFeedbackEvent"
+        if (diagnostic != lastFeedbackLog && now - lastFeedbackLogMs >= 2_000L) {
+            lastFeedbackLog = diagnostic
+            lastFeedbackLogMs = now
+            Log.i("WalkSafeCameraTest", "feedback=${diagnostic.replace('\n', ' ')}")
+        }
+    }
+
+    private fun resolveFailedSpeech(delivery: CameraTestFeedbackCoordinator.Delivery,
+                                    vibrationAccepted: Boolean, startedAtMs: Long) {
+        if (!vibrationAccepted) { feedback.reject(delivery); return }
+        // A vibration request is not physical completion. Hold the shared queue for its duration
+        // before consuming cooldown, mirroring the production haptic fallback.
+        val duration = delivery.action.vibrationPatternMs?.sum() ?: 0L
+        feedbackHandler.postDelayed({
+            if (feedbackLive(delivery.epoch)) {
+                if (feedback.complete(delivery, SystemClock.elapsedRealtime())) {
+                    lastFeedbackEvent = "음성 미완료 · 진동 요청 수락"
+                }
+            }
+        }, (startedAtMs + duration - SystemClock.elapsedRealtime()).coerceAtLeast(1L))
     }
 
     private fun showUnknownResult(result: FastSamResult<UnknownCapture>) {
         val capture = result.attachment
-        if (!foreground || capture.epoch != generation) return
+        if (!foreground || capture.epoch != generation || !unknownRuntime.accepts(result.token.sessionEpoch)) return
         val processed = capture.pipeline.process(capture.depth, result.token, result.masks, SystemClock.elapsedRealtime())
+            .forDisplayAt(SystemClock.elapsedRealtime())
+        val completedMs = SystemClock.elapsedRealtime()
+        val cameraEpoch = WalkRuntimeEpoch("local-camera-test", capture.epoch.toLong())
+        val allOutputs = processed.objects + processed.proximityObjects
+        val admitted = capture.feedbackPolicy.admit(
+            outputs = allOutputs,
+            sourceFrameId = result.token.frameId,
+            sourceTimestampMs = result.token.cameraTimestampNs / 1_000_000L,
+            sourceCapturedAtElapsedRealtimeNs = result.token.capturedElapsedNs,
+            completedAtElapsedRealtimeMs = completedMs,
+            sourceEpoch = cameraEpoch,
+            currentEpoch = cameraEpoch.takeIf { foreground && capture.epoch == generation &&
+                unknownRuntime.accepts(result.token.sessionEpoch) },
+            nowElapsedRealtimeMs = completedMs,
+        )
         val candidates = processed.observations.filter { it.walkingSelection?.show == true }
-            .sortedWith(compareBy({ it.depth.axialDepthM == null }, { it.depth.axialDepthM ?: Double.MAX_VALUE }))
-        // Cap only this diagnostic display. Warning admission uses all eligible candidates in the shared pipeline.
-        val selected = candidates.filterIndexed { index, observation ->
-            candidates.take(index).none { earlier ->
-                observation.mask.iou(earlier.mask) >= 0.70f &&
-                    observation.depth.axialDepthM?.let { z -> earlier.depth.axialDepthM?.let {
-                        kotlin.math.abs(z - it) <= 0.30
-                    } } == true
+        // Rank display patches and separate measured warnings together, then apply the display cap.
+        val selected = CameraUnknownObservation.selectForDisplay(candidates, allOutputs,
+            admitted?.outputs ?: emptyList(), limit = Int.MAX_VALUE)
+        val mapped = selected.map { candidate ->
+            val rect = candidate.bboxNorm
+            val corners = listOf(point(capture.view, rect.x, rect.y),
+                point(capture.view, rect.x + rect.width, rect.y),
+                point(capture.view, rect.x, rect.y + rect.height),
+                point(capture.view, rect.x + rect.width, rect.y + rect.height))
+            val observation = candidate.observation
+            val output = candidate.output
+            val label = if (observation == null) {
+                // A separate warning retains its own measured distance and bounds.
+                val warning = requireNotNull(output)
+                val kind = if (warning.source == kr.co.hanium.dreamup.walksafe.depth.DepthSource.ARCORE_FULL_DEPTH)
+                    "Full 추정" else "Raw 측정"
+                val alert = if (warning.userFacing.messageLevel == MessageLevel.STOP) "정지 경고 후보" else "주의 경고 후보"
+                String.format(Locale.US, "근접 경고 영역 · %s %.2fm · %s", kind, candidate.distanceM, alert)
+            } else {
+                val distance = output?.rayDistanceM?.toDouble() ?: candidate.distanceM
+                val kind = if (output?.prediction != null) "단기 예측" else if (observation.depth.source == "ARCORE_FULL_DEPTH") "Full 추정" else "Raw 측정"
+                val alert = when (output?.userFacing?.messageLevel) {
+                    MessageLevel.STOP -> " · 정지 경고 후보"
+                    MessageLevel.WARNING -> " · 주의 경고 후보"
+                    else -> ""
+                }
+                (if (observation.proximityDistanceM != null) "근접 표면 · " else "전방 영역 · ") + (distance?.let {
+                    String.format(Locale.US, "%s %.2fm", kind, it)
+                } ?: "거리 미확인") + (observation.metricExtent?.takeIf {
+                    observation.proximityDistanceM == null && distance != null
+                }?.let {
+                    String.format(Locale.US, " · 관측 폭 %.2fm/높이 %.2fm", it.widthM, it.heightM)
+                } ?: "") + (output?.prediction?.let {
+                    String.format(Locale.US, " ±%.2fm · 공백 %dms", it.errorBoundM, it.predictionAgeMs)
+                } ?: "") + alert
             }
-        }.take(6)
-        val mapped = selected.map { observation ->
-            val index = observation.sourceDetectionIndex
-            val mask = result.masks[index]
-            val view = capture.view
-            val corners = listOf(point(view, mask.bboxLeft() / mask.imageWidth(), mask.bboxTop() / mask.imageHeight()),
-                point(view, mask.bboxRight() / mask.imageWidth(), mask.bboxTop() / mask.imageHeight()),
-                point(view, mask.bboxLeft() / mask.imageWidth(), mask.bboxBottom() / mask.imageHeight()),
-                point(view, mask.bboxRight() / mask.imageWidth(), mask.bboxBottom() / mask.imageHeight()))
-            val depth = observation.depth
-            val output = processed.objects.firstOrNull { it.trackId == observation.trackId }
-            val distance = depth.axialDepthM
-            val kind = if (depth.source == "ARCORE_FULL_DEPTH") "Full 추정" else "Raw 측정"
-            val alert = when (output?.userFacing?.messageLevel) {
-                kr.co.hanium.dreamup.walksafe.depth.MessageLevel.STOP -> " · 정지 경고 후보"
-                kr.co.hanium.dreamup.walksafe.depth.MessageLevel.WARNING -> " · 주의 경고 후보"
-                else -> ""
-            }
-            val label = "전방 영역 · " + (distance?.let { String.format(Locale.US, "%s %.2fm", kind, it) }
-                ?: "거리 미확인") + alert
             DebugBboxOverlayView.DebugOverlayBox(RectF(corners.minOf { it.first }, corners.minOf { it.second },
                 corners.maxOf { it.first }, corners.maxOf { it.second }), label, true, "unnamed-obstacle")
         }
         runOnUiThread {
-            if (foreground && capture.epoch == generation) {
-                unknownBoxes.updateMapped(mapped, result.token.frameId, result.token.capturedElapsedNs / 1_000_000L,
-                    sourceComplete = true, animate = false)
-                val measured = processed.observations.count { it.depth.axialDepthM != null }
-                val waiting = processed.observations.firstOrNull { it.depth.axialDepthM == null }?.depth?.reason
-                unknownStatus.text = "FastSAM ${result.masks.size}개 → 전방 후보 ${candidates.size}개 · 표시 ${mapped.size}개\n" +
+            if (foreground && capture.epoch == generation && unknownRuntime.accepts(result.token.sessionEpoch)) {
+                val presentationCapture = CameraObjectPresentation.Capture(capture.epoch, result.token.frameId,
+                    result.token.capturedElapsedNs / 1_000_000L, result.token.geometryId)
+                if (primaryOverlayCapture?.let {
+                        it.geometryId != presentationCapture.geometryId && it.frameId >= presentationCapture.frameId
+                    } == true || unknownOverlay?.capture?.frameId?.let { it >= result.token.frameId } == true
+                ) return@runOnUiThread
+                val measured = processed.observations.count { CameraUnknownObservation.distanceM(it) != null }
+                val waiting = processed.observations.firstOrNull { CameraUnknownObservation.distanceM(it) == null }?.depth?.reason
+                unknownOverlay = UnknownOverlay(presentationCapture, selected.map { candidate ->
+                    CameraObjectPresentation.Region(candidate.bboxNorm, candidate.feedbackId,
+                        candidate.output.trustedPresentationDistanceM()?.takeIf { distance ->
+                            candidate.distanceM?.let { kotlin.math.abs(it - distance) <= 0.30 } == true
+                        }, candidate.output?.detectionConfidence ?: 0f)
+                }, mapped, selected.map { candidate -> candidate.output?.prediction?.let {
+                    DepthPredictionPresentation.validUntilMs(it, presentationCapture.capturedAtMs)
+                        ?: presentationCapture.capturedAtMs - 1L
+                } }, result.masks.size, candidates.size,
                     "거리 확인 ${measured}개 · 추론 ${result.inferenceMs.toLong()}ms\n" +
-                    "테스트 화면: 음성 없음 · 실제 안내 중 경고 조건 충족 시 음성/진동\n" +
+                    "3m 이내 보행 위험 조건 충족 시 음성·진동\n" +
                     (processed.rejectionReason?.let { "깊이 대기: $it" }
-                        ?: if (measured == 0) "거리 대기: ${waiting ?: "인식 영역 없음"}" else "")
+                        ?: if (measured == 0) "거리 대기: ${waiting ?: "인식 영역 없음"}" else ""))
+                val displayNow = SystemClock.elapsedRealtime()
+                renderUnknownObjects(displayNow)
+                unknownOverlay?.predictionDeadlinesMs?.filterNotNull()?.filter { it >= displayNow }?.distinct()?.forEach { deadline ->
+                    feedbackHandler.postDelayed({
+                        if (unknownOverlay?.capture == presentationCapture) renderUnknownObjects(SystemClock.elapsedRealtime())
+                    }, deadline - displayNow + 1L)
+                }
+                feedback.offer(CameraTestFeedbackCoordinator.Sample(
+                    CameraTestFeedbackCoordinator.Source.UNKNOWN, capture.epoch, result.token.frameId,
+                    result.token.capturedElapsedNs / 1_000_000L, completedMs, result.token.geometryId,
+                    admitted?.outputs ?: emptyList()),
+                    retainedUnknownTrackIds = processed.retainedProximityRegionIds,
+                    nowMs = SystemClock.elapsedRealtime())
+                updateFeedback()
             }
         }
     }
+
+    /** Recompute presentation when either model finishes; the risk queue retains both sources. */
+    private fun renderUnknownObjects(nowMs: Long) {
+        val observation = unknownOverlay ?: return
+        if (observation.capture.epoch != generation ||
+            nowMs - observation.capture.capturedAtMs !in 0L..UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS ||
+            primaryOverlayCapture?.let { it.geometryId != observation.capture.geometryId } == true
+        ) {
+            unknownOverlay = null
+            unknownBoxes.clear()
+            return
+        }
+        val merged = objectPresentation.mergedUnknownIndices(observation.capture, observation.regions, nowMs)
+        val visible = observation.boxes.filterIndexed { index, _ -> index !in merged &&
+            observation.predictionDeadlinesMs[index]?.let { nowMs <= it } != false }.take(6)
+        unknownBoxes.updateMapped(visible, observation.capture.frameId, observation.capture.capturedAtMs,
+            sourceComplete = true, animate = false)
+        unknownStatus.text = "FastSAM ${observation.rawCount}개 → 3m 내 후보 ${observation.candidateCount}개 · " +
+            "학습 객체와 통합 ${merged.size}개 · 추가 표시 ${visible.size}개\n" + observation.detail
+    }
+
+    private fun TrackedObjectDepth?.trustedPresentationDistanceM(): Double? = this?.takeIf {
+        it.source.metric && it.confidence.hardGate > 0f && it.confidence.freshnessQuality > 0f
+    }?.riskDistanceM?.takeIf { it.isFinite() && it > 0f }?.toDouble()
 
     private fun point(basis: FloatArray, x: Float, y: Float): Pair<Float, Float> =
         Pair(basis[0] + x * (basis[2] - basis[0]) + y * (basis[4] - basis[0]),
@@ -426,17 +760,4 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
         return if (count > 0) (sum / count).toInt() else 0
     }
 
-    /** Diagnostic center patch only; no claim of whole-object distance or motion. */
-    private fun centerDepth(snapshot: DepthFrameSnapshot, u: Float, v: Float): Double? {
-        if (!u.isFinite() || !v.isFinite() || u !in 0f..1f || v !in 0f..1f) return null
-        val depth = snapshot.fullDepth?.takeIf { snapshot.hasFreshFullDepth } ?: return null
-        val x = (u * depth.width).toInt().coerceIn(0, depth.width - 1)
-        val y = (v * depth.height).toInt().coerceIn(0, depth.height - 1)
-        val values = (-1..1).flatMap { dy -> (-1..1).mapNotNull { dx ->
-            val px = x + dx; val py = y + dy
-            if (px !in 0 until depth.width || py !in 0 until depth.height) null
-            else depth.millimeters[py * depth.width + px].takeIf { it > 0 }
-        } }.sorted()
-        return values.takeIf { it.size >= 3 }?.let { it[it.size / 2] / 1000.0 }
-    }
 }

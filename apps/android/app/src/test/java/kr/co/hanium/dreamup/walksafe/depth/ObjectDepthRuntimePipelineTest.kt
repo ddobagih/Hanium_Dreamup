@@ -9,6 +9,28 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ObjectDepthRuntimePipelineTest {
+    @Test fun rawMotionOnlyCameraStillWarnsForFullProximityWithoutInventingApproach() {
+        val pipeline = ObjectDepthRuntimePipeline(rawDepthMotionOnly = true)
+        val outputs = (0..8).map { index ->
+            val atMs = 1_000L + index * 300L
+            val cameraNs = atMs * 1_000_000L
+            pipeline.process(snapshot(0, 0, 2_000 - index * 100).copy(
+                frameTimestampNs = cameraNs, rawDepthTimestampNs = cameraNs,
+                fullDepthTimestampNs = cameraNs, cameraImageTimestampNs = cameraNs),
+                frameId = cameraNs, timestampMs = atMs,
+                detections = listOf(DetectionCandidate("person", .95f, RectNorm(.25f, .25f, .50f, .50f))))
+                .single()
+        }
+        outputs.forEach { output ->
+            assertEquals(DepthSource.ARCORE_FULL_DEPTH, output.source)
+            assertTrue(output.riskDistanceM!! > 0f)
+            assertNull(output.approachSpeedMps)
+            assertNull(output.timeToCollisionMs)
+            assertEquals(ObjectMotion.UNKNOWN, output.objectMotion)
+        }
+        assertTrue(outputs.any { it.userFacing.message != null && it.userFacing.messageLevel != MessageLevel.NONE })
+    }
+
     @Test
     fun synchronizedDepthPublishesWorldAndRelativeMotionWithoutMixingGpsAndArClocks() {
         val userMotion = UserMotionEstimate(

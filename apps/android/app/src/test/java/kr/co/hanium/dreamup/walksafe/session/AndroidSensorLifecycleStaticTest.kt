@@ -67,13 +67,19 @@ class AndroidSensorLifecycleStaticTest {
             "src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
         ).readText()
 
+        val start = orientationTracker.substringAfter("fun start(): Boolean {").substringBefore("fun stop()")
+        val register = orientationTracker.substringAfter("private fun register(").substringBefore("// Kept as text")
+        assertTrue(start.contains("val rotationRegistered = register(listener, rotationVectorSensor)"))
+        assertTrue(start.contains("magneticSensorRegistered = register(listener, magneticFieldSensor)"))
+        // Rotation success alone is sufficient; the fallback pair is an independent alternative.
         assertTrue(
-            orientationTracker.contains(
-                "magneticSensorRegistered = magneticFieldSensor?.let",
+            start.contains(
+                "started = rotationRegistered || (magneticSensorRegistered && (gravityRegistered || accelerometerRegistered))",
             ),
         )
-        assertTrue(orientationTracker.contains("}.getOrDefault(false)"))
+        assertTrue(register.contains("runCatching { sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME) }"))
+        assertTrue(register.contains(".getOrDefault(false)"))
         assertTrue(orientationTracker.contains("magneticSensorAvailable = magneticSensorRegistered"))
-        assertTrue(orientationTracker.contains("return true"))
+        assertTrue(start.contains("return true"))
     }
 }

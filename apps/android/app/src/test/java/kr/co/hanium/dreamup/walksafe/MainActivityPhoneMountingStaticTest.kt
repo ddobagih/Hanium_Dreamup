@@ -445,11 +445,15 @@ class MainActivityPhoneMountingStaticTest {
         assertTrue(fallbackConfirmation.contains("if (!phoneMountingOutputsAllowed)"))
         assertTrue(navigationSpeech.substringAfter("val mainThreadCompletion")
             .contains("navigationEnvironmentOutputsAllowed()"))
+        assertTrue(routeGuidance.contains("tryDispatchRouteInstruction(update, expectedWalkEpoch)"))
+        val delivery = functionBlock("private fun tryDispatchRouteInstruction(")
         assertInOrder(
-            routeGuidance.substringAfter("dispatchNavigationSpeech("),
-            "navigationEnvironmentOutputsAllowed()",
+            delivery.substringAfter("dispatchNavigationSpeech("),
+            "isRouteSpeechCurrent(expectedWalkEpoch, requestGeneration, lifecycleGeneration)",
             "routeNavigator.acknowledgeInstruction(",
         )
+        assertTrue(declarationRegion("private fun isRouteSpeechCurrent(")
+            .contains("navigationEnvironmentOutputsAllowed()"))
 
         val report = functionBlock("private fun processReportCandidate(")
         assertInOrder(

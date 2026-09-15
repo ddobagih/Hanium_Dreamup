@@ -1,0 +1,514 @@
+{
+  "schema": "unknown-spatial-preregistered-v6",
+  "createdAtUtc": "2026-09-14T13:12:18.092955+00:00",
+  "labelScope": "Explicit synthetic physical scenarios specified before candidate execution. Hazard/nuisance metrics are synthetic selection-contract checks, not field accident risk or measured model quality. Outside 3 m means policy exclusion, not physical safety.",
+  "coordinates": "Metres in one synthetic anchor: +X right, +Y gravity up, +Z camera/forward walking direction. Default camera=(0,1.5,0), forward=(0,0,1), gravityUp=(0,1,0).",
+  "defaults": {
+    "cameraPosition": [
+      0,
+      1.5,
+      0
+    ],
+    "cameraForward": [
+      0,
+      0,
+      1
+    ],
+    "gravityUp": [
+      0,
+      1,
+      0
+    ],
+    "timestampMs": 1200,
+    "independentDepth": true,
+    "fullyCovered": true,
+    "confidence": 0.95,
+    "source": "ARCORE_RAW_DEPTH",
+    "trend": "STABLE",
+    "trackAgeFrames": 6,
+    "trackStableMs": 1200,
+    "canRejectSmall": false,
+    "sceneFloor": {
+      "x": [
+        -1.6,
+        1.6
+      ],
+      "z": [
+        0.3,
+        3.5
+      ],
+      "y": 0,
+      "grid": [
+        17,
+        25
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "low_trip_bar",
+      "label": "hazard",
+      "expectedShow": true,
+      "expectedWarningCandidate": true,
+      "maskBoundsM": [
+        [
+          -0.32,
+          0.08,
+          1.65
+        ],
+        [
+          0.32,
+          0.11,
+          1.65
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "A transverse 64 cm bar 8 cm above independently supported ground intersects the forward walking corridor.",
+      "extentM": [
+        0.64,
+        0.03
+      ]
+    },
+    {
+      "id": "thin_vertical_pole",
+      "label": "hazard",
+      "expectedShow": true,
+      "expectedWarningCandidate": true,
+      "maskBoundsM": [
+        [
+          -0.012,
+          0.08,
+          1.8
+        ],
+        [
+          0.012,
+          1.8,
+          1.8
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "A 2.4 cm wide tall pole intersects body and head height within 3 m.",
+      "extentM": [
+        0.024,
+        1.72
+      ]
+    },
+    {
+      "id": "head_height_beam",
+      "label": "hazard",
+      "expectedShow": true,
+      "expectedWarningCandidate": true,
+      "maskBoundsM": [
+        [
+          -0.35,
+          1.68,
+          1.45
+        ],
+        [
+          0.35,
+          1.83,
+          1.45
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "An overhead beam intersects the stipulated adult head envelope; low image position is not required.",
+      "extentM": [
+        0.7,
+        0.15
+      ]
+    },
+    {
+      "id": "frontal_body_obstacle",
+      "label": "hazard",
+      "expectedShow": true,
+      "expectedWarningCandidate": true,
+      "maskBoundsM": [
+        [
+          -0.25,
+          0.25,
+          1.75
+        ],
+        [
+          0.25,
+          1.8,
+          1.75
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "A substantial frontal obstruction is inside the corridor and 3 m range.",
+      "extentM": [
+        0.5,
+        1.55
+      ]
+    },
+    {
+      "id": "stationary_object_user_approaches",
+      "label": "hazard",
+      "expectedShow": true,
+      "expectedWarningCandidate": true,
+      "maskBoundsM": [
+        [
+          -0.2,
+          0.2,
+          2.25
+        ],
+        [
+          0.2,
+          1.7,
+          2.25
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Obstacle stays at world z=2.25 while camera moves from z=0 to z=0.5; relative closing must retain it.",
+      "cameraPosition": [
+        0,
+        1.5,
+        0.5
+      ],
+      "previousCameraPosition": [
+        0,
+        1.5,
+        0
+      ],
+      "trend": "APPROACHING",
+      "objectMotion": "USER_APPROACHING_STATIONARY",
+      "extentM": [
+        0.4,
+        1.5
+      ]
+    },
+    {
+      "id": "crossing_object_enters_corridor",
+      "label": "hazard",
+      "expectedShow": true,
+      "expectedWarningCandidate": true,
+      "maskBoundsM": [
+        [
+          0.05,
+          0.2,
+          1.8
+        ],
+        [
+          0.4,
+          1.7,
+          1.8
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Object moved laterally from x=0.9 into the forward corridor at x=0.225; it is now a current collision candidate.",
+      "previousMaskCenterM": [
+        0.9,
+        0.95,
+        1.8
+      ],
+      "objectVelocityMps": [
+        -0.675,
+        0,
+        0
+      ],
+      "trend": "APPROACHING",
+      "extentM": [
+        0.35,
+        1.5
+      ]
+    },
+    {
+      "id": "near_frontal_just_inside_3m",
+      "label": "hazard",
+      "expectedShow": true,
+      "expectedWarningCandidate": true,
+      "maskBoundsM": [
+        [
+          -0.1,
+          1.4,
+          2.98
+        ],
+        [
+          0.1,
+          1.6,
+          2.98
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Current reliable points are less than 3 m away at the admission boundary.",
+      "extentM": [
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": "small_visible_part_of_real_obstacle",
+      "label": "hazard",
+      "expectedShow": true,
+      "expectedWarningCandidate": true,
+      "maskBoundsM": [
+        [
+          -0.008,
+          1.0,
+          1.8
+        ],
+        [
+          0.008,
+          1.025,
+          1.8
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Only a visible patch of a stipulated larger hazard is measured; no complete-small-object evidence is supplied.",
+      "extentM": [
+        0.016,
+        0.025
+      ],
+      "canRejectSmall": false,
+      "fullyCovered": false
+    },
+    {
+      "id": "broad_connected_floor",
+      "label": "nuisance",
+      "expectedShow": false,
+      "expectedWarningCandidate": false,
+      "maskBoundsM": [
+        [
+          -1.2,
+          0,
+          0.4
+        ],
+        [
+          1.2,
+          0,
+          2.8
+        ]
+      ],
+      "maskGrid": [
+        13,
+        17
+      ],
+      "rationale": "Flat ground is connected from near feet into the forward corridor and supported by independent scene samples.",
+      "surfaceAxes": "xz",
+      "extentM": [
+        2.4,
+        2.4
+      ]
+    },
+    {
+      "id": "left_side_wall",
+      "label": "nuisance",
+      "expectedShow": false,
+      "expectedWarningCandidate": false,
+      "maskBoundsM": [
+        [
+          -1.2,
+          0,
+          0.65
+        ],
+        [
+          -1.2,
+          1.9,
+          2.4
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Wall lies wholly 1.2 m left of the forward walking corridor.",
+      "surfaceAxes": "yz",
+      "extentM": [
+        1.75,
+        1.9
+      ]
+    },
+    {
+      "id": "right_side_wall",
+      "label": "nuisance",
+      "expectedShow": false,
+      "expectedWarningCandidate": false,
+      "maskBoundsM": [
+        [
+          1.2,
+          0,
+          0.65
+        ],
+        [
+          1.2,
+          1.9,
+          2.4
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Wall lies wholly 1.2 m right of the forward walking corridor.",
+      "surfaceAxes": "yz",
+      "extentM": [
+        1.75,
+        1.9
+      ]
+    },
+    {
+      "id": "repeated_complete_8mm_fragment",
+      "label": "nuisance",
+      "expectedShow": false,
+      "expectedWarningCandidate": false,
+      "maskBoundsM": [
+        [
+          -0.004,
+          1.0,
+          1.8
+        ],
+        [
+          0.004,
+          1.008,
+          1.8
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Fixture explicitly stipulates a complete isolated static harmless 8 mm speck, reliable full coverage and conservative extent.",
+      "extentM": [
+        0.008,
+        0.008
+      ],
+      "canRejectSmall": true
+    },
+    {
+      "id": "frontal_just_outside_3m",
+      "label": "nuisance",
+      "expectedShow": false,
+      "expectedWarningCandidate": false,
+      "maskBoundsM": [
+        [
+          -0.1,
+          1.4,
+          3.02
+        ],
+        [
+          0.1,
+          1.6,
+          3.02
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Outside 3 m is excluded by current UNKNOWN product scope, regardless of physical future hazard.",
+      "extentM": [
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": "approaching_outside_3m",
+      "label": "nuisance",
+      "expectedShow": false,
+      "expectedWarningCandidate": false,
+      "maskBoundsM": [
+        [
+          -0.15,
+          1.3,
+          3.6
+        ],
+        [
+          0.15,
+          1.6,
+          3.6
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Approach does not override the strict UNKNOWN 3 m admission boundary.",
+      "trend": "APPROACHING",
+      "timeToCollisionMs": 1800,
+      "extentM": [
+        0.3,
+        0.3
+      ]
+    },
+    {
+      "id": "missing_gravity_metric_obstacle",
+      "label": "unassessable",
+      "expectedShow": false,
+      "expectedWarningCandidate": false,
+      "maskBoundsM": [
+        [
+          -0.2,
+          0.2,
+          1.8
+        ],
+        [
+          0.2,
+          1.7,
+          1.8
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Metric distance without gravity cannot establish a walking corridor/floor model.",
+      "gravityUp": null,
+      "extentM": [
+        0.4,
+        1.5
+      ]
+    },
+    {
+      "id": "reused_depth_frontal_obstacle",
+      "label": "unassessable",
+      "expectedShow": false,
+      "expectedWarningCandidate": false,
+      "maskBoundsM": [
+        [
+          -0.2,
+          0.2,
+          1.8
+        ],
+        [
+          0.2,
+          1.7,
+          1.8
+        ]
+      ],
+      "maskGrid": [
+        9,
+        9
+      ],
+      "rationale": "Reused depth is not fresh independent evidence for a new warning.",
+      "independentDepth": false,
+      "extentM": [
+        0.4,
+        1.5
+      ]
+    }
+  ]
+}

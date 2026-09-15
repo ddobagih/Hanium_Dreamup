@@ -29,7 +29,8 @@ class UnknownWalkingObstaclePolicyTest {
         assertEquals("outside_forward_corridor", UnknownWalkingObstaclePolicy.select(topStrip, null, 1).reason)
         val leftStrip = mask { x, y -> x in 16..29 && y in 30..50 }
         assertEquals("outside_forward_corridor", UnknownWalkingObstaclePolicy.select(leftStrip, null, 0).reason)
-        assertEquals("waiting_for_repeated_observation", UnknownWalkingObstaclePolicy.select(leftStrip, null, 1).reason)
+        // Rotated foreground reaches the corridor; missing range now gates before repetition.
+        assertEquals("depth_unconfirmed", UnknownWalkingObstaclePolicy.select(leftStrip, null, 1).reason)
     }
 
     @Test fun aBoxSpanningCorridorWithOnlySideForegroundIsNotForwardEvidence() {
@@ -45,11 +46,27 @@ class UnknownWalkingObstaclePolicyTest {
             else -> (1f - y) to x
         }
         for (turns in 0..3) for ((x, expected) in listOf(
-            0.1f to "outside_forward_corridor", 0.5f to "waiting_for_repeated_observation")) {
+            0.1f to "outside_forward_corridor", 0.5f to "depth_unconfirmed")) {
             val center = sensor(x, 0.3f, turns)
             val image = mask { px, py -> kotlin.math.abs((px + .5f) / 130 - center.first) < .04f &&
                 kotlin.math.abs((py + .5f) / 80 - center.second) < .04f }
             assertEquals("rotation $turns", expected, UnknownWalkingObstaclePolicy.select(image, null, turns).reason)
+        }
+    }
+
+    @Test fun uprightCorridorRetainsBothHeadAndFootForegroundAcrossAllRotations() {
+        // The old vertical 12%-95% crop could discard head/low hazards; the v6 band spans full height.
+        for (turns in 0..3) for (uprightY in listOf(.03f, .97f)) {
+            val sensorCenter = when (turns) {
+                0 -> .5f to uprightY
+                1 -> uprightY to .5f
+                2 -> .5f to 1f - uprightY
+                else -> 1f - uprightY to .5f
+            }
+            val image = mask { x, y -> kotlin.math.abs((x + .5f) / 130 - sensorCenter.first) < .02f &&
+                kotlin.math.abs((y + .5f) / 80 - sensorCenter.second) < .02f }
+            assertTrue("rotation=$turns uprightY=$uprightY", UnknownWalkingObstaclePolicy.hasForwardCorridorSupport(image, turns))
+            assertEquals("depth_unconfirmed", UnknownWalkingObstaclePolicy.select(image, null, turns).reason)
         }
     }
 }

@@ -21,6 +21,9 @@ internal enum class VoskStreamingError {
 internal interface VoskStreamingListener {
     fun onReady(runId: Long)
     fun onTranscript(runId: Long, transcript: VoskTranscript)
+    fun onTranscript(runId: Long, transcript: VoskTranscript, inputGeneration: Long?) {
+        onTranscript(runId, transcript)
+    }
     fun onError(runId: Long, error: VoskStreamingError)
 }
 
@@ -47,6 +50,7 @@ internal class VoskStreamingTranscriber(
         Thread(runnable, "walksafe-vosk-loader").apply { isDaemon = true }
     },
     private val homeWakeEndpointing: Boolean = false,
+    private val inputGeneration: () -> Long? = { null },
 ) : Closeable {
     private enum class State {
         STOPPED,
@@ -66,6 +70,7 @@ internal class VoskStreamingTranscriber(
 
     @Volatile
     private var decoderSuppressed = false
+    private var decoderInputGeneration: Long? = null
     private var lastPartial = ""
     private var lastPartialEmittedAtNanos = 0L
 
@@ -157,6 +162,7 @@ internal class VoskStreamingTranscriber(
                 try {
                     source.start()
                     decoderSuppressed = false
+                    decoderInputGeneration = null
                     lastPartial = ""
                     lastPartialEmittedAtNanos = 0L
                     state = State.RUNNING
@@ -189,6 +195,7 @@ internal class VoskStreamingTranscriber(
     ) {
         synchronized(decoderLock) {
             if (!isCurrentRunning(callbackGeneration, activeRecognizer)) return
+            val capturedInputGeneration = runCatching(inputGeneration).getOrNull()
             if (runCatching(isInputSuppressed).getOrDefault(true)) {
                 if (!decoderSuppressed) {
                     decoderSuppressed = true
@@ -197,17 +204,23 @@ internal class VoskStreamingTranscriber(
                 }
                 return
             }
-            if (decoderSuppressed) {
+            if (decoderSuppressed || decoderInputGeneration != capturedInputGeneration) {
                 decoderSuppressed = false
                 activeRecognizer.reset()
                 lastPartial = ""
             }
+            decoderInputGeneration = capturedInputGeneration
             try {
                 if (activeRecognizer.acceptWaveForm(samples, samples.size)) {
-                    emitTranscript(callbackGeneration, activeRecognizer.result, isFinal = true)
+                    emitTranscript(
+                        callbackGeneration,
+                        activeRecognizer.result,
+                        isFinal = true,
+                        capturedInputGeneration = capturedInputGeneration,
+                    )
                     lastPartial = ""
                 } else {
-                    maybeEmitPartial(callbackGeneration, activeRecognizer)
+                    maybeEmitPartial(callbackGeneration, activeRecognizer, capturedInputGeneration)
                 }
             } catch (_: Throwable) {
                 handleRuntimeFailure(callbackGeneration, VoskStreamingError.INFERENCE_FAILED)
@@ -218,6 +231,7 @@ internal class VoskStreamingTranscriber(
     private fun maybeEmitPartial(
         callbackGeneration: Long,
         activeRecognizer: Recognizer,
+        capturedInputGeneration: Long?,
     ) {
         val nowNanos = System.nanoTime()
         if (nowNanos - lastPartialEmittedAtNanos < PARTIAL_INTERVAL_NANOS) return
@@ -225,16 +239,17 @@ internal class VoskStreamingTranscriber(
         if (transcript.text == lastPartial) return
         lastPartial = transcript.text
         lastPartialEmittedAtNanos = nowNanos
-        listener.onTranscript(callbackGeneration, transcript)
+        listener.onTranscript(callbackGeneration, transcript, capturedInputGeneration)
     }
 
     private fun emitTranscript(
         callbackGeneration: Long,
         payload: String,
         isFinal: Boolean,
+        capturedInputGeneration: Long?,
     ) {
         parseVoskTranscript(payload, isFinal)?.let { transcript ->
-            listener.onTranscript(callbackGeneration, transcript)
+            listener.onTranscript(callbackGeneration, transcript, capturedInputGeneration)
         }
     }
 
@@ -313,6 +328,7 @@ internal class VoskStreamingTranscriber(
             runCatching { resources.recognizer?.close() }
             runCatching { resources.model?.close() }
             decoderSuppressed = false
+            decoderInputGeneration = null
             lastPartial = ""
             lastPartialEmittedAtNanos = 0L
         }

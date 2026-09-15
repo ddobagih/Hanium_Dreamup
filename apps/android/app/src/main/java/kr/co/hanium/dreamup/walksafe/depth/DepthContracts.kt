@@ -32,12 +32,48 @@ data class ObjectGeometry(
     val polygonNorm: List<Point2>,
     val maskAreaNorm: Float,
     val centerNorm: Point2,
+    /** Upright bottom contact, stored in sensor coordinates for depth/pose projection. */
     val bottomContactNorm: Point2?,
+    /** Source-image zone. User-facing corridor decisions use [uprightScreenZone]. */
     val screenZone: ScreenZone = ScreenZone.CENTER,
     val centerlineNorm: List<Point2> = emptyList(),
     val orientationRad: Float? = null,
     val aspectRatio: Float? = null,
-)
+    /** Captured clockwise sensor-to-upright rotation; null means the display orientation is unknown. */
+    val imageQuarterTurns: Int? = 0,
+) {
+    // Keep all stored geometry in the source image plane for depth/pose projection and association.
+    val uprightCenterNorm: Point2? get() = sensorPointToUpright(centerNorm)
+
+    val uprightScreenZone: ScreenZone?
+        get() = uprightCenterNorm?.let { point ->
+            when {
+                point.y < 0.33f -> ScreenZone.UPPER
+                point.y > 0.70f -> ScreenZone.LOWER
+                point.x < 0.33f -> ScreenZone.LEFT
+                point.x > 0.67f -> ScreenZone.RIGHT
+                else -> ScreenZone.CENTER
+            }
+        }
+
+    fun sensorPointToUpright(point: Point2): Point2? = sensorPointToUpright(point, imageQuarterTurns)
+}
+
+internal fun sensorPointToUpright(point: Point2, imageQuarterTurns: Int?): Point2? = when (imageQuarterTurns) {
+    0 -> point
+    1 -> Point2(1f - point.y, point.x)
+    2 -> Point2(1f - point.x, 1f - point.y)
+    3 -> Point2(point.y, 1f - point.x)
+    else -> null
+}
+
+internal fun uprightPointToSensor(point: Point2, imageQuarterTurns: Int?): Point2? = when (imageQuarterTurns) {
+    0 -> point
+    1 -> Point2(point.y, 1f - point.x)
+    2 -> Point2(1f - point.x, 1f - point.y)
+    3 -> Point2(1f - point.y, point.x)
+    else -> null
+}
 
 /** Only metric sources may become spoken distances; pseudo sources remain trend/display evidence. */
 enum class DepthSource(
@@ -110,6 +146,21 @@ data class DepthConfidenceBreakdown(
     }
 }
 
+enum class DepthAvailability { MEASURED, PREDICTED, TEMPORARILY_UNAVAILABLE, UNAVAILABLE }
+
+/** A short extrapolation of accepted independent depth, never a metric measurement or voice input. */
+data class PredictedDepthEstimate(
+    val distanceM: Float,
+    val observedAtMs: Long,
+    val predictionAgeMs: Long,
+    /** Conservative model allowance, not a calibrated sensor accuracy or statistical confidence. */
+    val errorBoundM: Float,
+    /** Fixed from the last real observation; repeated rendering never extends this deadline. */
+    val horizonMs: Long,
+    /** Physical range upper allowance only when current pose and observed 3D motion support it. */
+    val rangeUpperBoundM: Float? = null,
+)
+
 data class TrackedObjectDepth(
     val frameId: Long,
     val timestampMs: Long,
@@ -144,7 +195,18 @@ data class TrackedObjectDepth(
     val userMotion: UserMotionEstimate = UserMotionEstimate(),
     /** Unnamed masks must pass the captured portrait corridor/near-obstacle selection. */
     val walkingObstacleCandidate: Boolean = true,
-)
+    /** Captured sensor-to-upright rotation; null/invalid orientation cannot guide tactile steering. */
+    val imageQuarterTurns: Int? = 0,
+    val depthAvailability: DepthAvailability = if (source.metric && riskDistanceM != null) {
+        DepthAvailability.MEASURED
+    } else DepthAvailability.UNAVAILABLE,
+    /** Original independent depth capture in the camera's millisecond clock, when known. */
+    val depthObservedAtMs: Long? = null,
+    val prediction: PredictedDepthEstimate? = null,
+) {
+    val uprightBottomContactNorm: Point2?
+        get() = bottomContactNorm?.let { sensorPointToUpright(it, imageQuarterTurns) }
+}
 
 data class UserFacingDepth(
     val stepsAhead: Int?,

@@ -18,10 +18,13 @@ class ObjectDepthRuntimePipeline(
     private val extractor: MaskPolygonExtractor = MaskPolygonExtractor(),
     private val tracker: ObjectTracker = ObjectTracker(),
     messagePolicy: MessagePolicy = MessagePolicy(),
+    /** The camera diagnostic uses Full for proximity without treating smoothing as independent motion. */
+    private val rawDepthMotionOnly: Boolean = false,
 ) {
+    private var messagePolicy = messagePolicy.forFeedbackQueue()
     private var estimator = ObjectDepthEstimator(
         tracker = tracker,
-        messagePolicy = messagePolicy,
+        messagePolicy = this.messagePolicy,
     )
     private var lastCompletedDetectionSequenceId: Long? = null
     private var lastVisualSourceKey: VisualFrameKey? = null
@@ -30,10 +33,11 @@ class ObjectDepthRuntimePipeline(
     private var lastVisualOutputs: List<TrackedObjectDepth> = emptyList()
 
     fun setUserStepLength(stepLengthM: Float) {
+        messagePolicy = messagePolicy.withStepLength(stepLengthM)
         estimator = ObjectDepthEstimator(
             sampler = DepthSampler(),
             tracker = tracker,
-            messagePolicy = MessagePolicy(stepLengthM = stepLengthM),
+            messagePolicy = messagePolicy,
         )
     }
 
@@ -46,6 +50,7 @@ class ObjectDepthRuntimePipeline(
         detectionCompleted: Boolean = true,
         mapper: CoordinateMapper? = null,
         motionContext: MotionContext = MotionContext(),
+        imageQuarterTurns: Int? = 0,
     ): List<TrackedObjectDepth> {
         // Partial legacy-model output is useful for the overlay, but must never count as one of
         // the three completed detector observations required by the warning/report safety gate.
@@ -56,7 +61,7 @@ class ObjectDepthRuntimePipeline(
         val effectiveMapper = mapper ?: identityMapper(depthWidth, depthHeight)
         val sourceDetections = detections ?: detectionProvider.detect(frameId, timestampMs)
         val geometries = sourceDetections
-            .map { extractor.extract(it) }
+            .map { extractor.extract(it, imageQuarterTurns = imageQuarterTurns) }
             .filter { it.detectionConfidence >= MIN_DETECTION_CONFIDENCE }
         val isNewCompletedDetection = detectionSequenceId != lastCompletedDetectionSequenceId
         if (isNewCompletedDetection) {
@@ -85,6 +90,7 @@ class ObjectDepthRuntimePipeline(
         mapperFrameId: Long,
         nowElapsedRealtimeMs: Long,
         motionContext: MotionContext = MotionContext(),
+        imageQuarterTurns: Int? = 0,
     ): List<TrackedObjectDepth> {
         if (!observation.isFreshAt(nowElapsedRealtimeMs) || !observation.matchesDepthSnapshot(snapshot) ||
             mapperFrameId != observation.targetKey.frameId
@@ -114,26 +120,42 @@ class ObjectDepthRuntimePipeline(
             ) return emptyList()
         }
         val indexed = observation.trackedObservations.mapNotNull { tracked ->
-            val geometry = extractor.extract(requireNotNull(tracked.geometry))
+            val geometry = extractor.extract(requireNotNull(tracked.geometry), imageQuarterTurns = imageQuarterTurns)
                 .takeIf { it.detectionConfidence >= MIN_DETECTION_CONFIDENCE } ?: return@mapNotNull null
             IndexedObjectGeometry(tracked.sourceIndex, geometry)
         }
         val sourceChanged = observation.sourceKey != lastVisualSourceKey
-        val tracks = if (sourceChanged) {
+        if (sourceChanged) {
             // Equal source frame IDs with changed metadata are never another completed detection.
             if (lastVisualSourceKey?.frameId == observation.sourceKey.frameId) return emptyList()
-            val assignments = tracker.updateWithAssignments(indexed, observation.timestampMs)
+            // Every completed source detection confirms identity, including budget-deferred flow.
+            // Its coordinates are source-time evidence and never enter current depth sampling.
+            val invalidIndices = observation.observations.filter {
+                it.failure == VisualTrackingFailure.INVALID_GEOMETRY
+            }.map { it.sourceIndex }.toSet()
+            val sourceGeometry = observation.sourceDetections.mapIndexedNotNull { index, detection ->
+                if (index in invalidIndices) return@mapIndexedNotNull null
+                extractor.extract(detection, imageQuarterTurns = imageQuarterTurns)
+                    .takeIf { it.detectionConfidence >= MIN_DETECTION_CONFIDENCE }
+                    ?.let { IndexedObjectGeometry(index, it) }
+            }
+            val assignments = tracker.updateSourceWithAssignments(
+                sourceGeometry, observation.sourceKey.frameId / 1_000_000L,
+                currentGeometries = indexed, currentTimestampMs = observation.timestampMs,
+            )
             visualAssignments = assignments.associate { it.sourceDetectionIndex to it.track.trackId }
             lastVisualSourceKey = observation.sourceKey
-            assignments.map { it.track }
-        } else {
-            tracker.applyTrackedObservations(
-                indexed.mapNotNull { indexedGeometry ->
-                    visualAssignments[indexedGeometry.sourceDetectionIndex]?.let { it to indexedGeometry.geometry }
-                },
-                observation.timestampMs,
-            )
         }
+        val deferredIds = observation.observations.filter {
+            it.failure == VisualTrackingFailure.OBJECT_BUDGET_EXCEEDED
+        }.mapNotNull { visualAssignments[it.sourceIndex] }.toSet()
+        val tracks = tracker.applyTrackedObservations(
+            indexed.mapNotNull { indexedGeometry ->
+                visualAssignments[indexedGeometry.sourceDetectionIndex]?.let { it to indexedGeometry.geometry }
+            },
+            observation.timestampMs,
+            budgetDeferredTrackIds = deferredIds,
+        )
         val visualQualities = observation.trackedObservations.mapNotNull { tracked ->
             visualAssignments[tracked.sourceIndex]?.let { it to tracked.trackingQuality }
         }.toMap()
@@ -172,7 +194,8 @@ class ObjectDepthRuntimePipeline(
                     rawDepthTimestampNs = snapshot.rawDepthTimestampNs,
                     fullDepthTimestampNs = snapshot.fullDepthTimestampNs,
                     visualTrackingQuality = visualQualities[track.trackId] ?: 1f,
-                    requireIndependentDepthObservation = requireIndependentDepthObservation,
+                    requireIndependentDepthObservation = requireIndependentDepthObservation || rawDepthMotionOnly,
+                    rawDepthMotionOnly = rawDepthMotionOnly,
                     motionContext = motionContext.copy(
                         cameraPoseEvidence = snapshot.cameraPoseEvidence,
                     ),

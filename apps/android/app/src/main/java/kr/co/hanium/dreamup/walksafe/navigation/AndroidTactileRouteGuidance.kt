@@ -262,9 +262,12 @@ class AndroidTactileRouteObservationSupplier : TactileRouteObservationSupplier {
         val depthIqrM = output.depthIqrM?.takeIf { it.isFinite() && it in 0f..MAX_DEPTH_IQR_M } ?: return null
         if (!output.hasTrustedMetricDepth()) return null
         val contact = output.bottomContactNorm ?: return null
+        val uprightContact = output.uprightBottomContactNorm ?: return null
         if (
             !contact.x.isFinite() || contact.x !in 0f..1f ||
-            !contact.y.isFinite() || contact.y !in MIN_CONTACT_Y_NORMALIZED..1f ||
+            !contact.y.isFinite() || contact.y !in 0f..1f ||
+            !uprightContact.x.isFinite() || uprightContact.x !in 0f..1f ||
+            !uprightContact.y.isFinite() || uprightContact.y !in MIN_CONTACT_Y_NORMALIZED..1f ||
             !output.maskAreaNorm.isFinite() || output.maskAreaNorm < MIN_MASK_AREA_NORMALIZED
         ) {
             return null
@@ -326,7 +329,7 @@ class AndroidTactileRouteObservationSupplier : TactileRouteObservationSupplier {
             ageMs = detectionAgeMs,
             routeHeadingDeltaDeg = routeHeadingDeltaDegrees(cameraBearingTrue, route.bearingDeg),
             tmapCorridorProjection = TmapCorridorProjectionEvidence.OVERLAPS,
-            centerXNormalized = contact.x,
+            centerXNormalized = uprightContact.x,
             routeId = routeId,
             routeSegmentIndex = route.segmentIndex,
         )

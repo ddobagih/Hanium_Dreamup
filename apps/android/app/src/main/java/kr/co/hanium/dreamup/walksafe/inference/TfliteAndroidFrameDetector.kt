@@ -614,10 +614,8 @@ private class TfliteSingleModelDetector(
         val parseStartedNs = System.nanoTime()
         outputFloats.rewind()
         outputFloats.get(flatOutput)
-        val parsed = rawParser?.parse(flatOutput) ?: parser.parse(flatOutput)
-        val detections = parsed.map { candidate ->
-            candidate.copy(bboxNorm = input.transform.modelRectToImageRect(candidate.bboxNorm))
-        }
+        val parsed = rawParser?.parse(flatOutput, input.transform) ?: parser.parse(flatOutput)
+        val detections = parsed.mapNotNull(input.transform::modelDetectionToImageDetection)
         hasCompletedOutput = true
         return SingleModelDetectionResult(
             detections = detections,

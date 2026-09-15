@@ -15,16 +15,30 @@ import kr.co.hanium.dreamup.walksafe.navigation.positioning.ChestMountedRotation
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.HeadingObservation
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.HeadingObservationHistory
 
-/** Fresh, accuracy-bounded magnetic East-North-Up orientation from TYPE_ROTATION_VECTOR. */
+/** Trusted RV orientation for AR/PDR, plus an independently gated route-only magnetic compass. */
 class AndroidEarthOrientationTracker(context: Context) {
     private val chestHeadingHistory = HeadingObservationHistory()
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
     private val magneticFieldSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
+    private val gravitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
+    private val accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private val chestMountedHeading = ChestMountedHeading()
 
     @Volatile
     private var latestOrientation: DeviceEarthOrientation? = null
+    // Unlike latest(), this route-only sample may contain an unavailable numeric heading error.
+    private var latestRouteOrientation: DeviceEarthOrientation? = null
+    private var latestRotationEventAtMs: Long? = null
+    // Accuracy callbacks describe current sensor state, independently of the last vector's age.
+    private var rotationAccuracyStatus: EarthOrientationAccuracy? = null
+    private var rotationQualityRequiresFreshSample = false
+    private var latestGravitySample: RouteCompassVectorSample? = null
+    private var latestAccelerometerSample: RouteCompassVectorSample? = null
+    private var latestRouteMagneticSample: RouteCompassVectorSample? = null
+    private var registrationStartedAtNanos = 0L
+    @Volatile
+    private var routeCompassUnavailableReason = RouteCompassHeadingReason.ORIENTATION_MISSING
     @Volatile
     private var latestRotationSample: ChestMountedRotationSample? = null
     @Volatile
@@ -41,9 +55,16 @@ class AndroidEarthOrientationTracker(context: Context) {
     @Synchronized
     fun start(): Boolean {
         if (started) return true
-        val sensor = rotationVectorSensor ?: return false
         magneticSensorRegistered = false
         latestOrientation = null
+        latestRouteOrientation = null
+        latestRotationEventAtMs = null
+        rotationAccuracyStatus = null
+        rotationQualityRequiresFreshSample = false
+        latestGravitySample = null
+        latestAccelerometerSample = null
+        latestRouteMagneticSample = null
+        routeCompassUnavailableReason = RouteCompassHeadingReason.ORIENTATION_MISSING
         latestRotationSample = null
         latestMagneticFieldSample = null
         chestHeadingHistory.clear()
@@ -52,60 +73,76 @@ class AndroidEarthOrientationTracker(context: Context) {
         lateinit var listener: SensorEventListener
         listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
-                if (!isCurrentRegistration(listener, generation)) return
-                handleSensorChanged(event)
+                synchronized(this@AndroidEarthOrientationTracker) {
+                    if (!isCurrentRegistration(listener, generation) || event.timestamp < registrationStartedAtNanos) return
+                    handleSensorChanged(event)
+                }
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                if (!isCurrentRegistration(listener, generation)) return
-                val mappedAccuracy = accuracy.toEarthOrientationAccuracy()
-                // Never replay headings accepted under a superseded quality assessment.
-                chestHeadingHistory.clear()
-                when (sensor?.type) {
-                    Sensor.TYPE_ROTATION_VECTOR -> {
-                        latestRotationSample = latestRotationSample?.let { sample ->
-                            sample.copy(accuracy = sample.accuracy.downgradedTo(mappedAccuracy))
-                        }
-                        if (accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE) {
-                            latestOrientation = null
-                        } else {
-                            latestOrientation = latestOrientation?.let { orientation ->
-                                orientation.copy(
-                                    accuracy = orientation.accuracy.downgradedTo(mappedAccuracy),
-                                )
+                synchronized(this@AndroidEarthOrientationTracker) {
+                    if (!isCurrentRegistration(listener, generation)) return
+                    val mappedAccuracy = accuracy.toEarthOrientationAccuracy()
+                    // Only the strict PDR input sensors can invalidate its accepted history.
+                    if (sensor?.type == Sensor.TYPE_ROTATION_VECTOR || sensor?.type == Sensor.TYPE_MAGNETIC_FIELD) {
+                        chestHeadingHistory.clear()
+                    }
+                    when (sensor?.type) {
+                        Sensor.TYPE_ROTATION_VECTOR -> {
+                            rotationAccuracyStatus = mappedAccuracy
+                            if (mappedAccuracy < EarthOrientationAccuracy.MEDIUM) {
+                                rotationQualityRequiresFreshSample = true
+                            }
+                            latestRouteOrientation = latestRouteOrientation?.let { orientation ->
+                                orientation.copy(accuracy = orientation.accuracy.downgradedTo(mappedAccuracy))
+                            }
+                            latestRotationSample = latestRotationSample?.let { sample ->
+                                sample.copy(accuracy = sample.accuracy.downgradedTo(mappedAccuracy))
+                            }
+                            if (accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE) {
+                                latestOrientation = null
+                                routeCompassUnavailableReason = RouteCompassHeadingReason.QUALITY_LOW
+                            } else {
+                                latestOrientation = latestOrientation?.let { orientation ->
+                                    orientation.copy(
+                                        accuracy = orientation.accuracy.downgradedTo(mappedAccuracy),
+                                    )
+                                }
                             }
                         }
-                    }
-                    Sensor.TYPE_MAGNETIC_FIELD -> {
-                        latestMagneticFieldSample = latestMagneticFieldSample?.let { sample ->
-                            sample.copy(accuracy = sample.accuracy.downgradedTo(mappedAccuracy))
+                        Sensor.TYPE_GRAVITY -> {
+                            latestGravitySample = latestGravitySample?.downgradedTo(mappedAccuracy)
+                        }
+                        Sensor.TYPE_ACCELEROMETER -> {
+                            latestAccelerometerSample = latestAccelerometerSample?.downgradedTo(mappedAccuracy)
+                        }
+                        Sensor.TYPE_MAGNETIC_FIELD -> {
+                            latestRouteMagneticSample = latestRouteMagneticSample?.downgradedTo(mappedAccuracy)
+                            latestMagneticFieldSample = latestMagneticFieldSample?.let { sample ->
+                                sample.copy(accuracy = sample.accuracy.downgradedTo(mappedAccuracy))
+                            }
                         }
                     }
                 }
             }
         }
         currentListener = listener
-        val rotationRegistered = sensorManager.registerListener(
-            listener,
-            sensor,
-            SensorManager.SENSOR_DELAY_GAME,
-        )
-        started = rotationRegistered
-        if (!rotationRegistered) {
-            if (currentListener === listener) currentListener = null
-            chestHeadingHistory.clear()
-            chestMountedHeading.reset()
+        registrationStartedAtNanos = SystemClock.elapsedRealtimeNanos()
+        started = true
+        // Registration failures are independent: a device without RV can still have a compass.
+        val rotationRegistered = register(listener, rotationVectorSensor)
+        magneticSensorRegistered = register(listener, magneticFieldSensor)
+        val gravityRegistered = register(listener, gravitySensor)
+        // Register raw acceleration independently; some devices expose gravity but produce no data.
+        val accelerometerRegistered = register(listener, accelerometerSensor)
+        started = rotationRegistered || (magneticSensorRegistered && (gravityRegistered || accelerometerRegistered))
+        if (!rotationRegistered) routeCompassUnavailableReason = RouteCompassHeadingReason.SENSOR_UNAVAILABLE
+        if (!started) {
+            currentListener = null
+            sensorManager.unregisterListener(listener)
+            magneticSensorRegistered = false
             return false
         }
-        magneticSensorRegistered = magneticFieldSensor?.let { magneticSensor ->
-            runCatching {
-                sensorManager.registerListener(
-                    listener,
-                    magneticSensor,
-                    SensorManager.SENSOR_DELAY_GAME,
-                )
-            }.getOrDefault(false)
-        } ?: false
         return true
     }
 
@@ -117,6 +154,14 @@ class AndroidEarthOrientationTracker(context: Context) {
         started = false
         listener?.let(sensorManager::unregisterListener)
         latestOrientation = null
+        latestRouteOrientation = null
+        latestRotationEventAtMs = null
+        rotationAccuracyStatus = null
+        rotationQualityRequiresFreshSample = false
+        latestGravitySample = null
+        latestAccelerometerSample = null
+        latestRouteMagneticSample = null
+        routeCompassUnavailableReason = RouteCompassHeadingReason.ORIENTATION_MISSING
         latestRotationSample = null
         latestMagneticFieldSample = null
         magneticSensorRegistered = false
@@ -125,6 +170,32 @@ class AndroidEarthOrientationTracker(context: Context) {
     }
 
     fun latest(): DeviceEarthOrientation? = latestOrientation
+
+    /** No fixed chest posture is required; fallback observations never enter latest() or PDR. */
+    @Synchronized
+    fun latestRouteCompassHeading(nowMs: Long = SystemClock.elapsedRealtime()): RouteCompassHeadingResult {
+        if (!started) return RouteCompassHeadingResult(null, routeCompassUnavailableReason)
+        if (rotationQualityRequiresFreshSample) {
+            return RouteCompassHeadingResult(null, RouteCompassHeadingReason.QUALITY_LOW)
+        }
+        val orientation = latestRouteOrientation
+        val primary = if (orientation != null) {
+            RouteCompassHeading.evaluate(orientation, geomagneticReference?.declinationDegrees, nowMs)
+        } else {
+            val at = latestRotationEventAtMs
+            val reason = when {
+                at != null && (nowMs < 0L || at < 0L || at > nowMs) -> RouteCompassHeadingReason.INVALID_TIMESTAMP
+                at != null && nowMs - at > 500L -> RouteCompassHeadingReason.STALE
+                else -> routeCompassUnavailableReason
+            }
+            RouteCompassHeadingResult(null, reason)
+        }
+        if (!RouteCompassHeading.permitsFallback(primary)) return primary
+        return RouteCompassHeading.evaluateFallback(
+            latestGravitySample, latestAccelerometerSample, latestRouteMagneticSample,
+            geomagneticReference, nowMs,
+        )
+    }
 
     fun latestChestMountedHeading(
         nowElapsedRealtimeMs: Long = SystemClock.elapsedRealtime(),
@@ -141,6 +212,7 @@ class AndroidEarthOrientationTracker(context: Context) {
 
     fun isMagneticFieldAvailable(): Boolean = magneticSensorRegistered
 
+    @Synchronized
     fun updateGeomagneticReference(
         latitudeDegrees: Double,
         longitudeDegrees: Double,
@@ -184,10 +256,17 @@ class AndroidEarthOrientationTracker(context: Context) {
         return true
     }
 
+    @Synchronized
     fun clearGeomagneticReference() {
         geomagneticReference = null
         chestHeadingHistory.clear()
+        chestMountedHeading.reset()
     }
+
+    private fun register(listener: SensorEventListener, sensor: Sensor?): Boolean = sensor?.let {
+        runCatching { sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME) }
+            .getOrDefault(false)
+    } ?: false
 
     // Kept as text so the frozen FP-017 trace can identify the superseded
     // listener contract while runtime code uses the stronger registration lease.
@@ -208,6 +287,15 @@ started = false
         when (event.sensor.type) {
             Sensor.TYPE_ROTATION_VECTOR -> handleRotationVectorChanged(event)
             Sensor.TYPE_MAGNETIC_FIELD -> handleMagneticFieldChanged(event)
+            Sensor.TYPE_GRAVITY -> {
+                latestGravitySample = event.toRouteVectorSample()
+                return
+            }
+            Sensor.TYPE_ACCELEROMETER -> {
+                latestAccelerometerSample = event.toRouteVectorSample()
+                return
+            }
+            else -> return
         }
         // Save already-gated observations at sensor time, before delayed step callbacks consume them.
         val result = latestChestMountedHeading(SystemClock.elapsedRealtime())
@@ -222,35 +310,49 @@ started = false
     }
 
     private fun handleRotationVectorChanged(event: SensorEvent) {
+        latestRotationEventAtMs = event.timestamp / NANOS_PER_MILLISECOND
         val headingErrorRad = event.values.getOrNull(4)
-            ?.takeIf { it.isFinite() && it >= 0f }
-            ?: run {
-                latestOrientation = null
-                latestRotationSample = null
-                return
-            }
+        val hasReportedError = headingErrorRad != null && !headingErrorRad.isNaN() && headingErrorRad >= 0f
         val rowMajorRotation = FloatArray(9)
         try {
             SensorManager.getRotationMatrixFromVector(rowMajorRotation, event.values)
         } catch (_: RuntimeException) {
+            routeCompassUnavailableReason = RouteCompassHeadingReason.INVALID_ROTATION
             latestOrientation = null
+            latestRouteOrientation = null
             latestRotationSample = null
             return
         }
         val rotation = RotationMatrix3.fromRowMajor(rowMajorRotation) ?: run {
+            routeCompassUnavailableReason = RouteCompassHeadingReason.INVALID_ROTATION
             latestOrientation = null
+            latestRouteOrientation = null
             latestRotationSample = null
             return
         }
         val observedAtMs = event.timestamp / NANOS_PER_MILLISECOND
-        val headingErrorDeg = Math.toDegrees(headingErrorRad.toDouble()).toFloat()
-        val accuracy = event.accuracy.toEarthOrientationAccuracy()
-        latestOrientation = DeviceEarthOrientation(
+        val headingErrorDeg = if (hasReportedError) Math.toDegrees(requireNotNull(headingErrorRad).toDouble()).toFloat()
+            else Float.NaN
+        val eventAccuracy = event.accuracy.toEarthOrientationAccuracy()
+        val accuracy = rotationAccuracyStatus?.let { eventAccuracy.downgradedTo(it) } ?: eventAccuracy
+        val nowMs = SystemClock.elapsedRealtime()
+        if (accuracy >= EarthOrientationAccuracy.MEDIUM &&
+            observedAtMs >= 0L && observedAtMs <= nowMs && nowMs - observedAtMs <= 500L
+        ) rotationQualityRequiresFreshSample = false
+        latestRouteOrientation = DeviceEarthOrientation(
             deviceToMagneticEnu = rotation,
             observedAtElapsedRealtimeMs = observedAtMs,
             headingErrorDeg = headingErrorDeg,
             accuracy = accuracy,
         )
+        if (!hasReportedError || !headingErrorDeg.isFinite()) {
+            routeCompassUnavailableReason = if (hasReportedError) RouteCompassHeadingReason.HEADING_ACCURACY
+                else RouteCompassHeadingReason.HEADING_ACCURACY_UNAVAILABLE
+            latestOrientation = null
+            latestRotationSample = null
+            return
+        }
+        latestOrientation = latestRouteOrientation
         latestRotationSample = ChestMountedRotationSample(
             deviceToMagneticEnu = rotation,
             observedAtMs = observedAtMs,
@@ -260,6 +362,7 @@ started = false
     }
 
     private fun handleMagneticFieldChanged(event: SensorEvent) {
+        latestRouteMagneticSample = event.toRouteVectorSample()
         latestMagneticFieldSample = ChestMountedMagneticFieldSample(
             xMicrotesla = event.values.getOrNull(0)?.toDouble() ?: Double.NaN,
             yMicrotesla = event.values.getOrNull(1)?.toDouble() ?: Double.NaN,
@@ -268,6 +371,17 @@ started = false
             accuracy = event.accuracy.toEarthOrientationAccuracy(),
         )
     }
+
+    private fun SensorEvent.toRouteVectorSample() = RouteCompassVectorSample(
+        values.getOrNull(0)?.toDouble() ?: Double.NaN,
+        values.getOrNull(1)?.toDouble() ?: Double.NaN,
+        values.getOrNull(2)?.toDouble() ?: Double.NaN,
+        timestamp / NANOS_PER_MILLISECOND,
+        accuracy.toEarthOrientationAccuracy(),
+    )
+
+    private fun RouteCompassVectorSample.downgradedTo(reported: EarthOrientationAccuracy) =
+        copy(accuracy = accuracy.downgradedTo(reported))
 
     private fun Int.toEarthOrientationAccuracy(): EarthOrientationAccuracy = when (this) {
         SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> EarthOrientationAccuracy.HIGH

@@ -31,6 +31,16 @@ data class CameraPoseEvidence(
     val forwardY: Float,
     val forwardZ: Float,
     val imageProjection: CameraImageProjection? = null,
+    /** World gravity-up rotated into this anchor; neither anchor Y nor image up is gravity. */
+    val gravityUpInAnchor: Vec3? = null,
+    val horizontalPlaneCandidates: List<CapturedHorizontalPlane> = emptyList(),
+)
+
+/** Finite same-capture surface evidence, not a semantic floor classification. */
+data class CapturedHorizontalPlane(
+    val referenceId: Long,
+    val captureTimestampMs: Long,
+    val polygonInAnchor: List<Vec3>,
 )
 
 data class CameraImageProjection(

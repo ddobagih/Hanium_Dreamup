@@ -134,7 +134,7 @@ class MainActivityNavigationCompositionTest {
         val deviation = functionBlock("private fun applyRouteDeviationSafetyUpdate(")
 
         val cancellation = deviation.indexOf("feedbackActuator?.cancelNavigationSpeech()")
-        val prompt = deviation.indexOf("update.instruction?.let(::speakInteraction)")
+        val prompt = deviation.indexOf("speakRouteDecision(it, token)")
         assertTrue(cancellation >= 0)
         assertTrue(prompt > cancellation)
         assertTrue(deviation.contains("update.cancelStaleNavigationSpeech"))
@@ -238,7 +238,7 @@ class MainActivityNavigationCompositionTest {
         )
         val tmapStopEnd = request.indexOf("return@runOnUiThread", tmapStopStart)
         val tmapStop = request.substring(tmapStopStart, tmapStopEnd)
-        val snapshotStop = request.substringAfter("if (storedRouteSnapshot == null)")
+        val snapshotStop = request.substringAfter("if (storedRouteSnapshot == null && !developmentGuidanceStartBypassEnabled)")
             .substringBefore("return@runOnUiThread")
         val expiry = functionBlock("private fun scheduleEncryptedRouteSnapshotExpiry(")
 

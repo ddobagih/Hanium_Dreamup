@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.inference
 
 import kr.co.hanium.dreamup.walksafe.depth.RectNorm
+import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import org.junit.Assert.assertArrayEquals
@@ -8,9 +9,29 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class YuvImagePreprocessorTest {
+    @Test
+    fun paddingOnlyDetectionsAreRemovedBeforeTheAuthoritativeImageBatch() {
+        val portrait = LetterboxTransform(480, 640, 768, 1.2f, 96f, 0f)
+        val landscape = LetterboxTransform(640, 480, 768, 1.2f, 0f, 96f)
+        val original = DetectionCandidate("person", .85f, RectNorm(.035f, .4f, .05f, .2f))
+        assertNull(portrait.modelDetectionToImageDetection(original))
+        assertNull(portrait.modelDetectionToImageDetection(original.copy(bboxNorm = RectNorm(.9f, .4f, .05f, .2f))))
+        assertNull(landscape.modelDetectionToImageDetection(original.copy(bboxNorm = RectNorm(.4f, .035f, .2f, .05f))))
+        assertNull(landscape.modelDetectionToImageDetection(original.copy(bboxNorm = RectNorm(.4f, .9f, .2f, .05f))))
+        val partial = original.copy(bboxNorm = RectNorm(.1f, .4f, .1f, .2f))
+        val admitted = requireNotNull(portrait.modelDetectionToImageDetection(partial))
+        assertEquals(0f, admitted.bboxNorm.x, 0f)
+        assertTrue(admitted.bboxNorm.width > 0f)
+        assertEquals(partial.className, admitted.className)
+        assertEquals(partial.detectionConfidence, admitted.detectionConfidence, 0f)
+        assertNull(portrait.modelDetectionToImageDetection(original.copy(bboxNorm = RectNorm(.2f, .2f, 0f, .3f))))
+        assertNull(portrait.modelDetectionToImageDetection(original.copy(bboxNorm = RectNorm(Float.NaN, .2f, .3f, .3f))))
+    }
+
     @Test
     fun rgbChannelOrderAndNormalizationHaveTheSpecifiedFloatBits() {
         val result = YuvImagePreprocessor().preprocess(
