@@ -90,15 +90,15 @@ class RouteCorridorMatcher(
     private val config: RouteCorridorMatcherConfig = RouteCorridorMatcherConfig(),
 ) {
     private var activeRouteId: String? = null
-    private var activeSegmentIndex: Int? = null
+    private var activeCorridorIndex: Int? = null
     private var activeProgressM: Double? = null
-    private var pendingSegmentIndex: Int? = null
+    private var pendingCorridorIndex: Int? = null
     private var pendingSegmentCount = 0
     private var latestSampleElapsedRealtimeMs: Long? = null
 
     fun reset() {
         activeRouteId = null
-        activeSegmentIndex = null
+        activeCorridorIndex = null
         activeProgressM = null
         latestSampleElapsedRealtimeMs = null
         clearPendingSwitch()
@@ -134,7 +134,12 @@ class RouteCorridorMatcher(
         latestSampleElapsedRealtimeMs = position.elapsedRealtimeMs
 
         val covariance = position.effectiveCovariance()
+        // A straight route is one geometric alternative regardless of its sampling density.
+        // Choose its nearest projection before applying the progress prior, so subdividing it
+        // cannot introduce extra endpoint choices that pull the match back toward old progress.
         val candidates = buildCandidates(polyline, position, covariance)
+            .groupBy(Candidate::corridorIndex)
+            .values.map { corridor -> corridor.minBy(Candidate::crossTrackDistanceM) }
         if (candidates.isEmpty()) {
             return unmatched(routeId, position.point, RouteMatchReason.INVALID_ROUTE)
         }
@@ -191,7 +196,7 @@ class RouteCorridorMatcher(
             !resolution.forceLowConfidence && !ambiguousReverseBranch &&
             (quality == RouteMatchQuality.HIGH || quality == RouteMatchQuality.MEDIUM)
         ) {
-            activeSegmentIndex = selected.candidate.segmentIndex
+            activeCorridorIndex = selected.candidate.corridorIndex
             activeProgressM = selected.candidate.geometricProgressM
         }
 
@@ -214,14 +219,14 @@ class RouteCorridorMatcher(
         best: ScoredCandidate,
         eligible: List<ScoredCandidate>,
     ): BranchResolution {
-        val activeIndex = activeSegmentIndex ?: return BranchResolution(best)
-        if (abs(best.candidate.segmentIndex - activeIndex) <= 1) {
+        val activeIndex = activeCorridorIndex ?: return BranchResolution(best)
+        if (abs(best.candidate.corridorIndex - activeIndex) <= 1) {
             clearPendingSwitch()
             return BranchResolution(best)
         }
 
         val activeBranch = eligible
-            .filter { abs(it.candidate.segmentIndex - activeIndex) <= 1 }
+            .filter { abs(it.candidate.corridorIndex - activeIndex) <= 1 }
             .minByOrNull(ScoredCandidate::cost)
         val advantage = (activeBranch?.cost ?: Double.POSITIVE_INFINITY) - best.cost
         if (advantage < config.branchSwitchMinimumCostAdvantage) {
@@ -241,10 +246,10 @@ class RouteCorridorMatcher(
             }
         }
 
-        if (pendingSegmentIndex == best.candidate.segmentIndex) {
+        if (pendingCorridorIndex == best.candidate.corridorIndex) {
             pendingSegmentCount += 1
         } else {
-            pendingSegmentIndex = best.candidate.segmentIndex
+            pendingCorridorIndex = best.candidate.corridorIndex
             pendingSegmentCount = 1
         }
         if (pendingSegmentCount >= config.branchSwitchConfirmations.coerceAtLeast(1)) {
@@ -313,9 +318,9 @@ class RouteCorridorMatcher(
     private fun competingBranch(selected: ScoredCandidate, other: ScoredCandidate): Boolean {
         val a = selected.candidate
         val b = other.candidate
-        if (abs(a.segmentIndex - b.segmentIndex) > 1) return true
+        if (abs(a.corridorIndex - b.corridorIndex) > 1) return true
         // Adjacent return legs can overlap physically while being far apart along the route.
-        return config.allowReverseTravel && a.segmentIndex != b.segmentIndex &&
+        return config.allowReverseTravel && a.corridorIndex != b.corridorIndex &&
             angleDifferenceDeg(a.bearingDeg.toDouble(), b.bearingDeg.toDouble()) > 135.0 &&
             abs(a.geometricProgressM - b.geometricProgressM) > max(15.0, 3.0 * hypot(a.alongTrackSigmaM, b.alongTrackSigmaM))
     }
@@ -327,9 +332,19 @@ class RouteCorridorMatcher(
     ): List<Candidate> {
         val result = mutableListOf<Candidate>()
         var cumulativeM = 0.0
+        var corridorIndex = -1
+        var corridorBearingDeg = 0.0
         polyline.zipWithNext().forEachIndexed { index, (start, end) ->
             val segmentLengthM = haversineMeters(start, end)
             if (segmentLengthM > ZERO_LENGTH_M && segmentLengthM.isFinite()) {
+                val bearingDeg = bearingDegrees(start, end)
+                if (corridorIndex < 0 || angleDifferenceDeg(corridorBearingDeg, bearingDeg.toDouble()) > STRAIGHT_BEARING_TOLERANCE_DEG) {
+                    corridorIndex += 1
+                    corridorBearingDeg = bearingDeg.toDouble()
+                }
+                // Only consecutive nonzero segments can share this id. Compare to the first
+                // bearing in the run, not just the previous one: small turns must not accumulate
+                // into a loop that is mistaken for one straight corridor.
                 val projection = projectToSegment(position.point, start, end)
                 val tangentEast = projection.tangentEast
                 val tangentNorth = projection.tangentNorth
@@ -340,6 +355,7 @@ class RouteCorridorMatcher(
                 val accuracyFloor = max(position.horizontalAccuracyM, config.minimumPositionSigmaM)
                 result += Candidate(
                     segmentIndex = index,
+                    corridorIndex = corridorIndex,
                     fraction = projection.fraction,
                     matchedPoint = RoutePoint(
                         latitude = start.latitude + (end.latitude - start.latitude) * projection.fraction,
@@ -347,7 +363,7 @@ class RouteCorridorMatcher(
                     ),
                     crossTrackDistanceM = projection.distanceM,
                     geometricProgressM = cumulativeM + segmentLengthM * projection.fraction,
-                    bearingDeg = bearingDegrees(start, end),
+                    bearingDeg = bearingDeg,
                     crossTrackSigmaM = max(accuracyFloor, sqrt(max(0.0, crossVariance))),
                     alongTrackSigmaM = max(accuracyFloor, sqrt(max(0.0, alongVariance))),
                 )
@@ -374,12 +390,13 @@ class RouteCorridorMatcher(
     }
 
     private fun clearPendingSwitch() {
-        pendingSegmentIndex = null
+        pendingCorridorIndex = null
         pendingSegmentCount = 0
     }
 
     private data class Candidate(
         val segmentIndex: Int,
+        val corridorIndex: Int,
         val fraction: Double,
         val matchedPoint: RoutePoint,
         val crossTrackDistanceM: Double,
@@ -402,6 +419,8 @@ class RouteCorridorMatcher(
 
     private companion object {
         const val ZERO_LENGTH_M = 0.01
+        // Geometry tolerance only; unrelated to the location uncertainty or match thresholds.
+        const val STRAIGHT_BEARING_TOLERANCE_DEG = 1.0
     }
 }
 

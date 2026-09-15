@@ -12,13 +12,16 @@ import org.junit.Test
 
 class RouteNavigatorGuidanceTestModeTest {
     @Test
-    fun defaultModeStillSuppressesLowCornerMatchAndRequiresLocationRecheck() {
+    fun defaultModeLimitsLowCornerToDirectionReferenceAndRetainsLocationRecheck() {
         listOf(RouteNavigator(), RouteNavigator(allowDegradedRouteGuidance = false)).forEach { navigator ->
             navigator.setRoute(route())
             navigator.update(fix(0.0, 0.00082, 1_000), 1_000, false)
             val corner = navigator.update(fix(0.00018, 0.001, 11_000), 11_000, false)
-            assertEquals("route_match_untrusted", corner.reason)
-            assertNull(corner.instruction)
+            assertEquals("route_guidance", corner.reason)
+            assertTrue(corner.directionOnly)
+            assertNull(corner.guideIndex)
+            assertNull(navigator.currentAcceptedRouteMatchFor(11_000))
+            assertFalse(corner.instruction?.contains("꺾으세요") == true)
             assertNull(navigator.currentInstruction(fix(0.00018, 0.001, 11_000)))
             assertEquals(RouteNavigatorUserDecision.LOCATION_RECHECK, navigator.onUntrustedLocation()?.pendingUserDecision)
             val restored = navigator.update(fix(0.00027, 0.001, 21_000), 21_000, false)

@@ -8,6 +8,7 @@ data class RouteSpeechCueToken(
     val cueRevision: Long,
     val guideIndex: Int?,
     val distanceBand: Int,
+    val directionOnly: Boolean = false,
 )
 
 internal fun routeGuidanceDistanceBand(distanceM: Int?): Int = when {

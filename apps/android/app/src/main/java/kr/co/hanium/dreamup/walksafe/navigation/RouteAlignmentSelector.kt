@@ -101,7 +101,13 @@ internal class RouteAlignmentSelector {
         }
         if (local.isEmpty()) return unavailable(RouteAlignmentReason.NO_ROUTE_BEARING)
 
-        val competing = local.any { a -> local.any { b ->
+        // The 8 m search floor finds nearby geometry, not equally plausible user positions.
+        // Keep a matched branch when the opposite leg lies outside the reported position area.
+        // An actual overlap (or an unresolved match) still has competing direction evidence.
+        val plausible = if (accepted != null) local.filter {
+            it.index == accepted.index || it.projection.distanceM <= maxOf(1.0, position.horizontalAccuracyM) * 2.0
+        } else local
+        val competing = plausible.any { a -> plausible.any { b ->
             a.index != b.index && (
                 angleDistance(a.bearing, b.bearing) > 135.0 ||
                     (angleDistance(a.bearing, b.bearing) > 45.0 &&

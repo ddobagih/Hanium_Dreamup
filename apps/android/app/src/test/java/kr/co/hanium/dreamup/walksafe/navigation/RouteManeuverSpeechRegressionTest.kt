@@ -92,8 +92,10 @@ class RouteManeuverSpeechRegressionTest {
         // Sparse fixes straddling the corner imply a diagonal course, not its new northbound leg.
         // Keep the real confidence gate, then provide consecutive movement along that new leg.
         val acrossCorner = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 11_000L), 11_000L, false)
-        assertEquals("route_match_untrusted", acrossCorner.reason)
-        assertNull(acrossCorner.instruction)
+        assertEquals("route_guidance", acrossCorner.reason)
+        assertTrue(acrossCorner.directionOnly)
+        assertNull(acrossCorner.guideIndex)
+        assertFalse(acrossCorner.instruction?.contains("꺾으세요") == true)
         val afterTurn = navigator.update(TrustedLocation(0.00027, 0.001, 2f, 21_000L), 21_000L, false)
 
         assertEquals("route_guidance", afterTurn.reason)
@@ -156,8 +158,10 @@ class RouteManeuverSpeechRegressionTest {
         }
         navigator.update(fix(0.00082, 1_000L), 1_000L, false)
         val acrossCorner = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 11_000L), 11_000L, false)
-        assertEquals("route_match_untrusted", acrossCorner.reason)
-        assertNull(acrossCorner.instruction)
+        assertEquals("route_guidance", acrossCorner.reason)
+        assertTrue(acrossCorner.directionOnly)
+        assertNull(acrossCorner.guideIndex)
+        assertFalse(acrossCorner.instruction?.contains("꺾으세요") == true)
         val afterTurn = navigator.update(TrustedLocation(0.00027, 0.001, 2f, 21_000L), 21_000L, false)
         assertEquals("route_guidance", afterTurn.reason)
         assertEquals(2, afterTurn.guideIndex)

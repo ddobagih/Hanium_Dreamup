@@ -118,23 +118,23 @@ class RouteNavigatorBearingCandidatesTest {
         assertTrue(beforeEndArea.instruction?.contains("앞쪽이 경로") == true)
     }
 
-    @Test fun denseCollinearSegmentsCanAgreeOnFacingWithoutUpgradingAmbiguousPositionEvidence() {
+    @Test fun denseCollinearSegmentsDoNotManufactureBranchAmbiguityFromSamplingDensity() {
         val dense = route(listOf(point(0.0), point(480.0), point(500.0), point(500.0), point(520.0), point(1_000.0)))
         listOf(90.0 to "앞쪽이 경로", 270.0 to "경로 진행 방향이 뒤쪽").forEach { (heading, expected) ->
             val navigator = navigator(dense)
             val result = navigator.update(fix(500.0, accuracy = 40f), 1_000, false,
                 facingObservation = facing(heading))
-            assertEquals(RouteMatchReason.AMBIGUOUS_CANDIDATES, navigator.currentRouteMatch()?.reason)
-            assertEquals(RouteMatchQuality.LOW, navigator.currentRouteMatch()?.quality)
-            assertNull(navigator.currentAcceptedRouteMatchFor(1_000))
-            assertNull(navigator.currentBearingDeg())
-            assertTrue(result.instruction?.contains("추정") == true)
+            assertEquals(RouteMatchReason.MATCHED, navigator.currentRouteMatch()?.reason)
+            assertEquals(RouteMatchQuality.HIGH, navigator.currentRouteMatch()?.quality)
+            assertNotNull(navigator.currentAcceptedRouteMatchFor(1_000))
+            assertNotNull(navigator.currentBearingDeg())
+            assertFalse(result.directionOnly)
             assertTrue(result.instruction?.contains(expected) == true)
         }
         val strict = navigator(dense, degraded = false).update(fix(500.0, accuracy = 40f), 1_000, false,
             facingObservation = facing(90.0))
-        assertEquals("route_match_untrusted", strict.reason)
-        assertNull(strict.instruction)
+        assertEquals("route_guidance", strict.reason)
+        assertTrue(strict.instruction?.contains("앞쪽이 경로") == true)
     }
 
     @Test fun retriesReevaluateCurrentLegFacingWithoutSwitchingToTheNearbyOutgoingSegment() {

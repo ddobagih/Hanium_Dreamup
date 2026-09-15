@@ -138,7 +138,7 @@ class RouteNavigatorSpeechRetryTest {
     }
 
     @Test
-    fun strictLowQualityClearsRetryWhileTestModeKeepsActualLowEvidence() {
+    fun strictLowQualityRetriesOnlyADirectionReferenceWhileTestModeKeepsActualLowEvidence() {
         listOf(false, true).forEach { testMode ->
             val navigator = navigator(testMode)
             navigator.update(fix(0.00082, 1_000), 1_000, false)
@@ -152,7 +152,10 @@ class RouteNavigatorSpeechRetryTest {
                 assertNotNull(retry?.instruction)
                 assertTrue(navigator.reserveInstruction(requireNotNull(retry)))
             } else {
-                assertNull(retry)
+                assertTrue(retry?.directionOnly == true)
+                assertNull(retry?.guideIndex)
+                assertFalse(retry?.instruction?.contains("꺾으세요") == true)
+                assertTrue(navigator.reserveInstruction(requireNotNull(retry)))
             }
             assertSame(actualMatch, navigator.currentRouteMatch())
             assertNull(navigator.currentAcceptedRouteMatchFor(4_000))
