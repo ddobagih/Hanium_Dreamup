@@ -11193,6 +11193,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun handleWalkScreenBackPressed(): Boolean {
+        if (guidanceTouchGuardScreen != null) return true
         if (nativeGuidanceConfirmationScreen != null) {
             finishNativeGuidanceConfirmation(start = false)
             return true
@@ -11253,6 +11254,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     override fun onPause() {
+        guidanceTouchGuardContent?.cancelHold()
         closeReportPanel()
         closeVoiceHelp(announce = false)
         cancelDeviceRuntimeCalibration("backgrounded")
@@ -11392,6 +11394,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     override fun onDestroy() {
+        closeGuidanceTouchGuard()
         if (runtimeLoadObservationSourceHolder.isInitialized()) runtimeLoadObservationSource.close()
         synchronized(frameStateLock) {
             detectorClosing = true
@@ -12897,6 +12900,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var guidanceInstructionCard: LinearLayout
     private lateinit var guidanceSymbol: TextView
     private lateinit var guidanceVoiceButton: Button
+    private lateinit var guidanceTouchGuardButton: Button
+    private var guidanceTouchGuardScreen: View? = null
+    private var guidanceTouchGuardContent: kr.co.hanium.dreamup.walksafe.ui.GuidanceTouchGuardView? = null
+    private val guidanceTouchGuardCoveredViews = mutableListOf<Pair<View, Int>>()
     private lateinit var guidanceStateButton: Button
     private lateinit var guidanceActionRow: LinearLayout
     private var guidanceRiskAction: FeedbackAction? = null
@@ -13212,6 +13219,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun showNativeUiPage(page: NativeUiPage, preserveVoiceInteraction: Boolean) {
+        if (page != NativeUiPage.GUIDANCE) closeGuidanceTouchGuard()
         if (page != NativeUiPage.GUIDANCE && isGuidancePreview()) {
             guidancePreviewIndex = null
             cancelCommandSpeechResponse()
@@ -13397,11 +13405,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 nativeGuidanceStatusText.contentDescription = detailedGuidance
                 guidanceSymbol.text = compactGuidance.symbol
                 val hasWalk = isGuidancePreview() || walkSessionLifecycle.snapshot().state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
-                nativeGuidanceRepeatButton.visibility = if (hasWalk) View.VISIBLE else View.GONE
+                nativeGuidanceDestinationText.visibility = if (hasWalk) View.GONE else View.VISIBLE
+                guidanceInstructionCard.visibility = if (hasWalk) View.GONE else View.VISIBLE
+                guidancePreviewControls.visibility = View.GONE
+                nativeGuidanceRepeatButton.visibility = View.GONE
+                guidanceTouchGuardButton.visibility = if (hasWalk) View.VISIBLE else View.GONE
+                if (!hasWalk) closeGuidanceTouchGuard()
                 nativeGuidancePauseButton.visibility = if (hasWalk) View.VISIBLE else View.GONE
                 nativeGuidanceCancelButton.text = if (isGuidancePreview()) "미리보기 닫기" else if (hasWalk) "안내 종료" else "안내 취소"
                 nativeGuidanceRetryButton.visibility =
-                    if (!isGuidancePreview() && presentation.retryAvailable) View.VISIBLE else View.GONE
+                    if (!hasWalk && !isGuidancePreview() && presentation.retryAvailable) View.VISIBLE else View.GONE
                 nativeGuidanceRetryButton.isEnabled = presentation.retryAvailable && isActivityForeground
                 nativeGuidanceCancelButton.isEnabled = true
             }
@@ -13464,11 +13477,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         refreshForegroundHomeWakeListening()
     }
 
-    /** Guidance keeps generous targets without inheriting the home screen's 144dp cards. */
+    /** Active guidance exposes four stable, large controls; preparation retains recovery UI. */
     private fun styleGuidanceScreen() {
         val density = resources.displayMetrics.density
         fun dp(value: Int) = (value * density).roundToInt()
         val preview = isGuidancePreview()
+        val hasWalk = preview || walkSessionLifecycle.snapshot().state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
         val paused = if (preview) guidancePreviewIndex == 4
             else walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED
         val obstacle = if (preview) guidancePreviewIndex == 6 else currentGuidanceRisk() != null
@@ -13503,11 +13517,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         nativeGuidanceRepeatButton.contentDescription = "현재 안내 다시 듣기"
         guidanceVoiceButton.text = if (preview) "예시 음성 듣기" else "음성 명령"
         listOf(guidanceStateButton, guidanceVoiceButton, nativeGuidanceRepeatButton,
-            nativeGuidancePauseButton, nativeGuidanceRetryButton, nativeGuidanceCancelButton).forEach { button ->
-            applyWsButtonStyle(button, 64f, primary = button === guidanceVoiceButton)
-            button.minHeight = dp(if (button === guidanceStateButton) 48 else 64)
+            nativeGuidancePauseButton, nativeGuidanceRetryButton, nativeGuidanceCancelButton,
+            guidanceTouchGuardButton).forEach { button ->
+            applyWsButtonStyle(button, if (hasWalk) 144f else 64f, primary = button === guidanceVoiceButton)
+            button.minHeight = dp(if (hasWalk) 144 else if (button === guidanceStateButton) 48 else 64)
             button.minimumHeight = button.minHeight
-            button.textSize = if (button === guidanceStateButton) 18f else 20f
+            button.textSize = if (hasWalk) 24f else if (button === guidanceStateButton) 18f else 20f
             button.setPadding(dp(12), dp(12), dp(12), dp(12))
         }
         guidanceActionRow.orientation = LinearLayout.VERTICAL
@@ -13524,6 +13539,46 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         spaceNativePreviewStack(nativeGuidanceControls, 12f)
         spaceNativePreviewStack(guidancePreviewControls, 8f)
         spaceNativePreviewStack(guidanceInstructionCard, 4f)
+    }
+
+    private fun openGuidanceTouchGuard() {
+        if (guidanceTouchGuardScreen != null || nativeUiPage != NativeUiPage.GUIDANCE ||
+            (!isGuidancePreview() && walkSessionLifecycle.snapshot().state !in
+                setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED))) return
+        closeVoiceHelp(announce = false)
+        closeReportPanel()
+        val host = findViewById<ViewGroup>(android.R.id.content)
+        guidanceTouchGuardCoveredViews.clear()
+        for (index in 0 until host.childCount) {
+            val child = host.getChildAt(index)
+            guidanceTouchGuardCoveredViews += child to child.importantForAccessibility
+            child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        val content = kr.co.hanium.dreamup.walksafe.ui.GuidanceTouchGuardView(this) {
+            closeGuidanceTouchGuard()
+            guidanceTouchGuardButton.requestFocus()
+            speakInteraction("터치 오작동 방지를 해제했습니다.")
+        }
+        guidanceTouchGuardContent = content
+        guidanceTouchGuardScreen = insetNativeContent(content).apply {
+            setBackgroundColor(android.graphics.Color.BLACK)
+            isClickable = true
+            isFocusable = true
+            ViewCompat.setAccessibilityPaneTitle(this, "터치 오작동 방지")
+        }.also { host.addView(it, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        )) }
+        speakInteraction("터치 오작동 방지를 켰습니다. 음성 안내는 계속됩니다. 해제하려면 중앙 버튼을 3초간 누르세요.")
+    }
+
+    private fun closeGuidanceTouchGuard() {
+        guidanceTouchGuardContent?.cancelHold()
+        val screen = guidanceTouchGuardScreen
+        guidanceTouchGuardScreen = null
+        guidanceTouchGuardContent = null
+        (screen?.parent as? ViewGroup)?.removeView(screen)
+        guidanceTouchGuardCoveredViews.forEach { (view, importance) -> view.importantForAccessibility = importance }
+        guidanceTouchGuardCoveredViews.clear()
     }
 
     private fun insetNativeContent(content: View): View =
@@ -17236,6 +17291,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(nativeGuidanceRepeatButton)
             addView(nativeGuidancePauseButton)
         }
+        guidanceTouchGuardButton = accessiblePriorityUserButton(
+            label = "터치 오작동 방지",
+            spokenLabel = "터치 오작동 방지 화면 열기. 음성 안내는 계속됩니다.",
+            onClick = ::openGuidanceTouchGuard,
+        )
+        nativeGuidancePauseButton.accessibilityTraversalAfter = guidanceVoiceButton.id
+        nativeGuidanceCancelButton.accessibilityTraversalAfter = nativeGuidancePauseButton.id
+        guidanceTouchGuardButton.accessibilityTraversalAfter = nativeGuidanceCancelButton.id
         nativeGuidanceControls = walkSection(
             null,
             guidancePreviewControls,
@@ -17245,6 +17308,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             guidanceActionRow,
             nativeGuidanceRetryButton,
             nativeGuidanceCancelButton,
+            guidanceTouchGuardButton,
         )
         nativeVoiceControls = walkSection(
             "음성 명령",
