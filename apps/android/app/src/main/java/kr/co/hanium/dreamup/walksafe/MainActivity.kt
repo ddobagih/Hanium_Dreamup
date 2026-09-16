@@ -164,6 +164,7 @@ import kr.co.hanium.dreamup.walksafe.device.CameraPreflightStabilityGate
 import kr.co.hanium.dreamup.walksafe.device.PhoneMountingAssessment
 import kr.co.hanium.dreamup.walksafe.device.PhoneMountingCheckRequest
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationGuidancePresentation
+import kr.co.hanium.dreamup.walksafe.navigation.CompactGuidancePresentationPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationGuidancePresentationPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.GuidanceFeatureDisplayInput
 import kr.co.hanium.dreamup.walksafe.device.PhoneMountingAssessmentPhase
@@ -13386,7 +13387,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 val presentation = currentNativeGuidancePresentation()
                 nativeGuidanceDestinationText.text = if (isGuidancePreview()) "서울역 · 예시 목적지" else nativeDestinationConfirmationMessage()
                 guidancePreviewControls.visibility = if (isGuidancePreview()) View.VISIBLE else View.GONE
-                nativeGuidanceStatusText.text = nativeGuidanceStatusMessage(presentation)
+                val detailedGuidance = nativeGuidanceStatusMessage(presentation)
+                val compactGuidance = CompactGuidancePresentationPolicy.present(
+                    detailedGuidance,
+                    risk = currentGuidanceRisk() != null,
+                    paused = walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED,
+                )
+                nativeGuidanceStatusText.text = compactGuidance.text
+                nativeGuidanceStatusText.contentDescription = detailedGuidance
+                guidanceSymbol.text = compactGuidance.symbol
                 val hasWalk = isGuidancePreview() || walkSessionLifecycle.snapshot().state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
                 nativeGuidanceRepeatButton.visibility = if (hasWalk) View.VISIBLE else View.GONE
                 nativeGuidancePauseButton.visibility = if (hasWalk) View.VISIBLE else View.GONE
@@ -13469,15 +13478,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             text = if (preview) "목적지  서울역 · 예시" else "목적지  ${nativeDestinationConfirmationMessage()}"
         }
         guidanceSymbol.apply {
-            text = when {
-                obstacle -> "!"
-                preview && guidancePreviewIndex == 0 -> "↱"
-                !preview && nativeGuidanceStatusText.text.contains("오른쪽") -> "↱"
-                !preview && nativeGuidanceStatusText.text.contains("왼쪽") -> "↰"
-                paused -> "Ⅱ"
-                preview && guidancePreviewIndex == 5 -> "✓"
-                else -> "•"
-            }
             setTextColor(ink)
         }
         nativeGuidanceStatusText.apply {
@@ -14020,13 +14020,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val hazardResponseReady = priorityUserPracticeAttemptToken?.let {
             priorityUserOnboardingPolicy.isHazardResponseReady(it)
         } == true
-        priorityUserEducationBodyText.visibility = if (showAnyEducation) View.VISIBLE else View.GONE
+        priorityUserEducationBodyText.visibility = if (showEducation) View.VISIBLE else View.GONE
         val body = PriorityUserEducationPresentation.screenText(state) +
             priorityUserPracticeInFlight?.let { "\n\n${it.actionLabelKo} 안내\n${it.instructionKo}" }.orEmpty()
         if (priorityUserEducationBodyText.text.toString() != body) priorityUserEducationBodyText.text = body
         priorityUserEducationBodyText.contentDescription = body
         priorityUserEducationProgressText.visibility = if (showAnyEducation) View.VISIBLE else View.GONE
-        val progress = PriorityUserEducationPresentation.progressNotice(
+        val progress = if (showPosture) {
+            when {
+                hazardResponseReady -> "응답 대기 중"
+                priorityUserPracticeInFlight != null -> "연습 안내 중"
+                educationPlaying -> "듣는 중"
+                state.nativeEducationComplete -> "사전 연습 완료"
+                !state.appUsageReviewed -> "안내 듣기 대기"
+                !state.usageConditionsAcknowledged -> "안내 청취 완료"
+                !state.safePracticePlaceConfirmed || state.requiresPracticeRestart -> "연습 장소 확인 필요"
+                else -> "조작 연습 ${state.completedPractices.size}/4 완료"
+            }
+        } else PriorityUserEducationPresentation.progressNotice(
             state, playback, priorityUserPracticeInFlight, hazardResponseReady,
         )
         if (priorityUserEducationProgressText.text.toString() != progress) {
@@ -14034,7 +14045,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         priorityUserEducationProgressText.contentDescription = progress
         firstRunPhonePostureControls.visibility = if (showPosture) View.VISIBLE else View.GONE
-        // The shared body already displays the complete posture notice spoken by TTS.
+        // The detailed practice notice is delivered by the listen button, not as a transcript.
         firstRunPhonePostureText.visibility = View.GONE
         firstRunPhonePostureButton.isEnabled = showPosture && eligible && !playing && !state.usageConditionsAcknowledged
         firstRunPhonePostureButton.text = if (state.usageConditionsAcknowledged)
@@ -14104,11 +14115,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         priorityUserEducationProgressText.accessibilityTraversalAfter = priorityUserOnboardingStatusText.id
         priorityUserEducationBodyText.accessibilityTraversalAfter = priorityUserEducationProgressText.id
-        firstRunPhonePostureButton.accessibilityTraversalAfter = priorityUserEducationBodyText.id
+        firstRunPhonePostureButton.accessibilityTraversalAfter = priorityUserEducationButton.id
         priorityUserPracticeNecessityButton.accessibilityTraversalAfter = priorityUserEducationButton.id
         priorityUserEducationButton.accessibilityTraversalAfter =
-            if (showPosture) firstRunPhonePostureButton.id else priorityUserEducationBodyText.id
-        priorityUserSafePlaceButton.accessibilityTraversalAfter = priorityUserEducationButton.id
+            if (showPosture) priorityUserEducationProgressText.id else priorityUserEducationBodyText.id
+        priorityUserSafePlaceButton.accessibilityTraversalAfter =
+            if (showPosture) firstRunPhonePostureButton.id else priorityUserEducationButton.id
         var previousPracticeControl: View = priorityUserSafePlaceButton
         PriorityUserPractice.entries.forEach { practice ->
             val button = priorityUserPracticeButtons.getValue(practice)
@@ -14118,8 +14130,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         priorityUserEducationAgreeButton.accessibilityTraversalAfter =
             if (showPosture) previousPracticeControl.id else priorityUserPracticeNecessityButton.id
         val enabledActions = buildList {
-            if (showPosture) add(firstRunPhonePostureButton)
             add(priorityUserEducationButton)
+            if (showPosture) add(firstRunPhonePostureButton)
             if (showEducation) add(priorityUserPracticeNecessityButton)
             if (showPosture) {
                 add(priorityUserSafePlaceButton)
@@ -14647,6 +14659,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var pendingUiDestination: DestinationSearchResult? = null
     private var nativeGuidanceAuthorizedDestination: DestinationSearchResult? = null
     private var nativeGuidanceConfirmationAction: (() -> Unit)? = null
+    private val nativeGuidanceConfirmationRetries =
+        kr.co.hanium.dreamup.walksafe.navigation.GuidanceConfirmationRetryBudget()
     private var nativeGuidanceConfirmationGeneration = 0
     private var nativeGuidanceReadinessDiagnostic: String? = null
 
@@ -14763,9 +14777,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (start) action?.invoke() else cancelNativeGuidanceAndReturnHome()
     }
 
-    private fun speakNativeGuidanceConfirmation() {
+    private fun handleNativeGuidanceConfirmationUnrecognized() {
+        if (nativeGuidanceConfirmationScreen == null || nativeGuidanceConfirmationAction == null) return
+        if (nativeGuidanceConfirmationRetries.allowAutomaticRetry()) {
+            speakNativeGuidanceConfirmation(explicitAttempt = false)
+            return
+        }
+        // Leave the confirmation open. Do not restart recognition from this recovery speech.
+        nativeGuidanceConfirmationGeneration++
+        cancelVoiceCommandRecognition()
+        val message = "음성을 확인하지 못했습니다. 다시 듣기를 누르면 음성 입력을 다시 시도합니다. 시작 또는 취소 버튼으로도 선택할 수 있습니다."
+        showNativeGuidanceConfirmationError(message)
+        speakCommandResponse(message)
+    }
+
+    private fun speakNativeGuidanceConfirmation(explicitAttempt: Boolean = true) {
         val dialog = nativeGuidanceConfirmationScreen ?: return
         val destination = pendingUiDestination ?: return
+        if (explicitAttempt) nativeGuidanceConfirmationRetries.beginExplicitAttempt()
+        nativeGuidanceConfirmationStatus?.visibility = View.GONE
         val generation = ++nativeGuidanceConfirmationGeneration
         cancelVoiceCommandRecognition()
         stopHandsFreeVoiceService()
@@ -16358,8 +16388,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(priorityUserOnboardingStatusText)
             addView(priorityUserEducationProgressText)
             addView(priorityUserEducationBodyText)
-            addView(firstRunPhonePostureControls)
             addView(priorityUserEducationButton)
+            addView(firstRunPhonePostureControls)
             addView(priorityUserPracticeNecessityButton)
             addView(priorityUserSafePlaceButton)
             PriorityUserPractice.entries.forEach { addView(priorityUserPracticeButtons.getValue(it)) }
@@ -34521,7 +34551,7 @@ generation != cameraFallbackGeneration
                 logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.ONE_SHOT_UI_ERROR, errorCode = error)
                 if (nativeGuidanceConfirmationAction != null && nativeGuidanceConfirmationScreen != null) {
                     if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-                        speakNativeGuidanceConfirmation()
+                        handleNativeGuidanceConfirmationUnrecognized()
                     } else {
                         showNativeGuidanceConfirmationError("음성 입력에 실패했습니다. 마이크 권한을 확인한 뒤 다시 듣기를 눌러 주세요. 시작·취소 버튼으로도 선택할 수 있습니다.")
                     }
@@ -34697,7 +34727,9 @@ generation != cameraFallbackGeneration
                     finishNativeGuidanceConfirmation(start = true)
                 kr.co.hanium.dreamup.walksafe.navigation.GuidanceStartVoicePolicy.Choice.CANCEL ->
                     finishNativeGuidanceConfirmation(start = false)
-                else -> speakNativeGuidanceConfirmation()
+                kr.co.hanium.dreamup.walksafe.navigation.GuidanceStartVoicePolicy.Choice.REPEAT ->
+                    speakNativeGuidanceConfirmation()
+                null -> handleNativeGuidanceConfirmationUnrecognized()
             }
             return
         }
