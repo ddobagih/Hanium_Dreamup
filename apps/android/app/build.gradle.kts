@@ -224,6 +224,9 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "WALKSAFE_DEBUG_GATEWAY_ORIGIN_PINNED", "false")
+        buildConfigField("boolean", "WALKSAFE_SERVER_STT_ENABLED",
+            "${providers.gradleProperty("walksafe.serverSttEnabled").orNull == "true"}")
         buildConfigField("String", "WALKSAFE_PRODUCT_ROLE", "\"USER\"")
         buildConfigField("boolean", "WALKSAFE_REPORT_QUEUE_ENABLED", "$reportQueueEnabled")
         buildConfigField(
@@ -286,6 +289,9 @@ android {
             }
             buildConfigField("String", "WALKSAFE_SOURCE_COMMIT", "\"${verifiedSourceCommit ?: "unverified"}\"")
             buildConfigField("String", "WALKSAFE_GATEWAY_ORIGIN", "\"$debugGatewayOrigin\"")
+            // Explicit HTTPS test builds must not silently reuse a saved USB origin.
+            buildConfigField("boolean", "WALKSAFE_DEBUG_GATEWAY_ORIGIN_PINNED",
+                "${!developmentQuickStart && verifiedReleaseGatewayOrigin != null}")
             buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walksafe-debug-v1\"")
             buildConfigField("boolean", "WALKSAFE_LONG_LIVED_LOGIN_ENABLED", "$debugLongLivedLoginEnabled")
             buildConfigField(

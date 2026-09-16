@@ -30,6 +30,39 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AndroidGatewaySessionCryptoLifecycleTest {
+    @org.junit.After fun clearProcessFenceAfterEachFixture() {
+        assertTrue(Fixture("cleanup").store().purgeDisabled())
+    }
+
+    @Test fun explicitDebugEndpointSwitchRecoversOldOriginBlockAndPreservesInstallation() {
+        org.junit.Assume.assumeTrue(kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_DEBUG_GATEWAY_ORIGIN_PINNED)
+        val fixture = Fixture("debug-endpoint-switch")
+        val store = fixture.store()
+        val id = requireNotNull(store.getOrCreateInstallDeviceId())
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
+            backendSession(id), backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        val origin = kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_GATEWAY_ORIGIN
+        assertNull(store.restoreBackendDevice(origin, NOW_EPOCH_MS))
+        assertTrue(store.isStorageBlocked())
+        assertTrue(store.prepareDebugEndpointSwitch(origin))
+        assertFalse(store.isStorageBlocked())
+        assertEquals(id, store.getOrCreateInstallDeviceId())
+        assertNull(store.restoreBackendDevice(origin, NOW_EPOCH_MS))
+        // A later unrelated failure must not be cleared by reapplying the same build.
+        fixture.preferences.edit().putBoolean(FAIL_CLOSED_PREF_KEY, true).commit()
+        assertTrue(store.prepareDebugEndpointSwitch(origin))
+        assertTrue(store.isStorageBlocked())
+    }
+
+    @Test fun explicitDebugEndpointSwitchDoesNotReplaceCorruptInstallationIdentity() {
+        org.junit.Assume.assumeTrue(kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_DEBUG_GATEWAY_ORIGIN_PINNED)
+        val fixture = Fixture("debug-endpoint-corrupt")
+        val store = fixture.store()
+        requireNotNull(store.getOrCreateInstallDeviceId())
+        fixture.preferences.edit().putString(INSTALL_ID_PREF_KEY, "corrupt").commit()
+        assertFalse(store.prepareDebugEndpointSwitch(kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_GATEWAY_ORIGIN))
+    }
+
     @Test
     fun passwordLoginSurvivesStoreRecreationWithoutGrantingUnverifiedAccess() {
         val fixture = Fixture("password-restart")

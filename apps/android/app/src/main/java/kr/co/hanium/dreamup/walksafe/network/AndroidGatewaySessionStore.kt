@@ -47,6 +47,25 @@ internal class AndroidGatewaySessionStore(
         }
     }
 
+    /** Explicit HTTPS debug build switch: discard credentials, preserve a verified installation ID.
+     * Never rebind an existing token to a different server, or recover a corrupt installation key.
+     */
+    fun prepareDebugEndpointSwitch(origin: String): Boolean = synchronized(PROCESS_LOCK) {
+        if (!kr.co.hanium.dreamup.walksafe.BuildConfig.DEBUG ||
+            !kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_DEBUG_GATEWAY_ORIGIN_PINNED ||
+            origin != kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_GATEWAY_ORIGIN ||
+            !origin.startsWith("https://")) return false
+        val marker = "gateway_debug_applied_origin_v1"
+        if (preferences.getString(marker, null) == origin) return true
+        if (!reconcileKeyResetLocked()) return false
+        val verifiedId = runCatching { readInstallDeviceIdLocked(createIfMissing = true, endpointSwitch = true) }.getOrNull()
+        if (verifiedId == null) return false
+        if (!stageKeyResetLocked(KEY_RESET_SCOPE_SESSION) || !reconcileKeyResetLocked()) return false
+        val saved = preferences.edit().putString(marker, origin).commit()
+        if (!saved) markFailClosedLocked()
+        saved
+    }
+
     fun saveInitialIfAbsent(
         session: GatewayFieldSession,
         firstRunSnapshot: FirstRunOnboardingSnapshot,
@@ -1167,9 +1186,9 @@ internal class AndroidGatewaySessionStore(
         )
     }
 
-    private fun readInstallDeviceIdLocked(createIfMissing: Boolean): String? {
+    private fun readInstallDeviceIdLocked(createIfMissing: Boolean, endpointSwitch: Boolean = false): String? {
         if (!reconcileKeyResetLocked()) return null
-        if (failClosedMarkerPresentLocked()) return null
+        if (!endpointSwitch && failClosedMarkerPresentLocked()) return null
         val encoded = preferences.getString(INSTALL_ID_PREF_KEY, null)
         if (encoded != null) {
             val opened = installIdAead.open(encoded, INSTALL_ID_AAD, INSTALL_ID_LIMITS)

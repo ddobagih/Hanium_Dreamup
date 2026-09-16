@@ -1979,6 +1979,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             legacyResetIntentAtStartup != LegacyResetIntentState.ABSENT,
                 )
                 gatewaySessionStore = AndroidGatewaySessionStore(stepLengthPrefs)
+                if (BuildConfig.DEBUG && BuildConfig.WALKSAFE_DEBUG_GATEWAY_ORIGIN_PINNED &&
+                    accountDeletionResetJournalStateAtStartup is AccountDeletionResetJournalState.Absent &&
+                    legacyResetIntentAtStartup == LegacyResetIntentState.ABSENT) {
+                    check(gatewaySessionStore.prepareDebugEndpointSwitch(BuildConfig.WALKSAFE_GATEWAY_ORIGIN)) {
+                        "Debug endpoint login storage preparation failed"
+                    }
+                }
                 emailEnrollmentStore = AndroidEmailEnrollmentStore(
                     getSharedPreferences("walksafe_email_enrollment", MODE_PRIVATE),
                 )
@@ -6522,6 +6529,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun configuredGatewayOriginOrNull(): String? {
         if (developmentQuickStartEnabled) return BuildConfig.WALKSAFE_GATEWAY_ORIGIN
+        if (BuildConfig.DEBUG && BuildConfig.WALKSAFE_DEBUG_GATEWAY_ORIGIN_PINNED) {
+            return GatewayEndpointPolicy.debugOriginOrNull(BuildConfig.WALKSAFE_GATEWAY_ORIGIN)
+        }
         val configured = stepLengthPrefs.getString(
             PREF_GATEWAY_ORIGIN_KEY,
             BuildConfig.WALKSAFE_GATEWAY_ORIGIN,
@@ -13219,9 +13229,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.CANCELLED ||
                 isHandsFreeVoiceSpeechOutputActive()
             ) return@play
-            if (command == null) {
-                // A completed cue is the listening prompt; a failed cue uses the normal spoken prompt.
-                if (result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.COMPLETED) {
+            if (command == null || BuildConfig.WALKSAFE_SERVER_STT_ENABLED) {
+                // Server mode captures a new utterance; an inline Vosk command must be repeated.
+                // A completed cue is sufficient only when the wake phrase had no inline command.
+                if (command == null && result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.COMPLETED) {
                     voiceCommandPromptReadyGeneration = voiceRecognitionGeneration
                 }
                 startVoiceCommandRecognition()
@@ -13621,6 +13632,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     if (!hasWalk && !isGuidancePreview() && presentation.retryAvailable) View.VISIBLE else View.GONE
                 nativeGuidanceRetryButton.isEnabled = presentation.retryAvailable && isActivityForeground
                 nativeGuidanceCancelButton.isEnabled = true
+                val checkFailed = nativeGuidanceCheckFailed()
+                guidanceVoiceButton.visibility = if (checkFailed) View.GONE else View.VISIBLE
+                if (checkFailed) {
+                    nativeGuidanceDestinationText.visibility = View.GONE
+                    guidanceInstructionCard.visibility = View.GONE
+                    nativeGuidanceRetryButton.visibility = View.VISIBLE
+                    nativeGuidanceRetryButton.text = "재점검"
+                    nativeGuidanceCancelButton.text = "취소"
+                    nativeGuidanceCancelButton.accessibilityTraversalAfter = nativeGuidanceRetryButton.id
+                    announceNativeGuidanceCheckFailure()
+                } else {
+                    nativeGuidanceRetryButton.text = "다시 시도"
+                    nativeGuidanceCancelButton.accessibilityTraversalAfter = nativeGuidancePauseButton.id
+                }
             }
             privacySectionToggleButton.visibility = View.GONE
             privacyControls.visibility = if (settingsVisible) View.VISIBLE else View.GONE
@@ -13687,6 +13712,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         fun dp(value: Int) = (value * density).roundToInt()
         val preview = isGuidancePreview()
         val hasWalk = preview || walkSessionLifecycle.snapshot().state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
+        val checkFailed = nativeGuidanceCheckFailed()
         val paused = if (preview) guidancePreviewIndex == 4
             else walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED
         val obstacle = if (preview) guidancePreviewIndex == 6 else currentGuidanceRisk() != null
@@ -13723,10 +13749,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         listOf(guidanceStateButton, guidanceVoiceButton, nativeGuidanceRepeatButton,
             nativeGuidancePauseButton, nativeGuidanceRetryButton, nativeGuidanceCancelButton,
             guidanceTouchGuardButton).forEach { button ->
-            applyWsButtonStyle(button, if (hasWalk) 144f else 64f, primary = button === guidanceVoiceButton)
-            button.minHeight = dp(if (hasWalk) 144 else if (button === guidanceStateButton) 48 else 64)
+            applyWsButtonStyle(button, if (hasWalk || checkFailed) 144f else 64f,
+                primary = if (checkFailed) button === nativeGuidanceRetryButton else button === guidanceVoiceButton)
+            button.minHeight = dp(if (hasWalk || checkFailed) 144 else if (button === guidanceStateButton) 48 else 64)
             button.minimumHeight = button.minHeight
-            button.textSize = if (hasWalk) 24f else if (button === guidanceStateButton) 18f else 20f
+            button.textSize = if (hasWalk || checkFailed) 24f else if (button === guidanceStateButton) 18f else 20f
             button.setPadding(dp(12), dp(12), dp(12), dp(12))
         }
         guidanceActionRow.orientation = LinearLayout.VERTICAL
@@ -14202,7 +14229,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var initialAppPermissionExitDialog: AlertDialog? = null
     private var initialAppPermissionExitRequired = false
     private var nativeGuidanceConfirmationScreen: View? = null
-    private var nativeGuidanceConfirmationStatus: TextView? = null
     private val nativeGuidanceCoveredViews = mutableListOf<Pair<View, Int>>()
     private var nativePrewalkConsentEpoch: WalkRuntimeEpoch? = null
     private var nativePrewalkConsentAtElapsedRealtimeMs: Long? = null
@@ -14218,6 +14244,61 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     @Volatile
     private var nativePhoneMountingCheckRequest: NativePhoneMountingCheckRequest? = null
     private var nativePhoneMountingCheckRequestId = 0L
+    private var guidanceFailureAnnouncedForRequest: Long? = null
+
+    private fun nativeGuidanceCheckFailed(): Boolean =
+        !isGuidancePreview() && !isWalkSessionRuntimeActive() &&
+            walkSessionLifecycle.snapshot().state != WalkSessionState.PAUSED &&
+            (officialEnvironmentPreflightPhase in setOf(
+                OfficialEnvironmentPreflightPhase.FAILED,
+                OfficialEnvironmentPreflightPhase.TIMED_OUT,
+            ) || startupCapabilityRetryRequiresUserAction)
+
+    private fun announceNativeGuidanceCheckFailure() {
+        if (!nativeGuidanceCheckFailed() || !isActivityForeground) return
+        val requestId = nativePhoneMountingCheckRequestId
+        if (guidanceFailureAnnouncedForRequest == requestId) return
+        guidanceFailureAnnouncedForRequest = requestId
+        val message = nativeGuidanceFailureMessage()
+        nativeGuidanceControls.post {
+            if (nativeUiPage == NativeUiPage.GUIDANCE && isActivityForeground &&
+                nativePhoneMountingCheckRequestId == requestId && nativeGuidanceCheckFailed()) {
+                speakInteraction(message)
+            } else if (guidanceFailureAnnouncedForRequest == requestId) {
+                guidanceFailureAnnouncedForRequest = null
+            }
+        }
+    }
+
+    private fun nativeGuidanceFailureMessage(): String {
+        val reasons = mutableListOf<String>()
+        if (!hasLocationPermission()) reasons += "정확한 위치 권한을 허용해 주세요."
+        else if (!isLocationServiceEnabledForDeviceCheck()) reasons += "휴대전화 위치 서비스를 켜 주세요."
+        else when (officialEnvironmentGpsDiagnosticDetail) {
+            "GPS_QUALITY_PASSED" -> Unit
+            "GPS_ACCURACY_OUTSIDE_APPROVED_RANGE" -> reasons += "위치 정확도가 부족합니다. 하늘이 잘 보이는 곳으로 이동해 주세요."
+            "LOCATION_REQUEST_FAILED" -> reasons += "위치를 요청하지 못했습니다. 위치 설정을 확인해 주세요."
+            else -> reasons += "현재 위치를 확인하지 못했습니다. 위치 수신 환경을 확인해 주세요."
+        }
+        if (cameraAnalysisFeaturesEnabled()) {
+            if (!hasCameraPermission()) reasons += "카메라 권한을 허용해 주세요."
+            else when (officialEnvironmentCameraDiagnosticReason) {
+                "PASSED" -> Unit
+                CameraFrameQualityReason.BRIGHTNESS_OUTSIDE_APPROVED_RANGE.name -> reasons += "카메라 영상이 어둡습니다. 렌즈와 주변 밝기를 확인해 주세요."
+                CameraFrameQualityReason.OCCLUSION_OUTSIDE_APPROVED_RANGE.name -> reasons += "카메라 가림이 감지됐습니다. 렌즈 앞을 확인해 주세요."
+                CameraFrameQualityReason.SHAKE_OUTSIDE_APPROVED_RANGE.name -> reasons += "휴대전화가 흔들립니다. 거치대를 고정해 주세요."
+                CameraFrameQualityReason.MOUNT_ANGLE_OUTSIDE_APPROVED_RANGE.name -> reasons += "카메라가 앞을 향하도록 휴대전화를 세워 주세요."
+                "CAMERA_BIND_FAILED", "CAMERA_PIPELINE_BUSY", "AR_CAMERA_PIPELINE_BUSY" -> reasons += "카메라를 사용할 수 없습니다. 다른 카메라 기능을 종료해 주세요."
+                "CAMERA_RELEASE_TIMED_OUT", "PREVIOUS_CAMERA_RELEASE_TIMED_OUT" -> reasons += "카메라 점검을 마무리하지 못했습니다. 앱을 다시 실행해 주세요."
+                "MOUNTING_SENSOR_UNAVAILABLE" -> reasons += "장착 센서를 사용할 수 없습니다. 기기 기능 점검을 확인해 주세요."
+                else -> reasons += "카메라와 장착 상태를 확인하지 못했습니다. 렌즈와 거치대를 확인해 주세요."
+            }
+        }
+        if (reasons.isEmpty()) reasons += "시작 준비를 완료하지 못했습니다."
+        return "점검을 완료하지 못해 안내를 시작하지 않았습니다. " +
+            reasons.joinToString(" ") + " 준비되면 재점검 버튼을, 돌아가려면 취소 버튼을 눌러 주세요."
+    }
+
 
     private val nativePhonePostureNotice: String
         get() = PriorityUserEducationPresentation.phonePostureNoticeKo
@@ -14875,7 +14956,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!decision.mayConfirmAndStart || walk.confirmationToken == null ||
             walkSessionReadinessBlockReason(decision) != null ||
             nativePrewalkConfirmationPosted || startupCapabilityConfirmationPending ||
+            nativeGuidanceConfirmationScreen != null || nativeGuidanceConfirmationAction != null ||
             isStartupCapabilityConfirmed()) return
+        val confirmationGeneration = nativeGuidanceConfirmationGeneration
+        val readinessToken = walk.confirmationToken
         nativePrewalkConfirmationPosted = true
         startupCapabilityText.post {
             nativePrewalkConfirmationPosted = false
@@ -14885,6 +14969,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 GatewaySessionProcessCoordinator.snapshot().generation != sensorRequest.gatewayGeneration ||
                 !isActivityForeground || nativePrewalkActorId != reporterUserId ||
                 !firstRunOnboardingComplete()) return@post
+            // Rendering while a button is being consumed can queue another callback. Recheck
+            // ownership and start progress here, not only when the callback was posted.
+            if (nativeGuidanceConfirmationGeneration != confirmationGeneration ||
+                walkSessionLifecycle.snapshot().confirmationToken != readinessToken ||
+                nativeGuidanceConfirmationScreen != null || nativeGuidanceConfirmationAction != null ||
+                startupCapabilityConfirmationPending || isStartupCapabilityConfirmed() ||
+                isWalkSessionRuntimeActive() || startupCapabilityRetryRequiresUserAction ||
+                startupCapabilityDecision != decision || walkSessionReadinessBlockReason(decision) != null
+            ) return@post
             // Existing READY startup uses its real readiness token and delivered safety notice.
             // PAUSED keeps the existing explicit voice/button resume confirmation.
             if (pendingUiDestination != null && nativeUiPage == NativeUiPage.GUIDANCE) {
@@ -14932,8 +15025,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var nativeGuidanceReadinessDiagnostic: String? = null
 
     private fun requestNativeGuidanceStartConfirmation(action: () -> Unit) {
-        if (nativeGuidanceConfirmationScreen != null) return
+        if (nativeGuidanceConfirmationScreen != null || nativeGuidanceConfirmationAction != null ||
+            startupCapabilityConfirmationPending) return
         val destination = pendingUiDestination ?: return
+        if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeGuidanceStart", "confirmation=opened")
         val epoch = walkSessionLifecycle.snapshot().epoch
         val actor = reporterUserId
         val gateway = GatewaySessionProcessCoordinator.snapshot().generation
@@ -14969,14 +15064,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(16), 0, 0)
         }
-        nativeGuidanceConfirmationStatus = TextView(this).apply {
-            id = View.generateViewId()
-            visibility = View.GONE
-            textSize = 24f
-            setTextColor(WS_COLOR_NOTICE_TEXT)
-            setPadding(0, dp(16), 0, dp(24))
-            accessibilityTraversalAfter = title.id
-        }.also(items::addView)
         var previousId = title.id
         listOf("시작", "다시 듣기", "취소").forEach { label ->
             val button = voiceHelpButton(label) {
@@ -15019,7 +15106,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun removeNativeGuidanceConfirmationScreen() {
         val screen = nativeGuidanceConfirmationScreen
         nativeGuidanceConfirmationScreen = null
-        nativeGuidanceConfirmationStatus = null
         (screen?.parent as? ViewGroup)?.removeView(screen)
         nativeGuidanceCoveredViews.forEach { (view, importance) ->
             view.importantForAccessibility = importance
@@ -15027,21 +15113,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         nativeGuidanceCoveredViews.clear()
     }
 
-    private fun showNativeGuidanceConfirmationError(message: String) {
-        nativeGuidanceConfirmationStatus?.apply {
-            text = message
-            visibility = View.VISIBLE
-            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-        }
+    private fun announceNativeGuidanceConfirmationError(message: String) {
+        if (nativeGuidanceConfirmationScreen == null || !isActivityForeground) return
+        // Recovery guidance is spoken; the screen keeps only its title and large controls.
+        // No completion/failure callback here, so a TTS failure cannot trigger a retry loop.
+        speakCommandResponse(message)
     }
 
     private fun finishNativeGuidanceConfirmation(start: Boolean) {
-        val action = nativeGuidanceConfirmationAction
+        val action = nativeGuidanceConfirmationAction ?: return
+        // Consume once before cancellation/UI callbacks can re-enter this method.
         nativeGuidanceConfirmationAction = null
         nativeGuidanceConfirmationGeneration++
+        if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeGuidanceStart", "confirmation=consumed start=$start")
         cancelVoiceCommandRecognition()
         removeNativeGuidanceConfirmationScreen()
-        if (start) action?.invoke() else cancelNativeGuidanceAndReturnHome()
+        if (start) action() else cancelNativeGuidanceAndReturnHome()
     }
 
     private fun handleNativeGuidanceConfirmationUnrecognized() {
@@ -15054,23 +15141,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         nativeGuidanceConfirmationGeneration++
         cancelVoiceCommandRecognition()
         val message = "음성을 확인하지 못했습니다. 다시 듣기를 누르면 음성 입력을 다시 시도합니다. 시작 또는 취소 버튼으로도 선택할 수 있습니다."
-        showNativeGuidanceConfirmationError(message)
-        speakCommandResponse(message)
+        announceNativeGuidanceConfirmationError(message)
     }
 
     private fun speakNativeGuidanceConfirmation(explicitAttempt: Boolean = true) {
         val dialog = nativeGuidanceConfirmationScreen ?: return
         val destination = pendingUiDestination ?: return
         if (explicitAttempt) nativeGuidanceConfirmationRetries.beginExplicitAttempt()
-        nativeGuidanceConfirmationStatus?.visibility = View.GONE
         val generation = ++nativeGuidanceConfirmationGeneration
         cancelVoiceCommandRecognition()
         stopHandsFreeVoiceService()
         fun current() = nativeGuidanceConfirmationScreen === dialog && isActivityForeground &&
             nativeUiPage == NativeUiPage.GUIDANCE && pendingUiDestination == destination &&
             nativeGuidanceConfirmationGeneration == generation
+        var recoveryAnnounced = false
         fun failed() {
-            if (current()) showNativeGuidanceConfirmationError("음성 입력 또는 안내를 완료하지 못했습니다. 마이크 권한과 한국어 음성 설정을 확인하거나 다시 듣기를 눌러 주세요.\n시작·취소 버튼으로도 선택할 수 있습니다.")
+            if (!current() || recoveryAnnounced) return
+            recoveryAnnounced = true
+            announceNativeGuidanceConfirmationError("음성 입력 또는 안내를 완료하지 못했습니다. 마이크 권한과 한국어 음성 설정을 확인하거나 다시 듣기를 눌러 주세요.\n시작·취소 버튼으로도 선택할 수 있습니다.")
         }
         val started = speakCommandResponse(
             "${destination.name}까지 안내를 시작할까요? 시작 또는 취소라고 말씀해 주세요.",
@@ -22990,7 +23078,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "보행 전 상태 점검 시간 초과",
                 "마지막 실제 측정 원인은 화면에 유지했습니다. 환경과 장착을 확인한 뒤 다시 점검하세요.",
             )
-            if (nativeUiPage == NativeUiPage.GUIDANCE) speakInteraction(nativeGuidancePreflightSummary())
+            // renderMainUi announces this failed attempt once and exposes recovery controls.
+            renderMainUi()
         }
         officialEnvironmentCameraPreflightTimeout = timeout
         officialEnvironmentStatusText.postDelayed(timeout, delayMs)
@@ -23471,6 +23560,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             !::officialEnvironmentConfirmButton.isInitialized ||
             !::walkSessionLifecycle.isInitialized
         ) return
+        if (nativeUiPage == NativeUiPage.GUIDANCE && nativeGuidanceCheckFailed()) renderMainUi()
         val snapshot = walkSessionLifecycle.snapshot()
         val assessment = currentOfficialEnvironmentAssessment(snapshot.epoch)
         val message = officialEnvironmentStatusMessage(assessment)
@@ -33395,6 +33485,12 @@ generation != cameraFallbackGeneration
                 showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)
             }
         }
+        if (BuildConfig.WALKSAFE_SERVER_STT_ENABLED) {
+            // Release the Vosk microphone before handing the command to server STT.
+            stopHandsFreeVoiceService()
+            startVoiceCommandRecognition()
+            return
+        }
         runCatching { ensureFeedbackActuator().playVoiceListeningStartVibration() }
         updateGatewayVoiceStatus("호출어를 인식했습니다. 음성 명령을 듣고 있습니다.")
         updateNavigationStatus("voice_hands_free=listening_command")
@@ -34519,6 +34615,10 @@ generation != cameraFallbackGeneration
     }
 
     private fun ensureVoicePermissionThenListen() {
+        if (gatewayVoiceRecorder?.isRecording == true) {
+            stopGatewayVoiceCapture()
+            return
+        }
         if (!hasRecordAudioPermission()) {
             showVoiceMicrophonePermissionError()
             return
@@ -34562,7 +34662,8 @@ generation != cameraFallbackGeneration
         val walk = walkSessionLifecycle.snapshot()
         if (
             !walk.isForeground ||
-            walk.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
+            (walk.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
+                !(nativeUiPage.isVoiceInteractionPage() && homeVoiceCommandAvailable()))
         ) return false
         if (!feedbackPolicy.canSpeakNavigation(SystemClock.elapsedRealtime())) return false
         if (isHandsFreeVoiceRecognitionBlocked() ||
@@ -34584,7 +34685,9 @@ generation != cameraFallbackGeneration
             networkTicket = networkTicket,
             expectedWalkEpoch = walk.epoch,
             expectedNavigationDecisionToken = routeNavigator.pendingDecisionToken(),
+            expectedPage = nativeUiPage,
         )
+        cancelForegroundHomeWakeListening(resetFailure = false)
         val recorder = ForegroundAacRecorder(cacheDir) {
             runOnUiThread { stopGatewayVoiceCapture(interactionGeneration) }
         }
@@ -34603,7 +34706,8 @@ generation != cameraFallbackGeneration
         runCatching { ensureFeedbackActuator().playVoiceListeningStartVibration() }
         voiceRecognitionActive = true
         voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
-        updateGatewayVoiceStatus("녹음 중입니다. 버튼을 다시 눌러 전송하세요.")
+        updateGatewayVoiceStatus("듣는 중입니다. 말씀이 끝나면 자동으로 전송합니다.")
+        if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeVoiceInput", "event=SERVER_STT_RECORDING backend=WHISPER")
         updateVoiceCommandButton(active = true)
         updateNavigationStatus("voice=gateway_recording")
         return true
@@ -34661,11 +34765,18 @@ generation != cameraFallbackGeneration
                 runOnUiThread {
                     if (gatewayVoiceUploadFile === audioFile) gatewayVoiceUploadFile = null
                     if (gatewaySpeechCall === call) gatewaySpeechCall = null
-                    if (!isGatewaySpeechInteractionCurrent(active)) return@runOnUiThread
+                    if (!isGatewaySpeechInteractionCurrent(active)) {
+                        finishGatewaySpeechInteraction(active)
+                        return@runOnUiThread
+                    }
                     result.onSuccess { transcript ->
+                        if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeVoiceInput",
+                            "event=SERVER_STT_RESULT backend=WHISPER allowed=${transcript.acoustic.executionAllowed}")
                         handleGatewaySpeechTranscript(active, transcript)
                     }.onFailure {
                         if (call.isCancelled()) return@onFailure
+                        if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeVoiceInput",
+                            "event=SERVER_STT_FAILED type=${it.javaClass.simpleName}")
                         finishGatewaySpeechInteraction(active)
                         updateGatewayVoiceStatus("서버 음성 인식을 사용할 수 없습니다.")
                         speakInteraction("서버 음성 인식을 사용할 수 없습니다. 잠시 뒤 다시 시도해 주세요.")
@@ -34686,10 +34797,8 @@ generation != cameraFallbackGeneration
     ) {
         if (!speechTranscript.acoustic.executionAllowed) {
             updateGatewayVoiceStatus("음성 품질이 낮아 명령을 실행하지 않았습니다.")
-            speakGatewayInteractionOrLocalFallback(
-                "음성을 확실히 확인하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요.",
-                active,
-            )
+            finishGatewaySpeechInteraction(active)
+            speakInteraction("음성을 확실히 확인하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요.")
             return
         }
         finishGatewaySpeechInteraction(active)
@@ -34794,7 +34903,9 @@ generation != cameraFallbackGeneration
         val process = GatewaySessionProcessCoordinator.snapshot()
         return walkSessionLifecycle.snapshot().let { walk ->
             walk.epoch == active.expectedWalkEpoch &&
-                walk.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
+                nativeUiPage == active.expectedPage &&
+                (walk.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) ||
+                    (nativeUiPage.isVoiceInteractionPage() && homeVoiceCommandAvailable())) &&
                 isGatewaySpeechCallbackCurrent(
                     expected = active.fence,
                     currentActorId = process.session?.actorId,
@@ -34971,6 +35082,12 @@ generation != cameraFallbackGeneration
         }
         clearDeferredVoiceRecognitionStart(notifyFailure = false)
         voiceCommandPromptReadyGeneration = null
+        if (BuildConfig.WALKSAFE_SERVER_STT_ENABLED && purpose == VoiceRecognitionPurpose.COMMAND) {
+            if (!promptCompletedForThisRequest) return prepareOneShotVoiceCommandPrompt()
+            val started = startGatewayVoiceCapture()
+            if (!started) speakInteraction("서버 음성 입력을 시작할 수 없습니다. 로그인과 데이터 사용 설정을 확인해 주세요.")
+            return started
+        }
         fun unavailable(detail: String, permanentlyLimit: Boolean): Boolean {
             updateNavigationStatus("voice=recognizer_unavailable")
             handleOneShotSpeechRecognitionFailure(detail, permanentlyLimit)
@@ -35261,7 +35378,7 @@ generation != cameraFallbackGeneration
                     if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                         handleNativeGuidanceConfirmationUnrecognized()
                     } else {
-                        showNativeGuidanceConfirmationError("음성 입력에 실패했습니다. 마이크 권한을 확인한 뒤 다시 듣기를 눌러 주세요. 시작·취소 버튼으로도 선택할 수 있습니다.")
+                        announceNativeGuidanceConfirmationError("음성 입력에 실패했습니다. 마이크 권한을 확인한 뒤 다시 듣기를 눌러 주세요. 시작·취소 버튼으로도 선택할 수 있습니다.")
                     }
                     return
                 }
@@ -37558,8 +37675,9 @@ generation != cameraFallbackGeneration
         val generationBefore = routeRequestGeneration
         requestRoute(retained.destination, reason = "user_destination")
         if (routeRequestGeneration != generationBefore && routeRequestInFlight.get()) {
-            clearNativeDestinationSearchState()
-            showNativeUiPage(NativeUiPage.HOME)
+            // The accepted destination belongs to the guidance session. Clearing it here
+            // loses its label/authorization and wrongly returns a delayed start to Home.
+            showNativeUiPage(NativeUiPage.GUIDANCE)
         }
     }
 
@@ -41667,6 +41785,7 @@ generation != cameraFallbackGeneration
         val networkTicket: GatewaySpeechNetworkGate.Ticket,
         val expectedWalkEpoch: WalkRuntimeEpoch,
         val expectedNavigationDecisionToken: RouteNavigatorDecisionToken?,
+        val expectedPage: NativeUiPage,
     )
 
     private enum class PermissionRequestPurpose {

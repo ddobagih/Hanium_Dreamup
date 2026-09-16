@@ -4,6 +4,8 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.SystemClock
+import android.os.Handler
+import android.os.Looper
 import java.io.File
 
 internal class ForegroundAacRecorder(
@@ -17,6 +19,29 @@ internal class ForegroundAacRecorder(
     )
 
     private var active: ActiveRecording? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var silencePoll: Runnable? = null
+
+    private fun watchSpeechEnd(recording: ActiveRecording) {
+        val endpoint = SpeechEndpointPolicy(recording.startedAtElapsedRealtimeMs)
+        val poll = object : Runnable {
+            override fun run() {
+                if (active !== recording) return
+                val amplitude = runCatching { recording.recorder.maxAmplitude }.getOrDefault(0)
+                if (endpoint.shouldStop(SystemClock.elapsedRealtime(), amplitude)) {
+                    silencePoll = null
+                    onLimitReached()
+                } else handler.postDelayed(this, 100L)
+            }
+        }
+        silencePoll = poll
+        handler.postDelayed(poll, 100L)
+    }
+
+    private fun cancelSilencePoll() {
+        silencePoll?.let(handler::removeCallbacks)
+        silencePoll = null
+    }
 
     val isRecording: Boolean
         get() = active != null
@@ -44,7 +69,9 @@ internal class ForegroundAacRecorder(
             }
             recorder.prepare()
             recorder.start()
-            active = ActiveRecording(recorder, file, SystemClock.elapsedRealtime())
+            val recording = ActiveRecording(recorder, file, SystemClock.elapsedRealtime())
+            active = recording
+            watchSpeechEnd(recording)
             true
         }.getOrElse {
             runCatching { recorder.release() }
@@ -57,6 +84,7 @@ internal class ForegroundAacRecorder(
     fun stop(): File? {
         val recording = active ?: return null
         active = null
+        cancelSilencePoll()
         recording.recorder.setOnInfoListener(null)
         val stopped = runCatching { recording.recorder.stop() }.isSuccess
         runCatching { recording.recorder.release() }
@@ -76,6 +104,7 @@ internal class ForegroundAacRecorder(
     fun cancel() {
         val recording = active ?: return
         active = null
+        cancelSilencePoll()
         recording.recorder.setOnInfoListener(null)
         runCatching { recording.recorder.stop() }
         runCatching { recording.recorder.release() }
