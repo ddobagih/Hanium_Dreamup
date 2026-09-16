@@ -11192,6 +11192,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun handleWalkScreenBackPressed(): Boolean {
+        if (nativeGuidanceConfirmationScreen != null) {
+            finishNativeGuidanceConfirmation(start = false)
+            return true
+        }
         if (voiceHelpScreen != null) {
             closeVoiceHelp(announce = true)
             return true
@@ -13237,7 +13241,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (nativeHomeFeatureContextAvailable()) clearNativeDestinationSearchState()
             pendingNativeUiPage = null
             if (!isWalkSessionRuntimeActive() &&
-                (nativePrewalkStartEpoch != null || nativePrewalkDialog != null)
+                (nativePrewalkStartEpoch != null || nativeGuidanceConfirmationScreen != null)
             ) {
                 cancelNativePrewalkPreparation(cancelFeatureEntry = true)
             }
@@ -13506,16 +13510,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             button.textSize = if (button === guidanceStateButton) 18f else 20f
             button.setPadding(dp(12), dp(12), dp(12), dp(12))
         }
-        val stacked = resources.configuration.fontScale >= 1.3f
-        guidanceActionRow.orientation = if (stacked) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+        guidanceActionRow.orientation = LinearLayout.VERTICAL
         listOf(nativeGuidanceRepeatButton, nativeGuidancePauseButton).forEachIndexed { index, button ->
             button.layoutParams = LinearLayout.LayoutParams(
-                if (stacked) ViewGroup.LayoutParams.MATCH_PARENT else 0,
+                ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                if (stacked) 0f else 1f,
             ).apply {
                 if (index == 0) {
-                    if (stacked) bottomMargin = dp(12) else marginEnd = dp(12)
+                    bottomMargin = dp(12)
                 }
             }
         }
@@ -13913,7 +13915,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             return
         }
         if (isWalkSessionRuntimeActive() || !firstRunOnboardingComplete() ||
-            nativePrewalkDialog?.isShowing == true || nativePreparationContinuationPosted
+            nativeGuidanceConfirmationScreen != null || nativePreparationContinuationPosted
         ) return
         val actorId = reporterUserId
         nativePreparationContinuationPosted = true
@@ -13937,7 +13939,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var nativeCompletedFirstRunRecord: JSONObject? = null
     private var initialAppPermissionExitDialog: AlertDialog? = null
     private var initialAppPermissionExitRequired = false
-    private var nativePrewalkDialog: AlertDialog? = null
+    private var nativeGuidanceConfirmationScreen: View? = null
+    private var nativeGuidanceConfirmationStatus: TextView? = null
+    private val nativeGuidanceCoveredViews = mutableListOf<Pair<View, Int>>()
     private var nativePrewalkConsentEpoch: WalkRuntimeEpoch? = null
     private var nativePrewalkConsentAtElapsedRealtimeMs: Long? = null
     private var nativePrewalkStartEpoch: WalkRuntimeEpoch? = null
@@ -14469,7 +14473,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (developmentGuidanceStartBypassEnabled) {
             cancelNativePrewalkPreparation(cancelFeatureEntry = false)
-        } else if (nativePrewalkDialog?.isShowing == true || nativePrewalkStartEpoch != null) {
+        } else if (nativeGuidanceConfirmationScreen != null || nativePrewalkStartEpoch != null) {
             return false
         }
         var walk = walkSessionLifecycle.snapshot()
@@ -14635,9 +14639,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         nativePrewalkConsentAtElapsedRealtimeMs = null
         nativePrewalkActorId = null
         nativePrewalkConfirmationPosted = false
-        val dialog = nativePrewalkDialog
-        nativePrewalkDialog = null
-        dialog?.dismiss()
+        removeNativeGuidanceConfirmationScreen()
         if (cancelFeatureEntry) cancelNativePendingFeatureEntry()
     }
 
@@ -14649,7 +14651,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var nativeGuidanceReadinessDiagnostic: String? = null
 
     private fun requestNativeGuidanceStartConfirmation(action: () -> Unit) {
-        if (nativePrewalkDialog != null) return
+        if (nativeGuidanceConfirmationScreen != null) return
         val destination = pendingUiDestination ?: return
         val epoch = walkSessionLifecycle.snapshot().epoch
         val actor = reporterUserId
@@ -14664,18 +14666,92 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 action()
             }
         }
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("길안내 시작")
-            .setMessage("${destination.name}까지 안내를 시작할까요?\n시작 또는 취소라고 말씀해 주세요.")
-            .setPositiveButton("시작") { _, _ -> finishNativeGuidanceConfirmation(start = true) }
-            .setNegativeButton("취소") { _, _ -> finishNativeGuidanceConfirmation(start = false) }
-            .setNeutralButton("다시 듣기", null)
-            .create()
-        nativePrewalkDialog = dialog
-        dialog.setOnCancelListener { finishNativeGuidanceConfirmation(start = false) }
-        dialog.show()
-        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener { speakNativeGuidanceConfirmation() }
+        closeVoiceHelp(announce = false)
+        closeReportPanel()
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).roundToInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            setBackgroundColor(WS_COLOR_GROUND)
+        }
+        val title = TextView(this).apply {
+            id = View.generateViewId()
+            text = "길안내 시작"
+            textSize = 28f
+            typeface = wsTypeface(Typeface.BOLD)
+            setTextColor(WS_COLOR_EMPHASIS)
+            ViewCompat.setAccessibilityHeading(this, true)
+        }
+        content.addView(title)
+        val items = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(16), 0, 0)
+        }
+        nativeGuidanceConfirmationStatus = TextView(this).apply {
+            id = View.generateViewId()
+            visibility = View.GONE
+            textSize = 24f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            setPadding(0, dp(16), 0, dp(24))
+            accessibilityTraversalAfter = title.id
+        }.also(items::addView)
+        var previousId = title.id
+        listOf("시작", "다시 듣기", "취소").forEach { label ->
+            val button = voiceHelpButton(label) {
+                when (label) {
+                    "시작" -> finishNativeGuidanceConfirmation(start = true)
+                    "취소" -> finishNativeGuidanceConfirmation(start = false)
+                    else -> speakNativeGuidanceConfirmation()
+                }
+            }.apply {
+                applyWsSecondaryButtonStyle(this)
+                textSize = 24f
+                accessibilityTraversalAfter = previousId
+            }
+            previousId = button.id
+            items.addView(button)
+        }
+        content.addView(ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = true
+            addView(items)
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        val host = findViewById<ViewGroup>(android.R.id.content)
+        nativeGuidanceCoveredViews.clear()
+        for (index in 0 until host.childCount) {
+            val child = host.getChildAt(index)
+            nativeGuidanceCoveredViews += child to child.importantForAccessibility
+            child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        nativeGuidanceConfirmationScreen = insetNativeContent(content).apply {
+            isClickable = true
+            isFocusable = true
+            ViewCompat.setAccessibilityPaneTitle(this, "길안내 시작")
+        }.also { host.addView(it, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        )) }
+        title.requestFocus()
         speakNativeGuidanceConfirmation()
+    }
+
+    private fun removeNativeGuidanceConfirmationScreen() {
+        val screen = nativeGuidanceConfirmationScreen
+        nativeGuidanceConfirmationScreen = null
+        nativeGuidanceConfirmationStatus = null
+        (screen?.parent as? ViewGroup)?.removeView(screen)
+        nativeGuidanceCoveredViews.forEach { (view, importance) ->
+            view.importantForAccessibility = importance
+        }
+        nativeGuidanceCoveredViews.clear()
+    }
+
+    private fun showNativeGuidanceConfirmationError(message: String) {
+        nativeGuidanceConfirmationStatus?.apply {
+            text = message
+            visibility = View.VISIBLE
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
     }
 
     private fun finishNativeGuidanceConfirmation(start: Boolean) {
@@ -14683,23 +14759,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         nativeGuidanceConfirmationAction = null
         nativeGuidanceConfirmationGeneration++
         cancelVoiceCommandRecognition()
-        val dialog = nativePrewalkDialog
-        nativePrewalkDialog = null
-        dialog?.dismiss()
+        removeNativeGuidanceConfirmationScreen()
         if (start) action?.invoke() else cancelNativeGuidanceAndReturnHome()
     }
 
     private fun speakNativeGuidanceConfirmation() {
-        val dialog = nativePrewalkDialog ?: return
+        val dialog = nativeGuidanceConfirmationScreen ?: return
         val destination = pendingUiDestination ?: return
         val generation = ++nativeGuidanceConfirmationGeneration
         cancelVoiceCommandRecognition()
         stopHandsFreeVoiceService()
-        fun current() = nativePrewalkDialog === dialog && isActivityForeground &&
+        fun current() = nativeGuidanceConfirmationScreen === dialog && isActivityForeground &&
             nativeUiPage == NativeUiPage.GUIDANCE && pendingUiDestination == destination &&
             nativeGuidanceConfirmationGeneration == generation
         fun failed() {
-            if (current()) dialog.setMessage("음성 입력 또는 안내를 완료하지 못했습니다. 마이크 권한과 한국어 음성 설정을 확인하거나 다시 듣기를 눌러 주세요.\n시작·취소 버튼으로도 선택할 수 있습니다.")
+            if (current()) showNativeGuidanceConfirmationError("음성 입력 또는 안내를 완료하지 못했습니다. 마이크 권한과 한국어 음성 설정을 확인하거나 다시 듣기를 눌러 주세요.\n시작·취소 버튼으로도 선택할 수 있습니다.")
         }
         val started = speakCommandResponse(
             "${destination.name}까지 안내를 시작할까요? 시작 또는 취소라고 말씀해 주세요.",
@@ -14930,7 +15004,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             (!cameraAnalysisFeaturesEnabled() || officialEnvironmentCameraDiagnosticReason == "PASSED")
         val nextStep = if (sensorPass && !stopped) {
             startupCapabilityDecision?.let { walkSessionReadinessBlockReason(it) }
-                ?: if (nativePrewalkDialog != null) "시작 또는 취소라고 말씀해 주세요."
+                ?: if (nativeGuidanceConfirmationScreen != null) "시작 또는 취소라고 말씀해 주세요."
                 else "보행 시작 확인을 준비하고 있습니다."
         } else ""
         return listOf(
@@ -17124,11 +17198,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         guidanceVoiceButton = accessiblePriorityUserButton(
             label = "음성 명령", emphasis = true,
             onClick = { if (isGuidancePreview()) speakGuidancePreview()
-                else if (nativePrewalkDialog != null) speakNativeGuidanceConfirmation()
+                else if (nativeGuidanceConfirmationScreen != null) speakNativeGuidanceConfirmation()
                 else ensureVoicePermissionThenListen() },
         )
         guidanceActionRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = LinearLayout.VERTICAL
             addView(nativeGuidanceRepeatButton)
             addView(nativeGuidancePauseButton)
         }
@@ -34445,11 +34519,11 @@ generation != cameraFallbackGeneration
                 updateVoiceCommandButton(active = false)
                 updateNavigationStatus("voice=recognition_failed code=$error")
                 logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.ONE_SHOT_UI_ERROR, errorCode = error)
-                if (nativeGuidanceConfirmationAction != null && nativePrewalkDialog != null) {
+                if (nativeGuidanceConfirmationAction != null && nativeGuidanceConfirmationScreen != null) {
                     if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                         speakNativeGuidanceConfirmation()
                     } else {
-                        nativePrewalkDialog?.setMessage("음성 입력에 실패했습니다. 마이크 권한을 확인한 뒤 다시 듣기를 눌러 주세요. 시작·취소 버튼으로도 선택할 수 있습니다.")
+                        showNativeGuidanceConfirmationError("음성 입력에 실패했습니다. 마이크 권한을 확인한 뒤 다시 듣기를 눌러 주세요. 시작·취소 버튼으로도 선택할 수 있습니다.")
                     }
                     return
                 }
@@ -34613,7 +34687,7 @@ generation != cameraFallbackGeneration
         hasAdditionalAlternatives: Boolean = false,
     ) {
         if (isGuidancePreview()) return
-        if (nativeGuidanceConfirmationAction != null && nativePrewalkDialog != null) {
+        if (nativeGuidanceConfirmationAction != null && nativeGuidanceConfirmationScreen != null) {
             val choice = kr.co.hanium.dreamup.walksafe.navigation.GuidanceStartVoicePolicy.parse(
                 phrases, confidenceScores?.getOrNull(0),
                 resultBackend == OfflineSpeechEngine.PLATFORM, hasAdditionalAlternatives,

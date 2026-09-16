@@ -1,0 +1,52 @@
+[
+  {
+    "file": "01-search.png",
+    "title": "목적지 검색",
+    "note": "검색 가능, 검색어 없음. 키보드·시스템 UI 제외."
+  },
+  {
+    "file": "02-results.png",
+    "title": "검색 결과",
+    "note": "목적지·주소·거리 값은 샘플. 결과 1개, 더보기 숨김. 전체 스크롤 콘텐츠."
+  },
+  {
+    "file": "03-destination-confirm.png",
+    "title": "목적지 확인 뷰",
+    "note": "DESTINATION_CONFIRM 뷰 구성. 실제 진입 경로별 노출 여부는 별도이며 구미역은 샘플."
+  },
+  {
+    "file": "04-preparing.png",
+    "title": "위치·장착 확인 중",
+    "note": "준비 상태, GPS 미확인·흔들림 조건. 다시 듣기/일시정지 숨김."
+  },
+  {
+    "file": "05-start-confirm.png",
+    "title": "길안내 시작 확인",
+    "note": "최신 본문 제거 코드. 제목+시작/다시 듣기/취소."
+  },
+  {
+    "file": "06-active.png",
+    "title": "안내 진행 중",
+    "note": "목적지·경로 지시·남은 거리만 샘플 값. 활성 경로, 재시도 없음."
+  },
+  {
+    "file": "07-paused.png",
+    "title": "일시정지",
+    "note": "일시정지 및 경로 준비 메시지 조건 예시. 실제 원인에 따라 내용/다시 시도 노출 변동."
+  },
+  {
+    "file": "08-obstacle.png",
+    "title": "장애물 경고",
+    "note": "유효한 currentGuidanceRisk가 있는 상태. FeedbackAction.message는 예시이며 객체별로 달라짐."
+  },
+  {
+    "file": "09-preflight-failure.png",
+    "title": "준비 점검 실패",
+    "note": "점검 실패+위치 요청 실패+렌즈 가림 조건 예시."
+  },
+  {
+    "file": "10-location-wait.png",
+    "title": "안내 중 위치 대기",
+    "note": "세션 ACTIVE, 신뢰 위치 없음, 카메라 출력 불가, 준비 작업 없음."
+  }
+]
