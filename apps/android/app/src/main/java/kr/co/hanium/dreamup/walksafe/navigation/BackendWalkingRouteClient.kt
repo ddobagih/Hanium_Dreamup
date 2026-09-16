@@ -642,7 +642,10 @@ private fun JSONObject.hasNonNull(name: String): Boolean = has(name) && !isNull(
 class GatewayResponseProtocolException(reason: String) : IllegalStateException("invalid gateway response: $reason")
 
 fun formatDestinationDistance(distanceM: Int?): String {
-    return distanceM?.let { "${it}m" } ?: "거리미상"
+    if (distanceM == null || distanceM < 0) return "거리미상"
+    return if (distanceM >= 1000) {
+        String.format(java.util.Locale.KOREA, "%.1fkm", distanceM / 1000.0)
+    } else "${distanceM}m"
 }
 
 private const val WALKING_ROUTE_SCHEMA = "walksafe.walking_route.v1"

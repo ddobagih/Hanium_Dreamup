@@ -74,7 +74,11 @@ class MainActivityInitialPermissionStaticTest {
         assertFalse(navigationRequest.contains("missing += Manifest.permission.ACTIVITY_RECOGNITION"))
         assertTrue(navigationRequest.contains("step_tracking_limited"))
         assertFalse(voiceAction.contains("PermissionRequestPurpose.VOICE_COMMAND"))
-        assertTrue(voiceAction.contains("showPermissionDenialPanel("))
+        assertTrue(voiceAction.contains("showVoiceMicrophonePermissionError()"))
+        val microphoneError = functionBlock("private fun showVoiceMicrophonePermissionError()")
+        assertTrue(microphoneError.contains("showVoiceCommandError("))
+        assertTrue(microphoneError.contains("마이크 권한 설정"))
+        assertTrue(microphoneError.contains("::openAppSettings"))
         assertTrue(voiceControls.contains("hasRecordAudioPermission()"))
         assertTrue(
             settings.contains(

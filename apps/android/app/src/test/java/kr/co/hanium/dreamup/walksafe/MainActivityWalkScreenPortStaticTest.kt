@@ -122,8 +122,10 @@ class MainActivityWalkScreenPortStaticTest {
         assertTrue(nativePrewalk.contains("nativePhoneMountingCheckRequest"))
         val startupActionIndex = nativePrewalk.indexOf("handleStartupCapabilityConfirmAction()")
         listOf(
-            "officialEnvironmentReadiness(expectedEpoch).first != WalkSessionReadinessStatus.READY",
-            "phoneMountingReadiness(expectedEpoch).first != WalkSessionReadinessStatus.READY",
+            "val environmentReadiness = officialEnvironmentReadiness(expectedEpoch)",
+            "environmentReadiness.first != WalkSessionReadinessStatus.READY",
+            "val mountingReadiness = phoneMountingReadiness(expectedEpoch)",
+            "mountingReadiness.first != WalkSessionReadinessStatus.READY",
             "!decision.mayConfirmAndStart",
             "walk.confirmationToken == null",
             "walkSessionReadinessBlockReason(decision) != null",

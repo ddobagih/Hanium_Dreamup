@@ -10,11 +10,6 @@
             android:name=".fieldtest.OutdoorPositionTestActivity"
             android:label="위치 야외 테스트"
             android:exported="true"
-            android:configChanges="orientation|screenSize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:configChanges="orientation|screenSize" />
     </application>
 </manifest>

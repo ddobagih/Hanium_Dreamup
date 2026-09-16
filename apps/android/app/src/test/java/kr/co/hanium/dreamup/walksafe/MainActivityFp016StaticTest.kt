@@ -141,13 +141,21 @@ class MainActivityFp016StaticTest {
 
     @Test
     fun appOwnedSpeechStatusRemainsDiscoverableWithoutDuplicateLiveAnnouncements() {
-        listOf("safetySummaryText", "statusText", "gatewayVoiceStatusText", "walkSafetyVoiceStatusText").forEach { name ->
+        listOf("safetySummaryText", "statusText", "walkSafetyVoiceStatusText").forEach { name ->
             val block = blockAt("$name = TextView(this).apply {")
             assertTrue(block.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
             assertTrue(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE"))
             assertFalse(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"))
             assertFalse(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE"))
         }
+    }
+
+    @Test
+    fun spokenTranscriptStaysHiddenFromVisualAndAccessibilityOutput() {
+        val transcript = blockAt("gatewayVoiceStatusText = TextView(this).apply {")
+        assertTrue(transcript.contains("visibility = View.GONE"))
+        assertTrue(transcript.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
+        assertTrue(transcript.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE"))
     }
 
     private fun assertOnlyInsideDebugBlocks(anchor: String, debugBlocks: List<IntRange>) {

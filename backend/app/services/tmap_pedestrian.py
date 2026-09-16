@@ -956,6 +956,16 @@ def _is_named_university_query(query: str) -> bool:
     return match is not None and match.group(1) not in ("국립", "공립", "사립")
 
 
+def _is_named_station_query(query: str) -> bool:
+    compact_query = "".join(query.split())
+    if any(marker in compact_query for marker in ("주변", "근처", "인근", "가까운")):
+        return False
+    match = re.fullmatch(r"([가-힣A-Za-z0-9]+?)역", compact_query)
+    return match is not None and match.group(1) not in (
+        "지하철", "전철", "기차", "철도", "고속철도",
+    )
+
+
 async def fetch_tmap_poi_search(
     query: str,
     settings: Settings,
@@ -1009,9 +1019,11 @@ async def fetch_tmap_poi_search(
         "poiGroupYn": "N",
     }
     if origin_lat is not None and origin_lng is not None:
-        # Named institutions need relevance before the bounded provider page.
+        # Named institutions and stations need relevance before the bounded provider page.
         # Keep nearby/category and explicitly qualified facility searches unchanged.
-        params["searchtypCd"] = "A" if _is_named_university_query(normalized_query) else "R"
+        params["searchtypCd"] = "A" if (
+            _is_named_university_query(normalized_query) or _is_named_station_query(normalized_query)
+        ) else "R"
         params["centerLat"] = origin_lat
         params["centerLon"] = origin_lng
     headers = {"Accept": "application/json", "appKey": settings.tmap_app_key}
