@@ -69,17 +69,20 @@ class AndroidSensorLifecycleStaticTest {
 
         val start = orientationTracker.substringAfter("fun start(): Boolean {").substringBefore("fun stop()")
         val register = orientationTracker.substringAfter("private fun register(").substringBefore("// Kept as text")
-        assertTrue(start.contains("val rotationRegistered = register(listener, rotationVectorSensor)"))
-        assertTrue(start.contains("magneticSensorRegistered = register(listener, magneticFieldSensor)"))
+        assertTrue(start.contains("val rotationRegistered = register(listener, rotationVectorSensor, handler)"))
+        assertTrue(start.contains("magneticSensorRegistered = register(listener, magneticFieldSensor, handler)"))
         // Rotation success alone is sufficient; the fallback pair is an independent alternative.
         assertTrue(
             start.contains(
                 "started = rotationRegistered || (magneticSensorRegistered && (gravityRegistered || accelerometerRegistered))",
             ),
         )
-        assertTrue(register.contains("runCatching { sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME) }"))
+        assertTrue(register.contains("runCatching { sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME, handler) }"))
         assertTrue(register.contains(".getOrDefault(false)"))
         assertTrue(orientationTracker.contains("magneticSensorAvailable = magneticSensorRegistered"))
+        assertTrue(start.contains("val handler = Handler(thread.looper)"))
+        assertTrue(start.contains("thread.quitSafely()"))
+        assertTrue(orientationTracker.contains("sensorThread?.quitSafely()"))
         assertTrue(start.contains("return true"))
     }
 }
